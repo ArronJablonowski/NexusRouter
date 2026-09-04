@@ -4,7 +4,7 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 
 ## Development status
 
-The executable supports layered configuration, automatic or explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands are available. Tool execution and interactive streaming are not yet connected to user-facing execution. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Write tools and interactive streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
 
 ## Build and verify
 
@@ -81,6 +81,17 @@ All endpoints require `Authorization: Bearer <token>`:
 Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Async submission, idempotency keys, live SSE, separate cancellation, full provider health, and service installation are unfinished. Do not automatically retry a timed-out submission; a durable task may already exist.
 
 ## Automatic routing and local knowledge
+
+Opt in to the built-in `read_file` tool with a narrow workspace directory:
+
+```yaml
+tools:
+  enabled: true
+  read_root: /absolute/path/to/workspace
+  max_turns: 8
+```
+
+This allows local models to read UTF-8 regular files up to 64 KiB within that directory. Relative paths and symlinks cannot escape the configured root. Do not include credentials or other files the model should not see in this scope. Enabling file tools excludes cloud execution; explicit cloud selection is denied. Tool results become sensitive durable session content. Tools default off; write tools, interactive approvals and general delegation remain unfinished. Context growth across tool turns still depends on provider overflow rejection until compaction is integrated.
 
 Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Model discovery is checked live. Automatic local reservations are shared within one daemon, not across separate processes.
 

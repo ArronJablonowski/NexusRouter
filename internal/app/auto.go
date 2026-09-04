@@ -106,6 +106,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	cfg := s.settings
+	if cfg.Tools.Enabled {
+		r.LocalRequired = true
+	}
 	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)
 	if err != nil {
 		return Result{}, errors.New("cannot open routing storage")

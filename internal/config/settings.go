@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -25,6 +26,7 @@ type Settings struct {
 	Memory     Memory     `yaml:"memory" json:"memory"`
 	Evaluation Evaluation `yaml:"evaluation" json:"evaluation"`
 	Security   Security   `yaml:"security" json:"security"`
+	Tools      Tools      `yaml:"tools" json:"tools"`
 	Telemetry  Telemetry  `yaml:"telemetry" json:"telemetry"`
 }
 type Daemon struct {
@@ -88,6 +90,11 @@ type Telemetry struct {
 	Database string `yaml:"database" json:"database"`
 	OTEL     bool   `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
 }
+type Tools struct {
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	ReadRoot string `yaml:"read_root" json:"read_root"`
+	MaxTurns int    `yaml:"max_turns" json:"max_turns"`
+}
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
@@ -95,7 +102,7 @@ func Defaults() Settings {
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{true, true, true, true}, Memory: Memory{true, true},
 		Evaluation: Evaluation{true, []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{"deny", "ask"}, Telemetry: Telemetry{"darwin.db", false}}
+		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -171,6 +178,12 @@ func (s Settings) Validate() error {
 	if s.Security.ToolPolicy != "ask" && s.Security.ToolPolicy != "deny" && s.Security.ToolPolicy != "allow" {
 		return errors.New("invalid default tool policy")
 	}
+	if s.Tools.MaxTurns < 2 || s.Tools.MaxTurns > 32 {
+		return errors.New("tool max turns must be between 2 and 32")
+	}
+	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
+		return errors.New("enabled tools require an absolute read root")
+	}
 	if s.Mode == "local_only" && (!s.Memory.LocalOnly || s.Telemetry.OTEL) {
 		return errors.New("local-only mode requires local memory and disabled telemetry export")
 	}
@@ -240,7 +253,7 @@ func (s Settings) Validate() error {
 }
 func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
 
-// RedactedJSON deliberately hides every provider endpoint and the local DB path.
+// RedactedJSON deliberately hides provider endpoints and local filesystem paths.
 // Credentials are never resolved into Settings in the first place.
 func (s Settings) RedactedJSON() ([]byte, error) {
 	s.Providers = append([]Provider(nil), s.Providers...)
@@ -248,5 +261,6 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 		s.Providers[i].Endpoint = "[REDACTED]"
 	}
 	s.Telemetry.Database = "[REDACTED]"
+	s.Tools.ReadRoot = "[REDACTED]"
 	return json.MarshalIndent(s, "", "  ")
 }

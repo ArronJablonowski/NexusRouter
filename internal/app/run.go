@@ -15,6 +15,7 @@ import (
 	"darwinrouter/providers"
 	"darwinrouter/runtime"
 	"darwinrouter/sessions"
+	"darwinrouter/tools"
 )
 
 var ErrAdmission = errors.New("task admission failed")
@@ -73,6 +74,20 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		if !matched {
 			return result, ErrAdmission
 		}
+	}
+	// File tools are local-only until an explicit data-egress approval exists.
+	if s.Tools.Enabled && model.Locality != "local" {
+		return result, ErrAdmission
+	}
+	var registry *tools.Registry
+	if s.Tools.Enabled {
+		var closeTools func()
+		var err error
+		registry, closeTools, err = readTools(s.Tools.ReadRoot)
+		if err != nil {
+			return result, err
+		}
+		defer closeTools()
 	}
 	var provider config.Provider
 	for _, p := range s.Providers {
@@ -152,7 +167,14 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	}
 	j := redactingJournal{db: db, secrets: secrets}
 	loop := runtime.Loop{Provider: p, Journal: j}
-	out, err := loop.Run(ctx, runtime.RunRequest{Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: providers.Request{Model: model.Model, Messages: messages}, MaxTurns: 1, MaxOutputBytes: 1 << 20})
+	inference := providers.Request{Model: model.Model, Messages: messages}
+	maxTurns := 1
+	if registry != nil {
+		inference.Tools = registry.Catalog()
+		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
+		maxTurns = s.Tools.MaxTurns
+	}
+	out, err := loop.Run(ctx, runtime.RunRequest{Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxOutputBytes: 1 << 20})
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns
 	result.FinishReason = out.FinishReason
