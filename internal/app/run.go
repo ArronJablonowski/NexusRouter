@@ -76,7 +76,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		}
 	}
 	// File tools are local-only until an explicit data-egress approval exists.
-	if s.Tools.Enabled && model.Locality != "local" {
+	if s.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
 		return result, ErrAdmission
 	}
 	var registry *tools.Registry
@@ -174,7 +174,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
 		maxTurns = s.Tools.MaxTurns
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns
 	result.FinishReason = out.FinishReason

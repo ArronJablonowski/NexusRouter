@@ -16,6 +16,10 @@ import (
 
 // readTools binds an operator-selected directory once per task. Model paths
 // are relative and cannot escape the directory, including through symlinks.
+func readFileSpec() providers.Tool {
+	return providers.Tool{Name: "read_file", Description: "Read a UTF-8 regular file within the configured local workspace (maximum 64 KiB).", Parameters: json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","minLength":1,"maxLength":4096}},"required":["path"],"additionalProperties":false}`)}
+}
+
 func readTools(path string) (*tools.Registry, func(), error) {
 	root, err := os.OpenRoot(path)
 	if err != nil {
@@ -23,7 +27,7 @@ func readTools(path string) (*tools.Registry, func(), error) {
 	}
 	registry := &tools.Registry{}
 	err = registry.Register(tools.Definition{
-		Tool:  providers.Tool{Name: "read_file", Description: "Read a UTF-8 regular file within the configured local workspace (maximum 64 KiB).", Parameters: json.RawMessage(`{"type":"object","properties":{"path":{"type":"string","minLength":1,"maxLength":4096}},"required":["path"],"additionalProperties":false}`)},
+		Tool:  readFileSpec(),
 		Scope: "workspace", ReadOnly: true,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			failed := runtime.ToolResult{Content: `{"error":"file_unavailable"}`, Effect: runtime.NoEffect}

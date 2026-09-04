@@ -34,6 +34,7 @@ type RunRequest struct {
 	TaskID, SessionID, ProviderID string
 	Inference                     providers.Request
 	MaxTurns                      int
+	MaxContextTokens              int
 	MaxOutputBytes                int
 }
 type Result struct {
@@ -60,6 +61,9 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
+	if r.MaxContextTokens < 0 {
+		return Result{}, ErrInvalidRun
+	}
 	if l.Provider == nil || l.Journal == nil || r.TaskID == "" || r.SessionID == "" || r.ProviderID == "" || r.Inference.Model == "" || len(r.Inference.Messages) == 0 || r.MaxTurns < 1 || r.MaxTurns > 1000 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 16<<20 {
 		return Result{}, ErrInvalidRun
 	}
@@ -106,6 +110,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
 		code := "execution_failed"
+		if errors.Is(cause, ErrLimit) {
+			code = "budget_exhausted"
+		}
 		if ctx.Err() != nil {
 			kind = TaskCanceled
 			code = "canceled"
@@ -126,6 +133,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 	for n := 0; n < r.MaxTurns; n++ {
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
+		}
+		if r.MaxContextTokens > 0 {
+			estimate, err := providers.EstimateContext(inference)
+			if err != nil || estimate > r.MaxContextTokens {
+				return fail(ErrLimit)
+			}
 		}
 		turn = rand.Text()
 		attempt = rand.Text()

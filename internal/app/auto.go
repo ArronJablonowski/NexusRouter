@@ -129,8 +129,14 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		messages = append(history.Messages, messages...)
 	}
 	// Byte count is a conservative token estimate, with framing/output reserve.
-	body, _ := json.Marshal(messages)
-	contextTokens := len(body) + 1024
+	inference := providers.Request{Messages: messages}
+	if cfg.Tools.Enabled {
+		inference.Tools = []providers.Tool{readFileSpec()}
+	}
+	contextTokens, estimateErr := providers.EstimateContext(inference)
+	if estimateErr != nil {
+		return Result{}, ErrAdmission
+	}
 	if r.ContextTokens > contextTokens {
 		contextTokens = r.ContextTokens
 	}
