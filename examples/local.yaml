@@ -1,0 +1,14 @@
+version: 1
+mode: local_only
+providers:
+  - id: local-primary
+    kind: ollama
+    endpoint: http://127.0.0.1:11434
+models:
+  - id: local-fast
+    provider: local-primary
+    model: local-model-id
+    locality: local
+    capabilities: [chat, summarize, classify]
+telemetry:
+  database: ./data/darwin.db

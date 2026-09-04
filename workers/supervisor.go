@@ -1,0 +1,178 @@
+// Package workers implements bounded in-process read-only delegation.
+package workers
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"time"
+
+	"darwinrouter/runtime"
+)
+
+type Lease struct {
+	Token, TaskID, Owner, Scope string
+	Writer                      bool
+	Expires                     time.Time
+	Released                    bool
+}
+type LeaseStore interface {
+	AcquireLease(context.Context, string, string, string, bool, time.Time, time.Duration) (Lease, error)
+	RenewLease(context.Context, string, string, time.Time, time.Duration) error
+	ReleaseLease(context.Context, string, string) error
+}
+type Work struct {
+	TaskID, SessionID, ParentID, Scope string
+	// Execute must honor cancellation. Only inference and read-only tools are
+	// admitted here; there is no safe forced termination of arbitrary Go code.
+	Execute  func(context.Context) (string, error)
+	Validate func(context.Context, string) error
+}
+type Supervisor struct {
+	slots          chan struct{}
+	store          LeaseStore
+	journal        runtime.Journal
+	heartbeat, ttl time.Duration
+}
+
+var ErrWork = errors.New("worker failed or output rejected")
+var ErrDurability = errors.New("worker durable state unavailable")
+
+func New(limit int, heartbeat, ttl time.Duration, store LeaseStore, journal runtime.Journal) (*Supervisor, error) {
+	if limit < 1 || limit > 64 || heartbeat < time.Millisecond || ttl <= 2*heartbeat || ttl > 10*time.Minute || store == nil || journal == nil {
+		return nil, ErrWork
+	}
+	return &Supervisor{make(chan struct{}, limit), store, journal, heartbeat, ttl}, nil
+}
+
+// Run waits for a slot and does not release it while a canceled callback is
+// still running. Parent-child scope and deny-rule derivation belong to admission.
+// Each child owns a separate task log, correlated to the durable parent task.
+func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
+	if w.TaskID == "" || w.SessionID == "" || w.ParentID == "" || w.Scope == "" || w.Execute == nil || w.Validate == nil {
+		return "", ErrWork
+	}
+	select {
+	case s.slots <- struct{}{}:
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	defer func() { <-s.slots }()
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	worker := rand.Text()
+	seq := int64(0)
+	persist := func(ctx context.Context, kind runtime.Kind, data runtime.Data) error {
+		e := runtime.Event{Version: 1, ID: rand.Text(), TaskID: w.TaskID, SessionID: w.SessionID, CorrelationID: w.ParentID, WorkerID: worker, Sequence: seq + 1, Time: time.Now().UTC(), Kind: kind, Data: data}
+		if s.journal.Append(ctx, seq, e) != nil {
+			return ErrDurability
+		}
+		seq++
+		return nil
+	}
+	finish := func(cause error) error {
+		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		kind := runtime.TaskFailed
+		if ctx.Err() != nil {
+			kind = runtime.TaskCanceled
+			cause = ctx.Err()
+		}
+		if persist(terminal, kind, runtime.Data{Code: "worker_failed"}) != nil {
+			return ErrDurability
+		}
+		return cause
+	}
+	if err := persist(ctx, runtime.TaskStarted, runtime.Data{}); err != nil {
+		return "", err
+	}
+	l, err := s.store.AcquireLease(ctx, w.TaskID, worker, w.Scope, false, time.Now(), s.ttl)
+	if err != nil {
+		return "", finish(ErrWork)
+	}
+	// Defer runs only after Execute and Validate have returned.
+	defer func() {
+		release, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = s.store.ReleaseLease(release, l.Token, worker)
+	}()
+	if err := persist(ctx, runtime.WorkerStarted, runtime.Data{}); err != nil {
+		return "", err
+	}
+	run, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type outcome struct {
+		text string
+		err  error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		result := outcome{}
+		defer func() {
+			if recover() != nil {
+				result = outcome{err: ErrWork}
+			}
+			done <- result
+		}()
+		result.text, result.err = w.Execute(run)
+		if result.err == nil && run.Err() == nil && len(result.text) <= 1<<20 {
+			result.err = w.Validate(run, result.text)
+		} else {
+			result.err = ErrWork
+		}
+	}()
+	ticker := time.NewTicker(s.heartbeat)
+	defer ticker.Stop()
+	var failure error
+	cancelSignal := ctx.Done()
+	for {
+		select {
+		case <-cancelSignal:
+			failure = ctx.Err()
+			cancel()
+			cancelSignal = nil
+		case <-ticker.C:
+			if failure != nil {
+				continue
+			}
+			if s.store.RenewLease(run, l.Token, worker, time.Now(), s.ttl) != nil {
+				failure = ErrWork
+				cancel()
+				continue
+			}
+			if persist(run, runtime.WorkerHeartbeat, runtime.Data{}) != nil {
+				failure = ErrDurability
+				cancel()
+			}
+		case result := <-done:
+			if failure != nil {
+				if failure == ErrDurability {
+					return "", failure
+				}
+				return "", finish(failure)
+			}
+			if ctx.Err() != nil {
+				return "", finish(ctx.Err())
+			}
+			if result.err != nil {
+				return "", finish(ErrWork)
+			}
+			// Verify ownership after execution/validation before accepting output.
+			if s.store.RenewLease(ctx, l.Token, worker, time.Now(), s.ttl) != nil {
+				return "", finish(ErrWork)
+			}
+			accepted := true
+			if err := persist(ctx, runtime.EvaluationRecorded, runtime.Data{Accepted: &accepted, Code: "worker_validator"}); err != nil {
+				return "", err
+			}
+			if err := persist(ctx, runtime.WorkerCompleted, runtime.Data{Text: result.text}); err != nil {
+				return "", err
+			}
+			if err := persist(ctx, runtime.TaskCompleted, runtime.Data{}); err != nil {
+				return "", err
+			}
+			return result.text, nil
+		}
+	}
+}

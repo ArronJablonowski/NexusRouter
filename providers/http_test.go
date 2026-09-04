@@ -1,0 +1,166 @@
+package providers
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func fixtureProvider(t *testing.T, kind string, handler http.HandlerFunc) *HTTP {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	p, err := NewHTTP(server.URL, kind, "fixture-secret", server.Client().Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func request() Request {
+	return Request{Model: "fixture", Messages: []Message{{Role: "user", Content: "hello"}}}
+}
+
+func TestOpenAIStream(t *testing.T) {
+	p := fixtureProvider(t, "openai_compatible", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/completions" || r.Header.Get("Authorization") != "Bearer fixture-secret" {
+			t.Error("bad request")
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body["model"] != "fixture" || body["stream"] != true {
+			t.Error(body)
+		}
+		fmt.Fprint(w, ": keepalive\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n")
+		fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call1\",\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"q\\\":\"}}]}}]}\n\n")
+		fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"Go\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n")
+		fmt.Fprint(w, "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n")
+	})
+	var chunks []Chunk
+	err := p.Stream(context.Background(), request(), func(c Chunk) error { chunks = append(chunks, c); return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chunks) != 4 || chunks[0].Text != "hello" || chunks[1].Usage.InputTokens != 3 || chunks[2].ToolCall.Name != "lookup" || string(chunks[2].ToolCall.Arguments) != `{"q":"Go"}` || !chunks[3].Done {
+		t.Fatalf("bad stream: %+v", chunks)
+	}
+}
+
+func TestOllamaStreamAndToolHandoff(t *testing.T) {
+	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/chat" {
+			t.Error(r.URL.Path)
+		}
+		var body struct {
+			Messages []map[string]any `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if len(body.Messages) == 3 && body.Messages[2]["tool_name"] != "lookup" {
+			t.Error("missing Ollama tool name")
+		}
+		fmt.Fprintln(w, `{"message":{"content":"hello","tool_calls":[{"function":{"name":"lookup","arguments":{"q":"Go"}}}]},"done":false}`)
+		fmt.Fprintln(w, `{"message":{"content":""},"done":true,"done_reason":"stop","prompt_eval_count":3,"eval_count":2}`)
+	})
+	var ids []string
+	for range 2 {
+		r := request()
+		r.Messages = append(r.Messages, Message{Role: "assistant", ToolCalls: []ToolCall{{ID: "prior", Name: "lookup", Arguments: json.RawMessage(`{}`)}}}, Message{Role: "tool", ToolCallID: "prior", Content: "ok"})
+		var chunks []Chunk
+		if err := p.Stream(context.Background(), r, func(c Chunk) error { chunks = append(chunks, c); return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if len(chunks) != 4 || chunks[1].ToolCall == nil || chunks[2].Usage.OutputTokens != 2 || !chunks[3].Done {
+			t.Fatalf("bad chunks: %+v", chunks)
+		}
+		ids = append(ids, chunks[1].ToolCall.ID)
+	}
+	if ids[0] == ids[1] {
+		t.Fatal("tool IDs reused across turns")
+	}
+}
+
+func TestDiscovery(t *testing.T) {
+	for _, kind := range []string{"ollama", "openai_compatible"} {
+		t.Run(kind, func(t *testing.T) {
+			p := fixtureProvider(t, kind, func(w http.ResponseWriter, r *http.Request) {
+				if kind == "ollama" {
+					if r.URL.Path != "/api/tags" {
+						t.Error(r.URL.Path)
+					}
+					fmt.Fprint(w, `{"models":[{"name":"fixture"}]}`)
+				} else {
+					if r.URL.Path != "/models" {
+						t.Error(r.URL.Path)
+					}
+					fmt.Fprint(w, `{"data":[{"id":"fixture"}]}`)
+				}
+			})
+			models, err := p.Models(context.Background())
+			if err != nil || len(models) != 1 || models[0] != "fixture" {
+				t.Fatalf("%v %v", models, err)
+			}
+		})
+	}
+}
+
+func TestFailuresAndRedaction(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		code   string
+		retry  bool
+	}{{401, "authentication", false}, {429, "rate_limit", true}, {503, "unavailable", true}, {302, "http_error", false}} {
+		t.Run(tc.code+fmt.Sprint(tc.status), func(t *testing.T) {
+			p := fixtureProvider(t, "openai_compatible", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Location", "https://example.invalid/secret")
+				w.WriteHeader(tc.status)
+				fmt.Fprint(w, "fixture-secret")
+			})
+			err := p.Stream(context.Background(), request(), func(Chunk) error { return nil })
+			var failure *Failure
+			if !errors.As(err, &failure) || failure.Code != tc.code || failure.Retryable != tc.retry || strings.Contains(err.Error(), "secret") {
+				t.Fatalf("unexpected failure %v", err)
+			}
+		})
+	}
+}
+
+func TestCallbackAndCancellation(t *testing.T) {
+	p := fixtureProvider(t, "openai_compatible", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	})
+	want := errors.New("consumer stopped")
+	if err := p.Stream(context.Background(), request(), func(Chunk) error { return want }); !errors.Is(err, want) {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := p.Stream(ctx, request(), func(Chunk) error { cancel(); return nil }); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}
+
+func TestInvalidRequestNeverSent(t *testing.T) {
+	p := fixtureProvider(t, "openai_compatible", func(http.ResponseWriter, *http.Request) { t.Error("invalid request sent") })
+	for _, r := range []Request{{}, {Model: "fixture", Messages: []Message{{Role: "invalid"}}}, {Model: "fixture", Messages: request().Messages, Tools: []Tool{{Name: "bad", Parameters: json.RawMessage(`null`)}}}} {
+		if err := p.Stream(context.Background(), r, func(Chunk) error { return nil }); err == nil {
+			t.Fatal("accepted invalid request")
+		}
+	}
+	if _, err := NewHTTP("https://user:secret@example.com", "ollama", "", http.DefaultTransport); err == nil {
+		t.Fatal("credentials in endpoint accepted")
+	}
+	if _, err := NewHTTP("http://localhost", "ollama", "", nil); err == nil {
+		t.Fatal("implicit transport accepted")
+	}
+}
