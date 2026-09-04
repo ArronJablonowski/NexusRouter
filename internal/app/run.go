@@ -14,11 +14,12 @@ import (
 	"darwinrouter/policy"
 	"darwinrouter/providers"
 	"darwinrouter/runtime"
+	"darwinrouter/sessions"
 )
 
 var ErrAdmission = errors.New("task admission failed")
 
-type Request struct{ ModelID, Prompt string }
+type Request struct{ ModelID, Prompt, ContinueTaskID string }
 type Result struct {
 	TaskID, Text string
 	Turns        int
@@ -81,10 +82,39 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		return result, errors.New("cannot open task storage")
 	}
 	defer db.Close()
+	messages := []providers.Message{}
+	sessionID := ""
+	privacy := "cloud_allowed"
+	if model.Locality == "local" {
+		privacy = "local_only"
+	}
+	if r.ContinueTaskID != "" {
+		history, err := sessions.Replay(ctx, db, r.ContinueTaskID)
+		if err != nil || history.State != "completed" || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
+			return result, ErrAdmission
+		}
+		// Unknown legacy privacy is never interpreted as cloud consent.
+		if history.Privacy != "cloud_allowed" && model.Locality != "local" {
+			return result, ErrAdmission
+		}
+		if history.Privacy != "cloud_allowed" {
+			privacy = "local_only"
+		}
+		messages = history.Messages
+		sessionID = history.SessionID
+	}
+	messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
+	encoded, err := json.Marshal(messages)
+	if err != nil || len(encoded) > 4<<20 {
+		return result, ErrAdmission
+	}
 	result.TaskID = rand.Text()
+	if sessionID == "" {
+		sessionID = result.TaskID
+	}
 	j := redactingJournal{db: db, secrets: secrets}
 	loop := runtime.Loop{Provider: p, Journal: j}
-	out, err := loop.Run(ctx, runtime.RunRequest{TaskID: result.TaskID, SessionID: result.TaskID, ProviderID: provider.ID, Inference: providers.Request{Model: model.Model, Messages: []providers.Message{{Role: "user", Content: r.Prompt}}}, MaxTurns: 1, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: providers.Request{Model: model.Model, Messages: messages}, MaxTurns: 1, MaxOutputBytes: 1 << 20})
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns
 	return result, err

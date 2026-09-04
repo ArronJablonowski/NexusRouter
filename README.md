@@ -55,11 +55,14 @@ Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model
 ./bin/darwin run --config examples/local.yaml --model local-fast < prompt.txt
 ./bin/darwin task show --db ./data/darwin.db --task TASK_ID
 ./bin/darwin resources
+./bin/darwin run --config examples/local.yaml --model local-fast --continue-task TASK_ID < followup.txt
 ```
 
 The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdout; the durable task ID goes to stderr. This initial command requires an explicit project config, optionally accepts `--user-config` and repeated `--set` scalar overrides, and uses environment overrides. Unlike `config`, it does not discover user/project configuration paths yet. The task has a five-minute timeout and one model turn; tool proposals are not executed. Known configured provider keys are redacted from persisted content and the returned answer. Partial token text is not persisted. Other sensitive-content redaction policies remain unfinished. No paid/live-provider qualification has been performed.
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
+
+`--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined history is limited to 4 MiB pending token-budget/compaction integration.
 
 ## Next sprints
 

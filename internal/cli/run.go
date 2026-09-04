@@ -20,6 +20,7 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	project := fs.String("config", "", "project configuration")
 	user := fs.String("user-config", "", "user configuration")
 	model := fs.String("model", "", "configured model ID")
+	previous := fs.String("continue-task", "", "completed task history to continue")
 	values := overrides{}
 	fs.Var(values, "set", "override scalar setting")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *project == "" || *model == "" {
@@ -40,7 +41,7 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	result, err := app.RunExplicit(ctx, s, app.Request{ModelID: *model, Prompt: string(prompt)}, os.Getenv)
+	result, err := app.RunExplicit(ctx, s, app.Request{ModelID: *model, Prompt: string(prompt), ContinueTaskID: *previous}, os.Getenv)
 	if result.TaskID != "" {
 		if _, writeErr := fmt.Fprintln(stderr, "Task:", result.TaskID); writeErr != nil {
 			return 1

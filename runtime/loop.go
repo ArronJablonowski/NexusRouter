@@ -29,6 +29,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	ParentTaskID, Privacy         string
 	TaskID, SessionID, ProviderID string
 	Inference                     providers.Request
 	MaxTurns                      int
@@ -87,7 +88,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

@@ -59,6 +59,8 @@ type Event struct {
 }
 
 type Data struct {
+	ParentTaskID string               `json:"parent_task_id,omitempty"`
+	Privacy      string               `json:"privacy,omitempty"`
 	Text         string               `json:"text,omitempty"`
 	ModelID      string               `json:"model_id,omitempty"`
 	ProviderID   string               `json:"provider_id,omitempty"`

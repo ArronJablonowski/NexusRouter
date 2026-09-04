@@ -62,7 +62,7 @@ func TestExplicitTaskEndToEnd(t *testing.T) {
 		}
 	}
 	s.Models[0].Locality = "cloud"
-	if _, err := RunExplicit(context.Background(), s, Request{"chat", "hello"}, func(string) string { return key }); err == nil || calls != 1 {
+	if _, err := RunExplicit(context.Background(), s, Request{ModelID: "chat", Prompt: "hello"}, func(string) string { return key }); err == nil || calls != 1 {
 		t.Fatal("forbidden cloud task dispatched")
 	}
 }
@@ -72,7 +72,7 @@ func TestAdmissionNoNetwork(t *testing.T) {
 	s.Mode = "local_only"
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://192.168.1.2:11434"}}
 	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
-	if _, err := RunExplicit(context.Background(), s, Request{"chat", "hello"}, nil); err != ErrAdmission {
+	if _, err := RunExplicit(context.Background(), s, Request{ModelID: "chat", Prompt: "hello"}, nil); err != ErrAdmission {
 		t.Fatal(err)
 	}
 }

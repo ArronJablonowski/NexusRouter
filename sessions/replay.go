@@ -22,6 +22,7 @@ type Pending struct {
 	Dispatched bool
 }
 type Snapshot struct {
+	ParentTaskID, Privacy    string
 	TaskID, SessionID, State string
 	Sequence                 int64
 	Messages                 []providers.Message
@@ -67,6 +68,8 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 					return s, ErrHistory
 				}
 				s.State = "running"
+				s.ParentTaskID = e.Data.ParentTaskID
+				s.Privacy = e.Data.Privacy
 				s.Messages = e.Data.Messages
 				if len(s.Messages) > 0 {
 					if providers.ValidateMessages(s.Messages) != nil {
