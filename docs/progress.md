@@ -75,3 +75,10 @@ Parallel implementation checkpoint (user-authorized sub-agents):
 - DAR-15: additional provider fixtures reject malformed discovery, unsupported tool kinds, refusal-as-success, duplicate choices/usage, invalid UTF-8 and oversized tool batches. Discovery preserves cancellation. Real provider qualification and richer model metadata remain unfinished.
 
 Native Linear was readable during this checkpoint, but input actions repeatedly failed with a window-availability error; no issue-status updates are claimed for this round.
+
+Second parallel checkpoint:
+
+- Automatic application routing is wired to CLI `--model auto` and the shared daemon service. Eligible routes require configured context, cost and local RAM estimates; health discovery, SQLite domain fitness, exploration, shared local reservations and durable route explanations precede inference. Default request cost ceiling is zero. Execution fallback, live health caching, calibrated context/memory estimates and overhead qualification remain unfinished. Explicit model selection remains an operator override of automatic capacity ranking.
+- `/v1/chat/completions` accepts configured model aliases, text system/user/assistant messages and optional `stream`. Other OpenAI parameters are rejected. Streaming is explicitly buffered (`X-Darwin-Stream-Mode: buffered`), not live; usage is included only when reported. Native task APIs remain synchronous. Shared authentication errors currently retain the native error format.
+- Operator CLI memory list/show/put/delete provides scoped JSON inspection and optimistic revisions. Skill list/show/history/draft/rollback exposes private local stores; inspection does not create stores or lock files. Skill activation still requires trusted programmatic validation. Runtime memory/skill injection, automatic drafting and regression detection remain unfinished. Memory deletion is logical, not secure erasure from backups/WAL.
+- Verified `make check`: formatting, source limits, vet, all race-enabled tests and build passed. Tests use local fixtures, not live model qualification. Hosted CI and Linear issue-status synchronization remain unverified.

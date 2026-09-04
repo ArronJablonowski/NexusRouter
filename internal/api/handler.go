@@ -61,6 +61,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/chat/completions" && r.Method == http.MethodPost:
+		h.serveChatCompletions(w, r.WithContext(ctx))
 	case r.URL.Path == "/health" && r.Method == http.MethodGet:
 		if h.services.Health(ctx) != nil {
 			failure(w, 503, "unhealthy")

@@ -29,6 +29,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	Route                         *Data
 	ParentTaskID, Privacy         string
 	TaskID, SessionID, ProviderID string
 	Inference                     providers.Request
@@ -36,8 +37,10 @@ type RunRequest struct {
 	MaxOutputBytes                int
 }
 type Result struct {
-	Text  string
-	Turns int
+	Text         string
+	Turns        int
+	FinishReason string
+	Usage        *providers.Usage
 }
 type Loop struct {
 	Provider providers.Provider
@@ -82,6 +85,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 	attempt := ""
 	persist := func(ctx context.Context, k Kind, d Data) error {
 		e := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, Sequence: seq + 1, Time: time.Now().UTC(), Kind: k, TurnID: turn, AttemptID: attempt, Data: d}
+		if k == RouteSelected {
+			e.RouteID = rand.Text()
+		}
 		if l.Journal.Append(ctx, seq, e) != nil {
 			return ErrPersistence
 		}
@@ -92,6 +98,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return Result{}, err
 	}
 	result := Result{}
+	if r.Route != nil {
+		if err := persist(ctx, RouteSelected, *r.Route); err != nil {
+			return result, err
+		}
+	}
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
 		code := "execution_failed"
@@ -109,6 +120,8 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return result, cause
 	}
 	used := 0
+	usageComplete := true
+	totalUsage := providers.Usage{}
 	seen := map[string]bool{}
 	for n := 0; n < r.MaxTurns; n++ {
 		if ctx.Err() != nil {
@@ -197,11 +210,21 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		if err := persist(ctx, TurnCompleted, Data{Text: text.String(), ToolCalls: calls, Usage: usage, FinishReason: reason}); err != nil {
 			return result, err
 		}
+		if usage == nil {
+			usageComplete = false
+		} else {
+			totalUsage.InputTokens += usage.InputTokens
+			totalUsage.OutputTokens += usage.OutputTokens
+		}
 		if len(calls) == 0 {
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
 				return result, err
 			}
 			result.Text = text.String()
+			result.FinishReason = reason
+			if usageComplete {
+				result.Usage = &totalUsage
+			}
 			return result, nil
 		}
 		// Never perform effects on the last permitted turn: their results could

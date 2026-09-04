@@ -40,6 +40,7 @@ type Query struct {
 }
 
 type Store interface {
+	GetMemory(context.Context, string, string) (Fact, error)
 	PutMemory(context.Context, Fact, int64) error
 	QueryMemory(context.Context, Query) ([]Fact, error)
 	TouchMemory(context.Context, string, string, time.Time) error

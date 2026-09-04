@@ -12,6 +12,27 @@ import (
 
 var _ memory.Store = (*Store)(nil)
 
+// GetMemory is an operator inspection lookup, including expired/private facts.
+// Runtime context retrieval must use QueryMemory with its privacy/expiry filters.
+func (s *Store) GetMemory(ctx context.Context, scope, id string) (memory.Fact, error) {
+	var f memory.Fact
+	if !memory.ValidKey(scope) || !memory.ValidKey(id) {
+		return f, memory.ErrInput
+	}
+	var body []byte
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM memory_facts WHERE scope=? AND id=?", scope, id).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return f, memory.ErrConflict
+	}
+	if err != nil {
+		return f, err
+	}
+	if json.Unmarshal(body, &f) != nil || f.Validate() != nil || f.Scope != scope || f.ID != id {
+		return memory.Fact{}, memory.ErrInput
+	}
+	return f, nil
+}
+
 // PutMemory creates at expected=0 or corrects with optimistic concurrency.
 // Corrections retain creation/last-use and cannot silently weaken privacy.
 // Provenance may change to identify the correction's source; creation remains

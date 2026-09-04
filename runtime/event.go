@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"darwinrouter/providers"
+	"darwinrouter/resources"
+	"darwinrouter/routing"
 )
 
 type Kind string
@@ -59,20 +61,27 @@ type Event struct {
 }
 
 type Data struct {
-	ParentTaskID string               `json:"parent_task_id,omitempty"`
-	Privacy      string               `json:"privacy,omitempty"`
-	Text         string               `json:"text,omitempty"`
-	ModelID      string               `json:"model_id,omitempty"`
-	ProviderID   string               `json:"provider_id,omitempty"`
-	ToolCallID   string               `json:"tool_call_id,omitempty"`
-	ToolName     string               `json:"tool_name,omitempty"`
-	Effect       Effect               `json:"effect,omitempty"`
-	Code         string               `json:"code,omitempty"`
-	Accepted     *bool                `json:"accepted,omitempty"`
-	Messages     []providers.Message  `json:"messages,omitempty"`
-	ToolCalls    []providers.ToolCall `json:"tool_calls,omitempty"`
-	Usage        *providers.Usage     `json:"usage,omitempty"`
-	FinishReason string               `json:"finish_reason,omitempty"`
+	RouteCandidates []routing.Candidate  `json:"route_candidates,omitempty"`
+	RoutePolicy     *routing.Policy      `json:"route_policy,omitempty"`
+	Resources       *resources.Snapshot  `json:"resources,omitempty"`
+	Route           *routing.Selection   `json:"route,omitempty"`
+	Domain          string               `json:"domain,omitempty"`
+	Profile         string               `json:"profile,omitempty"`
+	ConfigID        string               `json:"config_id,omitempty"`
+	ParentTaskID    string               `json:"parent_task_id,omitempty"`
+	Privacy         string               `json:"privacy,omitempty"`
+	Text            string               `json:"text,omitempty"`
+	ModelID         string               `json:"model_id,omitempty"`
+	ProviderID      string               `json:"provider_id,omitempty"`
+	ToolCallID      string               `json:"tool_call_id,omitempty"`
+	ToolName        string               `json:"tool_name,omitempty"`
+	Effect          Effect               `json:"effect,omitempty"`
+	Code            string               `json:"code,omitempty"`
+	Accepted        *bool                `json:"accepted,omitempty"`
+	Messages        []providers.Message  `json:"messages,omitempty"`
+	ToolCalls       []providers.ToolCall `json:"tool_calls,omitempty"`
+	Usage           *providers.Usage     `json:"usage,omitempty"`
+	FinishReason    string               `json:"finish_reason,omitempty"`
 }
 
 func (e Event) Validate() error {

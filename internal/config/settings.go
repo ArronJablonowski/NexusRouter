@@ -49,11 +49,16 @@ type Provider struct {
 	APIKeyEnv string `yaml:"api_key_env" json:"api_key_env,omitempty"`
 }
 type Model struct {
-	ID           string   `yaml:"id" json:"id"`
-	Provider     string   `yaml:"provider" json:"provider"`
-	Model        string   `yaml:"model" json:"model"`
-	Locality     string   `yaml:"locality" json:"locality"`
-	Capabilities []string `yaml:"capabilities" json:"capabilities"`
+	ContextTokens int      `yaml:"context_tokens" json:"context_tokens"`
+	EstimatedCost *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
+	RAMBytes      uint64   `yaml:"ram_bytes" json:"ram_bytes"`
+	VRAMBytes     uint64   `yaml:"vram_bytes" json:"vram_bytes"`
+	FailureDomain string   `yaml:"failure_domain" json:"failure_domain"`
+	ID            string   `yaml:"id" json:"id"`
+	Provider      string   `yaml:"provider" json:"provider"`
+	Model         string   `yaml:"model" json:"model"`
+	Locality      string   `yaml:"locality" json:"locality"`
+	Capabilities  []string `yaml:"capabilities" json:"capabilities"`
 }
 type Routing struct {
 	Exploration float64            `yaml:"exploration_rate" json:"exploration_rate"`
@@ -131,7 +136,7 @@ func (s Settings) Validate() error {
 	}
 	if s.Hardware.Concurrent != "auto" {
 		n, err := strconv.Atoi(s.Hardware.Concurrent)
-		if err != nil || n < 1 {
+		if err != nil || n < 1 || n > 64 {
 			return errors.New("invalid local model concurrency")
 		}
 	}
@@ -140,7 +145,7 @@ func (s Settings) Validate() error {
 	if s.Workers.Max < 1 || he != nil || le != nil || l <= h || s.Workers.EffectPolicy != "single_writer" {
 		return errors.New("invalid worker limits or lease policy")
 	}
-	if !finite(s.Routing.Exploration) || s.Routing.Exploration < 0 || s.Routing.Exploration > 1 || s.Routing.MinSamples < 1 {
+	if !finite(s.Routing.Exploration) || s.Routing.Exploration < 0 || s.Routing.Exploration > .25 || s.Routing.MinSamples < 1 {
 		return errors.New("invalid routing exploration or sample count")
 	}
 	if _, err := Duration(s.Routing.HalfLife); err != nil {
@@ -202,7 +207,16 @@ func (s Settings) Validate() error {
 		providers[p.ID] = p
 	}
 	models := map[string]bool{}
+	routes := map[[2]string]bool{}
 	for _, m := range s.Models {
+		route := [2]string{m.Provider, m.Model}
+		if routes[route] {
+			return errors.New("duplicate provider model route")
+		}
+		routes[route] = true
+		if m.ContextTokens < 0 || (m.EstimatedCost != nil && (!finite(*m.EstimatedCost) || *m.EstimatedCost < 0)) || (m.FailureDomain != "" && !identifier.MatchString(m.FailureDomain)) {
+			return errors.New("invalid model routing metadata")
+		}
 		if !identifier.MatchString(m.ID) || models[m.ID] || m.Model == "" {
 			return errors.New("invalid or duplicate model identity")
 		}

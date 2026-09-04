@@ -41,7 +41,12 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	result, err := app.RunExplicit(ctx, s, app.Request{ModelID: *model, Prompt: string(prompt), ContinueTaskID: *previous}, os.Getenv)
+	service, err := app.NewService(s, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
+	result, err := service.Run(ctx, app.Request{ModelID: *model, Prompt: string(prompt), ContinueTaskID: *previous})
 	if result.TaskID != "" {
 		if _, writeErr := fmt.Fprintln(stderr, "Task:", result.TaskID); writeErr != nil {
 			return 1

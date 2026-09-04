@@ -60,10 +60,13 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer db.Close()
+	service, err := app.NewService(s, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
-		Run: func(ctx context.Context, r app.Request) (app.Result, error) {
-			return app.RunExplicit(ctx, s, r, os.Getenv)
-		},
+		Run:     service.Run,
 		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:  func(ctx context.Context) error { _, err := db.Read(ctx, "__health__", 0, 1); return err },
 	})

@@ -1,0 +1,205 @@
+package api
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"io"
+	"mime"
+	"net/http"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"darwinrouter/internal/app"
+	"darwinrouter/providers"
+)
+
+// serveChatCompletions is a bounded text-only compatibility adapter. Authentication,
+// origin checks and the execution deadline are supplied by ServeHTTP. Run returns
+// only after durable completion, so SSE here delivers buffered output, not live
+// provider deltas. Unknown usage and finish metadata must not be invented.
+func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || media != "application/json" {
+		chatFailure(w, 415, "invalid_request_error", "json_required")
+		return
+	}
+	select {
+	case h.slots <- struct{}{}:
+		defer func() { <-h.slots }()
+	default:
+		w.Header().Set("Retry-After", "1")
+		chatFailure(w, 503, "server_error", "capacity")
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil {
+		var limit *http.MaxBytesError
+		status := 400
+		if errors.As(err, &limit) {
+			status = 413
+		}
+		chatFailure(w, status, "invalid_request_error", "invalid_request")
+		return
+	}
+	req, stream, err := decodeChatRequest(body)
+	if err != nil {
+		chatFailure(w, 400, "invalid_request_error", "unsupported_or_invalid_request")
+		return
+	}
+	if r.Context().Err() != nil {
+		return
+	}
+	if stream {
+		if _, ok := w.(http.Flusher); !ok {
+			chatFailure(w, 500, "server_error", "streaming_unavailable")
+			return
+		}
+	}
+	result, err := h.services.Run(r.Context(), req)
+	if r.Context().Err() == context.Canceled {
+		return
+	}
+	if err != nil || r.Context().Err() != nil {
+		status, code, kind := 500, "task_failed", "server_error"
+		if errors.Is(err, app.ErrAdmission) {
+			status, code, kind = 422, "admission_denied", "invalid_request_error"
+		}
+		if errors.Is(err, context.DeadlineExceeded) || r.Context().Err() == context.DeadlineExceeded {
+			status, code = 504, "deadline_exceeded"
+		}
+		chatFailure(w, status, kind, code)
+		return
+	}
+	if len(result.Text) > 1<<20 || !utf8.ValidString(result.Text) {
+		chatFailure(w, 502, "server_error", "invalid_upstream_response")
+		return
+	}
+	id := "chatcmpl-" + rand.Text()
+	created := time.Now().Unix()
+	var finish any
+	switch result.FinishReason {
+	case "stop", "length", "content_filter", "tool_calls", "function_call":
+		finish = result.FinishReason
+	}
+	base := func(object string, choice map[string]any) map[string]any {
+		return map[string]any{"id": id, "object": object, "created": created, "model": req.ModelID, "choices": []any{choice}}
+	}
+	if !stream {
+		response := base("chat.completion", map[string]any{"index": 0, "message": map[string]string{"role": "assistant", "content": result.Text}, "finish_reason": finish})
+		if u := result.Usage; u != nil && u.InputTokens >= 0 && u.OutputTokens >= 0 && u.InputTokens <= (1<<63-1)-u.OutputTokens {
+			response["usage"] = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
+		}
+		writeJSON(w, 200, response)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.Header().Set("X-Darwin-Stream-Mode", "buffered")
+	w.WriteHeader(200)
+	flusher := w.(http.Flusher)
+	for _, choice := range []map[string]any{
+		{"index": 0, "delta": map[string]string{"role": "assistant", "content": result.Text}, "finish_reason": nil},
+		{"index": 0, "delta": map[string]string{}, "finish_reason": finish},
+	} {
+		if r.Context().Err() != nil {
+			return
+		}
+		b, _ := json.Marshal(base("chat.completion.chunk", choice))
+		if _, err := io.WriteString(w, "data: "+string(b)+"\n\n"); err != nil {
+			return
+		}
+		flusher.Flush()
+	}
+	if r.Context().Err() == nil {
+		if _, err := io.WriteString(w, "data: [DONE]\n\n"); err == nil {
+			flusher.Flush()
+		}
+	}
+}
+
+func chatFailure(w http.ResponseWriter, status int, kind, code string) {
+	writeJSON(w, status, map[string]any{"error": map[string]any{"message": code, "type": kind, "param": nil, "code": code}})
+}
+
+func decodeChatRequest(body []byte) (app.Request, bool, error) {
+	bad := errors.New("unsupported or invalid chat request")
+	req := app.Request{}
+	fields, err := chatObject(body, "model", "messages", "stream")
+	if err != nil || chatString(fields["model"], &req.ModelID) != nil || strings.TrimSpace(req.ModelID) == "" || len(req.ModelID) > 256 {
+		return req, false, bad
+	}
+	stream := false
+	if raw, ok := fields["stream"]; ok {
+		if string(raw) != "true" && string(raw) != "false" {
+			return req, false, bad
+		}
+		stream = string(raw) == "true"
+	}
+	var messages []json.RawMessage
+	if json.Unmarshal(fields["messages"], &messages) != nil || len(messages) == 0 || len(messages) > 256 {
+		return req, false, bad
+	}
+	for _, raw := range messages {
+		fields, err := chatObject(raw, "role", "content")
+		m := providers.Message{}
+		if err != nil || chatString(fields["role"], &m.Role) != nil || chatString(fields["content"], &m.Content) != nil {
+			return req, false, bad
+		}
+		if m.Role != "system" && m.Role != "user" && m.Role != "assistant" {
+			return req, false, bad
+		}
+		req.Messages = append(req.Messages, m)
+	}
+	return req, stream, nil
+}
+
+func chatString(raw json.RawMessage, target *string) error {
+	if len(raw) == 0 || raw[0] != '"' {
+		return errors.New("string required")
+	}
+	return json.Unmarshal(raw, target)
+}
+
+// chatObject rejects duplicate, unknown and case-mismatched fields. Decoding
+// into a Go struct alone would silently accept duplicates and case aliases.
+func chatObject(body []byte, allowed ...string) (map[string]json.RawMessage, error) {
+	bad := errors.New("invalid object")
+	if !utf8.Valid(body) {
+		return nil, bad
+	}
+	d := json.NewDecoder(strings.NewReader(string(body)))
+	first, err := d.Token()
+	if err != nil || first != json.Delim('{') {
+		return nil, bad
+	}
+	fields := map[string]json.RawMessage{}
+	for d.More() {
+		token, err := d.Token()
+		key, ok := token.(string)
+		if err != nil || !ok {
+			return nil, bad
+		}
+		valid := false
+		for _, name := range allowed {
+			valid = valid || name == key
+		}
+		if !valid || fields[key] != nil {
+			return nil, bad
+		}
+		var raw json.RawMessage
+		if d.Decode(&raw) != nil {
+			return nil, bad
+		}
+		fields[key] = raw
+	}
+	if end, err := d.Token(); err != nil || end != json.Delim('}') {
+		return nil, bad
+	}
+	if _, err := d.Token(); err != io.EOF {
+		return nil, bad
+	}
+	return fields, nil
+}

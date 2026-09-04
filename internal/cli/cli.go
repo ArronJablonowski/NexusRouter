@@ -17,9 +17,11 @@ Usage:
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service
+  darwin memory list|show|put|delete --db path --scope scope
+  darwin skills list|show|history|draft|rollback --root path --scope scope
 
-Development status: explicit-model headless tasks are available. Automatic
-routing and interactive streaming are not yet implemented.
+Development status: use --model auto for constrained automatic routing.
+Interactive and live streaming are not yet implemented.
 `
 
 // Run executes a CLI invocation and returns its process exit code.
@@ -29,6 +31,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "skills" {
+		return runSkills(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "memory" {
+		return runMemory(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "serve" {
 		return runServe(args[1:], stdout, stderr)
 	}

@@ -19,10 +19,21 @@ import (
 
 var ErrAdmission = errors.New("task admission failed")
 
-type Request struct{ ModelID, Prompt, ContinueTaskID string }
+type Request struct {
+	ModelID, Prompt, ContinueTaskID string
+	Messages                        []providers.Message
+	Domain, Profile                 string
+	Capabilities                    []string
+	ContextTokens                   int
+	MaxCost                         float64
+	LocalRequired                   bool
+	route                           *runtime.Data
+}
 type Result struct {
 	TaskID, Text string
 	Turns        int
+	FinishReason string
+	Usage        *providers.Usage
 }
 
 // RunExplicit is the initial headless application path. It executes one model
@@ -30,7 +41,7 @@ type Result struct {
 // loopback-only transport, even when the application mode permits cloud use.
 func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
-	if s.Validate() != nil || r.ModelID == "" || strings.TrimSpace(r.Prompt) == "" || len(r.Prompt) > 1<<20 || s.Telemetry.OTEL {
+	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || s.Telemetry.OTEL {
 		return result, ErrAdmission
 	}
 	var model config.Model
@@ -42,7 +53,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 			break
 		}
 	}
-	if !found || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
+	if !found || (r.LocalRequired && model.Locality != "local") || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
 		return result, ErrAdmission
 	}
 	var provider config.Provider
@@ -108,7 +119,11 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		messages = history.Messages
 		sessionID = history.SessionID
 	}
-	messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
+	if len(r.Messages) > 0 {
+		messages = append(messages, r.Messages...)
+	} else {
+		messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
+	}
 	encoded, err := json.Marshal(messages)
 	if err != nil || len(encoded) > 4<<20 {
 		return result, ErrAdmission
@@ -119,9 +134,11 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	}
 	j := redactingJournal{db: db, secrets: secrets}
 	loop := runtime.Loop{Provider: p, Journal: j}
-	out, err := loop.Run(ctx, runtime.RunRequest{TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: providers.Request{Model: model.Model, Messages: messages}, MaxTurns: 1, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: providers.Request{Model: model.Model, Messages: messages}, MaxTurns: 1, MaxOutputBytes: 1 << 20})
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns
+	result.FinishReason = out.FinishReason
+	result.Usage = out.Usage
 	return result, err
 }
 

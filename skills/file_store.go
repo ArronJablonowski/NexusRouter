@@ -27,6 +27,7 @@ type FileStore struct {
 	mu        sync.Mutex
 	automatic atomic.Bool
 	scopes    map[string]bool
+	readOnly  bool
 }
 
 type catalog struct {
@@ -50,6 +51,10 @@ type activation struct {
 // Open creates a private directory; existing symlink path components are refused.
 // Automatic updates default off. Call SetAutomatic(true) only under host policy.
 func Open(path string, scopes []string) (*FileStore, error) {
+	return openStore(path, scopes, false)
+}
+
+func openStore(path string, scopes []string, readOnly bool) (*FileStore, error) {
 	if path == "" {
 		return nil, ErrInvalid
 	}
@@ -81,6 +86,9 @@ func Open(path string, scopes []string) (*FileStore, error) {
 			return nil, ErrInvalid
 		}
 	} else if os.IsNotExist(e) {
+		if readOnly {
+			return nil, ErrNotFound
+		}
 		if err = os.MkdirAll(abs, 0700); err != nil {
 			return nil, err
 		}
@@ -90,6 +98,14 @@ func Open(path string, scopes []string) (*FileStore, error) {
 	r, err := os.OpenRoot(abs)
 	if err != nil {
 		return nil, err
+	}
+	if readOnly {
+		s := &FileStore{root: r, scopes: allowed, readOnly: true}
+		if err = s.with(context.Background(), func(*catalog) error { return nil }, false); err != nil {
+			s.Close()
+			return nil, err
+		}
+		return s, nil
 	}
 	if st, e := r.Lstat("lock"); e == nil && !st.Mode().IsRegular() {
 		r.Close()
@@ -111,6 +127,9 @@ func Open(path string, scopes []string) (*FileStore, error) {
 func (s *FileStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.lock == nil {
+		return s.root.Close()
+	}
 	return errors.Join(s.lock.Close(), s.root.Close())
 }
 func (s *FileStore) SetAutomatic(enabled bool) { s.automatic.Store(enabled) }
@@ -122,12 +141,17 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := lockFile(ctx, s.lock); err != nil {
-		return err
+	if s.readOnly && write {
+		return ErrDisabled
 	}
-	defer unlockFile(s.lock)
+	if s.lock != nil {
+		if err := lockFile(ctx, s.lock); err != nil {
+			return err
+		}
+		defer unlockFile(s.lock)
+	}
 	c := catalog{Schema: 1, Skills: map[string]entry{}}
-	if err := s.read("catalog.json", &c); err != nil && !os.IsNotExist(err) {
+	if err := s.read("catalog.json", &c); err != nil && (s.readOnly || !os.IsNotExist(err)) {
 		return err
 	}
 	if c.Schema != 1 || c.Skills == nil || len(c.Skills) > 1000 {
@@ -180,6 +204,10 @@ func (s *FileStore) read(name string, out any) error {
 		return err
 	}
 	defer f.Close()
+	actual, err := f.Stat()
+	if err != nil || !os.SameFile(st, actual) || !actual.Mode().IsRegular() {
+		return ErrInvalid
+	}
 	b, err := io.ReadAll(io.LimitReader(f, maxFile+1))
 	if err != nil {
 		return err
