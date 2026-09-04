@@ -55,10 +55,14 @@ func TestReplayAndUnfinishedEffects(t *testing.T) {
 	}
 }
 func TestReplayRejectsCorruption(t *testing.T) {
-	for _, name := range []string{"gap", "session", "pair", "duplicate_dispatch", "premature_completion"} {
+	for _, name := range []string{"gap", "session", "pair", "attempt", "initial_orphan", "duplicate_dispatch", "premature_completion"} {
 		t.Run(name, func(t *testing.T) {
 			r := fixture()
 			switch name {
+			case "attempt":
+				r[5].AttemptID = "other-attempt"
+			case "initial_orphan":
+				r[0].Data.Messages = []providers.Message{{Role: "tool", ToolCallID: "orphan"}}
 			case "gap":
 				r[2].Sequence++
 			case "session":

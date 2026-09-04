@@ -121,6 +121,9 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 	if r.Model == "" || len(r.Messages) == 0 || emit == nil {
 		return &Failure{Code: "invalid_request"}
 	}
+	if ValidateMessages(r.Messages) != nil {
+		return &Failure{Code: "invalid_conversation"}
+	}
 	tools := []any{}
 	for _, t := range r.Tools {
 		if t.Name == "" || !jsonObject(t.Parameters) {

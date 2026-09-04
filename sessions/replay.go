@@ -18,6 +18,7 @@ type Reader interface {
 type Pending struct {
 	Call       providers.ToolCall
 	TurnID     string
+	AttemptID  string
 	Dispatched bool
 }
 type Snapshot struct {
@@ -40,6 +41,8 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 	turn, attempt := "", ""
 	seen := map[string]bool{}
 	toolIDs := map[string]bool{}
+	turnIDs := map[string]bool{}
+	attemptIDs := map[string]bool{}
 	for {
 		events, err := r.Read(ctx, task, s.Sequence, 100)
 		if err != nil {
@@ -65,12 +68,24 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				}
 				s.State = "running"
 				s.Messages = e.Data.Messages
+				if len(s.Messages) > 0 {
+					if providers.ValidateMessages(s.Messages) != nil {
+						return s, ErrHistory
+					}
+					for _, m := range s.Messages {
+						for _, call := range m.ToolCalls {
+							toolIDs[call.ID] = true
+						}
+					}
+				}
 			case runtime.TurnStarted:
-				if turn != "" || len(s.Pending) > 0 || e.AttemptID == "" {
+				if turn != "" || len(s.Pending) > 0 || e.AttemptID == "" || turnIDs[e.TurnID] || attemptIDs[e.AttemptID] {
 					return s, ErrHistory
 				}
 				turn = e.TurnID
 				attempt = e.AttemptID
+				turnIDs[turn] = true
+				attemptIDs[attempt] = true
 			case runtime.ModelDelta:
 				if turn == "" || turn != e.TurnID || attempt != e.AttemptID {
 					return s, ErrHistory
@@ -84,14 +99,14 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 						return s, ErrHistory
 					}
 					toolIDs[call.ID] = true
-					s.Pending[call.ID] = Pending{Call: call, TurnID: turn}
+					s.Pending[call.ID] = Pending{Call: call, TurnID: turn, AttemptID: attempt}
 				}
 				s.Messages = append(s.Messages, providers.Message{Role: "assistant", Content: e.Data.Text, ToolCalls: e.Data.ToolCalls})
 				turn = ""
 				attempt = ""
 			case runtime.ToolStarted, runtime.ToolCompleted:
 				pending, ok := s.Pending[e.Data.ToolCallID]
-				if !ok || pending.Call.Name != e.Data.ToolName || pending.TurnID != e.TurnID {
+				if !ok || pending.Call.Name != e.Data.ToolName || pending.TurnID != e.TurnID || pending.AttemptID != e.AttemptID {
 					return s, ErrHistory
 				}
 				if e.Kind == runtime.ToolStarted {

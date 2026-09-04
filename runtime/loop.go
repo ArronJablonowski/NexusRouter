@@ -60,6 +60,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return Result{}, ErrInvalidRun
 	}
 	// Snapshot nested caller-owned data before the provider receives it.
+	if providers.ValidateMessages(r.Inference.Messages) != nil {
+		return Result{}, ErrInvalidRun
+	}
 	b, err := json.Marshal(r.Inference)
 	if err != nil {
 		return Result{}, ErrInvalidRun
