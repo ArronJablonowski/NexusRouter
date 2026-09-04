@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,24 +39,40 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	fail := func(status int, code string) {
+		if r.URL.Path != "/v1/chat/completions" {
+			failure(w, status, code)
+			return
+		}
+		kind := "invalid_request_error"
+		switch {
+		case status == 401:
+			kind = "authentication_error"
+		case status == 403:
+			kind = "permission_error"
+		case status >= 500:
+			kind = "server_error"
+		}
+		chatFailure(w, status, kind, code)
+	}
 	defer func() {
 		if recover() != nil {
-			failure(w, http.StatusInternalServerError, "internal_error")
+			fail(http.StatusInternalServerError, "internal_error")
 		}
 	}()
 	auth := r.Header.Get("Authorization")
 	candidate := sha256.Sum256([]byte(strings.TrimPrefix(auth, "Bearer ")))
 	if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare(candidate[:], h.secret[:]) != 1 {
 		w.Header().Set("WWW-Authenticate", "Bearer")
-		failure(w, 401, "unauthorized")
+		fail(401, "unauthorized")
 		return
 	}
 	if r.Header.Get("Origin") != "" {
-		failure(w, 403, "browser_origin_denied")
+		fail(403, "browser_origin_denied")
 		return
 	}
 	if r.URL.RawQuery != "" {
-		failure(w, 400, "query_not_supported")
+		fail(400, "query_not_supported")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
@@ -115,7 +132,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, snapshot)
 	default:
-		failure(w, 404, "not_found")
+		fail(404, "not_found")
 	}
 }
 func failure(w http.ResponseWriter, status int, code string) {
@@ -132,6 +149,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 func decodeRequest(reader io.Reader) (app.Request, error) {
 	d := json.NewDecoder(reader)
+	d.UseNumber()
 	req := app.Request{}
 	bad := errors.New("invalid request")
 	first, err := d.Token()
@@ -146,6 +164,10 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 			return req, bad
 		}
 		seen[key] = true
+		var value any
+		if d.Decode(&value) != nil {
+			return req, bad
+		}
 		var target *string
 		switch key {
 		case "model_id":
@@ -154,11 +176,52 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 			target = &req.Prompt
 		case "continue_task_id":
 			target = &req.ContinueTaskID
+		case "domain":
+			target = &req.Domain
+		case "profile":
+			target = &req.Profile
+		case "capabilities":
+			items, ok := value.([]any)
+			if !ok {
+				return req, bad
+			}
+			req.Capabilities = make([]string, len(items))
+			for i, item := range items {
+				text, ok := item.(string)
+				if !ok {
+					return req, bad
+				}
+				req.Capabilities[i] = text
+			}
+			continue
+		case "context_tokens":
+			number, ok := value.(json.Number)
+			if !ok {
+				return req, bad
+			}
+			req.ContextTokens, err = strconv.Atoi(number.String())
+			if err != nil || req.ContextTokens < 0 {
+				return req, bad
+			}
+			continue
+		case "max_cost":
+			number, ok := value.(json.Number)
+			if !ok {
+				return req, bad
+			}
+			req.MaxCost, err = number.Float64()
+			if err != nil || req.MaxCost < 0 {
+				return req, bad
+			}
+			continue
+		case "local_required":
+			local, ok := value.(bool)
+			if !ok {
+				return req, bad
+			}
+			req.LocalRequired = local
+			continue
 		default:
-			return req, bad
-		}
-		var value any
-		if d.Decode(&value) != nil {
 			return req, bad
 		}
 		text, ok := value.(string)

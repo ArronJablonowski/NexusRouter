@@ -56,6 +56,24 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	if !found || (r.LocalRequired && model.Locality != "local") || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
 		return result, ErrAdmission
 	}
+	// Explicit selection bypasses ranking, not requested admission constraints.
+	// Zero cost retains the legacy explicit-model operator override; automatic
+	// routing instead interprets zero as a strict zero-cost ceiling.
+	if r.ContextTokens > 0 && model.ContextTokens < r.ContextTokens {
+		return result, ErrAdmission
+	}
+	if r.MaxCost > 0 && (model.EstimatedCost == nil || *model.EstimatedCost > r.MaxCost) {
+		return result, ErrAdmission
+	}
+	for _, required := range r.Capabilities {
+		matched := false
+		for _, capability := range model.Capabilities {
+			matched = matched || capability == required
+		}
+		if !matched {
+			return result, ErrAdmission
+		}
+	}
 	var provider config.Provider
 	for _, p := range s.Providers {
 		if p.ID == model.Provider {

@@ -4,7 +4,7 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 
 ## Development status
 
-The executable supports layered configuration, explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Automatic routing, tool execution and interactive streaming are not yet connected to user-facing execution. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands are available. Tool execution and interactive streaming are not yet connected to user-facing execution. See the implementation evidence for remaining work; this is not a released MVP.
 
 ## Build and verify
 
@@ -35,7 +35,7 @@ make build
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.
 
-The temporary local module path is `darwinrouter`. Replace it with the actual hosting path when publishing the Go SDK; no GitHub owner or repository has been assumed.
+The temporary local module path is `darwinrouter`. Migrate it to `github.com/ArronJablonowski/DarwinRouter` when publishing the Go SDK.
 
 ## Configuration
 
@@ -47,7 +47,7 @@ DARWIN__MODE=local_only ./bin/darwin config validate
 
 Precedence: defaults → OS user config directory `/darwinrouter/config.yaml` → working-directory `config.yaml` → `DARWIN__SECTION__FIELD` environment variables → repeated `--set section.field=value` flags. `--user-config` and `--config` select explicit files; missing explicit paths are errors. Nested mappings merge; arrays replace wholesale. Environment and CLI overrides address scalar settings only. Unknown fields, duplicate keys, aliases, nulls, and multi-document YAML are rejected. Configuration files are limited to 1 MiB.
 
-Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. The display redacts endpoints and database paths. Local-only configuration validation is not network enforcement; that guarantee requires the later transport-policy sprint.
+Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. The display redacts endpoints and database paths. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode; this is not an operating-system sandbox for arbitrary future tools.
 
 ## Run an explicit-model task
 
@@ -76,14 +76,26 @@ All endpoints require `Authorization: Bearer <token>`:
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 
-Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Async submission, idempotency keys, SSE, separate cancellation, OpenAI-compatible endpoints, full provider health, and service installation are unfinished. Do not automatically retry a timed-out submission; a durable task may already exist.
+`POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. SSE is buffered until durable completion and labeled `X-Darwin-Stream-Mode: buffered`; this is not live token streaming. Usage is omitted when unavailable.
+
+Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Async submission, idempotency keys, live SSE, separate cancellation, full provider health, and service installation are unfinished. Do not automatically retry a timed-out submission; a durable task may already exist.
+
+## Automatic routing and local knowledge
+
+Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Model discovery is checked live. Automatic local reservations are shared within one daemon, not across separate processes.
+
+Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--domain`, `--profile`, repeated `--capability`, `--context-tokens`, `--max-cost`, and `--local-required`. Native task JSON exposes corresponding `domain`, `profile`, `capabilities`, `context_tokens`, `max_cost`, and `local_required` fields. Explicit selection bypasses ranking and automatic resource reservations; zero cost preserves its legacy operator override, while a positive cost ceiling and requested capabilities/context are enforced. Execution fallback is not yet implemented.
+
+`darwin memory list|show|put|delete --db path --scope scope` inspects and maintains factual memory. Put reads a complete fact record as JSON from stdin; corrections and deletion require an expected revision. Deletion is logical, not secure erasure of WAL or backups.
+
+`darwin skills list|show|history|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
 
 ## Next sprints
 
-1. Connect provider calls to the durable runtime and cancellation lifecycle.
-2. Implement schema-validated tool registration and scoped permissions.
-3. Enforce transport policy before exposing live inference through the CLI.
-4. Expand cross-provider and crash-recovery qualification.
+1. Connect authorized tools and bounded delegation to application execution.
+2. Add safe execution fallback and automatic validated outcome updates.
+3. Integrate context compaction, factual memory and procedural skills into prompts.
+4. Add live events, recovery and cross-provider qualification.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

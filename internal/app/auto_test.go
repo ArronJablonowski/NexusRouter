@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -111,7 +112,7 @@ func TestAutoUnknownMetadataAndSharedReservations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = svc.Run(ctx, Request{Prompt: "hello"}); err != routing.ErrNoRoute {
+	if _, err = svc.Run(ctx, Request{Prompt: "hello"}); !errors.Is(err, routing.ErrNoRoute) {
 		t.Fatalf("shared capacity ignored: %v", err)
 	}
 	release()
@@ -121,7 +122,7 @@ func TestAutoUnknownMetadataAndSharedReservations(t *testing.T) {
 	for i := range svc.settings.Models {
 		svc.settings.Models[i].ContextTokens = 0
 	}
-	if _, err = svc.Run(ctx, Request{Prompt: "hello"}); err != routing.ErrNoRoute {
+	if _, err = svc.Run(ctx, Request{Prompt: "hello"}); !errors.Is(err, routing.ErrNoRoute) {
 		t.Fatalf("unknown context admitted: %v", err)
 	}
 }
@@ -137,7 +138,7 @@ func TestAutomaticContinuationKeepsLocalPrivacy(t *testing.T) {
 	for i := range svc.settings.Models {
 		svc.settings.Models[i].Locality = "cloud"
 	}
-	if _, err = svc.Run(ctx, Request{Prompt: "follow up", ContinueTaskID: prior.TaskID}); err != routing.ErrNoRoute {
+	if _, err = svc.Run(ctx, Request{Prompt: "follow up", ContinueTaskID: prior.TaskID}); !errors.Is(err, routing.ErrNoRoute) {
 		t.Fatalf("local history admitted to cloud: %v", err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
@@ -76,8 +77,15 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
-	if r.ContextTokens < 0 || len(r.Domain) > 128 || len(r.Profile) > 128 {
+	if r.ContextTokens < 0 || len(r.Domain) > 128 || len(r.Profile) > 128 || r.MaxCost < 0 || math.IsNaN(r.MaxCost) || math.IsInf(r.MaxCost, 0) || len(r.Capabilities) > 128 {
 		return ErrAdmission
+	}
+	seen := map[string]bool{}
+	for _, capability := range r.Capabilities {
+		if strings.TrimSpace(capability) == "" || len(capability) > 128 || seen[capability] {
+			return ErrAdmission
+		}
+		seen[capability] = true
 	}
 	if len(r.Messages) > 0 {
 		if r.Prompt != "" || r.ContinueTaskID != "" || providers.ValidateMessages(r.Messages) != nil {
@@ -237,6 +245,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	s.mu.Unlock()
 	if err != nil {
+		if errors.Is(err, routing.ErrNoRoute) || errors.Is(err, routing.ErrInvalid) {
+			return Result{}, errors.Join(ErrAdmission, err)
+		}
 		return Result{}, err
 	}
 	if release != nil {
