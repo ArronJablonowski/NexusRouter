@@ -13,4 +13,4 @@ test:
 	go test -race ./...
 
 fmt:
-	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources
+	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources memory skills

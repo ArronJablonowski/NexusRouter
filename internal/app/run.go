@@ -59,6 +59,11 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	defer tr.CloseIdleConnections()
 	key := ""
 	secrets := []string{}
+	if secret != nil {
+		if token := secret("DARWIN_API_TOKEN"); token != "" {
+			secrets = append(secrets, token)
+		}
+	}
 	for _, p := range s.Providers {
 		if p.APIKeyEnv != "" && secret != nil {
 			value := secret(p.APIKeyEnv)

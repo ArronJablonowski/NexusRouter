@@ -89,29 +89,35 @@ func (p *HTTP) Models(ctx context.Context) ([]string, error) {
 	}
 	defer resp.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20+1))
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if err != nil || len(b) > 1<<20 {
 		return nil, &Failure{Code: "invalid_response"}
 	}
-	var result struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(b, &envelope) != nil || envelope == nil {
+		return nil, &Failure{Code: "invalid_response"}
 	}
-	if json.Unmarshal(b, &result) != nil {
+	field, identity := "data", "id"
+	if p.kind == "ollama" {
+		field, identity = "models", "name"
+	}
+	// A missing list, null, or an error envelope is not a healthy empty pool.
+	var list []map[string]json.RawMessage
+	if json.Unmarshal(envelope[field], &list) != nil || list == nil || (len(envelope["error"]) > 0 && string(envelope["error"]) != "null") {
 		return nil, &Failure{Code: "invalid_response"}
 	}
 	ids := []string{}
-	for _, m := range result.Data {
-		if m.ID != "" {
-			ids = append(ids, m.ID)
+	seen := map[string]bool{}
+	for _, m := range list {
+		var id string
+		if json.Unmarshal(m[identity], &id) != nil || strings.TrimSpace(id) == "" {
+			return nil, &Failure{Code: "invalid_response"}
 		}
-	}
-	for _, m := range result.Models {
-		if m.Name != "" {
-			ids = append(ids, m.Name)
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
 		}
 	}
 	return ids, nil
@@ -125,10 +131,12 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 		return &Failure{Code: "invalid_conversation"}
 	}
 	tools := []any{}
+	toolNames := map[string]bool{}
 	for _, t := range r.Tools {
-		if t.Name == "" || !jsonObject(t.Parameters) {
+		if t.Name == "" || toolNames[t.Name] || len(r.Tools) > 128 || !jsonObject(t.Parameters) {
 			return &Failure{Code: "invalid_tool_schema"}
 		}
+		toolNames[t.Name] = true
 		tools = append(tools, map[string]any{"type": "function", "function": map[string]any{"name": t.Name, "description": t.Description, "parameters": t.Parameters}})
 	}
 	messages := []any{}

@@ -4,7 +4,7 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 
 ## Development status
 
-The executable supports layered configuration and explicit-model headless tasks with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Automatic routing, tools, interactive streaming and the daemon are not yet connected to the CLI. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Automatic routing, tool execution and interactive streaming are not yet connected to user-facing execution. See the implementation evidence for remaining work; this is not a released MVP.
 
 ## Build and verify
 
@@ -29,6 +29,8 @@ make build
 - `routing`: eligibility filters, normalized evidence ranking, bounded exploration and fallback selection.
 - `tools`: schema-validated registry and scoped read-only authorization boundary.
 - `policy`: owned HTTP transport with endpoint allowlisting and loopback-only egress mode.
+- `memory`: factual-memory contracts backed by SQLite, with provenance and scoped privacy-aware queries.
+- `skills`: private local versioned procedural workflows with validation-gated activation and rollback.
 - `internal/telemetry`: SQLite migration, atomic event append, and paginated replay.
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.
@@ -63,6 +65,18 @@ The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdo
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
 
 `--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined history is limited to 4 MiB pending token-budget/compaction integration.
+
+## Local HTTP service
+
+Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters, then run `darwin serve --config examples/local.yaml`. The configured daemon address must be loopback. This foreground process stops on SIGINT/SIGTERM and cancels active requests during shutdown. It is not yet an installed operating-system service.
+
+All endpoints require `Authorization: Bearer <token>`:
+
+- `GET /health`: application/database health; provider health is explicitly not checked yet.
+- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
+- `GET /v1/tasks/{id}`: reconstructed task/session state.
+
+Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Async submission, idempotency keys, SSE, separate cancellation, OpenAI-compatible endpoints, full provider health, and service installation are unfinished. Do not automatically retry a timed-out submission; a durable task may already exist.
 
 ## Next sprints
 

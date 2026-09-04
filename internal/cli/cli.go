@@ -16,9 +16,10 @@ Usage:
   darwin run --config path --model id < prompt.txt
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
+  darwin serve --config path  Run the authenticated loopback HTTP service
 
 Development status: explicit-model headless tasks are available. Automatic
-routing, interactive streaming and the daemon are not yet implemented.
+routing and interactive streaming are not yet implemented.
 `
 
 // Run executes a CLI invocation and returns its process exit code.
@@ -28,6 +29,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "serve" {
+		return runServe(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "task" {
 		return runTaskInspection(args[1:], stdout, stderr)
 	}

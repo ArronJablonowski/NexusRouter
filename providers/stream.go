@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 const maxStreamBytes = 16 << 20
@@ -15,6 +16,7 @@ const maxStreamBytes = 16 << 20
 type callDelta struct {
 	Index    int    `json:"index"`
 	ID       string `json:"id"`
+	Type     string `json:"type"`
 	Function struct {
 		Name      string `json:"name"`
 		Arguments string `json:"arguments"`
@@ -24,19 +26,20 @@ type callDelta struct {
 func readSSE(reader io.Reader, emit func(Chunk) error) error {
 	scanner := bufio.NewScanner(io.LimitReader(reader, maxStreamBytes+1))
 	scanner.Buffer(make([]byte, 4096), 1<<20)
-	data := ""
+	var data strings.Builder
 	partial := false
 	finished := false
 	reason := ""
 	total := 0
+	usageSeen := false
 	calls := map[int]*callDelta{}
 	fail := func() error { return &Failure{Code: "incomplete_or_invalid_stream", Partial: partial} }
 	consume := func() (bool, error) {
-		if data == "" {
+		if data.Len() == 0 {
 			return false, nil
 		}
-		payload := strings.TrimSuffix(data, "\n")
-		data = ""
+		payload := strings.TrimSuffix(data.String(), "\n")
+		data.Reset()
 		if payload == "[DONE]" {
 			if !finished {
 				return false, fail()
@@ -68,6 +71,7 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 				Index int `json:"index"`
 				Delta struct {
 					Content   string      `json:"content"`
+					Refusal   string      `json:"refusal"`
 					ToolCalls []callDelta `json:"tool_calls"`
 				} `json:"delta"`
 				Finish *string `json:"finish_reason"`
@@ -77,12 +81,15 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 				Output int64 `json:"completion_tokens"`
 			} `json:"usage"`
 		}
-		if json.Unmarshal([]byte(payload), &chunk) != nil || (len(chunk.Error) > 0 && string(chunk.Error) != "null") {
+		if !utf8.ValidString(payload) || json.Unmarshal([]byte(payload), &chunk) != nil || (len(chunk.Error) > 0 && string(chunk.Error) != "null") || len(chunk.Choices) > 1 {
 			return false, fail()
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Index != 0 || finished {
 				return false, fail()
+			}
+			if choice.Delta.Refusal != "" {
+				return false, &Failure{Code: "refusal", Partial: partial}
 			}
 			if choice.Delta.Content != "" {
 				partial = true
@@ -91,7 +98,7 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 				}
 			}
 			for _, d := range choice.Delta.ToolCalls {
-				if d.Index < 0 || d.Index > 127 {
+				if d.Index < 0 || d.Index > 127 || (d.Type != "" && d.Type != "function") {
 					return false, fail()
 				}
 				c := calls[d.Index]
@@ -115,9 +122,10 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 			}
 		}
 		if chunk.Usage != nil {
-			if chunk.Usage.Input < 0 || chunk.Usage.Output < 0 {
+			if usageSeen || chunk.Usage.Input < 0 || chunk.Usage.Output < 0 {
 				return false, fail()
 			}
+			usageSeen = true
 			if err := emit(Chunk{Usage: &Usage{chunk.Usage.Input, chunk.Usage.Output}}); err != nil {
 				return false, err
 			}
@@ -141,7 +149,8 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 			continue
 		}
 		if strings.HasPrefix(line, "data:") {
-			data += strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " ") + "\n"
+			data.WriteString(strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
+			data.WriteByte('\n')
 		}
 	}
 	if scanner.Err() != nil {
@@ -184,7 +193,7 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 				} `json:"tool_calls"`
 			} `json:"message"`
 		}
-		if total > maxStreamBytes || json.Unmarshal(line, &c) != nil || c.Error != "" {
+		if total > maxStreamBytes || !utf8.Valid(line) || json.Unmarshal(line, &c) != nil || c.Error != "" {
 			return &Failure{Code: "invalid_stream", Partial: partial}
 		}
 		if c.Message.Content != "" {
@@ -194,7 +203,7 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 			}
 		}
 		for _, call := range c.Message.Calls {
-			if call.Function.Name == "" || !jsonObject(call.Function.Arguments) {
+			if len(calls) >= 128 || call.Function.Name == "" || !jsonObject(call.Function.Arguments) {
 				return &Failure{Code: "invalid_tool_call", Partial: partial}
 			}
 			index++
