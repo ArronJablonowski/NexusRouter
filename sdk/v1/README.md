@@ -297,6 +297,17 @@ nil, not zero. Estimated cost is not billing evidence. The host remains responsi
 for privacy/redaction, resource reservation and durable attempt/accounting records.
 No daemon route selection, retry or activation occurs in this component.
 
+`ModelGenerator.GenerateRecorded(ctx, recorder, id, providerID, key, examples)`
+wraps generation in the `skills.GenerationRecorder` contract. Begin must be a
+single-winner durable claim, including for identical requests. SQLite schema16
+provides that implementation internally. Finish stores the generated proposal
+before returning it; cancellation uses an independent bounded cleanup write.
+On terminal persistence failure, inspect the returned started attempt's ID.
+Do not reissue inference under a new ID to bypass uncertainty. The input digest
+binds admitted examples and generation parameters; the host must additionally
+pin policy and estimator identity. This records proposals, not skill publication,
+and is not yet exposed through the application service or native management API.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

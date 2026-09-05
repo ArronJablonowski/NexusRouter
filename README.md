@@ -906,6 +906,16 @@ policy-bound provider and reserve resources, redact content and durably record
 the attempt. There is no retry or activation inside the generator, and daemon
 routing/scheduling of generation is not yet wired.
 
+`ModelGenerator.GenerateRecorded` adds durable execution tracking through a
+`skills.GenerationRecorder`. SQLite schema16 implements the recorder: each
+attempt ID can be claimed once, and completed proposals or sanitized failures
+are stored atomically. The initial record precedes estimation and inference.
+Repeated IDs never dispatch again; terminal persistence failure returns the
+started observation for inspection, not permission to retry. Cancellation still
+allows a bounded terminal write. Drafted records are proposals, not published or
+active skills. SQLite inspection supports individual IDs and scoped pagination;
+deduplicated publication and daemon/API/CLI integration remain unfinished.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
