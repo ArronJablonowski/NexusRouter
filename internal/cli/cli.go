@@ -19,6 +19,7 @@ Usage:
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
   darwin skills list|show|history|draft|rollback --root path --scope scope
+  darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
 
 Development status: use --model auto for constrained automatic routing.
 Interactive and live streaming are not yet implemented.
@@ -31,6 +32,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "feedback" {
+		return runFeedback(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "skills" {
 		return runSkills(args[1:], stdin, stdout, stderr)
 	}

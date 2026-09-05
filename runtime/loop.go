@@ -29,6 +29,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	Domain, Profile               string
 	Route                         *Data
 	ParentTaskID, Privacy         string
 	TaskID, SessionID, ProviderID string
@@ -98,7 +99,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

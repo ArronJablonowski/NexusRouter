@@ -82,6 +82,8 @@ Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, 
 
 ## Automatic routing and local knowledge
 
+Record operator feedback on a completed task with `darwin feedback --db path --task TASK_ID --outcome accepted --attempt-cost 0` (or `rejected`). Supply the observed final model-attempt cost explicitly; zero is appropriate only when known. This updates immutable user-feedback evidence and domain fitness atomically. Identical retries do not add samples; conflicting feedback or a pre-existing evaluation is rejected. Feedback covers the final attempt, not every preceding tool/model turn. No model tool can invoke this adapter. CLI output contains no task contents. An authenticated HTTP feedback endpoint and evaluation supersession remain unfinished.
+
 Opt in to the built-in `read_file` tool with a narrow workspace directory:
 
 ```yaml
