@@ -112,6 +112,10 @@ func readSkillGeneration(ctx context.Context, tx *sql.Tx, id string) (skills.Gen
 // permission to run. Every existing ID conflicts, including an identical start.
 // Provenance is a trusted host snapshot; this primitive does not inspect tasks.
 func (s *Store) BeginSkillGeneration(ctx context.Context, a skills.GenerationAttempt) error {
+	return s.beginSkillGeneration(ctx, a, nil)
+}
+
+func (s *Store) beginSkillGeneration(ctx context.Context, a skills.GenerationAttempt, budget *skills.GenerationBudget) error {
 	if ctx == nil || s == nil || s.db == nil || a.Status != "started" {
 		return skills.ErrInvalid
 	}
@@ -130,6 +134,15 @@ func (s *Store) BeginSkillGeneration(ctx context.Context, a skills.GenerationAtt
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
+	}
+	if budget != nil {
+		history, err := skillGenerationBudgetHistory(ctx, tx, a.Key.Scope)
+		if err != nil {
+			return err
+		}
+		if err = budget.Check(a, history, time.Now().UTC()); err != nil {
+			return err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO skill_generation_attempts(id,scope,name,status,body) VALUES(?,?,?,?,?)`, a.ID, a.Key.Scope, a.Key.Name, a.Status, body); err != nil {
 		return skillGenerationStorageError(ctx, err)

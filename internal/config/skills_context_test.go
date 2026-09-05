@@ -35,7 +35,7 @@ func TestSkillsContextDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}
+	want := Skills{GenerationBudget: Defaults().Skills.GenerationBudget, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}
 	if s.Skills != want {
 		t.Fatalf("skills=%#v want %#v", s.Skills, want)
 	}
@@ -51,7 +51,7 @@ func TestSkillsContextLayeredConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, Root: "/project/skills", Scope: "flag-scope", MaxSkills: 12, MaxBytes: 2048}
+	want := Skills{GenerationBudget: Defaults().Skills.GenerationBudget, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, Root: "/project/skills", Scope: "flag-scope", MaxSkills: 12, MaxBytes: 2048}
 	if s.Skills != want {
 		t.Fatalf("skills=%#v want %#v", s.Skills, want)
 	}

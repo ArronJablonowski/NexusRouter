@@ -456,6 +456,28 @@ historical page even when newer pages exist. Metadata can still be sensitive.
 These methods do not schedule scans, group candidates across pages, select a
 workflow, or dispatch generation.
 
+`skills.generation_budget` optionally caps generation across the configured skill
+scope. Defaults are disabled, with `window: 24h`, `max_cost: 0`,
+`max_attempts: 10`, `max_in_flight: 1`, and `cooldown: 1h`. When enabled, all
+application generation routes share the same durable claim budget. The rolling
+window counts estimated cost and every attempt, including failures; outstanding
+started attempts count toward concurrency regardless of age. Cooldown applies
+per skill name. A zero cost ceiling still permits zero-estimated-cost models,
+subject to attempt and concurrency limits.
+
+This is conservative admission accounting, not actual provider billing or a
+background scheduler. Limits must be valid even while disabled: window 1 minute
+through 30 days, attempts 1–1000, in-flight 1–attempt limit, finite nonnegative
+cost, and cooldown zero through the window. History inspection is currently
+bounded to 1000 records/8 MiB and fails closed beyond that bound; indexed budget
+history and retention remain future work.
+
+Policy is trusted client configuration, not an immutable database-wide limit:
+another host-authorized client can disable or loosen it. Enabled clients still
+count all recorded scope attempts, including earlier unbudgeted work. Cost
+ceilings use the same units as configured model estimates. Budget denial returns
+`skills.ErrGenerationBudget` without a generation claim or inference call.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

@@ -222,7 +222,19 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		return bad()
 	}
 	defer write.Close()
-	if err = write.BeginSkillGeneration(ctx, started); err != nil {
+	if s.settings.Skills.GenerationBudget.Enabled {
+		budget, budgetErr := s.skillGenerationBudget()
+		if budgetErr != nil {
+			return bad()
+		}
+		err = write.BeginSkillGenerationBudgeted(ctx, started, budget)
+	} else {
+		err = write.BeginSkillGeneration(ctx, started)
+	}
+	if err != nil {
+		if errors.Is(err, skills.ErrGenerationBudget) {
+			return skills.GenerationAttempt{}, skills.ErrGenerationBudget
+		}
 		return skills.GenerationAttempt{}, skills.ErrGenerationPersistence
 	}
 	finish := func(terminal skills.GenerationAttempt, cause error) (skills.GenerationAttempt, error) {

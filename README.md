@@ -55,6 +55,13 @@ skills:
   local_only: true
   max_skills: 3
   max_bytes: 16384
+  generation_budget:
+    enabled: false
+    window: 24h
+    max_cost: 0
+    max_attempts: 10
+    max_in_flight: 1
+    cooldown: 1h
 ```
 
 Root and scope are empty by default, so loading is opt-in. The configured root

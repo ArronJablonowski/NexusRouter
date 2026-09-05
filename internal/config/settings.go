@@ -81,15 +81,16 @@ type Routing struct {
 	Weights     map[string]float64 `yaml:"weights" json:"weights"`
 }
 type Skills struct {
-	Enabled      bool   `yaml:"enabled" json:"enabled"`
-	AutoDraft    bool   `yaml:"auto_draft" json:"auto_draft"`
-	AutoActivate bool   `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
-	Rollback     bool   `yaml:"rollback_on_regression" json:"rollback_on_regression"`
-	Root         string `yaml:"root" json:"root"`
-	Scope        string `yaml:"scope" json:"scope"`
-	LocalOnly    bool   `yaml:"local_only" json:"local_only"`
-	MaxSkills    int    `yaml:"max_skills" json:"max_skills"`
-	MaxBytes     int    `yaml:"max_bytes" json:"max_bytes"`
+	GenerationBudget GenerationBudget `yaml:"generation_budget" json:"generation_budget"`
+	Enabled          bool             `yaml:"enabled" json:"enabled"`
+	AutoDraft        bool             `yaml:"auto_draft" json:"auto_draft"`
+	AutoActivate     bool             `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
+	Rollback         bool             `yaml:"rollback_on_regression" json:"rollback_on_regression"`
+	Root             string           `yaml:"root" json:"root"`
+	Scope            string           `yaml:"scope" json:"scope"`
+	LocalOnly        bool             `yaml:"local_only" json:"local_only"`
+	MaxSkills        int              `yaml:"max_skills" json:"max_skills"`
+	MaxBytes         int              `yaml:"max_bytes" json:"max_bytes"`
 }
 type Memory struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
@@ -126,7 +127,7 @@ func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
 		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
-		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
+		Skills:  Skills{GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
@@ -254,6 +255,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Skills.MaxSkills < 1 || s.Skills.MaxSkills > 16 || s.Skills.MaxBytes < 256 || s.Skills.MaxBytes > 65536 || (s.Skills.Root == "") != (s.Skills.Scope == "") {
 		return errors.New("invalid skills context settings")
+	}
+	if err := s.Skills.GenerationBudget.Validate(); err != nil {
+		return err
 	}
 	if s.Skills.Root != "" {
 		if !filepath.IsAbs(s.Skills.Root) || filepath.Dir(filepath.Clean(s.Skills.Root)) == filepath.Clean(s.Skills.Root) || !skillScope.MatchString(s.Skills.Scope) {
