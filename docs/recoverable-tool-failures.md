@@ -7,6 +7,10 @@ of a tool call and not a general fallback guarantee.
 
 ## Trusted outcome contract
 
+The separate [tool behavior declaration](tool-behavior.md) does not change
+recoverability. Declaring an idempotent write does not make uncertain effects
+safe to replay or replace per-call approval.
+
 `runtime.ToolResult.Failed` describes success separately from side effects.
 By default an explicit failure stops the task. A trusted handler may return
 `Failed: true, Recoverable: true, Effect: runtime.NoEffect` with a nil Go error

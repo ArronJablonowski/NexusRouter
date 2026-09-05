@@ -494,7 +494,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if ctx.Err() != nil {
 				return fail(ctx.Err())
 			}
-			if err := persist(ctx, ToolStarted, Data{ToolCallID: call.ID, ToolName: call.Name, Effect: UncertainEffect}); err != nil {
+			behavior, behaviorErr := declaredToolBehavior(l.Tools, call.Name)
+			if behaviorErr != nil {
+				return fail(ErrTool)
+			}
+			if err := persist(ctx, ToolStarted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: UncertainEffect}); err != nil {
 				return result, err
 			}
 			out := ToolResult{Effect: NoEffect}
@@ -516,6 +520,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if out.Recoverable && (!out.Failed || out.Effect != NoEffect) {
 				toolErr = ErrTool
 			}
+			if behavior == BehaviorReadOnly && out.Effect == ConfirmedEffect {
+				// A declaration cannot erase an observed effect. Keep the effect
+				// as evidence, but do not release this contradictory result.
+				toolErr = ErrTool
+			}
 			used += len(out.Content)
 			if used > r.MaxOutputBytes {
 				out.Content = ""
@@ -526,7 +535,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				code = "tool_failed"
 			}
 			terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			err := persist(terminal, ToolCompleted, Data{ToolCallID: call.ID, ToolName: call.Name, Effect: out.Effect, Text: out.Content, Code: code})
+			err := persist(terminal, ToolCompleted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: out.Effect, Text: out.Content, Code: code})
 			cancel()
 			if err != nil {
 				return result, err

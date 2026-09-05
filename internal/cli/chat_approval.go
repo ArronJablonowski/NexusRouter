@@ -86,6 +86,9 @@ func chatApprovalPreview(settings config.Settings, secret func(string) string, p
 	if p.Request.Validate() != nil || p.Request.ToolName != "create_file" || len(p.Arguments) > 1<<20 || !utf8.Valid(p.Arguments) {
 		return "", tools.ErrDenied
 	}
+	if p.Request.ToolBehavior != "" && p.Request.ToolBehavior != tools.BehaviorNonIdempotentWrite {
+		return "", tools.ErrDenied
+	}
 	digest := sha256.Sum256(p.Arguments)
 	if hex.EncodeToString(digest[:]) != p.Request.ArgumentsDigest {
 		return "", tools.ErrDenied
@@ -124,6 +127,10 @@ func chatApprovalPreview(settings config.Settings, secret func(string) string, p
 	fmt.Fprintf(&out, "[approval pending %s]\nCreate NEW file only; existing paths are never overwritten.\nConfigured root: %s\nRelative path: %s\nContent: %d UTF-8 bytes, SHA-256 %x\nExact content lines (ASCII-quoted, including newline escapes):\n", p.Request.ID, strconv.QuoteToASCII(settings.Tools.CreateRoot), strconv.QuoteToASCII(args.Path), len(args.Content), contentDigest)
 	for _, line := range strings.SplitAfter(args.Content, "\n") {
 		fmt.Fprintf(&out, "| %s\n", strconv.QuoteToASCII(line))
+	}
+	// The validated declaration is metadata, never permission to replay a write.
+	if p.Request.ToolBehavior != "" {
+		fmt.Fprintf(&out, "Declared behavior: %s (not retry authority)\n", p.Request.ToolBehavior)
 	}
 	fmt.Fprintf(&out, "Use /approve %s or /deny %s for this request only.\n", p.Request.ID, p.Request.ID)
 	if out.Len() > 1<<20 {

@@ -82,6 +82,7 @@ type Data struct {
 	ProviderID       string               `json:"provider_id,omitempty"`
 	ToolCallID       string               `json:"tool_call_id,omitempty"`
 	ToolName         string               `json:"tool_name,omitempty"`
+	ToolBehavior     ToolBehavior         `json:"tool_behavior,omitempty"`
 	Effect           Effect               `json:"effect,omitempty"`
 	Code             string               `json:"code,omitempty"`
 	Accepted         *bool                `json:"accepted,omitempty"`
@@ -92,6 +93,9 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if e.Data.ToolBehavior != "" && (!e.Data.ToolBehavior.Valid() || (e.Kind != ToolStarted && e.Kind != ToolCompleted)) {
+		return errors.New("invalid tool behavior declaration")
+	}
 	if e.Data.DelegationOrigin != nil && (e.Kind != TaskStarted || e.Data.ParentTaskID == "" || e.Data.DelegationOrigin.Validate() != nil) {
 		return errors.New("invalid delegation origin placement")
 	}

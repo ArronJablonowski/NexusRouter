@@ -26,6 +26,11 @@ capability. Environment overrides include `DARWIN__TOOLS__CREATE_ENABLED` and
 
 ## Per-call review
 
+`create_file` explicitly declares `non_idempotent_write`. The declaration appears
+in its approval and durable tool events; it neither changes no-overwrite behavior
+nor permits retry. Terminal preview rejects a contradictory declared class.
+See [tool behavior](tool-behavior.md) for the separate operation/effect contracts.
+
 The terminal shows a pending approval ID, configured root, relative path, byte
 count, content SHA-256, and complete content as ASCII-quoted lines. Escapes
 represent the decoded characters and newlines; content is not executed or

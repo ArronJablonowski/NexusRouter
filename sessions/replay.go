@@ -16,10 +16,11 @@ type Reader interface {
 	Read(context.Context, string, int64, int) ([]runtime.Event, error)
 }
 type Pending struct {
-	Call       providers.ToolCall
-	TurnID     string
-	AttemptID  string
-	Dispatched bool
+	Call         providers.ToolCall
+	TurnID       string
+	AttemptID    string
+	Dispatched   bool
+	ToolBehavior runtime.ToolBehavior
 }
 type Snapshot struct {
 	Compaction               *runtime.ContextCompaction
@@ -135,9 +136,10 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 						return s, ErrHistory
 					}
 					pending.Dispatched = true
+					pending.ToolBehavior = e.Data.ToolBehavior
 					s.Pending[e.Data.ToolCallID] = pending
 				} else {
-					if !pending.Dispatched {
+					if !pending.Dispatched || pending.ToolBehavior != e.Data.ToolBehavior {
 						return s, ErrHistory
 					}
 					s.Messages = append(s.Messages, providers.Message{Role: "tool", ToolCallID: e.Data.ToolCallID, Content: e.Data.Text, ToolFailed: e.Data.Code == "tool_failed"})

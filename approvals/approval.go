@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 const (
@@ -30,18 +32,19 @@ var (
 // coordinator from exact arguments, schema and effective policy; no raw prompt,
 // arguments, credentials or lease capabilities belong in this record.
 type Request struct {
-	Version         int       `json:"version"`
-	ID              string    `json:"id"`
-	TaskID          string    `json:"task_id"`
-	TurnID          string    `json:"turn_id"`
-	ToolCallID      string    `json:"tool_call_id"`
-	ToolName        string    `json:"tool_name"`
-	Scope           string    `json:"scope"`
-	ArgumentsDigest string    `json:"arguments_digest"`
-	SchemaDigest    string    `json:"schema_digest"`
-	PolicyDigest    string    `json:"policy_digest"`
-	CreatedAt       time.Time `json:"created_at"`
-	ExpiresAt       time.Time `json:"expires_at"`
+	Version         int                  `json:"version"`
+	ID              string               `json:"id"`
+	TaskID          string               `json:"task_id"`
+	TurnID          string               `json:"turn_id"`
+	ToolCallID      string               `json:"tool_call_id"`
+	ToolName        string               `json:"tool_name"`
+	ToolBehavior    runtime.ToolBehavior `json:"tool_behavior,omitempty"`
+	Scope           string               `json:"scope"`
+	ArgumentsDigest string               `json:"arguments_digest"`
+	SchemaDigest    string               `json:"schema_digest"`
+	PolicyDigest    string               `json:"policy_digest"`
+	CreatedAt       time.Time            `json:"created_at"`
+	ExpiresAt       time.Time            `json:"expires_at"`
 }
 
 // Decision is operator-attributed, never model-authored authority. The host
@@ -64,6 +67,9 @@ type Record struct {
 }
 
 func (r Request) Validate() error {
+	if r.ToolBehavior != "" && !r.ToolBehavior.Valid() {
+		return ErrInvalid
+	}
 	if r.Version != Version || !identifier(r.ID) || !identifier(r.TaskID) || !identifier(r.TurnID) || !identifier(r.ToolCallID) || !toolName(r.ToolName) || !label(r.Scope, 256) || strings.Contains(r.Scope, "*") || !digest(r.ArgumentsDigest) || !digest(r.SchemaDigest) || !digest(r.PolicyDigest) || !validTime(r.CreatedAt) || !validTime(r.ExpiresAt) || !r.ExpiresAt.After(r.CreatedAt) || r.ExpiresAt.Sub(r.CreatedAt) > 10*time.Minute {
 		return ErrInvalid
 	}

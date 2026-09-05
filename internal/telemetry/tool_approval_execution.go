@@ -45,7 +45,7 @@ func (s *Store) ApprovalExecutionStatus(ctx context.Context, task, id string, no
 	}
 	out := approvals.ExecutionStatus{Version: approvals.Version, Approval: r, TaskState: snapshot.State, Sequence: snapshot.Sequence, ObservedAt: now, ScopeWriterState: "none"}
 	if pending, ok := snapshot.Pending[r.Request.ToolCallID]; ok {
-		if !pending.Dispatched || pending.TurnID != r.Request.TurnID || pending.Call.Name != r.Request.ToolName {
+		if !pending.Dispatched || pending.TurnID != r.Request.TurnID || pending.Call.Name != r.Request.ToolName || pending.ToolBehavior != r.Request.ToolBehavior {
 			return zero, approvals.ErrInvalid
 		}
 		out.CallState = "open"
@@ -71,7 +71,7 @@ func (s *Store) ApprovalExecutionStatus(ctx context.Context, task, id string, no
 			return zero, approvals.ErrUnavailable
 		}
 		var event runtime.Event
-		if !eventID.Valid || len(body) == 0 || json.Unmarshal(body, &event) != nil || event.Validate() != nil || event.ID != eventID.String || event.TaskID != task || event.SessionID != snapshot.SessionID || event.Sequence != sequence || event.Kind != runtime.ToolCompleted || event.TurnID != r.Request.TurnID || event.Data.ToolCallID != r.Request.ToolCallID || event.Data.ToolName != r.Request.ToolName {
+		if !eventID.Valid || len(body) == 0 || json.Unmarshal(body, &event) != nil || event.Validate() != nil || event.ID != eventID.String || event.TaskID != task || event.SessionID != snapshot.SessionID || event.Sequence != sequence || event.Kind != runtime.ToolCompleted || event.TurnID != r.Request.TurnID || event.Data.ToolCallID != r.Request.ToolCallID || event.Data.ToolName != r.Request.ToolName || event.Data.ToolBehavior != r.Request.ToolBehavior {
 			return zero, approvals.ErrInvalid
 		}
 		out.CallState = "completed"

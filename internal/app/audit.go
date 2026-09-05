@@ -96,7 +96,7 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 				}
 				// Retain only execution metadata, never another copy of tool
 				// output, arguments, prompts or unrelated event payloads.
-				e.Data = runtime.Data{Code: e.Data.Code, Accepted: e.Data.Accepted, Validation: e.Data.Validation, ToolCallID: e.Data.ToolCallID, ToolName: e.Data.ToolName, Effect: e.Data.Effect}
+				e.Data = runtime.Data{Code: e.Data.Code, Accepted: e.Data.Accepted, Validation: e.Data.Validation, ToolCallID: e.Data.ToolCallID, ToolName: e.Data.ToolName, ToolBehavior: e.Data.ToolBehavior, Effect: e.Data.Effect}
 				executionEvents = append(executionEvents, e)
 			}
 		}

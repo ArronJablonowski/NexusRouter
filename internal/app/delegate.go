@@ -160,7 +160,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		return runtime.ToolResult{Content: string(body), Effect: runtime.NoEffect}, nil
 	}
 	if err := registry.Register(tools.Definition{
-		Tool: delegateSpec(), Scope: "delegation", ReadOnly: true,
+		Tool: delegateSpec(), Scope: "delegation", ReadOnly: true, Behavior: runtime.BehaviorReadOnly,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			var input delegateInput
 			if ctx.Err() != nil || json.Unmarshal(raw, &input) != nil || !input.valid() || !reserve(1) {

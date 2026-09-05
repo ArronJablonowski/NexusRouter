@@ -17,17 +17,25 @@ func ParseCommand(body []byte) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	if _, err = commandObject(fields["expected"], "version", "id", "task_id", "turn_id", "tool_call_id", "tool_name", "scope", "arguments_digest", "schema_digest", "policy_digest", "created_at", "expires_at"); err != nil {
+	expected, err := commandObjectOptional(fields["expected"], "tool_behavior", "version", "id", "task_id", "turn_id", "tool_call_id", "tool_name", "scope", "arguments_digest", "schema_digest", "policy_digest", "created_at", "expires_at")
+	if err != nil {
 		return Command{}, err
 	}
 	var c Command
 	if json.Unmarshal(body, &c) != nil || c.Validate() != nil {
 		return Command{}, ErrInvalid
 	}
+	if expected["tool_behavior"] != nil && !c.Expected.ToolBehavior.Valid() {
+		return Command{}, ErrInvalid
+	}
 	return c, nil
 }
 
 func commandObject(body []byte, keys ...string) (map[string]json.RawMessage, error) {
+	return commandObjectOptional(body, "", keys...)
+}
+
+func commandObjectOptional(body []byte, optional string, keys ...string) (map[string]json.RawMessage, error) {
 	d := json.NewDecoder(bytes.NewReader(body))
 	token, err := d.Token()
 	if err != nil || token != json.Delim('{') {
@@ -40,7 +48,7 @@ func commandObject(body []byte, keys ...string) (map[string]json.RawMessage, err
 		if err != nil || !ok || fields[key] != nil {
 			return nil, ErrInvalid
 		}
-		known := false
+		known := optional != "" && key == optional
 		for _, allowed := range keys {
 			if key == allowed {
 				known = true
@@ -56,8 +64,13 @@ func commandObject(body []byte, keys ...string) (map[string]json.RawMessage, err
 		}
 		fields[key] = raw
 	}
-	if token, err = d.Token(); err != nil || token != json.Delim('}') || len(fields) != len(keys) {
+	if token, err = d.Token(); err != nil || token != json.Delim('}') {
 		return nil, ErrInvalid
+	}
+	for _, key := range keys {
+		if fields[key] == nil {
+			return nil, ErrInvalid
+		}
 	}
 	if _, err = d.Token(); err != io.EOF {
 		return nil, ErrInvalid

@@ -83,7 +83,7 @@ func parseAuditDelegationItem(e runtime.Event, body []byte) (*auditDelegation, e
 			}
 		}
 	}
-	e.Data = runtime.Data{ToolCallID: e.Data.ToolCallID, ToolName: e.Data.ToolName, Effect: e.Data.Effect}
+	e.Data = runtime.Data{ToolCallID: e.Data.ToolCallID, ToolName: e.Data.ToolName, ToolBehavior: e.Data.ToolBehavior, Effect: e.Data.Effect}
 	ref := &auditDelegation{parent: e}
 	var canonical []byte
 	var err error

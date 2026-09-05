@@ -36,20 +36,22 @@ func auditExecutionEvidence(events []runtime.Event, secrets []string) ([]evaluat
 			return nil, ErrAdmission
 		}
 		p := struct {
-			Version    int          `json:"version"`
-			Sequence   int64        `json:"sequence"`
-			Kind       runtime.Kind `json:"kind"`
-			TurnID     string       `json:"turn_id"`
-			AttemptID  string       `json:"attempt_id"`
-			ToolCallID string       `json:"tool_call_id,omitempty"`
-			ToolName   string       `json:"tool_name,omitempty"`
-			Effect     string       `json:"effect,omitempty"`
-			Code       string       `json:"code,omitempty"`
-			Accepted   *bool        `json:"accepted,omitempty"`
-			Validation string       `json:"validation,omitempty"`
+			Version      int                  `json:"version"`
+			Sequence     int64                `json:"sequence"`
+			Kind         runtime.Kind         `json:"kind"`
+			TurnID       string               `json:"turn_id"`
+			AttemptID    string               `json:"attempt_id"`
+			ToolCallID   string               `json:"tool_call_id,omitempty"`
+			ToolName     string               `json:"tool_name,omitempty"`
+			ToolBehavior runtime.ToolBehavior `json:"tool_behavior,omitempty"`
+			Effect       string               `json:"effect,omitempty"`
+			Code         string               `json:"code,omitempty"`
+			Accepted     *bool                `json:"accepted,omitempty"`
+			Validation   string               `json:"validation,omitempty"`
 		}{Version: 1, Sequence: e.Sequence, Kind: e.Kind, TurnID: e.TurnID, AttemptID: e.AttemptID, Code: e.Data.Code}
 		if e.Kind == runtime.ToolCompleted {
 			p.ToolCallID, p.ToolName, p.Effect = e.Data.ToolCallID, e.Data.ToolName, string(e.Data.Effect)
+			p.ToolBehavior = e.Data.ToolBehavior
 		} else {
 			p.Accepted, p.Validation = e.Data.Accepted, e.Data.Validation
 		}

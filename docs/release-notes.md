@@ -5,6 +5,10 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Declared read-only/idempotent-write/non-idempotent-write tool behavior, with
+  durable event/approval binding and no added retry authority. Both writer
+  classes retain approvals and writer leases; see [tool behavior](tool-behavior.md).
+
 - Explicit effect-free read/delegation failure feedback with bounded model repair,
   durable failed-step history and learning exclusion. Native Codex failure
   handoff and invalid-worker→corrected-worker delegation passed bounded live

@@ -19,7 +19,7 @@ func registerDelegateBatch(registry *tools.Registry, reserve func(int) bool, exe
 	if registry == nil || reserve == nil || execute == nil {
 		return ErrAdmission
 	}
-	return registry.Register(tools.Definition{Tool: delegateBatchSpec(), Scope: "delegation", ReadOnly: true,
+	return registry.Register(tools.Definition{Tool: delegateBatchSpec(), Scope: "delegation", ReadOnly: true, Behavior: runtime.BehaviorReadOnly,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			const failure = `{"error":"delegate_unavailable_or_rejected"}`
 			failed := runtime.ToolResult{Content: failure, Effect: runtime.NoEffect, Failed: true, Recoverable: true}

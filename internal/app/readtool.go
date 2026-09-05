@@ -28,7 +28,7 @@ func readTools(path string) (*tools.Registry, func(), error) {
 	registry := &tools.Registry{}
 	err = registry.Register(tools.Definition{
 		Tool:  readFileSpec(),
-		Scope: "workspace", ReadOnly: true,
+		Scope: "workspace", ReadOnly: true, Behavior: runtime.BehaviorReadOnly,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			failed := runtime.ToolResult{Content: `{"error":"file_unavailable"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
 			var args struct {

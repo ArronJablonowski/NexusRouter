@@ -79,6 +79,9 @@ type Definition struct {
 	Tool     providers.Tool
 	Scope    string
 	ReadOnly bool
+	// Behavior defaults from ReadOnly. Explicit read_only still requires
+	// ReadOnly=true; contradictory declarations fail registration.
+	Behavior runtime.ToolBehavior
 	Handler  func(context.Context, json.RawMessage) (runtime.ToolResult, error)
 }
 type entry struct {
@@ -96,6 +99,11 @@ type denyLoader struct{}
 func (denyLoader) Load(string) (any, error) { return nil, ErrDefinition }
 
 func (r *Registry) Register(d Definition) error {
+	var behaviorErr error
+	d.Behavior, behaviorErr = normalizeBehavior(d.Behavior, d.ReadOnly)
+	if behaviorErr != nil {
+		return behaviorErr
+	}
 	if d.Tool.Name == "" || d.Scope == "" || d.Handler == nil {
 		return ErrDefinition
 	}
@@ -144,8 +152,8 @@ func (r *Registry) Catalog() []providers.Tool {
 }
 
 // Executor admits writes or Ask only through an explicit scoped Authority.
-// Policy must remain immutable for the task lifetime. Application extensions
-// still reject writes until the operator approval surface is integrated.
+// Policy must remain immutable for the task lifetime. Declaring an idempotent
+// write does not bypass approval or authorize automatic retries.
 type Executor struct {
 	Registry  *Registry
 	Policy    *Policy

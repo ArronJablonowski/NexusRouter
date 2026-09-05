@@ -91,7 +91,7 @@ func approvalCall(ctx context.Context, tx *sql.Tx, r approvals.Request) error {
 		return approvals.ErrInvalid
 	}
 	pending, ok := snapshot.Pending[r.ToolCallID]
-	if snapshot.State != "running" || !ok || !pending.Dispatched || pending.TurnID != r.TurnID || pending.Call.Name != r.ToolName {
+	if snapshot.State != "running" || !ok || !pending.Dispatched || pending.TurnID != r.TurnID || pending.Call.Name != r.ToolName || pending.ToolBehavior != r.ToolBehavior {
 		return approvals.ErrConflict
 	}
 	var body []byte
@@ -105,7 +105,7 @@ func approvalCall(ctx context.Context, tx *sql.Tx, r approvals.Request) error {
 	if len(body) == 0 || json.Unmarshal(body, &event) != nil || event.Validate() != nil || event.ID != eventID || event.TaskID != r.TaskID || event.SessionID != session || event.Sequence != seq {
 		return approvals.ErrInvalid
 	}
-	if event.Kind != runtime.ToolStarted || event.TurnID != r.TurnID || event.Data.ToolCallID != r.ToolCallID || event.Data.ToolName != r.ToolName || event.Data.Effect != runtime.UncertainEffect {
+	if event.Kind != runtime.ToolStarted || event.TurnID != r.TurnID || event.Data.ToolCallID != r.ToolCallID || event.Data.ToolName != r.ToolName || event.Data.Effect != runtime.UncertainEffect || event.Data.ToolBehavior != r.ToolBehavior {
 		return approvals.ErrConflict
 	}
 	return nil

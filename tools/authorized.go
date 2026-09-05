@@ -18,6 +18,7 @@ import (
 // callbacks. Arguments may contain secrets: never persist or log these fields.
 // Digest-only approvals.Request is the durable authorization record.
 type Authorization struct {
+	ToolBehavior                                runtime.ToolBehavior
 	TaskID, SessionID, TurnID, AttemptID        string
 	ToolCallID, ToolName, Scope                 string
 	ArgumentsDigest, SchemaDigest, PolicyDigest string
@@ -55,16 +56,22 @@ type Authority interface {
 func (e Executor) approved(ctx context.Context, x runtime.ToolExecution, t entry, policy *Policy, arguments json.RawMessage) (out runtime.ToolResult, err error) {
 	out.Effect = runtime.NoEffect
 	hash := func(b []byte) string { sum := sha256.Sum256(b); return hex.EncodeToString(sum[:]) }
-	body, marshalErr := json.Marshal(policy)
+	body, marshalErr := json.Marshal(struct {
+		Version  int                  `json:"version"`
+		Policy   *Policy              `json:"policy"`
+		Behavior runtime.ToolBehavior `json:"behavior"`
+	}{1, policy, t.Behavior})
 	if marshalErr != nil {
 		return out, ErrDenied
 	}
 	a := Authorization{TaskID: x.TaskID, SessionID: x.SessionID, TurnID: x.TurnID, AttemptID: x.AttemptID, ToolCallID: x.Call.ID, ToolName: x.Call.Name, Scope: t.Scope, ArgumentsDigest: hash(arguments), SchemaDigest: hash(t.Tool.Parameters), PolicyDigest: hash(body)}
 	a.Arguments = append(json.RawMessage(nil), arguments...)
+	a.ToolBehavior = t.Behavior
 	a.Description = t.Tool.Description
 	// Validate identities before a host authority or callback sees the proposal.
 	now := time.Now().UTC()
 	r := approvals.Request{Version: 1, ID: "validation", TaskID: a.TaskID, TurnID: a.TurnID, ToolCallID: a.ToolCallID, ToolName: a.ToolName, Scope: a.Scope, ArgumentsDigest: a.ArgumentsDigest, SchemaDigest: a.SchemaDigest, PolicyDigest: a.PolicyDigest, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}
+	r.ToolBehavior = a.ToolBehavior
 	if r.Validate() != nil {
 		return out, ErrDenied
 	}

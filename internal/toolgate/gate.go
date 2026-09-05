@@ -56,13 +56,13 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 		}
 	}
 	now := time.Now().UTC()
-	req := approvals.Request{Version: approvals.Version, ID: rand.Text(), TaskID: a.TaskID, TurnID: a.TurnID, ToolCallID: a.ToolCallID, ToolName: a.ToolName, Scope: a.Scope, ArgumentsDigest: a.ArgumentsDigest, SchemaDigest: a.SchemaDigest, PolicyDigest: a.PolicyDigest, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}
+	req := approvals.Request{Version: approvals.Version, ID: rand.Text(), TaskID: a.TaskID, TurnID: a.TurnID, ToolCallID: a.ToolCallID, ToolName: a.ToolName, ToolBehavior: a.ToolBehavior, Scope: a.Scope, ArgumentsDigest: a.ArgumentsDigest, SchemaDigest: a.SchemaDigest, PolicyDigest: a.PolicyDigest, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}
 	if req.Validate() != nil {
 		return noEffect, tools.ErrDenied
 	}
 	snapshot, err := g.Store.TaskSnapshot(ctx, a.TaskID)
 	pending := snapshot.Pending[a.ToolCallID]
-	if err != nil || snapshot.SessionID != a.SessionID || pending.AttemptID != a.AttemptID || a.AttemptID == "" || a.SessionID == "" {
+	if err != nil || snapshot.SessionID != a.SessionID || pending.AttemptID != a.AttemptID || pending.ToolBehavior != a.ToolBehavior || a.AttemptID == "" || a.SessionID == "" {
 		return noEffect, tools.ErrDenied
 	}
 	if _, err = g.Store.RequestApproval(ctx, req); err != nil {

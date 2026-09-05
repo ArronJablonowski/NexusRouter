@@ -40,7 +40,7 @@ func registerCreateTool(registry *tools.Registry, path string) (func(), string, 
 		return nil, "", ErrAdmission
 	}
 	scope := fmt.Sprintf("create_%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d", stat.Dev, stat.Ino))))
-	err = registry.Register(tools.Definition{Tool: createFileSpec(), Scope: scope, ReadOnly: false, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
+	err = registry.Register(tools.Definition{Tool: createFileSpec(), Scope: scope, ReadOnly: false, Behavior: runtime.BehaviorNonIdempotentWrite, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 		return createNewFile(ctx, root, raw)
 	}})
 	if err != nil {

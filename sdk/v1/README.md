@@ -126,6 +126,21 @@ Durable extension identity and general lifecycle hooks remain unfinished.
 
 ### Operator-reviewed tool extensions
 
+`Tool.Behavior` distinguishes `sdk.BehaviorReadOnly`,
+`sdk.BehaviorIdempotentWrite`, and `sdk.BehaviorNonIdempotentWrite`. Omission
+defaults from `ReadOnly`: true is read-only, false is non-idempotent write.
+Explicit declarations must agree with that boolean; even an explicitly
+read-only tool must set `ReadOnly: true`. Unknown or contradictory declarations
+fail construction. For an idempotent implementation, set
+`Behavior: sdk.BehaviorIdempotentWrite` and leave `ReadOnly` false.
+
+Both writer classes still require the reviewer/presenter and durable writer
+lease below. `ApprovalPrompt.Request.ToolBehavior`, approval inspection and
+task tool events retain the normalized declaration. It is bound into the
+one-use approval and cannot enable retry after confirmed or uncertain effects.
+It describes trusted handler behavior, not submission deduplication or a proof
+that arbitrary Go code is idempotent. See [declared tool behavior](../../docs/tool-behavior.md).
+
 Trusted handlers can return `runtime.ToolResult{Failed: true, Effect: ...}` with
 a nil Go error for an explicitly known tool failure. The runtime records
 `tool_failed` and, by default, fails the task while preserving the declared effect.

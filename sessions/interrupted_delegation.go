@@ -195,7 +195,7 @@ func PlanInterruptedDelegation(histories [][]runtime.Event, now time.Time, cance
 		return runtime.Event{Version: 1, ID: hex.EncodeToString(sum[:]), TaskID: parent.TaskID, SessionID: parent.SessionID, CorrelationID: parent.TaskID, Sequence: sequence, Time: now.UTC(), Kind: kind, TurnID: pending.TurnID, AttemptID: pending.AttemptID}
 	}
 	tool := makeEvent(1, runtime.ToolCompleted)
-	tool.Data = runtime.Data{ToolName: pending.Call.Name, ToolCallID: pending.Call.ID, Effect: runtime.NoEffect, Code: "delegation_recovered", Text: payload}
+	tool.Data = runtime.Data{ToolName: pending.Call.Name, ToolCallID: pending.Call.ID, ToolBehavior: pending.ToolBehavior, Effect: runtime.NoEffect, Code: "delegation_recovered", Text: payload}
 	terminal := makeEvent(2, runtime.TaskFailed)
 	terminal.Data.Code = "interrupted_after_delegation"
 	if canceled {
