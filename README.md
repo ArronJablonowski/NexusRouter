@@ -1086,6 +1086,17 @@ answer does not erase a mechanically verified failure. Review is opt-in, and
 the current automatic hook audits successful runs only; eligible failed tasks
 can be reviewed explicitly. It does not automatically repair or rerun a task.
 
+Reviews receive separately citable `execution_<sequence>` records for persisted
+tool completions and validation outcomes, in addition to conversation history.
+Each record identifies its turn and attempt, so earlier tool work is not confused
+with final-answer validation. A `candidate_execution` reference identifies the
+final answer's turn, attempt and completion sequence. Tool error codes, side-effect status and explicit
+validation booleans remain distinct; tool completion alone does not prove tests
+passed. The projection excludes raw tool text and arguments, scrubs configured
+credentials, and admits at most 250 records totaling 64 KiB. Oversized metadata
+denies review instead of silently omitting failures. These references identify
+events within the audit's task, not independently verified external receipts.
+
 `darwin audits list --db path --task TASK_ID` and `darwin audits show --db path --id AUDIT_ID` inspect immutable advisory audits. `darwin audits attempts --db path --task TASK_ID` inspects admitted review lifecycles, including failures. Lists accept `--after` and `--limit` (1–100); inspection never creates storage. Audit records are separate from fitness and retain reported usage rather than fabricated dollar costs. Findings may contain sensitive content, so protect exports.
 
 Review execution persists `started` before calling the reviewer, then records the validated audit and `completed` status in one transaction, or `failed` with a generic code. Cancellation cleanup has an independent five-second storage deadline. Admission denials do not create attempts. A crash or storage failure can leave an attempt `started`; this means indeterminate, not proof that a review is still running. Automatic reconciliation is not implemented. Failed reviews never become candidate performance evidence. The standalone audit-storage API remains available for imported records; only `CompleteReview`, used by application execution, guarantees atomic audit/lifecycle persistence.
