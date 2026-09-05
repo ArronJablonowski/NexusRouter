@@ -12,6 +12,9 @@ import (
 )
 
 func runSkillGenerations(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && (args[0] == "generate" || args[0] == "publish") {
+		return runSkillGenerationAction(args, stdout, stderr)
+	}
 	usage := func() int {
 		fmt.Fprintln(stderr, "usage: darwin skill-generations list|show --db path --scope id [--id id] [--after id --limit 25]")
 		return 2

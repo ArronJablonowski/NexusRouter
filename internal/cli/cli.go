@@ -39,6 +39,9 @@ Usage:
   darwin skills list|show|history|state|draft|rollback --root path --scope scope
   darwin skill-generations list --db path --scope id [--after id --limit 25]
   darwin skill-generations show --db path --scope id --id generation-id
+  darwin skill-generations generate --config path --id attempt-id --model id --name skill-name --tasks task-a,task-b [--max-cost amount]
+  darwin skill-generations publish --config path --id attempt-id
+    Generate saves a proposal; publish creates an inactive version, never activates it
   darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
   darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
   darwin audits list|show|attempts --db path [--task id] [--id audit-id]

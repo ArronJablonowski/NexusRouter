@@ -914,8 +914,8 @@ Repeated IDs never dispatch again; terminal persistence failure returns the
 started observation for inspection, not permission to retry. Cancellation still
 allows a bounded terminal write. Drafted records are proposals, not published or
 active skills. SQLite inspection supports individual IDs and scoped pagination;
-publication is available through the Go service/SDK; native generation and
-publication commands/endpoints remain unfinished.
+generation and publication are available through the Go service/SDK and CLI;
+native HTTP mutation endpoints remain unfinished.
 
 The application service and Go SDK now provide `GenerateSkillDraft` for explicit
 task IDs and a configured generator model. It selects current accepted
@@ -927,6 +927,24 @@ honors skill scope/auto-draft settings, deployment mode, source privacy, context
 resource and cost limits. Inputs and output are redacted before dispatch/storage;
 the returned record is a durable proposal, never an active skill. Background
 example discovery and scheduling still remain open.
+
+Generate from two or more accepted completed tasks, then publish explicitly:
+
+```sh
+darwin skill-generations generate --config /path/to/config.yaml --id workflow-attempt-1 --model generator --name review-workflow --tasks TASK_A,TASK_B --max-cost 0
+darwin skill-generations show --db /path/to/darwin.db --scope project --id workflow-attempt-1
+darwin skill-generations publish --config /path/to/config.yaml --id workflow-attempt-1
+```
+
+Both mutation commands require a configuration file and take scope exclusively
+from its skill settings. Generation accepts 2–20 distinct task IDs from separate
+sessions in the same domain. Enable `skills.enabled` and `skills.auto_draft`,
+configure `skills.root`/`skills.scope`, and supply generator context/cost metadata
+(plus RAM estimates for local models). The default cost ceiling is zero.
+Generation IDs are single-use: on failure or lost output, inspect the saved
+attempt rather than automatically retrying inference. Publication retries with
+the same saved attempt are safe and return the existing version. Neither command
+activates a skill. JSON output includes workflow content and should be protected.
 
 Inspect saved generation without re-running it:
 
