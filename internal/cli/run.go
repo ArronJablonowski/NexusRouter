@@ -44,7 +44,7 @@ func parseRunFlagSet(args []string, jsonMode *bool) (config.Options, app.Request
 	fs.StringVar(&options.ProjectFile, "config", "", "project configuration")
 	fs.StringVar(&options.UserFile, "user-config", "", "user configuration")
 	fs.StringVar(&request.ModelID, "model", "", "configured model ID or auto")
-	fs.StringVar(&request.ContinueTaskID, "continue-task", "", "completed task history to continue")
+	fs.StringVar(&request.ContinueTaskID, "continue-task", "", "completed or recovered task history to continue")
 	fs.StringVar(&request.SummaryAttemptID, "summary-attempt", "", "approved stored summary attempt for continuation")
 	compactKeep := fs.Int("compact-keep", 0, "recent messages to retain when compacting continued history")
 	compactSummary := fs.String("compact-summary", "", "operator JSON summary file (maximum 64 KiB)")

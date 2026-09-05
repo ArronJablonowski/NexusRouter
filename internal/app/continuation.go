@@ -18,8 +18,13 @@ type continuationContext struct {
 
 func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secrets []string) (*continuationContext, error) {
 	history, err := sessions.Replay(ctx, db, r.ContinueTaskID)
-	if err != nil || history.State != "completed" || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
+	if err != nil || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
 		return nil, ErrAdmission
+	}
+	if history.State != "completed" {
+		if history.State != "failed" || r.Compaction != nil || r.SummaryAttemptID != "" || !recoveredDelegationContinuation(ctx, db, history) {
+			return nil, ErrAdmission
+		}
 	}
 	result := &continuationContext{Messages: history.Messages, SessionID: history.SessionID, Privacy: history.Privacy}
 	if r.Compaction != nil {
@@ -63,6 +68,21 @@ func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secret
 		result.Compaction.SummaryAttemptID, result.Compaction.SummaryReviewID = attempt.ID, review.ID
 	}
 	return result, nil
+}
+
+// Recovery closes the old task without claiming a final answer. An explicit
+// user continuation may consume the restored tool pair, never re-dispatch it.
+// Ordinary failures, cancellation and uncertain tool effects remain ineligible.
+func recoveredDelegationContinuation(ctx context.Context, db sessions.Reader, history sessions.Snapshot) bool {
+	if history.Sequence < 2 {
+		return false
+	}
+	events, err := db.Read(ctx, history.TaskID, history.Sequence-2, 2)
+	if err != nil || len(events) != 2 {
+		return false
+	}
+	tool, end := events[0], events[1]
+	return tool.TaskID == history.TaskID && end.TaskID == history.TaskID && tool.SessionID == history.SessionID && end.SessionID == history.SessionID && tool.Sequence == history.Sequence-1 && end.Sequence == history.Sequence && tool.Kind == runtime.ToolCompleted && tool.Data.Code == "delegation_recovered" && tool.Data.Effect == runtime.NoEffect && (tool.Data.ToolName == "delegate" || tool.Data.ToolName == "delegate_batch") && end.Kind == runtime.TaskFailed && end.Data.Code == "interrupted_after_delegation" && end.CausationID == tool.ID && end.TurnID == tool.TurnID && end.AttemptID == tool.AttemptID
 }
 
 func redactSummary(summary sessions.Summary, secrets []string) sessions.Summary {

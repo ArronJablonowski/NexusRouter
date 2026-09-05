@@ -47,7 +47,11 @@ func (d *Dispatcher) recoverPage(ctx context.Context, configDigest, after string
 		if len(item.TaskIDs) == 0 {
 			_, err = d.db.RecoverUndispatched(ctx, item.ID, configDigest, time.Now().UTC())
 		} else {
-			_, err = d.db.RecoverTerminalSubmission(ctx, item.ID, configDigest, time.Now().UTC())
+			var recovered bool
+			recovered, err = d.db.RecoverTerminalSubmission(ctx, item.ID, configDigest, time.Now().UTC())
+			if err == nil && !recovered {
+				_, err = d.db.RecoverInterruptedDelegation(ctx, item.ID, configDigest, time.Now().UTC())
+			}
 		}
 		if err != nil {
 			return after, err

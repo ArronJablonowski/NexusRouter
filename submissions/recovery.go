@@ -18,5 +18,8 @@ func (r Recovery) Validate() error {
 	if (r.Action == "queued" && r.Reason == "lease_expired_no_task") || (r.Action == "canceled" && r.Reason == "cancellation_requested") || (r.Action == "failed" && r.Reason == "recovery_limit") || (r.Reason == "terminal_history" && (r.Action == "succeeded" || r.Action == "failed" || r.Action == "canceled")) {
 		return nil
 	}
+	if r.Reason == "interrupted_delegation" && (r.Action == "failed" || r.Action == "canceled") {
+		return nil
+	}
 	return ErrInvalid
 }
