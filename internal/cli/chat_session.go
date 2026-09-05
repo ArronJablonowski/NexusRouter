@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -19,7 +20,14 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 		result app.Result
 		err    error
 	}
-	events := make(chan runtime.Event)
+	type update struct {
+		event  runtime.Event
+		text   string
+		isText bool
+	}
+	// A single unbuffered channel preserves lifecycle/text ordering and applies
+	// backpressure without retaining a second copy of the complete answer.
+	events := make(chan update)
 	var done chan completion
 	var cancel context.CancelFunc
 	var task string
@@ -29,7 +37,12 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 	feedbackTask := ""
 	failedOutput := false
 	eof := false
-	write := func(text string) (ok bool) {
+	live := hooks.RunLive != nil
+	liveOpen := false
+	liveLineStart := true
+	liveBytes := 0
+	var textFilter chatTextFilter
+	rawWrite := func(text string) (ok bool) {
 		if failedOutput {
 			return false
 		}
@@ -39,13 +52,23 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				ok = false
 			}
 		}()
-		text = chatSafeText(text)
 		n, err := io.WriteString(out, text)
 		if err != nil || n != len(text) {
 			failedOutput = true
 			return false
 		}
 		return true
+	}
+	// Trusted status messages are separated from provisional output and are not
+	// fed through the model's stateful terminal-control filter.
+	write := func(text string) bool {
+		if liveOpen {
+			liveOpen = false
+			if !rawWrite("\n") {
+				return false
+			}
+		}
+		return rawWrite(chatSafeText(text))
 	}
 	join := func() {
 		if cancel != nil {
@@ -61,6 +84,9 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 		}
 	}()
 	if !write("Chat ready. /help for commands.\n") {
+		return 1
+	}
+	if live && !write("Live assistant text is provisional until [task completed].\n") {
 		return 1
 	}
 	for {
@@ -87,7 +113,32 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					return 1
 				}
 			}
-		case event := <-events:
+		case item := <-events:
+			if item.isText {
+				if !utf8.ValidString(item.text) || len(item.text) > (1<<20)-liveBytes {
+					join()
+					write("Live output unavailable or exceeded its display limit. Partial text is not an accepted answer.\n")
+					return 1
+				}
+				liveBytes += len(item.text)
+				text := textFilter.Write(item.text)
+				if text != "" {
+					if !liveOpen {
+						if !write("[assistant provisional]\n") {
+							join()
+							return 1
+						}
+						liveOpen = true
+						liveLineStart = true
+					}
+					if !rawWrite(chatQuotedText(text, &liveLineStart)) {
+						join()
+						return 1
+					}
+				}
+				continue
+			}
+			event := item.event
 			switch event.Kind {
 			case runtime.TaskStarted:
 				task = event.TaskID
@@ -121,7 +172,13 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					base.Compaction = nil
 					base.SummaryAttemptID = ""
 				}
-				if !write(finished.result.Text + "\n") {
+				answer := finished.result.Text + "\n"
+				if live {
+					// Text already arrived from the provider. Reprinting Result.Text
+					// would duplicate the final answer and mislabel prior turns.
+					answer = "[task completed]\n"
+				}
+				if !write(answer) {
 					return 1
 				}
 			} else {
@@ -256,6 +313,8 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				continue
 			}
 			request := base
+			liveBytes = 0
+			textFilter.Reset()
 			feedbackTask = ""
 			request.Prompt = text
 			request.Messages = nil
@@ -265,14 +324,26 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			done = make(chan completion, 1)
 			completionChannel := done
 			go func() {
-				result, err := hooks.Run(runCtx, request, func(event runtime.Event) error {
+				deliver := func(item update) error {
 					select {
-					case events <- event:
+					case events <- item:
 						return nil
 					case <-runCtx.Done():
 						return runCtx.Err()
 					}
-				})
+				}
+				emitEvent := func(event runtime.Event) error { return deliver(update{event: event}) }
+				var result app.Result
+				var err error
+				if hooks.RunLive != nil {
+					result, err = hooks.RunLive(runCtx, request, emitEvent, func(text string) error {
+						return deliver(update{text: text, isText: true})
+					})
+				} else if hooks.Run != nil {
+					result, err = hooks.Run(runCtx, request, emitEvent)
+				} else {
+					err = app.ErrAdmission
+				}
 				completionChannel <- completion{result, err}
 			}()
 		}

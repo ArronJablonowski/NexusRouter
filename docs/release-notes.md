@@ -8,7 +8,8 @@ production release, release tag or complete PRD acceptance is claimed.
 - Go runtime, CLI, Go SDK and authenticated loopback HTTP service with durable
   SQLite/WAL task/session records and explicit configuration.
 - Provisional, incrementally redacted live text through the OpenAI-compatible
-  HTTP endpoint and Go SDK; interactive CLI chat still buffers answer text.
+  HTTP endpoint, Go SDK and interactive CLI chat, with a combined lifecycle/text
+  SDK interface and stateful terminal filtering in chat.
 - Adaptive eligibility/ranking, provider fallback, local resource admission,
   bounded delegation, validation evidence and advisory output audits.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
@@ -43,7 +44,7 @@ into DarwinRouter or artifacts.
 
 ## Required before announcing v1.0.0
 
-Full PRD qualification, interactive CLI token streaming, side-effecting tool surfaces,
+Full PRD qualification, built-in side-effecting CLI tools,
 automatic skill validation/activation, learning-attention controls,
 configuration reload, performance and supported-platform qualification remain
 open. This list is not exhaustive. Distribution also requires an approved

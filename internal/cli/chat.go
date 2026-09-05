@@ -16,6 +16,7 @@ import (
 
 type chatHooks struct {
 	Run             taskStreamRunner
+	RunLive         func(context.Context, app.Request, func(runtime.Event) error, func(string) error) (app.Result, error)
 	Steer           func(context.Context, string, string, string) (runtime.SteeringMessage, error)
 	Feedback        func(context.Context, string, bool, float64) error
 	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
@@ -53,7 +54,7 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	signal.Notify(brokenPipe, syscall.SIGPIPE)
 	defer signal.Stop(brokenPipe)
 	hooks := chatHooks{
-		Run: service.RunStream, Steer: service.SteerTask,
+		RunLive: service.RunLiveStream, Steer: service.SteerTask,
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, settings.Telemetry.Database, task, accepted, cost)
 		},

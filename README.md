@@ -10,7 +10,7 @@ verification. See [release packaging](docs/release-packaging.md) and
 `make qualify-release`. No release has been published; distribution identity,
 license approval and full runtime qualification remain separate gates.
 
-The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. The OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text; interactive CLI chat still displays answer text after completion. Write tools and interactive CLI token streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. Built-in CLI file-write tools remain unfinished; reviewed custom Go SDK tools have separate support and safety requirements. See the implementation evidence for remaining work; this is not a released MVP.
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
@@ -431,9 +431,14 @@ Ctrl-C requests cancellation during work and exits when idle. `/quit` and SIGTER
 cancel and join active work. EOF waits for active work to finish. A normal session
 exit returns zero even if an individual task failed; use headless `run` for
 per-task exit status. Each task retains the five-minute execution timeout.
-The command prints lifecycle progress and the final answer, not raw token deltas.
-Terminal escape sequences, clipboard controls and bidi formatting are stripped
-from displayed model output; stored content remains governed by runtime redaction.
+The command prints lifecycle progress and provisional live assistant text with a
+`| ` prefix on each explicit model-output line. It prints `[task completed]` only
+after successful return, without duplicating the final answer. Terminal escape
+sequences, clipboard controls and bidi formatting are filtered across text
+fragments; stored content remains governed by runtime redaction. Live text has
+a 1 MiB per-task display bound and can include intermediate assistant turns.
+See [interactive streaming](docs/interactive-streaming.md) for callback ordering,
+output failure and privacy boundaries.
 
 Chat accepts canonical terminals and UTF-8 files/pipes, with up to64KiB per line
 (the OS terminal line discipline may impose a smaller limit). Terminal echo and

@@ -183,6 +183,14 @@ The `darwin` CLI supports:
 - Memory and skill inspection, export, correction, deletion, activation, and rollback.
 - Approval review for model disabling, pruning suggestions, policy changes, and destructive tools.
 
+Interactive chat must deliver provisional assistant text while providers are
+streaming, alongside ordered committed lifecycle metadata. Known credentials
+must remain redacted across fragments, terminal controls must not cross chunk
+boundaries, and rendered model lines must be distinguished from runtime status.
+Only successful task completion advances conversation/feedback state; failed
+partial output must not silently become the next task's history. Delivery
+failure must cancel/join work without rewriting already committed events.
+
 ## 7. Configuration
 
 Configuration precedence is:

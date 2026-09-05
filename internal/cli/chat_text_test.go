@@ -49,3 +49,70 @@ func TestChatSafeTextLargeUnterminatedPayload(t *testing.T) {
 		t.Fatal("payload escaped", len(got))
 	}
 }
+
+func TestChatTextFilterEveryFragmentBoundary(t *testing.T) {
+	inputs := []string{
+		"数学 👩‍💻 مرحبا שלום\n\t",
+		"a\x1b[31mred\x1b[0mz",
+		"a\x1b]52;secret\x1b\\z",
+		"a\x1b]52;secret\az",
+		"a\x1bPsecret\astill hidden\x1b\\z",
+		"a\x1b_secret\x1b\\z\x1b^hidden\x1b\\",
+		"a\x1bXsecret\x1b\\z\x1b(B!",
+		"a\u009dsecret\u009cz\u009b31m!\u009b0m",
+		"a\u0090secret\u009cz\u0098hidden\u009c!",
+		"a\u061c\u200e\u202e\u2066b\u2069",
+		"visible\x1b]payload\x1b[31mhidden",
+		"a\xffb\x1b[123;",
+	}
+	for _, input := range inputs {
+		want := chatSafeText(input)
+		// Includes splits inside multibyte C1 controls, bidi marks and emoji.
+		for split := 0; split <= len(input); split++ {
+			var filter chatTextFilter
+			got := filter.Write(input[:split]) + filter.Write(input[split:])
+			if got != want || !utf8.ValidString(got) {
+				t.Fatalf("split %d: got %q want %q", split, got, want)
+			}
+		}
+		var filter chatTextFilter
+		var got strings.Builder
+		for i := range len(input) {
+			fragment := filter.Write(input[i : i+1])
+			if !utf8.ValidString(fragment) {
+				t.Fatal("emitted incomplete UTF-8")
+			}
+			got.WriteString(fragment)
+		}
+		if got.String() != want {
+			t.Fatalf("bytewise: got %q want %q", got.String(), want)
+		}
+	}
+}
+
+func TestChatTextFilterUnterminatedPayloadAndReset(t *testing.T) {
+	var filter chatTextFilter
+	if got := filter.Write("visible\x1b"); got != "visible" {
+		t.Fatal("prefix changed")
+	}
+	for _, chunk := range []string{"]52;", "secret", "\x1b", "[31m", strings.Repeat("hidden", 1<<17)} {
+		if got := filter.Write(chunk); got != "" {
+			t.Fatal("unterminated control payload leaked")
+		}
+	}
+	if filter.pending != "" {
+		t.Fatal("buffered payload")
+	}
+	filter.Reset()
+	if got := filter.Write("fresh task"); got != "fresh task" {
+		t.Fatal("reset retained parser state")
+	}
+	filter.Write("\xe2\x80") // Incomplete UTF-8 must not cross task boundaries.
+	if len(filter.pending) != 2 {
+		t.Fatal("missing bounded incomplete rune")
+	}
+	filter.Reset()
+	if got := filter.Write("new"); got != "new" || filter.pending != "" {
+		t.Fatal("reset retained partial rune")
+	}
+}

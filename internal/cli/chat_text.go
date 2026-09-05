@@ -2,12 +2,31 @@ package cli
 
 import (
 	"strings"
+	"unicode/utf8"
 )
+
+// chatTextFilter belongs to one untrusted text stream. It retains only parser
+// state and at most three incomplete UTF-8 bytes, never control-string payloads.
+// Do not share it concurrently or feed trusted terminal metadata through it.
+type chatTextFilter struct {
+	state   int
+	osc     bool
+	pending string
+}
+
+func (f *chatTextFilter) Reset() { *f = chatTextFilter{} }
+
+func (f *chatTextFilter) Write(text string) string { return f.write(text, false) }
 
 // chatSafeText renders a complete untrusted message as plain terminal text.
 // It does not interpret Markdown or emit ANSI. Escape strings are consumed as
 // units, including unterminated payloads, rather than exposing their contents.
 func chatSafeText(text string) string {
+	var filter chatTextFilter
+	return filter.write(text, true)
+}
+
+func (f *chatTextFilter) write(text string, final bool) string {
 	const (
 		plain = iota
 		escape
@@ -16,10 +35,20 @@ func chatSafeText(text string) string {
 		stringEscape
 		escapeIntermediate
 	)
-	state := plain
-	osc := false
+	state, osc := f.state, f.osc
+	defer func() { f.state, f.osc = state, osc }()
+	if f.pending != "" {
+		text = f.pending + text
+		f.pending = ""
+	}
 	var out strings.Builder
-	for _, r := range text {
+	for len(text) > 0 {
+		if !final && !utf8.FullRuneInString(text) {
+			f.pending = strings.Clone(text)
+			break
+		}
+		r, size := utf8.DecodeRuneInString(text)
+		text = text[size:]
 		switch state {
 		case controlString:
 			if r == '\a' && osc || r == 0x9c {

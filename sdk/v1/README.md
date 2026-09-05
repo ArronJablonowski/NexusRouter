@@ -557,6 +557,16 @@ failed call using `client.InspectTask(ctx, taskID)` or the CLI/API inspection
 commands. SDK embedding is trusted-process access, not an authentication or
 isolation boundary.
 
+`RunLiveStream(ctx, request, emitEvent, emitText)` combines both delivery paths.
+Both callbacks must be nonnil. Events precede text for the same committed marker;
+an error or panic in either callback stops both and cancels execution. Returning
+success from a callback does not itself accept the task. Cancellation during
+the terminal event callback returns cancellation even when durable completion
+already exists and trailing text was withheld. Event payloads retain their
+existing inspection content; only the text channel excludes tool/child output.
+Rendering, line prefixes and display limits belong to the caller, not the SDK.
+See [interactive streaming](../../docs/interactive-streaming.md).
+
 Task cancellation and steering use durable controls. Steering applies only at
 safe model/tool boundaries and requires a caller-chosen idempotency key. A
 completed task can be followed with `ContinueTaskID`; interrupted work is not
