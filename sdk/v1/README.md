@@ -141,6 +141,15 @@ one-use approval and cannot enable retry after confirmed or uncertain effects.
 It describes trusted handler behavior, not submission deduplication or a proof
 that arbitrary Go code is idempotent. See [declared tool behavior](../../docs/tool-behavior.md).
 
+SDK execution installs shared reader leases for allowed read-only tools and
+exclusive leases for approved writes. Assign the same trusted `Scope` to any
+overlapping resources; use `workspace` for filesystem extensions that can
+overlap built-in file tools. Busy scopes reject rather than silently retrying.
+Cancellation/expiry does not release a still-running callback. Hosts must join
+all handler-owned work before returning; this is not an OS sandbox. See
+[reader/writer execution](../../docs/reader-writer-execution.md), including
+same-database coordination, legacy scope compatibility and crash limits.
+
 Trusted handlers can return `runtime.ToolResult{Failed: true, Effect: ...}` with
 a nil Go error for an explicitly known tool failure. The runtime records
 `tool_failed` and, by default, fails the task while preserving the declared effect.

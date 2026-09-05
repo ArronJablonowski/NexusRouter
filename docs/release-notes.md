@@ -46,6 +46,13 @@ live-provider, hardware or crash scenarios.
 
 ## Upgrade cautions
 
+- Built-in file tools now share `workspace` reader/writer leases across all
+  roots, with legacy `create_*` scopes retained as conflicting. Expired readers
+  no longer stop blocking writers until explicitly released after termination.
+  Do not run older and newer binaries against the same database concurrently.
+  See [reader/writer execution](reader-writer-execution.md) for availability and
+  crashed-holder limits.
+
 The current durable store uses schema 21. Stop older writer processes and back
 up task databases before opening them with a newer build. Restoring an older
 binary alone does not downgrade a migrated database. Preserve the matching

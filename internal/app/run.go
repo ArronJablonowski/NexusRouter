@@ -299,7 +299,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()
-		executor := tools.Executor{Registry: registry, Policy: toolPolicy}
+		executor := tools.Executor{Registry: registry, Policy: toolPolicy, Reader: newToolAuthority(db, nil, nil, secrets)}
 		if (r.toolReviewer != nil || r.toolPresenter != nil) && r.delegatedParent == "" {
 			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
 		}

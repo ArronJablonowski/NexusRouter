@@ -78,10 +78,10 @@ permission to persist credentials.
   conservatively. A crash can leave a file or private staging directory even
   when completion was not acknowledged. There is no automatic deletion or
   replay of a spent approval to resolve that uncertainty.
-- The lease scope hashes the pinned root's device/inode identity, so aliases
-  share a scope. Coordination requires the same database and cooperative
-  processes. Different nested roots have different scopes; atomic no-replace
-  still prevents overwriting a shared target.
+- Built-in file readers and writers share the reserved `workspace` lease scope,
+  including nested, aliased and unrelated roots. Legacy `create_*` leases remain
+  conflicting during upgrades. Coordination requires the same database and
+  cooperating current-version processes. See [reader/writer execution](reader-writer-execution.md).
 - This is **not an OS sandbox**. Leases cannot fence arbitrary external writers,
   and pinning a directory does not prevent another actor from renaming it.
   Caller-owned roots, database and filesystem remain trusted. Stronger

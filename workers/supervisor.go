@@ -19,6 +19,8 @@ type Lease struct {
 type LeaseStore interface {
 	AcquireLease(context.Context, string, string, string, bool, time.Time, time.Duration) (Lease, error)
 	RenewLease(context.Context, string, string, time.Time, time.Duration) error
+	// Release only after all holder work has joined; neither reader nor writer
+	// expiry proves that an in-process callback stopped using the resource.
 	ReleaseLease(context.Context, string, string) error
 }
 

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"strings"
 	"time"
 )
 
@@ -14,11 +15,15 @@ var ErrLeaseInput = errors.New("invalid resource lease request")
 
 type Lease = workers.Lease
 
-// AcquireLease serializes overlapping exact scopes across database connections.
+// AcquireLease serializes overlapping scopes across database connections.
 // Scope IDs must be canonicalized by the application (not model-supplied paths).
-// Expired writers block both readers and writers until the holder has stopped
-// and explicitly releases them. Lease expiry alone cannot fence an in-process
-// side effect. Read holders must stop using results after lease loss.
+// Reserved workspace and legacy create_* scopes mutually overlap so upgrading
+// builtin file scopes never abandons an unreleased old holder or nested root.
+// Other scopes retain exact identity semantics.
+// Unreleased writers block readers and writers; unreleased readers block
+// writers even after expiry. Only a joined holder may explicitly release its
+// lease. Expiry alone cannot fence an in-process handler or prove it stopped.
+// Read holders must also stop using results after lease loss.
 func (s *Store) AcquireLease(ctx context.Context, task, owner, scope string, writer bool, now time.Time, ttl time.Duration) (Lease, error) {
 	l := Lease{}
 	if task == "" || owner == "" || scope == "" || len(scope) > 512 || !leaseTime(now, ttl) {
@@ -40,7 +45,9 @@ func (s *Store) AcquireLease(ctx context.Context, task, owner, scope string, wri
 		return l, ErrLeaseLost
 	}
 	var conflicts int
-	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM resource_leases WHERE scope=? AND released=0 AND (writer=1 OR (?=1 AND expires>?))`, scope, writer, now.UnixNano()).Scan(&conflicts)
+	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM resource_leases WHERE
+	(scope=? OR (?=1 AND (scope='workspace' OR scope GLOB 'create_*')))
+	AND released=0 AND (writer=1 OR ?=1)`, scope, filesystemLeaseScope(scope), writer).Scan(&conflicts)
 	if err != nil {
 		return l, err
 	}
@@ -98,9 +105,14 @@ func (s *Store) ReleaseLease(ctx context.Context, token, owner string) error {
 }
 
 // InspectLeases is for trusted supervision, not public output: it includes
-// holder tokens. State can be re-derived after restart without private maps.
+// holder tokens. It returns unreleased overlapping scopes, including reserved
+// workspace/create_* compatibility aliases; Lease.Scope retains the actual
+// stored identity. Observation never changes exact authorization bindings.
+// State can be re-derived after restart without private maps.
 func (s *Store) InspectLeases(ctx context.Context, scope string) ([]Lease, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT token,task_id,owner,scope,writer,expires,released FROM resource_leases WHERE scope=? AND released=0 ORDER BY expires,token LIMIT 1000", scope)
+	rows, err := s.db.QueryContext(ctx, `SELECT token,task_id,owner,scope,writer,expires,released FROM resource_leases
+	WHERE (scope=? OR (?=1 AND (scope='workspace' OR scope GLOB 'create_*')))
+	AND released=0 ORDER BY expires,token LIMIT 1000`, scope, filesystemLeaseScope(scope))
 	if err != nil {
 		return nil, err
 	}
@@ -119,4 +131,8 @@ func (s *Store) InspectLeases(ctx context.Context, scope string) ([]Lease, error
 }
 func leaseTime(now time.Time, ttl time.Duration) bool {
 	return now.UTC().Year() >= 1970 && now.UTC().Year() < 2261 && ttl >= time.Millisecond && ttl <= 10*time.Minute
+}
+
+func filesystemLeaseScope(scope string) bool {
+	return scope == "workspace" || strings.HasPrefix(scope, "create_")
 }

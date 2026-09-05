@@ -3,13 +3,10 @@ package app
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -29,17 +26,11 @@ func registerCreateTool(registry *tools.Registry, path string) (func(), string, 
 	if err != nil {
 		return nil, "", ErrAdmission
 	}
-	info, err := root.Stat(".")
-	if err != nil {
-		root.Close()
-		return nil, "", ErrAdmission
-	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		root.Close()
-		return nil, "", ErrAdmission
-	}
-	scope := fmt.Sprintf("create_%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%d", stat.Dev, stat.Ino))))
+	// All built-in file operations share this scope within the durable store.
+	// Root-specific identities cannot exclude overlapping/nested roots, aliases,
+	// or paths redirected inside an already-pinned root. Parallel reads remain
+	// possible; writers conservatively exclude unrelated roots as well.
+	scope := "workspace"
 	err = registry.Register(tools.Definition{Tool: createFileSpec(), Scope: scope, ReadOnly: false, Behavior: runtime.BehaviorNonIdempotentWrite, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 		return createNewFile(ctx, root, raw)
 	}})

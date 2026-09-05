@@ -158,6 +158,7 @@ type Executor struct {
 	Registry  *Registry
 	Policy    *Policy
 	Authority Authority
+	Reader    ReadAuthority
 }
 
 func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out runtime.ToolResult, err error) {
@@ -217,6 +218,12 @@ func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, 
 	}
 	if needsApproval {
 		return e.approved(ctx, execution, t, policy, arguments)
+	}
+	if e.Reader != nil {
+		if !scoped {
+			return out, ErrDenied
+		}
+		return e.readOwned(ctx, execution, t, arguments)
 	}
 	defer func() {
 		if recover() != nil {

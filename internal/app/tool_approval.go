@@ -15,7 +15,7 @@ type toolAuthority struct {
 	secrets []string
 }
 
-func newToolAuthority(db *telemetry.Store, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, secrets []string) tools.Authority {
+func newToolAuthority(db *telemetry.Store, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, secrets []string) *toolAuthority {
 	a := &toolAuthority{secrets: append([]string(nil), secrets...)}
 	a.gate = &toolgate.Gate{Store: db, Present: presenter}
 	if reviewer != nil {
@@ -30,6 +30,15 @@ func newToolAuthority(db *telemetry.Store, reviewer tools.ApprovalReviewer, pres
 		}
 	}
 	return a
+}
+
+func (a *toolAuthority) ExecuteRead(ctx context.Context, x runtime.ToolExecution, scope string, handler func(context.Context) (runtime.ToolResult, error)) (runtime.ToolResult, error) {
+	for _, identity := range []string{scope, x.Call.Name, x.Call.ID, x.TaskID, x.SessionID, x.TurnID, x.AttemptID} {
+		if a.containsSecret(identity) {
+			return runtime.ToolResult{Effect: runtime.NoEffect}, tools.ErrDenied
+		}
+	}
+	return a.gate.ExecuteRead(ctx, x, scope, handler)
 }
 
 func (a *toolAuthority) containsSecret(value string) bool {
