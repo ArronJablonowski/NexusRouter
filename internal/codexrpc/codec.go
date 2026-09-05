@@ -1,5 +1,6 @@
 // Package codexrpc implements bounded Codex app-server JSON-line envelopes.
-// It does not dispatch methods, execute tools, or manage subprocesses. Callers
+// It does not dispatch methods or execute tools. Process optionally owns a
+// trusted-host direct subprocess; it is not a configured Codex launcher. Callers
 // must treat protocol/read/write failures as terminal for the current stream.
 package codexrpc
 

@@ -1,6 +1,6 @@
 # Authenticated Codex coordinator integration
 
-Status: transport and paused-tool correspondence primitives implemented; no
+Status: framing, direct-process ownership and paused-tool correspondence primitives implemented; no
 launchable DarwinRouter Codex adapter yet. Target model remains `gpt-5.6-sol`.
 
 The installed Codex CLI can use its existing ChatGPT login. DarwinRouter must
@@ -43,8 +43,21 @@ compaction need explicit future handling instead of silently changing a paused
 Codex turn. RPC response delivery failure must abort, never rerun the worker.
 
 `internal/codexrpc` supplies bounded JSON-line framing, strict envelopes,
-opaque request IDs, serialized writes and payload-free local errors. Neither
-package launches a process, accesses credentials or performs inference.
+opaque request IDs, serialized writes and payload-free local errors. Its
+`StartProcess` primitive now owns an explicitly configured direct subprocess,
+requires absolute executable/directory paths and an explicit environment, and
+discards stderr. Cancellation/Close closes blocked pipe operations and reaps
+the direct child. The host must defer Close even after normal exit to release
+descriptors; OS exit is not a model-completion signal.
+
+This transport is trusted-host plumbing, not the configured Codex launcher.
+It does not supervise descendants, enforce an OS sandbox or disable tools.
+The direct child uses Go's process lifetime handling; raw numeric process-group
+signals are deliberately not used because they can race reaping and PID reuse.
+A descendant-containment boundary is still needed for a real runtime that
+spawns helpers. The capability, authentication and privacy integration below
+is not implemented by an explicit environment alone. Tests use only the test
+executable, not Codex, model inference or credential access.
 
 ## Required launch and lifecycle work
 
