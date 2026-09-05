@@ -31,20 +31,21 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	toolExtension   *tools.Extension
-	toolReviewer    tools.ApprovalReviewer
-	toolPresenter   tools.ApprovalPresenter
-	providerFactory providers.Factory
-	memoryStore     memory.Store
-	skillStore      skills.Store
-	execution       chan struct{}
-	discovery       *modelHealthCache
-	settings        config.Settings
-	secret          func(string) string
-	budget          *resources.Budget
-	profile         func(context.Context) (resources.Snapshot, error)
-	draw            func() float64
-	mu              sync.Mutex
+	toolExtension    *tools.Extension
+	toolReviewer     tools.ApprovalReviewer
+	toolPresenter    tools.ApprovalPresenter
+	providerFactory  providers.Factory
+	contextEstimator providers.ContextEstimator
+	memoryStore      memory.Store
+	skillStore       skills.Store
+	execution        chan struct{}
+	discovery        *modelHealthCache
+	settings         config.Settings
+	secret           func(string) string
+	budget           *resources.Budget
+	profile          func(context.Context) (resources.Snapshot, error)
+	draw             func() float64
+	mu               sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -101,6 +102,7 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	}
 	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
+	r.contextEstimator = s.contextEstimator
 	r.memoryStore = s.memoryStore
 	r.skillStore = s.skillStore
 	if s.execution != nil {
@@ -190,6 +192,7 @@ func validateInput(r Request) error {
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
+	r.contextEstimator = s.contextEstimator
 	executionCtx := ctx
 	if r.admissionContext != nil {
 		ctx = r.admissionContext
@@ -287,6 +290,23 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	p.Weights = routing.Weights{Quality: w["quality"], Compliance: w["schema_compliance"], Reliability: w["reliability"], Latency: w["latency"], Cost: w["cost"], Recency: w["recency"], Uncertainty: w["uncertainty"]}
 	candidates := []routing.Candidate{}
 	evidence := map[routing.Key]routing.Evidence{}
+	// Custom estimates are model-specific. Bound the whole measurement batch
+	// separately from provider health checks, and deny only unmeasurable models.
+	contextFits := map[string]bool{}
+	if r.contextEstimator != nil {
+		measureCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		for _, m := range cfg.Models {
+			local := m.Locality == "local"
+			if m.ContextTokens < 1 || m.EstimatedCost == nil || (cfg.Mode == "local_only" && !local) || (cfg.Mode == "cloud_only" && local) || (r.LocalRequired && !local) || (r.onlyModelID != "" && r.onlyModelID != m.ID) {
+				continue
+			}
+			candidateInput := inference
+			candidateInput.Model = m.Model
+			estimate, err := providers.EstimateWith(measureCtx, r.contextEstimator, candidateInput)
+			contextFits[m.ID] = err == nil && estimate <= m.ContextTokens
+		}
+		cancel()
+	}
 	for _, m := range cfg.Models {
 		c := routing.Candidate{Model: m.Model, Provider: m.Provider, FailureDomain: m.FailureDomain, Local: m.Locality == "local", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, CapacityAvailable: m.Locality != "local" || m.RAMBytes > 0}
 		// routing validates positive windows, so an unknown window is represented
@@ -295,6 +315,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			c.ContextTokens = 1
 		}
 		c.PolicyAllowed = m.ContextTokens > 0 && m.EstimatedCost != nil
+		if r.contextEstimator != nil && !contextFits[m.ID] {
+			c.PolicyAllowed = false
+		}
 		if r.onlyModelID != "" && m.ID != r.onlyModelID {
 			c.PolicyAllowed = false
 		}

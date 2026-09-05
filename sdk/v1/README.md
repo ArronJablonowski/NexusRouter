@@ -179,6 +179,33 @@ expiry does not establish process termination, and open calls do not establish
 whether an effect occurred. This method never retries work or releases leases;
 general interrupted-effect reconciliation is not implemented.
 
+### Replaceable task context estimates
+
+`ConfigOptions.ContextEstimator` implements the public `providers.ContextEstimator`
+interface (also `sdk.ContextEstimator`). `Estimate(ctx, providers.Request)` sees
+an isolated model request including messages, tool schemas and output schema.
+Automatic routing measures each eligible model under one cooperative three-second
+batch deadline; an error or oversized result makes that candidate ineligible.
+The runtime measures again before every model turn and before applying steering.
+Delegated tasks share the same estimator. Configured estimators require a known,
+positive model context window.
+
+The effective estimate is the larger of the custom value and the existing
+serialized-byte estimate plus framing/output reserve. This extension cannot
+lower that conservative floor, rewrite context or change permissions. Nil
+preserves built-in behavior. Custom inputs are capped at 4 MiB serialized JSON;
+invalid UTF-8, negative results, panics, errors and expired deadlines reject
+measurement without exposing callback diagnostics. Each call receives at most
+three seconds, but cancellation is cooperative and the host must ensure return.
+
+Estimators are trusted in-process code and must perform local computation only,
+honor cancellation and concurrency, and keep task data private. They are not
+serialized in durable submissions: a restarting host supplies its current engine.
+Auxiliary audit/summary calls and canonical compaction still use built-in context
+logic. This is the estimation component of the planned ContextEngine, not custom
+context assembly or automatic semantic compaction, and is not a tokenizer-accuracy
+or OS-isolation guarantee.
+
 ### Replaceable factual memory storage
 
 `ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`

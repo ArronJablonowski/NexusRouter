@@ -68,10 +68,13 @@ type Result struct {
 	Usage        *providers.Usage
 }
 type Loop struct {
-	Steering SteeringSource
-	Provider providers.Provider
-	Journal  Journal
-	Tools    ToolExecutor
+	// ContextEstimator is trusted, cooperative host code. Its estimates cannot
+	// reduce the built-in conservative context floor.
+	ContextEstimator providers.ContextEstimator
+	Steering         SteeringSource
+	Provider         providers.Provider
+	Journal          Journal
+	Tools            ToolExecutor
 	// ValidationText supplies the host's persisted/delivered view (for example
 	// secret redaction). It must match the journal and output adapter exactly.
 	// It is trusted host code, never a model-supplied transformation.
@@ -95,7 +98,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
 	}
-	if r.MaxContextTokens < 0 || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) {
+	if r.MaxContextTokens < 0 || (l.ContextEstimator != nil && r.MaxContextTokens == 0) || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) {
 		return Result{}, ErrInvalidRun
 	}
 	if l.Provider == nil || l.Journal == nil || r.TaskID == "" || r.SessionID == "" || r.ProviderID == "" || r.Inference.Model == "" || len(r.Inference.Messages) == 0 || r.MaxTurns < 1 || r.MaxTurns > 1000 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 16<<20 {
@@ -246,7 +249,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				return applied, ErrLimit
 			}
 			if r.MaxContextTokens > 0 {
-				estimate, estimateErr := providers.EstimateContext(candidate)
+				estimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, candidate)
 				if estimateErr != nil || estimate > r.MaxContextTokens {
 					return applied, ErrLimit
 				}
@@ -294,7 +297,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			return fail(ErrLimit)
 		}
 		if r.MaxContextTokens > 0 {
-			estimate, err := providers.EstimateContext(inference)
+			estimate, err := providers.EstimateWith(ctx, l.ContextEstimator, inference)
 			if err != nil || estimate > r.MaxContextTokens {
 				return fail(ErrLimit)
 			}

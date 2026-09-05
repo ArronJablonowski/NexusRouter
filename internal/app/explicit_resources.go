@@ -30,6 +30,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	r.providerFactory = s.providerFactory
+	r.contextEstimator = s.contextEstimator
 	r = s.bindToolExtension(r)
 	var model config.Model
 	for _, m := range s.settings.Models {

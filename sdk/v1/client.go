@@ -31,6 +31,8 @@ type SkillStore = skills.Store
 
 type ProviderFactory = providers.Factory
 
+type ContextEstimator = providers.ContextEstimator
+
 type Tool = tools.Definition
 type ToolPolicy = tools.Policy
 type ApprovalPrompt = tools.ApprovalPrompt
@@ -56,6 +58,11 @@ type ConfigOptions struct {
 	// built-in adapters. Factories are trusted code and must use the supplied
 	// policy transport, honor cancellation, and support concurrent calls.
 	ProviderFactory ProviderFactory
+	// ContextEstimator receives isolated task context for conservative admission.
+	// Automatic routing measures each candidate Model, then the runtime checks
+	// each actual model turn. It cannot lower the built-in byte reserve.
+	// Trusted code must honor cancellation and privacy; this is not a sandbox.
+	ContextEstimator ContextEstimator
 	// Tools registers trusted handlers independently of filesystem
 	// tools. Definitions and policy are snapshotted at construction; nil policy
 	// denies all custom tools. Handlers must honor cancellation and concurrency.
@@ -121,7 +128,7 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithToolControls(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter)
+	service, err := app.NewServiceWithContextEstimator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator)
 	if err != nil {
 		return nil, ErrAdmission
 	}

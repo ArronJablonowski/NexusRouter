@@ -27,6 +27,7 @@ type Request struct {
 	toolReviewer                    tools.ApprovalReviewer
 	toolPresenter                   tools.ApprovalPresenter
 	providerFactory                 providers.Factory
+	contextEstimator                providers.ContextEstimator
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
 	delegate                        delegateRunner
@@ -100,6 +101,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	// Zero cost retains the legacy explicit-model operator override; automatic
 	// routing instead interprets zero as a strict zero-cost ceiling.
 	if r.ContextTokens > 0 && model.ContextTokens < r.ContextTokens {
+		return result, ErrAdmission
+	}
+	if r.contextEstimator != nil && model.ContextTokens < 1 {
 		return result, ErrAdmission
 	}
 	if (r.Compaction != nil || r.SummaryAttemptID != "") && model.ContextTokens < 1 {
@@ -272,7 +276,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
-	loop := runtime.Loop{Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
+	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {

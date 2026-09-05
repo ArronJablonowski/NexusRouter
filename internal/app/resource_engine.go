@@ -79,3 +79,14 @@ func selectMemoryStore(custom, fallback memory.Store) memory.Store {
 	}
 	return fallback
 }
+
+// NewServiceWithContextEstimator replaces task context measurement without
+// replacing assembly, tool policy, canonical compaction or durable replay.
+func NewServiceWithContextEstimator(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, estimator providers.ContextEstimator) (*Service, error) {
+	svc, err := NewServiceWithToolControls(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter)
+	if err != nil {
+		return nil, err
+	}
+	svc.contextEstimator = estimator
+	return svc, nil
+}
