@@ -24,6 +24,8 @@ Usage:
   darwin submissions list --db path [--state state --after cursor --limit 25]
   darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
+  darwin models deprecation --config path --model id [--domain general --profile default --window 50 --minimum-samples 20 --failure-threshold 0.35]
+    Read-only recommendation; never disables or removes a model
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin task show --db path --task id  Inspect durable conversation state
   darwin task continuation --db path --task id  Inspect continuation readiness
@@ -66,6 +68,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "models" {
+		return runModelsDeprecation(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "skill-generations" {
 		return runSkillGenerations(args[1:], stdout, stderr)
 	}

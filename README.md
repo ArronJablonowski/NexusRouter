@@ -12,6 +12,11 @@ Automatic routing separately tracks nonempty-output validity from the latest 100
 
 For Go-generation tasks, opt into `darwin run --config path --model auto --validate go_source < prompt.txt`, or supply `"validation":"go_source"` to native `POST /v1/tasks`. Ask for a raw complete Go source file: prose and Markdown fences are rejected, not extracted. The check parses at most 1 MiB of UTF-8 source without loading imports, compiling, or executing anything. Invalid syntax fails the task and records objective evidence; syntax-valid code can still have type errors, missing dependencies, security bugs or failing tests. Validation uses the redacted output that is persisted and delivered. Validity populations are separated by requested validation mode; the OpenAI-compatible endpoint does not expose this extension.
 
+Read-only model recommendations are available with `darwin models deprecation
+--config config.yaml --model MODEL_ID`. The report requires sufficient persisted
+evaluation evidence and operator approval for any later model changes; it does
+not automatically prune models. See [model deprecation](docs/model-deprecation.md).
+
 ### Scoped memory in task context
 
 Stored facts can now enter task context when an operator configures a scope:

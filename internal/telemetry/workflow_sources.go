@@ -231,16 +231,22 @@ func workflowModelID(value string) bool {
 }
 
 func preflightWorkflowEvaluation(ctx context.Context, tx *sql.Tx, task, attempt string, key routing.Key) error {
+	return preflightEvaluationKey(ctx, tx, task, attempt, key, 128)
+}
+
+// Key limits belong to the caller's model catalog, not event identity rules.
+// Workflow discovery keeps its original bound; deprecation accepts longer tags.
+func preflightEvaluationKey(ctx context.Context, tx *sql.Tx, task, attempt string, key routing.Key, keyLimit int) error {
 	var base, head, model, provider, domain, profile sql.NullString
 	var size int64
 	err := tx.QueryRowContext(ctx, `SELECT
 	CASE WHEN length(CAST(e.id AS BLOB)) BETWEEN 1 AND 128 THEN e.id END,
 	CASE WHEN length(CAST(h.current_id AS BLOB)) BETWEEN 1 AND 128 THEN h.current_id END,
-	CASE WHEN length(CAST(e.model AS BLOB)) BETWEEN 1 AND 128 THEN e.model END,
-	CASE WHEN length(CAST(e.provider AS BLOB)) BETWEEN 1 AND 128 THEN e.provider END,
-	CASE WHEN length(CAST(e.domain AS BLOB)) BETWEEN 1 AND 128 THEN e.domain END,
-	CASE WHEN length(CAST(e.profile AS BLOB)) BETWEEN 1 AND 128 THEN e.profile END,
-	length(CAST(e.body AS BLOB)) FROM evaluations e JOIN evaluation_heads h ON h.base_id=e.id WHERE e.task_id=? AND e.attempt_id=?`, task, attempt).Scan(&base, &head, &model, &provider, &domain, &profile, &size)
+	CASE WHEN length(CAST(e.model AS BLOB)) BETWEEN 1 AND ? THEN e.model END,
+	CASE WHEN length(CAST(e.provider AS BLOB)) BETWEEN 1 AND ? THEN e.provider END,
+	CASE WHEN length(CAST(e.domain AS BLOB)) BETWEEN 1 AND ? THEN e.domain END,
+	CASE WHEN length(CAST(e.profile AS BLOB)) BETWEEN 1 AND ? THEN e.profile END,
+	length(CAST(e.body AS BLOB)) FROM evaluations e JOIN evaluation_heads h ON h.base_id=e.id WHERE e.task_id=? AND e.attempt_id=?`, keyLimit, keyLimit, keyLimit, keyLimit, task, attempt).Scan(&base, &head, &model, &provider, &domain, &profile, &size)
 	if err != nil {
 		return err
 	}
