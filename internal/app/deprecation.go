@@ -7,7 +7,6 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
@@ -24,7 +23,8 @@ func (s *Service) ModelDeprecation(ctx context.Context, modelID, domain, profile
 		}
 	}()
 	bad := func() (evaluation.DeprecationReport, error) { return evaluation.DeprecationReport{}, ErrDeprecation }
-	if s == nil || ctx == nil || ctx.Err() != nil || !memory.ValidKey(modelID) || !memory.ValidKey(domain) || !memory.ValidKey(profile) || policy.Validate() != nil {
+	request := evaluation.DeprecationRequest{Version: 1, ModelID: modelID, Domain: domain, Profile: profile, Policy: policy}
+	if s == nil || ctx == nil || ctx.Err() != nil || request.Validate() != nil {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -58,6 +58,9 @@ func (s *Service) ModelDeprecation(ctx context.Context, modelID, domain, profile
 		report.ConfiguredModelID = redact(model.ID, secrets)
 		if model.Locality == "local" {
 			report.EstimatedRAMBytes, report.EstimatedVRAMBytes = model.RAMBytes, model.VRAMBytes
+		}
+		if report.Validate() != nil || ctx.Err() != nil {
+			return bad()
 		}
 		return report, nil
 	}

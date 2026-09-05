@@ -19,6 +19,43 @@ minimum samples must fit the window; threshold is finite and greater than zero
 through one. Unknown models, invalid input, canceled reads and unavailable or
 corrupt storage return an error rather than a fabricated empty/successful report.
 
+## Daemon API and Go SDK
+
+Authenticated `POST /v1/models/deprecation` is a read-only inspection operation:
+
+```json
+{
+  "version": 1,
+  "model_id": "local-coder",
+  "domain": "code",
+  "profile": "default",
+  "policy": { "window": 50, "min_samples": 20, "failure_threshold": 0.35 }
+}
+```
+
+All fields are required. Send `Content-Type: application/json` and the daemon's
+Bearer token. The route rejects query parameters, browser origins, chunked or
+oversized bodies, invalid UTF-8, duplicate/unknown fields and invalid policy
+numbers. One dedicated inspection slot and a cooperative five-second deadline
+bound the work. Successful responses are the same versioned report as the CLI;
+invalid/unavailable backend reports return a generic error without partial data.
+POST supplies a bounded structured policy, not permission to mutate model state.
+
+The versioned SDK exposes the same request and report types:
+
+```go
+report, err := client.ModelDeprecation(ctx, sdk.DeprecationRequest{
+    Version: 1, ModelID: "local-coder", Domain: "code", Profile: "default",
+    Policy: sdk.DeprecationPolicy{Window: 50, MinSamples: 20, FailureThreshold: 0.35},
+})
+```
+
+Both adapters validate requests and report consistency, including exact failure
+rates, count partitions, threshold decisions and digest shape. These checks do
+not prove the truth of the underlying evidence. The application remains
+responsible for the configured target and secret redaction. Neither adapter
+executes inference, initializes storage, or changes model eligibility.
+
 ## Evidence semantics
 
 The original evaluation time selects the trailing window, with base evaluation
@@ -54,7 +91,7 @@ This is a report over persisted evaluations, **not the overall runtime failure
 rate**. Unevaluated requests, separate runtime-validity events and missing feedback
 are not silently counted as successes or merged into a different denominator.
 Unifying those evidence populations, value/cost thresholds, population-wide
-scheduled suggestions, native HTTP exposure and measured residency savings remain
+scheduled suggestions and measured residency savings remain
 follow-up work. The command is an initial implementation of PRD §9.3, not full
 model lifecycle or MVP completion.
 

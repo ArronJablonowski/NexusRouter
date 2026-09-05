@@ -1,5 +1,10 @@
 # Embedded Go client
 
+`Client.ModelDeprecation` provides read-only, versioned model recommendations
+using `DeprecationRequest`, `DeprecationPolicy` and `DeprecationReport`. It validates
+inputs/results and never runs inference or creates storage. See the
+[shared CLI/API/SDK contract](../../docs/model-deprecation.md).
+
 Import `github.com/ArronJablonowski/DarwinRouter/sdk/v1` with Go1.27.1 or newer.
 The versioned client is under development; this is not a tagged stable release.
 The snippet below assumes the alias import

@@ -15,7 +15,9 @@ For Go-generation tasks, opt into `darwin run --config path --model auto --valid
 Read-only model recommendations are available with `darwin models deprecation
 --config config.yaml --model MODEL_ID`. The report requires sufficient persisted
 evaluation evidence and operator approval for any later model changes; it does
-not automatically prune models. See [model deprecation](docs/model-deprecation.md).
+not automatically prune models. The same inspection is exposed through authenticated
+`POST /v1/models/deprecation` and the Go SDK's `Client.ModelDeprecation`.
+See [model deprecation](docs/model-deprecation.md).
 
 `darwin daemon start|status|stop --config config.yaml` now controls a background
 daemon on macOS/Linux using authenticated, instance-bound loopback requests.
