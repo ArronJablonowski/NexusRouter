@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"darwinrouter/internal/config"
@@ -15,7 +16,7 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 	if err != nil {
 		return Result{}, ErrAdmission
 	}
-	return svc.runExplicit(ctx, r)
+	return svc.runWithPressure(ctx, r, svc.runExplicit)
 }
 
 func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
@@ -53,24 +54,30 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if s.settings.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
 		return Result{}, ErrAdmission
 	}
+	admission := ctx
+	if r.admissionContext != nil {
+		admission = r.admissionContext
+	}
 	if model.Locality == "local" {
 		if model.RAMBytes == 0 {
 			return Result{}, ErrAdmission
 		}
-		release, err := s.reserveExplicit(ctx, model)
+		release, err := s.reserveExplicit(admission, model)
 		if err != nil {
-			return Result{}, ErrAdmission
+			return Result{}, errors.Join(ErrAdmission, err)
 		}
 		defer release()
 	}
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || admission.Err() != nil {
 		return Result{}, ErrAdmission
 	}
 	return runExplicitAdmitted(ctx, s.settings, r, s.secret)
 }
 
 func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (release func(), err error) {
-	s.mu.Lock()
+	if err := s.lockResources(ctx); err != nil {
+		return nil, err
+	}
 	defer s.mu.Unlock()
 	defer func() {
 		if recover() != nil {
@@ -86,6 +93,32 @@ func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (rele
 		return nil, ErrAdmission
 	}
 	return s.budget.Reserve(snapshot, resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes}, time.Now())
+}
+
+// lockResources lets admission expire while another request owns the profiler.
+func (s *Service) lockResources(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ErrAdmission
+	}
+	if s.mu.TryLock() {
+		return nil
+	}
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ErrAdmission
+		case <-ticker.C:
+			if s.mu.TryLock() {
+				if ctx.Err() != nil {
+					s.mu.Unlock()
+					return ErrAdmission
+				}
+				return nil
+			}
+		}
+	}
 }
 
 func (s *Service) resourceProfile(ctx context.Context) (snapshot resources.Snapshot, err error) {

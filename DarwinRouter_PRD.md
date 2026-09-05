@@ -207,6 +207,8 @@ hardware:
   max_ram_usage_pct: 80
   max_vram_usage_pct: 85
   max_concurrent_local_models: auto
+  local_pressure_policy: reject  # reject | wait
+  local_queue_timeout: 30s       # Admission wait only, not execution timeout
 
 workers:
   max_in_process: 3
@@ -432,6 +434,17 @@ work solely because it now exceeds a lower tier. A numeric concurrency setting
 remains an explicit cap, but never bypasses memory or pressure checks.
 
 Threshold crossings suspend new local admissions. Hybrid mode may use an eligible cloud route; local-only mode queues or rejects according to queue policy. Active work is canceled only for safety-critical pressure.
+
+The initial pressure policy defaults to `reject`. Operators may choose `wait`
+with a bounded admission allowance (100 ms through five minutes). Only verified
+resource-capacity denials before task dispatch may retry; invalid configuration,
+unavailable measurements, provider execution, tool effects and ambiguous durable
+state are not pressure retries. Automatic hybrid routing tries eligible cloud
+alternatives before waiting, without overriding local-only/privacy constraints.
+Admitted work retains its original execution deadline. Waiters are bounded by the
+service's execution slots; durable submissions retain their existing request and
+claim identity while waiting. Stronger fairness and cross-process admission
+coordination remain separate delivery requirements.
 
 ## 13. Storage and Observability
 

@@ -10,6 +10,10 @@ import (
 
 var ErrCapacity = errors.New("local resource capacity unavailable")
 
+// ErrResourceData identifies unknown or invalid resource facts, not transient
+// pressure. Waiting cannot safely turn these facts into an admission decision.
+var ErrResourceData = errors.New("local resource data unavailable")
+
 type Limits struct {
 	MaxConcurrent           int
 	RAMPercent, VRAMPercent float64
@@ -71,10 +75,16 @@ func percent(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >
 func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if n.RAM == 0 || s.Time.IsZero() || s.Time.After(now) || now.Sub(s.Time) > b.limits.MaxAge || s.TotalRAM == 0 || s.AvailableRAM > s.TotalRAM || b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) {
-		return nil, ErrCapacity
+	if n.RAM == 0 || s.Time.IsZero() || s.Time.After(now) || now.Sub(s.Time) > b.limits.MaxAge || s.TotalRAM == 0 || s.AvailableRAM > s.TotalRAM {
+		return nil, ErrResourceData
 	}
 	if s.UnifiedMemory && n.VRAM != 0 {
+		return nil, ErrResourceData
+	}
+	if n.VRAM > 0 && (s.VRAMTotal == nil || s.VRAMAvailable == nil || *s.VRAMTotal == 0 || *s.VRAMAvailable > *s.VRAMTotal) {
+		return nil, ErrResourceData
+	}
+	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) {
 		return nil, ErrCapacity
 	}
 	ramRoom, ok := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)
@@ -83,9 +93,6 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	}
 	usable := ramRoom
 	if n.VRAM > 0 {
-		if s.VRAMTotal == nil || s.VRAMAvailable == nil {
-			return nil, ErrCapacity
-		}
 		gpuRoom, ok := headroom(*s.VRAMTotal, *s.VRAMAvailable, b.used.VRAM, b.limits.VRAMPercent)
 		if !ok || n.VRAM > gpuRoom {
 			return nil, ErrCapacity

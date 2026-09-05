@@ -35,10 +35,12 @@ type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
 }
 type Hardware struct {
-	AutoProfile bool    `yaml:"auto_profile" json:"auto_profile"`
-	MaxRAM      float64 `yaml:"max_ram_usage_pct" json:"max_ram_usage_pct"`
-	MaxVRAM     float64 `yaml:"max_vram_usage_pct" json:"max_vram_usage_pct"`
-	Concurrent  string  `yaml:"max_concurrent_local_models" json:"max_concurrent_local_models"`
+	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`
+	MaxRAM              float64 `yaml:"max_ram_usage_pct" json:"max_ram_usage_pct"`
+	MaxVRAM             float64 `yaml:"max_vram_usage_pct" json:"max_vram_usage_pct"`
+	Concurrent          string  `yaml:"max_concurrent_local_models" json:"max_concurrent_local_models"`
+	LocalPressurePolicy string  `yaml:"local_pressure_policy" json:"local_pressure_policy"`
+	LocalQueueTimeout   string  `yaml:"local_queue_timeout" json:"local_queue_timeout"`
 }
 type Workers struct {
 	Max          int    `yaml:"max_in_process" json:"max_in_process"`
@@ -110,7 +112,7 @@ type Tools struct {
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
-		Hardware: Hardware{true, 80, 85, "auto"}, Workers: Workers{3, "5s", "30s", "single_writer"},
+		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{3, "5s", "30s", "single_writer"},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
@@ -159,6 +161,13 @@ func (s Settings) Validate() error {
 		if err != nil || n < 1 || n > 64 {
 			return errors.New("invalid local model concurrency")
 		}
+	}
+	if s.Hardware.LocalPressurePolicy != "reject" && s.Hardware.LocalPressurePolicy != "wait" {
+		return errors.New("invalid local pressure policy")
+	}
+	queueTimeout, queueErr := Duration(s.Hardware.LocalQueueTimeout)
+	if queueErr != nil || queueTimeout < 100*time.Millisecond || queueTimeout > 5*time.Minute {
+		return errors.New("invalid local queue timeout")
 	}
 	h, he := Duration(s.Workers.Heartbeat)
 	l, le := Duration(s.Workers.Lease)

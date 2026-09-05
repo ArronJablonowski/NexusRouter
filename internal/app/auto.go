@@ -88,9 +88,9 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	var result Result
 	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {
-		result, err = s.runExplicit(ctx, r)
+		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 	} else {
-		result, err = s.runAuto(ctx, r)
+		result, err = s.runWithPressure(ctx, r, s.runAuto)
 		if err != nil && result.retryable && result.fallbackModelID != "" && ctx.Err() == nil {
 			first := result
 			r.onlyModelID = first.fallbackModelID
@@ -98,7 +98,7 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 			r.LocalRequired = r.LocalRequired || first.retryLocalOnly
 			r.MaxCost -= first.reservedCost
 			if r.MaxCost >= 0 {
-				next, nextErr := s.runAuto(ctx, r)
+				next, nextErr := s.runWithPressure(ctx, r, s.runAuto)
 				if next.TaskID != "" {
 					next.PreviousTaskIDs = []string{first.TaskID}
 					result, err = next, nextErr
@@ -162,7 +162,11 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
-	if validateInput(r) != nil {
+	executionCtx := ctx
+	if r.admissionContext != nil {
+		ctx = r.admissionContext
+	}
+	if validateInput(r) != nil || ctx.Err() != nil {
 		return Result{}, ErrAdmission
 	}
 	cfg := s.settings
@@ -337,10 +341,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	// Serialize the snapshot/admission decision, while holding the reservation
 	// (not the mutex) throughout inference. Capacity failures rerank safely.
-	s.mu.Lock()
+	if err := s.lockResources(ctx); err != nil {
+		return Result{}, err
+	}
 	snapshot, profileErr := s.resourceProfile(ctx)
 	var selected routing.Selection
 	var release func()
+	capacityDenied := false
 	draw := s.draw()
 	for {
 		if profileErr != nil {
@@ -369,6 +376,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if err == nil {
 			break
 		}
+		if errors.Is(err, resources.ErrCapacity) {
+			capacityDenied = true
+		}
 		for i := range candidates {
 			if candidates[i].Model == model.Model && candidates[i].Provider == model.Provider {
 				candidates[i].CapacityAvailable = false
@@ -377,6 +387,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	s.mu.Unlock()
 	if err != nil {
+		if capacityDenied && errors.Is(err, routing.ErrNoRoute) {
+			return Result{}, errors.Join(ErrAdmission, routing.ErrNoRoute, resources.ErrCapacity)
+		}
 		if errors.Is(err, routing.ErrNoRoute) || errors.Is(err, routing.ErrInvalid) {
 			return Result{}, errors.Join(ErrAdmission, err)
 		}
@@ -392,7 +405,10 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	if profileErr == nil {
 		r.route.Resources = &snapshot
 	}
-	result, runErr := runExplicitAdmitted(ctx, cfg, r, s.secret)
+	if ctx.Err() != nil {
+		return Result{}, ErrAdmission
+	}
+	result, runErr := runExplicitAdmitted(executionCtx, cfg, r, s.secret)
 	if runErr != nil {
 		s.discovery.clear()
 	}

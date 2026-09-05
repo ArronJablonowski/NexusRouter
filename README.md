@@ -434,8 +434,9 @@ the next request's limit without canceling active work. A numeric concurrency
 setting keeps its fixed cap and still enforces memory/thermal checks.
 
 These limits count active in-process local executions, not distinct resident
-models. Capacity denial does not yet wait for memory, unload resident models or
-dynamically resize contexts. Existing model allocations may overlap observed
+models. Capacity denial rejects by default; bounded waiting is opt-in below.
+The runtime does not unload resident models or dynamically resize contexts.
+Existing model allocations may overlap observed
 host use and reservations; admission deliberately takes no credit for that overlap.
 Setting `hardware.auto_profile: false` disables service host measurements. No
 manual profile source is configured yet, so local execution is then unavailable
@@ -445,6 +446,49 @@ calls and independent CLI processes cannot coordinate this in-memory budget.
 Detailed health also reports local models without RAM metadata as unavailable
 (`model_metadata_missing`), even if the provider's catalog lists them. Health
 remains a coarse observation, not a reservation or guarantee of task admission.
+
+### Bounded resource-pressure waiting
+
+```yaml
+hardware:
+  local_pressure_policy: wait  # Default: reject
+  local_queue_timeout: 30s     # Allowed: 100ms through 5m
+```
+
+Waiting applies to explicit and automatic task admission, including detached
+submissions executed by the daemon. A capacity-denied request replans about every
+250 ms (one quarter of the allowance for sub-second timeouts) until it is
+admitted, canceled or its queue allowance expires. Automatic
+routing repeats admission planning using current storage and the existing
+five-second model-discovery cache. Eligible cloud alternatives are tried before
+waiting; explicit model selection and local-required/privacy constraints are
+never silently changed. Missing metadata, invalid/stale measurements, disabled
+profiling and provider/policy errors do not trigger pressure retries.
+
+The queue allowance begins after acquiring the service execution slot; waiting
+for that slot remains governed by the caller's overall deadline. Waiters occupy
+those slots, so at most `workers.max_in_process` requests are active or waiting
+inside admission. This is bounded polling, not FIFO fairness, an extra durable
+queue, or a dedicated cloud-capacity reservation. Direct auxiliary review and
+summary commands still reject resource pressure rather than use this wait policy.
+
+Once admitted, provider/tool execution uses the original caller deadline, not
+the admission timeout. No already-started task is replayed by pressure waiting.
+Admission timeout returns an error without creating a task; automatic planning
+can still initialize routing storage. A detached submission keeps its existing
+running claim and heartbeat while waiting, with no task ID until execution starts;
+submission cancellation remains the way to cancel it at that stage. Its wait is
+not a fresh submission or retry of model/tool effects. Existing explicit fallback
+rules remain unchanged; an allowed fallback has its own admission allowance within
+the caller's overall deadline.
+Pressure expiry finalizes a detached submission as failed, distinct from explicit
+submission cancellation. Waiting for the shared profiling lock is cancelable;
+custom in-process profilers must still honor the context they receive.
+
+These new configuration fields participate in submission configuration fingerprints.
+Inspect pending submissions when upgrading: work pinned to an older fingerprint
+must be explicitly canceled/resubmitted under a new key rather than silently run
+under changed configuration.
 
 Automatic execution permits one fallback after a provider-declared retryable first-turn failure with no text/tool proposals and a successfully persisted failure. It rechecks the preselected alternative's eligibility and remaining estimated cost budget. Partial output, validation failure, tool activity, cancellation and persistence failure do not authorize retries. Local-task privacy remains local on fallback. Each attempt has its own durable task ID with retry lineage; CLI/native task responses include previous attempt IDs. Returned text/usage belong to the final attempt, not aggregate billing. Explicit model requests do not auto-fallback. Broader recovery, validation-driven fallback and adaptive retry policies remain unfinished.
 

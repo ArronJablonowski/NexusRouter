@@ -21,6 +21,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	admissionContext                context.Context
 	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
 	SummaryAttemptID                string
