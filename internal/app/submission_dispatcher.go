@@ -12,8 +12,9 @@ import (
 	"darwinrouter/submissions"
 )
 
-// Dispatcher only recovers expired claims proven never to have dispatched a
-// durable task. Once dispatched, interrupted work remains inspectable.
+// Dispatcher requeues only expired claims with no durable task start, or
+// projects already-terminal histories without reexecution. Partial work is
+// never replayed automatically.
 type Dispatcher struct {
 	cancel context.CancelFunc
 	done   chan struct{}

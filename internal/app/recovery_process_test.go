@@ -45,8 +45,21 @@ func TestRecoveryClaimProcessHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.ClaimSubmission(context.Background(), status.ConfigDigest, time.Now(), time.Nanosecond); err != nil {
+	ttl := time.Nanosecond
+	terminal := os.Getenv("DARWIN_RECOVERY_STAGE") == "terminal"
+	if terminal {
+		ttl = 2 * time.Second
+	}
+	claim, err := db.ClaimSubmission(context.Background(), status.ConfigDigest, time.Now(), ttl)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if terminal {
+		// Execute and commit task completion, deliberately omitting the
+		// submission-finalization acknowledgement before the parent kills us.
+		if _, err := svc.Run(context.Background(), Request{ModelID: "chat", Prompt: "hello", submissionID: status.ID, submissionToken: claim.Token}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	fmt.Println(status.ID) // Parent kills this owner only after the committed claim.
 	time.Sleep(time.Minute)
@@ -75,7 +88,7 @@ func TestDispatcherRecoversClaimAfterOwnerProcessKilled(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRecoveryClaimProcessHelper$")
-	cmd.Env = append(os.Environ(), "DARWIN_RECOVERY_HELPER=1", "DARWIN_RECOVERY_CONFIG="+configuration)
+	cmd.Env = append(os.Environ(), "DARWIN_RECOVERY_HELPER=1", "DARWIN_RECOVERY_CONFIG="+configuration, "DARWIN_RECOVERY_STAGE=claim")
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)

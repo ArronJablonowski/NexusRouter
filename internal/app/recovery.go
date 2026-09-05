@@ -41,7 +41,13 @@ func (d *Dispatcher) recoverPage(ctx context.Context, configDigest, after string
 		if item.ConfigDigest != configDigest || !item.LeaseExpired {
 			continue
 		}
-		if _, err := d.db.RecoverUndispatched(ctx, item.ID, configDigest, time.Now().UTC()); err != nil {
+		var err error
+		if len(item.TaskIDs) == 0 {
+			_, err = d.db.RecoverUndispatched(ctx, item.ID, configDigest, time.Now().UTC())
+		} else {
+			_, err = d.db.RecoverTerminalSubmission(ctx, item.ID, configDigest, time.Now().UTC())
+		}
+		if err != nil {
 			return after, err
 		}
 	}

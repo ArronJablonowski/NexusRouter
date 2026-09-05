@@ -254,10 +254,11 @@ Queued work survives restart but is pinned to its original configuration digest:
 a daemon with changed configuration will not claim it. Cancel and resubmit
 with a new key if you intentionally change the configuration. Graceful shutdown
 cancels and joins active workers, leaving unclaimed requests queued. A crashed
-running job is eligible for automatic recovery only if it has **no durable task
-start**, as described below. Once a task start exists, an expired job remains
-running with `lease_expired: true` and is not automatically retried: effects may
-already have occurred. Inspect it before deciding on replacement work. General
+running job can be requeued only if it has **no durable task start**, as described
+below. Already-terminal histories can instead restore the result without any
+reexecution. Partial histories remain running with `lease_expired: true` and
+are not automatically retried: effects may already have occurred. Inspect them
+before deciding on replacement work. General
 orphan reconciliation, safe operator reassignment and queue retention remain
 unfinished.
 
@@ -301,11 +302,11 @@ commands never reassign or replay uncertain work.
 
 The daemon inspects one page of at most 100 running submissions on startup and
 every five seconds. Only matching-configuration, expired claims with **no
-persisted `task.started` event** can be recovered. The absence check and owner
+persisted `task.started` event** can be requeued. The absence check and owner
 replacement share a transaction with task-start admission. An old owner is
 fenced from starting a task, renewing its claim or publishing a result after
 recovery. A task-start commit—even if its acknowledgement was lost—prevents
-automatic recovery. This relies on the runtime's requirement that no model/tool
+automatic requeue. This relies on the runtime's requirement that no model/tool
 execution occurs before the task start is durably committed.
 
 An eligible request returns to the bounded queue; a pending cancellation instead
@@ -320,8 +321,33 @@ its action, reason and timestamp. Inspect it using
 `GET /v1/submissions/{id}/recoveries` or
 `darwin submissions recoveries --db /absolute/path/tasks.db --id SUBMISSION_ID`.
 These read-only views return at most four JSON records and expose no claim tokens
-or queued content. A claim with any recorded task start still needs inspection;
-automatic recovery after partial inference/tool execution is not implemented.
+or queued content. Automatic recovery after partial inference/tool execution is
+not implemented.
+
+### Restore a completed result after lost acknowledgement
+
+If execution reached a durable terminal event but the process died before saving
+the submission result, the same supervisor can restore that result from history.
+It requires an expired claim, matching configuration and complete validated
+journals for all linked tasks. The current one-fallback shape permits at most
+two linked tasks, each bounded to 10,000 events and 8 MiB. Unsupported or corrupt
+histories remain inspection-required; they are not replayed or declared successful.
+
+Successful reconstruction checks final output, paired tool events, model and
+provider identity, nonempty-output evidence, and requested Go-syntax evidence.
+Fallback lineage must identify a preceding retryable no-output failure. The
+result retains the original task IDs, final text and finish reason. Usage is
+summed only when every turn has complete, nonnegative, nonoverflowing usage;
+otherwise it remains unknown. Failed/canceled outcomes never expose partial text.
+A pending submission cancellation overrides delivery without rewriting the
+recorded execution history.
+
+The result and a `terminal_history` recovery record are committed atomically,
+and the former owner is fenced. This path performs no model, tool, fallback,
+evaluation or audit calls and does not add fitness evidence. Audit results are
+not reconstructed: `audit_status` is `not_recovered`, and existing audit records
+remain independently inspectable. Partial conversations and uncertain work are
+not resumed by this mechanism.
 
 ## Automatic routing and local knowledge
 

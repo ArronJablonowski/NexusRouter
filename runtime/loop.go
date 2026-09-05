@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -312,7 +313,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
 		}
-		if usage == nil {
+		if usage == nil || usage.InputTokens < 0 || usage.OutputTokens < 0 || usage.InputTokens > math.MaxInt64-totalUsage.InputTokens || usage.OutputTokens > math.MaxInt64-totalUsage.OutputTokens {
 			usageComplete = false
 		} else {
 			totalUsage.InputTokens += usage.InputTokens
