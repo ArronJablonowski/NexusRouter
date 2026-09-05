@@ -69,6 +69,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Run:     service.Run,
 		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:  func(ctx context.Context) error { _, err := db.Read(ctx, "__health__", 0, 1); return err },
+		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
+			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
+		},
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon configuration")

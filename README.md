@@ -75,6 +75,7 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /health`: application/database health; provider health is explicitly not checked yet.
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
+- `POST /v1/feedback`: JSON `{"task_id":"TASK_ID","outcome":"accepted","attempt_cost":0}` (or `rejected`). Requires an observed final-attempt cost. Identical retries return 200 without adding samples; conflicts return 409, and ineligible task histories return 422. The body limit is 4 KiB and feedback shares daemon admission capacity with tasks.
 
 `POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. SSE is buffered until durable completion and labeled `X-Darwin-Stream-Mode: buffered`; this is not live token streaming. Usage is omitted when unavailable.
 
@@ -82,7 +83,7 @@ Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, 
 
 ## Automatic routing and local knowledge
 
-Record operator feedback on a completed task with `darwin feedback --db path --task TASK_ID --outcome accepted --attempt-cost 0` (or `rejected`). Supply the observed final model-attempt cost explicitly; zero is appropriate only when known. This updates immutable user-feedback evidence and domain fitness atomically. Identical retries do not add samples; conflicting feedback or a pre-existing evaluation is rejected. Feedback covers the final attempt, not every preceding tool/model turn. No model tool can invoke this adapter. CLI output contains no task contents. An authenticated HTTP feedback endpoint and evaluation supersession remain unfinished.
+Record operator feedback on a completed task with `darwin feedback --db path --task TASK_ID --outcome accepted --attempt-cost 0` (or `rejected`). Supply the observed final model-attempt cost explicitly; zero is appropriate only when known. This updates immutable user-feedback evidence and domain fitness atomically. Identical retries do not add samples; conflicting feedback or a pre-existing evaluation is rejected. Feedback covers the final attempt, not every preceding tool/model turn. No model tool can invoke this adapter. CLI output contains no task contents. The authenticated HTTP endpoint uses the same rules; evaluation supersession remains unfinished.
 
 Opt in to the built-in `read_file` tool with a narrow workspace directory:
 

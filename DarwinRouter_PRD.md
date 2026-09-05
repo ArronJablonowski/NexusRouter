@@ -330,6 +330,19 @@ Outcome evidence is applied in this order:
 
 Contradictory lower-priority evidence cannot override stronger evidence without an auditable policy decision. Model self-assessment alone is never success evidence.
 
+### 9.1.1 Orchestrator audits and domain-sensitive feedback
+
+The orchestrator must be able to audit another model's output and observed results automatically, using a bounded auxiliary review call where useful. The audit receives task requirements, the candidate output, and available validation/tool evidence as untrusted data; it has no tool execution or permission-changing authority. It produces a validated structured assessment with findings, evidence references, confidence, and an abstain outcome. Persist the evaluator identity, rubric version, task domain, and audit cost separately from candidate performance.
+
+- Deterministic checks identify empty/whitespace-only final answers when a textual answer is required, invalid required schemas, failed tests, and other mechanically verifiable failures. Intermediate empty assistant messages with tool calls are not empty-output failures.
+- Code tasks combine tests, compiler/linter results, and contract checks with orchestrator code review. A model review can identify suspected defects, but must not claim tests ran or passed without execution evidence. Passing tests alone does not establish complete correctness.
+- Creative and preference-heavy tasks give explicit user feedback greater influence than orchestrator taste judgments. Model-only subjective assessments remain low-confidence, bounded advisory signals; they must not disable models, activate skills, or outweigh later user feedback.
+- Keep objective validity and subjective quality as separate dimensions. A user preference does not erase a failed test, and a test pass does not establish creative quality. Where no evidence supports an assessment, abstain rather than invent success.
+- Later user feedback must be able to supersede prior subjective judge evidence through compensating, versioned records. Recompute the affected fitness contribution without double-counting the attempt; preserve original evidence and revision history. Corrections to objective evidence require explicit provenance.
+- Audits inherit local-only/privacy constraints, use independent evaluator identity where possible, enforce time/cost budgets, and do not recursively judge their own judgments. Failed, malformed, or missing audits never become positive evidence.
+
+Acceptance tests must cover blank final answers versus tool-only intermediate turns, compiler/test evidence versus review opinion, creative-task user preference overriding a prior judge contribution, abstention, adversarial output attempting to influence the evaluator, revision replay/idempotency, and local-only audit egress denial.
+
 ### 9.2 Fitness Updates
 
 Fitness updates are transactional, replay-safe, and linked to immutable evidence. Failed or canceled persistence cannot partially update routing state. Operator-approved corrections produce compensating records rather than rewriting history.
@@ -440,7 +453,7 @@ Provider errors use normalized typed classifications. Expected operational failu
 - Simulate low-, mid-, and high-resource machines.
 - Prove fully local mode produces zero unauthorized external requests.
 - Verify adversarial output cannot bypass tool schemas, permissions, resource scopes, or redaction.
-- Require deterministic acceptance evidence before a result updates fitness or activates a skill revision.
+- Require attributable evidence under the domain-sensitive evaluation policy before a result updates fitness; automatic skill activation still requires deterministic validation.
 - Restart from a clean process and reproduce task, route, worker, evaluation, memory, and skill state.
 - Benchmark deterministic routing below 150 ms and auxiliary classification below 500 ms, excluding provider inference.
 

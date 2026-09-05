@@ -14,6 +14,7 @@ import (
 	"darwinrouter/internal/app"
 	"darwinrouter/internal/config"
 	"darwinrouter/internal/telemetry"
+	"darwinrouter/routing"
 	"darwinrouter/sessions"
 )
 
@@ -46,6 +47,9 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 		},
 		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:  func(context.Context) error { return nil },
+		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
+			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -91,5 +95,27 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 	var snapshot sessions.Snapshot
 	if json.Unmarshal(body, &snapshot) != nil || snapshot.State != "completed" || len(snapshot.Messages) != 2 {
 		t.Fatal(string(body))
+	}
+	for i, outcome := range []string{"accepted", "accepted", "rejected"} {
+		payload, _ := json.Marshal(map[string]any{"task_id": result.Task, "outcome": outcome, "attempt_cost": 0})
+		r, _ = http.NewRequest("POST", server.URL+"/v1/feedback", strings.NewReader(string(payload)))
+		r.Header.Set("Authorization", "Bearer "+token)
+		r.Header.Set("Content-Type", "application/json")
+		response, err = server.Client().Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		want := 200
+		if i == 2 {
+			want = 409
+		}
+		if response.StatusCode != want {
+			t.Fatalf("feedback status=%d want=%d", response.StatusCode, want)
+		}
+	}
+	fitness, err := db.Fitness(context.Background(), routing.Key{Model: "fixture", Provider: "local", Domain: "general", Profile: "default"})
+	if err != nil || fitness.Samples != 1 || fitness.Quality != 1 {
+		t.Fatalf("%+v %v", fitness, err)
 	}
 }
