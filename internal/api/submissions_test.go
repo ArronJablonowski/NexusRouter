@@ -403,7 +403,7 @@ func TestSubmissionRoutesRejectUnsupportedMethods(t *testing.T) {
 	}
 	s.CancelSubmission = s.Submission
 	h, _ := New(token, 1, s)
-	for _, route := range [][2]string{{"GET", "/v1/submissions"}, {"PUT", "/v1/submissions"}, {"DELETE", "/v1/submissions/submission"}, {"POST", "/v1/submissions/submission"}, {"PUT", "/v1/submissions/submission/cancel"}} {
+	for _, route := range [][2]string{{"PUT", "/v1/submissions"}, {"DELETE", "/v1/submissions/submission"}, {"POST", "/v1/submissions/submission"}, {"PUT", "/v1/submissions/submission/cancel"}} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, submissionRequest(route[0], route[1], `{}`))
 		if w.Code != 404 {

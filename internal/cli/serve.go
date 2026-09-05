@@ -68,6 +68,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		Submit:           service.Submit,
+		Submissions:      service.ListSubmissions,
 		Submission:       service.SubmissionStatus,
 		CancelSubmission: service.CancelSubmission,
 		Cancel:           service.CancelTask,

@@ -16,6 +16,10 @@ Usage:
   darwin run --config path --model id [--validate go_source] [--json] < prompt.txt
     go_source validation expects output containing a raw full Go source file
     --json streams committed events and a final result as versioned JSON lines
+  darwin submit --config path --key idempotency-key --model id < prompt.txt
+    Store queued work only; an independently running daemon executes it
+  darwin submissions list --db path [--state state --after cursor --limit 25]
+  darwin submissions show|cancel --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service
@@ -43,6 +47,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "submit" {
+		return runSubmit(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "submissions" {
+		return runSubmissions(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "summary-review" {
 		return runSummaryReview(args[1:], stdout, stderr)
 	}

@@ -23,6 +23,7 @@ import (
 )
 
 type Services struct {
+	Submissions      func(context.Context, submissions.ListOptions) (submissions.Page, error)
 	Submit           func(context.Context, string, app.Request) (submissions.Status, error)
 	Submission       func(context.Context, string) (submissions.Status, error)
 	CancelSubmission func(context.Context, string) (submissions.Status, error)
@@ -92,7 +93,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" {
+	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && r.URL.Path == "/v1/submissions") {
 		fail(400, "query_not_supported")
 		return
 	}

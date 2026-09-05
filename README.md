@@ -256,8 +256,44 @@ with a new key if you intentionally change the configuration. Graceful shutdown
 cancels and joins active workers, leaving unclaimed requests queued. A crashed
 running job remains running with `lease_expired: true`; it is **not automatically
 reclaimed or retried**, because effects may already have occurred. Inspect it
-before deciding on replacement work. Orphan reconciliation, operator recovery,
-queue listing/retention and CLI submission commands remain unfinished.
+before deciding on replacement work. Automatic orphan reconciliation, safe
+operator recovery and queue retention remain unfinished.
+
+### Discovering and controlling durable work
+
+`GET /v1/submissions` lists metadata without loading queued prompts or completed
+outputs. Optional query parameters are `state`, `limit` (1–100, default 25), and
+`after` (the opaque `next_cursor` from a prior page). Duplicate or unknown query
+parameters are rejected. Listing uses the independent control capacity, not
+execution capacity. Other endpoints still reject query parameters.
+
+Pages contain `items`, `has_more` and `next_cursor`. Continue while `has_more`
+is true. Each traversal excludes submissions inserted after its first page;
+start a new traversal to discover new work. State and lease observations are
+fresh per page, not a historical snapshot spanning pages: a state-filtered item
+can move out of the filter between reads. Keep the same state filter when using
+a cursor. Metadata pages are bounded to 1 MiB and may contain fewer items than
+the requested limit. Inspect an individual submission to retrieve its result.
+
+The CLI can operate on the same private SQLite store:
+
+```sh
+darwin submit --config examples/local.yaml --key unique-request-key-001 --model local-fast < prompt.txt
+darwin submissions list --db /absolute/path/tasks.db --state running --limit 25
+darwin submissions show --db /absolute/path/tasks.db --id SUBMISSION_ID
+darwin submissions cancel --db /absolute/path/tasks.db --id SUBMISSION_ID
+```
+
+`submit` durably queues the request and prints JSON; it does not start a daemon
+or wait for model execution. Run `darwin serve` with matching configuration to
+execute it. It accepts the run command's constraints and continuation options,
+but not `--json`: submission output is already a single JSON status. Preserve
+the exact key, input and configuration for an idempotent retry. Do not place
+credentials in the key or prompt. Input is bounded to 1 MiB; reading stdin
+still depends on the input source completing. Show/list are read-only; cancel
+requires local access to the configured database. An expired running lease is
+an inspection signal, not proof that all effects have stopped, and these
+commands never reassign or replay uncertain work.
 
 ## Automatic routing and local knowledge
 

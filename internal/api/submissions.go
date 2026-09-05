@@ -18,6 +18,10 @@ import (
 // callers from submitting durable work or inspecting/canceling queued work.
 func (h *Handler) serveSubmissions(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/v1/submissions" {
+		if r.Method == http.MethodGet {
+			h.listSubmissions(w, r)
+			return
+		}
 		if r.Method != http.MethodPost {
 			failure(w, 404, "not_found")
 			return
