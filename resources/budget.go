@@ -3,6 +3,7 @@ package resources
 import (
 	"errors"
 	"math"
+	"math/big"
 	"sync"
 	"time"
 )
@@ -16,10 +17,43 @@ type Limits struct {
 }
 type Need struct{ RAM, VRAM uint64 }
 type Budget struct {
-	mu     sync.Mutex
-	limits Limits
-	used   Need
-	active int
+	mu       sync.Mutex
+	limits   Limits
+	used     Need
+	active   int
+	adaptive bool
+}
+
+// NewAdaptiveBudget uses MaxConcurrent as an upper ceiling, deriving each new
+// admission's concurrency limit from remaining measured resource headroom.
+func NewAdaptiveBudget(l Limits) (*Budget, error) {
+	b, err := NewBudget(l)
+	if err != nil {
+		return nil, err
+	}
+	b.adaptive = true
+	return b, nil
+}
+
+// byteCeiling floors the exact rational value of the supplied float percentage.
+// Converting total to float first can round upward or overflow at MaxUint64.
+func byteCeiling(total uint64, pct float64) uint64 {
+	ratio := new(big.Rat).SetFloat64(pct)
+	ratio.Mul(ratio, new(big.Rat).SetInt(new(big.Int).SetUint64(total)))
+	ratio.Quo(ratio, big.NewRat(100, 1))
+	return new(big.Int).Quo(ratio.Num(), ratio.Denom()).Uint64()
+}
+
+func headroom(total, available, reserved uint64, pct float64) (uint64, bool) {
+	if available > total {
+		return 0, false
+	}
+	ceiling := byteCeiling(total, pct)
+	used := total - available
+	if used > ceiling || reserved > ceiling-used {
+		return 0, false
+	}
+	return ceiling - used - reserved, true
 }
 
 func NewBudget(l Limits) (*Budget, error) {
@@ -43,22 +77,34 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	if s.UnifiedMemory && n.VRAM != 0 {
 		return nil, ErrCapacity
 	}
-	room := func(total, available, reserved, needed uint64, pct float64) bool {
-		if available > total {
-			return false
-		}
-		ceiling := uint64(float64(total) * (pct / 100))
-		used := total - available
-		if used > ceiling || reserved > ceiling-used {
-			return false
-		}
-		return needed <= ceiling-used-reserved
-	}
-	if !room(s.TotalRAM, s.AvailableRAM, b.used.RAM, n.RAM, b.limits.RAMPercent) {
+	ramRoom, ok := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)
+	if !ok || n.RAM > ramRoom {
 		return nil, ErrCapacity
 	}
+	usable := ramRoom
 	if n.VRAM > 0 {
-		if s.VRAMTotal == nil || s.VRAMAvailable == nil || !room(*s.VRAMTotal, *s.VRAMAvailable, b.used.VRAM, n.VRAM, b.limits.VRAMPercent) {
+		if s.VRAMTotal == nil || s.VRAMAvailable == nil {
+			return nil, ErrCapacity
+		}
+		gpuRoom, ok := headroom(*s.VRAMTotal, *s.VRAMAvailable, b.used.VRAM, b.limits.VRAMPercent)
+		if !ok || n.VRAM > gpuRoom {
+			return nil, ErrCapacity
+		}
+		usable = min(usable, gpuRoom)
+	}
+	if b.adaptive {
+		limit := b.limits.MaxConcurrent
+		if usable < 16<<30 {
+			limit = 1
+		} else if usable <= 64<<30 {
+			limit = min(limit, 2)
+		}
+		if s.CPUs <= 0 {
+			limit = 1
+		} else {
+			limit = min(limit, s.CPUs)
+		}
+		if b.active >= limit {
 			return nil, ErrCapacity
 		}
 	}

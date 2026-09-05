@@ -52,15 +52,27 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 		return nil, ErrAdmission
 	}
 	s = snapshot
-	concurrent := 1 // auto is deliberately conservative until adaptive sizing exists.
+	concurrent := s.Workers.Max
 	if s.Hardware.Concurrent != "auto" {
 		concurrent, _ = strconv.Atoi(s.Hardware.Concurrent)
 	}
-	b, err := resources.NewBudget(resources.Limits{MaxConcurrent: concurrent, RAMPercent: s.Hardware.MaxRAM, VRAMPercent: s.Hardware.MaxVRAM, MaxAge: 5 * time.Second})
+	limits := resources.Limits{MaxConcurrent: concurrent, RAMPercent: s.Hardware.MaxRAM, VRAMPercent: s.Hardware.MaxVRAM, MaxAge: 5 * time.Second}
+	var b *resources.Budget
+	if s.Hardware.Concurrent == "auto" {
+		b, err = resources.NewAdaptiveBudget(limits)
+	} else {
+		b, err = resources.NewBudget(limits)
+	}
 	if err != nil {
 		return nil, err
 	}
-	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: resources.Profile, draw: rand.Float64}, nil
+	profile := resources.Profile
+	if !s.Hardware.AutoProfile {
+		// No manual profile source is configured yet. Disabling measurement
+		// must not invent capacity or allow local execution without admission.
+		profile = func(context.Context) (resources.Snapshot, error) { return resources.Snapshot{}, resources.ErrProfile }
+	}
+	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: profile, draw: rand.Float64}, nil
 }
 
 // Run dispatches an explicit model or performs automatic admission and ranking.

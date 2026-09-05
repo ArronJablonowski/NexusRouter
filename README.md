@@ -422,8 +422,24 @@ task storage/provider dispatch. Local requests hold their reservation through
 execution and release it on success, failure or cancellation. Automatic routes
 reserve once, using the same budget; auxiliary reviews and summaries also share
 that service's budget. Cloud explicit execution does not require local profiling.
-The current `auto` local concurrency default remains one; capacity denial does
-not yet wait for memory, unload resident models or dynamically resize contexts.
+The `auto` local concurrency setting now adapts to measured usable headroom:
+below 16 GiB permits one local execution, 16–64 GiB permits up to two, and above
+64 GiB permits up to `workers.max_in_process`. Usable headroom means the memory
+percentage ceiling minus observed host use and outstanding reservations. A
+discrete-GPU request uses the smaller RAM/VRAM headroom; Apple unified memory
+uses RAM only. CPU thread count also caps automatic admission; unknown CPU count
+permits one. Every candidate must still fit its declared footprint. The policy
+recomputes at admission, so earlier reservations or increased pressure can reduce
+the next request's limit without canceling active work. A numeric concurrency
+setting keeps its fixed cap and still enforces memory/thermal checks.
+
+These limits count active in-process local executions, not distinct resident
+models. Capacity denial does not yet wait for memory, unload resident models or
+dynamically resize contexts. Existing model allocations may overlap observed
+host use and reservations; admission deliberately takes no credit for that overlap.
+Setting `hardware.auto_profile: false` disables service host measurements. No
+manual profile source is configured yet, so local execution is then unavailable
+even with a numeric concurrency limit; eligible cloud execution remains possible.
 Use a persistent daemon/service for shared reservations: separate one-shot Go
 calls and independent CLI processes cannot coordinate this in-memory budget.
 Detailed health also reports local models without RAM metadata as unavailable

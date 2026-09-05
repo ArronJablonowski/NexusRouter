@@ -417,11 +417,19 @@ The resource profiler samples:
 - Loaded local models and estimated memory requirements.
 - Current provider and worker concurrency.
 
-Default allocation policy:
+Default allocation policy (GiB means 2^30 bytes):
 
-- Below 16 GB available unified memory/VRAM: one local model, unload before incompatible model switches.
-- From 16 GB through 64 GB: one or two models subject to measured pressure and declared footprints.
-- Above 64 GB: bounded parallel models or ensembles when policy enables them.
+- Below 16 GiB usable unified memory/VRAM: one local execution; unload before incompatible model switches.
+- From 16 GiB through 64 GiB: one or two executions subject to measured pressure and declared footprints.
+- Above 64 GiB: bounded parallel executions or ensembles when policy enables them.
+
+For automatic concurrency, usable headroom is the configured percentage ceiling
+minus observed host use and outstanding reservations. Where a model requires
+discrete VRAM, use the smaller of RAM and VRAM headroom. Cap admission by the
+configured worker ceiling and observed CPU thread count; missing CPU measurements
+permit only one slot. Recompute before each admission without preempting existing
+work solely because it now exceeds a lower tier. A numeric concurrency setting
+remains an explicit cap, but never bypasses memory or pressure checks.
 
 Threshold crossings suspend new local admissions. Hybrid mode may use an eligible cloud route; local-only mode queues or rejects according to queue policy. Active work is canceled only for safety-critical pressure.
 
