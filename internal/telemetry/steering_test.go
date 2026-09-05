@@ -192,7 +192,7 @@ func TestSteeringLegacyAndMalformed(t *testing.T) {
 	if err = db.Append(ctx, 1, event("complete", 2, runtime.TaskCompleted)); err == nil {
 		t.Fatal("corruptsteering allowedcompletion")
 	}
-	if _, err = db.db.Exec(`DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE tool_approvals; DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(ctx, path)

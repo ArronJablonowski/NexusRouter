@@ -21,9 +21,23 @@ func (s *Store) TaskSnapshot(ctx context.Context, task string) (sessions.Snapsho
 		return zero, err
 	}
 	defer tx.Rollback()
+	snapshot, err := taskSnapshot(ctx, tx, task)
+	if err != nil {
+		return zero, err
+	}
+	if err = tx.Commit(); err != nil {
+		return zero, err
+	}
+	return snapshot, nil
+}
+
+// taskSnapshot also serves authorization checks which already hold the writer
+// transaction. Validation and consumption then observe the same journal state.
+func taskSnapshot(ctx context.Context, tx *sql.Tx, task string) (sessions.Snapshot, error) {
+	zero := sessions.Snapshot{}
 	var session, state sql.NullString
 	var head int64
-	err = tx.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(session_id AS BLOB))<=128 THEN session_id END,CASE WHEN length(CAST(state AS BLOB))<=16 THEN state END,sequence FROM task_heads WHERE task_id=?`, task).Scan(&session, &state, &head)
+	err := tx.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(session_id AS BLOB))<=128 THEN session_id END,CASE WHEN length(CAST(state AS BLOB))<=16 THEN state END,sequence FROM task_heads WHERE task_id=?`, task).Scan(&session, &state, &head)
 	if err != nil {
 		return zero, err
 	}
@@ -88,9 +102,6 @@ func (s *Store) TaskSnapshot(ctx context.Context, task string) (sessions.Snapsho
 	}
 	if snapshot.Sequence != head || snapshot.State != state.String || snapshot.SessionID != session.String {
 		return zero, sessions.ErrHistory
-	}
-	if err = tx.Commit(); err != nil {
-		return zero, err
 	}
 	return snapshot, nil
 }
