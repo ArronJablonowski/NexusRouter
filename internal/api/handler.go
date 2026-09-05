@@ -22,10 +22,13 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 type Services struct {
+	SkillGenerations     func(context.Context, string, string, int) ([]skills.GenerationSummary, error)
+	SkillGeneration      func(context.Context, string, string) (skills.GenerationAttempt, error)
 	ApprovalExecution    func(context.Context, string, string) (approvals.ExecutionStatus, error)
 	DecideApproval       func(context.Context, approvals.Command) (approvals.Record, error)
 	Approval             func(context.Context, string, string) (approvals.Record, error)
@@ -111,7 +114,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || approvalRoute(r.URL.Path))) {
+	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -125,6 +128,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case skillGenerationRoute(r.URL.Path):
+		h.serveSkillGenerations(w, r.WithContext(ctx))
 	case approvalRoute(r.URL.Path):
 		h.serveApprovals(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.Contains(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/steering"):

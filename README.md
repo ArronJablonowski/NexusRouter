@@ -927,6 +927,21 @@ resource and cost limits. Inputs and output are redacted before dispatch/storage
 the returned record is a durable proposal, never an active skill. Background
 example discovery and scheduling still remain open.
 
+Inspect saved generation without re-running it:
+
+```sh
+darwin skill-generations list --db /path/to/darwin.db --scope project --limit 25
+darwin skill-generations show --db /path/to/darwin.db --scope project --id ATTEMPT_ID
+```
+
+Lists contain metadata only; show includes the saved proposal and may contain
+sensitive content. Authenticated HTTP equivalents are
+`GET /v1/skills/generations?scope=project&limit=25` and
+`GET /v1/skills/generations/ATTEMPT_ID?scope=project`. List pagination uses an
+exclusive `after` ID, in lexical order, with limits1–100. All reads are scoped,
+bounded and non-mutating; missing databases are not created or upgraded.
+A started record remains uncertain and does not authorize redispatch.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.

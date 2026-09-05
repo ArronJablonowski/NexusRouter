@@ -21,6 +21,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {
@@ -69,6 +70,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		SkillGeneration: func(ctx context.Context, scope, id string) (skills.GenerationAttempt, error) {
+			return app.InspectSkillGeneration(ctx, s.Telemetry.Database, scope, id)
+		},
+		SkillGenerations: func(ctx context.Context, scope, after string, limit int) ([]skills.GenerationSummary, error) {
+			return app.ListSkillGenerations(ctx, s.Telemetry.Database, scope, after, limit)
+		},
 		ApprovalExecution: func(ctx context.Context, task, id string) (approvals.ExecutionStatus, error) {
 			return app.ApprovalExecutionStatus(ctx, s.Telemetry.Database, task, id)
 		},

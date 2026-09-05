@@ -321,6 +321,15 @@ dispatch/persistence; exports can still contain other sensitive task content.
 No automatic selection of source tasks, publication, activation or background
 scheduling occurs. This does not mutate an injected SkillStore.
 
+`Client.ListSkillGenerations(ctx, scope, after, limit)` returns metadata-only
+summaries without generated content or source identifiers; limit is1–100 and
+after is an exclusive lexical ID cursor. Pages are live observations, not a
+frozen snapshot. `Client.InspectSkillGeneration(ctx, scope, id)` explicitly reads
+the full saved attempt, including any proposal. Both reject scope mismatches and
+never initialize/migrate storage or execute work. Protect full-record exports as
+sensitive data. HasResult means a saved proposal, not a published/active skill;
+started means uncertainty, never automatic retry permission.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
