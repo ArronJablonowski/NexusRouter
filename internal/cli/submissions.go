@@ -27,14 +27,14 @@ func submissionCLIContext() (context.Context, context.CancelFunc) {
 
 func runSubmissions(args []string, stdout, stderr io.Writer) int {
 	invalid := func() int {
-		fmt.Fprintln(stderr, "usage: darwin submissions list|show|cancel --db path [--id id] [--state state --after cursor --limit 25]")
+		fmt.Fprintln(stderr, "usage: darwin submissions list|show|cancel|recoveries --db path [--id id] [--state state --after cursor --limit 25]")
 		return 2
 	}
 	if len(args) == 0 {
 		return invalid()
 	}
 	verb := args[0]
-	if verb != "list" && verb != "show" && verb != "cancel" {
+	if verb != "list" && verb != "show" && verb != "cancel" && verb != "recoveries" {
 		return invalid()
 	}
 	seen := map[string]bool{}
@@ -70,6 +70,9 @@ func runSubmissions(args []string, stdout, stderr io.Writer) int {
 	if verb != "list" && !sessions.ValidEventPageID(*id) {
 		return invalid()
 	}
+	if verb == "recoveries" && strings.ContainsAny(*id, "/\\") {
+		return invalid()
+	}
 	if *state != "" && *state != "queued" && *state != "running" && *state != "succeeded" && *state != "failed" && *state != "canceled" {
 		return invalid()
 	}
@@ -98,6 +101,13 @@ func runSubmissions(args []string, stdout, stderr io.Writer) int {
 			defer db.Close()
 			if verb == "show" {
 				output, err = db.Submission(ctx, *id)
+			} else if verb == "recoveries" {
+				var records []submissions.Recovery
+				records, err = db.RecoveryHistory(ctx, *id)
+				if records == nil {
+					records = []submissions.Recovery{}
+				}
+				output = records
 			} else {
 				output, err = db.ListSubmissions(ctx, listOptions)
 			}

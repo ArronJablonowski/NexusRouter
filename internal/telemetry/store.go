@@ -84,7 +84,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 12 {
+	if version > 13 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -205,6 +205,12 @@ func (s *Store) initialize(ctx context.Context) error {
 		 CREATE INDEX submissions_queue ON submissions(state,config_digest,created_at,id);
 		 CREATE INDEX events_submission_start ON events(json_extract(body,'$.data.submission_id'),sequence) WHERE json_extract(body,'$.kind')='task.started';
 		 PRAGMA user_version=12;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 13 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE submission_recoveries (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES submissions(id), prior_token_digest TEXT NOT NULL, body BLOB NOT NULL, UNIQUE(submission_id,prior_token_digest)); PRAGMA user_version=13;`)
 		if err != nil {
 			return err
 		}

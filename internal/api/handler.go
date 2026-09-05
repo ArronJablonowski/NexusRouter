@@ -23,25 +23,26 @@ import (
 )
 
 type Services struct {
-	Submissions      func(context.Context, submissions.ListOptions) (submissions.Page, error)
-	Submit           func(context.Context, string, app.Request) (submissions.Status, error)
-	Submission       func(context.Context, string) (submissions.Status, error)
-	CancelSubmission func(context.Context, string) (submissions.Status, error)
-	Cancel           func(context.Context, string) (runtime.CancellationStatus, error)
-	Cancellation     func(context.Context, string) (runtime.CancellationStatus, error)
-	Events           func(context.Context, string, int64, int) (sessions.EventPage, error)
-	RunStream        func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
-	Summarize        func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
-	SummaryAttempt   func(context.Context, string) (sessions.SummaryAttempt, error)
-	SummaryAttempts  func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
-	ReviewSummary    func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
-	SummaryReviews   func(context.Context, string) ([]sessions.SummaryReview, error)
-	FeedbackHistory  func(context.Context, string) ([]evaluation.Record, error)
-	ReviseFeedback   func(context.Context, string, string, bool) error
-	Run              func(context.Context, app.Request) (app.Result, error)
-	Inspect          func(context.Context, string) (sessions.Snapshot, error)
-	Health           func(context.Context) error
-	Feedback         func(context.Context, string, bool, float64) error
+	SubmissionRecoveries func(context.Context, string) ([]submissions.Recovery, error)
+	Submissions          func(context.Context, submissions.ListOptions) (submissions.Page, error)
+	Submit               func(context.Context, string, app.Request) (submissions.Status, error)
+	Submission           func(context.Context, string) (submissions.Status, error)
+	CancelSubmission     func(context.Context, string) (submissions.Status, error)
+	Cancel               func(context.Context, string) (runtime.CancellationStatus, error)
+	Cancellation         func(context.Context, string) (runtime.CancellationStatus, error)
+	Events               func(context.Context, string, int64, int) (sessions.EventPage, error)
+	RunStream            func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
+	Summarize            func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
+	SummaryAttempt       func(context.Context, string) (sessions.SummaryAttempt, error)
+	SummaryAttempts      func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
+	ReviewSummary        func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
+	SummaryReviews       func(context.Context, string) ([]sessions.SummaryReview, error)
+	FeedbackHistory      func(context.Context, string) ([]evaluation.Record, error)
+	ReviseFeedback       func(context.Context, string, string, bool) error
+	Run                  func(context.Context, app.Request) (app.Result, error)
+	Inspect              func(context.Context, string) (sessions.Snapshot, error)
+	Health               func(context.Context) error
+	Feedback             func(context.Context, string, bool, float64) error
 }
 type Handler struct {
 	secret   [32]byte

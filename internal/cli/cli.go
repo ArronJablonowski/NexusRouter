@@ -19,7 +19,7 @@ Usage:
   darwin submit --config path --key idempotency-key --model id < prompt.txt
     Store queued work only; an independently running daemon executes it
   darwin submissions list --db path [--state state --after cursor --limit 25]
-  darwin submissions show|cancel --db path --id submission-id
+  darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service

@@ -12,8 +12,8 @@ import (
 	"darwinrouter/submissions"
 )
 
-// Dispatcher never reclaims expired running work: an interrupted effect must
-// remain inspectable, not be silently repeated by a replacement process.
+// Dispatcher only recovers expired claims proven never to have dispatched a
+// durable task. Once dispatched, interrupted work remains inspectable.
 type Dispatcher struct {
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -34,6 +34,8 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db}
 	var workers sync.WaitGroup
+	workers.Add(1)
+	go func() { defer workers.Done(); d.reconcile(ctx, s.submissionConfigDigest()) }()
 	for i := 0; i < s.settings.Workers.Max; i++ {
 		workers.Add(1)
 		go func() { defer workers.Done(); d.worker(ctx, s) }()
@@ -176,7 +178,9 @@ func (d *Dispatcher) execute(ctx context.Context, s *Service, claim submissions.
 			_, finishErr = d.db.FinishSubmission(finish, claim.Status.ID, claim.Token, state, code, result)
 		}
 	}
-	if finishErr != nil {
+	// Another supervisor may have fenced this undispatched owner. Its terminal
+	// write is expected to be denied; it must not poison unrelated active work.
+	if finishErr != nil && !errors.Is(finishErr, submissions.ErrLeaseLost) {
 		d.recordError()
 	}
 }

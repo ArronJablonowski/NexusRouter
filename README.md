@@ -254,10 +254,12 @@ Queued work survives restart but is pinned to its original configuration digest:
 a daemon with changed configuration will not claim it. Cancel and resubmit
 with a new key if you intentionally change the configuration. Graceful shutdown
 cancels and joins active workers, leaving unclaimed requests queued. A crashed
-running job remains running with `lease_expired: true`; it is **not automatically
-reclaimed or retried**, because effects may already have occurred. Inspect it
-before deciding on replacement work. Automatic orphan reconciliation, safe
-operator recovery and queue retention remain unfinished.
+running job is eligible for automatic recovery only if it has **no durable task
+start**, as described below. Once a task start exists, an expired job remains
+running with `lease_expired: true` and is not automatically retried: effects may
+already have occurred. Inspect it before deciding on replacement work. General
+orphan reconciliation, safe operator reassignment and queue retention remain
+unfinished.
 
 ### Discovering and controlling durable work
 
@@ -294,6 +296,32 @@ still depends on the input source completing. Show/list are read-only; cancel
 requires local access to the configured database. An expired running lease is
 an inspection signal, not proof that all effects have stopped, and these
 commands never reassign or replay uncertain work.
+
+### Safe recovery before execution
+
+The daemon inspects one page of at most 100 running submissions on startup and
+every five seconds. Only matching-configuration, expired claims with **no
+persisted `task.started` event** can be recovered. The absence check and owner
+replacement share a transaction with task-start admission. An old owner is
+fenced from starting a task, renewing its claim or publishing a result after
+recovery. A task-start commit—even if its acknowledgement was lost—prevents
+automatic recovery. This relies on the runtime's requirement that no model/tool
+execution occurs before the task start is durably committed.
+
+An eligible request returns to the bounded queue; a pending cancellation instead
+becomes terminal canceled. If the queue is full, recovery waits for capacity.
+At most three automatic requeues are permitted; a further expired undispatched
+claim becomes failed with `recovery_exhausted`. No request body or idempotency key
+changes, and an existing idempotency key continues to identify the same request.
+This does not resume an interrupted conversation or retry tool effects.
+
+Each decision is recorded transactionally in an immutable recovery history with
+its action, reason and timestamp. Inspect it using
+`GET /v1/submissions/{id}/recoveries` or
+`darwin submissions recoveries --db /absolute/path/tasks.db --id SUBMISSION_ID`.
+These read-only views return at most four JSON records and expose no claim tokens
+or queued content. A claim with any recorded task start still needs inspection;
+automatic recovery after partial inference/tool execution is not implemented.
 
 ## Automatic routing and local knowledge
 

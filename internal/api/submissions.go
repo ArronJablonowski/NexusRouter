@@ -30,6 +30,10 @@ func (h *Handler) serveSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/v1/submissions/")
+	if r.Method == http.MethodGet && strings.HasSuffix(id, "/recoveries") {
+		h.submissionRecoveries(w, r, strings.TrimSuffix(id, "/recoveries"))
+		return
+	}
 	mutating := r.Method == http.MethodPost && strings.HasSuffix(id, "/cancel")
 	if mutating {
 		id = strings.TrimSuffix(id, "/cancel")
@@ -226,7 +230,7 @@ func validSubmissionStatus(s submissions.Status, expectedID string) bool {
 			return true
 		}
 		switch s.ErrorCode {
-		case "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed":
+		case "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed", "recovery_exhausted":
 			return true
 		}
 	}
