@@ -132,7 +132,7 @@ func TestSteeringLegacyReadOnlyList(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if _, err = raw.Exec(`DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
+	if _, err = raw.Exec(`DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
 		t.Fatal(err)
 	}
 	var out, errout bytes.Buffer

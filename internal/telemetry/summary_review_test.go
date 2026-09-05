@@ -117,7 +117,7 @@ func TestSummaryReviewRollbackBoundAndMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, r := reviewDraftFixture(t, s)
-	if _, err := s.db.Exec("DROP INDEX events_submission_start; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; DROP TABLE summary_review_heads; DROP TABLE summary_reviews; PRAGMA user_version=9;"); err != nil {
+	if _, err := s.db.Exec("DROP INDEX events_submission_start; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; DROP TABLE summary_review_heads; DROP TABLE summary_reviews; PRAGMA user_version=9;"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

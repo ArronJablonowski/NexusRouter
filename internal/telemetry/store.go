@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 17 {
+	if version > 18 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -236,6 +236,23 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 17 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE workflow_selections (id TEXT PRIMARY KEY, scope TEXT NOT NULL, name TEXT NOT NULL, body BLOB NOT NULL); CREATE INDEX workflow_selections_scope ON workflow_selections(scope,id); PRAGMA user_version=17;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 18 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE workflow_scan_tasks (
+		 seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL UNIQUE REFERENCES task_heads(task_id));
+		 INSERT INTO workflow_scan_tasks(task_id) SELECT task_id FROM task_heads ORDER BY task_id;
+		 CREATE TRIGGER workflow_scan_task_insert AFTER INSERT ON task_heads BEGIN
+		 INSERT INTO workflow_scan_tasks(task_id) VALUES(NEW.task_id); END;
+		 CREATE TABLE workflow_scans (
+		 scope TEXT NOT NULL, name TEXT NOT NULL, domain TEXT NOT NULL, revision INTEGER NOT NULL,
+		 body BLOB NOT NULL, PRIMARY KEY(scope,name));
+		 CREATE TABLE workflow_scan_pages (
+		 scope TEXT NOT NULL, name TEXT NOT NULL, revision INTEGER NOT NULL,
+		 body BLOB NOT NULL, PRIMARY KEY(scope,name,revision));
+		 PRAGMA user_version=18;`)
 		if err != nil {
 			return err
 		}

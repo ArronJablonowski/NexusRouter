@@ -40,7 +40,7 @@ func OpenApprovalControl(ctx context.Context, path string) (*Store, error) {
 	}
 	var version int
 	var mode, check string
-	if db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version != 17 || db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode) != nil || mode != "wal" || db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check) != nil || check != "ok" {
+	if db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version != 18 || db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode) != nil || mode != "wal" || db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check) != nil || check != "ok" {
 		return nil, approvals.ErrUnavailable
 	}
 	ok = true
