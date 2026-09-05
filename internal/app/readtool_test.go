@@ -94,7 +94,7 @@ func TestApplicationReadToolCycleIsDurable(t *testing.T) {
 	cfg.Tools.ReadRoot = dir
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "task.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: server.URL}}
-	cfg.Models = []config.Model{{ID: "m", Provider: "local", Model: "m", Locality: "local", ContextTokens: 8192, Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "m", Provider: "local", Model: "m", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
 	out, err := RunExplicit(context.Background(), cfg, Request{ModelID: "m", Prompt: "Read note.txt"}, nil)
 	if err != nil || out.Turns != 2 || calls != 2 || out.Text != "Accepted evidence" {
 		t.Fatalf("%+v calls=%d err=%v", out, calls, err)

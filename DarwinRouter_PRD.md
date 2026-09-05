@@ -292,7 +292,13 @@ Before ranking, DarwinRouter rejects candidates that violate any hard constraint
 - Credential availability.
 - Egress or organizational policy.
 
-An ineligible model cannot win through a high historical score.
+An ineligible model cannot win through a high historical score. Explicit model
+selection must not bypass local memory or concurrency admission: named-model,
+automatic, and auxiliary execution share the service's resource budget. Unknown
+local memory estimates fail closed. Reservations cover the entire admitted
+execution and are released only after that execution returns, including failure
+and cancellation cleanup. Independent-process coordination remains a separate
+requirement from in-process reservations.
 
 ### 8.3 Fitness Ranking
 

@@ -134,7 +134,12 @@ Provider keys are referenced by `api_key_env`; the loader never resolves credent
 
 ## Run an explicit-model task
 
-Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model, then run:
+Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model
+and set that model's `ram_bytes` to a conservative positive estimate covering
+weights, maximum context/KV memory and runtime overhead. The sample deliberately
+uses zero to deny execution until this estimate is supplied; configuration
+validation alone does not establish execution readiness. On Apple unified
+memory include GPU allocations in RAM and leave `vram_bytes` zero. Then run:
 
 ```sh
 ./bin/darwin run --config examples/local.yaml --model local-fast < prompt.txt
@@ -406,9 +411,24 @@ tools:
 
 This allows local models to read UTF-8 regular files up to 64 KiB within that directory. Relative paths and symlinks cannot escape the configured root. Do not include credentials or other files the model should not see in this scope. Enabling file tools excludes cloud execution; explicit cloud selection is denied. Tool results become sensitive durable session content. Tools default off; write tools, interactive approvals and general delegation remain unfinished. Tool-enabled models require `context_tokens` metadata. Each turn checks serialized context including tools and schemas plus a 1,024-token reserve; overflow ends the task without discarding durable tool results. Tokenizer-based accounting, automatic compaction and budget-exhaustion recovery remain unfinished.
 
-Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Successful model discovery is cached for up to five seconds per provider/endpoint/credential/privacy identity; execution failures invalidate it. Failed discovery is not cached. Automatic local reservations and discovery caches are shared within one daemon, not across separate processes.
+Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Successful model discovery is cached for up to five seconds per provider/endpoint/credential/privacy identity; execution failures invalidate it. Failed discovery is not cached. Explicit and automatic local reservations share one application service; discovery caches are also service-local. Neither is shared across separate processes.
 
-Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--domain`, `--profile`, repeated `--capability`, `--context-tokens`, `--max-cost`, and `--local-required`. Native task JSON exposes corresponding `domain`, `profile`, `capabilities`, `context_tokens`, `max_cost`, and `local_required` fields. Explicit selection bypasses ranking and automatic resource reservations; zero cost preserves its legacy operator override, while a positive cost ceiling and requested capabilities/context are enforced.
+Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--domain`, `--profile`, repeated `--capability`, `--context-tokens`, `--max-cost`, and `--local-required`. Native task JSON exposes corresponding `domain`, `profile`, `capabilities`, `context_tokens`, `max_cost`, and `local_required` fields. Explicit selection bypasses ranking, not resource reservations. Explicit zero cost preserves its legacy cost override, while a positive cost ceiling and requested capabilities/context are enforced.
+
+Every explicitly selected local model now requires a positive `ram_bytes`
+estimate and a fresh usable host profile. RAM/VRAM pressure, stale measurements,
+reported thermal pressure or occupied local concurrency deny admission before
+task storage/provider dispatch. Local requests hold their reservation through
+execution and release it on success, failure or cancellation. Automatic routes
+reserve once, using the same budget; auxiliary reviews and summaries also share
+that service's budget. Cloud explicit execution does not require local profiling.
+The current `auto` local concurrency default remains one; capacity denial does
+not yet wait for memory, unload resident models or dynamically resize contexts.
+Use a persistent daemon/service for shared reservations: separate one-shot Go
+calls and independent CLI processes cannot coordinate this in-memory budget.
+Detailed health also reports local models without RAM metadata as unavailable
+(`model_metadata_missing`), even if the provider's catalog lists them. Health
+remains a coarse observation, not a reservation or guarantee of task admission.
 
 Automatic execution permits one fallback after a provider-declared retryable first-turn failure with no text/tool proposals and a successfully persisted failure. It rechecks the preselected alternative's eligibility and remaining estimated cost budget. Partial output, validation failure, tool activity, cancellation and persistence failure do not authorize retries. Local-task privacy remains local on fallback. Each attempt has its own durable task ID with retry lineage; CLI/native task responses include previous attempt IDs. Returned text/usage belong to the final attempt, not aggregate billing. Explicit model requests do not auto-fallback. Broader recovery, validation-driven fallback and adaptive retry policies remain unfinished.
 

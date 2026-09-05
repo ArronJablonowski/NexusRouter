@@ -35,7 +35,7 @@ func TestExplicitTaskEndToEnd(t *testing.T) {
 	s.Mode = "local_only"
 	s.Telemetry.Database = filepath.Join(t.TempDir(), "task.db")
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: server.URL, APIKeyEnv: "FIXTURE_KEY"}}
-	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	out, err := RunExplicit(context.Background(), s, Request{ModelID: "chat", Prompt: "do not store " + key}, func(string) string { return key })
 	if err != nil || out.Text != "[REDACTED] answer" || out.Turns != 1 || calls != 1 {
 		t.Fatalf("%+v %v calls=%d", out, err, calls)
@@ -71,7 +71,7 @@ func TestAdmissionNoNetwork(t *testing.T) {
 	s := config.Defaults()
 	s.Mode = "local_only"
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://192.168.1.2:11434"}}
-	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	if _, err := RunExplicit(context.Background(), s, Request{ModelID: "chat", Prompt: "hello"}, nil); err != ErrAdmission {
 		t.Fatal(err)
 	}

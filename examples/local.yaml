@@ -10,5 +10,9 @@ models:
     model: local-model-id
     locality: local
     capabilities: [chat, summarize, classify]
+    # Required before execution: replace 0 with your measured conservative byte
+    # estimate for model weights plus maximum context/KV and runtime overhead.
+    # On Apple unified memory, include GPU allocations here and leave VRAM zero.
+    ram_bytes: 0
 telemetry:
   database: ./data/darwin.db

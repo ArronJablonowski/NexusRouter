@@ -24,7 +24,7 @@ import (
 	"darwinrouter/sessions"
 )
 
-// Service shares local reservations across all concurrent automatic requests.
+// Service shares local reservations across all concurrent explicit and automatic requests.
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
@@ -76,7 +76,7 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	var result Result
 	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {
-		result, err = RunExplicit(ctx, s.settings, r, s.secret)
+		result, err = s.runExplicit(ctx, r)
 	} else {
 		result, err = s.runAuto(ctx, r)
 		if err != nil && result.retryable && result.fallbackModelID != "" && ctx.Err() == nil {
@@ -326,7 +326,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	// Serialize the snapshot/admission decision, while holding the reservation
 	// (not the mutex) throughout inference. Capacity failures rerank safely.
 	s.mu.Lock()
-	snapshot, profileErr := s.profile(ctx)
+	snapshot, profileErr := s.resourceProfile(ctx)
 	var selected routing.Selection
 	var release func()
 	draw := s.draw()
@@ -380,7 +380,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	if profileErr == nil {
 		r.route.Resources = &snapshot
 	}
-	result, runErr := RunExplicit(ctx, cfg, r, s.secret)
+	result, runErr := runExplicitAdmitted(ctx, cfg, r, s.secret)
 	if runErr != nil {
 		s.discovery.clear()
 	}

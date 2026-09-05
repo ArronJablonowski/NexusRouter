@@ -24,7 +24,7 @@ func TestBlankApplicationAnswerCannotReceiveSuccessFeedback(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "events.db")
 	cfg.Providers = []config.Provider{{ID: "p", Kind: "ollama", Endpoint: server.URL}}
-	cfg.Models = []config.Model{{ID: "m", Model: "m", Provider: "p", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "m", Model: "m", Provider: "p", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	out, err := RunExplicit(context.Background(), cfg, Request{ModelID: "m", Prompt: "answer"}, nil)
 	if !errors.Is(err, runtime.ErrEmptyOutput) || out.TaskID == "" {
 		t.Fatalf("%+v %v", out, err)

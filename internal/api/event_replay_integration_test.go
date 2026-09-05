@@ -39,7 +39,7 @@ func TestHTTPEventReplayReconnectDoesNotExecute(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "replay.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	svc, err := app.NewService(cfg, func(name string) string {
 		if name == "DARWIN_API_TOKEN" {
 			return token

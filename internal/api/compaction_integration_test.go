@@ -84,7 +84,7 @@ func TestHTTPCompactedContinuationPersistsBeforeProvider(t *testing.T) {
 	}))
 	defer provider.Close()
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 8192}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, ContextTokens: 8192}}
 	svc, err := app.NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)

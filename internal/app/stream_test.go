@@ -25,7 +25,7 @@ func streamService(t *testing.T, handler http.HandlerFunc) (*Service, string) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "stream.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: server.URL, APIKeyEnv: "FIXTURE_KEY"}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, func(string) string { return "fixture-secret" })
 	if err != nil {
 		t.Fatal(err)

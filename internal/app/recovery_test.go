@@ -31,7 +31,13 @@ func recoveryFixture(t *testing.T) (*Service, *telemetry.Store, *atomic.Int32) {
 	s.settings.Workers.Max = 1
 	s.settings.Mode = "local_only"
 	s.settings.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
+	configured, err := NewService(s.settings, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = configured
+	s.profile = healthProfile
 	db, err := telemetry.Open(context.Background(), s.settings.Telemetry.Database)
 	if err != nil {
 		t.Fatal(err)

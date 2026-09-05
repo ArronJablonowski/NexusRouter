@@ -50,7 +50,7 @@ func TestDispatcherQueuedRestartExecutesIdempotentSubmissionOnce(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "dispatch.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +109,7 @@ func TestDispatcherCancellationStopsBlockedProvider(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "cancel.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	s, err := NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -179,8 +179,14 @@ func TestDispatcherCancelBeforeExecutionSlotHasNoInventedTask(t *testing.T) {
 	defer provider.Close()
 	s.settings.Mode = "local_only"
 	s.settings.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.settings.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	s.settings.Workers.Max = 1
+	configured, err := NewService(s.settings, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = configured
+	s.profile = healthProfile
 	s.execution = make(chan struct{}, 1)
 	s.execution <- struct{}{}
 	a, err := s.Submit(ctx, "0123456789abcdef", Request{ModelID: "chat", Prompt: "hello"})

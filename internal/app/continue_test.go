@@ -34,7 +34,7 @@ func TestContinueCompletedHistoryAndPrivacy(t *testing.T) {
 	s.Mode = "local_only"
 	s.Telemetry.Database = filepath.Join(t.TempDir(), "history.db")
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: server.URL}}
-	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	ctx := context.Background()
 	first, err := RunExplicit(ctx, s, Request{ModelID: "chat", Prompt: "first question"}, nil)
 	if err != nil {

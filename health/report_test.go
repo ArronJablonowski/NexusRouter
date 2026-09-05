@@ -43,9 +43,16 @@ func TestHealthCheckRejectsContradictionAndRawErrors(t *testing.T) {
 		{Component: "supervisor", Status: "healthy", Code: "supervisor_stopped"},
 		{Component: "resources", ID: "gpu", Status: "healthy", Code: "metrics_unknown"},
 		{Component: "database", ID: "private/path", Status: "healthy", Code: "available"},
+		{Component: "model", ID: "local", Status: "healthy", Code: "model_metadata_missing"},
 	} {
 		if c.Validate() == nil {
 			t.Fatal(c)
 		}
+	}
+}
+
+func TestMissingModelMetadataIsUnavailable(t *testing.T) {
+	if err := (Check{Component: "model", ID: "local", Status: "unavailable", Code: "model_metadata_missing"}).Validate(); err != nil {
+		t.Fatal(err)
 	}
 }

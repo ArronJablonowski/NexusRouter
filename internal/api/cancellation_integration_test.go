@@ -37,7 +37,7 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "cancellation.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	runner, err := app.NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)

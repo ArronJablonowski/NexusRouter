@@ -73,7 +73,7 @@ func TestJSONRunProcessLiveOutputAndBrokenPipe(t *testing.T) {
 			cfg.Telemetry.Database = filepath.Join(t.TempDir(), "task.db")
 			cfg.Providers = []config.Provider{{ID: "fixture", Kind: "ollama", Endpoint: provider.URL}}
 			zero := 0.0
-			cfg.Models = []config.Model{{ID: "chat", Provider: "fixture", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}, EstimatedCost: &zero}}
+			cfg.Models = []config.Model{{ID: "chat", Provider: "fixture", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, EstimatedCost: &zero}}
 			configPath := filepath.Join(t.TempDir(), "run.yaml")
 			data, err := yaml.Marshal(cfg)
 			if err != nil {

@@ -81,7 +81,7 @@ func TestDispatcherRecoversClaimAfterOwnerProcessKilled(t *testing.T) {
 	cfg.Workers.Max = 1
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "crashed.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	configuration := filepath.Join(t.TempDir(), "config.json")
 	body, _ := json.Marshal(cfg)
 	if err := os.WriteFile(configuration, body, 0600); err != nil {

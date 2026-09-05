@@ -31,7 +31,7 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 	s.Mode = "local_only"
 	s.Telemetry.Database = filepath.Join(t.TempDir(), "http.db")
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
-	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	db, err := telemetry.Open(context.Background(), s.Telemetry.Database)
 	if err != nil {
 		t.Fatal(err)

@@ -220,6 +220,8 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 			status, code = "disabled", "disabled_by_policy"
 		} else if policyBlocked[i] {
 			status, code = "unavailable", "unavailable"
+		} else if m.Locality == "local" && m.RAMBytes == 0 {
+			status, code = "unavailable", "model_metadata_missing"
 		} else {
 			for j, p := range s.settings.Providers {
 				if m.Provider != p.ID {

@@ -49,7 +49,7 @@ func (c Check) Validate() error {
 		return ErrInvalid
 	}
 	switch c.Code {
-	case "serving", "available", "unavailable", "configuration_limit", "disabled_by_policy", "credentials_missing", "discovery_failed", "model_missing", "capacity_available", "capacity_exhausted", "metrics_unknown", "supervisor_unavailable", "supervisor_ok", "supervisor_starting", "supervisor_stopping", "supervisor_stopped", "supervisor_error", "supervisor_stalled":
+	case "serving", "available", "unavailable", "configuration_limit", "disabled_by_policy", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "capacity_available", "capacity_exhausted", "metrics_unknown", "supervisor_unavailable", "supervisor_ok", "supervisor_starting", "supervisor_stopping", "supervisor_stopped", "supervisor_error", "supervisor_stalled":
 	default:
 		return ErrInvalid
 	}
@@ -57,7 +57,7 @@ func (c Check) Validate() error {
 	switch c.Code {
 	case "serving", "available", "capacity_available", "supervisor_ok":
 		validState = c.Status == "healthy"
-	case "configuration_limit", "credentials_missing", "discovery_failed", "model_missing", "supervisor_stopping", "supervisor_stopped":
+	case "configuration_limit", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "supervisor_stopping", "supervisor_stopped":
 		validState = c.Status == "unavailable"
 	case "disabled_by_policy":
 		validState = c.Status == "disabled"

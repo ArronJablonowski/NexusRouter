@@ -43,7 +43,7 @@ func TestMetricsSurviveServiceRestartWithoutExecution(t *testing.T) {
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "metrics.db")
 	cfg.Providers = []config.Provider{{ID: "private-provider", Kind: "ollama", Endpoint: provider.URL}}
-	cfg.Models = []config.Model{{ID: "private-model", Provider: "private-provider", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}}}
+	cfg.Models = []config.Model{{ID: "private-model", Provider: "private-provider", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	svc, err := app.NewService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)

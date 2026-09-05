@@ -54,10 +54,9 @@ type Result struct {
 	Usage                *providers.Usage
 }
 
-// RunExplicit executes an admitted model with optional bounded read-only tools
-// and no implicit fallback. A local model always receives a loopback-only
-// transport, even when the application mode permits cloud use.
-func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
+// runExplicitAdmitted MUST only be called after resource admission. Local
+// dispatch retains its loopback-only transport even when cloud use is enabled.
+func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
 	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || s.Telemetry.OTEL {
 		return result, ErrAdmission

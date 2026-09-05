@@ -39,7 +39,7 @@ func TestHealthReportReadOnlyCatalogAndSafeMetadata(t *testing.T) {
 	s := submissionService(t)
 	s.settings.Mode = "local_only"
 	s.settings.Providers = []config.Provider{{ID: "provider-private-key", Kind: "ollama", Endpoint: p.URL}}
-	s.settings.Models = []config.Model{{ID: "model-private-key", Provider: "provider-private-key", Model: "fixture", Locality: "local"}}
+	s.settings.Models = []config.Model{{ID: "model-private-key", Provider: "provider-private-key", Model: "fixture", Locality: "local", RAMBytes: 1}}
 	s.secret = func(string) string { return "private-key" }
 	s.profile = healthProfile
 	db, err := telemetry.Open(context.Background(), s.settings.Telemetry.Database)
@@ -64,6 +64,64 @@ func TestHealthReportReadOnlyCatalogAndSafeMetadata(t *testing.T) {
 	}
 }
 
+func TestHealthReportRequiresEnabledLocalRAMMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name, locality, mode string
+		ram                  uint64
+		ready                bool
+	}{
+		{"missing local RAM", "local", "local_only", 0, false},
+		{"known local RAM", "local", "local_only", 1, true},
+		{"cloud RAM not required", "cloud", "cloud_only", 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			p := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				if r.Method != "GET" || r.URL.Path != "/api/tags" {
+					t.Error("health executed provider work")
+				}
+				fmt.Fprintln(w, `{"models":[{"name":"fixture"}]}`)
+			}))
+			defer p.Close()
+			s := submissionService(t)
+			s.profile = healthProfile
+			s.settings.Mode = tc.mode
+			s.settings.Providers = []config.Provider{{ID: "provider", Kind: "ollama", Endpoint: p.URL}}
+			s.settings.Models = []config.Model{{ID: "model", Provider: "provider", Model: "fixture", Locality: tc.locality, RAMBytes: tc.ram}}
+			db, err := telemetry.Open(context.Background(), s.settings.Telemetry.Database)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Close(); err != nil {
+				t.Fatal(err)
+			}
+			budget := s.budget
+			report, err := s.HealthReport(context.Background(), healthySupervisor())
+			if err != nil || report.Validate() != nil || report.Ready != tc.ready || calls.Load() != 1 || s.budget != budget {
+				t.Fatal(report, err, calls.Load())
+			}
+			found := false
+			for _, check := range report.Checks {
+				if check.Component != "model" {
+					continue
+				}
+				found = true
+				if tc.ready {
+					if check.Status != "healthy" || check.Code != "available" {
+						t.Fatal(check)
+					}
+				} else if check.Status != "unavailable" || check.Code != "model_metadata_missing" {
+					t.Fatal(check)
+				}
+			}
+			if !found {
+				t.Fatal("model observation missing")
+			}
+		})
+	}
+}
+
 func TestHealthReportPolicyAndMissingDatabase(t *testing.T) {
 	for _, mode := range []string{"local_only", "cloud_only"} {
 		t.Run(mode, func(t *testing.T) {
@@ -82,6 +140,11 @@ func TestHealthReportPolicyAndMissingDatabase(t *testing.T) {
 			report, err := s.HealthReport(context.Background(), healthySupervisor())
 			if err != nil || report.Ready || calls.Load() != 0 {
 				t.Fatal(report, err, calls.Load())
+			}
+			for _, check := range report.Checks {
+				if check.Component == "model" && (check.Status != "disabled" || check.Code != "disabled_by_policy") {
+					t.Fatal("missing metadata overrode mode classification", check)
+				}
 			}
 			if _, err := os.Stat(s.settings.Telemetry.Database); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("health created database", err)
