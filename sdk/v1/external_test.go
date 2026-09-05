@@ -135,6 +135,7 @@ import (
  "time"
  sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
  "github.com/ArronJablonowski/DarwinRouter/runtime"
+ "github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 func check(ok bool, label string) { if !ok { panic(label) } }
 func main() {
@@ -174,6 +175,19 @@ func main() {
  check(err!=nil&&!strings.Contains(err.Error(),"private callback detail"),"delivery error unsafe")
  result,err=client.Run(ctx,sdk.Request{Version:1,ModelID:"chat",Prompt:"second"})
  check(err==nil&&result.Version==1&&result.TaskID!="","run failed")
+ queuedRequest:=sdk.Request{Version:1,ModelID:"chat",Prompt:"queued only; do not execute"}
+ queued,err:=client.Submit(ctx,"external-submission-key",queuedRequest)
+ check(err==nil&&queued.Version==1&&queued.ID!=""&&queued.State=="queued"&&len(queued.TaskIDs)==0,"submission failed")
+ retried,err:=client.Submit(ctx,"external-submission-key",queuedRequest)
+ check(err==nil&&retried.ID==queued.ID&&retried.CreatedAt.Equal(queued.CreatedAt)&&retried.State=="queued","submission retry changed work")
+ page,err:=client.ListSubmissions(ctx,submissions.ListOptions{State:"queued",Limit:10})
+ check(err==nil&&page.Version==1&&len(page.Items)==1&&page.Items[0].ID==queued.ID&&page.Items[0].State=="queued","submission discovery failed")
+ status,err:=client.SubmissionStatus(ctx,queued.ID)
+ check(err==nil&&status.ID==queued.ID&&status.State=="queued"&&status.Result==nil,"submission status failed")
+ canceled,err:=client.CancelSubmission(ctx,queued.ID)
+ check(err==nil&&canceled.ID==queued.ID&&canceled.State=="canceled"&&canceled.CancelRequested&&len(canceled.TaskIDs)==0,"submission cancel failed")
+ status,err=client.SubmissionStatus(ctx,queued.ID)
+ check(err==nil&&status.State=="canceled"&&status.Result==nil,"cancellation not durable")
  fmt.Println("SDK_EXTERNAL_OK")
 }
 `

@@ -54,6 +54,27 @@ silently resumed. Feedback and prior-ID revisions use existing immutable
 accounting; costs are explicit, subjective feedback cannot overwrite objective
 failures, and identical retries do not add fitness samples.
 
+## Durable daemon submissions
+
+`Submit(ctx, key, Request{Version: 1, ...})` stores queued work and returns a
+versioned `submissions.Status`; it does not dispatch inference or start a worker.
+A separately running daemon must use the same database and matching effective
+configuration to execute it. Submission acceptance is not proof that execution
+admission or output validation will succeed. Reuse a16–128-character printable
+ASCII idempotency key with the exact request after uncertain delivery. Conflicting
+reuse rejects; the raw key is hashed before persistence. Configured credentials
+in the request are rejected rather than silently changing the stored intent.
+
+Use `SubmissionStatus(ctx, id)` to inspect durable lifecycle and completed output,
+`ListSubmissions(ctx, submissions.ListOptions{Limit: 25})` for metadata-only
+discovery, and `CancelSubmission(ctx, id)` for durable cancellation. Import the
+public `github.com/ArronJablonowski/DarwinRouter/submissions` package for list
+options and queue conflict/capacity error identities. Listing supports limits1–100
+and opaque insertion-fenced cursors; changing task states are not frozen across
+pages. Read methods never create or migrate missing storage. Cancellation of
+running work remains cooperative and does not prove side effects have stopped.
+No SDK method silently starts a dispatcher; use the daemon for background work.
+
 `InspectTask` returns a versioned `TaskSnapshot` with messages, sequence, task
 state, pending tool calls and uncertainty flags. It reads one coherent SQLite
 snapshot, bounded to10,000 events and8MiB of serialized history, with a ten-second
