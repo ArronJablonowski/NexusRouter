@@ -24,6 +24,13 @@ daemon on macOS/Linux using authenticated, instance-bound loopback requests.
 Set `DARWIN_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
 readiness, shutdown semantics and limits; `serve` remains the foreground option.
 
+### Managed local model residency
+
+Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,
+confirmed low-memory model switching. This requires exclusive use by one
+DarwinRouter Service; shared servers must leave it disabled. Logical reservation
+release alone does not unload a model. See [model residency](docs/model-residency.md).
+
 ### Replaceable context planning
 
 Embedding applications can replace context assembly, estimation and compaction

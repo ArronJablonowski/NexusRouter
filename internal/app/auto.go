@@ -46,6 +46,8 @@ type Service struct {
 	settings         config.Settings
 	secret           func(string) string
 	budget           *resources.Budget
+	residencyMu      sync.Mutex
+	residencies      map[string]*residencyEndpoint
 	profile          func(context.Context) (resources.Snapshot, error)
 	draw             func() float64
 	mu               sync.Mutex
@@ -395,16 +397,18 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		}
 		candidates = append(candidates, c)
 	}
-	// Serialize the snapshot/admission decision, while holding the reservation
-	// (not the mutex) throughout inference. Capacity failures rerank safely.
+	// Serialize profiling and the exploration draw. Each selected local route
+	// then performs fresh, serialized reservation admission; managed lifecycle
+	// HTTP runs outside the global mutex. Capacity failures rerank safely.
 	if err := s.lockResources(ctx); err != nil {
 		return Result{}, err
 	}
 	snapshot, profileErr := s.resourceProfile(ctx)
+	draw := s.draw()
+	s.mu.Unlock()
 	var selected routing.Selection
 	var release func()
 	capacityDenied := false
-	draw := s.draw()
 	for {
 		if profileErr != nil {
 			for i := range candidates {
@@ -428,8 +432,14 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if model.Locality != "local" {
 			break
 		}
-		release, err = s.budget.Reserve(snapshot, modelResources(model), time.Now())
+		release, err = s.reserveExplicit(ctx, model)
 		if err == nil {
+			for _, provider := range cfg.Providers {
+				if provider.ID == model.Provider && provider.ManageResidency {
+					// Never attach a pre-unload observation to a managed route.
+					snapshot, profileErr = s.residencyProfile(ctx)
+				}
+			}
 			break
 		}
 		if errors.Is(err, resources.ErrCapacity) {
@@ -441,7 +451,6 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			}
 		}
 	}
-	s.mu.Unlock()
 	if err != nil {
 		if capacityDenied && errors.Is(err, routing.ErrNoRoute) {
 			return Result{}, errors.Join(ErrAdmission, routing.ErrNoRoute, resources.ErrCapacity)

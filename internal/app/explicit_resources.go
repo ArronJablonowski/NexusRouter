@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
@@ -68,6 +69,26 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return Result{}, ErrAdmission
 	}
+	// Managed residency is an admission-time maintenance action. Reject known
+	// credential/source failures before any such provider mutation.
+	for _, provider := range s.settings.Providers {
+		if provider.ID == model.Provider && provider.ManageResidency {
+			if provider.APIKeyEnv != "" && (s.secret == nil || s.secret(provider.APIKeyEnv) == "") {
+				return Result{}, ErrAdmission
+			}
+			if r.ContinueTaskID != "" && r.continuation == nil {
+				db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+				if err != nil {
+					return Result{}, ErrAdmission
+				}
+				r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(s.settings, s.secret))
+				db.Close()
+				if err != nil {
+					return Result{}, ErrAdmission
+				}
+			}
+		}
+	}
 	admission := ctx
 	if r.admissionContext != nil {
 		admission = r.admissionContext
@@ -92,6 +113,15 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 }
 
 func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (release func(), err error) {
+	for _, provider := range s.settings.Providers {
+		if provider.ID == model.Provider && provider.ManageResidency {
+			return s.reserveManagedResidency(ctx, provider, model)
+		}
+	}
+	return s.reserveUnmanaged(ctx, model)
+}
+
+func (s *Service) reserveUnmanaged(ctx context.Context, model config.Model) (release func(), err error) {
 	if err := s.lockResources(ctx); err != nil {
 		return nil, err
 	}

@@ -465,6 +465,18 @@ permit only one slot. Recompute before each admission without preempting existin
 work solely because it now exceeds a lower tier. A numeric concurrency setting
 remains an explicit cap, but never bypasses memory or pressure checks.
 
+Residency management must distinguish a released task reservation from actual
+provider eviction. For the initial Ollama backend, explicit provider
+`manage_residency: true` authorizes inspection and unloading of configured idle
+models on a dedicated loopback endpoint. It defaults off on potentially shared
+servers. Hold active-use references through tool pauses; never evict an active
+or unknown model. Require an unload acknowledgement and fresh inventory absence,
+then re-profile hardware before admitting the replacement. Ambiguous unload
+outcomes must not cause blind repeat mutations. A single Service coordinates the
+initial implementation; cross-process/shared-server fencing and equivalent
+lifecycle adapters for other backends remain required qualification work before
+those deployment scenarios are supported.
+
 Local discrete-GPU models declare `gpu_device` as a source-qualified NVIDIA UUID
 or AMD card identifier plus positive RAM/VRAM footprint estimates. Admission
 requires fresh matching observations and rejects unavailable or ambiguous device

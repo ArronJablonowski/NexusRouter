@@ -58,11 +58,12 @@ type Workers struct {
 	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
-	ID         string `yaml:"id" json:"id"`
-	Kind       string `yaml:"kind" json:"kind"`
-	Endpoint   string `yaml:"endpoint" json:"endpoint"`
-	APIKeyEnv  string `yaml:"api_key_env" json:"api_key_env,omitempty"`
-	Executable string `yaml:"executable,omitempty" json:"executable,omitempty"`
+	ManageResidency bool   `yaml:"manage_residency" json:"manage_residency,omitempty"`
+	ID              string `yaml:"id" json:"id"`
+	Kind            string `yaml:"kind" json:"kind"`
+	Endpoint        string `yaml:"endpoint" json:"endpoint"`
+	APIKeyEnv       string `yaml:"api_key_env" json:"api_key_env,omitempty"`
+	Executable      string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
 type Model struct {
 	ContextTokens int      `yaml:"context_tokens" json:"context_tokens"`
@@ -304,6 +305,9 @@ func (s Settings) Validate() error {
 		}
 	}
 	providers := map[string]Provider{}
+	if err := s.validateResidency(); err != nil {
+		return err
+	}
 	for _, p := range s.Providers {
 		if !identifier.MatchString(p.ID) {
 			return errors.New("invalid provider ID")
