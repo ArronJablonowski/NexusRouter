@@ -549,6 +549,26 @@ Provider errors use normalized typed classifications. Expected operational failu
 - Restart from a clean process and reproduce task, route, worker, evaluation, memory, and skill state.
 - Benchmark deterministic routing below 150 ms and auxiliary classification below 500 ms, excluding provider inference.
 
+### 16.1 Release Artifact Acceptance
+
+Release preparation must bind artifacts to an explicit reviewed source commit
+and semantic version. Build macOS/Linux amd64/arm64 archives from one isolated
+snapshot of committed source, with fixed build/archive metadata. Include a
+versioned manifest and checksums covering both binaries' archives and manifest.
+Qualify reproducibility with two complete builds and verify executable target
+identities and the native CLI version. Cross-compilation is not native runtime
+qualification on the other targets.
+
+Sign the checksum set with a separately provisioned release identity; never
+reuse repository SSH credentials. Verification must require an independently
+trusted public key, reject malformed manifests, missing/extra files and unsafe
+paths, and perform no extraction or execution. Publication must not overwrite
+existing artifacts or occur implicitly during build/test. A real release still
+requires full runtime acceptance, approved license/dependency notices, supported
+platform qualification, installation/migration guidance and reviewed release
+notes. Local test signatures do not establish a production signing identity or
+platform notarization.
+
 ## 17. Delivery Roadmap
 
 ### Phase 1: Foundation

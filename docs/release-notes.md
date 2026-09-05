@@ -1,0 +1,49 @@
+# DarwinRouter release notes — unreleased
+
+This is a development summary, not a v1.0.0 release announcement. No signed
+production release, release tag or complete PRD acceptance is claimed.
+
+## Available for supervised testing
+
+- Go runtime, CLI, Go SDK and authenticated loopback HTTP service with durable
+  SQLite/WAL task/session records and explicit configuration.
+- Adaptive eligibility/ranking, provider fallback, local resource admission,
+  bounded delegation, validation evidence and advisory output audits.
+- Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
+  → local Ollama → Sol round trip, historical continuation and a separate Sol
+  output audit have been qualified. See [the integration guide](codex-coordinator-integration.md).
+- Scoped lexical memory retrieval and operator memory management, progressive
+  skills, and opt-in background workflow learning that creates **inactive**
+  drafts rather than automatically trusting generated instructions.
+- Replaceable context planning, bounded safe compaction paths, daemon lifecycle
+  controls and recovery for the specifically qualified interruption boundaries.
+- Opt-in managed residency for dedicated Ollama servers. Sharing a managed
+  endpoint with other clients is not supported.
+- Local four-target release packaging, checksummed manifests, independent-key
+  signing and offline verification. See [packaging instructions](release-packaging.md).
+
+Each item has narrower limits than the eventual PRD. [Implementation evidence](progress.md)
+records tests and remaining work; fixtures and cross-builds are not proof of all
+live-provider, hardware or crash scenarios.
+
+## Upgrade cautions
+
+The current durable store uses schema 21. Stop older writer processes and back
+up task databases before opening them with a newer build. Restoring an older
+binary alone does not downgrade a migrated database. Preserve the matching
+pre-upgrade data backup for rollback; no automatic destructive downgrade exists.
+
+Background learning and managed model residency default off. Do not enable
+either merely to try a newer binary: review scope, budgets, privacy, dedicated
+server ownership and recovery semantics first. Keep credentials outside source
+configuration and logs. Existing Codex login is used without copying credentials
+into DarwinRouter or artifacts.
+
+## Required before announcing v1.0.0
+
+Full PRD qualification, live token streaming, side-effecting tool surfaces,
+automatic skill validation/activation, learning-attention controls,
+configuration reload, performance and supported-platform qualification remain
+open. This list is not exhaustive. Distribution also requires an approved
+license and notices, a dedicated signing identity with an independent public-key
+trust record, approved version-specific notes and explicit publication.

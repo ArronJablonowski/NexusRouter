@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup
+.PHONY: build check test fmt qualify-linux-cgroup qualify-release
 
 build:
 	go build -trimpath -o bin/darwin ./cmd/darwin
@@ -17,3 +17,7 @@ fmt:
 
 qualify-linux-cgroup:
 	sh scripts/qualify-linux-cgroup.sh
+
+# Requires a clean committed checkout. Uses only disposable test signing keys.
+qualify-release:
+	DARWIN_RELEASE_QUALIFY=1 go test -count=1 -timeout=45m -run '^TestReleaseQualification$$' -v ./internal/releasepack
