@@ -30,6 +30,9 @@ func TestAuditInspectionListAndValidation(t *testing.T) {
 	if runAudits([]string{"list", "--db", path, "--task", "task"}, io.Discard, io.Discard) != 0 {
 		t.Fatal("empty listing failed")
 	}
+	if runAudits([]string{"attempts", "--db", path, "--task", "task"}, io.Discard, io.Discard) != 0 {
+		t.Fatal("empty attempt listing failed")
+	}
 	for _, args := range [][]string{{"delete"}, {"show", "--db", path}, {"list", "--db", path, "--task", "task", "--limit", "101"}} {
 		if runAudits(args, io.Discard, io.Discard) != 2 {
 			t.Fatal(args)

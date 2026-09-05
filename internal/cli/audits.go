@@ -13,10 +13,10 @@ import (
 
 func runAudits(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin audits list|show --db path [--task id] [--id audit-id] [--after id] [--limit n]")
+		fmt.Fprintln(stderr, "usage: darwin audits list|show|attempts --db path [--task id] [--id audit-id] [--after id] [--limit n]")
 		return 2
 	}
-	if len(args) == 0 || (args[0] != "list" && args[0] != "show") {
+	if len(args) == 0 || (args[0] != "list" && args[0] != "show" && args[0] != "attempts") {
 		return usage()
 	}
 	fs := flag.NewFlagSet("audits", flag.ContinueOnError)
@@ -26,7 +26,7 @@ func runAudits(args []string, stdout, stderr io.Writer) int {
 	id := fs.String("id", "", "audit ID")
 	after := fs.String("after", "", "exclusive audit ID cursor")
 	limit := fs.Int("limit", 100, "page size")
-	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || (args[0] == "show" && (*id == "" || *task != "" || *after != "")) || (args[0] == "list" && (*task == "" || *id != "")) || *limit < 1 || *limit > 100 {
+	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || (args[0] == "show" && (*id == "" || *task != "" || *after != "")) || (args[0] != "show" && (*task == "" || *id != "")) || *limit < 1 || *limit > 100 {
 		return usage()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -40,6 +40,8 @@ func runAudits(args []string, stdout, stderr io.Writer) int {
 	var out any
 	if args[0] == "show" {
 		out, err = db.Audit(ctx, *id)
+	} else if args[0] == "attempts" {
+		out, err = db.ReviewAttempts(ctx, *task, *after, *limit)
 	} else {
 		out, err = db.Audits(ctx, *task, *after, *limit)
 	}

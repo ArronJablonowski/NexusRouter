@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"darwinrouter/evaluation"
 	"darwinrouter/internal/telemetry"
@@ -55,6 +56,10 @@ func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {
 	if err != nil || saved.TaskID != source.TaskID || saved.EvaluatorModel != "z" {
 		t.Fatalf("%+v %v", saved, err)
 	}
+	attempts, err := db.ReviewAttempts(ctx, source.TaskID, "", 100)
+	if err != nil || len(attempts) != 1 || attempts[0].Status != "completed" || attempts[0].AuditID != record.ID {
+		t.Fatalf("review lifecycle: %+v %v", attempts, err)
+	}
 	if _, err := svc.AuditTask(ctx, source.TaskID, "a", 0); err == nil {
 		t.Fatal("self review admitted")
 	}
@@ -65,6 +70,65 @@ func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatal("denied review dispatched")
+	}
+}
+
+func TestFailedReviewLifecycleSurvivesCancellation(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
+			svc, cfg := autoFixture(t)
+			ctx := context.Background()
+			source, err := svc.Run(ctx, Request{ModelID: "a", Prompt: "hello"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reviewCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// The attempt must be durable before any reviewer request arrives.
+				db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				attempts, err := db.ReviewAttempts(ctx, source.TaskID, "", 100)
+				db.Close()
+				if err != nil || len(attempts) != 1 || attempts[0].Status != "started" {
+					t.Errorf("dispatch preceded persistence: %+v %v", attempts, err)
+				}
+				if canceled {
+					cancel()
+					return
+				}
+				fmt.Fprintln(w, `{"message":{"content":"sensitive-invalid-review"},"done":true,"done_reason":"stop"}`)
+			}))
+			defer server.Close()
+			svc.settings.Providers[0].Endpoint = server.URL
+			if _, err := svc.AuditTask(reviewCtx, source.TaskID, "z", 0); err == nil {
+				t.Fatal("failed review accepted")
+			}
+			db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			attempts, err := db.ReviewAttempts(ctx, source.TaskID, "", 100)
+			code := "review_failed"
+			if canceled {
+				code = "canceled"
+			}
+			if err != nil || len(attempts) != 1 || attempts[0].Status != "failed" || attempts[0].Code != code || attempts[0].FinishedAt.Before(attempts[0].StartedAt) || time.Since(attempts[0].FinishedAt) > time.Minute {
+				t.Fatalf("failure lifecycle: %+v %v", attempts, err)
+			}
+			encoded, _ := json.Marshal(attempts)
+			if strings.Contains(string(encoded), "sensitive-invalid-review") {
+				t.Fatal("review payload persisted in lifecycle")
+			}
+			audits, err := db.Audits(ctx, source.TaskID, "", 100)
+			if err != nil || len(audits) != 0 {
+				t.Fatalf("failure created advisory evidence: %+v %v", audits, err)
+			}
+		})
 	}
 }
 
