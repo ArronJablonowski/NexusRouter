@@ -1067,6 +1067,25 @@ monitoring and statistical regression detection are not yet scheduled.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
 
+The orchestrator's reviewer can assess code and missing deliverables, but its
+opinion is not a compiler, test runner, or proof of completion. The current
+evidence policy distinguishes these cases:
+
+| Observation | Treatment |
+| --- | --- |
+| Blank required final answer | Objective validity failure; tool-only intermediate turns are excluded. |
+| Nonblank answer repeats the request, promises future work, or omits deliverables | Reviewer cites requirements and output; the finding remains advisory. |
+| Suspected code defect | Advisory code review; claims about executed tests require supplied execution evidence. |
+| Creative quality or taste | Bounded advisory influence; explicit user feedback takes precedence. |
+| Insufficient evidence | Reviewer may abstain; no success is invented. |
+
+User feedback removes the reviewed attempt from the advisory population, and
+conflicting advisory evidence from other attempts cannot reverse the direction
+of direct quality feedback. Objective validity remains separate: liking an
+answer does not erase a mechanically verified failure. Review is opt-in, and
+the current automatic hook audits successful runs only; eligible failed tasks
+can be reviewed explicitly. It does not automatically repair or rerun a task.
+
 `darwin audits list --db path --task TASK_ID` and `darwin audits show --db path --id AUDIT_ID` inspect immutable advisory audits. `darwin audits attempts --db path --task TASK_ID` inspects admitted review lifecycles, including failures. Lists accept `--after` and `--limit` (1–100); inspection never creates storage. Audit records are separate from fitness and retain reported usage rather than fabricated dollar costs. Findings may contain sensitive content, so protect exports.
 
 Review execution persists `started` before calling the reviewer, then records the validated audit and `completed` status in one transaction, or `failed` with a generic code. Cancellation cleanup has an independent five-second storage deadline. Admission denials do not create attempts. A crash or storage failure can leave an attempt `started`; this means indeterminate, not proof that a review is still running. Automatic reconciliation is not implemented. Failed reviews never become candidate performance evidence. The standalone audit-storage API remains available for imported records; only `CompleteReview`, used by application execution, guarantees atomic audit/lifecycle persistence.
