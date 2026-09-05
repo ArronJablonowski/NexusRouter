@@ -957,6 +957,15 @@ Discovery inspects the configured database for one operator; a skill scope is
 the destination catalog scope, not tenant or source-project isolation. Protect
 candidate metadata exports and use separate databases where isolation is needed.
 
+The storage layer also supports immutable `WorkflowSelection` records. A stable
+selection ID binds the destination skill, trusted grouping-rule identity,
+configured model, policy digest and complete source provenance. Its creation
+time is excluded from the hash; repeated saves return the first committed record.
+Schema 17 adds the selection ledger without changing existing generation records.
+Storage does not verify that a caller's grouping is semantically meaningful or
+that source feedback is still current. Saving a selection neither dispatches
+inference nor reserves a generation attempt; scheduler integration is unfinished.
+
 Generate from two or more accepted completed tasks, then publish explicitly:
 
 ```sh
@@ -1024,7 +1033,7 @@ credential collisions reject before opening the skill root. Publication does not
 recheck source-feedback freshness or validate/activate the workflow.
 
 The first publication upgrades the file catalog to schema 2, so older writers
-reject it instead of dropping receipts; SQLite remains schema 16. Version
+reject it instead of dropping receipts; SQLite now uses schema 17. Version
 visibility and its receipt share one catalog commit. A failure before that commit
 can leave an unreferenced version file; automatic cleanup and power-loss
 qualification remain open.

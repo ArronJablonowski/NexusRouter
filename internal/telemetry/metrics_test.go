@@ -42,7 +42,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.StorageSchema != 16 || snapshot.Validate() != nil {
+	if snapshot.StorageSchema != 17 || snapshot.Validate() != nil {
 		t.Fatal(snapshot)
 	}
 	for _, group := range snapshot.Groups {
@@ -61,7 +61,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 
 func TestMetricsLegacyAbsentTables(t *testing.T) {
 	db, path := submissionStore(t)
-	if _, err := db.db.Exec(`DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; PRAGMA user_version=1`); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; PRAGMA user_version=1`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(context.Background(), path)

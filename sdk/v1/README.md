@@ -389,6 +389,18 @@ common domain remain generation requirements; use `GenerateSkillDraft` to
 recheck the chosen IDs. Discovery is not semantic workflow clustering, an
 automatic drafting scheduler or permission to publish/activate.
 
+`skills.NewWorkflowSelection` constructs a bounded, content-addressed selection
+from 2–20 same-domain candidates in distinct sessions, plus a destination key,
+group/algorithm identifiers, configured model ID and policy digest. It owns and
+sorts source metadata. `Validate` recomputes the versioned ID, including privacy
+and source/evaluation bindings but excluding creation time. These are trusted
+host inputs, not semantic grouping proof or policy authority.
+
+SQLite schema 17 persists such records idempotently, preserving the first saved
+creation time. This is a storage prerequisite only: no public Client selection
+planning/claiming method or automatic scheduler exists yet, and a saved selection
+does not prevent rebilling until generation is explicitly bound to its identity.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
