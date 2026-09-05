@@ -105,6 +105,9 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
+	if r.Validation != "" && r.Validation != "go_source" {
+		return ErrAdmission
+	}
 	if r.ContextTokens < 0 || len(r.Domain) > 128 || len(r.Profile) > 128 || r.MaxCost < 0 || math.IsNaN(r.MaxCost) || math.IsInf(r.MaxCost, 0) || len(r.Capabilities) > 128 {
 		return ErrAdmission
 	}
@@ -256,7 +259,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 				evidence[key] = e
 			}
 		}
-		validity, verr := db.OutputValidity(ctx, key)
+		validity, verr := db.OutputValidity(ctx, key, r.Validation)
 		if verr != nil {
 			return Result{}, errors.New("cannot read output validity")
 		}

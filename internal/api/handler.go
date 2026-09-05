@@ -190,6 +190,13 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 			target = &req.Domain
 		case "profile":
 			target = &req.Profile
+		case "validation":
+			validation, ok := value.(string)
+			if !ok || (validation != "" && validation != "go_source") {
+				return req, bad
+			}
+			req.Validation = validation
+			continue
 		case "capabilities":
 			items, ok := value.([]any)
 			if !ok {

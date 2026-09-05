@@ -21,6 +21,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	Validation                      string
 	onlyModelID, retryOfTaskID      string
 	ModelID, Prompt, ContinueTaskID string
 	Messages                        []providers.Message
@@ -173,7 +174,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		sessionID = result.TaskID
 	}
 	j := redactingJournal{db: db, secrets: secrets}
-	loop := runtime.Loop{Provider: p, Journal: j}
+	loop := runtime.Loop{Provider: p, Journal: j, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := 1
 	if registry != nil {
@@ -181,7 +182,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
 		maxTurns = s.Tools.MaxTurns
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
 	result.retryable = out.Retryable
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns

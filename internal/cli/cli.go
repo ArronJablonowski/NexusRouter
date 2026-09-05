@@ -13,7 +13,8 @@ Usage:
   darwin version   Print the build version
   darwin help      Show this help
   darwin config validate|show [--config path] [--set key=value]
-  darwin run --config path --model id < prompt.txt
+  darwin run --config path --model id [--validate go_source] < prompt.txt
+    go_source validation expects output containing a raw full Go source file
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service

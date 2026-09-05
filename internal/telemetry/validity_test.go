@@ -188,3 +188,95 @@ func TestOutputValidityLegacyAndIntermediateToolTurns(t *testing.T) {
 		t.Fatal("intermediate counted", out, err)
 	}
 }
+
+func syntaxValidityEvents(task, source string, accepted bool) []runtime.Event {
+	events := validityEvents(task, true)
+	events[0].Data.Validation = "go_source"
+	events[2].Data.Text = source
+	check := events[3]
+	check.ID = task + "-syntax"
+	check.Data.Accepted = &accepted
+	check.Data.Code = "deterministic.go_syntax.v1"
+	events = append(events[:4], append([]runtime.Event{check}, events[4:]...)...)
+	for i := range events {
+		events[i].Sequence = int64(i + 1)
+	}
+	if !accepted {
+		events[5].Kind = runtime.TaskFailed
+		events[5].Data.Code = "invalid_output"
+	}
+	return events
+}
+
+func TestOutputValidityGoSourceIsolation(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "syntax.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	appendValidity(t, s, syntaxValidityEvents("valid", "package main\nfunc main() {}", true))
+	appendValidity(t, s, syntaxValidityEvents("invalid", "package main\nfunc {", false))
+	appendValidity(t, s, validityEvents("text", true))
+	blank := validityEvents("blank", false)
+	blank[0].Data.Validation = "go_source"
+	appendValidity(t, s, blank)
+	out, err := s.OutputValidity(ctx, validityKey(), "go_source")
+	if err != nil || out.Samples != 3 || out.Failures != 2 {
+		t.Fatal(out, err)
+	}
+	out, err = s.OutputValidity(ctx, validityKey())
+	if err != nil || out.Samples != 1 || out.Failures != 0 {
+		t.Fatal("mixed validation populations", out, err)
+	}
+	for _, args := range [][]string{{"unknown"}, {"", "go_source"}} {
+		if _, err := s.OutputValidity(ctx, validityKey(), args...); err == nil {
+			t.Fatal("invalid mode accepted")
+		}
+	}
+}
+
+func TestOutputValidityGoSourceMissingOrForged(t *testing.T) {
+	for _, mode := range []string{"missing", "duplicate", "lie", "fence", "attempt", "terminal", "nonempty_missing", "unrequested"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			s, err := Open(ctx, filepath.Join(t.TempDir(), "syntax.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			e := syntaxValidityEvents("task", "package main\nfunc main() {}", true)
+			validation := "go_source"
+			switch mode {
+			case "missing":
+				e = append(e[:4], e[5])
+			case "duplicate":
+				duplicate := e[4]
+				duplicate.ID = "duplicate"
+				e = append(e[:5], append([]runtime.Event{duplicate}, e[5:]...)...)
+			case "lie":
+				no := false
+				e[4].Data.Accepted = &no
+			case "fence":
+				e[2].Data.Text = "```go\npackage main\n```"
+			case "attempt":
+				e[4].AttemptID = "other"
+			case "terminal":
+				e[5].Kind = runtime.TaskFailed
+				e[5].Data.Code = "empty_output"
+			case "nonempty_missing":
+				e = append(e[:3], e[4:]...)
+			case "unrequested":
+				e[0].Data.Validation = ""
+				validation = ""
+			}
+			for i := range e {
+				e[i].Sequence = int64(i + 1)
+			}
+			appendValidity(t, s, e)
+			if _, err := s.OutputValidity(ctx, validityKey(), validation); err == nil {
+				t.Fatal("missing or forged syntax accepted")
+			}
+		})
+	}
+}

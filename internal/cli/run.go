@@ -44,6 +44,13 @@ func parseRunArgs(args []string) (config.Options, app.Request, error) {
 	fs.IntVar(&request.ContextTokens, "context-tokens", 0, "minimum context tokens")
 	fs.Float64Var(&request.MaxCost, "max-cost", 0, "maximum estimated route cost")
 	fs.BoolVar(&request.LocalRequired, "local-required", false, "require a local model")
+	fs.Func("validate", "output validation: go_source expects a raw full Go source file", func(value string) error {
+		if value != "" && value != "go_source" {
+			return fmt.Errorf("invalid output validation")
+		}
+		request.Validation = value
+		return nil
+	})
 	values := overrides{}
 	fs.Var(values, "set", "override scalar setting")
 	if err := fs.Parse(args); err != nil {
@@ -71,7 +78,8 @@ func parseRunArgs(args []string) (config.Options, app.Request, error) {
 func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, err := parseRunArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] < prompt.txt")
+		fmt.Fprintln(stderr, "usage: darwin run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
+		fmt.Fprintln(stderr, "go_source validation expects output containing a raw full Go source file")
 		return 2
 	}
 	options.Env = config.Environment(os.Environ())

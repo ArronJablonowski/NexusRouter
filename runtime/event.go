@@ -61,6 +61,7 @@ type Event struct {
 }
 
 type Data struct {
+	Validation      string               `json:"validation,omitempty"`
 	RetryOfTaskID   string               `json:"retry_of_task_id,omitempty"`
 	RouteCandidates []routing.Candidate  `json:"route_candidates,omitempty"`
 	RoutePolicy     *routing.Policy      `json:"route_policy,omitempty"`

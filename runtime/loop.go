@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"darwinrouter/evaluation"
 	"darwinrouter/providers"
 )
 
@@ -29,6 +30,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	Validation    string
 	RetryOfTaskID string
 	// RequireText applies only to a final answer, never an intermediate tool
 	// proposal. Non-text host workflows may leave this false explicitly.
@@ -53,22 +55,27 @@ type Loop struct {
 	Provider providers.Provider
 	Journal  Journal
 	Tools    ToolExecutor
+	// ValidationText supplies the host's persisted/delivered view (for example
+	// secret redaction). It must match the journal and output adapter exactly.
+	// It is trusted host code, never a model-supplied transformation.
+	ValidationText func(string) string
 }
 
 var (
-	ErrInvalidRun  = errors.New("invalid runtime request")
-	ErrProvider    = errors.New("model turn failed")
-	ErrProtocol    = errors.New("invalid model stream")
-	ErrLimit       = errors.New("runtime budget exhausted")
-	ErrEmptyOutput = errors.New("required final text is empty")
-	ErrTool        = errors.New("tool execution failed or denied")
-	ErrPersistence = errors.New("runtime persistence failed; inspect durable state before retry")
+	ErrInvalidRun    = errors.New("invalid runtime request")
+	ErrProvider      = errors.New("model turn failed")
+	ErrProtocol      = errors.New("invalid model stream")
+	ErrLimit         = errors.New("runtime budget exhausted")
+	ErrEmptyOutput   = errors.New("required final text is empty")
+	ErrInvalidOutput = errors.New("final output failed requested validation")
+	ErrTool          = errors.New("tool execution failed or denied")
+	ErrPersistence   = errors.New("runtime persistence failed; inspect durable state before retry")
 )
 
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
-	if r.MaxContextTokens < 0 {
+	if r.MaxContextTokens < 0 || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) {
 		return Result{}, ErrInvalidRun
 	}
 	if l.Provider == nil || l.Journal == nil || r.TaskID == "" || r.SessionID == "" || r.ProviderID == "" || r.Inference.Model == "" || len(r.Inference.Messages) == 0 || r.MaxTurns < 1 || r.MaxTurns > 1000 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 16<<20 {
@@ -105,7 +112,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}
@@ -125,6 +132,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		}
 		if errors.Is(cause, ErrEmptyOutput) {
 			code = "empty_output"
+		}
+		if errors.Is(cause, ErrInvalidOutput) {
+			code = "invalid_output"
 		}
 		if ctx.Err() != nil {
 			kind = TaskCanceled
@@ -248,13 +258,26 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			totalUsage.OutputTokens += usage.OutputTokens
 		}
 		if len(calls) == 0 {
+			validationText := text.String()
+			if l.ValidationText != nil {
+				validationText = l.ValidationText(validationText)
+			}
 			if r.RequireText {
-				accepted := strings.TrimSpace(text.String()) != ""
+				accepted := strings.TrimSpace(validationText) != ""
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.nonempty_text.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
 					return result, err
 				}
 				if !accepted {
 					return fail(ErrEmptyOutput)
+				}
+			}
+			if r.Validation == "go_source" {
+				accepted := evaluation.GoSourceValid(validationText)
+				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.go_syntax.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
+					return result, err
+				}
+				if !accepted {
+					return fail(ErrInvalidOutput)
 				}
 			}
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
