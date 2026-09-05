@@ -29,6 +29,7 @@ func NewCheckedSession(ctx context.Context, w Wire, options Options, features []
 		return nil, err
 	}
 	s.launchFeatures = append([]string(nil), features...)
+	s.allowDisabledStatus = true
 	return s, nil
 }
 

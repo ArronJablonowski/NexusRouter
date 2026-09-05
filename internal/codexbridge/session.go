@@ -50,6 +50,7 @@ type Session struct {
 	prepared                   bool
 	launchFeatures             []string
 	launchRequestID            int
+	allowDisabledStatus        bool
 }
 
 func NewSession(ctx context.Context, w Wire, options Options) (*Session, error) {
@@ -245,7 +246,7 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 			return nil, err
 		}
 		kind, _ := e.Kind()
-		if s.launchFeatures != nil && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
+		if s.allowDisabledStatus && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
 			continue
 		}
 		if kind == codexrpc.Response || kind == codexrpc.ErrorResponse {

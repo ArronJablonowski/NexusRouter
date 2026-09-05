@@ -202,6 +202,34 @@ fresh checks after preparation, changed-state rejection, cancellation and no
 task-data release after failed checks. Real inference and integrated delegation
 remain pending, as do task-owned launcher/application integration and containment.
 
+### Task-owned internal launcher
+
+`LaunchChecked` now performs the launch sequence and returns the checked session.
+It requires explicit `hybrid`/`cloud_only` mode and `cloud_allowed` privacy before
+any metadata subprocess starts. The host must resolve session privacy first;
+setting a string here is not a substitute for that application policy decision.
+The experimental profile is pinned to `gpt-5.6-sol` and CLI `0.153.4`.
+
+The launcher validates an absolute executable, an empty host-owned cwd, and an
+explicit environment limited to HOME, PATH, TMPDIR and CODEX_HOME. It preserves
+existing login locations without reading/copying credential files. CLI metadata
+is captured with a 64KiB limit, sanitized errors and a bounded pipe wait. The
+profile validates the actual 135-row metadata format, including two-word
+`under development` stages, and builds deterministic feature/control arguments.
+
+A discovery process initializes and reads configuration/skills without starting
+a thread. It is closed before the final process launches with explicit extension
+and skill disables. The final process runs checked-session preflight on its own
+wire. Discovery and setup have a 15-second deadline; the returned session uses
+the task's lifetime instead, and the task owner must defer Close over the entire
+agent/tool loop. Errors clean up all successfully owned connections.
+
+The opt-in `TestLiveCodexCheckedLauncher` passed against the signed-in CLI,
+including a second preflight after setup returned. It sent no model request.
+Default CI skips live launch tests. This remains an internal experimental entry
+point: application provider configuration, built-in tool/context qualification,
+descendant containment and integrated live delegation are still outstanding.
+
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed
 durable boundaries. Then run the requested supervised live test: Sol proposes
