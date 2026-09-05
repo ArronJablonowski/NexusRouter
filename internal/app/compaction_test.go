@@ -31,7 +31,7 @@ func TestCompactedContinuationFitsAdmissionAndSurvivesRestart(t *testing.T) {
 				}
 				return ""
 			}
-			request := Request{ModelID: model, ContinueTaskID: first.TaskID, Prompt: "next question", Compaction: &sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Decisions: []string{"Retain private-summary-token decision"}, PendingWork: []string{"Finish task"}}}}
+			request := Request{ModelID: model, ContinueTaskID: first.TaskID, Prompt: "next question", Compaction: &sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Decisions: []string{"Retain private-summary-token decision"}, PendingWork: []string{"Finish task"}, Requirements: []string{"Do not disclose private-summary-token"}, Activity: []string{"Inspected private-summary-token fixture"}}}}
 			out, err := svc.Run(ctx, request)
 			if err != nil {
 				t.Fatal(err)
@@ -59,6 +59,9 @@ func TestCompactedContinuationFitsAdmissionAndSurvivesRestart(t *testing.T) {
 			}
 			if request.Compaction.Summary.Decisions[0] != "Retain private-summary-token decision" {
 				t.Fatal("mutated caller summary")
+			}
+			if replayed.Compaction.Summary.Requirements[0] != "Do not disclose [REDACTED]" || replayed.Compaction.Summary.Activity[0] != "Inspected [REDACTED] fixture" || !strings.Contains(request.Compaction.Summary.Requirements[0], "private-summary-token") || !strings.Contains(request.Compaction.Summary.Activity[0], "private-summary-token") {
+				t.Fatal("new summary fields were not redacted independently")
 			}
 			// A later ordinary continuation must use the persisted compacted input.
 			next, err := svc.Run(ctx, Request{ModelID: model, ContinueTaskID: out.TaskID, Prompt: "one more"})

@@ -152,7 +152,7 @@ The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdo
 To shorten a completed conversation, supply an operator-reviewed summary file:
 
 ```json
-{"decisions":["Keep the existing public API"],"pending_work":["Add integration coverage"],"failures":[],"artifacts":["src/router.go"]}
+{"decisions":["Keep the existing public API"],"requirements":["Preserve local-only privacy"],"pending_work":["Add integration coverage"],"failures":[],"artifacts":["src/router.go"],"activity":["Inspected router.go; no files modified"]}
 ```
 
 ```sh
@@ -161,7 +161,9 @@ To shorten a completed conversation, supply an operator-reviewed summary file:
 
 Compaction retains at least the requested recent message count, expanding backward to keep tool-call/result batches complete. All original system messages remain. Summary fields are untrusted reference data, not permissions; each category permits at most 128 nonblank entries and the serialized summary is limited to 64 KiB. At least one summary entry and one removable non-system message are required. Configured credentials are redacted before summary use. Models need known `context_tokens`; compaction does not guarantee that the resulting input fits.
 
-The new task atomically records its compacted input and a versioned summary checkpoint with source task, event sequence, source-conversation SHA-256 and removed-message count. Inspect it with `task show` or `GET /v1/tasks/{id}` after restart. The original history remains untouched, including any sensitive content; compaction is not deletion. Automatic summary generation, summary-accuracy validation and mid-task compaction are not yet implemented.
+The new task atomically records its compacted input and a versioned summary checkpoint with source task, event sequence, source-conversation SHA-256 and removed-message count. It also records the first retained recent-message index and its source event sequence, plus before/after context estimates. These estimates cover the source and compacted history only, excluding the next prompt, freshly retrieved knowledge and tool catalog; they use conservative serialized-byte accounting, not a tokenizer. Legacy checkpoints may omit these additive fields. Inspect with `task show` or `GET /v1/tasks/{id}` after restart. The original history remains untouched, including any sensitive content; compaction is not deletion.
+
+The Go `sessions.Summarizer` component can generate a bounded draft with requirements, decisions, open work, failures, artifacts and activity. It makes one auxiliary call with no tools or retries, enforces time/context/operator-estimated-cost limits, and rejects malformed or truncated output. The returned proposal includes source provenance and context estimates, but is neither persisted nor activated. Its host must enforce privacy/resource admission, redact sensitive data, persist attempt lifecycle, and validate accuracy before use. This component is not yet wired to daemon/CLI automatic summarization. Summary-accuracy validation and mid-task compaction remain unfinished.
 
 ## Local HTTP service
 

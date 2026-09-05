@@ -65,7 +65,7 @@ func Compact(messages []providers.Message, keep int, summary Summary) (Compactio
 
 func validSummary(summary Summary) bool {
 	bytes := 0
-	for _, items := range [][]string{summary.Decisions, summary.PendingWork, summary.Failures, summary.Artifacts} {
+	for _, items := range [][]string{summary.Requirements, summary.Activity, summary.Decisions, summary.PendingWork, summary.Failures, summary.Artifacts} {
 		if len(items) > 128 {
 			return false
 		}
@@ -85,9 +85,11 @@ func validSummary(summary Summary) bool {
 
 func cloneSummary(summary Summary) Summary {
 	return Summary{
-		Decisions:   append([]string(nil), summary.Decisions...),
-		PendingWork: append([]string(nil), summary.PendingWork...),
-		Failures:    append([]string(nil), summary.Failures...),
-		Artifacts:   append([]string(nil), summary.Artifacts...),
+		Requirements: append([]string(nil), summary.Requirements...),
+		Activity:     append([]string(nil), summary.Activity...),
+		Decisions:    append([]string(nil), summary.Decisions...),
+		PendingWork:  append([]string(nil), summary.PendingWork...),
+		Failures:     append([]string(nil), summary.Failures...),
+		Artifacts:    append([]string(nil), summary.Artifacts...),
 	}
 }

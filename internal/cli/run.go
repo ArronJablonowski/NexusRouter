@@ -137,6 +137,10 @@ func readCompactionSummary(path string) (sessions.Summary, error) {
 		seen[key] = true
 		var target *[]string
 		switch key {
+		case "requirements":
+			target = &summary.Requirements
+		case "activity":
+			target = &summary.Activity
 		case "decisions":
 			target = &summary.Decisions
 		case "pending_work":

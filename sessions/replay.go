@@ -28,6 +28,7 @@ type Snapshot struct {
 	TaskID, SessionID, State string
 	Sequence                 int64
 	Messages                 []providers.Message
+	MessageSequences         []int64
 	Pending                  map[string]Pending
 	InterruptedTurn          bool
 	UncertainEffects         bool
@@ -75,6 +76,10 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.Privacy = e.Data.Privacy
 				s.Compaction = e.Data.Compaction
 				s.Messages = e.Data.Messages
+				s.MessageSequences = make([]int64, len(s.Messages))
+				for i := range s.MessageSequences {
+					s.MessageSequences[i] = e.Sequence
+				}
 				if len(s.Messages) > 0 {
 					if providers.ValidateMessages(s.Messages) != nil {
 						return s, ErrHistory
@@ -109,6 +114,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 					s.Pending[call.ID] = Pending{Call: call, TurnID: turn, AttemptID: attempt}
 				}
 				s.Messages = append(s.Messages, providers.Message{Role: "assistant", Content: e.Data.Text, ToolCalls: e.Data.ToolCalls})
+				s.MessageSequences = append(s.MessageSequences, e.Sequence)
 				turn = ""
 				attempt = ""
 			case runtime.ToolStarted, runtime.ToolCompleted:
@@ -127,6 +133,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 						return s, ErrHistory
 					}
 					s.Messages = append(s.Messages, providers.Message{Role: "tool", ToolCallID: e.Data.ToolCallID, Content: e.Data.Text})
+					s.MessageSequences = append(s.MessageSequences, e.Sequence)
 					delete(s.Pending, e.Data.ToolCallID)
 					if e.Data.Effect == runtime.UncertainEffect {
 						s.UncertainEffects = true

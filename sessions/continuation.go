@@ -18,7 +18,7 @@ type CompactionRequest struct {
 
 func ValidateCompactionRequest(r *CompactionRequest) error {
 	if r == nil || r.Keep < 1 || r.Keep > 100000 || !validSummary(r.Summary) ||
-		len(r.Summary.Decisions)+len(r.Summary.PendingWork)+len(r.Summary.Failures)+len(r.Summary.Artifacts) == 0 {
+		len(r.Summary.Requirements)+len(r.Summary.Activity)+len(r.Summary.Decisions)+len(r.Summary.PendingWork)+len(r.Summary.Failures)+len(r.Summary.Artifacts) == 0 {
 		return ErrHistory
 	}
 	return nil
@@ -32,6 +32,18 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 	if ValidateCompactionRequest(&request) != nil || source.State != "completed" || source.TaskID == "" || source.Sequence < 1 ||
 		source.InterruptedTurn || source.UncertainEffects || len(source.Pending) != 0 {
 		return nil, nil, ErrHistory
+	}
+	if source.MessageSequences != nil {
+		if len(source.MessageSequences) != len(source.Messages) {
+			return nil, nil, ErrHistory
+		}
+		var previous int64
+		for _, sequence := range source.MessageSequences {
+			if sequence < 1 || sequence > source.Sequence || sequence < previous {
+				return nil, nil, ErrHistory
+			}
+			previous = sequence
+		}
 	}
 	selected, err := Compact(source.Messages, request.Keep, request.Summary)
 	if err != nil {
@@ -55,10 +67,11 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 	record := &runtime.ContextCompaction{
 		Version: 1, SourceTaskID: source.TaskID, SourceSequence: source.Sequence,
 		SourceDigest: hex.EncodeToString(digest[:]), RemovedMessages: removed,
-		Summary: selected.Summary,
+		Summary:              selected.Summary,
+		FirstRetainedMessage: selected.RemovedMessages,
 	}
-	if record.Validate(source.TaskID) != nil {
-		return nil, nil, ErrHistory
+	if source.MessageSequences != nil {
+		record.FirstRetainedSequence = source.MessageSequences[selected.RemovedMessages]
 	}
 	summary, err := json.Marshal(struct {
 		Summary Summary `json:"session_summary"`
@@ -72,6 +85,14 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 	)
 	messages = append(messages, selected.Recent...)
 	if providers.ValidateMessages(messages) != nil {
+		return nil, nil, ErrHistory
+	}
+	record.BeforeContextTokens, err = providers.EstimateContext(providers.Request{Messages: source.Messages})
+	if err != nil {
+		return nil, nil, ErrHistory
+	}
+	record.AfterContextTokens, err = providers.EstimateContext(providers.Request{Messages: messages})
+	if err != nil || record.Validate(source.TaskID) != nil {
 		return nil, nil, ErrHistory
 	}
 	return messages, record, nil

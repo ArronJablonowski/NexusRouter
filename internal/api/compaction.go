@@ -27,6 +27,10 @@ func decodeCompactionRequest(raw []byte) (*sessions.CompactionRequest, error) {
 	for key, value := range summary {
 		var target *[]string
 		switch key {
+		case "requirements":
+			target = &request.Summary.Requirements
+		case "activity":
+			target = &request.Summary.Activity
 		case "decisions":
 			target = &request.Summary.Decisions
 		case "pending_work":
