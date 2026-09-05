@@ -81,7 +81,7 @@ func TestReplayRejectsCorruption(t *testing.T) {
 	}
 }
 func TestCompactionPreservesParallelToolBatch(t *testing.T) {
-	m := []providers.Message{{Role: "user", Content: "old"}, {Role: "assistant", ToolCalls: []providers.ToolCall{{ID: "a"}, {ID: "b"}}}, {Role: "tool", ToolCallID: "a"}, {Role: "tool", ToolCallID: "b"}, {Role: "assistant", Content: "answer"}}
+	m := []providers.Message{{Role: "user", Content: "old"}, {Role: "assistant", ToolCalls: []providers.ToolCall{{ID: "a", Name: "lookup", Arguments: json.RawMessage(`{}`)}, {ID: "b", Name: "lookup", Arguments: json.RawMessage(`{}`)}}}, {Role: "tool", ToolCallID: "a"}, {Role: "tool", ToolCallID: "b"}, {Role: "assistant", Content: "answer"}}
 	for _, keep := range []int{2, 3, 4} {
 		out, err := Compact(m, keep, Summary{Decisions: []string{"retain decision"}})
 		if err != nil || out.RemovedMessages != 1 || len(out.Recent) != 4 {
