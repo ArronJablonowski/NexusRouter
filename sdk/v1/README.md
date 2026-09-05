@@ -374,6 +374,21 @@ credential, trusted-callback and cooperative-deadline rules apply as activation.
 An initial version has no predecessor to restore. This method does not schedule
 continuous checks or infer statistical regressions from task outcomes.
 
+`Client.DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` discovers accepted
+source candidates from durable tasks. It requires enabled skill drafting and a
+configured root/scope, but reads only the existing telemetry database. Limits are
+1–20 scanned task heads, not 1–20 matches. Follow `Next` even for zero-candidate
+pages; a full final page may be followed by an empty page. Metadata preserves
+privacy and source/evaluation provenance without conversation text. Credential
+collisions reject the page rather than rewriting identities or cursors.
+
+Candidates qualify through current completed replay and accepted deterministic,
+tool-result or user evidence, never judge-only ratings. Pages are coherent local
+observations but do not freeze future feedback. Distinct source sessions and a
+common domain remain generation requirements; use `GenerateSkillDraft` to
+recheck the chosen IDs. Discovery is not semantic workflow clustering, an
+automatic drafting scheduler or permission to publish/activate.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

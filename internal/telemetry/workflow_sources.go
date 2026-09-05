@@ -21,6 +21,7 @@ import (
 )
 
 var errWorkflowSources = errors.New("skill workflow sources unavailable")
+var errWorkflowIneligible = errors.New("skill workflow is not eligible")
 var workflowSourceID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
 // SkillWorkflowSources reads completed conversations and their current accepted
@@ -57,58 +58,17 @@ func (s *Store) SkillWorkflowSources(ctx context.Context, tasks []string) (sourc
 	budget := 256 << 10
 	domain := ""
 	for _, task := range tasks {
-		var events []runtime.Event
-		snapshot, err := taskSnapshotWithEvents(bounded, tx, task, &events)
+		source, err := workflowSource(bounded, tx, task, &budget)
 		if err != nil {
 			return nil, err
 		}
-		if snapshot.State != "completed" || snapshot.InterruptedTurn || snapshot.UncertainEffects || len(snapshot.Pending) != 0 || !workflowSourceID.MatchString(snapshot.SessionID) || seenSessions[snapshot.SessionID] || (snapshot.Privacy != "local_only" && snapshot.Privacy != "cloud_allowed") {
+		if seenSessions[source.Example.SessionID] || (domain != "" && source.Example.Domain != domain) {
 			return nil, errWorkflowSources
 		}
-		seenSessions[snapshot.SessionID] = true
-		key, attempt, err := workflowFinalAttempt(events)
-		if err != nil || (domain != "" && key.Domain != domain) {
-			return nil, errWorkflowSources
-		}
-		domain = key.Domain
-		if err = preflightWorkflowEvaluation(bounded, tx, task, attempt, key); err != nil {
-			return nil, err
-		}
-		history, err := evaluationHistory(bounded, tx, task, attempt)
-		if err != nil || len(history) == 0 {
-			return nil, errWorkflowSources
-		}
-		record := history[len(history)-1]
-		outcome, err := evaluation.Resolve(record.Checks, false)
-		if err != nil || !outcome.Accepted || !record.ExecutionSucceeded || record.Key != key || record.TaskID != task || record.AttemptID != attempt {
-			return nil, errWorkflowSources
-		}
-		encoded, err := json.Marshal(record)
-		if err != nil {
-			return nil, err
-		}
-		evaluationDigest := workflowDigest(encoded)
-		example := skills.WorkflowExample{SessionID: snapshot.SessionID, TaskID: task, Domain: key.Domain, Checks: []evaluation.Check{{Source: outcome.Source, Reference: evaluationDigest, Passed: true}}}
-		for _, message := range snapshot.Messages {
-			if message.Role == "system" {
-				continue
-			}
-			if len(example.Steps) >= 128 {
-				return nil, errWorkflowSources
-			}
-			body, err := json.Marshal(message)
-			if err != nil || len(body) > budget {
-				return nil, errWorkflowSources
-			}
-			budget -= len(body)
-			example.Steps = append(example.Steps, string(body))
-		}
-		encoded, err = json.Marshal(snapshot)
-		if err != nil {
-			return nil, err
-		}
-		examples = append(examples, example)
-		sources = append(sources, skills.WorkflowSource{Example: example, Privacy: snapshot.Privacy, EvaluationID: record.ID, EvaluationDigest: evaluationDigest, SourceDigest: workflowDigest(encoded), SourceSequence: snapshot.Sequence})
+		seenSessions[source.Example.SessionID] = true
+		domain = source.Example.Domain
+		examples = append(examples, source.Example)
+		sources = append(sources, source)
 	}
 	if skills.ValidateWorkflowExamples(skills.Key{Scope: "workflow", Name: "sources"}, examples) != nil {
 		return nil, errWorkflowSources
@@ -117,6 +77,94 @@ func (s *Store) SkillWorkflowSources(ctx context.Context, tasks []string) (sourc
 		return nil, err
 	}
 	return sources, nil
+}
+
+// workflowSource separates valid-but-ineligible work from corrupt persisted
+// history. The caller owns the coherent read transaction and source-byte budget.
+func workflowSource(ctx context.Context, tx *sql.Tx, task string, budget *int) (skills.WorkflowSource, error) {
+	zero := skills.WorkflowSource{}
+	var events []runtime.Event
+	snapshot, err := taskSnapshotWithEvents(ctx, tx, task, &events)
+	if err != nil {
+		return zero, err
+	}
+	if snapshot.State != "completed" || snapshot.InterruptedTurn || snapshot.UncertainEffects || len(snapshot.Pending) != 0 {
+		return zero, errWorkflowIneligible
+	}
+	if !workflowSourceID.MatchString(task) || !workflowSourceID.MatchString(snapshot.SessionID) {
+		return zero, errWorkflowIneligible
+	}
+	if snapshot.Privacy != "local_only" && snapshot.Privacy != "cloud_allowed" {
+		return zero, errWorkflowSources
+	}
+	key, attempt, err := workflowFinalAttempt(events)
+	if err != nil {
+		return zero, err
+	}
+	if !workflowSourceID.MatchString(key.Domain) || !workflowSourceID.MatchString(key.Profile) {
+		return zero, errWorkflowIneligible
+	}
+	if err = preflightWorkflowEvaluation(ctx, tx, task, attempt, key); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			var count int
+			if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM evaluations WHERE task_id=? AND attempt_id=?`, task, attempt).Scan(&count); err != nil {
+				return zero, err
+			}
+			if count == 0 {
+				return zero, errWorkflowIneligible
+			}
+		}
+		return zero, errWorkflowSources
+	}
+	history, err := evaluationHistory(ctx, tx, task, attempt)
+	if err != nil || len(history) == 0 {
+		return zero, errWorkflowSources
+	}
+	record := history[len(history)-1]
+	if record.Key != key || record.TaskID != task || record.AttemptID != attempt {
+		return zero, errWorkflowSources
+	}
+	outcome, err := evaluation.Resolve(record.Checks, false)
+	if err != nil {
+		if _, judgeErr := evaluation.Resolve(record.Checks, true); judgeErr == nil {
+			return zero, errWorkflowIneligible
+		}
+		return zero, errWorkflowSources
+	}
+	if !outcome.Accepted || !record.ExecutionSucceeded {
+		return zero, errWorkflowIneligible
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return zero, err
+	}
+	evaluationDigest := workflowDigest(encoded)
+	example := skills.WorkflowExample{SessionID: snapshot.SessionID, TaskID: task, Domain: key.Domain, Checks: []evaluation.Check{{Source: outcome.Source, Reference: evaluationDigest, Passed: true}}}
+	for _, message := range snapshot.Messages {
+		if message.Role == "system" {
+			continue
+		}
+		if len(example.Steps) >= 128 {
+			return zero, errWorkflowIneligible
+		}
+		body, err := json.Marshal(message)
+		if err != nil {
+			return zero, errWorkflowSources
+		}
+		if len(body) > *budget {
+			return zero, errWorkflowIneligible
+		}
+		*budget -= len(body)
+		example.Steps = append(example.Steps, string(body))
+	}
+	if len(example.Steps) == 0 {
+		return zero, errWorkflowSources
+	}
+	encoded, err = json.Marshal(snapshot)
+	if err != nil {
+		return zero, err
+	}
+	return skills.WorkflowSource{Example: example, Privacy: snapshot.Privacy, EvaluationID: record.ID, EvaluationDigest: evaluationDigest, SourceDigest: workflowDigest(encoded), SourceSequence: snapshot.Sequence}, nil
 }
 
 func workflowFinalAttempt(events []runtime.Event) (routing.Key, string, error) {
@@ -144,7 +192,7 @@ func workflowFinalAttempt(events []runtime.Event) (routing.Key, string, error) {
 			completed = event
 		}
 	}
-	if !workflowSourceID.MatchString(key.Domain) || !workflowSourceID.MatchString(key.Profile) || !workflowModelID(key.Model) || !workflowModelID(key.Provider) || !sessions.ValidEventPageID(started.AttemptID) || completed.AttemptID != started.AttemptID || completed.TurnID != started.TurnID || completed.Sequence <= started.Sequence || completed.Time.Before(started.Time) {
+	if !workflowModelID(key.Domain) || !workflowModelID(key.Profile) || !workflowModelID(key.Model) || !workflowModelID(key.Provider) || !sessions.ValidEventPageID(started.AttemptID) || completed.AttemptID != started.AttemptID || completed.TurnID != started.TurnID || completed.Sequence <= started.Sequence || completed.Time.Before(started.Time) {
 		return routing.Key{}, "", errWorkflowSources
 	}
 	return key, started.AttemptID, nil

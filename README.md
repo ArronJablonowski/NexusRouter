@@ -927,7 +927,18 @@ Newer negative user feedback disqualifies an earlier positive example. Generatio
 honors skill scope/auto-draft settings, deployment mode, source privacy, context,
 resource and cost limits. Inputs and output are redacted before dispatch/storage;
 the returned record is a durable proposal, never an active skill. Background
-example discovery and scheduling still remain open.
+learning scheduling remains open.
+
+Go hosts can now call `DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` to
+find current accepted examples without supplying task IDs first. It scans 1–20
+task records per page and returns metadata only: task/session identity, domain,
+privacy, evaluation/source digests and journal sequence. `Next` advances across
+ineligible tasks too; a full page may have no candidates and still have a cursor.
+Continue until `Next` is empty (the last full page may require one empty read).
+Pages are live observations, not one frozen snapshot. Choose distinct sessions
+and let generation revalidate the resulting 2–20-task set. Discovery never
+opens the skill root, dispatches a model, publishes or activates a skill.
+Background scheduling and semantic grouping of repeated workflows remain open.
 
 Generate from two or more accepted completed tasks, then publish explicitly:
 
