@@ -22,6 +22,7 @@ import (
 )
 
 type Services struct {
+	Events          func(context.Context, string, int64, int) (sessions.EventPage, error)
 	RunStream       func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	Summarize       func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
 	SummaryAttempt  func(context.Context, string) (sessions.SummaryAttempt, error)
@@ -141,6 +142,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// This synchronous endpoint acknowledges only a completed durable task.
 		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus, "previous_task_ids": result.PreviousTaskIDs})
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/events") && r.URL.Path != "/v1/tasks/events" && r.Method == http.MethodGet:
+		h.serveEventReplay(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && r.Method == http.MethodGet:
 		id := strings.TrimPrefix(r.URL.Path, "/v1/tasks/")
 		if id == "" || len(id) > 128 || strings.Contains(id, "/") {

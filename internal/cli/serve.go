@@ -79,6 +79,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
 		},
 		RunStream: service.RunStream,
+		Events:    db.ReadEventPage,
 		Run:       service.Run,
 		Inspect:   func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:    func(ctx context.Context) error { _, err := db.Read(ctx, "__health__", 0, 1); return err },
