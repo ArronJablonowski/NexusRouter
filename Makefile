@@ -1,4 +1,4 @@
-.PHONY: build check test fmt
+.PHONY: build check test fmt qualify-linux-cgroup
 
 build:
 	go build -trimpath -o bin/darwin ./cmd/darwin
@@ -13,4 +13,7 @@ test:
 	go test -race ./...
 
 fmt:
-	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources memory skills health metrics submissions sdk examples
+	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources memory skills health metrics submissions sdk examples scripts/qualify-cgroup
+
+qualify-linux-cgroup:
+	sh scripts/qualify-linux-cgroup.sh

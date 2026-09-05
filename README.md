@@ -184,7 +184,10 @@ Only visible v2 limits are accounted for—hidden namespace ancestors, legacy CP
 controllers, external inference-server limits, and concurrent kernel changes
 are not inferred. Swap figures remain host-level and thermal sensors may remain
 unknown. These are observations, not OS-enforced reservations or container
-isolation. Real Linux container/hardware qualification remains outstanding.
+isolation. One isolated Docker Linux/arm64 profile has been verified; broader
+container/hardware qualification remains outstanding. Run
+`make qualify-linux-cgroup` for the optional cached-image check described in
+[Linux qualification](docs/linux-qualification.md).
 
 `resources` also includes `gpu_inventory`, a separate per-device diagnostic survey.
 On Linux it queries `/usr/bin/nvidia-smi` and AMD DRM sysfs concurrently; each
