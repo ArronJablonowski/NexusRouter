@@ -317,6 +317,10 @@ func (s *Store) AppendWorker(ctx context.Context, expected int64, e runtime.Even
 }
 
 func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string) error {
+	return s.appendFencedFinal(ctx, expected, e, id, token, leaseToken, owner, false)
+}
+
+func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string, finish bool) error {
 	body, err := e.Encode()
 	if err != nil {
 		return err
@@ -333,11 +337,21 @@ func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Even
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", e.TaskID); err != nil {
 		return err
 	}
+	if finish {
+		if err := uniqueWorkerLease(ctx, tx, e, leaseToken, owner); err != nil {
+			return err
+		}
+	}
 	var previous []byte
 	err = tx.QueryRowContext(ctx, "SELECT body FROM events WHERE id=?", e.ID).Scan(&previous)
 	if err == nil {
 		if string(previous) != string(body) {
 			return ErrConflict
+		}
+		if finish {
+			if err := finishedWorkerLease(ctx, tx, e, leaseToken, owner); err != nil {
+				return err
+			}
 		}
 		return tx.Commit()
 	}
@@ -374,8 +388,8 @@ func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Even
 		// Cancellation may durably clean up an expired lease, but release or
 		// reassignment fences even cleanup from its former owner.
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases
-			WHERE token=? AND task_id=? AND owner=? AND released=0 AND (expires>? OR ?))`,
-			leaseToken, e.TaskID, owner, time.Now().UnixNano(), e.Kind == runtime.TaskCanceled).Scan(&held); err != nil {
+			WHERE token=? AND task_id=? AND owner=? AND released=0 AND (expires>? OR ?) AND (?=0 OR writer=0))`,
+			leaseToken, e.TaskID, owner, time.Now().UnixNano(), e.Kind == runtime.TaskCanceled, finish).Scan(&held); err != nil {
 			return err
 		}
 		if !held {
@@ -407,6 +421,11 @@ func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Even
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=?, state=? WHERE task_id=?", e.Sequence, state, e.TaskID); err != nil {
 		return err
+	}
+	if finish {
+		if err := releaseFinishedWorker(ctx, tx, e, leaseToken, owner); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

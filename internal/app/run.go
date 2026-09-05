@@ -351,7 +351,17 @@ func (j redactingJournal) AppendLeased(ctx context.Context, expected int64, e ru
 	return j.appendLeased(ctx, expected, e, token, owner)
 }
 
+// FinishLeased preserves the same redaction, submission fencing and committed
+// event delivery as normal appends while atomically finalizing joined work.
+func (j redactingJournal) FinishLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
+	return j.appendJournal(ctx, expected, e, token, owner, true)
+}
+
 func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
+	return j.appendJournal(ctx, expected, e, token, owner, false)
+}
+
+func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e runtime.Event, token, owner string, finish bool) error {
 	rawText := e.Data.Text
 	// Partial deltas can split a credential across records. Persist lifecycle
 	// markers without delta text; the complete turn contains redacted text.
@@ -392,7 +402,9 @@ func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e ru
 	}
 	e.Data = redacted
 	var appendErr error
-	if token != "" {
+	if finish {
+		appendErr = j.db.FinishWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
+	} else if token != "" {
 		appendErr = j.db.AppendWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
 	} else if j.submissionID != "" {
 		appendErr = j.db.AppendSubmission(ctx, expected, e, j.submissionID, j.submissionToken)

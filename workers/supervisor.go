@@ -29,6 +29,13 @@ type LeaseStore interface {
 type LeaseJournal interface {
 	AppendLeased(context.Context, int64, runtime.Event, string, string) error
 }
+
+// FinalizingLeaseJournal atomically appends a worker terminal event and releases
+// its exact lease. Calling it asserts that Execute and Validate have joined.
+// An acknowledgement is required before a Supervisor releases accepted output.
+type FinalizingLeaseJournal interface {
+	FinishLeased(context.Context, int64, runtime.Event, string, string) error
+}
 type Work struct {
 	TaskID, SessionID, ParentID, Scope string
 	SubmissionID                       string
@@ -58,7 +65,7 @@ func New(limit int, heartbeat, ttl time.Duration, store LeaseStore, journal runt
 // Run waits for a slot and does not release it while a canceled callback is
 // still running. Parent-child scope and deny-rule derivation belong to admission.
 // Each child owns a separate task log, correlated to the durable parent task.
-func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
+func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr error) {
 	if w.TaskID == "" || w.SessionID == "" || w.ParentID == "" || w.Scope == "" || w.Execute == nil || w.Validate == nil {
 		return "", ErrWork
 	}
@@ -79,11 +86,19 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 	}
 	worker := rand.Text()
 	leaseToken := ""
+	leaseFinalized := false
 	seq := int64(0)
 	persist := func(ctx context.Context, kind runtime.Kind, data runtime.Data) error {
 		e := runtime.Event{Version: 1, ID: rand.Text(), TaskID: w.TaskID, SessionID: w.SessionID, CorrelationID: w.TaskID, WorkerID: worker, Sequence: seq + 1, Time: time.Now().UTC(), Kind: kind, Data: data}
 		var err error
-		if fenced, ok := s.journal.(LeaseJournal); ok && leaseToken != "" {
+		finalizer, canFinalize := s.journal.(FinalizingLeaseJournal)
+		terminal := kind == runtime.TaskCompleted || kind == runtime.TaskFailed || kind == runtime.TaskCanceled
+		if canFinalize && leaseToken != "" && terminal {
+			err = finalizeWorkerLease(finalizer, ctx, seq, e, leaseToken, worker)
+			if err == nil {
+				leaseFinalized = true
+			}
+		} else if fenced, ok := s.journal.(LeaseJournal); ok && leaseToken != "" {
 			err = fenced.AppendLeased(ctx, seq, e, leaseToken, worker)
 		} else {
 			err = s.journal.Append(ctx, seq, e)
@@ -103,7 +118,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 			cause = ctx.Err()
 		}
 		if persist(terminal, kind, runtime.Data{Code: "worker_failed"}) != nil {
-			return ErrDurability
+			return errors.Join(cause, ErrDurability)
 		}
 		return cause
 	}
@@ -117,9 +132,19 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 	leaseToken = l.Token
 	// Defer runs only after Execute and Validate have returned.
 	defer func() {
+		if leaseFinalized {
+			return
+		}
 		release, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		_ = s.store.ReleaseLease(release, l.Token, worker)
+		defer func() {
+			if recover() != nil {
+				output, runErr = "", errors.Join(runErr, ErrDurability, ctx.Err())
+			}
+		}()
+		if s.store.ReleaseLease(release, l.Token, worker) != nil {
+			output, runErr = "", errors.Join(runErr, ErrDurability, ctx.Err())
+		}
 	}()
 	if err := persist(ctx, runtime.WorkerStarted, runtime.Data{}); err != nil {
 		return "", err
@@ -146,6 +171,18 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 			result.err = ErrWork
 		}
 	}()
+	joined := false
+	defer func() {
+		if recover() != nil {
+			// Even a trusted lease/journal adapter panic cannot abandon active
+			// callback work and let the earlier lease-release defer run early.
+			cancel()
+			if !joined {
+				<-done
+			}
+			output, runErr = "", errors.Join(ErrDurability, ctx.Err())
+		}
+	}()
 	ticker := time.NewTicker(s.heartbeat)
 	defer ticker.Stop()
 	var failure error
@@ -170,6 +207,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 				cancel()
 			}
 		case result := <-done:
+			joined = true
 			if failure != nil {
 				if failure == ErrDurability {
 					return "", failure
@@ -199,4 +237,13 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 			return result.text, nil
 		}
 	}
+}
+
+func finalizeWorkerLease(j FinalizingLeaseJournal, ctx context.Context, seq int64, e runtime.Event, token, owner string) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrDurability
+		}
+	}()
+	return j.FinishLeased(ctx, seq, e, token, owner)
 }
