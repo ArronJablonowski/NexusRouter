@@ -7,7 +7,8 @@ production release, release tag or complete PRD acceptance is claimed.
 
 - Explicit effect-free read/delegation failure feedback with bounded model repair,
   durable failed-step history and learning exclusion. Native Codex failure
-  handoff is fixture-qualified, not yet live-qualified; see
+  handoff and invalid-worker→corrected-worker delegation passed bounded live
+  Sol tests with controlled local output; see
   [recoverable tool failures](recoverable-tool-failures.md).
 
 - Opt-in local `create_file` with terminal per-call approval, complete bounded

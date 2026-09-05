@@ -48,8 +48,8 @@ boolean to that exact pending call. Imported historical function-call outputs
 use the same explicit text prefix because that history item has no success field.
 The [official App Server documentation](https://learn.chatgpt.com/docs/app-server)
 describes the experimental dynamic-tool request/response lifecycle and completion
-status. Failure mapping is covered by protocol/schema-informed fixtures; no new
-live Sol failure-response exchange has been qualified for this checkpoint.
+status. Protocol/schema-informed fixtures and the opt-in live check below cover
+the failure mapping for the pinned CLI version; later versions are not implied.
 
 Session replay derives the failure flag from durable `tool_failed`, not by
 parsing arbitrary JSON or error-like text. Branches, safe compaction and serialized
@@ -68,3 +68,56 @@ This does not add compiler/test execution, automatic skill activation, general
 write repair, uncertain-effect recovery, coordinator filesystem write authority
 or stronger process isolation. Existing subjective-feedback precedence remains
 unchanged. Live provider behavior and full PRD acceptance remain separate gates.
+
+## Live qualification
+
+On September 5, 2026, signed-in `codex-cli 0.153.4` with `gpt-5.6-sol` passed:
+
+```sh
+DARWIN_CODEX_LIVE_FAILURE_REPAIR=1 go test -race ./internal/codexbridge \
+  -run '^TestLiveCodexRecoverableToolProtocol$' -count=1 -v
+```
+
+The actual runtime and temporary SQLite journal executed one fixed, effect-free
+fixture tool failure. At RPC write time the wrapper verified committed
+`tool_failed`/NoEffect evidence; exactly one `success:false` response was sent.
+The actual CLI then emitted `status: failed, success: false`, Sol produced
+nonempty final output in the second runtime turn, and replay retained exactly
+one failed tool step. The live test passed in 6.68 seconds (race-enabled package
+run 8.093 seconds). The owner explicitly closed the session on completion.
+
+This is real cloud coordinator inference with synthetic tool output, not local
+LLM inference, subjective quality validation, general process containment or a
+guarantee of future model behavior. The opt-in command consumes signed-in account
+usage. It inherits the checked launcher's existing login and process-local
+capability controls without reading/copying credential files or modifying user
+configuration. Codex itself may update authentication/state. Test working
+directories and SQLite are temporary; diagnostics report bounded protocol
+metadata, not raw prompts, arguments or generated output. Ordinary tests skip it.
+
+The same day's application-level live qualifier also passed:
+
+```sh
+DARWIN_CODEX_LIVE_REPAIR=1 go test -race ./internal/app \
+  -run '^TestLiveCodexDelegationRepair$' -count=1 -v
+```
+
+The actual application Service launched one checked Sol coordinator. Its first
+delegated loopback worker response was deliberately invalid Go; deterministic
+validation rejected it and the parent retained a failed NoEffect tool result.
+Sol then proposed a distinct sequential delegation. The controlled worker's
+corrected source passed syntax validation and supervisor acceptance; Sol
+completed in three runtime turns. The test observed exactly two worker calls,
+one failed and one successful parent tool completion, five correctly linked
+terminal task records, no pending or uncertain tools, zero remaining worker
+leases, exact corrected source in durable history and removal of the temporary
+coordinator directory. The test passed in 14.92 seconds (race-enabled package run
+16.372 seconds). Generated code was parsed, not compiled or executed.
+
+`make qualify-codex-repair` runs both explicit qualifiers sequentially; it uses
+signed-in account usage and is not included in `make check`. A failure stops the
+target. Each test has a 90-second context and bounded turns/delegation; these are
+not currency or backend billing caps. Both use controlled local results, not a
+real Ollama model. Earlier Sol→Ollama success evidence remains separate from
+this failure-repair qualification. No production behavior was relaxed to make
+the observed failure tuple pass, and no background learning was enabled.

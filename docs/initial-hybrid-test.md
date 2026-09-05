@@ -123,9 +123,26 @@ completed a model turn but produced no delegation and is not counted as success.
 Only exact known deprecation/unstable-feature notices and bounded, discarded
 account-rate metadata are accepted; unknown warnings still fail closed.
 
-Next live qualification: negative worker results, cancellation while delegated work
-is active, restart behavior, and helper-process cleanup/containment. These are
-not established by one successful prompt. Background learning remains disabled.
+At this first checkpoint, negative worker results, cancellation, restart and
+helper cleanup were still unqualified. Later bounded cancellation and controlled
+negative-worker repair checks are recorded below; these do not establish general
+recovery/containment. Background learning remains disabled.
+
+## Live negative-worker repair checkpoint
+
+On September 5, 2026, `TestLiveCodexDelegationRepair` used the actual application
+Service and signed-in `gpt-5.6-sol` with a controlled loopback Ollama-protocol
+worker. Deliberately invalid Go was rejected, Sol received explicit failure
+feedback and requested a distinct correction, corrected Go passed deterministic
+syntax validation and supervisor acceptance, and Sol completed. Exactly two
+worker calls and three parent turns were observed; failed-step evidence remained
+durable. This used synthetic worker responses, not real Ollama inference, and
+did not compile or execute generated code. See
+[qualification commands and limits](recoverable-tool-failures.md#live-qualification).
+
+`make qualify-codex-repair` reproduces both the native failure-protocol check and
+this application repair check, consuming signed-in account usage. It is opt-in
+and does not alter the normal development checks or user configuration.
 
 ## Application failure and cancellation regression coverage
 

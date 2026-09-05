@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-release
+.PHONY: build check test fmt qualify-linux-cgroup qualify-release qualify-codex-repair
 
 build:
 	go build -trimpath -o bin/darwin ./cmd/darwin
@@ -17,6 +17,12 @@ fmt:
 
 qualify-linux-cgroup:
 	sh scripts/qualify-linux-cgroup.sh
+
+# Explicit supervised signed-in cloud inference with controlled local results.
+# Uses account usage; never included in check/test or ordinary CI.
+qualify-codex-repair:
+	DARWIN_CODEX_LIVE_FAILURE_REPAIR=1 go test -race ./internal/codexbridge -run '^TestLiveCodexRecoverableToolProtocol$$' -count=1 -v
+	DARWIN_CODEX_LIVE_REPAIR=1 go test -race ./internal/app -run '^TestLiveCodexDelegationRepair$$' -count=1 -v
 
 # Requires a clean committed checkout. Uses only disposable test signing keys.
 qualify-release:

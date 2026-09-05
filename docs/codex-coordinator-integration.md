@@ -9,6 +9,13 @@ passed; automatic resume and compaction remain unfinished.
 Historical sections below record earlier
 implementation stages; they do not imply production qualification.
 
+The live effect-free tool-failure protocol also passed on CLI 0.153.4: the actual
+runtime committed `tool_failed` before sending `success:false`, observed Codex's
+`failed/false` completion, then received a final Sol response. See
+[recoverable tool qualification](recoverable-tool-failures.md#live-qualification)
+for opt-in reproduction and the distinction between controlled worker results
+and actual local-model inference.
+
 The current pinned profile enables only `skip_host_skill_discovery` and
 `code_mode_host` among its 134 feature controls. The latter is necessary for
 the observed Sol tool path; the bundled host must be installed. A disabled-host
@@ -57,8 +64,9 @@ The existing runtime owns the following ordering:
 1. Receive a provider tool **proposal**, without executing it.
 2. Persist the assistant turn and tool-start event.
 3. Apply Darwin's tool permissions and run its bounded worker.
-4. Persist the tool outcome; fail on errors or uncertain effects.
-5. Supply the successful tool message to the next provider invocation.
+4. Persist the tool outcome; stop on errors, uncertain effects or nonrecoverable failures.
+5. Supply the successful or explicitly recoverable effect-free failed tool message
+   to the next provider invocation, preserving its failure status.
 
 A Codex adapter must pause the RPC at step 1 and answer it only at step 5.
 Executing delegation inside a provider callback would skip these boundaries.
