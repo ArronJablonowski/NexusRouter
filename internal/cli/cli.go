@@ -16,6 +16,8 @@ Usage:
   darwin run --config path --model id [--validate go_source] [--json] < prompt.txt
     go_source validation expects output containing a raw full Go source file
     --json streams committed events and a final result as versioned JSON lines
+  darwin chat --config path --model id
+    Line-oriented conversation: /help /status /new /cancel /steer TEXT /quit
   darwin submit --config path --key idempotency-key --model id < prompt.txt
     Store queued work only; an independently running daemon executes it
   darwin submissions list --db path [--state state --after cursor --limit 25]
@@ -42,7 +44,7 @@ Usage:
   darwin run --config path --model id --continue-task id --summary-attempt approved-attempt-id < prompt.txt
 
 Development status: use --model auto for constrained automatic routing.
-JSON lifecycle streaming and separate-command steering are available; an interactive prompt UI remains unfinished.
+JSON lifecycle streaming and separate-command steering are available, plus line-oriented chat.
 `
 
 // Run executes a CLI invocation and returns its process exit code.
@@ -52,6 +54,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "chat" {
+		return runChat(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "steer" {
 		return runSteer(args[1:], stdin, stdout, stderr)
 	}

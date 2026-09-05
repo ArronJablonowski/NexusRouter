@@ -4,7 +4,7 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 
 ## Development status
 
-The executable supports layered configuration, automatic or explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Write tools and interactive streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Write tools and live token streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
@@ -213,7 +213,7 @@ retrievable. Use completed-session continuation for a new follow-up task.
 Storage migrates transactionally to schema14. Back up operational databases
 before upgrades; older binaries cannot open this schema. The new runtime turn
 configuration changes durable submission fingerprints, so older queued requests
-require explicit configuration-mismatch handling. A full interactive prompt UI
+require explicit configuration-mismatch handling. A full-screen interactive editor
 and general interrupted-session recovery remain unfinished.
 
 From a second terminal using configuration that points to the same task database:
@@ -236,8 +236,39 @@ within a five-second input allowance. Size remains 64 KiB; blank and invalid
 UTF-8 input is rejected. Pipe cancellation borrows a descriptor, restores its
 flags and leaves the caller's descriptor open. Regular-file kernel reads and
 custom embedded readers remain cooperative rather than forcibly interruptible.
-Output uses existing cancellation/broken-pipe handling. An integrated interactive
-editor with continuous steering/follow-ups remains future work.
+Output uses existing cancellation/broken-pipe handling.
+
+### Line-oriented interactive chat
+
+```sh
+./bin/darwin chat --config examples/local.yaml --model auto
+```
+
+Enter one prompt per line; wait for its final answer before entering the next
+prompt. Each successful task becomes the next task's persisted conversation
+context. Failed or canceled tasks never silently become continuation sources.
+Use `/status`, `/cancel`, `/steer TEXT`, `/new`, `/help`, or `/quit`.
+`/new` clears the continuation pointer only when idle; it does not delete history.
+While a task runs, ordinary lines are rejected explicitly; `/steer TEXT` queues
+guidance once a task ID is available. Guidance applies at safe runtime boundaries,
+not mid-tool execution. Prefix a prompt with `//` for a literal leading slash.
+
+Ctrl-C requests cancellation during work and exits when idle. `/quit` and SIGTERM
+cancel and join active work. EOF waits for active work to finish. A normal session
+exit returns zero even if an individual task failed; use headless `run` for
+per-task exit status. Each task retains the five-minute execution timeout.
+The command prints lifecycle progress and the final answer, not raw token deltas.
+Terminal escape sequences, clipboard controls and bidi formatting are stripped
+from displayed model output; stored content remains governed by runtime redaction.
+
+Chat accepts canonical terminals and UTF-8 files/pipes, with up to64KiB per line
+(the OS terminal line discipline may impose a smaller limit). Terminal echo and
+canonical settings are unchanged. Idle input has no timeout; cancellation joins
+borrowed pipe/terminal reads and restores descriptor flags. Custom embedded readers,
+writers and regular-file kernel operations remain cooperative. A full-screen
+editor, multiline editing, automatic context compaction and interrupted-task resume
+are not implemented. Chat supports the same routing/continuation flags as `run`,
+but JSON output belongs to `run --json`.
 
 To shorten a completed conversation, supply an operator-reviewed summary file:
 
