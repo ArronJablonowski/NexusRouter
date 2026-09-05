@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/DarwinRouter/daemon"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
@@ -27,6 +28,8 @@ import (
 )
 
 type Services struct {
+	DaemonStatus           func(context.Context) (daemon.Status, error)
+	StopDaemon             func(context.Context, string) (daemon.Status, error)
 	DiscoverSkillWorkflows func(context.Context, string, string, int) (skills.WorkflowCandidatePage, error)
 	GenerateSkillDraft     func(context.Context, string, string, string, []string, float64) (skills.GenerationAttempt, error)
 	PublishSkillGeneration func(context.Context, string) (skills.Version, error)
@@ -132,6 +135,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/daemon/status" || r.URL.Path == "/v1/daemon/stop":
+		h.serveDaemonControl(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/skills/workflows":
 		h.serveWorkflowDiscovery(w, r.WithContext(ctx))
 	case skillGenerationRoute(r.URL.Path):

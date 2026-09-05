@@ -38,6 +38,7 @@ Usage:
   darwin approvals execution --db path --task id --id approval-id
   darwin approval-decision --config path < decision.json
   darwin serve --config path  Run the authenticated loopback HTTP service
+  darwin daemon start|status|stop --config path  Control an authenticated local daemon
   darwin memory list|show|put|delete --db path --scope scope
   darwin skills list|show|history|state|draft|rollback --root path --scope scope
   darwin skill-generations list --db path --scope id [--after id --limit 25]
@@ -68,6 +69,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "daemon" {
+		return runDaemonControl(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "models" {
 		return runModelsDeprecation(args[1:], stdout, stderr)
 	}

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/DarwinRouter/daemon"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/api"
@@ -28,7 +29,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := fs.String("config", "", "configuration file")
-	if fs.Parse(args) != nil || fs.NArg() != 0 || *path == "" {
+	instance := fs.String("instance-id", "", "managed launch identity")
+	if fs.Parse(args) != nil || fs.NArg() != 0 || *path == "" || (*instance != "" && !daemon.ValidID(*instance)) {
 		fmt.Fprintln(stderr, "usage: darwin serve --config path (requires DARWIN_API_TOKEN)")
 		return 2
 	}
@@ -57,6 +59,22 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "DARWIN_API_TOKEN must contain at least 32 characters")
 		return 1
 	}
+	// Binding is the single-instance gate. Do not migrate or dispatch against
+	// storage if another process already owns this endpoint.
+	listener, err := net.Listen("tcp", net.JoinHostPort(host, port))
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot bind daemon address")
+		return 1
+	}
+	defer listener.Close()
+	if *instance == "" {
+		*instance = daemon.NewID()
+	}
+	control, err := daemon.New(*instance, stop)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot initialize daemon identity")
+		return 1
+	}
 	db, err := telemetry.Open(ctx, s.Telemetry.Database)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot open daemon storage")
@@ -70,6 +88,15 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
+			status, err := control.Current(ctx)
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy") {
+				// Keep identity visible so an operator can stop a degraded daemon.
+				status.State = "degraded"
+			}
+			return status, err
+		},
+		StopDaemon:             control.Stop,
 		DiscoverSkillWorkflows: service.DiscoverSkillWorkflows,
 		GenerateSkillDraft: func(ctx context.Context, id, model, name string, tasks []string, maxCost float64) (skills.GenerationAttempt, error) {
 			return service.GenerateSkillDraft(ctx, id, model, skills.Key{Scope: s.Skills.Scope, Name: name}, tasks, maxCost)
@@ -142,12 +169,6 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "invalid daemon configuration")
 		return 1
 	}
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, port))
-	if err != nil {
-		fmt.Fprintln(stderr, "cannot bind daemon address")
-		return 1
-	}
-	defer listener.Close()
 	dispatcher, err = app.StartDispatcher(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start task dispatcher")

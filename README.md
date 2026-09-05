@@ -17,6 +17,11 @@ Read-only model recommendations are available with `darwin models deprecation
 evaluation evidence and operator approval for any later model changes; it does
 not automatically prune models. See [model deprecation](docs/model-deprecation.md).
 
+`darwin daemon start|status|stop --config config.yaml` now controls a background
+daemon on macOS/Linux using authenticated, instance-bound loopback requests.
+Set `DARWIN_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
+readiness, shutdown semantics and limits; `serve` remains the foreground option.
+
 ### Scoped memory in task context
 
 Stored facts can now enter task context when an operator configures a scope:
