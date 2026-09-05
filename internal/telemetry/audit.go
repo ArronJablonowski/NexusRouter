@@ -12,6 +12,18 @@ import (
 // RecordAudit stores reviewer provenance separately from candidate fitness.
 // Exact retries are idempotent; changing an existing identity is a conflict.
 func (s *Store) RecordAudit(ctx context.Context, r evaluation.AuditRecord) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := recordAudit(ctx, tx, r); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func recordAudit(ctx context.Context, tx *sql.Tx, r evaluation.AuditRecord) error {
 	if err := r.Validate(); err != nil {
 		return err
 	}
@@ -20,11 +32,6 @@ func (s *Store) RecordAudit(ctx context.Context, r evaluation.AuditRecord) error
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", r.TaskID); err != nil {
 		return err
 	}
@@ -34,7 +41,7 @@ func (s *Store) RecordAudit(ctx context.Context, r evaluation.AuditRecord) error
 		if string(prior) != string(body) {
 			return ErrConflict
 		}
-		return tx.Commit()
+		return nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
@@ -53,7 +60,7 @@ func (s *Store) RecordAudit(ctx context.Context, r evaluation.AuditRecord) error
 	if _, err = tx.ExecContext(ctx, "INSERT INTO audit_records(id,task_id,body) VALUES(?,?,?)", r.ID, r.TaskID, body); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (s *Store) Audit(ctx context.Context, id string) (evaluation.AuditRecord, error) {

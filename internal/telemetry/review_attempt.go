@@ -55,6 +55,38 @@ func (s *Store) BeginReview(ctx context.Context, r evaluation.ReviewAttempt) err
 }
 
 func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := finishReview(ctx, tx, r); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// CompleteReview commits advisory evidence and its successful lifecycle together.
+// A conflict or persistence error rolls back both changes. Exact retries are safe.
+func (s *Store) CompleteReview(ctx context.Context, r evaluation.ReviewAttempt, a evaluation.AuditRecord) error {
+	if r.Validate() != nil || a.Validate() != nil || r.Status != "completed" || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider {
+		return evaluation.ErrAudit
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := recordAudit(ctx, tx, a); err != nil {
+		return err
+	}
+	if err := finishReview(ctx, tx, r); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) error {
 	if r.Validate() != nil || r.Status == "started" {
 		return evaluation.ErrAudit
 	}
@@ -63,11 +95,6 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", r.TaskID); err != nil {
 		return err
 	}
@@ -84,7 +111,7 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 		if string(priorBody) != string(body) {
 			return ErrConflict
 		}
-		return tx.Commit()
+		return nil
 	}
 	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || !prior.StartedAt.Equal(r.StartedAt) {
 		return ErrConflict
@@ -110,7 +137,7 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 	if n, err := result.RowsAffected(); err != nil || n != 1 {
 		return ErrConflict
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (s *Store) ReviewAttempt(ctx context.Context, id string) (evaluation.ReviewAttempt, error) {

@@ -169,11 +169,10 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		out.Audit.Findings[i].Summary = redact(out.Audit.Findings[i].Summary, secrets)
 	}
 	record := evaluation.AuditRecord{Version: 1, ID: rand.Text(), TaskID: task, AttemptID: start.AttemptID, EvaluatorModel: model.Model, EvaluatorProvider: model.Provider, Audit: out.Audit, EvidenceRefs: []string{"requirements", "candidate", "session_history"}, Usage: out.Usage, Elapsed: out.Elapsed, Time: time.Now().UTC()}
-	if err = write.RecordAudit(ctx, record); err != nil {
+	attempt.Status, attempt.AuditID = "completed", record.ID
+	attempt.FinishedAt = time.Now().UTC()
+	if err = write.CompleteReview(ctx, attempt, record); err != nil {
 		return evaluation.AuditRecord{}, errors.Join(err, finish("failed", "persistence_failed", ""))
-	}
-	if err := finish("completed", "", record.ID); err != nil {
-		return evaluation.AuditRecord{}, err
 	}
 	return record, nil
 }
