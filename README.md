@@ -24,6 +24,15 @@ daemon on macOS/Linux using authenticated, instance-bound loopback requests.
 Set `DARWIN_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
 readiness, shutdown semantics and limits; `serve` remains the foreground option.
 
+### Background skill learning
+
+The daemon can now scan repeated accepted tool workflows and publish generated
+skills as inactive drafts. It requires explicit `skills.learning.enabled: true`
+and an aggregate generation budget; it remains off by default. Inspect its
+durable cursor with `darwin skills learning status --config config.yaml`.
+See [background learning](docs/background-learning.md) for setup, recovery,
+privacy boundaries and validation requirements.
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

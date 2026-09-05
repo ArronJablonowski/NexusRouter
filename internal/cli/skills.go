@@ -35,6 +35,9 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return skillsError(stderr, skillsUsage, 2)
 	}
 	command := args[0]
+	if command == "learning" {
+		return runSkillLearning(args[1:], stdout, stderr)
+	}
 	switch command {
 	case "list", "show", "history", "state", "draft", "rollback":
 	default:

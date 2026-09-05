@@ -36,7 +36,12 @@ func (s Settings) validateLearning() error {
 		if m.ContextTokens < 1 || m.EstimatedCost == nil || !finite(*m.EstimatedCost) || *m.EstimatedCost < 0 || *m.EstimatedCost > l.MaxCost || (m.Locality == "local" && m.RAMBytes == 0) || ((s.Mode == "local_only" || s.Skills.LocalOnly) && m.Locality != "local") || (s.Mode == "cloud_only" && m.Locality != "cloud") {
 			return errors.New("learning model unavailable within configured limits")
 		}
-		return nil
+		for _, provider := range s.Providers {
+			if provider.ID == m.Provider && (provider.Kind == "ollama" || provider.Kind == "openai_compatible") {
+				return nil
+			}
+		}
+		return errors.New("learning requires an HTTP generation provider")
 	}
 	return errors.New("learning model unavailable within configured limits")
 }

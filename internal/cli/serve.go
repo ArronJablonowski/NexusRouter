@@ -87,6 +87,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	var dispatcher *app.Dispatcher
+	var learner *app.Learner
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
@@ -95,7 +96,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy") {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner)) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -154,7 +155,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Inspect:          db.TaskSnapshot,
 		TaskContinuation: db.TaskContinuation,
 		Health: func(ctx context.Context) error {
-			if dispatcher == nil || dispatcher.Health().Status != "healthy" {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner) {
 				return errors.New("supervisor unavailable")
 			}
 			_, err := db.Read(ctx, "__health__", 0, 1)
@@ -164,7 +165,11 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			if dispatcher == nil {
 				return health.Report{}, errors.New("supervisor unavailable")
 			}
-			return service.HealthReport(ctx, dispatcher.Health())
+			report, err := service.HealthReport(ctx, dispatcher.Health())
+			if err != nil {
+				return health.Report{}, err
+			}
+			return withLearningHealth(report, learner.Health())
 		},
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
@@ -180,8 +185,18 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer dispatcher.Close()
+	learner, err = app.StartLearning(ctx, service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start skill learning supervisor")
+		return 1
+	}
+	defer learner.Close()
 	if err := serveHTTP(ctx, listener, handler, stdout); err != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
+		return 1
+	}
+	if err := learner.Close(); err != nil {
+		fmt.Fprintln(stderr, "skill learning supervisor requires inspection")
 		return 1
 	}
 	if err := dispatcher.Close(); err != nil {

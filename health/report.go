@@ -30,7 +30,7 @@ type Report struct {
 
 func (c Check) Validate() error {
 	switch c.Component {
-	case "daemon", "database", "supervisor", "resources", "provider", "model":
+	case "daemon", "database", "supervisor", "learning", "resources", "provider", "model":
 	default:
 		return ErrInvalid
 	}
@@ -40,7 +40,7 @@ func (c Check) Validate() error {
 	if (c.Component == "provider" || c.Component == "model") && c.ID == "" {
 		return ErrInvalid
 	}
-	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor") && c.ID != "" {
+	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "learning") && c.ID != "" {
 		return ErrInvalid
 	}
 	switch c.Status {
@@ -49,13 +49,17 @@ func (c Check) Validate() error {
 		return ErrInvalid
 	}
 	switch c.Code {
+	case "learning_budget_wait":
+		if c.Component != "learning" {
+			return ErrInvalid
+		}
 	case "serving", "available", "unavailable", "configuration_limit", "disabled_by_policy", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "capacity_available", "capacity_exhausted", "metrics_unknown", "supervisor_unavailable", "supervisor_ok", "supervisor_starting", "supervisor_stopping", "supervisor_stopped", "supervisor_error", "supervisor_stalled":
 	default:
 		return ErrInvalid
 	}
 	validState := false
 	switch c.Code {
-	case "serving", "available", "capacity_available", "supervisor_ok":
+	case "serving", "available", "capacity_available", "supervisor_ok", "learning_budget_wait":
 		validState = c.Status == "healthy"
 	case "configuration_limit", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "supervisor_stopping", "supervisor_stopped":
 		validState = c.Status == "unavailable"
@@ -79,9 +83,11 @@ func (c Check) Validate() error {
 // Outcome derives readiness from operational prerequisites and at least one
 // discovered configured model. Unknown supplemental measurements degrade the
 // report but do not assert that an otherwise usable model is unavailable.
+// An included learning supervisor must be healthy or explicitly disabled;
+// older reports without this optional component retain their prior semantics.
 func Outcome(checks []Check) (string, bool) {
 	core := map[string]bool{}
-	model, all := false, true
+	model, all, learningReady := false, true, true
 	for _, c := range checks {
 		if c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" {
 			core[c.Component] = c.Status == "healthy"
@@ -89,11 +95,14 @@ func Outcome(checks []Check) (string, bool) {
 		if c.Component == "model" && c.Status == "healthy" {
 			model = true
 		}
+		if c.Component == "learning" {
+			learningReady = c.Status == "healthy" || c.Status == "disabled"
+		}
 		if c.Status != "healthy" && c.Status != "disabled" {
 			all = false
 		}
 	}
-	ready := core["daemon"] && core["database"] && core["supervisor"] && model
+	ready := core["daemon"] && core["database"] && core["supervisor"] && model && learningReady
 	if !ready {
 		return "unavailable", false
 	}

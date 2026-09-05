@@ -378,7 +378,17 @@ The initial deterministic grouping rule, `observed_tools_v1`, recognizes repeate
 
 Discovery must persist each observed page atomically with its scan checkpoint. Retries of the same revision and parameters return the original saved page, even when feedback changes afterward. Each epoch freezes membership using a durable insertion-sequence fence, not merely a maximum task ID; new tasks cannot indefinitely extend an active epoch. The next epoch starts from the beginning to revisit late feedback and lower-sorting arrivals. Page boundaries freeze neither source evidence across the epoch nor permission to generate. Corrupt history must stop advancement visibly rather than silently skip work.
 
-Automatic generation must require an enabled aggregate budget before dispatch. Reserve estimated cost, rolling attempt capacity and an in-flight slot atomically with the single-use generation claim. Failed attempts remain charged; unresolved started attempts retain their in-flight slot regardless of age. Apply a per-skill-name cooldown in the configured scope. Cost estimates must use consistent units and are not proof of actual provider charges. Manual generation retains an explicit budget opt-in for compatibility; a future scheduler must not inherit an unlimited default. Budget-policy changes remain trusted operator configuration.
+Automatic generation must require an enabled aggregate budget before dispatch. Reserve estimated cost, rolling attempt capacity and an in-flight slot atomically with the single-use generation claim. Failed attempts remain charged; unresolved started attempts retain their in-flight slot regardless of age. Apply a per-skill-name cooldown in the configured scope. Cost estimates must use consistent units and are not proof of actual provider charges. Manual generation retains an explicit budget opt-in for compatibility; the background scheduler must not inherit an unlimited default. Budget-policy changes remain trusted operator configuration.
+
+The daemon's learner is disabled by default and advances bounded durable phases.
+Pin the exact selection and destination bucket in its cursor before inference;
+restarts must not recompute a different attempt ID from changed feedback. Use
+stable workflow-derived skill identities independent of scan epochs. Publish
+generated proposals as inactive versions until separate validation authorizes
+activation. Budget/cooldown pauses are expected policy states; unresolved claims,
+stale sources and incompatible policy require visible operator attention rather
+than silent reset. Provide read-only persisted state inspection even when
+scheduling is disabled, metadata-only health and cancellation/join on shutdown.
 
 ## 10. Sessions, Context, and Memory
 

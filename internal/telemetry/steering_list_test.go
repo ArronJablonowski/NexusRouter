@@ -69,7 +69,7 @@ func TestListSteeringLegacyDoesNotMigrate(t *testing.T) {
 	if err := db.Append(ctx, 0, event("start", 1, runtime.TaskStarted)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec(`DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; PRAGMA user_version=13`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(ctx, path)

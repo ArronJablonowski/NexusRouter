@@ -44,6 +44,11 @@ func TestLearningValidation(t *testing.T) {
 		"ram":            func(s *Settings) { s.Models[0].RAMBytes = 0 },
 		"privacy":        func(s *Settings) { s.Models[0].Locality = "cloud" },
 		"mode":           func(s *Settings) { s.Mode = "cloud_only" },
+		"generation adapter": func(s *Settings) {
+			s.Skills.LocalOnly = false
+			s.Models[0].Model, s.Models[0].Locality = "gpt-5.6-sol", "cloud"
+			s.Providers[0].Kind, s.Providers[0].Endpoint, s.Providers[0].Executable = "codex_app_server", "", "/bin/codex"
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := learningSettings()

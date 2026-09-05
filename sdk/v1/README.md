@@ -1,5 +1,10 @@
 # Embedded Go client
 
+`Client.SkillLearningState(ctx)` inspects the configured learner's persisted
+phase, scan cursor and pending generation identity without starting background
+work. Inspection remains available when learning is disabled. The daemon owns
+the opt-in background loop; see [background learning](../../docs/background-learning.md).
+
 `Client.ModelDeprecation` provides read-only, versioned model recommendations
 using `DeprecationRequest`, `DeprecationPolicy` and `DeprecationReport`. It validates
 inputs/results and never runs inference or creates storage. See the
