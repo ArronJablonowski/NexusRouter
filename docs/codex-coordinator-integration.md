@@ -1,7 +1,8 @@
 # Authenticated Codex coordinator integration
 
-Status: framing, direct-process ownership and paused-tool correspondence primitives implemented; no
-launchable DarwinRouter Codex adapter yet. Target model remains `gpt-5.6-sol`.
+Status: controlled-wire session adapter, framing, direct-process ownership and
+paused-tool correspondence implemented; no launchable DarwinRouter Codex
+profile yet. Target model remains `gpt-5.6-sol`.
 
 The installed Codex CLI can use its existing ChatGPT login. DarwinRouter must
 not extract tokens from its credential files or silently require direct API
@@ -59,6 +60,29 @@ spawns helpers. The capability, authentication and privacy integration below
 is not implemented by an explicit environment alone. Tests use only the test
 executable, not Codex, model inference or credential access.
 
+`internal/codexbridge.Session` now drives initialization, ephemeral thread and
+turn creation, item/text streams, paused dynamic calls and final completion
+over an already-admitted `Wire`. It implements the provider contract but is
+not installed in the HTTP factory or application configuration. Construction
+does not send traffic. The host owns the wire and must close the session after
+the entire runtime loop, including failures after a proposal is returned.
+
+The prototype accepts one fresh user message, the configured model/tool catalog,
+an optional output schema, and exact subsequent tool-result continuations.
+It rejects historical import/steering instead of flattening message roles.
+It snapshots input before callbacks, rejects ambiguous control keys, and checks
+thread/turn/item identity and terminal status. Text deltas stream immediately
+and must agree with the completed item. Reasoning frames are attributed and
+bounded but are not emitted as answer text. Usage is reported as differences
+between observed cumulative totals; missing or late usage is not invented.
+There are limits of 4,096 frames, 16 MiB wire data, 256 items and 64 queued
+startup frames per session. Unsupported protocol notifications fail closed.
+
+The actual runtime loop and SQLite journal are exercised by controlled-wire
+tests: no tool RPC response is sent before successful tool-result persistence;
+injected tool-start/result persistence failures preserve the unresolved durable
+boundary and prevent a response. This is not a live Codex/local worker test.
+
 ## Required launch and lifecycle work
 
 - Introduce a distinct cloud `codex_app_server` configuration kind. Do not
@@ -69,9 +93,10 @@ executable, not Codex, model inference or credential access.
 - Give the task explicit ownership of shutdown. The existing HTTP factory does
   not call provider `Close`; a paused subprocess needs cleanup on persistence
   failure, cancellation, iteration limits, rejected tools and normal completion.
-- Correlate initialize/thread/turn responses and notifications. Verify final
-  completion rather than equating EOF, a text item, or a tool pause with task
-  success. Track usage without double-counting across paused segments.
+- Qualify the implemented initialize/thread/turn and item correlation against
+  the actual CLI, including notification ordering and usage arriving late.
+  Add historical session import, steering and compaction handling without
+  weakening the single-turn prototype's correspondence checks.
 - Disable ambient shell, filesystem, MCP, apps, plugins, hooks, skills and
   auxiliary agents before launch/turn execution. Verify the actual exposed
   capabilities for the supported CLI version. Empty working directories and

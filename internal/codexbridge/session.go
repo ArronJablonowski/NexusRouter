@@ -1,0 +1,282 @@
+package codexbridge
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"path/filepath"
+	"reflect"
+	"sync"
+	"sync/atomic"
+	"unicode/utf8"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+)
+
+// Wire is an already-admitted, task-owned connection. Close MUST unblock IO.
+// Session does not launch Codex or establish sandbox/capability isolation.
+type Wire interface {
+	Read() (codexrpc.Envelope, error)
+	Write(codexrpc.Envelope) error
+	Close() error
+}
+
+type Options struct{ Model, CWD string }
+
+// Session adapts one Codex turn into Darwin model/tool segments. A verified
+// item/tool/call is a paused segment boundary, NOT successful task completion.
+// Only turn/completed can finish the final segment. A caller must defer Close
+// across the entire runtime loop, including while a proposed tool is executing.
+// This first implementation admits a fresh single-user-message conversation;
+// historical session import, steering and compaction are not silently flattened.
+type Session struct {
+	w                          Wire
+	options                    Options
+	mu                         sync.Mutex
+	closed                     atomic.Bool
+	closeDone                  chan struct{}
+	stopWatch                  func() bool
+	thread, turn               string
+	started, finished, emitted bool
+	pending                    *Pending
+	pendingID                  json.RawMessage
+	pendingCall                string
+	queue                      []codexrpc.Envelope
+	frames, wireBytes          int
+	items                      map[string]*itemState
+	usageTotal, usageReported  providers.Usage
+	usageUpdated               bool
+}
+
+func NewSession(ctx context.Context, w Wire, options Options) (*Session, error) {
+	if ctx == nil || ctx.Err() != nil || w == nil || (reflect.ValueOf(w).Kind() == reflect.Pointer && reflect.ValueOf(w).IsNil()) || options.Model == "" || len(options.Model) > 128 ||
+		!utf8.ValidString(options.Model) || !filepath.IsAbs(options.CWD) || !utf8.ValidString(options.CWD) {
+		return nil, failure(false)
+	}
+	s := &Session{w: w, options: options, items: make(map[string]*itemState), closeDone: make(chan struct{})}
+	// Do not call Close here: that would access stopWatch during assignment.
+	s.stopWatch = context.AfterFunc(ctx, func() {
+		if s.closed.CompareAndSwap(false, true) {
+			defer close(s.closeDone)
+			_ = s.w.Close()
+		}
+	})
+	return s, nil
+}
+
+func failure(partial bool) error { return &providers.Failure{Code: "codex_protocol", Partial: partial} }
+
+func (s *Session) Close() error {
+	s.stopWatch()
+	if s.closed.CompareAndSwap(false, true) {
+		defer close(s.closeDone)
+		return s.w.Close()
+	}
+	<-s.closeDone
+	return nil
+}
+
+func (s *Session) Models(ctx context.Context) ([]string, error) {
+	if ctx == nil || ctx.Err() != nil || s.closed.Load() {
+		return nil, failure(false)
+	}
+	return []string{s.options.Model}, nil
+}
+
+func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(providers.Chunk) error) (err error) {
+	if !s.mu.TryLock() {
+		return failure(false)
+	}
+	defer s.mu.Unlock()
+	defer func() {
+		if recover() != nil {
+			err = failure(s.emitted)
+		}
+		if err != nil {
+			_ = s.Close()
+		}
+	}()
+	if ctx == nil || ctx.Err() != nil || emit == nil || s.closed.Load() || s.finished ||
+		!validRequest(req) || providers.ValidateMessages(req.Messages) != nil || req.Model != s.options.Model {
+		return failure(s.emitted)
+	}
+	// Own the admitted history/catalog before a callback can mutate it.
+	body, cloneErr := json.Marshal(req)
+	if cloneErr != nil || len(body) > maxExchangeBytes {
+		return failure(s.emitted)
+	}
+	var owned providers.Request
+	if json.Unmarshal(body, &owned) != nil {
+		return failure(s.emitted)
+	}
+	if req.JSONSchema == nil {
+		owned.JSONSchema = nil
+	}
+	req = owned
+	stop := context.AfterFunc(ctx, func() { _ = s.Close() })
+	defer stop()
+	if !s.started {
+		if len(req.Messages) != 1 || req.Messages[0].Role != "user" {
+			return failure(false)
+		}
+		if err = s.begin(req); err != nil {
+			return err
+		}
+		s.started = true
+	} else {
+		if s.pending == nil {
+			return failure(s.emitted)
+		}
+		response, resumeErr := s.pending.Resume(req)
+		if resumeErr != nil {
+			return failure(s.emitted)
+		}
+		if err = s.w.Write(codexrpc.Envelope{ID: bytes.Clone(s.pendingID), Result: response}); err != nil {
+			return failure(s.emitted)
+		}
+		s.items[s.pendingCall].responded = true
+		s.pending, s.pendingID, s.pendingCall = nil, nil, ""
+	}
+	return s.segment(ctx, req, emit)
+}
+
+func marshal(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
+
+func (s *Session) begin(req providers.Request) error {
+	names := map[string]bool{}
+	definitions := make([]map[string]any, 0, len(req.Tools))
+	for _, tool := range req.Tools {
+		if !namePattern.MatchString(tool.Name) || names[tool.Name] || !json.Valid(tool.Parameters) {
+			return failure(false)
+		}
+		names[tool.Name] = true
+		definitions = append(definitions, map[string]any{"type": "function", "name": tool.Name, "description": tool.Description, "inputSchema": tool.Parameters})
+	}
+	initialized, err := s.call("1", "initialize", map[string]any{"clientInfo": map[string]string{"name": "darwin_router", "version": "0.1.0"}, "capabilities": map[string]bool{"experimentalApi": true}})
+	if err != nil {
+		return err
+	}
+	var initialization struct {
+		UserAgent string `json:"userAgent"`
+	}
+	if decodePayload(initialized, &initialization) != nil || initialization.UserAgent == "" {
+		return failure(false)
+	}
+	if s.w.Write(codexrpc.Envelope{Method: "initialized"}) != nil {
+		return failure(false)
+	}
+	dynamic := []map[string]any{}
+	if len(definitions) > 0 {
+		dynamic = append(dynamic, map[string]any{"type": "namespace", "name": "darwin", "description": "DarwinRouter-authorized tools", "tools": definitions})
+	}
+	result, err := s.call("2", "thread/start", map[string]any{
+		"model": req.Model, "cwd": s.options.CWD, "ephemeral": true, "allowProviderModelFallback": false,
+		"approvalPolicy": "never", "sandbox": "read-only", "environments": []any{}, "dynamicTools": dynamic,
+	})
+	if err != nil {
+		return err
+	}
+	var thread struct {
+		Model  string `json:"model"`
+		Thread struct {
+			ID string `json:"id"`
+		} `json:"thread"`
+	}
+	if decodePayload(result, &thread) != nil || !validOpaque(thread.Thread.ID) || thread.Model != req.Model {
+		return failure(false)
+	}
+	s.thread = thread.Thread.ID
+	// Validate thread-start notices before transmitting the user's input.
+	for _, queued := range s.queue {
+		var notice struct {
+			ThreadID string `json:"threadId"`
+			Thread   struct {
+				ID string `json:"id"`
+			} `json:"thread"`
+		}
+		if decodePayload(queued.Params, &notice) != nil || (queued.Method == "thread/started" && notice.Thread.ID != s.thread) || (queued.Method == "thread/status/changed" && notice.ThreadID != s.thread) {
+			return failure(false)
+		}
+	}
+	params := map[string]any{"threadId": s.thread, "model": req.Model, "environments": []any{}, "input": []map[string]any{{"type": "text", "text": req.Messages[0].Content, "text_elements": []any{}}}}
+	if req.JSONSchema != nil {
+		if !json.Valid(req.JSONSchema) {
+			return failure(false)
+		}
+		params["outputSchema"] = req.JSONSchema
+	}
+	result, err = s.call("3", "turn/start", params)
+	if err != nil {
+		return err
+	}
+	var turn struct {
+		Turn struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"turn"`
+	}
+	if decodePayload(result, &turn) != nil || !validOpaque(turn.Turn.ID) || turn.Turn.Status != "inProgress" {
+		return failure(false)
+	}
+	s.turn = turn.Turn.ID
+	return nil
+}
+
+func validOpaque(v string) bool { return v != "" && len(v) <= 256 && utf8.ValidString(v) }
+
+func (s *Session) receive() (codexrpc.Envelope, error) {
+	e, err := s.w.Read()
+	if err != nil {
+		return codexrpc.Envelope{}, failure(s.emitted)
+	}
+	if _, err = e.Kind(); err != nil {
+		return codexrpc.Envelope{}, failure(s.emitted)
+	}
+	b, err := json.Marshal(e)
+	if err != nil || len(b) > codexrpc.DefaultMaxFrame || s.frames >= 4096 || len(b) > 16<<20-s.wireBytes {
+		return codexrpc.Envelope{}, failure(s.emitted)
+	}
+	s.frames++
+	s.wireBytes += len(b)
+	return e, nil
+}
+
+func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
+	if s.w.Write(codexrpc.Envelope{ID: json.RawMessage(id), Method: method, Params: marshal(params)}) != nil {
+		return nil, failure(s.emitted)
+	}
+	for {
+		e, err := s.receive()
+		if err != nil {
+			return nil, err
+		}
+		kind, _ := e.Kind()
+		if kind == codexrpc.Response || kind == codexrpc.ErrorResponse {
+			if !bytes.Equal(e.ID, []byte(id)) || kind == codexrpc.ErrorResponse {
+				return nil, failure(s.emitted)
+			}
+			return e.Result, nil
+		}
+		if kind == codexrpc.Request && (method != "turn/start" || e.Method != "item/tool/call") {
+			return nil, failure(s.emitted)
+		}
+		if method == "initialize" || (method == "thread/start" && (kind != codexrpc.Notification || (e.Method != "thread/started" && e.Method != "thread/status/changed"))) {
+			return nil, failure(s.emitted)
+		}
+		if len(s.queue) >= 64 {
+			return nil, failure(s.emitted)
+		}
+		s.queue = append(s.queue, e)
+	}
+}
+
+func (s *Session) next() (codexrpc.Envelope, error) {
+	if len(s.queue) == 0 {
+		return s.receive()
+	}
+	e := s.queue[0]
+	s.queue[0] = codexrpc.Envelope{}
+	s.queue = s.queue[1:]
+	return e, nil
+}
