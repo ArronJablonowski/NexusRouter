@@ -145,10 +145,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		return Result{}, errors.New("cannot open routing storage")
 	}
 	defer db.Close()
-	messages := r.Messages
-	if len(messages) == 0 {
-		messages = []providers.Message{{Role: "user", Content: r.Prompt}}
-	}
+	messages := []providers.Message{}
 	if r.ContinueTaskID != "" {
 		history, e := sessions.Replay(ctx, db, r.ContinueTaskID)
 		if e != nil || history.State != "completed" || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
@@ -157,7 +154,28 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if history.Privacy != "cloud_allowed" {
 			r.LocalRequired = true
 		}
-		messages = append(history.Messages, messages...)
+		messages = append(messages, history.Messages...)
+	}
+	if !r.memoryPrepared {
+		// Freeze one retrieval snapshot for context admission and execution.
+		// Hybrid local-only memory pins this task local; shareable mode excludes
+		// private facts before ranking any possible cloud candidate.
+		if cfg.Mode != "cloud_only" || !cfg.Memory.LocalOnly {
+			r.memoryContext, err = loadMemoryContext(ctx, db, cfg.Memory, cfg.Memory.LocalOnly && cfg.Mode != "cloud_only", memorySecrets(cfg, s.secret))
+			if err != nil {
+				return Result{}, ErrAdmission
+			}
+		}
+		r.memoryPrepared = true
+	}
+	if r.memoryContext != nil {
+		messages = append(messages, r.memoryContext.Messages...)
+		r.LocalRequired = r.LocalRequired || r.memoryContext.LocalOnly
+	}
+	if len(r.Messages) > 0 {
+		messages = append(messages, r.Messages...)
+	} else {
+		messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
 	}
 	// Byte count is a conservative token estimate, with framing/output reserve.
 	inference := providers.Request{Messages: messages}

@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"darwinrouter/memory"
 )
 
 type Settings struct {
@@ -75,8 +77,11 @@ type Skills struct {
 	Rollback     bool `yaml:"rollback_on_regression" json:"rollback_on_regression"`
 }
 type Memory struct {
-	Enabled   bool `yaml:"enabled" json:"enabled"`
-	LocalOnly bool `yaml:"local_only" json:"local_only"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	LocalOnly bool   `yaml:"local_only" json:"local_only"`
+	Scope     string `yaml:"scope" json:"scope"`
+	MaxFacts  int    `yaml:"max_facts" json:"max_facts"`
+	MaxBytes  int    `yaml:"max_bytes" json:"max_bytes"`
 }
 type Evaluation struct {
 	AutoReviewModel   string   `yaml:"auto_review_model" json:"auto_review_model"`
@@ -102,7 +107,7 @@ func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
 		Hardware: Hardware{true, 80, 85, "auto"}, Workers: Workers{3, "5s", "30s", "single_writer"},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
-		Skills:  Skills{true, true, true, true}, Memory: Memory{true, true},
+		Skills:  Skills{true, true, true, true}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
@@ -185,6 +190,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
 		return errors.New("enabled tools require an absolute read root")
+	}
+	if (s.Memory.Scope != "" && !memory.ValidKey(s.Memory.Scope)) || s.Memory.MaxFacts < 1 || s.Memory.MaxFacts > 64 || s.Memory.MaxBytes < 256 || s.Memory.MaxBytes > 65536 {
+		return errors.New("invalid memory context settings")
 	}
 	if s.Mode == "local_only" && (!s.Memory.LocalOnly || s.Telemetry.OTEL) {
 		return errors.New("local-only mode requires local memory and disabled telemetry export")

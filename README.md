@@ -12,6 +12,39 @@ Automatic routing separately tracks nonempty-output validity from the latest 100
 
 For Go-generation tasks, opt into `darwin run --config path --model auto --validate go_source < prompt.txt`, or supply `"validation":"go_source"` to native `POST /v1/tasks`. Ask for a raw complete Go source file: prose and Markdown fences are rejected, not extracted. The check parses at most 1 MiB of UTF-8 source without loading imports, compiling, or executing anything. Invalid syntax fails the task and records objective evidence; syntax-valid code can still have type errors, missing dependencies, security bugs or failing tests. Validation uses the redacted output that is persisted and delivered. Validity populations are separated by requested validation mode; the OpenAI-compatible endpoint does not expose this extension.
 
+### Scoped memory in task context
+
+Stored facts can now enter task context when an operator configures a scope:
+
+```yaml
+memory:
+  enabled: true
+  scope: my-project
+  local_only: true
+  max_facts: 8
+  max_bytes: 16384
+```
+
+The default empty scope disables retrieval. Facts come from the same configured
+SQLite database used by `darwin memory` commands. Retrieval inspects up to
+`max_facts` unexpired facts in ID order and includes only whole facts fitting the
+serialized message budget; this is not semantic search. Known credentials are
+redacted before model dispatch. Context includes fact ID, revision, provenance,
+and confidence in a JSON data envelope, preceded by a fixed instruction that
+memory is untrusted factual context, never tool or policy authority.
+
+With `local_only: true`, nonempty memory context pins automatic hybrid tasks to
+local models. Explicit cloud tasks and cloud-only mode omit memory. With
+`local_only: false`, cloud-eligible automatic routing loads only shareable facts;
+explicit local models may also retrieve private facts. Context admission and
+execution share one snapshot. A deletion after that snapshot does not recall an
+in-flight request; the next fresh task retrieves current facts. Continuations
+retain historical messages, including previous memory snapshots: deleting a fact
+or disabling retrieval does not erase its copies from session history. Memory
+retrieval currently neither updates last-use timestamps nor creates/corrects
+facts automatically. Prompt separation is not proof of injection immunity;
+tool permissions remain enforced independently.
+
 Advisory audits now influence automatic routing quality with bounded weight: creative/unknown domains receive less influence than coding/math/structured-output domains. Only the newest review per attempt counts; abstentions do not score, and direct evaluation/user feedback excludes that attempt's audit signal. Audits do not become measured execution samples or change cost/reliability statistics. `llm_judge_enabled: false` disables both review calls and advisory routing influence.
 
 ## Build and verify

@@ -21,6 +21,8 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	memoryPrepared                  bool
+	memoryContext                   *memoryContext
 	Validation                      string
 	onlyModelID, retryOfTaskID      string
 	ModelID, Prompt, ContinueTaskID string
@@ -159,6 +161,18 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		}
 		messages = history.Messages
 		sessionID = history.SessionID
+	}
+	if !r.memoryPrepared && (model.Locality == "local" || !s.Memory.LocalOnly) {
+		r.memoryContext, err = loadMemoryContext(ctx, db, s.Memory, model.Locality == "local", secrets)
+		if err != nil {
+			return result, ErrAdmission
+		}
+	}
+	if r.memoryContext != nil {
+		if model.ContextTokens < 1 || (r.memoryContext.LocalOnly && model.Locality != "local") {
+			return result, ErrAdmission
+		}
+		messages = append(messages, r.memoryContext.Messages...)
 	}
 	if len(r.Messages) > 0 {
 		messages = append(messages, r.Messages...)
