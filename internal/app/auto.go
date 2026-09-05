@@ -23,6 +23,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 // Service shares local reservations across all concurrent explicit and automatic requests.
@@ -30,6 +31,7 @@ import (
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
 	memoryStore memory.Store
+	skillStore  skills.Store
 	execution   chan struct{}
 	discovery   *modelHealthCache
 	settings    config.Settings
@@ -88,6 +90,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	r.memoryStore = s.memoryStore
+	r.skillStore = s.skillStore
 	if s.execution != nil {
 		select {
 		case s.execution <- struct{}{}:
@@ -221,7 +224,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	if !r.skillPrepared {
 		if cfg.Mode != "cloud_only" || !cfg.Skills.LocalOnly {
-			r.skillContext, err = loadSkillContext(ctx, cfg.Skills, r.Domain, contextTools(cfg), memorySecrets(cfg, s.secret))
+			r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, cfg.Skills, r.Domain, contextTools(cfg), memorySecrets(cfg, s.secret))
 			if err != nil {
 				return Result{}, ErrAdmission
 			}

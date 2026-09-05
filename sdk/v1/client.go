@@ -14,6 +14,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 var ErrAdmission = app.ErrAdmission
@@ -24,6 +25,8 @@ var ErrEventDelivery = app.ErrEventDelivery
 type ResourceProfiler = resources.Profiler
 
 type MemoryStore = memory.Store
+
+type SkillStore = skills.Store
 
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
@@ -37,6 +40,9 @@ type ConfigOptions struct {
 	// MemoryStore is trusted process-local storage. Runtime retrieval is opt-in
 	// and query-only; operator mutations remain explicit store operations.
 	MemoryStore MemoryStore
+	// SkillStore replaces opt-in skill discovery/loading only. The trusted store
+	// must expose active validated versions; the runtime never mutates or closes it.
+	SkillStore SkillStore
 }
 
 type Client struct {
@@ -80,7 +86,7 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithEngines(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore)
+	service, err := app.NewServiceWithStores(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore)
 	if err != nil {
 		return nil, ErrAdmission
 	}

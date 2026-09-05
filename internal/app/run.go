@@ -16,6 +16,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
@@ -23,6 +24,7 @@ var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
 	memoryStore                     memory.Store
+	skillStore                      skills.Store
 	admissionContext                context.Context
 	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
@@ -190,7 +192,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		messages = append(messages, r.memoryContext.Messages...)
 	}
 	if !r.skillPrepared && (model.Locality == "local" || !s.Skills.LocalOnly) {
-		r.skillContext, err = loadSkillContext(ctx, s.Skills, r.Domain, contextTools(s), secrets)
+		r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, s.Skills, r.Domain, contextTools(s), secrets)
 		if err != nil {
 			return result, ErrAdmission
 		}

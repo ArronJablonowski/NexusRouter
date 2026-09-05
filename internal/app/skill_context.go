@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -28,35 +30,65 @@ type contextSkill struct {
 }
 
 func loadSkillContext(ctx context.Context, settings config.Skills, domain string, availableTools []string, secrets []string) (*skillContext, error) {
+	return loadSkillContextFrom(ctx, nil, settings, domain, availableTools, secrets)
+}
+
+// Custom stores are trusted, caller-owned code. The timeout is cooperative;
+// implementations must honor cancellation and return active validated skills.
+func loadSkillContextFrom(ctx context.Context, store skills.Store, settings config.Skills, domain string, availableTools []string, secrets []string) (result *skillContext, resultErr error) {
+	defer func() {
+		if recover() != nil {
+			result, resultErr = nil, ErrAdmission
+		}
+	}()
 	if !settings.Enabled || settings.Root == "" {
 		return nil, nil
 	}
 	if settings.MaxSkills < 1 || settings.MaxSkills > 16 || settings.MaxBytes < 256 || settings.MaxBytes > 65536 {
 		return nil, ErrAdmission
 	}
-	store, err := skills.OpenReadOnly(settings.Root, []string{settings.Scope})
-	if err != nil {
+	if ctx == nil || ctx.Err() != nil {
 		return nil, ErrAdmission
 	}
-	defer store.Close()
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if store == nil {
+		owned, err := skills.OpenReadOnly(settings.Root, []string{settings.Scope})
+		if err != nil {
+			return nil, ErrAdmission
+		}
+		defer owned.Close()
+		store = owned
+	}
 	if domain == "" {
 		domain = "general"
 	}
 	metadata, err := store.Discover(ctx, settings.Scope, []string{domain}, settings.MaxSkills)
-	if err != nil {
+	if err != nil || ctx.Err() != nil || len(metadata) > settings.MaxSkills {
 		return nil, ErrAdmission
 	}
+	seen := make(map[skills.Key]bool, len(metadata))
+	for _, m := range metadata {
+		if skills.ValidateContextMetadata(m, settings.Scope, domain) != nil || seen[m.Key] {
+			return nil, ErrAdmission
+		}
+		seen[m.Key] = true
+	}
+	metadata = append([]skills.Metadata(nil), metadata...)
+	sort.Slice(metadata, func(i, j int) bool { return metadata[i].Key.Name < metadata[j].Key.Name })
 	available := make(map[string]bool, len(availableTools))
 	for _, name := range availableTools {
 		available[name] = true
 	}
 	selected := []contextSkill{}
-	var result *skillContext
 	for _, m := range metadata {
+		if ctx.Err() != nil {
+			return nil, ErrAdmission
+		}
 		// Pin the discovered version. Concurrent activation cannot replace the
 		// workflow selected for this admission between discovery and loading.
 		v, err := store.Load(ctx, m.Key, m.Version)
-		if err != nil {
+		if err != nil || ctx.Err() != nil || skills.ValidateContextVersion(m, v, settings.Scope, domain) != nil {
 			return nil, ErrAdmission
 		}
 		compatible := true
@@ -93,6 +125,9 @@ func loadSkillContext(ctx context.Context, settings config.Skills, domain string
 		}
 		selected = next
 		result = &skillContext{Messages: messages, LocalOnly: settings.LocalOnly}
+	}
+	if ctx.Err() != nil {
+		return nil, ErrAdmission
 	}
 	return result, nil
 }

@@ -92,6 +92,12 @@ type ValidatorFunc func(context.Context, Version) (Evidence, error)
 
 func (f ValidatorFunc) Validate(ctx context.Context, v Version) (Evidence, error) { return f(ctx, v) }
 
+// Store is a trusted procedural-workflow engine. Discover must return only
+// active versions accepted by deterministic validation, matching the exact
+// scope and at least one requested tag, with at most limit entries. Load must
+// return the requested immutable version even if activation changes meanwhile.
+// Implementations must honor cancellation and support concurrent calls without
+// mutating returned data. Content integrity alone does not prove activation.
 type Store interface {
 	Discover(context.Context, string, []string, int) ([]Metadata, error)
 	Load(context.Context, Key, string) (Version, error)

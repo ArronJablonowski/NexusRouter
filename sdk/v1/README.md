@@ -76,6 +76,29 @@ This store is not serialized with submissions and does not change CLI/API memory
 management storage. A daemon uses its own configured store. Automatic memory
 creation, semantic retrieval and application-level lifecycle hooks remain open.
 
+### Replaceable procedural skill storage
+
+`ConfigOptions.SkillStore` accepts `skills.Store` (`sdk.SkillStore` is an alias).
+Nil retains filesystem storage. Configure skills.enabled, root, scope, privacy
+and size limits explicitly; injection does not enable retrieval. Root remains
+required configuration but is not opened when a custom store is supplied.
+The runtime only calls Discover and Load, never drafts, activates, rolls back
+or closes this caller-owned store. CLI/API skill management remains filesystem
+backed; injected callbacks are not serialized with queued submissions.
+
+Discovery must return active deterministically validated versions. Admission
+checks count, exact scope/domain, identifiers, UTF-8, duplicate keys, bounded
+draft structure and SHA-256 agreement with discovery metadata. Versions are
+pinned across discovery/loading; automatic routing freezes one context snapshot.
+Missing tool permissions exclude a skill rather than granting capabilities.
+Content is redacted and remains untrusted reference material.
+
+The overall discovery/loading allowance is three seconds, cooperatively enforced.
+Errors and panics deny admission without leaking backend details. Hosts must
+provide concurrency safety, cancellation, honest activation validation and local
+egress compliance: this is not a sandbox or a proof of workflow correctness.
+Automatic drafting, regression detection and lifecycle hooks remain unfinished.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
