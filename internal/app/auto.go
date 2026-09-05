@@ -256,6 +256,17 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 				evidence[key] = e
 			}
 		}
+		validity, verr := db.OutputValidity(ctx, key)
+		if verr != nil {
+			return Result{}, errors.New("cannot read output validity")
+		}
+		if validity.Samples > 0 {
+			e.Validity = validity
+			if e.Updated.IsZero() {
+				e.Updated = validity.Updated
+			}
+			evidence[key] = e
+		}
 		candidates = append(candidates, c)
 	}
 	// Serialize the snapshot/admission decision, while holding the reservation

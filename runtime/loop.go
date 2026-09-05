@@ -248,12 +248,14 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			totalUsage.OutputTokens += usage.OutputTokens
 		}
 		if len(calls) == 0 {
-			if r.RequireText && strings.TrimSpace(text.String()) == "" {
-				accepted := false
+			if r.RequireText {
+				accepted := strings.TrimSpace(text.String()) != ""
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.nonempty_text.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
 					return result, err
 				}
-				return fail(ErrEmptyOutput)
+				if !accepted {
+					return fail(ErrEmptyOutput)
+				}
 			}
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
 				return result, err

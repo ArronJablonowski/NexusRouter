@@ -66,4 +66,20 @@ func TestTextRequirementAllowsToolOnlyIntermediateTurn(t *testing.T) {
 	if err != nil || out.Text != "answer" || turns != 2 {
 		t.Fatalf("%+v %v", out, err)
 	}
+	events, err := s.Read(context.Background(), r.TaskID, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := 0
+	for _, e := range events {
+		if e.Kind == runtime.EvaluationRecorded {
+			checks++
+			if e.Data.Accepted == nil || !*e.Data.Accepted || e.Data.Code != "deterministic.nonempty_text.v1" {
+				t.Fatal("invalid positive check", e)
+			}
+		}
+	}
+	if checks != 1 {
+		t.Fatal("tool-only turn counted as final-output evidence", checks)
+	}
 }

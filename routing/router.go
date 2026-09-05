@@ -16,7 +16,15 @@ type Advisory struct {
 	Quality, Confidence float64
 	Updated             time.Time
 }
+
+// Validity measures objective output checks, not subjective quality or cost.
+// Passing a nonempty check does not establish that an answer is useful/correct.
+type Validity struct {
+	Samples, Failures int
+	Updated           time.Time
+}
 type Evidence struct {
+	Validity                         Validity
 	Advisory                         Advisory
 	Samples                          int
 	Quality, Compliance, Reliability float64
@@ -49,11 +57,13 @@ type Policy struct {
 	Exploration  float64
 }
 type Ranked struct {
-	AdvisorySamples                int
-	AdvisoryInfluence              float64
-	Model, Provider, FailureDomain string
-	Score, Confidence              float64
-	Samples                        int
+	ValiditySamples, ValidityFailures int
+	ValidityPenalty                   float64
+	AdvisorySamples                   int
+	AdvisoryInfluence                 float64
+	Model, Provider, FailureDomain    string
+	Score, Confidence                 float64
+	Samples                           int
 }
 
 // Explanation has no prompt, endpoint, credentials, or model output fields.
@@ -175,10 +185,24 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			advisoryInfluence = (1 - confidence) * cap * a.Confidence * math.Min(1, float64(a.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(a.Updated))/float64(p.HalfLife))
 		}
 		quality := shrink(e.Quality) + advisoryInfluence*(a.Quality-.5)
+		v := e.Validity
+		if v.Samples < 0 || v.Failures < 0 || v.Failures > v.Samples {
+			return out, ErrInvalid
+		}
+		validityPenalty := 0.0
+		if v.Samples > 0 {
+			if v.Updated.IsZero() || v.Updated.After(now) {
+				return out, ErrInvalid
+			}
+			validityPenalty = float64(v.Failures) / float64(v.Samples) * math.Min(1, float64(v.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(v.Updated))/float64(p.HalfLife))
+		}
+		// Objective invalidity discounts the quality component independently of
+		// user taste. Valid outputs add no quality bonus or execution samples.
+		quality *= 1 - validityPenalty
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
 		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
-		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence})
+		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
 		a, b := out.Excluded[i], out.Excluded[j]
