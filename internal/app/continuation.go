@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 
 	"darwinrouter/providers"
 	"darwinrouter/runtime"
@@ -28,6 +30,37 @@ func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secret
 		if err != nil {
 			return nil, ErrAdmission
 		}
+	}
+	if r.SummaryAttemptID != "" {
+		store, ok := db.(interface {
+			SummaryAttempt(context.Context, string) (sessions.SummaryAttempt, error)
+			CurrentSummaryReview(context.Context, string) (sessions.SummaryReview, error)
+		})
+		if !ok {
+			return nil, ErrAdmission
+		}
+		attempt, err := store.SummaryAttempt(ctx, r.SummaryAttemptID)
+		if err != nil || attempt.Status != "drafted" || attempt.Draft == nil || attempt.TaskID != history.TaskID {
+			return nil, ErrAdmission
+		}
+		review, err := store.CurrentSummaryReview(ctx, attempt.ID)
+		if err != nil || review.Validate() != nil || review.AttemptID != attempt.ID || review.Decision != "approved" {
+			return nil, ErrAdmission
+		}
+		request := attempt.Draft.Request
+		request.Summary = redactSummary(request.Summary, secrets)
+		result.Messages, result.Compaction, err = sessions.PrepareContinuation(history, request)
+		if err != nil {
+			return nil, ErrAdmission
+		}
+		// The operator reviewed this exact immutable proposal. If newly
+		// configured redaction changes it, require a fresh draft and review.
+		expected, err := json.Marshal(attempt.Draft.Checkpoint)
+		actual, encodeErr := json.Marshal(result.Compaction)
+		if err != nil || encodeErr != nil || !bytes.Equal(expected, actual) {
+			return nil, ErrAdmission
+		}
+		result.Compaction.SummaryAttemptID, result.Compaction.SummaryReviewID = attempt.ID, review.ID
 	}
 	return result, nil
 }

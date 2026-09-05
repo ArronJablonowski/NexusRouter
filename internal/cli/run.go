@@ -33,6 +33,7 @@ func parseRunArgs(args []string) (config.Options, app.Request, error) {
 	fs.StringVar(&options.UserFile, "user-config", "", "user configuration")
 	fs.StringVar(&request.ModelID, "model", "", "configured model ID or auto")
 	fs.StringVar(&request.ContinueTaskID, "continue-task", "", "completed task history to continue")
+	fs.StringVar(&request.SummaryAttemptID, "summary-attempt", "", "approved stored summary attempt for continuation")
 	compactKeep := fs.Int("compact-keep", 0, "recent messages to retain when compacting continued history")
 	compactSummary := fs.String("compact-summary", "", "operator JSON summary file (maximum 64 KiB)")
 	fs.StringVar(&request.Domain, "domain", "", "routing evidence domain")
@@ -66,8 +67,11 @@ func parseRunArgs(args []string) (config.Options, app.Request, error) {
 		return options, request, fmt.Errorf("invalid run arguments")
 	}
 	var invalidLabel bool
-	var keepSet, summarySet bool
+	var keepSet, summarySet, attemptSet bool
 	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "summary-attempt" {
+			attemptSet = true
+		}
 		if f.Name == "compact-keep" {
 			keepSet = true
 		}
@@ -83,6 +87,9 @@ func parseRunArgs(args []string) (config.Options, app.Request, error) {
 	})
 	if invalidLabel {
 		return options, request, fmt.Errorf("invalid routing label")
+	}
+	if attemptSet && (request.SummaryAttemptID == "" || !validSummaryReviewLabel(request.SummaryAttemptID) || request.ContinueTaskID == "" || keepSet || summarySet) {
+		return options, request, fmt.Errorf("invalid stored summary arguments")
 	}
 	if keepSet || summarySet {
 		if !keepSet || !summarySet || *compactKeep < 1 || *compactSummary == "" || request.ContinueTaskID == "" {
@@ -185,6 +192,7 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: darwin run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
 		fmt.Fprintln(stderr, "go_source validation expects output containing a raw full Go source file")
 		fmt.Fprintln(stderr, "continuation compaction: --continue-task id --compact-keep n --compact-summary summary.json")
+		fmt.Fprintln(stderr, "approved stored summary: --continue-task id --summary-attempt id")
 		return 2
 	}
 	options.Env = config.Environment(os.Environ())

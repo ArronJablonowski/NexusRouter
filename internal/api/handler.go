@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"darwinrouter/evaluation"
 	"darwinrouter/internal/app"
@@ -197,6 +198,13 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 			target = &req.Prompt
 		case "continue_task_id":
 			target = &req.ContinueTaskID
+		case "summary_attempt_id":
+			id, ok := value.(string)
+			if !ok || id == "" || len(id) > 128 || strings.TrimSpace(id) != id || strings.ContainsFunc(id, unicode.IsControl) {
+				return req, bad
+			}
+			req.SummaryAttemptID = id
+			continue
 		case "domain":
 			target = &req.Domain
 		case "profile":
@@ -265,7 +273,7 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 	if _, err := d.Token(); err != io.EOF {
 		return req, bad
 	}
-	if req.ModelID == "" || strings.TrimSpace(req.Prompt) == "" || (req.Compaction != nil && req.ContinueTaskID == "") {
+	if req.ModelID == "" || strings.TrimSpace(req.Prompt) == "" || (req.Compaction != nil && req.ContinueTaskID == "") || (req.SummaryAttemptID != "" && (req.ContinueTaskID == "" || req.Compaction != nil)) {
 		return req, bad
 	}
 	return req, nil

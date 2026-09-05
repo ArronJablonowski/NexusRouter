@@ -156,7 +156,7 @@ func TestAuditMigrationAndMissingCompletedTurn(t *testing.T) {
 	if err := s.RecordAudit(ctx, storedAudit()); !errors.Is(err, evaluation.ErrAudit) {
 		t.Fatal("audit without completed output accepted", err)
 	}
-	if _, err := s.db.ExecContext(ctx, "DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; PRAGMA user_version=4;"); err != nil {
+	if _, err := s.db.ExecContext(ctx, "DROP TABLE summary_review_heads; DROP TABLE summary_reviews; DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; PRAGMA user_version=4;"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -168,7 +168,7 @@ func TestAuditMigrationAndMissingCompletedTurn(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 9 {
+	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 10 {
 		t.Fatal(version, err)
 	}
 	if audits, err := s.Audits(ctx, "task", "", 100); err != nil || len(audits) != 0 {

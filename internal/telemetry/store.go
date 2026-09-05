@@ -84,7 +84,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 9 {
+	if version > 10 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -180,6 +180,16 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 10 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE summary_reviews (
+		 id TEXT PRIMARY KEY, attempt_id TEXT NOT NULL REFERENCES summary_attempts(id), body BLOB NOT NULL);
+		 CREATE INDEX summary_reviews_attempt ON summary_reviews(attempt_id);
+		 CREATE TABLE summary_review_heads (attempt_id TEXT PRIMARY KEY REFERENCES summary_attempts(id),review_id TEXT NOT NULL REFERENCES summary_reviews(id));
+		 PRAGMA user_version=10;`)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -215,6 +225,11 @@ func (s *Store) Append(ctx context.Context, expected int64, e runtime.Event) err
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
+	}
+	if e.Kind == runtime.TaskStarted && e.Data.Compaction != nil && e.Data.Compaction.SummaryAttemptID != "" {
+		if err := validateSummaryGate(ctx, tx, e.Data.Compaction); err != nil {
+			return err
+		}
 	}
 	var seq int64
 	var session, state string

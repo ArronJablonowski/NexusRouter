@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -22,6 +23,8 @@ type ContextSummary struct {
 // The caller verifies the source digest; the runtime validates its canonical
 // representation and persists provenance atomically with the new task input.
 type ContextCompaction struct {
+	SummaryAttemptID      string         `json:"summary_attempt_id,omitempty"`
+	SummaryReviewID       string         `json:"summary_review_id,omitempty"`
 	FirstRetainedMessage  int            `json:"first_retained_message,omitempty"`
 	FirstRetainedSequence int64          `json:"first_retained_sequence,omitempty"`
 	BeforeContextTokens   int            `json:"before_context_tokens,omitempty"`
@@ -36,6 +39,14 @@ type ContextCompaction struct {
 
 func (c ContextCompaction) Validate(parent string) error {
 	bad := errors.New("invalid context compaction")
+	if (c.SummaryAttemptID == "") != (c.SummaryReviewID == "") {
+		return bad
+	}
+	for _, label := range []string{c.SummaryAttemptID, c.SummaryReviewID} {
+		if len(label) > 128 || strings.TrimSpace(label) != label || !utf8.ValidString(label) || strings.ContainsFunc(label, unicode.IsControl) {
+			return bad
+		}
+	}
 	if c.FirstRetainedMessage < 0 || c.FirstRetainedSequence < 0 || c.FirstRetainedSequence > c.SourceSequence || c.BeforeContextTokens < 0 || c.AfterContextTokens < 0 || (c.BeforeContextTokens == 0) != (c.AfterContextTokens == 0) {
 		return bad
 	}

@@ -175,7 +175,19 @@ The selected model needs configured `context_tokens` and `estimated_cost`; local
 
 Generation makes one auxiliary call without tools or retries. Application admission enforces deployment mode, source privacy, resource reservation and cost metadata, then persists a `started` attempt before dispatch. Configured credentials are redacted from input and draft content. Success atomically stores the proposal with `drafted` status; failure stores a generic code. Cancellation cleanup is bounded independently. A crash or unavailable store can leave `started` indeterminate—it is not proof that a summarizer is still running. Inspection opens storage read-only and supports up to 100 records per page, with optional task filtering and an exclusive `--after` ID cursor.
 
-Drafting never modifies the source, starts a continuation or affects fitness. Inspect the full proposal and verify its accuracy before using its `Draft.Request.summary` object as an operator-reviewed summary file. Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries and inspection output can contain sensitive session information. Automatic application, semantic validation, crash reconciliation, HTTP summary endpoints and mid-task compaction remain unfinished.
+Drafting never modifies the source, starts a continuation or affects fitness. Inspect the full proposal and verify its accuracy before recording an operator review:
+
+```sh
+./bin/darwin summary-review --config path/to/config.yaml --attempt SUMMARY_ATTEMPT_ID --decision approved --note "Describe the source checks supporting approval"
+./bin/darwin summary-reviews --db ./data/darwin.db --attempt SUMMARY_ATTEMPT_ID
+./bin/darwin run --config path/to/config.yaml --model auto --continue-task TASK_ID --summary-attempt SUMMARY_ATTEMPT_ID < followup.txt
+```
+
+`--summary-attempt` uses the frozen draft's retained-message count and summary; it cannot be combined with manual compaction flags. The draft must match the source and have a current approval. Its review ID is recorded in the new task's compaction metadata. Approval is checked again in the same SQLite transaction as task start, so a rejection committed before that start blocks dispatch. To change a decision, use `summary-review --expected CURRENT_REVIEW_ID --decision rejected --note "Explain the issue"` with the same config and attempt. Stale decisions conflict; history is immutable and limited to 100 reviews per attempt. Review notes are capped at 4 KiB and credentials are redacted.
+
+Review is a local operator attestation, not automated proof of accuracy, and does not itself run a model. Rejection blocks subsequent direct admissions of that stored draft; it does not cancel already-started work or erase summary copies in existing sessions. Newly configured redaction that changes an approved summary requires a fresh draft and review. The manual summary-file route remains available for explicitly operator-supplied summaries.
+
+Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation, HTTP draft/review management and mid-task compaction remain unfinished.
 
 ## Local HTTP service
 
@@ -184,7 +196,7 @@ Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters,
 All endpoints require `Authorization: Bearer <token>`:
 
 - `GET /health`: application/database health; provider health is explicitly not checked yet.
-- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, optional `compaction` accepts `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` using the same safety checks as the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
+- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `POST /v1/feedback`: JSON `{"task_id":"TASK_ID","outcome":"accepted","attempt_cost":0}` (or `rejected`). Requires an observed final-attempt cost. Identical retries return 200 without adding samples; conflicts return 409, and ineligible task histories return 422. The body limit is 4 KiB and feedback shares daemon admission capacity with tasks.
 - `GET /v1/feedback/{task_id}`: original final-attempt evaluation followed by its revision history.

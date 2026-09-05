@@ -107,6 +107,9 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
+	if r.SummaryAttemptID != "" && (r.ContinueTaskID == "" || r.Compaction != nil || len(r.SummaryAttemptID) > 128 || strings.TrimSpace(r.SummaryAttemptID) != r.SummaryAttemptID) {
+		return ErrAdmission
+	}
 	if r.Compaction != nil && (r.ContinueTaskID == "" || sessions.ValidateCompactionRequest(r.Compaction) != nil) {
 		return ErrAdmission
 	}

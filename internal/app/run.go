@@ -21,6 +21,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
 	continuation                    *continuationContext
 	skillPrepared                   bool
@@ -77,7 +78,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	if r.ContextTokens > 0 && model.ContextTokens < r.ContextTokens {
 		return result, ErrAdmission
 	}
-	if r.Compaction != nil && model.ContextTokens < 1 {
+	if (r.Compaction != nil || r.SummaryAttemptID != "") && model.ContextTokens < 1 {
 		return result, ErrAdmission
 	}
 	if r.MaxCost > 0 && (model.EstimatedCost == nil || *model.EstimatedCost > r.MaxCost) {

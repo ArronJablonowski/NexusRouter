@@ -106,6 +106,33 @@ func TestCLISummaryDraftAndReadOnlyInspection(t *testing.T) {
 			t.Fatalf("unexpected list: %s %v", stdout.String(), err)
 		}
 	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run([]string{"summary-review", "--config", configPath, "--attempt", attempt.ID, "--decision", "approved", "--note", "Compared all categories against source"}, &stdout, &stderr, "dev"); code != 0 {
+		t.Fatalf("review exit=%d stderr=%q", code, stderr.String())
+	}
+	var review sessions.SummaryReview
+	if err := json.Unmarshal(stdout.Bytes(), &review); err != nil || review.ID == "" || review.AttemptID != attempt.ID || review.Decision != "approved" || review.Validate() != nil {
+		t.Fatalf("unexpected review=%+v error=%v", review, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run([]string{"summary-reviews", "--db", cfg.Telemetry.Database, "--attempt", attempt.ID}, &stdout, &stderr, "dev"); code != 0 {
+		t.Fatalf("review history exit=%d stderr=%q", code, stderr.String())
+	}
+	var reviews []sessions.SummaryReview
+	if err := json.Unmarshal(stdout.Bytes(), &reviews); err != nil || len(reviews) != 1 || !reflect.DeepEqual(reviews[0], review) {
+		t.Fatalf("unexpected review history=%+v error=%v", reviews, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run([]string{"summary-review", "--config", configPath, "--attempt", attempt.ID, "--expected", review.ID, "--decision", "rejected", "--note", "Needs further correction"}, &stdout, &stderr, "dev"); code != 0 {
+		t.Fatalf("review revision exit=%d stderr=%q", code, stderr.String())
+	}
+	var revised sessions.SummaryReview
+	if err := json.Unmarshal(stdout.Bytes(), &revised); err != nil || revised.PreviousID != review.ID || revised.Decision != "rejected" {
+		t.Fatalf("unexpected revised review=%+v error=%v", revised, err)
+	}
 	after, err := sessions.Replay(ctx, db, source.TaskID)
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("summary activated or changed source", err)

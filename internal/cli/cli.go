@@ -27,6 +27,9 @@ Usage:
   darwin summary --config path --task id --model id --keep n [--max-cost amount]
     Generate a stored summary draft; does not activate compaction
   darwin summaries list|show --db path [--task id --after id --limit n] [--id id]
+  darwin summary-review --config path --attempt id [--expected review-id] --decision approved|rejected --note text
+  darwin summary-reviews --db path --attempt id
+  darwin run --config path --model id --continue-task id --summary-attempt approved-attempt-id < prompt.txt
 
 Development status: use --model auto for constrained automatic routing.
 Interactive and live streaming are not yet implemented.
@@ -39,6 +42,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "summary-review" {
+		return runSummaryReview(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "summary-reviews" {
+		return runSummaryReviews(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "summary" {
 		return runSummary(args[1:], stdout, stderr)
 	}
