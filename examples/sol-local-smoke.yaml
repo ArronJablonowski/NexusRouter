@@ -1,0 +1,58 @@
+# Supervised first test; not a production or end-to-end local-only profile.
+# Prompts and returned worker output are sent to the OpenAI coordinator.
+version: 1
+mode: hybrid
+runtime:
+  max_turns: 3
+hardware:
+  auto_profile: true
+  max_ram_usage_pct: 80
+  max_concurrent_local_models: "1"
+  local_pressure_policy: reject
+workers:
+  max_in_process: 2  # Parent plus one local child.
+  delegate_model: local-worker
+  delegate_max_calls: 1
+  delegate_max_cost: 0
+  delegate_read_tools: false
+providers:
+  - id: openai-coordinator
+    kind: openai_compatible
+    endpoint: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+  - id: ollama-worker
+    kind: ollama
+    endpoint: http://127.0.0.1:11434
+models:
+  - id: coordinator
+    provider: openai-coordinator
+    model: gpt-5.6-sol
+    locality: cloud
+    capabilities: [chat, code, orchestration]
+    context_tokens: 16384  # Conservative application input ceiling.
+    estimated_cost: 0.10  # Admission estimate, NOT a billing/output-token cap.
+  - id: local-worker
+    provider: ollama-worker
+    model: gemma4:12b-it-q4_K_M
+    locality: local
+    capabilities: [chat, code]
+    context_tokens: 4096
+    # Initial 12-GiB estimate for weights/context/runtime on the inspected
+    # 48-GiB host. Verify actual pressure; this is not a measured peak guarantee.
+    ram_bytes: 12884901888
+    estimated_cost: 0
+tools:
+  enabled: false
+memory:
+  enabled: false
+skills:
+  enabled: false
+  auto_draft: false
+  auto_activate_after_validation: false
+  learning:
+    enabled: false
+evaluation:
+  llm_judge_enabled: false  # Coordinator reviews its delegated result directly.
+telemetry:
+  database: ./data/sol-local-smoke.db
+  opentelemetry_enabled: false
