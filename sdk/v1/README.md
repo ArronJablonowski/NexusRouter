@@ -187,7 +187,12 @@ an isolated model request including messages, tool schemas and output schema.
 Automatic routing measures each eligible model under one cooperative three-second
 batch deadline; an error or oversized result makes that candidate ineligible.
 The runtime measures again before every model turn and before applying steering.
-Delegated tasks share the same estimator. Configured estimators require a known,
+Delegated tasks and auxiliary audits/summaries share the same estimator. Auxiliary
+measurement sees the redacted, assembled review/summary prompt after its durable
+attempt record is created; its three-second ceiling also falls within the overall
+auxiliary timeout. Estimation failure prevents inference and records a failed
+auxiliary attempt without changing the completed source task or accepting a draft.
+Configured estimators require a known,
 positive model context window.
 
 The effective estimate is the larger of the custom value and the existing
@@ -201,8 +206,9 @@ three seconds, but cancellation is cooperative and the host must ensure return.
 Estimators are trusted in-process code and must perform local computation only,
 honor cancellation and concurrency, and keep task data private. They are not
 serialized in durable submissions: a restarting host supplies its current engine.
-Auxiliary audit/summary calls and canonical compaction still use built-in context
-logic. This is the estimation component of the planned ContextEngine, not custom
+Canonical compaction checkpoints still use built-in estimates for reproducible
+provenance; custom measurement controls actual inference admission, not those
+stored values. This is the estimation component of the planned ContextEngine, not custom
 context assembly or automatic semantic compaction, and is not a tokenizer-accuracy
 or OS-isolation guarantee.
 

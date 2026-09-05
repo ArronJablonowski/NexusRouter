@@ -109,7 +109,7 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		}
 		return attempt, cause
 	}
-	summarizer := sessions.Summarizer{Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 	draft, err := summarizer.Draft(ctx, input, keep)
 	if err != nil {
 		code := "summary_failed"

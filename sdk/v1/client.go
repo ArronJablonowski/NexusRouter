@@ -61,6 +61,7 @@ type ConfigOptions struct {
 	// ContextEstimator receives isolated task context for conservative admission.
 	// Automatic routing measures each candidate Model, then the runtime checks
 	// each actual model turn. It cannot lower the built-in byte reserve.
+	// Auxiliary audits and summaries measure their assembled, redacted prompts.
 	// Trusted code must honor cancellation and privacy; this is not a sandbox.
 	ContextEstimator ContextEstimator
 	// Tools registers trusted handlers independently of filesystem

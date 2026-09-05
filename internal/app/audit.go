@@ -130,7 +130,7 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 	if err != nil {
 		return bad()
 	}
-	reviewer := evaluation.Reviewer{Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	reviewer := evaluation.Reviewer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		return evaluation.AuditRecord{}, err
