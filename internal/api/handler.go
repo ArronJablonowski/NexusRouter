@@ -17,10 +17,12 @@ import (
 
 	"darwinrouter/evaluation"
 	"darwinrouter/internal/app"
+	"darwinrouter/runtime"
 	"darwinrouter/sessions"
 )
 
 type Services struct {
+	RunStream       func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	Summarize       func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
 	SummaryAttempt  func(context.Context, string) (sessions.SummaryAttempt, error)
 	SummaryAttempts func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
@@ -88,6 +90,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:
+		h.serveTaskStream(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/summaries" || strings.HasPrefix(r.URL.Path, "/v1/summaries/"):
 		h.serveSummaries(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/feedback/revisions" && r.Method == http.MethodPost:
