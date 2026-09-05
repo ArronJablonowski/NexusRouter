@@ -50,6 +50,10 @@ func approvalListQuery(task, raw string) (approvals.ListOptions, error) {
 
 func (h *Handler) serveApprovals(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/")
+	if len(parts) == 4 && parts[1] == "approvals" && parts[3] == "execution" && replayTaskID(parts[0]) && replayTaskID(parts[2]) && r.Method == http.MethodGet {
+		h.serveApprovalExecution(w, r, parts[0], parts[2])
+		return
+	}
 	if len(parts) == 4 && parts[1] == "approvals" && parts[3] == "decision" && replayTaskID(parts[0]) && replayTaskID(parts[2]) && r.Method == http.MethodPost {
 		h.serveApprovalDecision(w, r, parts[0], parts[2])
 		return
@@ -119,6 +123,41 @@ func (h *Handler) serveApprovals(w http.ResponseWriter, r *http.Request) {
 		page.Records = []approvals.Record{}
 	}
 	writeJSON(w, 200, page)
+}
+
+func (h *Handler) serveApprovalExecution(w http.ResponseWriter, r *http.Request, task, id string) {
+	if r.URL.RawQuery != "" || r.URL.ForceQuery || r.ContentLength != 0 || len(r.TransferEncoding) > 0 {
+		failure(w, 400, "invalid_approval_request")
+		return
+	}
+	if h.services.ApprovalExecution == nil {
+		failure(w, 503, "approvals_unavailable")
+		return
+	}
+	select {
+	case h.approvalSlots <- struct{}{}:
+		defer func() { <-h.approvalSlots }()
+	default:
+		w.Header().Set("Retry-After", "1")
+		failure(w, 503, "approval_capacity")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		failure(w, 503, "approvals_unavailable")
+		return
+	}
+	status, err := h.services.ApprovalExecution(ctx, task, id)
+	if err != nil || ctx.Err() != nil {
+		failure(w, 503, "approvals_unavailable")
+		return
+	}
+	if status.Validate() != nil || status.Approval.Request.TaskID != task || status.Approval.Request.ID != id {
+		failure(w, 500, "invalid_approval_execution")
+		return
+	}
+	writeJSON(w, 200, status)
 }
 
 func approvalFailure(w http.ResponseWriter, err error) {

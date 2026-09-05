@@ -76,3 +76,27 @@ func readApprovals(ctx context.Context, path string, read func(*telemetry.Store,
 	}
 	return nil
 }
+
+// ApprovalExecutionStatus observes correlated recovery evidence only. Neither
+// lease expiry nor absent completion is permission to retry or release a scope.
+func ApprovalExecutionStatus(ctx context.Context, path, task, id string) (approvals.ExecutionStatus, error) {
+	var result approvals.ExecutionStatus
+	if ctx == nil || path == "" || !sessions.ValidEventPageID(task) || !sessions.ValidEventPageID(id) {
+		return result, ErrAdmission
+	}
+	err := readApprovals(ctx, path, func(db *telemetry.Store, readCtx context.Context) error {
+		var err error
+		result, err = db.ApprovalExecutionStatus(readCtx, task, id, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		if result.Validate() != nil || result.Approval.Request.TaskID != task || result.Approval.Request.ID != id {
+			return ErrInspection
+		}
+		return nil
+	})
+	if err != nil {
+		return approvals.ExecutionStatus{}, err
+	}
+	return result, nil
+}

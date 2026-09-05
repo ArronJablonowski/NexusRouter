@@ -172,6 +172,13 @@ These operations never invoke review or execution, create/migrate storage, or
 expose raw arguments/lease tokens. Actor/scope metadata may still be sensitive;
 `Consumed` is spent authority, not evidence that repeating an effect is safe.
 
+`client.ApprovalExecutionStatus(ctx, taskID, approvalID)` returns one coherent
+read snapshot of the approval, validated call completion and scope-wide writer
+state. `RecordedEffect` is a durable tool report, not artifact proof. Writer
+expiry does not establish process termination, and open calls do not establish
+whether an effect occurred. This method never retries work or releases leases;
+general interrupted-effect reconciliation is not implemented.
+
 ### Replaceable factual memory storage
 
 `ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`

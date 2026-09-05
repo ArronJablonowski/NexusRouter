@@ -57,12 +57,15 @@ func TestApprovalAPIReadsDurableLedgerWithoutMutation(t *testing.T) {
 	s.Approvals = func(ctx context.Context, q approvals.ListOptions) (approvals.Page, error) {
 		return app.ListApprovals(ctx, path, q)
 	}
+	s.ApprovalExecution = func(ctx context.Context, task, id string) (approvals.ExecutionStatus, error) {
+		return app.ApprovalExecutionStatus(ctx, path, task, id)
+	}
 	h, _ := New(token, 1, s)
 	before, err := db.Read(ctx, "task", 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, endpoint := range []string{"/v1/tasks/task/approvals?limit=1", "/v1/tasks/task/approvals/approval"} {
+	for _, endpoint := range []string{"/v1/tasks/task/approvals?limit=1", "/v1/tasks/task/approvals/approval", "/v1/tasks/task/approvals/approval/execution"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", endpoint, ""))
 		if w.Code != 200 {
@@ -77,6 +80,12 @@ func TestApprovalAPIReadsDurableLedgerWithoutMutation(t *testing.T) {
 				t.Fatal(w.Body.String())
 			}
 		}
+		if endpoint == "/v1/tasks/task/approvals/approval/execution" {
+			var got approvals.ExecutionStatus
+			if json.Unmarshal(w.Body.Bytes(), &got) != nil || got.Validate() != nil || got.CallState != "open" || got.ScopeWriterState != "none" || got.Sequence != 4 || !got.Approval.Request.Matches(r.Request) {
+				t.Fatal("incorrect durable execution observation", w.Body.String())
+			}
+		}
 	}
 	stored, err := db.ReadApproval(ctx, r.Request.ID)
 	if err != nil || stored.State != approvals.Pending || len(stored.Decisions) != 0 {
@@ -86,7 +95,7 @@ func TestApprovalAPIReadsDurableLedgerWithoutMutation(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("inspection mutated task events", err)
 	}
-	for _, endpoint := range []string{"/v1/tasks/other/approvals/approval", "/v1/tasks/other/approvals"} {
+	for _, endpoint := range []string{"/v1/tasks/other/approvals/approval", "/v1/tasks/other/approvals", "/v1/tasks/other/approvals/approval/execution"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", endpoint, ""))
 		if w.Code == 200 {

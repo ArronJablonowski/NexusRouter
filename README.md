@@ -212,6 +212,7 @@ Inspect durable approval metadata without invoking the reviewer or executing wor
 ```sh
 darwin approvals list --db path/to/events.db --task task-id --limit 25
 darwin approvals show --db path/to/events.db --task task-id --id approval-id
+darwin approvals execution --db path/to/events.db --task task-id --id approval-id
 ```
 
 The authenticated daemon exposes `GET /v1/tasks/{task_id}/approvals?limit=25`
@@ -226,6 +227,15 @@ not raw arguments or lease tokens. Treat actor/scope metadata as private.
 `consumed` means dispatch authority was spent, not that a write succeeded or is
 safe to repeat. These read-only commands never migrate/create a database or
 approve, revoke, resume or retry anything.
+
+`execution` (also `GET /v1/tasks/{task_id}/approvals/{approval_id}/execution`)
+correlates the approval, validated task journal and scope-wide writer lease in
+one read snapshot. It reports an open or completed call, any durably recorded
+effect, and a `none`, `live` or `expired` writer observation. A recorded effect
+is the tool's report, not independent artifact verification. An expired writer
+does not prove its process stopped, and an open call cannot distinguish a crash
+before a write from one after a write. Neither observation permits automatic
+retry or lease release; interrupted-effect reconciliation remains unfinished.
 
 ### Recording an operator approval decision
 

@@ -26,6 +26,7 @@ import (
 )
 
 type Services struct {
+	ApprovalExecution    func(context.Context, string, string) (approvals.ExecutionStatus, error)
 	DecideApproval       func(context.Context, approvals.Command) (approvals.Record, error)
 	Approval             func(context.Context, string, string) (approvals.Record, error)
 	Approvals            func(context.Context, approvals.ListOptions) (approvals.Page, error)

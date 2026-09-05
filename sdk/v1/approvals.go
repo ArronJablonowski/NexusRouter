@@ -33,3 +33,12 @@ func (c *Client) DecideApproval(ctx context.Context, command approvals.Command, 
 	}
 	return c.service.DecideApproval(ctx, command, actor)
 }
+
+// ApprovalExecutionStatus reads consistent approval/journal/lease observations.
+// It does not establish process quiescence or permit effect replay.
+func (c *Client) ApprovalExecutionStatus(ctx context.Context, task, id string) (approvals.ExecutionStatus, error) {
+	if !c.valid(ctx) {
+		return approvals.ExecutionStatus{}, ErrAdmission
+	}
+	return app.ApprovalExecutionStatus(ctx, c.database, task, id)
+}

@@ -13,10 +13,10 @@ import (
 
 func runApprovals(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin approvals list --db path --task id [--after call-id --limit 25] | show --db path --task id --id approval-id")
+		fmt.Fprintln(stderr, "usage: darwin approvals list --db path --task id [--after call-id --limit 25] | show|execution --db path --task id --id approval-id")
 		return 2
 	}
-	if len(args) < 1 || (args[0] != "list" && args[0] != "show") || len(args) > 11 {
+	if len(args) < 1 || (args[0] != "list" && args[0] != "show" && args[0] != "execution") || len(args) > 11 {
 		return usage()
 	}
 	flags := map[string]string{}
@@ -25,7 +25,7 @@ func runApprovals(args []string, stdout, stderr io.Writer) int {
 			return usage()
 		}
 		key, value, equal := strings.Cut(strings.TrimPrefix(args[i], "--"), "=")
-		if key != "db" && key != "task" && !(args[0] == "show" && key == "id") && !(args[0] == "list" && (key == "after" || key == "limit")) {
+		if key != "db" && key != "task" && !(args[0] != "list" && key == "id") && !(args[0] == "list" && (key == "after" || key == "limit")) {
 			return usage()
 		}
 		if _, exists := flags[key]; exists {
@@ -59,14 +59,16 @@ func runApprovals(args []string, stdout, stderr io.Writer) int {
 		}
 		options.Limit = limit
 	}
-	if options.Validate() != nil || (args[0] == "show" && !sessions.ValidEventPageID(flags["id"])) {
+	if options.Validate() != nil || (args[0] != "list" && !sessions.ValidEventPageID(flags["id"])) {
 		return usage()
 	}
 	ctx, cancel := submissionCLIContext()
 	defer cancel()
 	var output any
 	var err error
-	if args[0] == "show" {
+	if args[0] == "execution" {
+		output, err = app.ApprovalExecutionStatus(ctx, flags["db"], flags["task"], flags["id"])
+	} else if args[0] == "show" {
 		output, err = app.InspectApproval(ctx, flags["db"], flags["task"], flags["id"])
 	} else {
 		output, err = app.ListApprovals(ctx, flags["db"], options)

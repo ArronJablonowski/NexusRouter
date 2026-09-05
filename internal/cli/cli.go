@@ -32,6 +32,7 @@ Usage:
   darwin steering show --db path --task id --id message-id
   darwin approvals list --db path --task id [--after call-id --limit 25]
   darwin approvals show --db path --task id --id approval-id
+  darwin approvals execution --db path --task id --id approval-id
   darwin approval-decision --config path < decision.json
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
