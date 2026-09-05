@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 type reviewProvider func(context.Context, providers.Request, func(providers.Chunk) error) error

@@ -9,8 +9,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 // Summarizer makes one bounded auxiliary call. The host must admit the model,

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func TestRedactSummaryMessagesPreservesPairsPrecisionAndOriginal(t *testing.T) {

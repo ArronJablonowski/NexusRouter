@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"darwinrouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func TestNativeValidationRequest(t *testing.T) {

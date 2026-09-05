@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 )
 
 func seedContextMemory(t *testing.T, cfg config.Settings) {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func TestFeedbackRevisionStrictAndAuthenticated(t *testing.T) {

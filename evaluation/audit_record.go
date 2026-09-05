@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 // AuditRecord stores an advisory review independently of candidate fitness.

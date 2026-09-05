@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func (h *Handler) serveFeedbackHistory(w http.ResponseWriter, r *http.Request) {

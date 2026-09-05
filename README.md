@@ -110,7 +110,10 @@ make build
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.
 
-The temporary local module path is `darwinrouter`. Migrate it to `github.com/ArronJablonowski/DarwinRouter` when publishing the Go SDK.
+The module path is `github.com/ArronJablonowski/DarwinRouter`. The development
+[Go SDK](sdk/v1/README.md) embeds the same application service through `sdk/v1`;
+see [the compilable example](examples/sdk/main.go). It is not yet a tagged stable
+release, and full application-level extension contracts remain unfinished.
 
 ## Configuration
 

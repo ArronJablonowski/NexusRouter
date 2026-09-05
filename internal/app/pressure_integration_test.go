@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func TestPressureWaitDoesNotShortenAdmittedProviderExecution(t *testing.T) {

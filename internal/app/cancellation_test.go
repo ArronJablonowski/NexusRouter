@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
 func TestCancellationWatcherFailsClosedAndJoins(t *testing.T) {

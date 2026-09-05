@@ -7,9 +7,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/memory"
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 type memoryContext struct {

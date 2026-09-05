@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	_ "modernc.org/sqlite"
 )
 

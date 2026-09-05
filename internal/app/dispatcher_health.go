@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"darwinrouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/health"
 )
 
 func (d *Dispatcher) supervisorTime() time.Time {

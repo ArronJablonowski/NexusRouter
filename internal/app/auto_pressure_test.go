@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/resources"
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 func TestAutomaticPressureClassification(t *testing.T) {

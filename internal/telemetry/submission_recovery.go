@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 // RecoverUndispatched never reclaims a submission with a durable task start.

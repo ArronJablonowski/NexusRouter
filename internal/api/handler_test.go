@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 const token = "fixture-token-at-least-32-characters"

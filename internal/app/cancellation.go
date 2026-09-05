@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 var ErrCancellationControl = errors.New("task cancellation control unavailable")

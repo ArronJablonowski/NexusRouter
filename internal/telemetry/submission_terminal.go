@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 // RecoverTerminalSubmission projects committed terminal histories only. It never

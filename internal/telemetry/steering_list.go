@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // ListSteering returns the complete lifetime queue in insertion order. Payload

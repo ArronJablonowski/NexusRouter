@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 // ErrPressureTimeout is an admission failure, not a request to cancel a task.

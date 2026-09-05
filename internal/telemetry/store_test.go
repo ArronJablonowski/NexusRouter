@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func event(id string, sequence int64, kind runtime.Kind) runtime.Event {

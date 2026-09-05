@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 const httpSummaryBody = `{"task_id":"task","model_id":"model","keep":2,"max_cost":0.25}`

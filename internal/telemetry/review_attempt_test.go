@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func reviewStart() evaluation.ReviewAttempt {

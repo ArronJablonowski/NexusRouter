@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestSteeringCannotExpandContextBudget(t *testing.T) {

@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestAutomaticSafeFallbackPreservesFailedHistory(t *testing.T) {

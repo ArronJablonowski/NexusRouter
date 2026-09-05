@@ -10,8 +10,8 @@ import (
 	"sort"
 	"sync"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

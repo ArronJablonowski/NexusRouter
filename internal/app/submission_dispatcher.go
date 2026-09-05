@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 // Dispatcher requeues only expired claims with no durable task start, or

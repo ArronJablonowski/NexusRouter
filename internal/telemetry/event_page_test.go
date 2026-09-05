@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func eventPageStore(t *testing.T) (*Store, string) {

@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"darwinrouter/health"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/policy"
-	"darwinrouter/providers"
-	"darwinrouter/resources"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 var ErrHealth = errors.New("health report unavailable")

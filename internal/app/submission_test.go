@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func submissionService(t *testing.T) *Service {

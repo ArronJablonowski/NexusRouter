@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"darwinrouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
 type overrides map[string]string

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type Lease struct {

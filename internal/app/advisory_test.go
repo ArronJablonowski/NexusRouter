@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestAutomaticRoutingConsumesAuditQuality(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type taskStreamRunner func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)

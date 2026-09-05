@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 // Cancellation has independent bounded capacity: occupied execution slots must

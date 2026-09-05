@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/metrics"
 )
 
 type metricsUnreadBody struct{ t *testing.T }

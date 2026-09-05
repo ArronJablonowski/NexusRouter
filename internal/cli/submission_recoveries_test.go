@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestSubmissionRecoveriesCLIReadsWithoutChangingStorage(t *testing.T) {

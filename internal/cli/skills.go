@@ -10,7 +10,7 @@ import (
 	"io"
 	"regexp"
 
-	"darwinrouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 const skillsUsage = "usage: darwin skills list|show|history|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--limit 100]\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable."

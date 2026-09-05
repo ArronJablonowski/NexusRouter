@@ -9,13 +9,13 @@ import (
 	"sort"
 	"strings"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/policy"
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
-	"darwinrouter/tools"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 var ErrAdmission = errors.New("task admission failed")

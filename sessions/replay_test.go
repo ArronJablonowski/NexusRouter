@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type reader []runtime.Event

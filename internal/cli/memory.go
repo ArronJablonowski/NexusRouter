@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 )
 
 func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func streamService(t *testing.T, handler http.HandlerFunc) (*Service, string) {

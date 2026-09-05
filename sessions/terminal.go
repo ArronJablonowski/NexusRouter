@@ -6,10 +6,10 @@ import (
 	"math"
 	"strings"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 type TerminalOutcome struct {

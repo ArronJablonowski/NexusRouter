@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestChatFeedbackRealServiceImmutableHistory(t *testing.T) {

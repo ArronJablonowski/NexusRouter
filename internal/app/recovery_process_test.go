@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func TestRecoveryClaimProcessHelper(t *testing.T) {

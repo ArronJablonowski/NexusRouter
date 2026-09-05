@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func summaryAttemptFixture(t *testing.T, s *Store) (sessions.SummaryAttempt, *sessions.SummaryDraft) {

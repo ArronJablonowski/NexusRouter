@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 var ErrHistory = errors.New("invalid session history")

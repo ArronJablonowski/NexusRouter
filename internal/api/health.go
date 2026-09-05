@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"darwinrouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/health"
 )
 
 func (h *Handler) serveHealthReport(w http.ResponseWriter, r *http.Request) {

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func TestDisabledProfilingDeniesLocalWithoutStorage(t *testing.T) {

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestCommittedBoundaryCancellationTerminatesDurably(t *testing.T) {

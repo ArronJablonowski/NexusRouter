@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/providers"
-	"darwinrouter/resources"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 // BenchmarkAutomaticTaskOverhead measures full automatic Service.Run tasks,

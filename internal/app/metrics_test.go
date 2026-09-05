@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func TestServiceMetricsMissingAndExisting(t *testing.T) {

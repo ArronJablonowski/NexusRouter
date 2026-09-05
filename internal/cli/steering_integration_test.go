@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"go.yaml.in/yaml/v3"
 )
 

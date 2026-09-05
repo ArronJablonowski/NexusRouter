@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 type Source string

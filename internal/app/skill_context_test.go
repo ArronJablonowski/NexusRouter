@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 func contextSkillStore(t *testing.T) (*skills.FileStore, config.Skills) {

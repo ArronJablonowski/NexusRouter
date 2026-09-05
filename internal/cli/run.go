@@ -17,9 +17,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // parseRunArgs validates constraints before configuration, storage or providers

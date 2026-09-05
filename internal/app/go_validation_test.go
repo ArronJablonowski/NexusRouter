@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/routing"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestGoValidationFailsTaskAndChangesOnlyValidatedRoute(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/tools"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 // readTools binds an operator-selected directory once per task. Model paths

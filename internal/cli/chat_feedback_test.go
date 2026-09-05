@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 func TestChatFeedbackExplicitChoices(t *testing.T) {

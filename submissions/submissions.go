@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 const MaxRequestBytes = 8 << 20

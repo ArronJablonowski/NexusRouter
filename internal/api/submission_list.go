@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func parseSubmissionListQuery(raw string) (submissions.ListOptions, error) {

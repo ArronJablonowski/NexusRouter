@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 func seedTaskSkills(t *testing.T) string {

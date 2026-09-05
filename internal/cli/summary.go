@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 type summaryArgs struct {

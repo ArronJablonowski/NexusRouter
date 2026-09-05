@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"darwinrouter/memory"
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 type Settings struct {

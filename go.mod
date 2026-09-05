@@ -1,4 +1,4 @@
-module darwinrouter
+module github.com/ArronJablonowski/DarwinRouter
 
 go 1.27.1
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"darwinrouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 )
 
 func chatFeedbackID(id string) bool {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func leaseStore(t *testing.T) (*Store, string) {

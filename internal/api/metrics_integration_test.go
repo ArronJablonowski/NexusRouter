@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/metrics"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestMetricsSurviveServiceRestartWithoutExecution(t *testing.T) {

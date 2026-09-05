@@ -8,8 +8,8 @@ import (
 	"io"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {

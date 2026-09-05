@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type Summary = runtime.ContextSummary

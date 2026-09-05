@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func TestNativeRoutingRequest(t *testing.T) {

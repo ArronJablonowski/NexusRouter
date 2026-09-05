@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func awaitSubmission(t *testing.T, ctx context.Context, s *Service, id, state string) submissions.Status {

@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // ReadEventPage observes the head and contiguous event slice in one SQLite read

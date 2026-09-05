@@ -15,13 +15,13 @@ import (
 	"time"
 	"unicode"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/health"
-	"darwinrouter/internal/app"
-	"darwinrouter/metrics"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 type Services struct {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestReplayRetainsDetachedCompaction(t *testing.T) {

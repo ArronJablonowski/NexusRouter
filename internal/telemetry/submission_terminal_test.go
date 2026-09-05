@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func terminalFixture(t *testing.T, db *Store, claim submissions.Claim, task, retry, mode string) {

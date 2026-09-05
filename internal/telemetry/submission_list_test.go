@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestSubmissionListByteBoundNoSkips(t *testing.T) {

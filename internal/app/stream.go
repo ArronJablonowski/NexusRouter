@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 var ErrEventDelivery = errors.New("task event delivery failed")

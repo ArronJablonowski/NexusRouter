@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"darwinrouter/providers"
-	"darwinrouter/routing"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func validityEvents(task string, passed bool) []runtime.Event {

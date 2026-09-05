@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 )
 
 func TestMemoryCLI(t *testing.T) {

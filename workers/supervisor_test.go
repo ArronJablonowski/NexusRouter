@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
-	"darwinrouter/workers"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
 func setup(t *testing.T) (*telemetry.Store, *workers.Supervisor) {

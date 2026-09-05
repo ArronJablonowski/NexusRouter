@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 // ReviewEvidence is caller-attributed material, not evaluator-generated proof.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func TestLocalDestinationPolicy(t *testing.T) {

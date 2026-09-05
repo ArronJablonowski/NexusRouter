@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/providers"
-	"darwinrouter/resources"
-	"darwinrouter/routing"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func autoFixture(t *testing.T) (*Service, config.Settings) {

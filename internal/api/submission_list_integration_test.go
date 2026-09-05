@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestSubmissionHTTPDiscoveryFindsExpiredWorkWithoutReexecution(t *testing.T) {

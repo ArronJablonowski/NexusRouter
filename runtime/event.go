@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/providers"
-	"darwinrouter/resources"
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 type Kind string

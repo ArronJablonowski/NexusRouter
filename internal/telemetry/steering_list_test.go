@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestListSteeringReadOnlyOrderedClosedTask(t *testing.T) {

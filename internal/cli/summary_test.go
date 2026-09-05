@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestSummaryArguments(t *testing.T) {

@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 // serveChatCompletions is a bounded text-only compatibility adapter. Authentication,

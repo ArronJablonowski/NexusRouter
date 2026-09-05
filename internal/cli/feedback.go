@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"darwinrouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func runFeedback(args []string, stdout, stderr io.Writer) int {

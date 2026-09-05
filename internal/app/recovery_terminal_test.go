@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestRecoveryStartupReconstructsTerminalHistoryWithoutExecution(t *testing.T) {

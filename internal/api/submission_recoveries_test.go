@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func recoveryAPIFixture() submissions.Recovery {

@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"strconv"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func FeedbackHistory(ctx context.Context, path, task string) ([]evaluation.Record, error) {

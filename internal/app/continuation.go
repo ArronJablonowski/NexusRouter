@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 type continuationContext struct {

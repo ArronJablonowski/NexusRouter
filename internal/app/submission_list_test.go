@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestListSubmissionsMissingDatabaseIsReadOnly(t *testing.T) {

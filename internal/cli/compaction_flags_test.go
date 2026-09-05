@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func compactSummaryFile(t *testing.T, body string) string {

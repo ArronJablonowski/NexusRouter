@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/runtime"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 const submissionFixtureKey = "private-intake-key-12345"

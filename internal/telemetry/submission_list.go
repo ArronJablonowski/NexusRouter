@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 // ListSubmissions reads a bounded insertion-fenced page. State membership remains

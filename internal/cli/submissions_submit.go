@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
 // Extract only the intake-specific flag; all execution options are validated

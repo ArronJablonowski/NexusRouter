@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/health"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func healthySupervisor() health.Check {

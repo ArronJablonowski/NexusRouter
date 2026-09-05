@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 )
 
 var _ memory.Store = (*Store)(nil)

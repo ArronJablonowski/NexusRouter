@@ -7,11 +7,11 @@ import (
 	"math"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/policy"
-	"darwinrouter/providers"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // SummarizeTask creates a durable proposal, never an active context change or

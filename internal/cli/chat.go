@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type chatHooks struct {

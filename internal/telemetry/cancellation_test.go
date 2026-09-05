@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func cancellationStore(t *testing.T) (*Store, string, runtime.Event) {

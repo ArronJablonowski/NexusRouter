@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/memory"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 )
 
 func testFact() memory.Fact {

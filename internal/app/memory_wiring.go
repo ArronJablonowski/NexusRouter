@@ -1,6 +1,6 @@
 package app
 
-import "darwinrouter/internal/config"
+import "github.com/ArronJablonowski/DarwinRouter/internal/config"
 
 // Context leaves storage only after configured credentials are removed. Routing
 // itself must not carry raw facts or secrets in its explanation metadata.

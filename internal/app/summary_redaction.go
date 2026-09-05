@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"darwinrouter/providers"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func redactSummaryMessages(messages []providers.Message, secrets []string) ([]providers.Message, error) {

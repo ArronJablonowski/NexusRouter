@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"darwinrouter/internal/cli"
+	"github.com/ArronJablonowski/DarwinRouter/internal/cli"
 )
 
 // version can be set by release builds using -ldflags.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/providers"
-	"darwinrouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
 type skillContext struct {

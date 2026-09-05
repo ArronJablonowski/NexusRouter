@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 // Detached intake has independent capacity so active tasks cannot prevent

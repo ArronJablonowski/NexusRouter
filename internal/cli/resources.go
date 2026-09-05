@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func runResources(args []string, stdout, stderr io.Writer) int {

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestExplicitTaskEndToEnd(t *testing.T) {

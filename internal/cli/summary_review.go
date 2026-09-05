@@ -13,8 +13,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
 type summaryReviewArgs struct{ config, attempt, expected, decision, note string }

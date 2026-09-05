@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/providers"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestCompactedContinuationFitsAdmissionAndSurvivesRestart(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/health"
-	"darwinrouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func healthReportFixture() health.Report {

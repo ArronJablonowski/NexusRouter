@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func TestReplayMessageOriginsAndCompactionEstimates(t *testing.T) {

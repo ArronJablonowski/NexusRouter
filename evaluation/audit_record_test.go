@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func TestAuditRecordValidation(t *testing.T) {

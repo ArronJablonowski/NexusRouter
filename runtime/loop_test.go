@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type model func(context.Context, providers.Request, func(providers.Chunk) error) error

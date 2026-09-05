@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"darwinrouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/metrics"
 )
 
 func (h *Handler) serveMetrics(w http.ResponseWriter, r *http.Request) {

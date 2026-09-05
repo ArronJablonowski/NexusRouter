@@ -3,8 +3,8 @@ package telemetry
 import (
 	"context"
 	"crypto/rand"
-	"darwinrouter/workers"
 	"errors"
+	"github.com/ArronJablonowski/DarwinRouter/workers"
 	"time"
 )
 

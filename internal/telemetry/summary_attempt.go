@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // verifySummarySource reads an immutable completed source before taking the

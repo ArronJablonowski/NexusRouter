@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func TestSubmissionPressureTimeoutAndCancellationBeforeDispatch(t *testing.T) {

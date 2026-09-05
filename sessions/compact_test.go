@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func compactConversation() []providers.Message {

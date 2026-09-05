@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func apiCancellationStatus(state string, requested bool) runtime.CancellationStatus {

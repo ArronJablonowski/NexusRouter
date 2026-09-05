@@ -12,9 +12,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func (h *Handler) serveSummaries(w http.ResponseWriter, r *http.Request) {

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, lines <-chan chatLine, signals <-chan os.Signal, out io.Writer) int {

@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/providers"
-	"darwinrouter/routing"
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestSummarizeTaskPersistsDraftBeforeDispatchAndKeepsSource(t *testing.T) {

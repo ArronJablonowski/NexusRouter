@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestSteeringAtomicApplyAndIdempotence(t *testing.T) {

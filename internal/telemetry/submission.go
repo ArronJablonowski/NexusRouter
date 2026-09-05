@@ -12,9 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func submissionDigest(s string) bool {

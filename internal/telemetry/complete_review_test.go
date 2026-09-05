@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func completeReviewFixture(t *testing.T, s *Store) (evaluation.ReviewAttempt, evaluation.AuditRecord) {

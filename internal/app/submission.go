@@ -12,9 +12,9 @@ import (
 	"os"
 	"strings"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 var ErrSubmission = errors.New("submission unavailable")

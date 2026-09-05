@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 const chatFixture = `{"model":"m","messages":[{"role":"system","content":"Be concise."},{"role":"user","content":"Hi"},{"role":"assistant","content":"Hello"},{"role":"user","content":"你好\nagain"}]}`

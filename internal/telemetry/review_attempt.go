@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"darwinrouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 )
 
 func (s *Store) BeginReview(ctx context.Context, r evaluation.ReviewAttempt) error {

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/resources"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestHealthUsesConfiguredGPUInsteadOfAggregate(t *testing.T) {

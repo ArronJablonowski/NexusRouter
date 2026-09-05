@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func (s *Store) RecordSummaryReview(ctx context.Context, r sessions.SummaryReview) error {

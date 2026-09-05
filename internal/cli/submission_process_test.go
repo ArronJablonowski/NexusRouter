@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestSubmissionCommandsAcrossProcesses(t *testing.T) {

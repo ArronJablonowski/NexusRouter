@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/mattn/go-isatty"
 )
 

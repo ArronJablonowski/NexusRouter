@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestSubmissionLeaseGateStopsDispatchAndPreservesReason(t *testing.T) {

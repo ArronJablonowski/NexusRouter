@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"darwinrouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 )
 
 // RecordAudit stores reviewer provenance separately from candidate fitness.

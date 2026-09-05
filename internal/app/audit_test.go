@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {

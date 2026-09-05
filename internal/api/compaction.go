@@ -7,7 +7,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func decodeCompactionRequest(raw []byte) (*sessions.CompactionRequest, error) {

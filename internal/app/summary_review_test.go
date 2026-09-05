@@ -14,11 +14,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/resources"
-	"darwinrouter/routing"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func summaryReviewFixture(t *testing.T) (*Service, config.Settings, Result, sessions.SummaryAttempt, *atomic.Int32) {

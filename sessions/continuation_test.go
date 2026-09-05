@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func continuationSnapshot() Snapshot {

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func readSteering(ctx context.Context, tx *sql.Tx, task, id string) (runtime.SteeringMessage, error) {

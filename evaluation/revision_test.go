@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 func revisionFixture() (Record, Record) {

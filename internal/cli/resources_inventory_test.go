@@ -8,7 +8,7 @@ import (
 	"io"
 	"testing"
 
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 func TestResourcesInventoryPreservesHostFields(t *testing.T) {

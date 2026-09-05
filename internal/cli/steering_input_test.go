@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	run "darwinrouter/runtime"
+	run "github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestSteeringInputValidation(t *testing.T) {

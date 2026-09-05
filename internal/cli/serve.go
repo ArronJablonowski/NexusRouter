@@ -14,13 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/health"
-	"darwinrouter/internal/api"
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/api"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {

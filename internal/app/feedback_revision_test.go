@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 func TestFeedbackRevisionKeepsOneAttemptContribution(t *testing.T) {

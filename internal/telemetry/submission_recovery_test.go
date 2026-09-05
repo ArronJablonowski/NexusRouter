@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/runtime"
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestSubmissionRecoveryLimitHistoryAndFencing(t *testing.T) {

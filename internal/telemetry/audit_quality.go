@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"darwinrouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 // AuditQuality reads advisory reviews without changing objective fitness. The

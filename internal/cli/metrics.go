@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"darwinrouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
 
 func runMetrics(args []string, stdout, stderr io.Writer) int {

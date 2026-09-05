@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
 func runAudit(args []string, stdout, stderr io.Writer) int {

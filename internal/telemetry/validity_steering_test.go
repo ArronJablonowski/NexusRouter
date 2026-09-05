@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"darwinrouter/evaluation"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestOutputValidityUsesFinalSteeredAttempt(t *testing.T) {

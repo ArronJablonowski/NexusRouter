@@ -6,8 +6,8 @@ import (
 	"math"
 	"testing"
 
-	"darwinrouter/providers"
-	"darwinrouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func TestRuntimeUsageOverflowRemainsUnknown(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/runtime"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func cancellationStatus(ctx context.Context, tx *sql.Tx, task string, legacy bool) (runtime.CancellationStatus, error) {

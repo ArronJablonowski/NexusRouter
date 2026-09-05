@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"darwinrouter/internal/app"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestNativeCompactionRequestForwarding(t *testing.T) {

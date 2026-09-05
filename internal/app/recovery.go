@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"darwinrouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {

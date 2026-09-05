@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"darwinrouter/internal/quality"
+	"github.com/ArronJablonowski/DarwinRouter/internal/quality"
 )
 
 func main() {

@@ -12,7 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func replayTaskID(id string) bool {

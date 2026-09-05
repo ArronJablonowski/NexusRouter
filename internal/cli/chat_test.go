@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"darwinrouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func TestChatRejectsArgumentsBeforeInput(t *testing.T) {

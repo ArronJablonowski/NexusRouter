@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"darwinrouter/internal/config"
-	"darwinrouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 )
 
 // RunExplicit is a one-shot execution without automatic review or fallback.

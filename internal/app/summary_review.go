@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"time"
 
-	"darwinrouter/internal/telemetry"
-	"darwinrouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // ReviewSummary records explicit operator review, not an LLM accuracy claim.
