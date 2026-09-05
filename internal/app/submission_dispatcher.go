@@ -16,12 +16,23 @@ import (
 // projects already-terminal histories without reexecution. Partial work is
 // never replayed automatically.
 type Dispatcher struct {
-	cancel context.CancelFunc
-	done   chan struct{}
-	db     *telemetry.Store
-	once   sync.Once
-	mu     sync.Mutex
-	err    error
+	cancel            context.CancelFunc
+	done              chan struct{}
+	db                *telemetry.Store
+	once              sync.Once
+	mu                sync.Mutex
+	err               error
+	configuredWorkers int
+	startedWorkers    int
+	workerAlive       map[int]bool
+	workerBeats       map[int]time.Time
+	reconcilerStarted bool
+	reconcilerAlive   bool
+	reconcilerBeat    time.Time
+	closing           bool
+	closed            bool
+	healthNow         func() time.Time
+	renewInterval     time.Duration
 }
 
 func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
@@ -33,13 +44,23 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 		return nil, ErrSubmission
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db}
+	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
 	var workers sync.WaitGroup
 	workers.Add(1)
-	go func() { defer workers.Done(); d.reconcile(ctx, s.submissionConfigDigest()) }()
+	go func() {
+		defer workers.Done()
+		d.supervisorStarted(-1)
+		defer d.supervisorStopped(-1)
+		d.reconcile(ctx, s.submissionConfigDigest())
+	}()
 	for i := 0; i < s.settings.Workers.Max; i++ {
 		workers.Add(1)
-		go func() { defer workers.Done(); d.worker(ctx, s) }()
+		go func() {
+			defer workers.Done()
+			d.supervisorStarted(i)
+			defer d.supervisorStopped(i)
+			d.worker(ctx, s, i)
+		}()
 	}
 	go func() { workers.Wait(); close(d.done) }()
 	return d, nil
@@ -47,11 +68,17 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 
 func (d *Dispatcher) Close() error {
 	d.once.Do(func() {
+		d.mu.Lock()
+		d.closing = true
+		d.mu.Unlock()
 		d.cancel()
 		<-d.done
 		if d.db.Close() != nil {
 			d.recordError()
 		}
+		d.mu.Lock()
+		d.closed = true
+		d.mu.Unlock()
 	})
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -60,15 +87,16 @@ func (d *Dispatcher) Close() error {
 
 func (d *Dispatcher) recordError() { d.mu.Lock(); d.err = ErrSubmission; d.mu.Unlock() }
 
-func (d *Dispatcher) worker(ctx context.Context, s *Service) {
+func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	for ctx.Err() == nil {
+		d.supervisorHeartbeat(id)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
 		claim, err := d.db.ClaimSubmission(query, s.submissionConfigDigest(), time.Now().UTC(), 30*time.Second)
 		cancel()
 		if err == nil {
-			d.execute(ctx, s, claim)
+			d.executeWorker(ctx, s, claim, id)
 			continue
 		}
 		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
@@ -84,12 +112,20 @@ func (d *Dispatcher) worker(ctx context.Context, s *Service) {
 }
 
 func (d *Dispatcher) execute(ctx context.Context, s *Service, claim submissions.Claim) {
+	d.executeWorker(ctx, s, claim, -2)
+}
+
+func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submissions.Claim, workerID int) {
 	job, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	heartbeat, stopHeartbeat := context.WithCancel(job)
 	heartbeatDone := make(chan error, 1)
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		interval := d.renewInterval
+		if interval <= 0 {
+			interval = 5 * time.Second
+		}
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -98,9 +134,11 @@ func (d *Dispatcher) execute(ctx context.Context, s *Service, claim submissions.
 				return
 			case <-ticker.C:
 			}
+			d.supervisorHeartbeat(workerID)
 			query, stop := context.WithTimeout(heartbeat, 5*time.Second)
 			cancelRequested, err := d.db.RenewSubmission(query, claim.Status.ID, claim.Token, time.Now().UTC(), 30*time.Second)
 			stop()
+			d.supervisorHeartbeat(workerID)
 			if heartbeat.Err() != nil {
 				heartbeatDone <- nil
 				return

@@ -200,7 +200,8 @@ Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters,
 
 All endpoints require `Authorization: Bearer <token>`:
 
-- `GET /health`: application/database health; provider health is explicitly not checked yet.
+- `GET /health`: lightweight database and live supervisor check. Its legacy response still declares `providers_checked: false`; it performs no provider discovery.
+- `GET /v1/health`: detailed operational report described below, including bounded provider/model discovery.
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `POST /v1/tasks/{id}/cancel`: send JSON `{}` to durably request cancellation. HTTP202 means the request was recorded while the task was running, not that execution has already stopped; HTTP200 reports an already-terminal task. Repeating the request is naturally idempotent for that task and retains the original request ID/time. `GET /v1/tasks/{id}/cancellation` reports durable request status and the current task state. Two independent control slots keep these operations available when execution capacity is full. Current runners observe requests through SQLite, including requests from another service instance/process. Database transaction order resolves cancellation versus completion: a cancellation recorded first prevents later normal events and completion, while a terminal event recorded first remains terminal. Already-started tool effects may finish and must be recorded; cancellation does not roll them back. A stopped/orphaned runner can retain a pending request until recovery is implemented. Post-completion auxiliary audits have their own lifecycle and are not canceled through this task endpoint.
@@ -219,7 +220,46 @@ All summary endpoints share task concurrency capacity and enforce authentication
 
 `POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. SSE is buffered until durable completion and labeled `X-Darwin-Stream-Mode: buffered`; this is not live token streaming. Usage is omitted when unavailable.
 
-Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Full provider health and service installation remain unfinished. Do not automatically retry a timed-out synchronous task POST; a durable task may already exist.
+Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Inference qualification and operating-system service installation remain unfinished. Do not automatically retry a timed-out synchronous task POST; a durable task may already exist.
+
+### Operational health
+
+Authenticated `GET /v1/health` returns a versioned report with `checked_at`,
+`status`, `ready` and machine-readable checks for the daemon, database,
+supervisor, host resources, configured providers and models. HTTP 200 means
+`ready: true`; HTTP 503 can carry a valid not-ready report. Invalid/unavailable
+diagnostics return a generic error instead. Health has one independent request
+slot; saturation returns 503 with `Retry-After: 1` without occupying execution
+or cancellation capacity.
+
+Readiness requires a healthy database and supervisor plus at least one enabled
+configured model found in a provider catalog and passing the applicable coarse
+resource checks. Unknown supplemental measurements or unavailable alternatives
+produce a degraded report even when another model remains available. Catalog
+presence is **not an inference test**: it does not prove model loading, task
+capability, remaining quota, context fit or output quality. Normal task admission
+still checks its own constraints.
+
+Probes use a five-second application budget, two-second per-provider deadlines
+and at most four concurrent catalog calls; the endpoint allows six seconds for
+completion and report validation. Configurations over 64 providers or 256 models
+return a bounded configuration-limit report without probing the pool. Built-in
+probes honor cancellation; custom in-process hooks must do so too. Discovery is
+not cached into routing fitness and runs no inference, tools, model pulling or
+database migrations. Local-only mode denies external discovery; disabled model
+localities are not probed, and mixed-provider configurations must satisfy each
+model's transport policy independently.
+
+Reports expose configured identifiers (safely aliased if they contain known
+credentials), never endpoints, database paths, raw provider errors, unconfigured
+catalog entries or credentials. RAM/CPU observations are validated; missing GPU
+or thermal data remains unknown rather than healthy. Resource observations are
+estimates, not memory reservations. Supervisor state includes startup, shutdown,
+latched failures and per-worker/reconciler heartbeats; a heartbeat older than
+15 seconds is reported stalled. Heartbeats continue during provider execution,
+but cannot by themselves prove useful model progress. These are bounded live
+observations, not an atomic system-wide snapshot or a full production health
+qualification.
 
 ### Detached durable submissions
 

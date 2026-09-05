@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"darwinrouter/evaluation"
+	"darwinrouter/health"
 	"darwinrouter/internal/api"
 	"darwinrouter/internal/app"
 	"darwinrouter/internal/config"
@@ -66,6 +67,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "invalid application configuration")
 		return 1
 	}
+	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		Submit:               service.Submit,
 		Submissions:          service.ListSubmissions,
@@ -89,7 +91,19 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Events:    db.ReadEventPage,
 		Run:       service.Run,
 		Inspect:   func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
-		Health:    func(ctx context.Context) error { _, err := db.Read(ctx, "__health__", 0, 1); return err },
+		Health: func(ctx context.Context) error {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" {
+				return errors.New("supervisor unavailable")
+			}
+			_, err := db.Read(ctx, "__health__", 0, 1)
+			return err
+		},
+		HealthReport: func(ctx context.Context) (health.Report, error) {
+			if dispatcher == nil {
+				return health.Report{}, errors.New("supervisor unavailable")
+			}
+			return service.HealthReport(ctx, dispatcher.Health())
+		},
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
 		},
@@ -104,7 +118,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer listener.Close()
-	dispatcher, err := app.StartDispatcher(ctx, service)
+	dispatcher, err = app.StartDispatcher(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start task dispatcher")
 		return 1
