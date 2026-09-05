@@ -32,6 +32,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	r.providerFactory = s.providerFactory
 	r.codexLauncher = s.codexLauncher
 	r.contextEstimator = s.contextEstimator
+	r.contextEngine = s.contextEngine
 	r = s.bindToolExtension(r)
 	var model config.Model
 	for _, m := range s.settings.Models {

@@ -5,6 +5,7 @@ package v1
 
 import (
 	"context"
+	"github.com/ArronJablonowski/DarwinRouter/contextengine"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
@@ -37,6 +38,8 @@ type ProviderFactory = providers.Factory
 
 type ContextEstimator = providers.ContextEstimator
 
+type ContextEngine = contextengine.Engine
+
 type Tool = tools.Definition
 type ToolPolicy = tools.Policy
 type ApprovalPrompt = tools.ApprovalPrompt
@@ -68,6 +71,7 @@ type ConfigOptions struct {
 	// Auxiliary audits and summaries measure their assembled, redacted prompts.
 	// Trusted code must honor cancellation and privacy; this is not a sandbox.
 	ContextEstimator ContextEstimator
+	ContextEngine    ContextEngine
 	// Tools registers trusted handlers independently of filesystem
 	// tools. Definitions and policy are snapshotted at construction; nil policy
 	// denies all custom tools. Handlers must honor cancellation and concurrency.
@@ -133,7 +137,15 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithContextEstimator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator)
+	if options.ContextEngine != nil && options.ContextEstimator != nil {
+		return nil, ErrAdmission
+	}
+	var service *app.Service
+	if options.ContextEngine != nil {
+		service, err = app.NewServiceWithContextEngine(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEngine)
+	} else {
+		service, err = app.NewServiceWithContextEstimator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator)
+	}
 	if err != nil {
 		return nil, ErrAdmission
 	}

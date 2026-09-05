@@ -24,6 +24,14 @@ daemon on macOS/Linux using authenticated, instance-bound loopback requests.
 Set `DARWIN_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
 readiness, shutdown semantics and limits; `serve` remains the foreground option.
 
+### Replaceable context planning
+
+Embedding applications can replace context assembly, estimation and compaction
+selection through `ConfigOptions.ContextEngine`. Optional memory/skill bundles
+can be reordered or omitted without rewriting protected history or tool pairs.
+See [context planning engines](docs/context-engine.md) for actual execution
+wiring, summary approval boundaries and a Go SDK example.
+
 ### Scoped memory in task context
 
 Stored facts can now enter task context when an operator configures a scope:

@@ -217,6 +217,15 @@ stored values. This is the estimation component of the planned ContextEngine, no
 context assembly or automatic semantic compaction, and is not a tokenizer-accuracy
 or OS-isolation guarantee.
 
+### Replaceable context planning
+
+For assembly/retention strategy, `ConfigOptions.ContextEngine` accepts the public
+`contextengine.Engine` contract (`sdk.ContextEngine` is an alias). It drives
+real task assembly, per-turn estimation and compaction selection. It is mutually
+exclusive with `ContextEstimator`; nil keeps the defaults. See
+[context planning](../../docs/context-engine.md) for isolation, bounds, privacy,
+frozen summary reviews and an implementation example.
+
 ### Replaceable factual memory storage
 
 `ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`

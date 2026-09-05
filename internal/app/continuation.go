@@ -31,6 +31,10 @@ func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secret
 		// Redact before both provider assembly and checkpoint persistence.
 		request := *r.Compaction
 		request.Summary = redactSummary(request.Summary, secrets)
+		request, err = selectContextCompaction(ctx, r.contextEngine, history, request, secrets)
+		if err != nil {
+			return nil, ErrAdmission
+		}
 		result.Messages, result.Compaction, err = sessions.PrepareContinuation(history, request)
 		if err != nil {
 			return nil, ErrAdmission

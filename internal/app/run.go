@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ArronJablonowski/DarwinRouter/contextengine"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
@@ -28,6 +29,8 @@ type Request struct {
 	providerFactory                 providers.Factory
 	codexLauncher                   codexLaunch
 	contextEstimator                providers.ContextEstimator
+	contextEngine                   contextengine.Engine
+	preparedContext                 *contextengine.Prepared
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
 	delegate                        delegateRunner
@@ -204,7 +207,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if history.Privacy != "cloud_allowed" {
 			privacy = "local_only"
 		}
-		messages = history.Messages
 		sessionID = history.SessionID
 	}
 	if !r.memoryPrepared && (model.Locality == "local" || !s.Memory.LocalOnly) {
@@ -217,7 +219,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if model.ContextTokens < 1 || (r.memoryContext.LocalOnly && model.Locality != "local") {
 			return result, ErrAdmission
 		}
-		messages = append(messages, r.memoryContext.Messages...)
 	}
 	if !r.skillPrepared && (model.Locality == "local" || !s.Skills.LocalOnly) {
 		r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, s.Skills, r.Domain, contextTools(s, r.toolExtension), secrets)
@@ -229,17 +230,17 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if model.ContextTokens < 1 || (r.skillContext.LocalOnly && model.Locality != "local") {
 			return result, ErrAdmission
 		}
-		messages = append(messages, r.skillContext.Messages...)
 	}
-	if len(r.Messages) > 0 {
-		messages = append(messages, r.Messages...)
-	} else {
-		messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
+	messages, err = prepareTaskContext(ctx, &r, secrets)
+	if err != nil {
+		return result, ErrAdmission
 	}
-	if provider.Kind == "codex_app_server" && r.ContinueTaskID != "" {
+	if provider.Kind == "codex_app_server" && r.ContinueTaskID != "" && r.contextEngine == nil {
 		// Credentials may have rotated since this history was recorded. Own and
 		// scrub decoded fields before importing them into a new CLI session;
 		// never rewrite the original journal or send raw saved context first.
+		// Custom-engine assembly already scrubbed its frozen messages. Repeating
+		// replacement here can change them if a secret overlaps the marker.
 		messages, err = redactCodexHistoryMessages(messages, secrets)
 		if err != nil {
 			return result, ErrAdmission

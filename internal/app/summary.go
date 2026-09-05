@@ -31,10 +31,6 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	if err != nil {
 		return bad()
 	}
-	_, provenance, err := sessions.PrepareContinuation(history, sessions.CompactionRequest{Keep: keep, Summary: sessions.Summary{Decisions: []string{"pending draft"}}})
-	if err != nil {
-		return bad()
-	}
 	var model config.Model
 	for _, candidate := range s.settings.Models {
 		if candidate.ID == modelID {
@@ -62,6 +58,15 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		key = s.secret(provider.APIKeyEnv)
 	}
 	if provider.APIKeyEnv != "" && key == "" {
+		return bad()
+	}
+	selection, err := selectContextCompaction(ctx, s.contextEngine, history, sessions.CompactionRequest{Keep: keep, Summary: sessions.Summary{Decisions: []string{"pending draft"}}}, secrets)
+	if err != nil {
+		return bad()
+	}
+	keep = selection.Keep
+	_, provenance, err := sessions.PrepareContinuation(history, selection)
+	if err != nil {
 		return bad()
 	}
 	input := history

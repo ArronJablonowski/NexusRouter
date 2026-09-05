@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/contextengine"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
@@ -37,6 +38,7 @@ type Service struct {
 	providerFactory  providers.Factory
 	codexLauncher    codexLaunch
 	contextEstimator providers.ContextEstimator
+	contextEngine    contextengine.Engine
 	memoryStore      memory.Store
 	skillStore       skills.Store
 	execution        chan struct{}
@@ -104,6 +106,7 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
 	r.contextEstimator = s.contextEstimator
+	r.contextEngine = s.contextEngine
 	r.memoryStore = s.memoryStore
 	r.skillStore = s.skillStore
 	if s.execution != nil {
@@ -191,6 +194,7 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
+	r.contextEngine = s.contextEngine
 	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
 	r.contextEstimator = s.contextEstimator
@@ -222,7 +226,6 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if history.Privacy != "cloud_allowed" {
 			r.LocalRequired = true
 		}
-		messages = append(messages, history.Messages...)
 	}
 	if !r.memoryPrepared {
 		// Freeze one retrieval snapshot for context admission and execution.
@@ -237,7 +240,6 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		r.memoryPrepared = true
 	}
 	if r.memoryContext != nil {
-		messages = append(messages, r.memoryContext.Messages...)
 		r.LocalRequired = r.LocalRequired || r.memoryContext.LocalOnly
 	}
 	if !r.skillPrepared {
@@ -250,13 +252,11 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		r.skillPrepared = true
 	}
 	if r.skillContext != nil {
-		messages = append(messages, r.skillContext.Messages...)
 		r.LocalRequired = r.LocalRequired || r.skillContext.LocalOnly
 	}
-	if len(r.Messages) > 0 {
-		messages = append(messages, r.Messages...)
-	} else {
-		messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
+	messages, err = prepareTaskContext(ctx, &r, memorySecrets(cfg, s.secret))
+	if err != nil {
+		return Result{}, ErrAdmission
 	}
 	// Byte count is a conservative token estimate, with framing/output reserve.
 	inference := providers.Request{Messages: messages}
