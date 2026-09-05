@@ -914,7 +914,8 @@ Repeated IDs never dispatch again; terminal persistence failure returns the
 started observation for inspection, not permission to retry. Cancellation still
 allows a bounded terminal write. Drafted records are proposals, not published or
 active skills. SQLite inspection supports individual IDs and scoped pagination;
-deduplicated publication and native HTTP/CLI integration remain unfinished.
+publication is available through the Go service/SDK; native generation and
+publication commands/endpoints remain unfinished.
 
 The application service and Go SDK now provide `GenerateSkillDraft` for explicit
 task IDs and a configured generator model. It selects current accepted
@@ -941,6 +942,19 @@ sensitive content. Authenticated HTTP equivalents are
 exclusive `after` ID, in lexical order, with limits1–100. All reads are scoped,
 bounded and non-mutating; missing databases are not created or upgraded.
 A started record remains uncertain and does not authorize redispatch.
+
+`PublishSkillGeneration(ctx, attemptID)` publishes a saved drafted proposal as an
+inactive immutable skill version. It requires enabled skills, auto-draft and the
+configured root/scope, and rejects injected retrieval stores. Exact retries
+return the same version; conflicting reuse of an attempt ID rejects. Current
+credential collisions reject before opening the skill root. Publication does not
+recheck source-feedback freshness or validate/activate the workflow.
+
+The first publication upgrades the file catalog to schema 2, so older writers
+reject it instead of dropping receipts; SQLite remains schema 16. Version
+visibility and its receipt share one catalog commit. A failure before that commit
+can leave an unreferenced version file; automatic cleanup and power-loss
+qualification remain open.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

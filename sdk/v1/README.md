@@ -330,6 +330,16 @@ never initialize/migrate storage or execute work. Protect full-record exports as
 sensitive data. HasResult means a saved proposal, not a published/active skill;
 started means uncertainty, never automatic retry permission.
 
+`Client.PublishSkillGeneration(ctx, attemptID)` reads a saved drafted attempt in
+the configured scope and publishes an inactive immutable file-store version.
+It requires enabled skills and auto-draft, rejects injected SkillStore instances,
+and rejects current credential collisions without rewriting the proposal.
+Identical retries return the same version; conflicting attempt reuse rejects.
+Publication does not revalidate source feedback, validate the workflow or activate
+it. File catalogs upgrade to schema 2 on first publication; older binaries reject
+that schema. Receipts and version visibility commit together, but pre-commit
+failures may leave unreferenced files. There is no automatic cleanup.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
