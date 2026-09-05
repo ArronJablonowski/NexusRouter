@@ -53,7 +53,14 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses schema 21. Stop older writer processes and back
+The current durable store uses schema 22. New resource leases carry private
+[execution-image ownership](process-lifetime-ownership.md); foreign processes
+cannot mutate a bound lease merely by copying its token. Legacy leases remain
+unbound and no automatic orphan release is introduced. Guard storage currently
+requires a supported local temporary filesystem and retained guard paths; review
+the documented platform and retention limits before unattended use.
+
+Stop older writer processes and back
 up task databases before opening them with a newer build. Restoring an older
 binary alone does not downgrade a migrated database. Preserve the matching
 pre-upgrade data backup for rollback; no automatic destructive downgrade exists.

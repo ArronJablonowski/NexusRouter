@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 	"strings"
 	"time"
@@ -28,6 +29,10 @@ func (s *Store) AcquireLease(ctx context.Context, task, owner, scope string, wri
 	l := Lease{}
 	if task == "" || owner == "" || scope == "" || len(scope) > 512 || !leaseTime(now, ttl) {
 		return l, ErrLeaseInput
+	}
+	process, err := processguard.Current(ctx)
+	if err != nil {
+		return l, ErrLeaseLost
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -54,8 +59,11 @@ func (s *Store) AcquireLease(ctx context.Context, task, owner, scope string, wri
 	if conflicts > 0 {
 		return l, ErrLeaseBusy
 	}
+	if err := registerLeaseProcess(ctx, tx, process); err != nil {
+		return l, err
+	}
 	l = Lease{Token: rand.Text(), TaskID: task, Owner: owner, Scope: scope, Writer: writer, Expires: now.Add(ttl).UTC()}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires) VALUES(?,?,?,?,?,?)`, l.Token, task, owner, scope, writer, l.Expires.UnixNano()); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,process_id) VALUES(?,?,?,?,?,?,?)`, l.Token, task, owner, scope, writer, l.Expires.UnixNano(), process.ID); err != nil {
 		return Lease{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -69,7 +77,18 @@ func (s *Store) RenewLease(ctx context.Context, token, owner string, now time.Ti
 	if token == "" || owner == "" || !leaseTime(now, ttl) {
 		return ErrLeaseInput
 	}
-	result, err := s.db.ExecContext(ctx, `UPDATE resource_leases SET expires=max(expires,?) WHERE token=? AND owner=? AND released=0 AND expires>? AND task_id IN (SELECT task_id FROM task_heads WHERE state='running')`, now.Add(ttl).UnixNano(), token, owner, now.UnixNano())
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE resource_leases SET owner=owner WHERE token=? AND owner=?`, token, owner); err != nil {
+		return err
+	}
+	if err := leaseProcessGate(ctx, tx, token, owner); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE resource_leases SET expires=max(expires,?) WHERE token=? AND owner=? AND released=0 AND expires>? AND task_id IN (SELECT task_id FROM task_heads WHERE state='running')`, now.Add(ttl).UnixNano(), token, owner, now.UnixNano())
 	if err != nil {
 		return err
 	}
@@ -80,7 +99,7 @@ func (s *Store) RenewLease(ctx context.Context, token, owner string, now time.Ti
 	if n != 1 {
 		return ErrLeaseLost
 	}
-	return nil
+	return tx.Commit()
 }
 
 // ReleaseLease asserts the holder has actually stopped all use of the scope.
@@ -90,7 +109,18 @@ func (s *Store) ReleaseLease(ctx context.Context, token, owner string) error {
 	if token == "" || owner == "" {
 		return ErrLeaseInput
 	}
-	result, err := s.db.ExecContext(ctx, "UPDATE resource_leases SET released=1 WHERE token=? AND owner=?", token, owner)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE resource_leases SET owner=owner WHERE token=? AND owner=?`, token, owner); err != nil {
+		return err
+	}
+	if err := leaseProcessGate(ctx, tx, token, owner); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, "UPDATE resource_leases SET released=1 WHERE token=? AND owner=?", token, owner)
 	if err != nil {
 		return err
 	}
@@ -101,7 +131,7 @@ func (s *Store) ReleaseLease(ctx context.Context, token, owner string) error {
 	if n != 1 {
 		return ErrLeaseLost
 	}
-	return nil
+	return tx.Commit()
 }
 
 // InspectLeases is for trusted supervision, not public output: it includes

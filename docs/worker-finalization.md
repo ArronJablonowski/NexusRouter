@@ -76,6 +76,10 @@ automatic daemon restart, or all failed/canceled terminal process boundaries.
 
 No general process-death proof, orphan release, idempotent reassignment, automatic
 continuation or forced in-process termination is provided by this change.
+New schema-22 leases additionally bind to a private
+[local execution-image guard](process-lifetime-ownership.md), preventing active
+mutation by an unrelated process with a copied lease token. Internal guard
+observation is not yet wired to reclamation or running-worker recovery.
 Unresolved readers can still block availability. Even when the test knows its
 child died, production recovery has no such trusted observation and does not
 release those leases. Stronger lifecycle ownership and safe reconciliation are

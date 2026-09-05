@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 21 {
+	if version > 22 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -284,6 +284,12 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 22 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE lease_processes(id TEXT PRIMARY KEY,body BLOB NOT NULL); ALTER TABLE resource_leases ADD COLUMN process_id TEXT REFERENCES lease_processes(id); PRAGMA user_version=22;`)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -384,6 +390,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		return err
 	}
 	if leaseToken != "" {
+		if err := leaseProcessGate(ctx, tx, leaseToken, owner); err != nil {
+			return runtime.ErrExecutionLeaseLost
+		}
 		var held bool
 		// Cancellation may durably clean up an expired lease, but release or
 		// reassignment fences even cleanup from its former owner.

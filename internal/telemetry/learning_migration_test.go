@@ -16,7 +16,7 @@ func TestLearningMigrationAndRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`DROP TABLE learning_states; PRAGMA user_version=20`); err != nil {
+	if _, err = s.db.Exec(`ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; PRAGMA user_version=20`); err != nil {
 		t.Fatal(err)
 	}
 	fact := testFact()
@@ -41,7 +41,7 @@ func TestLearningMigrationAndRollback(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 21 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 22 {
 		t.Fatal(version, err)
 	}
 	if got, err := s.GetMemory(ctx, fact.Scope, fact.ID); err != nil || got != fact {

@@ -237,6 +237,9 @@ func (s *Store) ConsumeApproval(ctx context.Context, req approvals.Request, toke
 		return approvals.Record{}, err
 	}
 	var count int
+	if err := leaseProcessGate(ctx, tx, token, owner); err != nil {
+		return approvals.Record{}, approvals.ErrConflict
+	}
 	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM resource_leases WHERE token=? AND owner=? AND task_id=? AND scope=? AND writer=1 AND released=0 AND expires>?`, token, owner, req.TaskID, req.Scope, now.UnixNano()).Scan(&count)
 	if err != nil {
 		return approvals.Record{}, approvals.ErrUnavailable

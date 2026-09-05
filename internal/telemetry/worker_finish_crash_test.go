@@ -47,6 +47,10 @@ func TestWorkerFinishCrashHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
+	lease, err := s.AcquireLease(ctx, "task", "owner", "scope", false, time.Now(), time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var trigger string
 	switch mode {
 	case "before_event":
@@ -64,7 +68,7 @@ func TestWorkerFinishCrashHelper(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err = s.FinishLeased(ctx, 1, crashWorkerTerminal(), os.Getenv("DARWIN_FINISH_CRASH_TOKEN"), "owner"); err != nil {
+	if err = s.FinishLeased(ctx, 1, crashWorkerTerminal(), lease.Token, "owner"); err != nil {
 		t.Fatal(err)
 	}
 	if mode == "after_commit" {
@@ -89,15 +93,11 @@ func TestWorkerFinishSIGKILLAtomicity(t *testing.T) {
 			if err := s.Append(ctx, 0, start); err != nil {
 				t.Fatal(err)
 			}
-			lease, err := s.AcquireLease(ctx, "task", "owner", "scope", false, time.Now(), time.Minute)
-			if err != nil {
-				t.Fatal(err)
-			}
 			if err = s.Close(); err != nil {
 				t.Fatal(err)
 			}
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkerFinishCrashHelper$")
-			cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_FINISH_CRASH_MODE=" + mode, "DARWIN_FINISH_CRASH_DB=" + path, "DARWIN_FINISH_CRASH_TOKEN=" + lease.Token}
+			cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_FINISH_CRASH_MODE=" + mode, "DARWIN_FINISH_CRASH_DB=" + path}
 			cmd.Stderr = io.Discard
 			cmd.WaitDelay = time.Second
 			pipe, err := cmd.StdoutPipe()
@@ -151,6 +151,10 @@ func TestWorkerFinishSIGKILLAtomicity(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer reopened.Close()
+			var lease Lease
+			if err := reopened.db.QueryRowContext(ctx, `SELECT token FROM resource_leases WHERE task_id='task' AND owner='owner'`).Scan(&lease.Token); err != nil {
+				t.Fatal(err)
+			}
 			before, err := reopened.ReadEventPage(ctx, "task", 0, 100)
 			if err != nil || before.HasMore {
 				t.Fatal(before, err)
