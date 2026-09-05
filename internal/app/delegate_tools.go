@@ -25,5 +25,5 @@ func inheritDelegateTools(ctx context.Context, registry *tools.Registry, parent 
 }
 
 func applicationToolPolicy() *tools.Policy {
-	return &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}, {Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}
+	return &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}, {Tool: "delegate", Scope: "delegation", Decision: tools.Allow}, {Tool: "delegate_batch", Scope: "delegation", Decision: tools.Allow}}}
 }

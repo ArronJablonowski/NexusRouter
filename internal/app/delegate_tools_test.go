@@ -41,7 +41,7 @@ func TestDelegateToolsInheritancePreservesDenial(t *testing.T) {
 	if capability.Registry != registry || capability.Policy.Decide("read_file", "workspace") != tools.Allow {
 		t.Fatal("read capability not inherited")
 	}
-	for _, identity := range [][2]string{{"delegate", "delegation"}, {"write_file", "workspace"}, {"read_file", "other"}} {
+	for _, identity := range [][2]string{{"delegate", "delegation"}, {"delegate_batch", "delegation"}, {"write_file", "workspace"}, {"read_file", "other"}} {
 		if capability.Policy.Decide(identity[0], identity[1]) != tools.Deny {
 			t.Fatal("child escalated", identity)
 		}

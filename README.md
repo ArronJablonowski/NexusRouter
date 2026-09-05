@@ -378,12 +378,27 @@ by `runtime.max_turns` and `tools.max_turns`. Tool-call/result pairs and validat
 are recorded in the child's ordinary runtime history. The 30-second deadline
 and output cap remain unchanged across the whole child run.
 
+The parent also receives `delegate_batch` with a `tasks` array of two to four
+objects using the same `prompt` and `validation` fields. Independent tasks run
+concurrently when capacity permits. Its `results` array preserves input order;
+each element is the normal delegate envelope or a bounded error. All items
+reserve from the same `delegate_max_calls` allowance as single calls. A batch
+that exceeds the remaining allowance starts no children and consumes no calls.
+Once admitted, failures still count toward that allowance.
+
+Every child is joined before returning, including after cancellation or failure.
+Accepted sibling results can be returned alongside individual failures, but
+cancellation suppresses all delivery. Each encoded result is limited to128KiB
+(including JSON escaping); larger results become per-item errors and remain
+available in durable child history. The overall tool response is below1MiB.
+Large batches can still exceed a parent's configured context capacity.
+
 Parents retain their task slots and hardware reservations. Children acquire
 additional capacity without waiting; unavailable capacity produces a bounded
 tool error that lets the parent continue. Thus a one-slot or one-model system
 cannot delegate yet. Sharing/unloading a parent's local model reservation is
-not implemented. Current model tool calls are sequential, while independent
-parents may run workers concurrently within the shared service ceiling.
+not implemented. Separate model tool calls are sequential; `delegate_batch`
+and independent parents can run children concurrently within the shared ceiling.
 
 Each invocation records a supervisor work task and a separate inference task.
 The work task links to the parent; the inference task links to the work task.
@@ -776,7 +791,7 @@ and production-scale metrics qualification remain unfinished.
 
 ## Next sprints
 
-1. Extend scoped read-only delegation to parallel child batches and approved single-writer tools.
+1. Add approved single-writer tools and interrupted delegation-tree recovery.
 2. Expand safe fallback qualification and automatic validated outcome updates.
 3. Add automatic context summarization and knowledge maintenance beyond current operator-compacted continuation, scoped factual memory and validated procedural-skill retrieval.
 4. Add live events, recovery and cross-provider qualification.

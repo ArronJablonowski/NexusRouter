@@ -246,7 +246,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		inference.Tools = []providers.Tool{readFileSpec()}
 	}
 	if cfg.Workers.DelegateModel != "" {
-		inference.Tools = append(inference.Tools, delegateSpec())
+		inference.Tools = append(inference.Tools, delegateSpec(), delegateBatchSpec())
 	}
 	contextTokens, estimateErr := providers.EstimateContext(inference)
 	if estimateErr != nil {

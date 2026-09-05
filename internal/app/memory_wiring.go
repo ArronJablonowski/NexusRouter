@@ -23,7 +23,7 @@ func contextTools(cfg config.Settings) []string {
 		names = append(names, "read_file")
 	}
 	if cfg.Workers.DelegateModel != "" {
-		names = append(names, "delegate")
+		names = append(names, "delegate", "delegate_batch")
 	}
 	return names
 }

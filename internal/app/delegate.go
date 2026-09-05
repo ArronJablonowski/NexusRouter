@@ -20,6 +20,12 @@ import (
 
 type delegateRunner func(context.Context, string, string, string, bool) (Result, error)
 
+type delegateInput struct{ Prompt, Validation string }
+
+func (input delegateInput) valid() bool {
+	return len(input.Prompt) > 0 && len(input.Prompt) <= 16<<10 && strings.TrimSpace(input.Prompt) != "" && utf8.ValidString(input.Prompt) && (input.Validation == "text" || input.Validation == "go_source")
+}
+
 func delegateSpec() providers.Tool {
 	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured worker to perform a bounded task. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. Capacity may be unavailable.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
 }
@@ -73,69 +79,85 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		return ErrAdmission
 	}
 	var calls atomic.Int32
-	return registry.Register(tools.Definition{
-		Tool:  delegateSpec(),
-		Scope: "delegation", ReadOnly: true,
-		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
-			failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}
-			var input struct{ Prompt, Validation string }
-			if json.Unmarshal(raw, &input) != nil || len(input.Prompt) > 16<<10 || strings.TrimSpace(input.Prompt) == "" || !utf8.ValidString(input.Prompt) || calls.Add(1) > int32(cfg.Workers.DelegateMaxCalls) {
-				return failed, nil
+	reserve := func(count int) bool {
+		for {
+			previous := calls.Load()
+			if count < 1 || count > cfg.Workers.DelegateMaxCalls-int(previous) {
+				return false
 			}
-			if input.Validation == "text" {
-				input.Validation = ""
+			if calls.CompareAndSwap(previous, previous+int32(count)) {
+				return true
 			}
-			if input.Validation != "" && input.Validation != "go_source" {
-				return failed, nil
-			}
-			childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			if cfg.Workers.DelegateReadTools {
-				var err error
-				childCtx, err = inheritDelegateTools(childCtx, registry, parentPolicy)
-				if err != nil {
-					return failed, nil
-				}
-			}
-			workID := rand.Text()
-			stopWatcher := watchCancellation(childCtx, func(query context.Context) (bool, error) {
-				return db.CancellationRequested(query, workID)
-			}, cancel)
-			watcherStopped := false
-			defer func() {
-				if !watcherStopped {
-					_ = stopWatcher()
-				}
-			}()
-			var executionID string
-			answer, err := supervisor.Run(childCtx, workers.Work{
-				TaskID: workID, SessionID: session, ParentID: parent, Scope: "delegation-" + parent, SubmissionID: submissionID,
-				Execute: func(ctx context.Context) (string, error) {
-					result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
-					executionID = result.TaskID
-					return result.Text, err
-				},
-				Validate: func(_ context.Context, output string) error {
-					if executionID == "" || len(output) > 64<<10 || strings.TrimSpace(output) == "" || !utf8.ValidString(output) || (input.Validation == "go_source" && !evaluation.GoSourceValid(output)) {
-						return workers.ErrWork
-					}
-					return nil
-				},
-			})
-			watchErr := stopWatcher()
-			watcherStopped = true
-			if err != nil || watchErr != nil {
-				return failed, nil
-			}
-			body, err := json.Marshal(struct {
-				WorkID      string `json:"work_task_id"`
-				ExecutionID string `json:"execution_task_id"`
-				Output      string `json:"untrusted_output"`
-			}{workID, executionID, answer})
+		}
+	}
+	execute := func(ctx context.Context, input delegateInput) (runtime.ToolResult, error) {
+		failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}
+		if input.Validation == "text" {
+			input.Validation = ""
+		}
+		if input.Validation != "" && input.Validation != "go_source" {
+			return failed, nil
+		}
+		childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if cfg.Workers.DelegateReadTools {
+			var err error
+			childCtx, err = inheritDelegateTools(childCtx, registry, parentPolicy)
 			if err != nil {
 				return failed, nil
 			}
-			return runtime.ToolResult{Content: string(body), Effect: runtime.NoEffect}, nil
+		}
+		workID := rand.Text()
+		stopWatcher := watchCancellation(childCtx, func(query context.Context) (bool, error) {
+			return db.CancellationRequested(query, workID)
+		}, cancel)
+		watcherStopped := false
+		defer func() {
+			if !watcherStopped {
+				_ = stopWatcher()
+			}
+		}()
+		var executionID string
+		answer, err := supervisor.Run(childCtx, workers.Work{
+			TaskID: workID, SessionID: session, ParentID: parent, Scope: "delegation-" + parent, SubmissionID: submissionID,
+			Execute: func(ctx context.Context) (string, error) {
+				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
+				executionID = result.TaskID
+				return result.Text, err
+			},
+			Validate: func(_ context.Context, output string) error {
+				if executionID == "" || len(output) > 64<<10 || strings.TrimSpace(output) == "" || !utf8.ValidString(output) || (input.Validation == "go_source" && !evaluation.GoSourceValid(output)) {
+					return workers.ErrWork
+				}
+				return nil
+			},
+		})
+		watchErr := stopWatcher()
+		watcherStopped = true
+		if err != nil || watchErr != nil {
+			return failed, nil
+		}
+		body, err := json.Marshal(struct {
+			WorkID      string `json:"work_task_id"`
+			ExecutionID string `json:"execution_task_id"`
+			Output      string `json:"untrusted_output"`
+		}{workID, executionID, answer})
+		if err != nil {
+			return failed, nil
+		}
+		return runtime.ToolResult{Content: string(body), Effect: runtime.NoEffect}, nil
+	}
+	if err := registry.Register(tools.Definition{
+		Tool: delegateSpec(), Scope: "delegation", ReadOnly: true,
+		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
+			var input delegateInput
+			if ctx.Err() != nil || json.Unmarshal(raw, &input) != nil || !input.valid() || !reserve(1) {
+				return runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}, nil
+			}
+			return execute(ctx, input)
 		},
-	})
+	}); err != nil {
+		return err
+	}
+	return registerDelegateBatch(registry, reserve, execute)
 }
