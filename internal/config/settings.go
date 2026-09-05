@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
@@ -56,10 +58,11 @@ type Workers struct {
 	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
-	ID        string `yaml:"id" json:"id"`
-	Kind      string `yaml:"kind" json:"kind"`
-	Endpoint  string `yaml:"endpoint" json:"endpoint"`
-	APIKeyEnv string `yaml:"api_key_env" json:"api_key_env,omitempty"`
+	ID         string `yaml:"id" json:"id"`
+	Kind       string `yaml:"kind" json:"kind"`
+	Endpoint   string `yaml:"endpoint" json:"endpoint"`
+	APIKeyEnv  string `yaml:"api_key_env" json:"api_key_env,omitempty"`
+	Executable string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
 type Model struct {
 	ContextTokens int      `yaml:"context_tokens" json:"context_tokens"`
@@ -308,12 +311,21 @@ func (s Settings) Validate() error {
 		if _, ok := providers[p.ID]; ok {
 			return errors.New("duplicate provider ID")
 		}
-		if p.Kind != "ollama" && p.Kind != "openai_compatible" {
+		if p.Kind != "ollama" && p.Kind != "openai_compatible" && p.Kind != "codex_app_server" {
 			return errors.New("unsupported provider kind")
 		}
-		u, err := url.Parse(p.Endpoint)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-			return errors.New("invalid provider endpoint; credentials and query strings are prohibited")
+		if p.Kind == "codex_app_server" {
+			if !filepath.IsAbs(p.Executable) || len(p.Executable) > 4096 || !utf8.ValidString(p.Executable) || strings.ContainsRune(p.Executable, 0) || p.Endpoint != "" || p.APIKeyEnv != "" {
+				return errors.New("invalid Codex app-server provider settings")
+			}
+		} else {
+			if p.Executable != "" {
+				return errors.New("HTTP providers cannot configure an executable")
+			}
+			u, err := url.Parse(p.Endpoint)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+				return errors.New("invalid provider endpoint; credentials and query strings are prohibited")
+			}
 		}
 		if p.APIKeyEnv != "" && !envName.MatchString(p.APIKeyEnv) {
 			return errors.New("invalid credential environment reference")
@@ -341,6 +353,9 @@ func (s Settings) Validate() error {
 		if m.Locality != "local" && m.Locality != "cloud" {
 			return errors.New("invalid model locality")
 		}
+		if providers[m.Provider].Kind == "codex_app_server" && (m.Locality != "cloud" || m.Model != "gpt-5.6-sol" || m.ContextTokens < 1) {
+			return errors.New("invalid Codex coordinator model settings")
+		}
 		if m.GPUDevice != "" && (m.Locality != "local" || m.VRAMBytes == 0 || !resources.ValidGPUDeviceID(m.GPUDevice)) {
 			return errors.New("invalid model GPU binding")
 		}
@@ -363,6 +378,9 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 	s.Providers = append([]Provider(nil), s.Providers...)
 	for i := range s.Providers {
 		s.Providers[i].Endpoint = "[REDACTED]"
+		if s.Providers[i].Executable != "" {
+			s.Providers[i].Executable = "[REDACTED]"
+		}
 	}
 	s.Telemetry.Database = "[REDACTED]"
 	s.Tools.ReadRoot = "[REDACTED]"

@@ -35,6 +35,7 @@ type Service struct {
 	toolReviewer     tools.ApprovalReviewer
 	toolPresenter    tools.ApprovalPresenter
 	providerFactory  providers.Factory
+	codexLauncher    codexLaunch
 	contextEstimator providers.ContextEstimator
 	memoryStore      memory.Store
 	skillStore       skills.Store

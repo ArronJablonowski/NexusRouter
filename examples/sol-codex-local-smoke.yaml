@@ -1,0 +1,56 @@
+# Experimental, supervised CLI coordinator test. No separate API key required.
+# Task text and local-worker output reach the signed-in cloud coordinator.
+version: 1
+mode: hybrid
+runtime:
+  max_turns: 3
+hardware:
+  auto_profile: true
+  max_ram_usage_pct: 80
+  max_concurrent_local_models: "1"
+  local_pressure_policy: reject
+workers:
+  max_in_process: 2
+  delegate_model: local-worker
+  delegate_max_calls: 1
+  delegate_max_cost: 0
+  delegate_read_tools: false
+providers:
+  - id: codex-coordinator
+    kind: codex_app_server
+    # Replace with the absolute installed CLI path on another host.
+    executable: /Users/aj_lobster/.local/bin/codex
+  - id: ollama-worker
+    kind: ollama
+    endpoint: http://127.0.0.1:11434
+models:
+  - id: coordinator
+    provider: codex-coordinator
+    model: gpt-5.6-sol
+    locality: cloud
+    capabilities: [chat, code, orchestration]
+    context_tokens: 16384
+    estimated_cost: 0.10 # Admission estimate, not an account-usage cap.
+  - id: local-worker
+    provider: ollama-worker
+    model: gemma4:12b-it-q4_K_M
+    locality: local
+    capabilities: [chat, code]
+    context_tokens: 4096
+    ram_bytes: 12884901888 # Initial estimate; not a measured peak guarantee.
+    estimated_cost: 0
+tools:
+  enabled: false
+memory:
+  enabled: false
+skills:
+  enabled: false
+  auto_draft: false
+  auto_activate_after_validation: false
+  learning:
+    enabled: false
+evaluation:
+  llm_judge_enabled: false
+telemetry:
+  database: ./data/sol-codex-local-smoke.db
+  opentelemetry_enabled: false

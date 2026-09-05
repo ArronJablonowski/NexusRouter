@@ -230,6 +230,39 @@ Default CI skips live launch tests. This remains an internal experimental entry
 point: application provider configuration, built-in tool/context qualification,
 descendant containment and integrated live delegation are still outstanding.
 
+### Explicit application task integration
+
+Configuration now accepts an experimental `codex_app_server` provider with an
+absolute `executable`, no HTTP endpoint and no API-key environment setting. Its
+models must have cloud locality, positive context capacity and the pinned Sol
+model name. Executable paths are redacted in configuration display. HTTP provider
+contracts remain unchanged and reject executable settings.
+
+Explicit task execution constructs the selected provider after resolved history
+privacy and supported context-shape checks. Codex currently requires one fresh
+user message; history import and multi-role memory/skill context are rejected
+before launch rather than flattened. The task owns the returned provider and
+closes it across model/tool/journal errors, then removes only its own temporary
+working directory. Context-size estimation still runs in the runtime before
+inference. HTTP construction also occurs later now, so failed provider creation
+can leave an initialized task database even though no task was started.
+
+Fixture tests exercise real application delegation to a local HTTP/Ollama fixture
+with a simulated Codex provider: durable parent/child linkage, local privacy,
+result return and task-owned cleanup pass. This does not qualify live protocol
+behavior. Automatic model discovery/health and auxiliary model use do not launch
+Codex and are not supported for this kind yet; the sample selects an explicit model.
+
+The first real application attempt failed before delegation. An opt-in inference
+diagnostic reached thread/turn creation and isolated the rejection to queued
+deprecation/warning notifications. The adapter still rejects them. Known feature
+mentions include deprecated landlock/web-search flags, host skill discovery and
+Code Mode host configuration. Their semantic impact must be understood before
+adding narrowly scoped handling. `TestLiveCodexProposalProtocol` is separately
+gated by `DARWIN_CODEX_LIVE_INFERENCE=1`, makes a real model attempt, and never
+executes or answers a proposed tool; default CI skips it. It currently fails,
+while no-inference launcher qualification passes. Full live delegation remains open.
+
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed
 durable boundaries. Then run the requested supervised live test: Sol proposes

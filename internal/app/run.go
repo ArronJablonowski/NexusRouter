@@ -12,7 +12,6 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -27,6 +26,7 @@ type Request struct {
 	toolReviewer                    tools.ApprovalReviewer
 	toolPresenter                   tools.ApprovalPresenter
 	providerFactory                 providers.Factory
+	codexLauncher                   codexLaunch
 	contextEstimator                providers.ContextEstimator
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
@@ -157,11 +157,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			break
 		}
 	}
-	tr, err := policy.NewTransport(s.Mode == "local_only" || model.Locality == "local", []string{provider.Endpoint})
-	if err != nil {
-		return result, ErrAdmission
-	}
-	defer tr.CloseIdleConnections()
 	key := ""
 	secrets := []string{}
 	if secret != nil {
@@ -181,10 +176,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 	}
 	if provider.APIKeyEnv != "" && key == "" {
-		return result, ErrAdmission
-	}
-	p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: tr})
-	if err != nil {
 		return result, ErrAdmission
 	}
 	db, err := telemetry.Open(ctx, s.Telemetry.Database)
@@ -276,6 +267,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
+	p, closeProvider, err := openTaskProvider(ctx, s, provider, model, r, messages, privacy, key)
+	if err != nil {
+		return result, ErrAdmission
+	}
+	defer closeProvider()
 	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns

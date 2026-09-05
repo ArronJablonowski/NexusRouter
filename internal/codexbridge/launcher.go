@@ -25,7 +25,7 @@ type LaunchSpec struct {
 // Callers MUST defer Close over the entire runtime loop, including tool and
 // persistence failures. This experimental internal entry point does not provide
 // descendant containment or full built-in prompt/tool isolation and is not yet
-// exposed through application configuration. No task is sent during launch.
+// a production isolation boundary. No task is sent during launch.
 func LaunchChecked(ctx context.Context, spec LaunchSpec) (*Session, error) {
 	return launchChecked(ctx, spec, func(ctx context.Context, p codexrpc.ProcessSpec) (Wire, error) {
 		return codexrpc.StartProcess(ctx, p)

@@ -32,9 +32,9 @@ local-only privacy.
 
 ## Prerequisites and readiness evidence
 
-- For the preferred CLI route, a working authenticated Codex CLI. A native
-  DarwinRouter-to-Codex coordinator adapter still needs implementation; the
-  successful standalone CLI call does not establish that integration.
+- For the preferred CLI route, a working authenticated Codex CLI. The experimental
+  native adapter is wired for explicit fresh tasks; live notification compatibility
+  is still failing, so it is not yet qualified for normal use.
 - For the optional direct-HTTP route only, a locally configured
   `OPENAI_API_KEY`; never paste the credential into chat or commit it.
 - A hybrid configuration with Sol pinned as the parent and an explicit local
@@ -72,3 +72,22 @@ The CLI coordinator uses the signed-in account's Codex usage limits. A complete
 live coordinator-to-worker-to-coordinator run, CLI adapter safety/cancellation,
 and sustained qualification remain unfinished. Full MVP work continues
 separately from these initial checks.
+
+## Experimental CLI profile and first integrated attempt
+
+`examples/sol-codex-local-smoke.yaml` uses `codex_app_server`, the existing
+ChatGPT login, and an absolute CLI executable path (adjust it on another host).
+No HTTP endpoint or API-key setting belongs on this provider. Only explicit
+fresh tasks are supported initially: select `--model coordinator`. Automatic
+health/routing discovery, auxiliary judging, history import and compaction are
+not implemented for this provider yet. Memory and skills remain off in the sample.
+
+The first CLI-backed application attempt created durable task
+`BQJR6VQWJRF4GCVVMDL3G4R4SR` in the ignored sample database and failed before
+any local delegation. A separate protocol diagnostic confirmed that Codex accepted
+thread and turn creation, then sent startup deprecation/warning notifications
+which the strict adapter rejected. Diagnostics associated the notices with
+`use_legacy_landlock`, `web_search_cached`, `web_search_request`,
+`skip_host_skill_discovery`, and `code_mode_host`. This is not proof those warnings
+are harmless; handling remains under investigation. No worker result or successful
+full round trip is claimed. Raw warning payloads and credentials are not persisted.
