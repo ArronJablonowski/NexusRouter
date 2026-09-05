@@ -306,7 +306,20 @@ On terminal persistence failure, inspect the returned started attempt's ID.
 Do not reissue inference under a new ID to bypass uncertainty. The input digest
 binds admitted examples and generation parameters; the host must additionally
 pin policy and estimator identity. This records proposals, not skill publication,
-and is not yet exposed through the application service or native management API.
+and is not exposed through the native management API.
+
+`Client.GenerateSkillDraft(ctx, attemptID, modelID, key, taskIDs, maxCost)` connects
+the application workflow to verified history. Supply a stable attempt ID, a
+configured model ID and2–20 completed task IDs from distinct sessions in one
+domain. Enable skills.enabled and skills.auto_draft with a configured root/scope;
+the root is not opened or changed by generation. Current accepted final-attempt
+evidence is selected from storage, including explicit subjective corrections.
+Local-only source/skill policy cannot be offloaded to a cloud generator. Admission
+uses shared execution/resource capacity and the configured context estimator.
+Configured secrets are redacted from observations and generated drafts before
+dispatch/persistence; exports can still contain other sensitive task content.
+No automatic selection of source tasks, publication, activation or background
+scheduling occurs. This does not mutate an injected SkillStore.
 
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease

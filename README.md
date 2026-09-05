@@ -914,7 +914,18 @@ Repeated IDs never dispatch again; terminal persistence failure returns the
 started observation for inspection, not permission to retry. Cancellation still
 allows a bounded terminal write. Drafted records are proposals, not published or
 active skills. SQLite inspection supports individual IDs and scoped pagination;
-deduplicated publication and daemon/API/CLI integration remain unfinished.
+deduplicated publication and native HTTP/CLI integration remain unfinished.
+
+The application service and Go SDK now provide `GenerateSkillDraft` for explicit
+task IDs and a configured generator model. It selects current accepted
+final-attempt evaluations from completed tasks in one read-only snapshot, rather
+than accepting caller-declared success. It preserves paired tool history, ignores
+system prompt material, and requires distinct sessions and a common domain.
+Newer negative user feedback disqualifies an earlier positive example. Generation
+honors skill scope/auto-draft settings, deployment mode, source privacy, context,
+resource and cost limits. Inputs and output are redacted before dispatch/storage;
+the returned record is a durable proposal, never an active skill. Background
+example discovery and scheduling still remain open.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

@@ -34,6 +34,11 @@ func (s *Store) TaskSnapshot(ctx context.Context, task string) (sessions.Snapsho
 // taskSnapshot also serves authorization checks which already hold the writer
 // transaction. Validation and consumption then observe the same journal state.
 func taskSnapshot(ctx context.Context, tx *sql.Tx, task string) (sessions.Snapshot, error) {
+	return taskSnapshotWithEvents(ctx, tx, task, nil)
+}
+
+// The optional event capture is populated only after complete replay validation.
+func taskSnapshotWithEvents(ctx context.Context, tx *sql.Tx, task string, captured *[]runtime.Event) (sessions.Snapshot, error) {
 	zero := sessions.Snapshot{}
 	var session, state sql.NullString
 	var head int64
@@ -102,6 +107,9 @@ func taskSnapshot(ctx context.Context, tx *sql.Tx, task string) (sessions.Snapsh
 	}
 	if snapshot.Sequence != head || snapshot.State != state.String || snapshot.SessionID != session.String {
 		return zero, sessions.ErrHistory
+	}
+	if captured != nil {
+		*captured = events
 	}
 	return snapshot, nil
 }

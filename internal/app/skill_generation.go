@@ -1,0 +1,237 @@
+package app
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"math"
+	"regexp"
+	"slices"
+	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
+)
+
+var skillGenerationIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+
+// GenerateSkillDraft derives a durable inactive proposal from accepted task
+// snapshots. A stable attempt ID is claimed once before estimation/inference;
+// started records after failure are uncertain and never authorize redispatch.
+// This does not publish, activate, or mutate the configured SkillStore.
+func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID string, key skills.Key, taskIDs []string, maxCost float64) (skills.GenerationAttempt, error) {
+	bad := func() (skills.GenerationAttempt, error) { return skills.GenerationAttempt{}, ErrAdmission }
+	if s == nil || ctx == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(attemptID) || len(taskIDs) < 2 || len(taskIDs) > 20 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
+		return bad()
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		return bad()
+	}
+	ids := append([]string(nil), taskIDs...)
+	slices.Sort(ids)
+	for i, id := range ids {
+		if !skillGenerationIdentifier.MatchString(id) || (i > 0 && ids[i-1] == id) {
+			return bad()
+		}
+	}
+	secrets := memorySecrets(s.settings, s.secret)
+	identities := append([]string{attemptID, modelID, key.Scope, key.Name}, ids...)
+	for _, id := range identities {
+		if redact(id, secrets) != id {
+			return bad()
+		}
+	}
+	if s.execution == nil {
+		return bad()
+	}
+	select {
+	case s.execution <- struct{}{}:
+		defer func() { <-s.execution }()
+	case <-ctx.Done():
+		return bad()
+	}
+	read, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return bad()
+	}
+	sources, err := read.SkillWorkflowSources(ctx, ids)
+	read.Close()
+	if err != nil || len(sources) != len(ids) {
+		return bad()
+	}
+	localRequired := s.settings.Skills.LocalOnly
+	examples := make([]skills.WorkflowExample, 0, len(sources))
+	var sourceSessions, sourceEvidence []string
+	seenTasks := make(map[string]bool, len(ids))
+	for i := range sources {
+		source := &sources[i]
+		if !slices.Contains(ids, source.Example.TaskID) || seenTasks[source.Example.TaskID] {
+			return bad()
+		}
+		seenTasks[source.Example.TaskID] = true
+		if source.Privacy != "cloud_allowed" {
+			localRequired = true
+		}
+		metadata := []string{source.Example.TaskID, source.Example.SessionID, source.Example.Domain, source.Privacy, source.EvaluationID, source.EvaluationDigest, source.SourceDigest}
+		for _, check := range source.Example.Checks {
+			metadata = append(metadata, check.Reference)
+		}
+		for _, value := range metadata {
+			if redact(value, secrets) != value {
+				return bad()
+			}
+		}
+		for j := range source.Example.Steps {
+			source.Example.Steps[j] = redact(source.Example.Steps[j], secrets)
+		}
+		outcome, resolveErr := evaluation.Resolve(source.Example.Checks, false)
+		if resolveErr != nil || !outcome.Accepted {
+			return bad()
+		}
+		sourceSessions = append(sourceSessions, source.Example.SessionID)
+		sourceEvidence = append(sourceEvidence, outcome.References...)
+		examples = append(examples, source.Example)
+	}
+	if skills.ValidateWorkflowExamples(key, examples) != nil {
+		return bad()
+	}
+	slices.Sort(sourceSessions)
+	sourceSessions = slices.Compact(sourceSessions)
+	slices.Sort(sourceEvidence)
+	sourceEvidence = slices.Compact(sourceEvidence)
+	var model config.Model
+	for _, m := range s.settings.Models {
+		if m.ID == modelID {
+			model = m
+			break
+		}
+	}
+	if model.ID == "" || model.ContextTokens < 1 || model.EstimatedCost == nil || *model.EstimatedCost > maxCost {
+		return bad()
+	}
+	local := model.Locality == "local"
+	if s.settings.Mode == "local_only" && !local || s.settings.Mode == "cloud_only" && local || localRequired && !local {
+		return bad()
+	}
+	var provider config.Provider
+	for _, p := range s.settings.Providers {
+		if p.ID == model.Provider {
+			provider = p
+			break
+		}
+	}
+	if provider.ID == "" || redact(model.Model, secrets) != model.Model || redact(provider.ID, secrets) != provider.ID {
+		return bad()
+	}
+	apiKey := ""
+	if s.secret != nil && provider.APIKeyEnv != "" {
+		apiKey = s.secret(provider.APIKeyEnv)
+	}
+	if provider.APIKeyEnv != "" && apiKey == "" {
+		return bad()
+	}
+	if local {
+		if model.RAMBytes == 0 {
+			return bad()
+		}
+		release, err := s.reserveExplicit(ctx, model)
+		if err != nil {
+			return bad()
+		}
+		defer release()
+	}
+	transport, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{provider.Endpoint})
+	if err != nil {
+		return bad()
+	}
+	defer transport.CloseIdleConnections()
+	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: apiKey, Transport: transport})
+	if err != nil {
+		return bad()
+	}
+	body, err := json.Marshal(struct {
+		Version                                  int
+		Key                                      skills.Key
+		Sources                                  []skills.WorkflowSource
+		Model                                    config.Model
+		ProviderID, ProviderKind, Endpoint, Mode string
+		LocalOnly                                bool
+		ContextTokens                            int
+		Timeout                                  time.Duration
+		MaxCost                                  float64
+	}{1, key, sources, model, provider.ID, provider.Kind, provider.Endpoint, s.settings.Mode, localRequired, model.ContextTokens, 30 * time.Second, maxCost})
+	if err != nil || len(body) > 512<<10 {
+		return bad()
+	}
+	digest := sha256.Sum256(body)
+	started := skills.GenerationAttempt{Version: 1, ID: attemptID, Key: key, Model: model.Model, Provider: provider.ID, InputDigest: hex.EncodeToString(digest[:]), SourceSessions: sourceSessions, SourceEvidence: sourceEvidence, Status: "started", EstimatedCost: *model.EstimatedCost, StartedAt: time.Now().UTC()}
+	if started.Validate() != nil {
+		return bad()
+	}
+	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return bad()
+	}
+	defer write.Close()
+	if err = write.BeginSkillGeneration(ctx, started); err != nil {
+		return skills.GenerationAttempt{}, skills.ErrGenerationPersistence
+	}
+	finish := func(terminal skills.GenerationAttempt, cause error) (skills.GenerationAttempt, error) {
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer stop()
+		if terminal.Validate() != nil || write.FinishSkillGeneration(cleanup, terminal) != nil {
+			return started, skills.ErrGenerationPersistence
+		}
+		return terminal, cause
+	}
+	fail := func(code string) (skills.GenerationAttempt, error) {
+		a := started
+		a.Status, a.Code = "failed", code
+		a.FinishedAt = time.Now().UTC()
+		if a.FinishedAt.Before(a.StartedAt) {
+			a.FinishedAt = a.StartedAt
+		}
+		return finish(a, errors.New("skill generation failed"))
+	}
+	g := skills.ModelGenerator{Provider: adapter, ContextEstimator: s.contextEstimator, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: 30 * time.Second, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	result, err := g.GenerateDetailed(ctx, key, examples)
+	if err != nil {
+		code := "generation_failed"
+		if ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			code = "canceled"
+		}
+		return fail(code)
+	}
+	draft := result.Draft
+	draft.Description = redact(draft.Description, secrets)
+	draft.Configuration = redact(draft.Configuration, secrets)
+	draft.Tags = redactSkillStrings(draft.Tags, secrets)
+	draft.RequiredTools = redactSkillStrings(draft.RequiredTools, secrets)
+	draft.Steps = redactSkillStrings(draft.Steps, secrets)
+	draft.Risks = redactSkillStrings(draft.Risks, secrets)
+	draft.ValidationCases = redactSkillStrings(draft.ValidationCases, secrets)
+	draft.SourceSessions = append([]string(nil), sourceSessions...)
+	draft.SourceEvidence = append([]string(nil), sourceEvidence...)
+	result.Draft = draft
+	terminal := started
+	terminal.Status, terminal.Result = "drafted", &result
+	terminal.FinishedAt = time.Now().UTC()
+	if terminal.FinishedAt.Before(terminal.StartedAt) {
+		terminal.FinishedAt = terminal.StartedAt
+	}
+	if terminal.Validate() != nil {
+		return fail("generation_failed")
+	}
+	if ctx.Err() != nil {
+		return fail("canceled")
+	}
+	return finish(terminal, nil)
+}
