@@ -21,6 +21,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	eventSink                       func(runtime.Event)
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
 	continuation                    *continuationContext
@@ -210,7 +211,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	if sessionID == "" {
 		sessionID = result.TaskID
 	}
-	j := redactingJournal{db: db, secrets: secrets}
+	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink}
 	loop := runtime.Loop{Provider: p, Journal: j, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := 1
@@ -233,8 +234,9 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 }
 
 type redactingJournal struct {
-	db      *telemetry.Store
-	secrets []string
+	db        *telemetry.Store
+	secrets   []string
+	eventSink func(runtime.Event)
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
@@ -271,10 +273,18 @@ func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.
 	if err != nil {
 		return err
 	}
-	if json.Unmarshal(data, &e.Data) != nil {
+	var redacted runtime.Data
+	if json.Unmarshal(data, &redacted) != nil {
 		return errors.New("cannot redact event")
 	}
-	return j.db.Append(ctx, expected, e)
+	e.Data = redacted
+	if err := j.db.Append(ctx, expected, e); err != nil {
+		return err
+	}
+	if j.eventSink != nil {
+		j.eventSink(e)
+	}
+	return nil
 }
 func redact(value string, secrets []string) string {
 	ordered := append([]string(nil), secrets...)

@@ -184,7 +184,24 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			}
 			advisoryInfluence = (1 - confidence) * cap * a.Confidence * math.Min(1, float64(a.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(a.Updated))/float64(p.HalfLife))
 		}
-		quality := shrink(e.Quality) + advisoryInfluence*(a.Quality-.5)
+		quality := shrink(e.Quality)
+		advisoryDelta := advisoryInfluence * (a.Quality - .5)
+		if confidence > 0 {
+			// Even sparse direct feedback retains its direction about neutral.
+			// Opposing reviews can soften that signal by at most half; they do
+			// not manufacture execution samples or direct-evidence confidence.
+			directDelta := quality - .5
+			if directDelta == 0 {
+				advisoryInfluence, advisoryDelta = 0, 0
+			} else if (directDelta < 0 && advisoryDelta > 0) || (directDelta > 0 && advisoryDelta < 0) {
+				limit := math.Abs(directDelta) / 2
+				if math.Abs(advisoryDelta) > limit {
+					advisoryDelta = math.Copysign(limit, advisoryDelta)
+					advisoryInfluence = advisoryDelta / (a.Quality - .5)
+				}
+			}
+		}
+		quality += advisoryDelta
 		v := e.Validity
 		if v.Samples < 0 || v.Failures < 0 || v.Failures > v.Samples {
 			return out, ErrInvalid

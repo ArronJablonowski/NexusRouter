@@ -34,6 +34,11 @@ func TestReviewerKeepsCandidateUntrustedAndPreservesAbstention(t *testing.T) {
 		if len(r.Tools) != 0 || len(r.Messages) != 2 || r.Messages[0].Role != "system" || r.Messages[1].Role != "user" || strings.Contains(r.Messages[0].Content, "INJECTED") || !strings.Contains(r.Messages[1].Content, "INJECTED") {
 			t.Fatal("review boundary lost")
 		}
+		for _, required := range []string{"Nonblank text is not evidence", "Brevity alone is not a defect", "semantic findings remain advisory", "defer to explicit user preferences"} {
+			if !strings.Contains(r.Messages[0].Content, required) {
+				t.Fatalf("missing audit policy: %s", required)
+			}
+		}
 		if err := emit(providers.Chunk{Text: reviewOutput("abstain")}); err != nil {
 			return err
 		}

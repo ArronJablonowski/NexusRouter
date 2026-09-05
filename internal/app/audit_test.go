@@ -31,7 +31,7 @@ func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {
 		if tools, ok := body["tools"].([]any); ok && len(tools) > 0 {
 			t.Error("review tools exposed")
 		}
-		a := evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v1", Domain: "creative", Verdict: "reject", Confidence: .4, Findings: []evaluation.AuditFinding{{Summary: "private-token advisory", EvidenceRefs: []string{"candidate"}}}}
+		a := evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "reject", Confidence: .4, Findings: []evaluation.AuditFinding{{Summary: "private-token advisory", EvidenceRefs: []string{"candidate"}}}}
 		encoded, _ := json.Marshal(a)
 		fmt.Fprintf(w, "{\"message\":{\"content\":%q},\"done\":true,\"done_reason\":\"stop\"}\n", string(encoded))
 	}))
@@ -141,7 +141,7 @@ func TestAutomaticReviewDoesNotReplaceCandidateOutcome(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&body)
 		text := "candidate answer"
 		if body.Model == "z" {
-			encoded, _ := json.Marshal(evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v1", Domain: "creative", Verdict: "abstain", Confidence: 0, Findings: []evaluation.AuditFinding{}})
+			encoded, _ := json.Marshal(evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "abstain", Confidence: 0, Findings: []evaluation.AuditFinding{}})
 			text = string(encoded)
 		}
 		fmt.Fprintf(w, "{\"message\":{\"content\":%q},\"done\":true,\"done_reason\":\"stop\"}\n", text)
