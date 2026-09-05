@@ -207,7 +207,7 @@ func TestMemoryMigrationFromV3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec("DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; DROP TABLE memory_facts; PRAGMA user_version=3;"); err != nil {
+	if _, err = s.db.Exec("DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; DROP TABLE memory_facts; PRAGMA user_version=3;"); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
