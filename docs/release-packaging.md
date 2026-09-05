@@ -141,7 +141,8 @@ make qualify-release
 
 This opt-in test builds all four targets twice from separate private snapshots,
 compares every unsigned output byte, checks executable platform/architecture,
-signs/verifies using disposable test keys, runs the native binary's version
+exercises the package/sign/verify CLIs, signs/verifies using disposable test keys,
+compares library/CLI signatures, runs the native binary's version
 command, and proves archive tampering is rejected. It uses temporary files
 removed by the test framework. It does not sign with an operator identity,
 publish artifacts, run model inference, or modify user configuration/databases.

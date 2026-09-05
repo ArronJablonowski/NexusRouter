@@ -39,10 +39,11 @@ func TestReleaseQualification(t *testing.T) {
 	parent := t.TempDir()
 	first, second := filepath.Join(parent, "first"), filepath.Join(parent, "second")
 	const version = "0.0.0-qualification"
-	for _, out := range []string{first, second} {
-		if err = Package(ctx, Options{Version: version, Commit: commit, Out: out, Source: source}); err != nil {
-			t.Fatal(err)
-		}
+	if err = Package(ctx, Options{Version: version, Commit: commit, Out: first, Source: source}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/package-release", "--version", version, "--commit", commit, "--out", second, "--source", source); err != nil {
+		t.Fatal("package CLI", err)
 	}
 	entries, err := os.ReadDir(first)
 	if err != nil || len(entries) != 6 {
@@ -79,6 +80,20 @@ func TestReleaseQualification(t *testing.T) {
 	}
 	if err = Verify(first, publicFile); err != nil {
 		t.Fatal(err)
+	}
+	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/sign-release", "--dir", second, "--key", seedFile); err != nil {
+		t.Fatal("signing CLI", err)
+	}
+	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", second, "--public-key", publicFile); err != nil {
+		t.Fatal("verification CLI", err)
+	}
+	firstSignature, err := os.ReadFile(filepath.Join(first, signatureName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondSignature, err := os.ReadFile(filepath.Join(second, signatureName))
+	if err != nil || !bytes.Equal(firstSignature, secondSignature) {
+		t.Fatal("library/CLI signature mismatch", err)
 	}
 	body, err := os.ReadFile(filepath.Join(first, "manifest.json"))
 	if err != nil {
@@ -136,7 +151,10 @@ func TestReleaseQualification(t *testing.T) {
 	if Verify(first, publicFile) == nil {
 		t.Fatal("tampered release verified")
 	}
-	t.Log("eight builds: every unsigned byte matched; four executable formats checked; ephemeral signature verified; native version ran; tampering rejected")
+	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", first, "--public-key", publicFile); err == nil {
+		t.Fatal("verification CLI accepted tampering")
+	}
+	t.Log("eight builds: every unsigned byte matched; four executable formats checked; package/sign/verify CLIs exercised; ephemeral signatures matched; native version ran; tampering rejected")
 }
 
 func qualificationBinary(t *testing.T, path string) []byte {

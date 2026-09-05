@@ -10,7 +10,7 @@ verification. See [release packaging](docs/release-packaging.md) and
 `make qualify-release`. No release has been published; distribution identity,
 license approval and full runtime qualification remain separate gates.
 
-The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Write tools and live token streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. The OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text; interactive CLI chat still displays answer text after completion. Write tools and interactive CLI token streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
