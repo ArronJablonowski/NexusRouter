@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -62,6 +63,11 @@ func Load(options Options) (Settings, error) {
 				return Settings{}, err
 			}
 		}
+		// Reject malformed lower-precedence overrides even when a later layer
+		// would replace them, matching the per-file type checks above.
+		if _, err := decode(root); err != nil {
+			return Settings{}, err
+		}
 	}
 	s, err := decode(root)
 	if err != nil {
@@ -115,6 +121,9 @@ func safeNode(n *yaml.Node) error {
 }
 
 func decode(n *yaml.Node) (Settings, error) {
+	if err := strictIntegers(n, reflect.TypeOf(Settings{})); err != nil {
+		return Settings{}, err
+	}
 	data, err := yaml.Marshal(n)
 	if err != nil {
 		return Settings{}, errors.New("cannot encode configuration")
