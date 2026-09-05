@@ -39,6 +39,7 @@ type Services struct {
 	Cancellation         func(context.Context, string) (runtime.CancellationStatus, error)
 	Events               func(context.Context, string, int64, int) (sessions.EventPage, error)
 	RunStream            func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
+	RunTextStream        func(context.Context, app.Request, func(string) error) (app.Result, error)
 	Summarize            func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
 	SummaryAttempt       func(context.Context, string) (sessions.SummaryAttempt, error)
 	SummaryAttempts      func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)

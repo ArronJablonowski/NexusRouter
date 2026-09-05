@@ -105,6 +105,15 @@ fields. Public provider messages, runtime events and session compaction records
 are shared with the core. Do not concurrently mutate request data or secret
 callbacks while a call uses them.
 
+`RunTextStream` accepts a synchronous callback for provisional, incrementally
+redacted assistant text after the corresponding lifecycle marker commits. It
+withholds possible secret fragments across chunks and can include intermediate
+assistant turns, but never tool contents or delegated child streams. Only a
+successful return establishes task completion. Callback errors/panics cancel
+execution; callbacks must cooperate with cancellation. Token text is not
+persisted or replayable. The returned result contains the final answer, not an
+aggregate of all intermediate turns.
+
 `RunStream` accepts a synchronous callback receiving committed, redacted events
 in journal order. It is lifecycle streaming, not raw token streaming. A callback
 error or panic cancels work and returns `ErrEventDelivery`; a committed event is

@@ -115,6 +115,17 @@ func (c *Client) RunStream(ctx context.Context, r Request, emit func(runtime.Eve
 	out, err := c.service.RunStream(ctx, r.internal(), emit)
 	return publicResult(out), err
 }
+
+// RunTextStream delivers provisional, incrementally redacted assistant text.
+// Unlike RunStream, token text is not replayable. Intermediate assistant turns
+// may be included; a successful return alone establishes task completion.
+func (c *Client) RunTextStream(ctx context.Context, r Request, emit func(string) error) (Result, error) {
+	if !c.valid(ctx) || r.Version != 1 || emit == nil {
+		return Result{Version: 1}, ErrAdmission
+	}
+	out, err := c.service.RunTextStream(ctx, r.internal(), emit)
+	return publicResult(out), err
+}
 func (c *Client) CancelTask(ctx context.Context, task string) (runtime.CancellationStatus, error) {
 	if !c.valid(ctx) {
 		return runtime.CancellationStatus{}, ErrAdmission

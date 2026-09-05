@@ -31,6 +31,7 @@ type Request struct {
 	admissionContext                context.Context
 	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
+	textSink                        func(string)
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
 	continuation                    *continuationContext
@@ -244,6 +245,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = result.TaskID
 	}
 	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, submissionID: r.submissionID, submissionToken: r.submissionToken}
+	if r.textSink != nil {
+		j.textDelivery = &textDelivery{secrets: secrets, emit: r.textSink}
+	}
 	if s.Workers.DelegateModel != "" && r.delegate != nil {
 		if registry == nil {
 			registry = &tools.Registry{}
@@ -294,6 +298,7 @@ type redactingJournal struct {
 	db                            *telemetry.Store
 	secrets                       []string
 	eventSink                     func(runtime.Event)
+	textDelivery                  *textDelivery
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
@@ -305,6 +310,7 @@ func (j redactingJournal) AppendLeased(ctx context.Context, expected int64, e ru
 }
 
 func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
+	rawText := e.Data.Text
 	// Partial deltas can split a credential across records. Persist lifecycle
 	// markers without delta text; the complete turn contains redacted text.
 	if e.Kind == runtime.ModelDelta {
@@ -356,6 +362,9 @@ func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e ru
 	}
 	if j.eventSink != nil {
 		j.eventSink(e)
+	}
+	if j.textDelivery != nil {
+		j.textDelivery.accept(e.Kind, rawText)
 	}
 	return nil
 }

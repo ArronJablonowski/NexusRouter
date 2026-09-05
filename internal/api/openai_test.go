@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
@@ -80,26 +81,32 @@ func TestChatStrictSubset(t *testing.T) {
 	}
 }
 
-func TestChatBufferedSSE(t *testing.T) {
+func TestChatLiveSSE(t *testing.T) {
 	w := httptest.NewRecorder()
 	s := services()
-	s.Run = func(context.Context, app.Request) (app.Result, error) {
-		if w.Body.Len() != 0 || w.Flushed {
-			t.Fatal("stream began before durable completion")
+	s.RunTextStream = func(_ context.Context, _ app.Request, emit func(string) error) (app.Result, error) {
+		if w.Body.Len() == 0 || !w.Flushed {
+			t.Fatal("stream role was not flushed before execution")
+		}
+		if err := emit("Hello\n🌍"); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(w.Body.String(), "Hello") {
+			t.Fatal("text held until completion")
 		}
 		return app.Result{Text: "Hello\n🌍"}, nil
 	}
 	h, _ := New(token, 1, s)
 	h.serveChatCompletions(w, request("POST", "/v1/chat/completions", strings.TrimSuffix(chatFixture, "}")+`,"stream":true}`))
-	if w.Code != 200 || w.Header().Get("Content-Type") != "text/event-stream" || w.Header().Get("X-Darwin-Stream-Mode") != "buffered" || !w.Flushed {
+	if w.Code != 200 || w.Header().Get("Content-Type") != "text/event-stream" || w.Header().Get("X-Darwin-Stream-Mode") != "live-redacted" || !w.Flushed {
 		t.Fatal(w.Code, w.Header())
 	}
 	events := strings.Split(strings.TrimSuffix(w.Body.String(), "\n\n"), "\n\n")
-	if len(events) != 3 || events[2] != "data: [DONE]" {
+	if len(events) != 4 || events[3] != "data: [DONE]" {
 		t.Fatal(w.Body.String())
 	}
 	var previous map[string]any
-	for i, event := range events[:2] {
+	for i, event := range events[:3] {
 		var body map[string]any
 		if !strings.HasPrefix(event, "data: ") || json.Unmarshal([]byte(strings.TrimPrefix(event, "data: ")), &body) != nil {
 			t.Fatal(event)
@@ -107,15 +114,18 @@ func TestChatBufferedSSE(t *testing.T) {
 		if body["object"] != "chat.completion.chunk" || body["model"] != "m" {
 			t.Fatal(body)
 		}
-		if i == 1 && (body["id"] != previous["id"] || body["created"] != previous["created"]) {
+		if i > 0 && (body["id"] != previous["id"] || body["created"] != previous["created"]) {
 			t.Fatal("chunk identity changed")
 		}
 		choice := body["choices"].([]any)[0].(map[string]any)
 		delta := choice["delta"].(map[string]any)
-		if i == 0 && (delta["role"] != "assistant" || delta["content"] != "Hello\n🌍") {
+		if i == 0 && delta["role"] != "assistant" {
 			t.Fatal(delta)
 		}
-		if i == 1 && len(delta) != 0 {
+		if i == 1 && delta["content"] != "Hello\n🌍" {
+			t.Fatal(delta)
+		}
+		if i == 2 && len(delta) != 0 {
 			t.Fatal(delta)
 		}
 		if choice["finish_reason"] != nil {
@@ -138,13 +148,13 @@ func TestChatLimitsErrorsAndCancellation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := services()
-			s.Run = func(context.Context, app.Request) (app.Result, error) {
+			s.RunTextStream = func(context.Context, app.Request, func(string) error) (app.Result, error) {
 				return app.Result{Text: "private partial"}, tc.err
 			}
 			h, _ := New(token, 1, s)
 			w := httptest.NewRecorder()
 			h.serveChatCompletions(w, request("POST", "/v1/chat/completions", strings.TrimSuffix(chatFixture, "}")+`,"stream":true}`))
-			if w.Code != tc.status || strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "[DONE]") {
+			if w.Code != 200 || !strings.Contains(w.Body.String(), `"error"`) || strings.Contains(w.Body.String(), "private") || strings.Contains(w.Body.String(), "[DONE]") {
 				t.Fatal(w.Code, w.Body.String())
 			}
 		})
@@ -203,6 +213,12 @@ func TestChatReportedMetadata(t *testing.T) {
 		s.Run = func(context.Context, app.Request) (app.Result, error) {
 			return app.Result{Text: "truncated", FinishReason: "length", Usage: &providers.Usage{InputTokens: 7, OutputTokens: 3}}, nil
 		}
+		s.RunTextStream = func(ctx context.Context, req app.Request, emit func(string) error) (app.Result, error) {
+			if err := emit("truncated"); err != nil {
+				return app.Result{}, err
+			}
+			return s.Run(ctx, req)
+		}
 		h, _ := New(token, 1, s)
 		w := httptest.NewRecorder()
 		body := chatFixture
@@ -246,6 +262,116 @@ func TestChatSharedAuthentication(t *testing.T) {
 			h.ServeHTTP(w, r)
 			if w.Code != status || (status != 200 && calls != 0) || (status == 200 && calls != 1) {
 				t.Fatal(w.Code, calls, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestChatStreamUnavailableDoesNotFallBack(t *testing.T) {
+	s := services()
+	s.Run = func(context.Context, app.Request) (app.Result, error) {
+		t.Fatal("stream request silently buffered")
+		return app.Result{}, nil
+	}
+	h, _ := New(token, 1, s)
+	w := httptest.NewRecorder()
+	h.serveChatCompletions(w, request("POST", "/v1/chat/completions", strings.TrimSuffix(chatFixture, "}")+`,"stream":true}`))
+	if w.Code != 503 || !strings.Contains(w.Body.String(), "streaming_unavailable") || len(h.slots) != 0 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
+func TestChatStreamDoesNotFinishAfterFailure(t *testing.T) {
+	for _, mode := range []string{"provider", "panic", "invalid_utf8", "oversize", "invalid_result"} {
+		t.Run(mode, func(t *testing.T) {
+			s := services()
+			s.RunTextStream = func(_ context.Context, _ app.Request, emit func(string) error) (app.Result, error) {
+				if err := emit("provisional"); err != nil {
+					t.Fatal(err)
+				}
+				switch mode {
+				case "provider":
+					return app.Result{Text: "private final"}, errors.New("private provider error")
+				case "panic":
+					panic("private panic")
+				case "invalid_utf8":
+					if emit(string([]byte{0xff})) == nil {
+						t.Fatal("invalid text accepted")
+					}
+				case "oversize":
+					if emit(strings.Repeat("x", 1<<20)) == nil {
+						t.Fatal("aggregate limit ignored")
+					}
+				case "invalid_result":
+					return app.Result{Text: string([]byte{0xff})}, nil
+				}
+				// Even a service that ignores delivery errors cannot fabricate
+				// a successful end-of-stream marker.
+				return app.Result{Text: "private final"}, nil
+			}
+			h, _ := New(token, 1, s)
+			w := httptest.NewRecorder()
+			h.serveChatCompletions(w, request("POST", "/v1/chat/completions", strings.TrimSuffix(chatFixture, "}")+`,"stream":true}`))
+			body := w.Body.String()
+			if w.Code != 200 || !strings.Contains(body, "provisional") || !strings.Contains(body, `"error"`) || strings.Contains(body, "private") || strings.Contains(body, "[DONE]") || len(h.slots) != 0 {
+				t.Fatal(w.Code, body)
+			}
+		})
+	}
+}
+
+type chatFailWriter struct {
+	*httptest.ResponseRecorder
+	writes int
+	mode   string
+}
+
+func (w *chatFailWriter) Write(p []byte) (int, error) {
+	w.writes++
+	if w.writes > 1 {
+		switch w.mode {
+		case "panic":
+			panic("private writer panic")
+		case "short":
+			return 0, nil
+		case "write":
+			return 0, errors.New("private write error")
+		}
+	}
+	return w.ResponseRecorder.Write(p)
+}
+
+func (w *chatFailWriter) FlushError() error {
+	if w.writes > 1 && w.mode == "flush" {
+		return errors.New("private flush error")
+	}
+	w.ResponseRecorder.Flush()
+	return nil
+}
+
+// Hide ResponseRecorder.WriteString so io.WriteString exercises Write.
+type chatWriterOnly struct{ w *chatFailWriter }
+
+func (w chatWriterOnly) Header() http.Header         { return w.w.Header() }
+func (w chatWriterOnly) WriteHeader(code int)        { w.w.WriteHeader(code) }
+func (w chatWriterOnly) Write(p []byte) (int, error) { return w.w.Write(p) }
+func (w chatWriterOnly) FlushError() error           { return w.w.FlushError() }
+
+func TestChatStreamWriterFailureStopsDelivery(t *testing.T) {
+	for _, mode := range []string{"panic", "short", "write", "flush"} {
+		t.Run(mode, func(t *testing.T) {
+			s := services()
+			s.RunTextStream = func(_ context.Context, _ app.Request, emit func(string) error) (app.Result, error) {
+				if emit("provisional") == nil || emit("later") == nil {
+					t.Fatal("delivery failure not sticky")
+				}
+				return app.Result{Text: "final"}, nil
+			}
+			h, _ := New(token, 1, s)
+			w := &chatFailWriter{ResponseRecorder: httptest.NewRecorder(), mode: mode}
+			h.serveChatCompletions(chatWriterOnly{w}, request("POST", "/v1/chat/completions", strings.TrimSuffix(chatFixture, "}")+`,"stream":true}`))
+			if w.writes != 2 || strings.Contains(w.Body.String(), "[DONE]") || strings.Contains(w.Body.String(), "private") || len(h.slots) != 0 {
+				t.Fatal(w.writes, w.Body.String())
 			}
 		})
 	}

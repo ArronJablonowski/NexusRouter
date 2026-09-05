@@ -18,8 +18,8 @@ import (
 
 // serveChatCompletions is a bounded text-only compatibility adapter. Authentication,
 // origin checks and the execution deadline are supplied by ServeHTTP. Run returns
-// only after durable completion, so SSE here delivers buffered output, not live
-// provider deltas. Unknown usage and finish metadata must not be invented.
+// only after durable completion; streaming uses the redacted text callback and
+// never exposes raw journal deltas. Unknown metadata must not be invented.
 func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || media != "application/json" {
@@ -53,10 +53,8 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if stream {
-		if _, ok := w.(http.Flusher); !ok {
-			chatFailure(w, 500, "server_error", "streaming_unavailable")
-			return
-		}
+		h.serveChatStream(w, r, req)
+		return
 	}
 	result, err := h.services.Run(r.Context(), req)
 	if r.Context().Err() == context.Canceled {
@@ -87,37 +85,11 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 	base := func(object string, choice map[string]any) map[string]any {
 		return map[string]any{"id": id, "object": object, "created": created, "model": req.ModelID, "choices": []any{choice}}
 	}
-	if !stream {
-		response := base("chat.completion", map[string]any{"index": 0, "message": map[string]string{"role": "assistant", "content": result.Text}, "finish_reason": finish})
-		if u := result.Usage; u != nil && u.InputTokens >= 0 && u.OutputTokens >= 0 && u.InputTokens <= (1<<63-1)-u.OutputTokens {
-			response["usage"] = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
-		}
-		writeJSON(w, 200, response)
-		return
+	response := base("chat.completion", map[string]any{"index": 0, "message": map[string]string{"role": "assistant", "content": result.Text}, "finish_reason": finish})
+	if u := result.Usage; u != nil && u.InputTokens >= 0 && u.OutputTokens >= 0 && u.InputTokens <= (1<<63-1)-u.OutputTokens {
+		response["usage"] = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
 	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.Header().Set("X-Darwin-Stream-Mode", "buffered")
-	w.WriteHeader(200)
-	flusher := w.(http.Flusher)
-	for _, choice := range []map[string]any{
-		{"index": 0, "delta": map[string]string{"role": "assistant", "content": result.Text}, "finish_reason": nil},
-		{"index": 0, "delta": map[string]string{}, "finish_reason": finish},
-	} {
-		if r.Context().Err() != nil {
-			return
-		}
-		b, _ := json.Marshal(base("chat.completion.chunk", choice))
-		if _, err := io.WriteString(w, "data: "+string(b)+"\n\n"); err != nil {
-			return
-		}
-		flusher.Flush()
-	}
-	if r.Context().Err() == nil {
-		if _, err := io.WriteString(w, "data: [DONE]\n\n"); err == nil {
-			flusher.Flush()
-		}
-	}
+	writeJSON(w, 200, response)
 }
 
 func chatFailure(w http.ResponseWriter, status int, kind, code string) {

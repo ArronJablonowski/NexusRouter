@@ -24,7 +24,8 @@ func TestUninitializedClientRejectsAllOperations(t *testing.T) {
 		g := client.Feedback(ctx, "task", true, 0)
 		_, h := client.FeedbackHistory(ctx, "task")
 		i := client.ReviseFeedback(ctx, "task", "expected", true)
-		for _, err := range []error{a, b, c, d, e, f, g, h, i} {
+		_, j := client.RunTextStream(ctx, Request{Version: 1}, func(string) error { return nil })
+		for _, err := range []error{a, b, c, d, e, f, g, h, i, j} {
 			if !errors.Is(err, ErrAdmission) {
 				t.Fatal(err)
 			}
@@ -49,6 +50,10 @@ func TestSDKConfigAndVersionFailBeforeStorage(t *testing.T) {
 	}
 	for _, version := range []int{0, -1, 2} {
 		out, err := client.Run(context.Background(), Request{Version: version, Prompt: "hello"})
+		if !errors.Is(err, ErrAdmission) || out.Version != 1 || out.TaskID != "" {
+			t.Fatal(out, err)
+		}
+		out, err = client.RunTextStream(context.Background(), Request{Version: version}, func(string) error { t.Fatal("invalid request reached callback"); return nil })
 		if !errors.Is(err, ErrAdmission) || out.Version != 1 || out.TaskID != "" {
 			t.Fatal(out, err)
 		}
