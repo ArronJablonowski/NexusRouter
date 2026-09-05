@@ -947,6 +947,16 @@ and let generation revalidate the resulting 2–20-task set. Discovery never
 opens the skill root, dispatches a model, publishes or activates a skill.
 Background scheduling and semantic grouping of repeated workflows remain open.
 
+Go hosts can also use durable discovery/consumption through
+`AdvanceSkillWorkflowScan` and `ConsumeSkillWorkflowScan`. Consumption groups
+matching observed tool sequences across saved pages, refreshes the source
+evidence transactionally, and saves a repeat-safe receipt. Read-only receipt
+and bucket inspection survives restarts. Groups remain heuristic candidates;
+selection planning and generation must revalidate them. See the
+[SDK learning workflow](sdk/v1/README.md) for revision handling, bounds and
+privacy requirements. Background scheduling and automatic skill activation
+are not implied by these operations.
+
 Operator surfaces expose that same read-only discovery:
 
 ```sh

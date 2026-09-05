@@ -167,7 +167,7 @@ func TestSubmissionRecoveryRollbackAndLegacy(t *testing.T) {
 	if err != nil || len(history) != 0 {
 		t.Fatalf("partial audit %v %v", history, err)
 	}
-	if _, err = db.db.Exec(`DROP TRIGGER reject_recovery; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; PRAGMA user_version=12`); err != nil {
+	if _, err = db.db.Exec(`DROP TRIGGER reject_recovery; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; PRAGMA user_version=12`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(ctx, path)

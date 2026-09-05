@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 18 {
+	if version > 19 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -253,6 +253,21 @@ func (s *Store) initialize(ctx context.Context) error {
 		 scope TEXT NOT NULL, name TEXT NOT NULL, revision INTEGER NOT NULL,
 		 body BLOB NOT NULL, PRIMARY KEY(scope,name,revision));
 		 PRAGMA user_version=18;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 19 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE workflow_scan_consumers (
+		 scope TEXT NOT NULL, name TEXT NOT NULL, revision INTEGER NOT NULL,
+		 body BLOB NOT NULL, PRIMARY KEY(scope,name));
+		 CREATE TABLE workflow_scan_consumptions (
+		 scope TEXT NOT NULL, name TEXT NOT NULL, revision INTEGER NOT NULL,
+		 body BLOB NOT NULL, PRIMARY KEY(scope,name,revision));
+		 CREATE TABLE workflow_scan_buckets (
+		 scope TEXT NOT NULL, name TEXT NOT NULL, epoch INTEGER NOT NULL,
+		 id TEXT NOT NULL, revision INTEGER NOT NULL, body BLOB NOT NULL, PRIMARY KEY(scope,name,epoch,id));
+		 PRAGMA user_version=19;`)
 		if err != nil {
 			return err
 		}

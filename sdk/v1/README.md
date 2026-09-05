@@ -441,7 +441,7 @@ establish source tenancy.
 `Client.AdvanceSkillWorkflowScan(ctx, name, domain, expectedRevision, scanLimit)`
 saves a bounded discovery page and progress together in the configured scope.
 Start at revision zero; use the returned scan revision for the next page. Enable
-skills and auto-draft with a configured root/scope and an existing schema-18
+skills and auto-draft with a configured root/scope and an existing schema-19
 database. The call does not initialize or migrate storage, open the skill root,
 or invoke a model. Sensitive metadata is checked before persistence; identities
 are rejected rather than rewritten when they collide with current credentials.
@@ -455,6 +455,36 @@ the write may already have committed, and an exact retry returns its original
 historical page even when newer pages exist. Metadata can still be sensitive.
 These methods do not schedule scans, group candidates across pages, select a
 workflow, or dispatch generation.
+
+`Client.ConsumeSkillWorkflowScan(ctx, name, expectedRevision)` now performs the
+separate grouping stage for the next saved scan page. Start consumption at zero
+even if discovery has already saved several pages. After success, use the
+returned receipt revision; after uncertain delivery, retry the same expected
+revision. An exact retry returns its original historical receipt without
+reapplying the page. Consumption requires enabled auto-draft and existing
+current-schema storage, and does not invoke a provider or open the skill root.
+
+The consumer refreshes acceptance and actual paired tool events transactionally.
+Changed or no-longer-eligible examples are skipped; malformed evidence fails the
+whole page. Matching domain/profile/ordered-tool observations accumulate across
+pages within one epoch, keeping the lexical first task per session and at most
+20 distinct sessions. Each epoch is limited to 1000 patterns; exceeding the cap
+fails closed. A singleton is retained but cannot yet become a workflow group.
+
+`Client.SkillWorkflowScanConsumption(ctx, name)` inspects the latest receipt.
+`Client.SkillWorkflowScanBuckets(ctx, name, epoch, afterID, limit)` lists 1–20
+buckets ordered by ID, including singletons. Advance `afterID` to the final ID
+returned; an empty page ends inspection. Inspection works with auto-draft off.
+Call `bucket.Group()` to require at least two sources, then pass its source task
+IDs through `PlanGroupedWorkflowSelection` before `GenerateSkillSelection`.
+Planning and generation revalidate evidence; a saved bucket is not fresh
+acceptance, semantic equivalence, or permission to execute tools.
+
+Discovery and consumption use independent revision cursors. Scope/name identify
+one operator's scan, not source-data tenancy. Receipt/catalog integrity checks
+run within a ten-second operation deadline; indexed long-history accounting and
+retention remain future work. These operations do not start a background
+scheduler, dispatch generation, publish drafts, or activate skills.
 
 `skills.generation_budget` optionally caps generation across the configured skill
 scope. Defaults are disabled, with `window: 24h`, `max_cost: 0`,
