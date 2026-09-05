@@ -118,7 +118,16 @@ func ProjectTerminalSubmission(events []runtime.Event) (TerminalOutcome, error) 
 	}
 	nonempty, syntax := int64(0), int64(0)
 	for _, e := range events {
+		if e.Kind == runtime.SteeringApplied && e.Sequence > turnEnd.Sequence {
+			return bad()
+		}
 		if e.Kind != runtime.EvaluationRecorded {
+			continue
+		}
+		// A prior answer can have been evaluated before newly queued steering
+		// forced another turn. Only the final turn's evaluation window supplies
+		// acceptance evidence; checks inside that window must still match it.
+		if e.Sequence <= turnStart.Sequence {
 			continue
 		}
 		if e.Data.Code != "deterministic.nonempty_text.v1" && e.Data.Code != "deterministic.go_syntax.v1" {

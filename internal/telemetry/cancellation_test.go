@@ -163,7 +163,7 @@ func TestCancellationRollbackMissingAndLegacyStatus(t *testing.T) {
 	if status, err := db.CancellationStatus(ctx, "task"); err != nil || status.Requested || status.State != "running" {
 		t.Fatal("failed insert not rolled back", status, err)
 	}
-	if _, err := db.db.Exec("DROP TRIGGER reject_cancellation; DROP INDEX events_submission_start; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; PRAGMA user_version=10"); err != nil {
+	if _, err := db.db.Exec("DROP TRIGGER reject_cancellation; DROP INDEX events_submission_start; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; PRAGMA user_version=10"); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

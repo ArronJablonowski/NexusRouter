@@ -1,5 +1,7 @@
 version: 1
 mode: local_only
+runtime:
+  max_turns: 8  # Shared iteration budget for initial work and active steering.
 providers:
   - id: local-primary
     kind: ollama

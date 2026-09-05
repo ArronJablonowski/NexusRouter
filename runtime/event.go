@@ -30,6 +30,7 @@ const (
 	RouteSelected      Kind = "route.selected"
 	EvaluationRecorded Kind = "evaluation.recorded"
 	ErrorRecorded      Kind = "error.recorded"
+	SteeringApplied    Kind = "steering.applied"
 )
 
 type Effect string
@@ -61,6 +62,7 @@ type Event struct {
 }
 
 type Data struct {
+	SteeringID      string               `json:"steering_id,omitempty"`
 	SubmissionID    string               `json:"submission_id,omitempty"`
 	Compaction      *ContextCompaction   `json:"compaction,omitempty"`
 	Validation      string               `json:"validation,omitempty"`
@@ -89,6 +91,9 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if e.Data.SteeringID != "" && e.Kind != SteeringApplied {
+		return errors.New("invalid steering identity")
+	}
 	if id := e.Data.SubmissionID; id != "" {
 		if e.Kind != TaskStarted || len(id) > 128 {
 			return errors.New("invalid submission identity")
@@ -106,6 +111,10 @@ func (e Event) Validate() error {
 		return errors.New("invalid context compaction")
 	}
 	switch e.Kind {
+	case SteeringApplied:
+		if !validSteeringID(e.Data.SteeringID) || !ValidSteeringText(e.Data.Text) || e.TurnID != "" || e.AttemptID != "" {
+			return errors.New("invalid steering event")
+		}
 	case TaskStarted, TaskCompleted, TaskFailed, TaskCanceled:
 	case TurnStarted, TurnCompleted, ModelDelta:
 		if e.TurnID == "" {

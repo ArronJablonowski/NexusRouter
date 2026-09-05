@@ -224,13 +224,13 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = result.TaskID
 	}
 	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, submissionID: r.submissionID, submissionToken: r.submissionToken}
-	loop := runtime.Loop{Provider: p, Journal: j, ValidationText: func(text string) string { return redact(text, secrets) }}
+	loop := runtime.Loop{Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
-	maxTurns := 1
+	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()
 		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
-		maxTurns = s.Tools.MaxTurns
+		maxTurns = min(maxTurns, s.Tools.MaxTurns)
 	}
 	var compaction *runtime.ContextCompaction
 	if r.continuation != nil {

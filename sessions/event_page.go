@@ -43,7 +43,7 @@ func EventPageStateMatches(state string, kind runtime.Kind) bool {
 		return kind == runtime.TaskCanceled
 	case "running":
 		switch kind {
-		case runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.ModelDelta, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.RouteSelected, runtime.EvaluationRecorded, runtime.ErrorRecorded:
+		case runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.ModelDelta, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.RouteSelected, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.SteeringApplied:
 			return true
 		}
 		return false

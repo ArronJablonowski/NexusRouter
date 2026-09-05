@@ -25,6 +25,8 @@ import (
 )
 
 type Services struct {
+	Steer                func(context.Context, string, string, string) (runtime.SteeringMessage, error)
+	Steering             func(context.Context, string, string) (runtime.SteeringMessage, error)
 	Metrics              func(context.Context) (metrics.Snapshot, error)
 	HealthReport         func(context.Context) (health.Report, error)
 	SubmissionRecoveries func(context.Context, string) ([]submissions.Recovery, error)
@@ -49,20 +51,21 @@ type Services struct {
 	Feedback             func(context.Context, string, bool, float64) error
 }
 type Handler struct {
-	secret       [32]byte
-	services     Services
-	slots        chan struct{}
-	controls     chan struct{}
-	intake       chan struct{}
-	healthSlots  chan struct{}
-	metricsSlots chan struct{}
+	secret        [32]byte
+	services      Services
+	slots         chan struct{}
+	controls      chan struct{}
+	intake        chan struct{}
+	healthSlots   chan struct{}
+	metricsSlots  chan struct{}
+	steeringSlots chan struct{}
 }
 
 func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1)}, nil
+	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -114,6 +117,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.Contains(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/steering"):
+		h.serveSteering(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/metrics" && r.Method == http.MethodGet:
 		h.serveMetrics(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/health" && r.Method == http.MethodGet:

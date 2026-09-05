@@ -61,7 +61,7 @@ func TestSubmissionListByteBoundNoSkips(t *testing.T) {
 func TestSubmissionListLegacyReadOnly(t *testing.T) {
 	db, path := submissionStore(t)
 	ctx := context.Background()
-	if _, err := db.db.Exec(`DROP INDEX events_submission_start; DROP TABLE submission_recoveries; DROP TABLE submissions; PRAGMA user_version=11`); err != nil {
+	if _, err := db.db.Exec(`DROP INDEX events_submission_start; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; PRAGMA user_version=11`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(ctx, path)

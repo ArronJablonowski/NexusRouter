@@ -173,6 +173,46 @@ discrete-GPU inventory.
 
 `--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined input is limited to 4 MiB and configured per-model context admission still applies.
 
+### Steering an active task
+
+With the daemon running, authenticated clients can send
+`POST /v1/tasks/{task_id}/steering` with JSON:
+
+```json
+{"idempotency_key":"unique-client-message-1","text":"Focus the answer on the migration risks."}
+```
+
+The response is202 while pending and includes a message ID, not the submitted
+text or key. Inspect with `GET /v1/tasks/{task_id}/steering/{message_id}`.
+Reusing a key with the same persisted text returns the original record;
+different text conflicts. Keys are hashed before storage and configured secrets
+are redacted from guidance. Task/session content still needs privacy care.
+Control endpoints have separate bounded capacity from execution and cancellation.
+
+Steering is applied before a model turn or after a complete tool batch, never
+halfway through a tool-call/result pair. It does not interrupt a running provider
+or stop tools already proposed; use cancellation to request stopping. The
+`steering.applied` SSE/replay event means the guidance was durably added to context,
+not that another provider turn executed or that the model obeyed it. The runtime
+checks again at completion, so guidance accepted before the terminal transaction
+causes another bounded turn rather than being silently ignored.
+
+Limits are32 messages over a task's lifetime,64KiB per message,4MiB serialized
+conversation at steering admission, and the model's configured context limit.
+`runtime.max_turns` defaults to8 (allowed1–32) for all tasks; enabled tools also
+apply `tools.max_turns`. Guidance does not reset these budgets or change model,
+privacy, tool permissions or resource reservations. Context/turn exhaustion can
+fail the task with guidance pending or applied-but-not-executed. Failed/canceled
+tasks retain those records for inspection; they are not automatically resumed.
+New guidance for a terminal task is rejected, but duplicate-key receipts remain
+retrievable. Use completed-session continuation for a new follow-up task.
+
+Storage migrates transactionally to schema14. Back up operational databases
+before upgrades; older binaries cannot open this schema. The new runtime turn
+configuration changes durable submission fingerprints, so older queued requests
+require explicit configuration-mismatch handling. Interactive CLI steering,
+pending-guidance listing and general interrupted-session recovery remain unfinished.
+
 To shorten a completed conversation, supply an operator-reviewed summary file:
 
 ```json

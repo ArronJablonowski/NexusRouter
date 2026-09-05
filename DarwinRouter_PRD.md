@@ -372,6 +372,19 @@ State transitions are appended durably before acknowledgement. Events carry task
 
 Sessions support cancellation, retries, resumable branches, steering messages, follow-ups, checkpoints, and idempotency keys.
 
+Active-task steering is durable user guidance, not a policy or permission change.
+The initial HTTP surface accepts up to32 messages per task, each up to64KiB UTF-8,
+with task-scoped idempotency keys. Acceptance means queued; a separate committed
+`steering.applied` event means added to conversation context, not proven execution
+or compliance. Apply only outside model streams and complete tool-call/result
+batches. Completion must serialize with queue acceptance so accepted guidance
+cannot disappear behind a successful terminal transition. Guidance never resets
+iteration, output, context, privacy or tool limits, and pending guidance must not
+be discarded by automatic fallback. `runtime.max_turns` bounds all task turns
+(default8, allowed1–32), also capped by tool limits when tools are enabled.
+Failed/canceled tasks may retain inspectable pending guidance; general interrupted
+task recovery and an interactive steering CLI remain required delivery work.
+
 ### 10.2 Context Assembly
 
 Prompt input is assembled in three tiers:

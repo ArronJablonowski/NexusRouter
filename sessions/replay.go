@@ -47,6 +47,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 	toolIDs := map[string]bool{}
 	turnIDs := map[string]bool{}
 	attemptIDs := map[string]bool{}
+	steeringIDs := map[string]bool{}
 	for {
 		events, err := r.Read(ctx, task, s.Sequence, 100)
 		if err != nil {
@@ -98,6 +99,13 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				attempt = e.AttemptID
 				turnIDs[turn] = true
 				attemptIDs[attempt] = true
+			case runtime.SteeringApplied:
+				if turn != "" || attempt != "" || len(s.Pending) > 0 || s.UncertainEffects || e.TurnID != "" || e.AttemptID != "" || steeringIDs[e.Data.SteeringID] || len(steeringIDs) >= 32 {
+					return s, ErrHistory
+				}
+				steeringIDs[e.Data.SteeringID] = true
+				s.Messages = append(s.Messages, providers.Message{Role: "user", Content: e.Data.Text})
+				s.MessageSequences = append(s.MessageSequences, e.Sequence)
 			case runtime.ModelDelta:
 				if turn == "" || turn != e.TurnID || attempt != e.AttemptID {
 					return s, ErrHistory

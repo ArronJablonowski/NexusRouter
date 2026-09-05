@@ -30,6 +30,7 @@ type Settings struct {
 	Evaluation Evaluation `yaml:"evaluation" json:"evaluation"`
 	Security   Security   `yaml:"security" json:"security"`
 	Tools      Tools      `yaml:"tools" json:"tools"`
+	Runtime    Runtime    `yaml:"runtime" json:"runtime"`
 	Telemetry  Telemetry  `yaml:"telemetry" json:"telemetry"`
 }
 type Daemon struct {
@@ -112,13 +113,17 @@ type Tools struct {
 	MaxTurns int    `yaml:"max_turns" json:"max_turns"`
 }
 
+type Runtime struct {
+	MaxTurns int `yaml:"max_turns" json:"max_turns"`
+}
+
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
 		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{3, "5s", "30s", "single_writer"},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
+		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -204,6 +209,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Tools.MaxTurns < 2 || s.Tools.MaxTurns > 32 {
 		return errors.New("tool max turns must be between 2 and 32")
+	}
+	if s.Runtime.MaxTurns < 1 || s.Runtime.MaxTurns > 32 {
+		return errors.New("runtime max turns must be between 1 and 32")
 	}
 	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
 		return errors.New("enabled tools require an absolute read root")

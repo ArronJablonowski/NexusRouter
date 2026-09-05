@@ -55,6 +55,7 @@ type Result struct {
 	Usage        *providers.Usage
 }
 type Loop struct {
+	Steering SteeringSource
 	Provider providers.Provider
 	Journal  Journal
 	Tools    ToolExecutor
@@ -119,7 +120,13 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
 		}
+		if k == SteeringApplied {
+			e.TurnID, e.AttemptID = "", ""
+		}
 		if err := l.Journal.Append(ctx, seq, e); err != nil {
+			if errors.Is(err, ErrSteeringPending) {
+				return ErrSteeringPending
+			}
 			if errors.Is(err, ErrExecutionLeaseLost) {
 				return ErrExecutionLeaseLost
 			}
@@ -135,6 +142,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		return Result{}, err
 	}
 	result := Result{}
+	appliedSteering := 0
 	// The cancellation gate guarantees no append occurred. Unlike an ambiguous
 	// storage failure, it is safe to append one bounded cancellation terminal.
 	defer func() {
@@ -178,9 +186,71 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if err := persist(terminal, kind, Data{Code: code}); err != nil {
+			if errors.Is(err, ErrSteeringPending) && kind == TaskFailed && code == "provider_retryable_no_output" {
+				result.Retryable = false
+				if rewriteErr := persist(terminal, TaskFailed, Data{Code: "execution_failed"}); rewriteErr != nil {
+					return result, rewriteErr
+				}
+				return result, cause
+			}
 			return result, err
 		}
 		return result, cause
+	}
+	drain := func() (applied bool, err error) {
+		if l.Steering == nil {
+			return false, nil
+		}
+		next := func() (message *SteeringMessage, err error) {
+			defer func() {
+				if recover() != nil {
+					err = ErrProtocol
+				}
+			}()
+			return l.Steering.NextSteering(ctx, r.TaskID)
+		}
+		for {
+			if ctx.Err() != nil {
+				return applied, ctx.Err()
+			}
+			message, sourceErr := next()
+			if sourceErr != nil {
+				return applied, ErrProtocol
+			}
+			if message == nil {
+				return applied, nil
+			}
+			if message.Validate() != nil || message.TaskID != r.TaskID || message.State != "pending" {
+				return applied, ErrProtocol
+			}
+			if appliedSteering >= MaxSteeringMessages {
+				return applied, ErrLimit
+			}
+			candidate := inference
+			candidate.Messages = append(append([]providers.Message(nil), inference.Messages...), providers.Message{Role: "user", Content: message.Text})
+			body, encodeErr := json.Marshal(candidate.Messages)
+			if encodeErr != nil || len(body) > 4<<20 {
+				return applied, ErrLimit
+			}
+			if r.MaxContextTokens > 0 {
+				estimate, estimateErr := providers.EstimateContext(candidate)
+				if estimateErr != nil || estimate > r.MaxContextTokens {
+					return applied, ErrLimit
+				}
+			}
+			if persistErr := persist(ctx, SteeringApplied, Data{SteeringID: message.ID, Text: message.Text}); persistErr != nil {
+				return applied, persistErr
+			}
+			inference = candidate
+			appliedSteering++
+			applied = true
+		}
+	}
+	steeringFailure := func(err error) (Result, error) {
+		if errors.Is(err, ErrPersistence) || errors.Is(err, ErrCancellationRequested) || errors.Is(err, ErrExecutionLeaseLost) {
+			return result, err
+		}
+		return fail(err)
 	}
 	// A committed append may notify a sink that cancels the task. Observe
 	// that cancellation before the next normal append or external dispatch;
@@ -203,6 +273,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	for n := 0; n < r.MaxTurns; n++ {
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
+		}
+		if _, err := drain(); err != nil {
+			return steeringFailure(err)
+		}
+		if body, err := json.Marshal(inference.Messages); err != nil || len(body) > 4<<20 {
+			return fail(ErrLimit)
 		}
 		if r.MaxContextTokens > 0 {
 			estimate, err := providers.EstimateContext(inference)
@@ -289,10 +365,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		if err != nil {
 			var providerFailure *providers.Failure
-			safe := n == 0 && text.Len() == 0 && len(calls) == 0 && ctx.Err() == nil && errors.As(err, &providerFailure) && providerFailure.Retryable && !providerFailure.Partial
+			safe := n == 0 && appliedSteering == 0 && text.Len() == 0 && len(calls) == 0 && ctx.Err() == nil && errors.As(err, &providerFailure) && providerFailure.Retryable && !providerFailure.Partial
 			result.Retryable = safe
 			out, failErr := fail(ErrProvider)
-			out.Retryable = safe && errors.Is(failErr, ErrProvider)
+			out.Retryable = out.Retryable && safe && errors.Is(failErr, ErrProvider)
 			return out, failErr
 		}
 		if !done {
@@ -320,6 +396,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			totalUsage.OutputTokens += usage.OutputTokens
 		}
 		if len(calls) == 0 {
+			inference.Messages = append(inference.Messages, providers.Message{Role: "assistant", Content: text.String()})
+			if applied, err := drain(); err != nil {
+				return steeringFailure(err)
+			} else if applied {
+				continue
+			}
 			validationText := text.String()
 			if l.ValidationText != nil {
 				validationText = l.ValidationText(validationText)
@@ -355,6 +437,16 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				return fail(ctx.Err())
 			}
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
+				if errors.Is(err, ErrSteeringPending) {
+					applied, drainErr := drain()
+					if drainErr != nil {
+						return steeringFailure(drainErr)
+					}
+					if !applied {
+						return fail(ErrProtocol)
+					}
+					continue
+				}
 				return result, err
 			}
 			result.Text = text.String()

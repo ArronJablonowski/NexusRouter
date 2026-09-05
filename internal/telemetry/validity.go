@@ -43,6 +43,9 @@ func (s *Store) OutputValidity(ctx context.Context, key routing.Key, requested .
 	// For a dense model history, reverse event scanning can stop at the recent
 	// window. For a sparse model, let SQLite start at the model index. This only
 	// changes join planning, never filtering, ordering, or the sample limit.
+	// Scope checks to the final turn's sequence window, then validate their
+	// attempt identity below. Filtering only by attempt ID would silently hide
+	// malformed final evidence. Steering after that turn invalidates its answer.
 	join := "JOIN"
 	if modelStarts > 200 {
 		join = "CROSS JOIN"
@@ -54,7 +57,8 @@ func (s *Store) OutputValidity(ctx context.Context, key routing.Key, requested .
 	 AND t.sequence=(SELECT max(sequence) FROM events x WHERE x.task_id=a.task_id AND json_extract(x.body,'$.kind')='turn.started')
 	 WHERE json_extract(a.body,'$.kind')='evaluation.recorded'
 	 AND json_extract(a.body,'$.data.code') IN ('deterministic.nonempty_text.v1','deterministic.go_syntax.v1')
-	 AND a.sequence=(SELECT min(sequence) FROM events x WHERE x.task_id=a.task_id AND json_extract(x.body,'$.kind')='evaluation.recorded' AND json_extract(x.body,'$.data.code') IN ('deterministic.nonempty_text.v1','deterministic.go_syntax.v1'))
+	 AND a.sequence=(SELECT min(sequence) FROM events x WHERE x.task_id=a.task_id AND x.sequence>t.sequence AND json_extract(x.body,'$.kind')='evaluation.recorded' AND json_extract(x.body,'$.data.code') IN ('deterministic.nonempty_text.v1','deterministic.go_syntax.v1'))
+	 AND NOT EXISTS(SELECT 1 FROM events x WHERE x.task_id=a.task_id AND x.sequence>t.sequence AND json_extract(x.body,'$.kind')='steering.applied')
 	 AND json_extract(t.body,'$.data.model_id')=? AND json_extract(t.body,'$.data.provider_id')=?
 	 AND COALESCE((SELECT json_extract(p.body,'$.data.validation') FROM events p WHERE p.task_id=a.task_id AND json_extract(p.body,'$.kind')='task.started' LIMIT 1),'')=?
 	 AND COALESCE((SELECT NULLIF(json_extract(p.body,'$.data.domain'),'') FROM events p WHERE p.task_id=a.task_id AND p.sequence<t.sequence AND json_extract(p.body,'$.kind')='route.selected' AND NULLIF(json_extract(p.body,'$.data.domain'),'') IS NOT NULL ORDER BY p.sequence DESC LIMIT 1),
@@ -66,9 +70,9 @@ func (s *Store) OutputValidity(ctx context.Context, key routing.Key, requested .
 	 (SELECT body FROM events c WHERE c.task_id=a.task_id AND json_extract(c.body,'$.kind')='turn.completed' ORDER BY sequence DESC LIMIT 1),
 	 (SELECT body FROM events z WHERE z.task_id=a.task_id ORDER BY sequence DESC LIMIT 1),
 	 (SELECT body FROM events p WHERE p.task_id=a.task_id AND json_extract(p.body,'$.kind')='task.started' ORDER BY sequence LIMIT 1),
-	 (SELECT body FROM events p WHERE p.task_id=a.task_id AND json_extract(p.body,'$.kind')='evaluation.recorded' AND json_extract(p.body,'$.data.code')='deterministic.go_syntax.v1' ORDER BY sequence LIMIT 1),
-	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND json_extract(d.body,'$.kind')='evaluation.recorded' AND json_extract(d.body,'$.data.code')='deterministic.go_syntax.v1'),
-	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND json_extract(d.body,'$.kind')='evaluation.recorded' AND json_extract(d.body,'$.data.code')='deterministic.nonempty_text.v1'),
+	 (SELECT body FROM events p WHERE p.task_id=a.task_id AND p.sequence>json_extract(a.start_body,'$.sequence') AND json_extract(p.body,'$.kind')='evaluation.recorded' AND json_extract(p.body,'$.data.code')='deterministic.go_syntax.v1' ORDER BY sequence LIMIT 1),
+	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND d.sequence>json_extract(a.start_body,'$.sequence') AND json_extract(d.body,'$.kind')='evaluation.recorded' AND json_extract(d.body,'$.data.code')='deterministic.go_syntax.v1'),
+	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND d.sequence>json_extract(a.start_body,'$.sequence') AND json_extract(d.body,'$.kind')='evaluation.recorded' AND json_extract(d.body,'$.data.code')='deterministic.nonempty_text.v1'),
 	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND json_extract(d.body,'$.attempt_id')=json_extract(a.start_body,'$.attempt_id') AND json_extract(d.body,'$.kind')='turn.started'),
 	 (SELECT count(*) FROM events d WHERE d.task_id=a.task_id AND json_extract(d.body,'$.attempt_id')=json_extract(a.start_body,'$.attempt_id') AND json_extract(d.body,'$.kind')='turn.completed')
 	 FROM recent a`, key.Model, key.Provider, validationFilter, key.Domain, key.Profile)

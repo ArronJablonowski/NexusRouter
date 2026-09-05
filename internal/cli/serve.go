@@ -77,6 +77,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		CancelSubmission:     service.CancelSubmission,
 		Cancel:               service.CancelTask,
 		Cancellation:         service.CancellationStatus,
+		Steer:                service.SteerTask,
+		Steering:             service.SteeringStatus,
 		Summarize:            service.SummarizeTask,
 		SummaryAttempt:       db.SummaryAttempt,
 		SummaryAttempts:      db.ListSummaryAttempts,
