@@ -438,6 +438,24 @@ Generation still creates only an inactive proposal, with the stable selection
 ID preventing automatic redispatch. These operations do not schedule work or
 establish source tenancy.
 
+`Client.AdvanceSkillWorkflowScan(ctx, name, domain, expectedRevision, scanLimit)`
+saves a bounded discovery page and progress together in the configured scope.
+Start at revision zero; use the returned scan revision for the next page. Enable
+skills and auto-draft with a configured root/scope and an existing schema-18
+database. The call does not initialize or migrate storage, open the skill root,
+or invoke a model. Sensitive metadata is checked before persistence; identities
+are rejected rather than rewritten when they collide with current credentials.
+
+An epoch fences task membership by insertion sequence while reading live task
+and feedback state. Later epochs revisit changed evidence and lower-ID arrivals.
+`Client.SkillWorkflowScan(ctx, name)` reads current progress without advancing;
+it requires enabled skills but remains available when auto-draft is disabled.
+After uncertain delivery, retry the same name/domain/expected revision/limit:
+the write may already have committed, and an exact retry returns its original
+historical page even when newer pages exist. Metadata can still be sensitive.
+These methods do not schedule scans, group candidates across pages, select a
+workflow, or dispatch generation.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

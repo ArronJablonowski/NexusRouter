@@ -120,6 +120,10 @@ func (s *Store) WorkflowScan(ctx context.Context, scope, name string) (skills.Wo
 // advances. Completed epochs restart at the beginning with a new upper bound,
 // revisiting late feedback and lower-ID arrivals. No inference is dispatched.
 func (s *Store) AdvanceWorkflowScan(ctx context.Context, scope, name, domain string, expectedRevision int64, scanLimit int) (page skills.WorkflowScanPage, err error) {
+	return s.advanceWorkflowScan(ctx, scope, name, domain, expectedRevision, scanLimit, nil)
+}
+
+func (s *Store) advanceWorkflowScan(ctx context.Context, scope, name, domain string, expectedRevision int64, scanLimit int, guard func(context.Context, skills.WorkflowScanPage) error) (page skills.WorkflowScanPage, err error) {
 	if ctx == nil || s == nil || s.db == nil || !workflowSourceID.MatchString(scope) || !workflowSourceID.MatchString(name) || !workflowSourceID.MatchString(domain) || expectedRevision < 0 || expectedRevision >= 1e9 || scanLimit < 1 || scanLimit > 20 {
 		return page, skills.ErrInvalid
 	}
@@ -175,6 +179,9 @@ func (s *Store) AdvanceWorkflowScan(ctx context.Context, scope, name, domain str
 			}
 			if prior.Limit != scanLimit || prior.Scan.Domain != domain {
 				return page, ErrConflict
+			}
+			if err = guardWorkflowScan(ctx, guard, prior); err != nil {
+				return page, err
 			}
 			if err = tx.Commit(); err != nil {
 				return page, err
@@ -258,6 +265,9 @@ func (s *Store) AdvanceWorkflowScan(ctx context.Context, scope, name, domain str
 	page = skills.WorkflowScanPage{Version: 1, Scan: head, After: after, Limit: scanLimit, Page: observation}
 	if page.Validate() != nil {
 		return page, skills.ErrInvalid
+	}
+	if err = guardWorkflowScan(ctx, guard, page); err != nil {
+		return page, err
 	}
 	pageBody, e := json.Marshal(page)
 	if e != nil || len(pageBody) > 65536 {
