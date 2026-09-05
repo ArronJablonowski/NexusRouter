@@ -45,13 +45,15 @@ type Hardware struct {
 	LocalQueueTimeout   string  `yaml:"local_queue_timeout" json:"local_queue_timeout"`
 }
 type Workers struct {
-	Max              int     `yaml:"max_in_process" json:"max_in_process"`
-	Heartbeat        string  `yaml:"heartbeat_interval" json:"heartbeat_interval"`
-	Lease            string  `yaml:"lease_timeout" json:"lease_timeout"`
-	EffectPolicy     string  `yaml:"side_effect_policy" json:"side_effect_policy"`
-	DelegateModel    string  `yaml:"delegate_model" json:"delegate_model"`
-	DelegateMaxCalls int     `yaml:"delegate_max_calls" json:"delegate_max_calls"`
-	DelegateMaxCost  float64 `yaml:"delegate_max_cost" json:"delegate_max_cost"`
+	Max               int     `yaml:"max_in_process" json:"max_in_process"`
+	Heartbeat         string  `yaml:"heartbeat_interval" json:"heartbeat_interval"`
+	Lease             string  `yaml:"lease_timeout" json:"lease_timeout"`
+	EffectPolicy      string  `yaml:"side_effect_policy" json:"side_effect_policy"`
+	DelegateModel     string  `yaml:"delegate_model" json:"delegate_model"`
+	DelegateMaxCalls  int     `yaml:"delegate_max_calls" json:"delegate_max_calls"`
+	DelegateMaxCost   float64 `yaml:"delegate_max_cost" json:"delegate_max_cost"`
+	DelegateReadTools bool    `yaml:"delegate_read_tools" json:"delegate_read_tools"`
+	DelegateMaxTurns  int     `yaml:"delegate_max_turns" json:"delegate_max_turns"`
 }
 type Provider struct {
 	ID        string `yaml:"id" json:"id"`
@@ -122,7 +124,7 @@ type Runtime struct {
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
-		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0},
+		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
@@ -184,8 +186,11 @@ func (s Settings) Validate() error {
 	if s.Workers.Max < 1 || he != nil || le != nil || l <= h || s.Workers.EffectPolicy != "single_writer" {
 		return errors.New("invalid worker limits or lease policy")
 	}
-	if s.Workers.DelegateMaxCalls < 1 || s.Workers.DelegateMaxCalls > 16 || !finite(s.Workers.DelegateMaxCost) || s.Workers.DelegateMaxCost < 0 {
+	if s.Workers.DelegateMaxCalls < 1 || s.Workers.DelegateMaxCalls > 16 || s.Workers.DelegateMaxTurns < 1 || s.Workers.DelegateMaxTurns > 8 || !finite(s.Workers.DelegateMaxCost) || s.Workers.DelegateMaxCost < 0 {
 		return errors.New("invalid delegation limits")
+	}
+	if s.Workers.DelegateReadTools && (s.Workers.DelegateModel == "" || !s.Tools.Enabled || s.Workers.DelegateMaxTurns < 2) {
+		return errors.New("invalid delegate read tools configuration")
 	}
 	if s.Workers.DelegateModel != "" {
 		if !identifier.MatchString(s.Workers.DelegateModel) || h < time.Millisecond || l > 10*time.Minute || l <= 2*h {
@@ -194,7 +199,11 @@ func (s Settings) Validate() error {
 		found := false
 		for _, model := range s.Models {
 			if model.ID == s.Workers.DelegateModel {
-				if model.ContextTokens < 1 || model.EstimatedCost == nil || !finite(*model.EstimatedCost) || *model.EstimatedCost < 0 || *model.EstimatedCost > s.Workers.DelegateMaxCost || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
+				turns := 1
+				if s.Workers.DelegateReadTools {
+					turns = s.Workers.DelegateMaxTurns
+				}
+				if model.ContextTokens < 1 || model.EstimatedCost == nil || !finite(*model.EstimatedCost) || *model.EstimatedCost < 0 || *model.EstimatedCost > s.Workers.DelegateMaxCost/float64(turns) || (s.Workers.DelegateReadTools && model.Locality != "local") || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
 					return errors.New("delegation model unavailable within configured limits")
 				}
 				found = true

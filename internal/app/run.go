@@ -24,6 +24,7 @@ var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
 	delegatedParent                 string
+	delegatedTools                  *delegateTools
 	delegate                        delegateRunner
 	memoryStore                     memory.Store
 	skillStore                      skills.Store
@@ -69,10 +70,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	if r.delegatedParent != "" {
-		// Children receive only their explicit prompt, never ambient workspace,
-		// memory, skills, continuation history or recursive delegation authority.
-		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = false, false, false
+		// Children receive only explicit context and, optionally, a borrowed
+		// read-only capability. Never grant memory, skills or recursion.
+		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
 		s.Workers.DelegateModel = ""
+		s.Workers.DelegateReadTools = false
 	}
 	var model config.Model
 	found := false
@@ -115,7 +117,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	var registry *tools.Registry
-	if s.Tools.Enabled {
+	toolPolicy := applicationToolPolicy()
+	if r.delegatedTools != nil {
+		registry, toolPolicy = r.delegatedTools.Registry, r.delegatedTools.Policy
+	} else if s.Tools.Enabled {
 		var closeTools func()
 		var err error
 		registry, closeTools, err = readTools(s.Tools.ReadRoot)
@@ -243,7 +248,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate); err != nil {
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, toolPolicy); err != nil {
 			return result, ErrAdmission
 		}
 	}
@@ -252,7 +257,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()
-		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}, {Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}
+		loop.Tools = tools.Executor{Registry: registry, Policy: toolPolicy}
 		if s.Tools.Enabled {
 			maxTurns = min(maxTurns, s.Tools.MaxTurns)
 		}
@@ -260,6 +265,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	parentID, maxOutput := r.ContinueTaskID, 1<<20
 	if r.delegatedParent != "" {
 		parentID, maxTurns, maxOutput = r.delegatedParent, 1, 64<<10
+		if r.delegatedTools != nil {
+			inference.Tools = []providers.Tool{readFileSpec()}
+			maxTurns = min(s.Workers.DelegateMaxTurns, s.Tools.MaxTurns, s.Runtime.MaxTurns)
+		}
 	}
 	var compaction *runtime.ContextCompaction
 	if r.continuation != nil {

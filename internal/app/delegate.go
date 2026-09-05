@@ -21,7 +21,7 @@ import (
 type delegateRunner func(context.Context, string, string, string, bool) (Result, error)
 
 func delegateSpec() providers.Tool {
-	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured inference-only worker to perform a bounded task. Pass only necessary context. Workers cannot use tools or delegate. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. Capacity may be unavailable.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
+	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured worker to perform a bounded task. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. Capacity may be unavailable.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
 }
 
 // runDelegate never waits for execution capacity or local pressure while the
@@ -44,10 +44,22 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 		return Result{}, ErrAdmission
 	}
 	r := Request{ModelID: s.settings.Workers.DelegateModel, Prompt: prompt, Validation: validation, LocalRequired: localOnly, delegatedParent: parent, submissionID: submissionID, submissionToken: submissionToken}
+	if s.settings.Workers.DelegateReadTools {
+		capability, ok := ctx.Value(delegateToolsKey{}).(*delegateTools)
+		if !ok || capability == nil || capability.Registry == nil || capability.Policy == nil || capability.Policy.Decide("read_file", "workspace") != tools.Allow {
+			return Result{}, ErrAdmission
+		}
+		r.delegatedTools = capability
+		r.LocalRequired = true
+	}
 	return s.runExplicit(ctx, r)
 }
 
-func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner) error {
+func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, policies ...*tools.Policy) error {
+	var parentPolicy *tools.Policy
+	if len(policies) == 1 {
+		parentPolicy = policies[0]
+	}
 	heartbeat, err := config.Duration(cfg.Workers.Heartbeat)
 	if err != nil {
 		return ErrAdmission
@@ -78,6 +90,13 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 			}
 			childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
+			if cfg.Workers.DelegateReadTools {
+				var err error
+				childCtx, err = inheritDelegateTools(childCtx, registry, parentPolicy)
+				if err != nil {
+					return failed, nil
+				}
+			}
 			workID := rand.Text()
 			stopWatcher := watchCancellation(childCtx, func(query context.Context) (bool, error) {
 				return db.CancellationRequested(query, workID)

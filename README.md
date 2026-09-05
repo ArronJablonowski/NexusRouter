@@ -342,7 +342,7 @@ Review is a local operator attestation, not automated proof of accuracy, and doe
 
 Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation and mid-task compaction remain unfinished.
 
-### Model-callable inference workers
+### Model-callable bounded workers
 
 Delegation is opt-in. Set `workers.delegate_model` to an existing configured
 model ID with a known `context_tokens` capacity and `estimated_cost`:
@@ -353,15 +353,30 @@ workers:
   delegate_model: local-worker
   delegate_max_calls: 4
   delegate_max_cost: 0
+  delegate_read_tools: false
+  delegate_max_turns: 4
 ```
 
 The parent receives a `delegate` tool accepting a prompt (up to 16 KiB) and
 `validation: text` or `go_source`. The operator chooses the worker model; model
-output cannot select a different provider or grant permissions. Each child has
-one inference turn, a 30-second deadline and a 64-KiB output limit. It receives
-only the explicit prompt, with no ambient history, memory, skills or tools.
+output cannot select a different provider or grant permissions. By default each
+child has one inference turn, a 30-second deadline and a 64-KiB output limit.
+It receives only the explicit prompt, with no ambient history, memory or skills.
 It cannot delegate recursively. A local-only parent cannot send its child to
 the cloud, even in hybrid mode.
+
+To permit workspace inspection, explicitly enable `workers.delegate_read_tools`
+alongside the parent's `tools.enabled` and `tools.read_root`. The worker must be
+local. It receives only `read_file`, borrowing the parent's already-open root;
+it cannot reopen a changed path, escape the root, write files or acquire new
+permissions. Its allow rule is subordinate to the parent's policy: deny or ask
+does not become permission. The registry stays open until all child work has
+joined. Disabled delegation tools remain inference-only.
+
+Read-tool children use at most `delegate_max_turns` (2–8), additionally capped
+by `runtime.max_turns` and `tools.max_turns`. Tool-call/result pairs and validation
+are recorded in the child's ordinary runtime history. The 30-second deadline
+and output cap remain unchanged across the whole child run.
 
 Parents retain their task slots and hardware reservations. Children acquire
 additional capacity without waiting; unavailable capacity produces a bounded
@@ -385,10 +400,12 @@ of completed multi-task submission trees, remains operator-inspection-only.
 Delegation does not automatically update fitness or audit the child.
 
 `delegate_max_calls` is 1–16 per parent execution, including failed admitted
-attempts. `delegate_max_cost` is a separate **per-call configured estimate** ceiling,
+attempts. `delegate_max_cost` is a separate **per-child configured estimate** ceiling,
 not the parent's request budget or a measured billing cap. Up to max-calls times
-that estimate can be spent in addition to parent inference. Provider billing
-can differ from estimates. Disable delegation by leaving `delegate_model` empty.
+that ceiling can be spent in addition to parent inference. For read-tool children,
+configuration conservatively requires the model's per-turn estimate times
+`delegate_max_turns` to fit this ceiling. Provider billing can differ from
+estimates. Disable delegation by leaving `delegate_model` empty.
 
 ## Local HTTP service
 
@@ -759,7 +776,7 @@ and production-scale metrics qualification remain unfinished.
 
 ## Next sprints
 
-1. Extend inference-only delegation to scoped read-only tools, parallel child batches and approved single-writer tools.
+1. Extend scoped read-only delegation to parallel child batches and approved single-writer tools.
 2. Expand safe fallback qualification and automatic validated outcome updates.
 3. Add automatic context summarization and knowledge maintenance beyond current operator-compacted continuation, scoped factual memory and validated procedural-skill retrieval.
 4. Add live events, recovery and cross-provider qualification.
