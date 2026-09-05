@@ -28,12 +28,13 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	settings config.Settings
-	secret   func(string) string
-	budget   *resources.Budget
-	profile  func(context.Context) (resources.Snapshot, error)
-	draw     func() float64
-	mu       sync.Mutex
+	discovery *modelHealthCache
+	settings  config.Settings
+	secret    func(string) string
+	budget    *resources.Budget
+	profile   func(context.Context) (resources.Snapshot, error)
+	draw      func() float64
+	mu        sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -56,7 +57,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{settings: s, secret: secret, budget: b, profile: resources.Profile, draw: rand.Float64}, nil
+	return &Service{discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: resources.Profile, draw: rand.Float64}, nil
 }
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
@@ -220,7 +221,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 				adapter, e := providers.NewHTTP(pr.Endpoint, pr.Kind, key, tr)
 				if e == nil {
 					check, cancel := context.WithTimeout(ctx, 2*time.Second)
-					models, e := adapter.Models(check)
+					identity, _ := json.Marshal([]string{pr.ID, pr.Kind, pr.Endpoint, key, strconv.FormatBool(cfg.Mode == "local_only" || c.Local)})
+					digest := sha256.Sum256(identity)
+					models, e := s.discovery.models(check, hex.EncodeToString(digest[:]), adapter.Models)
 					cancel()
 					if e == nil {
 						for _, name := range models {
@@ -313,6 +316,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		r.route.Resources = &snapshot
 	}
 	result, runErr := RunExplicit(ctx, cfg, r, s.secret)
+	if runErr != nil {
+		s.discovery.clear()
+	}
 	for _, m := range cfg.Models {
 		if m.ID == r.ModelID && m.EstimatedCost != nil {
 			result.reservedCost = *m.EstimatedCost
