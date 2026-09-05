@@ -22,6 +22,7 @@ type Pending struct {
 	Dispatched bool
 }
 type Snapshot struct {
+	RetryOfTaskID            string
 	ParentTaskID, Privacy    string
 	TaskID, SessionID, State string
 	Sequence                 int64
@@ -69,6 +70,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				}
 				s.State = "running"
 				s.ParentTaskID = e.Data.ParentTaskID
+				s.RetryOfTaskID = e.Data.RetryOfTaskID
 				s.Privacy = e.Data.Privacy
 				s.Messages = e.Data.Messages
 				if len(s.Messages) > 0 {

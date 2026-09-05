@@ -106,6 +106,11 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	for _, previous := range result.PreviousTaskIDs {
+		if _, writeErr := fmt.Fprintln(stderr, "Previous attempt:", previous); writeErr != nil {
+			return 1
+		}
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "task failed; inspect local task history before retrying")
 		return 1

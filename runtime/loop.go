@@ -29,6 +29,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	RetryOfTaskID string
 	// RequireText applies only to a final answer, never an intermediate tool
 	// proposal. Non-text host workflows may leave this false explicitly.
 	RequireText                   bool
@@ -42,6 +43,7 @@ type RunRequest struct {
 	MaxOutputBytes                int
 }
 type Result struct {
+	Retryable    bool
 	Text         string
 	Turns        int
 	FinishReason string
@@ -103,7 +105,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}
@@ -115,6 +117,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
 		code := "execution_failed"
+		if result.Retryable && errors.Is(cause, ErrProvider) {
+			code = "provider_retryable_no_output"
+		}
 		if errors.Is(cause, ErrLimit) {
 			code = "budget_exhausted"
 		}
@@ -217,7 +222,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			return fail(callbackErr)
 		}
 		if err != nil {
-			return fail(ErrProvider)
+			var providerFailure *providers.Failure
+			safe := n == 0 && text.Len() == 0 && len(calls) == 0 && ctx.Err() == nil && errors.As(err, &providerFailure) && providerFailure.Retryable && !providerFailure.Partial
+			result.Retryable = safe
+			out, failErr := fail(ErrProvider)
+			out.Retryable = safe && errors.Is(failErr, ErrProvider)
+			return out, failErr
 		}
 		if !done {
 			return fail(ErrProtocol)

@@ -124,11 +124,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				status = 422
 				code = "admission_denied"
 			}
-			writeJSON(w, status, map[string]string{"error": code, "task_id": result.TaskID})
+			writeJSON(w, status, map[string]any{"error": code, "task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs})
 			return
 		}
 		// This synchronous endpoint acknowledges only a completed durable task.
-		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus})
+		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus, "previous_task_ids": result.PreviousTaskIDs})
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && r.Method == http.MethodGet:
 		id := strings.TrimPrefix(r.URL.Path, "/v1/tasks/")
 		if id == "" || len(id) > 128 || strings.Contains(id, "/") {

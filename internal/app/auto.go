@@ -67,6 +67,20 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 		result, err = RunExplicit(ctx, s.settings, r, s.secret)
 	} else {
 		result, err = s.runAuto(ctx, r)
+		if err != nil && result.retryable && result.fallbackModelID != "" && ctx.Err() == nil {
+			first := result
+			r.onlyModelID = first.fallbackModelID
+			r.retryOfTaskID = first.TaskID
+			r.LocalRequired = r.LocalRequired || first.retryLocalOnly
+			r.MaxCost -= first.reservedCost
+			if r.MaxCost >= 0 {
+				next, nextErr := s.runAuto(ctx, r)
+				if next.TaskID != "" {
+					next.PreviousTaskIDs = []string{first.TaskID}
+					result, err = next, nextErr
+				}
+			}
+		}
 	}
 	if err == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
 		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
@@ -85,7 +99,8 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 	if err != nil {
 		return Result{}, err
 	}
-	return svc.runAuto(ctx, r)
+	r.ModelID = "auto"
+	return svc.Run(ctx, r)
 }
 
 func validateInput(r Request) error {
@@ -177,6 +192,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			c.ContextTokens = 1
 		}
 		c.PolicyAllowed = m.ContextTokens > 0 && m.EstimatedCost != nil
+		if r.onlyModelID != "" && m.ID != r.onlyModelID {
+			c.PolicyAllowed = false
+		}
 		if m.EstimatedCost != nil {
 			c.EstimatedCost = *m.EstimatedCost
 		}
@@ -294,5 +312,23 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	if profileErr == nil {
 		r.route.Resources = &snapshot
 	}
-	return RunExplicit(ctx, cfg, r, s.secret)
+	result, runErr := RunExplicit(ctx, cfg, r, s.secret)
+	for _, m := range cfg.Models {
+		if m.ID == r.ModelID && m.EstimatedCost != nil {
+			result.reservedCost = *m.EstimatedCost
+			result.retryLocalOnly = m.Locality == "local"
+		}
+	}
+	for _, fallback := range selected.Fallbacks {
+		for _, m := range cfg.Models {
+			if m.Model == fallback.Model && m.Provider == fallback.Provider && (!result.retryLocalOnly || m.Locality == "local") {
+				result.fallbackModelID = m.ID
+				break
+			}
+		}
+		if result.fallbackModelID != "" {
+			break
+		}
+	}
+	return result, runErr
 }

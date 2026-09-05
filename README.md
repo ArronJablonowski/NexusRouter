@@ -106,7 +106,9 @@ This allows local models to read UTF-8 regular files up to 64 KiB within that di
 
 Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Model discovery is checked live. Automatic local reservations are shared within one daemon, not across separate processes.
 
-Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--domain`, `--profile`, repeated `--capability`, `--context-tokens`, `--max-cost`, and `--local-required`. Native task JSON exposes corresponding `domain`, `profile`, `capabilities`, `context_tokens`, `max_cost`, and `local_required` fields. Explicit selection bypasses ranking and automatic resource reservations; zero cost preserves its legacy operator override, while a positive cost ceiling and requested capabilities/context are enforced. Execution fallback is not yet implemented.
+Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--domain`, `--profile`, repeated `--capability`, `--context-tokens`, `--max-cost`, and `--local-required`. Native task JSON exposes corresponding `domain`, `profile`, `capabilities`, `context_tokens`, `max_cost`, and `local_required` fields. Explicit selection bypasses ranking and automatic resource reservations; zero cost preserves its legacy operator override, while a positive cost ceiling and requested capabilities/context are enforced.
+
+Automatic execution permits one fallback after a provider-declared retryable first-turn failure with no text/tool proposals and a successfully persisted failure. It rechecks the preselected alternative's eligibility and remaining estimated cost budget. Partial output, validation failure, tool activity, cancellation and persistence failure do not authorize retries. Local-task privacy remains local on fallback. Each attempt has its own durable task ID with retry lineage; CLI/native task responses include previous attempt IDs. Returned text/usage belong to the final attempt, not aggregate billing. Explicit model requests do not auto-fallback. Broader recovery, validation-driven fallback and adaptive retry policies remain unfinished.
 
 `darwin memory list|show|put|delete --db path --scope scope` inspects and maintains factual memory. Put reads a complete fact record as JSON from stdin; corrections and deletion require an expected revision. Deletion is logical, not secure erasure of WAL or backups.
 
@@ -121,7 +123,7 @@ To audit successful tasks automatically, set `evaluation.auto_review_model` to a
 ## Next sprints
 
 1. Connect authorized tools and bounded delegation to application execution.
-2. Add safe execution fallback and automatic validated outcome updates.
+2. Expand safe fallback qualification and automatic validated outcome updates.
 3. Integrate context compaction, factual memory and procedural skills into prompts.
 4. Add live events, recovery and cross-provider qualification.
 
