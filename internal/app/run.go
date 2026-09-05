@@ -21,6 +21,8 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	skillPrepared                   bool
+	skillContext                    *skillContext
 	memoryPrepared                  bool
 	memoryContext                   *memoryContext
 	Validation                      string
@@ -173,6 +175,18 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 			return result, ErrAdmission
 		}
 		messages = append(messages, r.memoryContext.Messages...)
+	}
+	if !r.skillPrepared && (model.Locality == "local" || !s.Skills.LocalOnly) {
+		r.skillContext, err = loadSkillContext(ctx, s.Skills, r.Domain, contextTools(s), secrets)
+		if err != nil {
+			return result, ErrAdmission
+		}
+	}
+	if r.skillContext != nil {
+		if model.ContextTokens < 1 || (r.skillContext.LocalOnly && model.Locality != "local") {
+			return result, ErrAdmission
+		}
+		messages = append(messages, r.skillContext.Messages...)
 	}
 	if len(r.Messages) > 0 {
 		messages = append(messages, r.Messages...)

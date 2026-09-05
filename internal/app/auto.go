@@ -172,6 +172,19 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		messages = append(messages, r.memoryContext.Messages...)
 		r.LocalRequired = r.LocalRequired || r.memoryContext.LocalOnly
 	}
+	if !r.skillPrepared {
+		if cfg.Mode != "cloud_only" || !cfg.Skills.LocalOnly {
+			r.skillContext, err = loadSkillContext(ctx, cfg.Skills, r.Domain, contextTools(cfg), memorySecrets(cfg, s.secret))
+			if err != nil {
+				return Result{}, ErrAdmission
+			}
+		}
+		r.skillPrepared = true
+	}
+	if r.skillContext != nil {
+		messages = append(messages, r.skillContext.Messages...)
+		r.LocalRequired = r.LocalRequired || r.skillContext.LocalOnly
+	}
 	if len(r.Messages) > 0 {
 		messages = append(messages, r.Messages...)
 	} else {

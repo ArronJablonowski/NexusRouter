@@ -71,10 +71,15 @@ type Routing struct {
 	Weights     map[string]float64 `yaml:"weights" json:"weights"`
 }
 type Skills struct {
-	Enabled      bool `yaml:"enabled" json:"enabled"`
-	AutoDraft    bool `yaml:"auto_draft" json:"auto_draft"`
-	AutoActivate bool `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
-	Rollback     bool `yaml:"rollback_on_regression" json:"rollback_on_regression"`
+	Enabled      bool   `yaml:"enabled" json:"enabled"`
+	AutoDraft    bool   `yaml:"auto_draft" json:"auto_draft"`
+	AutoActivate bool   `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
+	Rollback     bool   `yaml:"rollback_on_regression" json:"rollback_on_regression"`
+	Root         string `yaml:"root" json:"root"`
+	Scope        string `yaml:"scope" json:"scope"`
+	LocalOnly    bool   `yaml:"local_only" json:"local_only"`
+	MaxSkills    int    `yaml:"max_skills" json:"max_skills"`
+	MaxBytes     int    `yaml:"max_bytes" json:"max_bytes"`
 }
 type Memory struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
@@ -107,13 +112,14 @@ func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
 		Hardware: Hardware{true, 80, 85, "auto"}, Workers: Workers{3, "5s", "30s", "single_writer"},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
-		Skills:  Skills{true, true, true, true}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
+		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var skillScope = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
 // Duration accepts Go duration syntax plus positive integer days (e.g. 30d).
 func Duration(value string) (time.Duration, error) {
@@ -193,6 +199,17 @@ func (s Settings) Validate() error {
 	}
 	if (s.Memory.Scope != "" && !memory.ValidKey(s.Memory.Scope)) || s.Memory.MaxFacts < 1 || s.Memory.MaxFacts > 64 || s.Memory.MaxBytes < 256 || s.Memory.MaxBytes > 65536 {
 		return errors.New("invalid memory context settings")
+	}
+	if s.Skills.MaxSkills < 1 || s.Skills.MaxSkills > 16 || s.Skills.MaxBytes < 256 || s.Skills.MaxBytes > 65536 || (s.Skills.Root == "") != (s.Skills.Scope == "") {
+		return errors.New("invalid skills context settings")
+	}
+	if s.Skills.Root != "" {
+		if !filepath.IsAbs(s.Skills.Root) || filepath.Dir(filepath.Clean(s.Skills.Root)) == filepath.Clean(s.Skills.Root) || !skillScope.MatchString(s.Skills.Scope) {
+			return errors.New("invalid skills root or scope")
+		}
+		if s.Mode == "local_only" && !s.Skills.LocalOnly {
+			return errors.New("local-only mode requires local skills context")
+		}
 	}
 	if s.Mode == "local_only" && (!s.Memory.LocalOnly || s.Telemetry.OTEL) {
 		return errors.New("local-only mode requires local memory and disabled telemetry export")
@@ -286,5 +303,6 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 	}
 	s.Telemetry.Database = "[REDACTED]"
 	s.Tools.ReadRoot = "[REDACTED]"
+	s.Skills.Root = "[REDACTED]"
 	return json.MarshalIndent(s, "", "  ")
 }

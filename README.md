@@ -45,6 +45,40 @@ retrieval currently neither updates last-use timestamps nor creates/corrects
 facts automatically. Prompt separation is not proof of injection immunity;
 tool permissions remain enforced independently.
 
+### Procedural skills in task context
+
+```yaml
+skills:
+  enabled: true
+  root: /absolute/private/skill-store
+  scope: my-project
+  local_only: true
+  max_skills: 3
+  max_bytes: 16384
+```
+
+Root and scope are empty by default, so loading is opt-in. The configured root
+must already exist and satisfy the store's private-directory and no-symlink
+checks. A task's `--domain` (or native API `domain`) selects an exact skill tag;
+an omitted domain uses `general`. Discovery reads metadata first, then loads
+only matching active versions up to the candidate limit. Drafts are never
+loaded. Active versions require prior activation through the store's trusted
+deterministic-validator interface; creating a draft with the CLI is insufficient.
+
+Skills requiring unavailable tools are skipped. Whole workflows must fit the
+serialized message budget; no workflow is truncated. The context contains
+version/provenance, steps, configuration, tool requirements and risks as
+untrusted JSON data, with configured credentials redacted. It cannot grant tool
+access or approval. Automatic routing and execution share the same snapshot.
+
+Local-only skill context pins hybrid tasks local and is omitted for explicit
+cloud/cloud-only tasks. Setting `local_only: false` authorizes sharing selected
+content from that scope with configured cloud models. Loading never drafts,
+activates or revises a skill. Automatic skill generation, production workflow
+validators, semantic relevance selection and regression-triggered rollback are
+still unfinished. As with memory, old skill snapshots remain in continuation
+history; changing an active version does not rewrite prior session messages.
+
 Advisory audits now influence automatic routing quality with bounded weight: creative/unknown domains receive less influence than coding/math/structured-output domains. Only the newest review per attempt counts; abstentions do not score, and direct evaluation/user feedback excludes that attempt's audit signal. Audits do not become measured execution samples or change cost/reliability statistics. `llm_judge_enabled: false` disables both review calls and advisory routing influence.
 
 ## Build and verify
