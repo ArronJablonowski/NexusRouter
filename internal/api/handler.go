@@ -22,6 +22,8 @@ import (
 )
 
 type Services struct {
+	Cancel          func(context.Context, string) (runtime.CancellationStatus, error)
+	Cancellation    func(context.Context, string) (runtime.CancellationStatus, error)
 	Events          func(context.Context, string, int64, int) (sessions.EventPage, error)
 	RunStream       func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	Summarize       func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
@@ -40,13 +42,14 @@ type Handler struct {
 	secret   [32]byte
 	services Services
 	slots    chan struct{}
+	controls chan struct{}
 }
 
 func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{sha256.Sum256([]byte(token)), s, make(chan struct{}, concurrent)}, nil
+	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -91,6 +94,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && ((strings.HasSuffix(r.URL.Path, "/cancel") && r.Method == http.MethodPost) || (strings.HasSuffix(r.URL.Path, "/cancellation") && r.Method == http.MethodGet)):
+		h.serveCancellation(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:
 		h.serveTaskStream(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/summaries" || strings.HasPrefix(r.URL.Path, "/v1/summaries/"):

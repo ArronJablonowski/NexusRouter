@@ -208,6 +208,17 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		return result, ErrAdmission
 	}
 	result.TaskID = rand.Text()
+	ctx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	stopWatcher := watchCancellation(ctx, func(query context.Context) (bool, error) {
+		return db.CancellationRequested(query, result.TaskID)
+	}, cancelRun)
+	watcherStopped := false
+	defer func() {
+		if !watcherStopped {
+			_ = stopWatcher()
+		}
+	}()
 	if sessionID == "" {
 		sessionID = result.TaskID
 	}
@@ -225,6 +236,12 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		compaction = r.continuation.Compaction
 	}
 	out, err := loop.Run(ctx, runtime.RunRequest{Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
+	watchErr := stopWatcher()
+	watcherStopped = true
+	if watchErr != nil {
+		err = errors.Join(err, watchErr)
+		out.Retryable = false
+	}
 	result.retryable = out.Retryable
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns

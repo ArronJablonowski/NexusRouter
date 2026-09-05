@@ -32,7 +32,7 @@ func TestJSONRunProcessLiveOutputAndBrokenPipe(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, out)
 	}
-	for _, mode := range []string{"complete", "closed", "stalled"} {
+	for _, mode := range []string{"complete", "closed", "stalled", "durable"} {
 		t.Run(mode, func(t *testing.T) {
 			broken := mode != "complete"
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -131,6 +131,19 @@ func TestJSONRunProcessLiveOutputAndBrokenPipe(t *testing.T) {
 			}
 			if mode == "closed" {
 				_ = pipe.Close()
+			}
+			if mode == "durable" {
+				// The test process has no cancellation context for the child.
+				// Only a committed request in shared storage can stop its run.
+				control, err := telemetry.Open(ctx, cfg.Telemetry.Database)
+				if err != nil {
+					t.Fatal(err)
+				}
+				status, err := control.RequestCancellation(ctx, first.Event.TaskID)
+				control.Close()
+				if err != nil || !status.Requested || status.RequestID == "" {
+					t.Fatal(status, err)
+				}
 			}
 			close(release)
 			if mode == "stalled" {

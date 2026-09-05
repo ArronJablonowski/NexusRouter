@@ -75,7 +75,7 @@ var (
 
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
-func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
+func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr error) {
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
 	}
@@ -117,7 +117,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
 		}
-		if l.Journal.Append(ctx, seq, e) != nil {
+		if err := l.Journal.Append(ctx, seq, e); err != nil {
+			if errors.Is(err, ErrCancellationRequested) {
+				return ErrCancellationRequested
+			}
 			return ErrPersistence
 		}
 		seq++
@@ -127,6 +130,21 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return Result{}, err
 	}
 	result := Result{}
+	// The cancellation gate guarantees no append occurred. Unlike an ambiguous
+	// storage failure, it is safe to append one bounded cancellation terminal.
+	defer func() {
+		if !errors.Is(runErr, ErrCancellationRequested) || errors.Is(runErr, ErrPersistence) {
+			return
+		}
+		returned.Retryable = false
+		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := persist(terminal, TaskCanceled, Data{Code: "canceled"}); err != nil {
+			runErr = errors.Join(context.Canceled, err)
+			return
+		}
+		runErr = context.Canceled
+	}()
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
 		code := "execution_failed"
@@ -253,6 +271,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		})
 		if errors.Is(callbackErr, ErrPersistence) {
 			return result, ErrPersistence
+		}
+		if errors.Is(callbackErr, ErrCancellationRequested) {
+			return result, callbackErr
 		}
 		if callbackErr != nil {
 			return fail(callbackErr)

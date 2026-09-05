@@ -84,7 +84,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 10 {
+	if version > 11 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -190,6 +190,12 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 11 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE task_cancellations (task_id TEXT PRIMARY KEY REFERENCES task_heads(task_id),request_id TEXT NOT NULL UNIQUE,requested_at TEXT NOT NULL); PRAGMA user_version=11;`)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -247,6 +253,15 @@ func (s *Store) Append(ctx context.Context, expected int64, e runtime.Event) err
 	}
 	if seq != expected || session != e.SessionID || state != "running" || (seq > 0 && e.Kind == runtime.TaskStarted) {
 		return ErrConflict
+	}
+	if e.Kind != runtime.ToolCompleted && e.Kind != runtime.TaskCanceled {
+		var requested bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM task_cancellations WHERE task_id=?)", e.TaskID).Scan(&requested); err != nil {
+			return err
+		}
+		if requested {
+			return runtime.ErrCancellationRequested
+		}
 	}
 	switch e.Kind {
 	case runtime.TaskCompleted:

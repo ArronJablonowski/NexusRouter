@@ -120,7 +120,7 @@ func TestReviewMigrationAndCorruptRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec("DROP TABLE summary_review_heads; DROP TABLE summary_reviews; DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; PRAGMA user_version=6;"); err != nil {
+	if _, err := s.db.Exec("DROP TABLE task_cancellations; DROP TABLE summary_review_heads; DROP TABLE summary_reviews; DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; PRAGMA user_version=6;"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
