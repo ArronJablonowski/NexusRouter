@@ -53,8 +53,8 @@ func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive st
 	}, true)
 }
 
-// Rollback reverses the most recent non-rollback activation of the current
-// version. It cannot activate an unvalidated draft, nor oscillate between versions.
+// Rollback reverses the latest activation not already undone. It cannot activate
+// an unvalidated draft or undo the same historical activation twice.
 // expectedActive protects against a stale regression detector.
 func (s *FileStore) Rollback(ctx context.Context, key Key, expectedActive string, automatic bool) error {
 	if !s.permitted(key) || !versionID(expectedActive) {
@@ -74,23 +74,17 @@ func (s *FileStore) Rollback(ctx context.Context, key Key, expectedActive string
 		if len(e.Activations) >= 10000 {
 			return ErrInvalid
 		}
-		for i := len(e.Activations) - 1; i >= 0; i-- {
-			a := e.Activations[i]
-			if a.To != e.Active || a.Rollback {
-				continue
-			}
-			if a.From == "" {
-				return ErrNotFound
-			}
-			proof := e.Validated[a.From]
-			if !proof.Passed || !proof.Deterministic {
-				return ErrValidation
-			}
-			e.Activations = append(e.Activations, activation{From: e.Active, To: a.From, At: time.Now().UTC(), Rollback: true})
-			e.Active = a.From
-			c.Skills[key.index()] = e
-			return nil
+		stack, err := activationStack(e)
+		if err != nil {
+			return err
 		}
-		return ErrNotFound
+		if len(stack) == 0 || stack[len(stack)-1].From == "" {
+			return ErrNotFound
+		}
+		previous := stack[len(stack)-1].From
+		e.Activations = append(e.Activations, activation{From: e.Active, To: previous, At: time.Now().UTC(), Rollback: true})
+		e.Active = previous
+		c.Skills[key.index()] = e
+		return nil
 	}, true)
 }

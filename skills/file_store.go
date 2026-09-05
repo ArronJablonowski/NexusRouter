@@ -178,6 +178,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 				return ErrInvalid
 			}
 		}
+		if _, err := activationStack(e); err != nil {
+			return err
+		}
 	}
 	if err := fn(&c); err != nil {
 		return err

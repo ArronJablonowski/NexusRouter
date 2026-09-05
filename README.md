@@ -861,6 +861,15 @@ Automatic execution permits one fallback after a provider-declared retryable fir
 
 `darwin skills list|show|history|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
 
+Rollback undoes the latest activation that has not already been reversed, not
+the latest appearance of a version ID. Reactivating an older version therefore
+does not make past undo operations reusable. Rollback stops at the first active
+version; it does not deactivate that version or delete immutable drafts. Reads
+validate the complete activation chain, validation evidence and final active
+pointer. Inconsistent histories are rejected without automatic repair or file
+changes. `--expected-version` guards the current version, not a unique activation
+epoch; automatic regression detection and epoch-bound decisions remain future work.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
