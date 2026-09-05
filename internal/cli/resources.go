@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -15,15 +14,29 @@ func runResources(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: darwin resources")
 		return 2
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	parent, stop := submissionCLIContext()
+	defer stop()
+	return runResourcesContext(parent, stdout, stderr, resources.Profile, resources.SurveyGPUs)
+}
+
+func runResourcesContext(parent context.Context, stdout, stderr io.Writer, profile func(context.Context) (resources.Snapshot, error), survey func(context.Context) (resources.GPUInventory, error)) int {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
-	snapshot, err := resources.Profile(ctx)
+	snapshot, err := profile(ctx)
 	if err != nil {
 		fmt.Fprintln(stderr, "resource measurements unavailable")
 		return 1
 	}
-	if json.NewEncoder(stdout).Encode(snapshot) != nil {
+	gpus, err := survey(ctx)
+	if err != nil {
+		fmt.Fprintln(stderr, "resource measurements unavailable")
 		return 1
 	}
-	return 0
+	// Embed the existing snapshot to preserve its JSON fields. GPU observations
+	// are diagnostic only until model/device placement can be verified.
+	report := struct {
+		resources.Snapshot
+		GPUs resources.GPUInventory `json:"gpu_inventory"`
+	}{snapshot, gpus}
+	return writeSubmissionJSON(ctx, stdout, report)
 }

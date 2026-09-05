@@ -157,6 +157,20 @@ The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdo
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
 
+`resources` also includes `gpu_inventory`, a separate per-device diagnostic survey.
+On Linux it queries `/usr/bin/nvidia-smi` and AMD DRM sysfs concurrently; each
+source reports `observed`, `unavailable`, or `unsupported` with byte counters.
+It never sums separate GPUs or changes routing admission. Model-to-device
+binding and per-device reservations remain unfinished, so these observations do
+not fill the legacy aggregate VRAM fields. The survey runs only for diagnostics,
+not on every routing decision. NVIDIA needs its existing driver utility at the
+fixed path; no software is installed. AMD cards missing PCI vendor/counter files
+make that source unavailable. Driver errors are not printed. Sysfs cancellation
+is cooperative around bounded reads, not a guarantee against a stalled kernel.
+GPU identifiers appear in this local diagnostic output; treat hardware exports
+accordingly. Apple unified memory remains in the host snapshot, not a fabricated
+discrete-GPU inventory.
+
 `--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined input is limited to 4 MiB and configured per-model context admission still applies.
 
 To shorten a completed conversation, supply an operator-reviewed summary file:
