@@ -6,6 +6,8 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 
 The executable supports layered configuration, automatic or explicit-model headless tasks, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands and opt-in local read-only file tools are available. Write tools and interactive streaming remain unfinished. See the implementation evidence for remaining work; this is not a released MVP.
 
+Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Orchestrator review parsing is implemented, but automatic auxiliary-model audits and revision-aware fitness updates are not yet connected.
+
 ## Build and verify
 
 Requires Go 1.27.1 and Make. SQLite uses the pinned pure-Go `modernc.org/sqlite` dependency; no C compiler is required for ordinary builds. Race tests require the platform's supported race-detector toolchain.

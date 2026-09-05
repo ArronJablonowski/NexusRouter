@@ -29,6 +29,9 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	// RequireText applies only to a final answer, never an intermediate tool
+	// proposal. Non-text host workflows may leave this false explicitly.
+	RequireText                   bool
 	Domain, Profile               string
 	Route                         *Data
 	ParentTaskID, Privacy         string
@@ -55,6 +58,7 @@ var (
 	ErrProvider    = errors.New("model turn failed")
 	ErrProtocol    = errors.New("invalid model stream")
 	ErrLimit       = errors.New("runtime budget exhausted")
+	ErrEmptyOutput = errors.New("required final text is empty")
 	ErrTool        = errors.New("tool execution failed or denied")
 	ErrPersistence = errors.New("runtime persistence failed; inspect durable state before retry")
 )
@@ -113,6 +117,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		code := "execution_failed"
 		if errors.Is(cause, ErrLimit) {
 			code = "budget_exhausted"
+		}
+		if errors.Is(cause, ErrEmptyOutput) {
+			code = "empty_output"
 		}
 		if ctx.Err() != nil {
 			kind = TaskCanceled
@@ -231,6 +238,13 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			totalUsage.OutputTokens += usage.OutputTokens
 		}
 		if len(calls) == 0 {
+			if r.RequireText && strings.TrimSpace(text.String()) == "" {
+				accepted := false
+				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.nonempty_text.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
+					return result, err
+				}
+				return fail(ErrEmptyOutput)
+			}
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
 				return result, err
 			}
