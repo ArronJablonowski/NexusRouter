@@ -222,6 +222,19 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		} else if !errors.Is(eerr, sql.ErrNoRows) {
 			return Result{}, errors.New("cannot read routing fitness")
 		}
+		if cfg.Evaluation.Judge {
+			advisory, aerr := db.AuditQuality(ctx, key)
+			if aerr != nil {
+				return Result{}, errors.New("cannot read advisory evidence")
+			}
+			if advisory.Samples > 0 {
+				e.Advisory = advisory
+				if e.Updated.IsZero() {
+					e.Updated = advisory.Updated
+				}
+				evidence[key] = e
+			}
+		}
 		candidates = append(candidates, c)
 	}
 	// Serialize the snapshot/admission decision, while holding the reservation

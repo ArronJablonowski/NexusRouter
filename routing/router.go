@@ -9,7 +9,15 @@ import (
 )
 
 type Key struct{ Model, Provider, Domain, Profile string }
+
+// Advisory is model-review evidence, separate from measured execution samples.
+type Advisory struct {
+	Samples             int
+	Quality, Confidence float64
+	Updated             time.Time
+}
 type Evidence struct {
+	Advisory                         Advisory
 	Samples                          int
 	Quality, Compliance, Reliability float64
 	Latency                          time.Duration
@@ -41,6 +49,8 @@ type Policy struct {
 	Exploration  float64
 }
 type Ranked struct {
+	AdvisorySamples                int
+	AdvisoryInfluence              float64
 	Model, Provider, FailureDomain string
 	Score, Confidence              float64
 	Samples                        int
@@ -148,10 +158,27 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		// and latency use fixed scales, so adding a candidate cannot change a
 		// different candidate's score through pool-relative normalization.
 		shrink := func(v float64) float64 { return .5 + confidence*(v-.5) }
+		advisoryInfluence := 0.0
+		a := e.Advisory
+		if a.Samples < 0 || !unit(a.Quality) || !unit(a.Confidence) {
+			return out, ErrInvalid
+		}
+		if a.Samples > 0 {
+			if a.Updated.IsZero() || a.Updated.After(now) {
+				return out, ErrInvalid
+			}
+			cap := .1 // Unknown and creative domains retain a small advisory role.
+			switch r.Domain {
+			case "code", "coding", "debugging", "math", "structured_json":
+				cap = .25
+			}
+			advisoryInfluence = (1 - confidence) * cap * a.Confidence * math.Min(1, float64(a.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(a.Updated))/float64(p.HalfLife))
+		}
+		quality := shrink(e.Quality) + advisoryInfluence*(a.Quality-.5)
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
-		score := w.Quality*shrink(e.Quality) + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
-		out.Ranked = append(out.Ranked, Ranked{c.Model, c.Provider, c.FailureDomain, score, confidence, e.Samples})
+		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
+		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
 		a, b := out.Excluded[i], out.Excluded[j]
