@@ -56,6 +56,30 @@ daemon execution uses the daemon's configured measurement source, not an SDK
 callback. This interface replaces measurement only; the wider extension and
 budget-recommendation contracts remain unfinished.
 
+### Replaceable provider construction
+
+Set `ConfigOptions.ProviderFactory` to a `providers.Factory` implementation
+(`sdk.ProviderFactory` is an alias). Its `Build(ctx, providers.Connection)` returns
+the public provider-neutral `providers.Provider`. Nil retains built-in adapters.
+Admission still checks configured model capabilities, deployment mode, privacy,
+context, resource capacity and budgets before execution. Injection does not add
+new configuration kinds or let a model select arbitrary endpoints.
+
+The version-one connection supplies provider ID, kind, endpoint, resolved API key
+and an origin-restricted HTTP transport. Custom adapters must use that transport
+for every network request, avoid logging credentials, honor cancellation and
+implement the provider streaming contract (ordered chunks and verified completion).
+Connection credentials are sensitive and must not be retained beyond their need.
+The factory and returned providers are trusted in-process code, not sandboxed
+plugins; policy cannot prevent arbitrary Go code from opening another transport.
+Callers own concurrency safety and any external resources; the runtime does not
+call a custom provider's Close method. Custom engines are not serialized into
+queued submissions: daemon execution uses its own configured factory.
+
+Explicit execution and provisional live text use the same injected adapter,
+with normal runtime validation, redaction, journaling and cancellation. This is
+provider construction, not a general extension-hook or tool-registration API.
+
 ### Replaceable factual memory storage
 
 `ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`
@@ -183,7 +207,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Pluggable provider/tool/context/skill/evaluator engines,
+qualification. Pluggable tool/context/evaluator engines, automatic skill learning,
 resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
 remain unfinished. Existing low-level packages are not a substitute for those
 future application-level extension contracts.

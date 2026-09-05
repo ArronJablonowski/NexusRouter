@@ -23,6 +23,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	providerFactory                 providers.Factory
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
 	delegate                        delegateRunner
@@ -163,7 +164,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if provider.APIKeyEnv != "" && key == "" {
 		return result, ErrAdmission
 	}
-	p, err := providers.NewHTTP(provider.Endpoint, provider.Kind, key, tr)
+	p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: tr})
 	if err != nil {
 		return result, ErrAdmission
 	}

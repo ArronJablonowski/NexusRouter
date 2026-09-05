@@ -28,6 +28,8 @@ type MemoryStore = memory.Store
 
 type SkillStore = skills.Store
 
+type ProviderFactory = providers.Factory
+
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
 type ConfigOptions struct {
@@ -43,6 +45,10 @@ type ConfigOptions struct {
 	// SkillStore replaces opt-in skill discovery/loading only. The trusted store
 	// must expose active validated versions; the runtime never mutates or closes it.
 	SkillStore SkillStore
+	// ProviderFactory replaces provider construction after admission. Nil keeps
+	// built-in adapters. Factories are trusted code and must use the supplied
+	// policy transport, honor cancellation, and support concurrent calls.
+	ProviderFactory ProviderFactory
 }
 
 type Client struct {
@@ -86,7 +92,7 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithStores(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore)
+	service, err := app.NewServiceWithProviderFactory(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory)
 	if err != nil {
 		return nil, ErrAdmission
 	}

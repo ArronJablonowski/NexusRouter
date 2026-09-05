@@ -122,7 +122,7 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		return bad()
 	}
 	defer transport.CloseIdleConnections()
-	adapter, err := providers.NewHTTP(provider.Endpoint, provider.Kind, key, transport)
+	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: transport})
 	if err != nil {
 		return bad()
 	}

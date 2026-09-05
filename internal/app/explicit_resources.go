@@ -29,6 +29,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if s == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || validateInput(r) != nil || ctx.Err() != nil {
 		return Result{}, ErrAdmission
 	}
+	r.providerFactory = s.providerFactory
 	var model config.Model
 	for _, m := range s.settings.Models {
 		if m.ID == r.ModelID {

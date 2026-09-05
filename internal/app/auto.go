@@ -30,16 +30,17 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	memoryStore memory.Store
-	skillStore  skills.Store
-	execution   chan struct{}
-	discovery   *modelHealthCache
-	settings    config.Settings
-	secret      func(string) string
-	budget      *resources.Budget
-	profile     func(context.Context) (resources.Snapshot, error)
-	draw        func() float64
-	mu          sync.Mutex
+	providerFactory providers.Factory
+	memoryStore     memory.Store
+	skillStore      skills.Store
+	execution       chan struct{}
+	discovery       *modelHealthCache
+	settings        config.Settings
+	secret          func(string) string
+	budget          *resources.Budget
+	profile         func(context.Context) (resources.Snapshot, error)
+	draw            func() float64
+	mu              sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -89,6 +90,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	r.providerFactory = s.providerFactory
 	r.memoryStore = s.memoryStore
 	r.skillStore = s.skillStore
 	if s.execution != nil {
@@ -176,6 +178,7 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
+	r.providerFactory = s.providerFactory
 	executionCtx := ctx
 	if r.admissionContext != nil {
 		ctx = r.admissionContext
@@ -305,13 +308,12 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 					c.PolicyAllowed = false
 					break
 				}
-				adapter, e := providers.NewHTTP(pr.Endpoint, pr.Kind, key, tr)
+				check, cancel := context.WithTimeout(ctx, 2*time.Second)
+				adapter, e := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: pr.ID, Endpoint: pr.Endpoint, Kind: pr.Kind, APIKey: key, Transport: tr})
 				if e == nil {
-					check, cancel := context.WithTimeout(ctx, 2*time.Second)
 					identity, _ := json.Marshal([]string{pr.ID, pr.Kind, pr.Endpoint, key, strconv.FormatBool(cfg.Mode == "local_only" || c.Local)})
 					digest := sha256.Sum256(identity)
 					models, e := s.discovery.models(check, hex.EncodeToString(digest[:]), adapter.Models)
-					cancel()
 					if e == nil {
 						for _, name := range models {
 							if name == m.Model {
@@ -320,6 +322,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 						}
 					}
 				}
+				cancel()
 				tr.CloseIdleConnections()
 			}
 		}
