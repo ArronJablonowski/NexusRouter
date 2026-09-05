@@ -58,6 +58,13 @@ func (s *Store) PutMemory(ctx context.Context, f memory.Fact, expected int64) er
 		if expected != 0 || !f.Created.Equal(f.Updated) || !f.LastUse.IsZero() {
 			return memory.ErrConflict
 		}
+		var retired bool
+		if err = tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM memory_retired_ids WHERE scope=? AND id=?)", f.Scope, f.ID).Scan(&retired); err != nil {
+			return err
+		}
+		if retired {
+			return memory.ErrConflict
+		}
 	} else if err != nil {
 		return err
 	} else {
@@ -180,7 +187,19 @@ func (s *Store) DeleteMemory(ctx context.Context, scope, id string, expected int
 	if !memory.ValidKey(scope) || !memory.ValidKey(id) || expected < 1 {
 		return memory.ErrInput
 	}
-	r, err := s.db.ExecContext(ctx, "DELETE FROM memory_facts WHERE scope=? AND id=? AND revision=?", scope, id, expected)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// This writer reservation serializes retirement against create/correction.
+	if _, err = tx.ExecContext(ctx, "UPDATE memory_facts SET revision=revision WHERE scope=? AND id=?", scope, id); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO memory_retired_ids(scope,id) SELECT scope,id FROM memory_facts WHERE scope=? AND id=? AND revision=?", scope, id, expected); err != nil {
+		return err
+	}
+	r, err := tx.ExecContext(ctx, "DELETE FROM memory_facts WHERE scope=? AND id=? AND revision=?", scope, id, expected)
 	if err != nil {
 		return err
 	}
@@ -191,16 +210,34 @@ func (s *Store) DeleteMemory(ctx context.Context, scope, id string, expected int
 	if n != 1 {
 		return memory.ErrConflict
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (s *Store) ExpireMemory(ctx context.Context, scope string, now time.Time) (int64, error) {
 	if !memory.ValidKey(scope) || !memory.ValidTime(now) {
 		return 0, memory.ErrInput
 	}
-	r, err := s.db.ExecContext(ctx, "DELETE FROM memory_facts WHERE scope=? AND expires>0 AND expires<=?", scope, now.UnixNano())
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	return r.RowsAffected()
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "UPDATE memory_facts SET revision=revision WHERE scope=? AND expires>0 AND expires<=?", scope, now.UnixNano()); err != nil {
+		return 0, err
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO memory_retired_ids(scope,id) SELECT scope,id FROM memory_facts WHERE scope=? AND expires>0 AND expires<=?", scope, now.UnixNano()); err != nil {
+		return 0, err
+	}
+	r, err := tx.ExecContext(ctx, "DELETE FROM memory_facts WHERE scope=? AND expires>0 AND expires<=?", scope, now.UnixNano())
+	if err != nil {
+		return 0, err
+	}
+	n, err := r.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return n, nil
 }

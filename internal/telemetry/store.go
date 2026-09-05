@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 19 {
+	if version > 20 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -268,6 +268,12 @@ func (s *Store) initialize(ctx context.Context) error {
 		 scope TEXT NOT NULL, name TEXT NOT NULL, epoch INTEGER NOT NULL,
 		 id TEXT NOT NULL, revision INTEGER NOT NULL, body BLOB NOT NULL, PRIMARY KEY(scope,name,epoch,id));
 		 PRAGMA user_version=19;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 20 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE memory_retired_ids (scope TEXT NOT NULL, id TEXT NOT NULL, PRIMARY KEY(scope,id)); PRAGMA user_version=20;`)
 		if err != nil {
 			return err
 		}

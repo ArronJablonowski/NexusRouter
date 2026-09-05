@@ -220,10 +220,11 @@ or OS-isolation guarantee.
 ### Replaceable factual memory storage
 
 `ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`
-is an alias). Nil retains SQLite. Injection does not enable memory: configure
+is an alias). Nil retains SQLite. Injection does not enable retrieval: configure
 `memory.enabled`, scope, privacy and context-size limits explicitly. Runtime use
-is query-only; put/correct/touch/delete/expiry operations remain explicit actions
-on the supplied store. The caller owns that store's lifetime and concurrency.
+queries facts and optionally updates selected-fact last-use through `MemoryUseStore`.
+Creation, correction, deletion and expiry remain explicit operations. The caller
+owns that store's lifetime and concurrency.
 
 Returned facts must pass schema-version, provenance, scope, expiry, privacy,
 UTF-8, count and size validation before context assembly. Configured credentials
@@ -233,8 +234,12 @@ Queries receive a three-second context allowance, but callbacks must cooperate
 with cancellation. The store must obey local-only policy and avoid unauthorized
 egress; trusted in-process extensions are not sandboxed.
 
-This store is not serialized with submissions and does not change CLI/API memory
-management storage. A daemon uses its own configured store. Automatic memory
+This store is not serialized with submissions. `Client.Memory`, `Memories`,
+`PutMemory` and `DeleteMemory` use it for configured-scope operator management;
+these operations remain available with retrieval disabled and do not invoke
+models. See [memory management](../../docs/memory-management.md) for revision
+conflicts, redaction and uncertain-write handling. A daemon uses its own service's
+store, and the legacy direct-database CLI is unaffected. Automatic memory
 creation, semantic retrieval and application-level lifecycle hooks remain open.
 
 ### Replaceable procedural skill storage
@@ -446,7 +451,7 @@ establish source tenancy.
 `Client.AdvanceSkillWorkflowScan(ctx, name, domain, expectedRevision, scanLimit)`
 saves a bounded discovery page and progress together in the configured scope.
 Start at revision zero; use the returned scan revision for the next page. Enable
-skills and auto-draft with a configured root/scope and an existing schema-19
+skills and auto-draft with a configured root/scope and an existing current-schema
 database. The call does not initialize or migrate storage, open the skill root,
 or invoke a model. Sensitive metadata is checked before persistence; identities
 are rejected rather than rewritten when they collide with current credentials.

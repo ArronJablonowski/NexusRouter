@@ -20,6 +20,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -28,6 +29,10 @@ import (
 )
 
 type Services struct {
+	Memory                 func(context.Context, string) (memory.Fact, error)
+	Memories               func(context.Context, string, string, int, bool) ([]memory.Fact, error)
+	PutMemory              func(context.Context, memory.Fact, int64) error
+	DeleteMemory           func(context.Context, string, int64) error
 	ModelDeprecation       func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
 	DaemonStatus           func(context.Context) (daemon.Status, error)
 	StopDaemon             func(context.Context, string) (daemon.Status, error)
@@ -69,6 +74,7 @@ type Services struct {
 	Feedback               func(context.Context, string, bool, float64) error
 }
 type Handler struct {
+	memorySlots      chan struct{}
 	deprecationSlots chan struct{}
 	secret           [32]byte
 	services         Services
@@ -85,7 +91,7 @@ func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
+	return &Handler{memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -137,6 +143,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case memoryManagementRoute(r.URL.Path):
+		h.serveMemoryManagement(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/models/deprecation":
 		h.serveDeprecation(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/daemon/status" || r.URL.Path == "/v1/daemon/stop":

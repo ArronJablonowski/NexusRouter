@@ -89,6 +89,10 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		ModelDeprecation: service.ModelDeprecation,
+		Memory:           service.Memory,
+		Memories:         service.Memories,
+		PutMemory:        service.PutMemory,
+		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
 			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy") {

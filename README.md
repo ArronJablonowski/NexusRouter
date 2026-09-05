@@ -910,6 +910,12 @@ Automatic execution permits one fallback after a provider-declared retryable fir
 
 `darwin memory list|show|put|delete --db path --scope scope` inspects and maintains factual memory. Put reads a complete fact record as JSON from stdin; corrections and deletion require an expected revision. Deletion is logical, not secure erasure of WAL or backups.
 
+The daemon and Go SDK also provide configured-scope memory inspection, paginated
+export, creation/correction and revision-checked deletion. These operations remain
+available when prompt retrieval is disabled and do not invoke models. See
+[operator memory management](docs/memory-management.md) for the authenticated
+HTTP contract, redaction, storage requirements and uncertain-write handling.
+
 `darwin skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
 
 Rollback undoes the latest activation that has not already been reversed, not

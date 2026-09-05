@@ -71,7 +71,7 @@ func TestMemoryRevisionUseRejectsStaleAndInvalidWithoutMutation(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.Content = "different replacement at same revision"
-				if err := db.PutMemory(ctx, f, 0); err != nil {
+				if err := db.PutMemory(ctx, f, 0); !errors.Is(err, memory.ErrConflict) {
 					t.Fatal(err)
 				}
 			case "expired":

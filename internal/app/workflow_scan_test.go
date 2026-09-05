@@ -162,7 +162,7 @@ func TestSkillWorkflowScanAdmissionDoesNotInitializeOrMigrate(t *testing.T) {
 	if err := raw.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 17 {
 		t.Fatal("legacy store migrated", schema, err)
 	}
-	if _, err := raw.Exec("PRAGMA user_version=19"); err != nil {
+	if _, err := raw.Exec("PRAGMA user_version=20"); err != nil {
 		t.Fatal(err)
 	}
 	for _, service := range []*Service{nil, svc} {

@@ -21,7 +21,7 @@ func TestSkillGenerationMigrationFrom15PreservesExistingData(t *testing.T) {
 	if err = store.Append(ctx, 0, start); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`INSERT INTO tool_approvals VALUES('approval','task','call','pending',X'010203'); DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; PRAGMA user_version=15`); err != nil {
+	if _, err = store.db.Exec(`INSERT INTO tool_approvals VALUES('approval','task','call','pending',X'010203'); DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; PRAGMA user_version=15`); err != nil {
 		t.Fatal(err)
 	}
 	if err = store.Close(); err != nil {
@@ -44,7 +44,7 @@ func TestSkillGenerationMigrationFrom15PreservesExistingData(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = store.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 19 {
+		if err = store.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 20 {
 			t.Fatalf("migration schema=%d %v", schema, err)
 		}
 		items, err := store.Read(ctx, "task", 0, 10)
