@@ -253,7 +253,7 @@ The overall discovery/loading allowance is three seconds, cooperatively enforced
 Errors and panics deny admission without leaking backend details. Hosts must
 provide concurrency safety, cancellation, honest activation validation and local
 egress compliance: this is not a sandbox or a proof of workflow correctness.
-Automatic drafting, regression detection and lifecycle hooks remain unfinished.
+Background drafting, statistical regression detection and lifecycle hooks remain unfinished.
 
 Filesystem stores also implement the optional `skills.RevisionStore` extension.
 Read `ActivationState`, then use `ActivateAt` or `RollbackAt` for delayed decisions
@@ -261,7 +261,7 @@ that must reject intervening activations, including A→B→A. The full revision
 checked under the mutation lock after candidate validation. Draft-only changes
 do not invalidate it. Legacy `Activate`/`Rollback` compare active versions only.
 Revision checks do not grant permission or replace deterministic validation and
-the automatic-mutation kill switch; the runtime still does not mutate skills.
+the automatic-mutation kill switch; ordinary task execution does not mutate skills.
 
 A trusted host using the filesystem implementation can opt into deterministic
 revalidation via `FileStore.RevalidateAndRollback(ctx, state, validator)`.
@@ -358,6 +358,21 @@ sanitizes callback failures; it cannot forcibly stop an uncooperative callback.
 Current credential collisions in the candidate or proof identifier reject, not
 silently rewrite evidence. There is no remote endpoint accepting self-declared
 validation proof and no background activation scheduler.
+
+`Client.RevalidateSkillVersion(ctx, expected, validator)` checks the currently
+active version and rolls back to its validated predecessor on attributable
+deterministic failure. Enable `skills.rollback_on_regression`; disabling new
+activations does not disable this recovery control. Passing checks leave the
+catalog unchanged. Validator errors, panic, cancellation or judge-only opinions
+are not regression evidence and do not trigger rollback.
+
+The returned `RegressionResult.State` is the checked observation, not the new
+post-rollback state. Read `SkillActivationState` again before another decision.
+Failure proof and the rollback transition commit together; stale revisions reject
+without invoking a validator when detected at admission. The same scoped store,
+credential, trusted-callback and cooperative-deadline rules apply as activation.
+An initial version has no predecessor to restore. This method does not schedule
+continuous checks or infer statistical regressions from task outcomes.
 
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease

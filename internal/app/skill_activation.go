@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -82,23 +81,7 @@ func (s *Service) ActivateSkillVersion(ctx context.Context, expected skills.Acti
 	}
 	defer store.Close()
 	store.SetAutomatic(true)
-	guarded := skills.ValidatorFunc(func(callCtx context.Context, actual skills.Version) (skills.Evidence, error) {
-		// Rebind the candidate after reopening the catalog; a changed version
-		// must not enter the callback under a previously inspected identity.
-		body, err := json.Marshal(actual)
-		entrySecrets := append(append([]string(nil), secrets...), memorySecrets(s.settings, s.secret)...)
-		if err != nil || !bytes.Equal(body, candidateBody) || actual.Validate() != nil || !skillActivationCandidateClean(actual, entrySecrets) || !skillActivationClean(expected, []string{expected.Key.Scope, expected.Key.Name, expected.Active, expected.Revision, id}, entrySecrets) {
-			return skills.Evidence{}, skills.ErrValidation
-		}
-		proof, err := validator.Validate(callCtx, actual)
-		// Observe credential rotation again before accepting proof. Recheck the
-		// owned pre-callback candidate, not slices the validator may have edited.
-		currentSecrets := append(entrySecrets, memorySecrets(s.settings, s.secret)...)
-		if err != nil || redact(proof.ID, currentSecrets) != proof.ID || !skillActivationCandidateClean(candidate, currentSecrets) || !skillActivationClean(expected, []string{expected.Key.Scope, expected.Key.Name, expected.Active, expected.Revision, id}, currentSecrets) {
-			return skills.Evidence{}, skills.ErrValidation
-		}
-		return proof, nil
-	})
+	guarded := s.guardSkillValidator(expected, candidate, candidateBody, secrets, validator)
 	if store.ActivateAt(ctx, expected, id, guarded, true) != nil {
 		return ErrAdmission
 	}

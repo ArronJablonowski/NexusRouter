@@ -74,9 +74,10 @@ access or approval. Automatic routing and execution share the same snapshot.
 Local-only skill context pins hybrid tasks local and is omitted for explicit
 cloud/cloud-only tasks. Setting `local_only: false` authorizes sharing selected
 content from that scope with configured cloud models. Loading never drafts,
-activates or revises a skill. Automatic skill generation, production workflow
-validators, semantic relevance selection and regression-triggered rollback are
-still unfinished. As with memory, old skill snapshots remain in continuation
+activates or revises a skill. Explicit generation, validated activation and
+deterministic regression rollback are available to trusted hosts; automatic
+scheduling, production workflow validators and semantic relevance selection
+remain unfinished. As with memory, old skill snapshots remain in continuation
 history; changing an active version does not rewrite prior session messages.
 
 Advisory audits now influence automatic routing quality with bounded weight: creative/unknown domains receive less influence than coding/math/structured-output domains. Only the newest review per attempt counts; abstentions do not score, and direct evaluation/user feedback excludes that attempt's audit signal. Audits do not become measured execution samples or change cost/reliability statistics. `llm_judge_enabled: false` disables both review calls and advisory routing influence.
@@ -1009,6 +1010,14 @@ not sandboxed commands; they must obey privacy/tool policy and support repeated
 invocation. Stale revisions, failed validation, credential collisions and
 callback errors reject without activating the candidate. This does not schedule
 automatic learning or expose remote proof submission through CLI/HTTP.
+
+`RevalidateSkillVersion` completes the host-driven recovery path: with
+`skills.rollback_on_regression` enabled, a trusted deterministic failing check
+can restore the validated predecessor of the observed active version. Passing
+checks are non-mutating; callback errors or model opinions do not cause rollback.
+The returned state identifies the version checked, so inspect activation state
+again after rollback. New activation may be disabled independently. Continuous
+monitoring and statistical regression detection are not yet scheduled.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

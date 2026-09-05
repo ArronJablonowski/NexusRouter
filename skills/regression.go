@@ -52,6 +52,12 @@ func (s *FileStore) RevalidateAndRollback(ctx context.Context, expected Activati
 	if err != nil {
 		return RegressionResult{}, err
 	}
+	if version.Validate() != nil {
+		return RegressionResult{}, ErrValidation
+	}
+	if bounded.Err() != nil {
+		return RegressionResult{}, bounded.Err()
+	}
 	proof, err := regressionEvidence(bounded, validator, version)
 	if bounded.Err() != nil {
 		return RegressionResult{}, bounded.Err()
