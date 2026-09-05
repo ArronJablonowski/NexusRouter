@@ -24,6 +24,9 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 	var cancel context.CancelFunc
 	var task string
 	last := base.ContinueTaskID
+	// Feedback targets the most recently displayed successful answer, never a
+	// previous answer hidden behind a failed run or an initial continuation ID.
+	feedbackTask := ""
 	failedOutput := false
 	eof := false
 	write := func(text string) (ok bool) {
@@ -114,6 +117,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			if finished.err == nil {
 				if finished.result.TaskID != "" {
 					last = finished.result.TaskID
+					feedbackTask = finished.result.TaskID
 					base.Compaction = nil
 					base.SummaryAttemptID = ""
 				}
@@ -161,6 +165,20 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			if !escaped && strings.HasPrefix(text, "/") {
 				command, argument, _ := strings.Cut(text, " ")
 				argument = strings.TrimSpace(argument)
+				if command == "/feedback" || command == "/feedback-show" || command == "/feedback-revise" {
+					if cancel != nil {
+						write("Feedback not accepted while a task is active.\n")
+					} else if feedbackTask == "" {
+						write("Feedback requires a successful answer from this conversation.\n")
+					} else {
+						write(runChatFeedback(ctx, command, argument, feedbackTask, hooks))
+					}
+					if failedOutput {
+						join()
+						return 1
+					}
+					continue
+				}
 				if command != "/steer" && argument != "" {
 					if !write("Command takes no arguments.\n") {
 						join()
@@ -170,7 +188,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				}
 				switch command {
 				case "/help":
-					write("Enter text to start a task. /status /new /cancel /steer TEXT /quit. Use // for a literal slash.\n")
+					write("Enter text to start a task. /status /new /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
 				case "/status":
 					if cancel != nil {
 						if task == "" {
@@ -189,6 +207,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 						base.ContinueTaskID = ""
 						base.Compaction = nil
 						base.SummaryAttemptID = ""
+						feedbackTask = ""
 						write("New conversation.\n")
 					}
 				case "/cancel":
@@ -237,6 +256,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				continue
 			}
 			request := base
+			feedbackTask = ""
 			request.Prompt = text
 			request.Messages = nil
 			request.ContinueTaskID = last

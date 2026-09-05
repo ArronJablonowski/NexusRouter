@@ -18,6 +18,7 @@ Usage:
     --json streams committed events and a final result as versioned JSON lines
   darwin chat --config path --model id
     Line-oriented conversation: /help /status /new /cancel /steer TEXT /quit
+    Rate the latest answer with /feedback accepted|rejected COST
   darwin submit --config path --key idempotency-key --model id < prompt.txt
     Store queued work only; an independently running daemon executes it
   darwin submissions list --db path [--state state --after cursor --limit 25]

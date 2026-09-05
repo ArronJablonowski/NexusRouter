@@ -270,6 +270,28 @@ editor, multiline editing, automatic context compaction and interrupted-task res
 are not implemented. Chat supports the same routing/continuation flags as `run`,
 but JSON output belongs to `run --json`.
 
+Give explicit feedback before starting another task:
+
+```text
+/feedback rejected 0
+/feedback-show
+/feedback-revise EXPECTED_EVALUATION_ID accepted
+```
+
+`/feedback accepted|rejected COST` requires the observed final-attempt cost;
+zero is explicit, never inferred from missing provider usage. These commands
+target only the latest successful answer displayed in this chat. Starting another
+task or using `/new` clears that feedback target; feedback is rejected while busy,
+after a failed/canceled task, or before any answer has been displayed. Use the
+standalone `feedback --task` commands to address older answers explicitly.
+`/feedback-show` exposes evaluation IDs, outcomes and evidence sources, not answer
+text. It can include objective evidence, which is not subjectively revisable. Corrections
+require the exact prior ID and retain immutable history; identical retries do not
+add fitness samples, and conflicting/stale revisions fail. Observed cost cannot
+be corrected through the subjective revision command. User feedback cannot erase
+objective validation failures. These commands are operator actions, never model
+tools or automatic interpretation of conversational text.
+
 To shorten a completed conversation, supply an operator-reviewed summary file:
 
 ```json

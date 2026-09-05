@@ -8,14 +8,18 @@ import (
 	"os/signal"
 	"syscall"
 
+	"darwinrouter/evaluation"
 	"darwinrouter/internal/app"
 	"darwinrouter/internal/config"
 	"darwinrouter/runtime"
 )
 
 type chatHooks struct {
-	Run   taskStreamRunner
-	Steer func(context.Context, string, string, string) (runtime.SteeringMessage, error)
+	Run             taskStreamRunner
+	Steer           func(context.Context, string, string, string) (runtime.SteeringMessage, error)
+	Feedback        func(context.Context, string, bool, float64) error
+	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
+	ReviseFeedback  func(context.Context, string, string, bool) error
 }
 
 type chatLine struct {
@@ -48,7 +52,19 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	brokenPipe := make(chan os.Signal, 1)
 	signal.Notify(brokenPipe, syscall.SIGPIPE)
 	defer signal.Stop(brokenPipe)
-	return runChatIO(ctx, request, chatHooks{Run: service.RunStream, Steer: service.SteerTask}, stdin, stdout, signals)
+	hooks := chatHooks{
+		Run: service.RunStream, Steer: service.SteerTask,
+		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
+			return app.RecordFeedback(ctx, settings.Telemetry.Database, task, accepted, cost)
+		},
+		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
+			return app.FeedbackHistory(ctx, settings.Telemetry.Database, task)
+		},
+		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
+			return app.ReviseFeedback(ctx, settings.Telemetry.Database, task, expected, accepted)
+		},
+	}
+	return runChatIO(ctx, request, hooks, stdin, stdout, signals)
 }
 
 func runChatIO(ctx context.Context, request app.Request, hooks chatHooks, stdin io.Reader, stdout io.Writer, signals <-chan os.Signal) (code int) {
