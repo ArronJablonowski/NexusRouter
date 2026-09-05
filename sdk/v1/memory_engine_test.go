@@ -121,7 +121,7 @@ func TestSDKMemoryEngineScopedReadOnlyAndUntrusted(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			result, err := client.Run(ctx, sdk.Request{Version: 1, ModelID: "chat", Prompt: "hello"})
+			result, err := client.Run(ctx, sdk.Request{Version: 1, ModelID: "chat", Prompt: "useful fact"})
 			if store.writes != 0 {
 				t.Fatal("memory mutated", store.writes)
 			}

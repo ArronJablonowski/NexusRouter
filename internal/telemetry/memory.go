@@ -11,6 +11,7 @@ import (
 )
 
 var _ memory.Store = (*Store)(nil)
+var _ memory.UseStore = (*Store)(nil)
 
 // GetMemory is an operator inspection lookup, including expired/private facts.
 // Runtime context retrieval must use QueryMemory with its privacy/expiry filters.
@@ -114,7 +115,21 @@ func (s *Store) QueryMemory(ctx context.Context, q memory.Query) ([]memory.Fact,
 }
 
 func (s *Store) TouchMemory(ctx context.Context, scope, id string, now time.Time) error {
-	if !memory.ValidKey(scope) || !memory.ValidKey(id) || !memory.ValidTime(now) {
+	return s.touchMemory(ctx, scope, id, nil, now)
+}
+
+// TouchMemoryFact binds use metadata to the complete fact selected for context.
+// Corrections (including privacy changes), deletion and expiry cannot cause a
+// stale selected revision to touch a different current fact.
+func (s *Store) TouchMemoryFact(ctx context.Context, expected memory.Fact, now time.Time) error {
+	if expected.Validate() != nil {
+		return memory.ErrInput
+	}
+	return s.touchMemory(ctx, expected.Scope, expected.ID, &expected, now)
+}
+
+func (s *Store) touchMemory(ctx context.Context, scope, id string, expected *memory.Fact, now time.Time) error {
+	if ctx == nil || !memory.ValidKey(scope) || !memory.ValidKey(id) || !memory.ValidTime(now) {
 		return memory.ErrInput
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -126,16 +141,21 @@ func (s *Store) TouchMemory(ctx context.Context, scope, id string, now time.Time
 		return err
 	}
 	var body []byte
-	if err = tx.QueryRowContext(ctx, "SELECT body FROM memory_facts WHERE scope=? AND id=?", scope, id).Scan(&body); errors.Is(err, sql.ErrNoRows) {
+	var revision, expiry int64
+	var privacy string
+	if err = tx.QueryRowContext(ctx, "SELECT body,revision,privacy,expires FROM memory_facts WHERE scope=? AND id=?", scope, id).Scan(&body, &revision, &privacy, &expiry); errors.Is(err, sql.ErrNoRows) {
 		return memory.ErrConflict
 	} else if err != nil {
 		return err
 	}
 	var f memory.Fact
-	if json.Unmarshal(body, &f) != nil || f.Validate() != nil {
+	if json.Unmarshal(body, &f) != nil || f.Validate() != nil || f.Scope != scope || f.ID != id || f.Revision != revision || f.Privacy != privacy {
 		return memory.ErrInput
 	}
-	if now.Before(f.Created) || (!f.Expires.IsZero() && !f.Expires.After(now)) {
+	if (f.Expires.IsZero() && expiry != 0) || (!f.Expires.IsZero() && expiry != f.Expires.UnixNano()) {
+		return memory.ErrInput
+	}
+	if (expected != nil && !sameMemoryFact(f, *expected)) || now.Before(f.Created) || (!f.Expires.IsZero() && !f.Expires.After(now)) {
 		return memory.ErrConflict
 	}
 	if now.After(f.LastUse) {
@@ -149,6 +169,11 @@ func (s *Store) TouchMemory(ctx context.Context, scope, id string, now time.Time
 		return err
 	}
 	return tx.Commit()
+}
+
+// LastUse alone is mutable without changing the fact selected for context.
+func sameMemoryFact(a, b memory.Fact) bool {
+	return a.Version == b.Version && a.ID == b.ID && a.Scope == b.Scope && a.Revision == b.Revision && a.Content == b.Content && a.Provenance == b.Provenance && a.Confidence == b.Confidence && a.Privacy == b.Privacy && a.Created.Equal(b.Created) && a.Updated.Equal(b.Updated) && a.Expires.Equal(b.Expires)
 }
 
 func (s *Store) DeleteMemory(ctx context.Context, scope, id string, expected int64) error {

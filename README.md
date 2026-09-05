@@ -26,9 +26,13 @@ memory:
 ```
 
 The default empty scope disables retrieval. Facts come from the same configured
-SQLite database used by `darwin memory` commands. Retrieval inspects up to
-`max_facts` unexpired facts in ID order and includes only whole facts fitting the
-serialized message budget; this is not semantic search. Known credentials are
+SQLite database used by `darwin memory` commands. Retrieval pages through scoped,
+unexpired candidates (at most 1,024 facts, 8 MiB and a cooperative three-second
+deadline). It ranks positive unique keyword overlap with the current user request,
+then confidence and ID, selecting at most `max_facts` whole facts fitting the
+serialized message budget. Unmatched facts are omitted. This is deterministic
+local lexical retrieval, not semantic search; exceeding scan bounds fails admission.
+Known credentials are
 redacted before model dispatch. Context includes fact ID, revision, provenance,
 and confidence in a JSON data envelope, preceded by a fixed instruction that
 memory is untrusted factual context, never tool or policy authority.
@@ -37,12 +41,16 @@ With `local_only: true`, nonempty memory context pins automatic hybrid tasks to
 local models. Explicit cloud tasks and cloud-only mode omit memory. With
 `local_only: false`, cloud-eligible automatic routing loads only shareable facts;
 explicit local models may also retrieve private facts. Context admission and
-execution share one snapshot. A deletion after that snapshot does not recall an
-in-flight request; the next fresh task retrieves current facts. Continuations
+execution share one selection snapshot. Before its first admitted model dispatch,
+SQLite validates each selected fact's complete identity and updates last-use;
+correction, deletion or expiry detected then blocks dispatch. A later deletion
+cannot recall an in-flight request; the next fresh task retrieves current facts. Continuations
 retain historical messages, including previous memory snapshots: deleting a fact
 or disabling retrieval does not erase its copies from session history. Memory
-retrieval currently neither updates last-use timestamps nor creates/corrects
-facts automatically. Prompt separation is not proof of injection immunity;
+inspection remains read-only. Last-use means a dispatch attempt, not verified
+provider receipt; see [memory retrieval and use](docs/memory-retrieval.md) for
+snapshot races and custom-store behavior. Retrieval does not create/correct facts
+automatically. Prompt separation is not proof of injection immunity;
 tool permissions remain enforced independently.
 
 ### Procedural skills in task context

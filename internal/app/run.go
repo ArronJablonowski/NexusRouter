@@ -208,7 +208,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = history.SessionID
 	}
 	if !r.memoryPrepared && (model.Locality == "local" || !s.Memory.LocalOnly) {
-		r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), s.Memory, model.Locality == "local", secrets)
+		r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), s.Memory, model.Locality == "local", secrets, memoryTaskQuery(r))
 		if err != nil {
 			return result, ErrAdmission
 		}
@@ -281,7 +281,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	defer closeProvider()
-	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
+	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: withMemoryUse(p, selectMemoryStore(r.memoryStore, db), r.memoryContext), Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {

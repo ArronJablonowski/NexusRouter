@@ -27,6 +27,10 @@ type ResourceProfiler = resources.Profiler
 
 type MemoryStore = memory.Store
 
+// MemoryUseStore is an optional snapshot-bound context-use capability. Legacy
+// MemoryStore implementations without it remain read-only during execution.
+type MemoryUseStore = memory.UseStore
+
 type SkillStore = skills.Store
 
 type ProviderFactory = providers.Factory

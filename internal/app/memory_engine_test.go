@@ -20,7 +20,7 @@ func TestAutomaticRouteFreezesInjectedMemoryOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.profile = fixture.profile
-	result, err := svc.Run(context.Background(), Request{ModelID: "auto", Prompt: "question"})
+	result, err := svc.Run(context.Background(), Request{ModelID: "auto", Prompt: "useful fact"})
 	if err != nil {
 		t.Fatal(err)
 	}

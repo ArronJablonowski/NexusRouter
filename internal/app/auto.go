@@ -229,7 +229,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		// Hybrid local-only memory pins this task local; shareable mode excludes
 		// private facts before ranking any possible cloud candidate.
 		if cfg.Mode != "cloud_only" || !cfg.Memory.LocalOnly {
-			r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), cfg.Memory, cfg.Memory.LocalOnly && cfg.Mode != "cloud_only", memorySecrets(cfg, s.secret))
+			r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), cfg.Memory, cfg.Memory.LocalOnly && cfg.Mode != "cloud_only", memorySecrets(cfg, s.secret), memoryTaskQuery(r))
 			if err != nil {
 				return Result{}, ErrAdmission
 			}
