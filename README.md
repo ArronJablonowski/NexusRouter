@@ -914,8 +914,8 @@ Repeated IDs never dispatch again; terminal persistence failure returns the
 started observation for inspection, not permission to retry. Cancellation still
 allows a bounded terminal write. Drafted records are proposals, not published or
 active skills. SQLite inspection supports individual IDs and scoped pagination;
-generation and publication are available through the Go service/SDK and CLI;
-native HTTP mutation endpoints remain unfinished.
+generation and publication are available through the Go service/SDK, CLI and
+authenticated native HTTP API.
 
 The application service and Go SDK now provide `GenerateSkillDraft` for explicit
 task IDs and a configured generator model. It selects current accepted
@@ -945,6 +945,32 @@ Generation IDs are single-use: on failure or lost output, inspect the saved
 attempt rather than automatically retrying inference. Publication retries with
 the same saved attempt are safe and return the existing version. Neither command
 activates a skill. JSON output includes workflow content and should be protected.
+
+The daemon exposes the same actions with bearer authentication and no browser
+origin or query parameters. Send `Content-Type: application/json`:
+
+```http
+POST /v1/skills/generations
+
+{"version":1,"id":"workflow-attempt-1","model_id":"generator","name":"review-workflow","task_ids":["TASK_A","TASK_B"],"max_cost":0}
+```
+
+```http
+POST /v1/skills/generations/workflow-attempt-1/publish
+
+{"version":1}
+```
+
+Scope remains bound to daemon configuration, not request input. `max_cost` is
+optional and defaults to zero. Requests are limited to 8 KiB, share task capacity,
+and use cooperative 30-second generation / 10-second publication deadlines.
+Successful responses are HTTP 200 with the saved attempt or immutable version.
+Malformed input returns 400 (oversized bodies 413, wrong media type 415); capacity
+or missing adapters return 503. A service failure returns a generic 422 and does
+not establish whether an attempt committed: inspect the caller-chosen ID before
+deciding what to do next. Neither endpoint retries inference or activates skills.
+Model names in stored attempts are provider names and may differ from the
+configured `model_id` alias.
 
 Inspect saved generation without re-running it:
 

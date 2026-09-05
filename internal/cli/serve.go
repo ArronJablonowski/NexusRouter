@@ -70,6 +70,10 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		GenerateSkillDraft: func(ctx context.Context, id, model, name string, tasks []string, maxCost float64) (skills.GenerationAttempt, error) {
+			return service.GenerateSkillDraft(ctx, id, model, skills.Key{Scope: s.Skills.Scope, Name: name}, tasks, maxCost)
+		},
+		PublishSkillGeneration: service.PublishSkillGeneration,
 		SkillGeneration: func(ctx context.Context, scope, id string) (skills.GenerationAttempt, error) {
 			return app.InspectSkillGeneration(ctx, s.Telemetry.Database, scope, id)
 		},

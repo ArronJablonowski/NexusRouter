@@ -18,6 +18,10 @@ func skillGenerationRoute(path string) bool {
 }
 
 func (h *Handler) serveSkillGenerations(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		h.serveSkillGenerationAction(w, r)
+		return
+	}
 	if r.Method != http.MethodGet {
 		failure(w, 404, "not_found")
 		return

@@ -77,6 +77,7 @@ func TestSkillGenerationHTTPAdmission(t *testing.T) {
 			case "post":
 				r.Method = "POST"
 				r.URL.RawQuery = ""
+				want = 503 // Mutation adapter is deliberately absent in this fixture.
 			}
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, r)
