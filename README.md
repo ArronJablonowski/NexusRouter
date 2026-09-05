@@ -138,8 +138,9 @@ outputs. Eligible history is either completed or an exact restored-delegation
 checkpoint. Pending tools, uncertain effects, interrupted turns, ordinary
 failures and canceled tasks are not eligible. This observation grants no retry
 permission and does not check the selected provider, privacy, resource or context
-budget. The experimental Codex CLI provider still does not accept historical
-continuation. Inspecting readiness never repairs or resumes a task.
+budget. The experimental Codex CLI provider supports explicit typed-history
+continuation within its [documented limits](docs/codex-history-continuation.md).
+Inspecting readiness never repairs or resumes a task.
 The CLI exits zero for a successful inspection even when `history_eligible` is
 false; scripts must inspect that field, not treat command success as permission.
 

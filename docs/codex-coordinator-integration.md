@@ -3,7 +3,10 @@
 Status: experimental configured provider and one live Sol → Ollama → Sol
 round trip verified on September 5, 2026. Target model remains `gpt-5.6-sol`.
 Use `examples/sol-codex-local-smoke.yaml` with `--model coordinator` for fresh,
-supervised, non-sensitive tasks. Historical sections below record earlier
+supervised, non-sensitive tasks or [explicit history continuation](codex-history-continuation.md).
+Live continuation from the earlier completed Sol/local-worker task has also
+passed; automatic resume and compaction remain unfinished.
+Historical sections below record earlier
 implementation stages; they do not imply production qualification.
 
 The current pinned profile enables only `skip_host_skill_discovery` and

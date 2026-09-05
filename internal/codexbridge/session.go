@@ -28,8 +28,9 @@ type Options struct{ Model, CWD string }
 // item/tool/call is a paused segment boundary, NOT successful task completion.
 // Only turn/completed can finish the final segment. A caller must defer Close
 // across the entire runtime loop, including while a proposed tool is executing.
-// This first implementation admits a fresh single-user-message conversation;
-// historical session import, steering and compaction are not silently flattened.
+// Initial history is imported as typed items into a new ephemeral thread, not
+// flattened into a user prompt or resumed from a foreign Codex thread ID.
+// Steering and compaction of an active exchange remain unsupported.
 type Session struct {
 	w                          Wire
 	options                    Options
@@ -121,9 +122,6 @@ func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(p
 	stop := context.AfterFunc(ctx, func() { _ = s.Close() })
 	defer stop()
 	if !s.started {
-		if len(req.Messages) != 1 || req.Messages[0].Role != "user" {
-			return failure(false)
-		}
 		if err = s.begin(req); err != nil {
 			return err
 		}
@@ -148,6 +146,10 @@ func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(p
 func marshal(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 
 func (s *Session) begin(req providers.Request) error {
+	history, prompt, err := initialHistory(req.Messages)
+	if err != nil {
+		return failure(false)
+	}
 	names := map[string]bool{}
 	definitions := make([]map[string]any, 0, len(req.Tools))
 	for _, tool := range req.Tools {
@@ -193,7 +195,17 @@ func (s *Session) begin(req providers.Request) error {
 			return failure(false)
 		}
 	}
-	params := map[string]any{"threadId": s.thread, "model": req.Model, "environments": []any{}, "input": []map[string]any{{"type": "text", "text": req.Messages[0].Content, "text_elements": []any{}}}}
+	if len(history) > 0 {
+		result, err = s.call("4", "thread/inject_items", map[string]any{"threadId": s.thread, "items": history})
+		if err != nil {
+			return err
+		}
+		var ack map[string]json.RawMessage
+		if decodePayload(result, &ack) != nil || len(ack) != 0 {
+			return failure(false)
+		}
+	}
+	params := map[string]any{"threadId": s.thread, "model": req.Model, "environments": []any{}, "input": []map[string]any{{"type": "text", "text": prompt, "text_elements": []any{}}}}
 	if req.JSONSchema != nil {
 		if !json.Valid(req.JSONSchema) {
 			return failure(false)
@@ -247,6 +259,23 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 		}
 		kind, _ := e.Kind()
 		if s.allowDisabledStatus && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
+			continue
+		}
+		if method == "thread/inject_items" && kind == codexrpc.Notification && s.compatibilityNotice(e) {
+			continue // Same checked informational notices as normal streaming.
+		}
+		if method == "thread/inject_items" && kind == codexrpc.Notification && (e.Method == "thread/status/changed" || e.Method == "thread/started") {
+			var notice struct {
+				ThreadID string `json:"threadId"`
+				Thread   struct {
+					ID string `json:"id"`
+				} `json:"thread"`
+			}
+			if decodePayload(e.Params, &notice) != nil || (e.Method == "thread/status/changed" && notice.ThreadID != s.thread) || (e.Method == "thread/started" && notice.Thread.ID != s.thread) {
+				return nil, failure(false)
+			}
+			// The CLI can deliver thread/started after its start response. Bind
+			// this delayed metadata to the new thread; never dispatch from it.
 			continue
 		}
 		if kind == codexrpc.Response || kind == codexrpc.ErrorResponse {

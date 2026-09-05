@@ -236,6 +236,15 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	} else {
 		messages = append(messages, providers.Message{Role: "user", Content: r.Prompt})
 	}
+	if provider.Kind == "codex_app_server" && r.ContinueTaskID != "" {
+		// Credentials may have rotated since this history was recorded. Own and
+		// scrub decoded fields before importing them into a new CLI session;
+		// never rewrite the original journal or send raw saved context first.
+		messages, err = redactCodexHistoryMessages(messages, secrets)
+		if err != nil {
+			return result, ErrAdmission
+		}
+	}
 	encoded, err := json.Marshal(messages)
 	if err != nil || len(encoded) > 4<<20 {
 		return result, ErrAdmission

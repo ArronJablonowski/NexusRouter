@@ -35,9 +35,10 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 		}
 		return p, tr.CloseIdleConnections, nil
 	}
-	// This initial bridge supports one fresh turn, not imported history or
-	// flattened memory/skill roles. Reject unsupported contexts before launch.
-	if ctx.Err() != nil || privacy != "cloud_allowed" || model.Locality != "cloud" || r.LocalRequired || s.Mode == "local_only" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || len(messages) != 1 || messages[0].Role != "user" {
+	// Explicit continuation imports only validated, completed conversation items.
+	// Fresh tasks still cannot acquire extra memory/skill roles implicitly;
+	// compaction and reviewed-summary imports await separate qualification.
+	if ctx.Err() != nil || privacy != "cloud_allowed" || model.Locality != "cloud" || r.LocalRequired || s.Mode == "local_only" || r.Compaction != nil || r.SummaryAttemptID != "" || codexbridge.ValidateInitialMessages(messages) != nil || (r.ContinueTaskID == "" && (len(messages) != 1 || messages[0].Role != "user")) {
 		return nil, nil, ErrAdmission
 	}
 	dir, err := os.MkdirTemp("", "darwin-codex-task-")

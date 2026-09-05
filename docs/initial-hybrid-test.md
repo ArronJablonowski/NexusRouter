@@ -33,7 +33,7 @@ local-only privacy.
 ## Prerequisites and readiness evidence
 
 - For the preferred CLI route, a working authenticated Codex CLI. The experimental
-  native adapter is wired for explicit fresh tasks and has passed the small
+  native adapter is wired for explicit tasks and has passed the small
   live test below. It remains experimental, not production-qualified.
 - For the optional direct-HTTP route only, a locally configured
   `OPENAI_API_KEY`; never paste the credential into chat or commit it.
@@ -76,10 +76,11 @@ Full MVP work continues separately from these initial checks.
 
 `examples/sol-codex-local-smoke.yaml` uses `codex_app_server`, the existing
 ChatGPT login, and an absolute CLI executable path (adjust it on another host).
-No HTTP endpoint or API-key setting belongs on this provider. Only explicit
-fresh tasks are supported initially: select `--model coordinator`. Automatic
-health/routing discovery, auxiliary judging, history import and compaction are
-not implemented for this provider yet. Memory and skills remain off in the sample.
+No HTTP endpoint or API-key setting belongs on this provider. Select the model
+explicitly with `--model coordinator`. Fresh tasks and bounded explicit history
+continuations are supported; see [the continuation guide](codex-history-continuation.md).
+Automatic health/routing discovery, auxiliary judging and compaction remain
+unsupported for this provider. Memory and skills remain off in the sample.
 
 The first CLI-backed application attempt created durable task
 `BQJR6VQWJRF4GCVVMDL3G4R4SR` in the ignored sample database and failed before

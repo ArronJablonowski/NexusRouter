@@ -586,8 +586,10 @@ oversized history returns an error rather than partial metadata.
 
 This is not model readiness or execution authorization. Normal provider,
 privacy, resource, budget and tool policy checks still apply; no method silently
-replays old tool calls. In particular, Codex CLI remains fresh-task-only. Use
-`Request.ContinueTaskID` only with a history-capable provider after inspection.
+replays old tool calls. Codex CLI now supports explicit `Request.ContinueTaskID`
+through typed history import into a new ephemeral thread, subject to its 1 MiB
+injection-frame limit. Compaction/summary requests and in-flight steering remain
+unsupported for that provider; see [the continuation guide](../../docs/codex-history-continuation.md).
 
 `ReadEvents(ctx, taskID, afterSequence, limit)` provides paged durable events
 directly to embedded consumers. Start at sequence0, process a validated page, then

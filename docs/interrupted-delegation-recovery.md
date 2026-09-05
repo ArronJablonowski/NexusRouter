@@ -68,8 +68,11 @@ is unchanged.
 
 This relies on trusted journal writers, not cryptographic protection against
 database tampering. The continuation provider must support conversation history.
-The experimental Codex CLI adapter is still fresh-task-only, so this checkpoint
-does not establish Sol CLI history continuation or automatic coordinator resume.
+The experimental Codex CLI adapter now supports explicit typed-history import;
+see [its limits and qualification](codex-history-continuation.md). Recovered
+checkpoint admission is tested with fixtures; live Sol testing has used a
+completed source, not a crashed/recovered source. Automatic coordinator resume
+is still unimplemented.
 
 ## Verification scope
 
