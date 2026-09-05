@@ -21,6 +21,7 @@ Usage:
   darwin submissions list --db path [--state state --after cursor --limit 25]
   darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
+  darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
@@ -47,6 +48,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "metrics" {
+		return runMetrics(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "submit" {
 		return runSubmit(args[1:], stdin, stdout, stderr)
 	}

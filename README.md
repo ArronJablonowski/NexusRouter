@@ -424,6 +424,35 @@ To audit successful tasks automatically, set `evaluation.auto_review_model` to a
 
 Review execution persists `started` before calling the reviewer, then records the validated audit and `completed` status in one transaction, or `failed` with a generic code. Cancellation cleanup has an independent five-second storage deadline. Admission denials do not create attempts. A crash or storage failure can leave an attempt `started`; this means indeterminate, not proof that a review is still running. Automatic reconciliation is not implemented. Failed reviews never become candidate performance evidence. The standalone audit-storage API remains available for imported records; only `CompleteReview`, used by application execution, guarantees atomic audit/lifecycle persistence.
 
+## Durable lifecycle metrics
+
+`darwin metrics --db /absolute/path/to/darwin.db` reads a versioned JSON snapshot
+from existing storage. The daemon exposes the same snapshot through authenticated
+`GET /v1/metrics`, with a separate one-request diagnostic slot. Requests with a
+body, query parameters or browser origin are rejected. Missing or unreadable
+storage returns an error, not a fabricated empty population.
+
+The snapshot contains fixed groups for tasks, submissions, review attempts,
+evaluation records, audit records and submission recovery records. Tasks,
+submissions and reviews are grouped by stored lifecycle state; the other groups
+count stored records. Counts come from one SQLite read transaction and survive
+service restarts. Older schemas explicitly mark unsupported groups unavailable.
+No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
+
+These are current stored-population **gauges**, not monotonic counters, validated
+success rates or proof that a `running` task/`started` review is alive. A completed
+task is not necessarily semantically correct. Evaluation revisions are not
+additional base evaluations; audit and recovery counts do not rate candidate
+quality. The reader checks lifecycle metadata, not every underlying event or
+opaque record body. Use health, task history and audit inspection for that detail.
+
+The storage query has a three-second context limit, the application a four-second
+limit, and the HTTP route a five-second limit. Count queries and database integrity
+checks scale with stored data and may time out on large or pressured databases;
+only response size and label cardinality are fixed. Reads neither migrate storage
+nor dispatch inference. OpenTelemetry export, latency/cost histograms, retention
+and production-scale metrics qualification remain unfinished.
+
 ## Next sprints
 
 1. Connect authorized tools and bounded delegation to application execution.

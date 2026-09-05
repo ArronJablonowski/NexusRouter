@@ -69,6 +69,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		Metrics:              service.Metrics,
 		Submit:               service.Submit,
 		Submissions:          service.ListSubmissions,
 		SubmissionRecoveries: service.SubmissionRecoveries,
