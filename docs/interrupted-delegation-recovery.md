@@ -67,7 +67,36 @@ and an explicitly continued coordinator receiving the restored result without
 the fixture requesting repeated work. Storage tests cover stale claims,
 concurrent recovery, cancellation, rollback, invalid provenance and bounds.
 
-These tests do not kill an actual process at this new boundary or run live model
-inference. General interrupted inference, running children, missing batch slots,
-uncertain effects, automatic continuation and broader crash qualification remain
-required follow-up work.
+Subprocess qualification also runs the actual service and worker runtime against
+HTTP fixtures in a test-owned executable. A test-only SQLite function pauses
+inside a `BEFORE INSERT` trigger for the parent tool result. The test sends
+SIGKILL to that exact child process and verifies its signal termination before
+opening the database. This prevents graceful cleanup from manufacturing the
+state under test. Both single and batch cases prove that terminal worker records
+survive while the parent result transaction remains uncommitted. After removing
+the fixture trigger and advancing the claim to expired, the dispatcher's recovery
+page restores only the two missing parent records. Child journals and the
+original parent prefix remain unchanged; repeated recovery adds no receipt or
+inference call.
+
+A complementary subprocess test kills the owner while the child's HTTP request
+is still in progress. After the connection closes, the parent, work and execution
+journals remain running. Repeated recovery leaves those journals and the expired
+submission unresolved, produces no receipt or redispatch, and denies continuation
+of the unfinished history. This verifies a safe refusal, not automatic recovery
+of running children.
+
+Run the process-boundary tests with:
+
+```sh
+go test -race ./internal/app -run 'Test(InterruptedDelegationRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRemainsUnresolved)$' -count=5
+```
+
+These SIGKILL tests target macOS and Linux; local execution evidence is macOS.
+They use synthetic loopback provider responses, not live model inference, and
+manually expire the fixture claim rather than waiting for a production lease.
+They do not establish power-loss durability, automatic daemon restart, recovery
+from arbitrary transaction instructions, or stopping remote generation/billing.
+General interrupted inference, running children, missing batch slots, uncertain
+effects, automatic continuation and broader crash qualification remain required
+follow-up work.
