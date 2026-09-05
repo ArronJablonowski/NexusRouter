@@ -119,7 +119,7 @@ func TestExternalSchemaAndHandlerFailures(t *testing.T) {
 		if err := r.Register(d); err != nil {
 			t.Fatal(err)
 		}
-		out, err := (Executor{r, &Policy{Default: Allow}}).Execute(context.Background(), providers.ToolCall{ID: "id", Name: "lookup", Arguments: json.RawMessage(`{"q":"a"}`)})
+		out, err := (Executor{Registry: r, Policy: &Policy{Default: Allow}}).Execute(context.Background(), providers.ToolCall{ID: "id", Name: "lookup", Arguments: json.RawMessage(`{"q":"a"}`)})
 		if err != ErrExecution || out.Effect != runtime.UncertainEffect || out.Content != "" {
 			t.Fatalf("%+v %v", out, err)
 		}

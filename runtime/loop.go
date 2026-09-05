@@ -26,6 +26,19 @@ type ToolExecutor interface {
 	Execute(context.Context, providers.ToolCall) (ToolResult, error)
 }
 
+// ScopedToolExecutor is an optional extension to ToolExecutor for authorization
+// bound to a durable execution identity. The loop prefers it when available,
+// only after ToolStarted commits. These identities are assigned by the runtime,
+// not supplied by the model. They identify work; they do not grant permission.
+type ScopedToolExecutor interface {
+	ExecuteScoped(context.Context, ToolExecution) (ToolResult, error)
+}
+
+type ToolExecution struct {
+	TaskID, SessionID, TurnID, AttemptID string
+	Call                                 providers.ToolCall
+}
+
 type ToolResult struct {
 	Content string
 	Effect  Effect
@@ -475,7 +488,14 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			out := ToolResult{Effect: NoEffect}
 			toolErr := ctx.Err()
 			if toolErr == nil {
-				out, toolErr = l.Tools.Execute(ctx, call)
+				if scoped, ok := l.Tools.(ScopedToolExecutor); ok {
+					// The executor owns its argument bytes, not the conversation's.
+					owned := call
+					owned.Arguments = append(json.RawMessage(nil), call.Arguments...)
+					out, toolErr = scoped.ExecuteScoped(ctx, ToolExecution{TaskID: r.TaskID, SessionID: r.SessionID, TurnID: turn, AttemptID: attempt, Call: owned})
+				} else {
+					out, toolErr = l.Tools.Execute(ctx, call)
+				}
 			}
 			if out.Effect != NoEffect && out.Effect != ConfirmedEffect && out.Effect != UncertainEffect {
 				out.Effect = UncertainEffect

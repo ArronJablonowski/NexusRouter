@@ -143,15 +143,25 @@ func (r *Registry) Catalog() []providers.Tool {
 	return out
 }
 
-// Executor currently admits only read-only tools. Side-effecting tools stay
-// denied until durable leases and approvals are integrated; Ask never implies
-// approval. Policy must remain immutable for the task lifetime.
+// Executor admits writes or Ask only through an explicit scoped Authority.
+// Policy must remain immutable for the task lifetime. Application extensions
+// still reject writes until the operator approval surface is integrated.
 type Executor struct {
-	Registry *Registry
-	Policy   *Policy
+	Registry  *Registry
+	Policy    *Policy
+	Authority Authority
 }
 
 func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out runtime.ToolResult, err error) {
+	return e.execute(ctx, runtime.ToolExecution{Call: call}, false)
+}
+
+func (e Executor) ExecuteScoped(ctx context.Context, execution runtime.ToolExecution) (runtime.ToolResult, error) {
+	return e.execute(ctx, execution, true)
+}
+
+func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, scoped bool) (out runtime.ToolResult, err error) {
+	call := execution.Call
 	out.Effect = runtime.NoEffect
 	if ctx.Err() != nil {
 		return out, ctx.Err()
@@ -162,7 +172,13 @@ func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out run
 	e.Registry.mu.RLock()
 	t, ok := e.Registry.entries[call.Name]
 	e.Registry.mu.RUnlock()
-	if !ok || !t.ReadOnly || e.Policy.Decide(call.Name, t.Scope) != Allow {
+	policy, policyErr := extensionPolicy(e.Policy)
+	if !ok || policyErr != nil {
+		return out, ErrDenied
+	}
+	decision := policy.Decide(call.Name, t.Scope)
+	needsApproval := !t.ReadOnly || decision == Ask
+	if decision == Deny || (needsApproval && (!scoped || e.Authority == nil)) {
 		return out, ErrDenied
 	}
 	arguments := append(json.RawMessage(nil), call.Arguments...)
@@ -178,6 +194,9 @@ func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out run
 	}
 	if ctx.Err() != nil {
 		return out, ctx.Err()
+	}
+	if needsApproval {
+		return e.approved(ctx, execution, t, policy, arguments)
 	}
 	defer func() {
 		if recover() != nil {
