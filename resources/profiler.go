@@ -75,15 +75,7 @@ func Profile(ctx context.Context) (Snapshot, error) {
 		}
 		s.Source = "darwin-vm-stat-estimate"
 	case "linux":
-		b, err := readHostMemory(ctx, "/proc/meminfo")
-		if err != nil {
-			return s, ErrProfile
-		}
-		s.TotalRAM, s.AvailableRAM, s.SwapUsed, err = parseLinuxMeminfo(b)
-		if err != nil {
-			return s, ErrProfile
-		}
-		s.Source = "linux-proc-meminfo-host"
+		return profileLinux(ctx, readLinuxProfileFile)
 	default:
 		return s, ErrProfile
 	}

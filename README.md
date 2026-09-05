@@ -167,6 +167,25 @@ The prompt is read from stdin (maximum1MiB, nonblank UTF-8, with a30-second inpu
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
 
+On Linux, cgroup-v2 measurements cap host RAM by every visible ancestor's
+`memory.max` and `memory.high`, and cap available RAM by the corresponding
+`limit - memory.current` headroom (saturated at zero). Treating `memory.high`
+as a capacity boundary is a conservative routing policy: the kernel defines it
+as a throttling threshold, not an OOM limit. CPU counts also honor visible
+`cpu.max` quotas and effective cpusets; fractional quotas allow at least one
+worker and otherwise round down. These measurements feed normal admission.
+See the [kernel cgroup-v2 documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html).
+
+Discovery uses bounded proc/mount records and checks membership again after
+sampling. Missing, malformed, ambiguous, or changing hierarchies fail closed.
+Legacy v1 memory hierarchies and namespace paths containing `..` are currently
+unsupported; use a trusted SDK resource profiler for unsupported deployments.
+Only visible v2 limits are accounted for—hidden namespace ancestors, legacy CPU
+controllers, external inference-server limits, and concurrent kernel changes
+are not inferred. Swap figures remain host-level and thermal sensors may remain
+unknown. These are observations, not OS-enforced reservations or container
+isolation. Real Linux container/hardware qualification remains outstanding.
+
 `resources` also includes `gpu_inventory`, a separate per-device diagnostic survey.
 On Linux it queries `/usr/bin/nvidia-smi` and AMD DRM sysfs concurrently; each
 source reports `observed`, `unavailable`, or `unsupported` with byte counters.
