@@ -19,6 +19,13 @@ import (
 // procedures. It reads accepted source snapshots without inference or skill-root
 // creation. The single-operator database is trusted; save alone is not authority.
 func (s *Service) PlanWorkflowSelection(ctx context.Context, modelID string, key skills.Key, group, algorithm string, taskIDs []string, maxCost float64) (skills.WorkflowSelection, error) {
+	if algorithm == skills.ObservedToolsAlgorithm {
+		return skills.WorkflowSelection{}, ErrAdmission
+	}
+	return s.planWorkflowSelection(ctx, modelID, key, group, algorithm, taskIDs, maxCost, nil, nil)
+}
+
+func (s *Service) planWorkflowSelection(ctx context.Context, modelID string, key skills.Key, group, algorithm string, taskIDs []string, maxCost float64, binding *skills.WorkflowGroup, observedSecrets []string) (skills.WorkflowSelection, error) {
 	bad := func() (skills.WorkflowSelection, error) { return skills.WorkflowSelection{}, ErrAdmission }
 	if s == nil || ctx == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(group) || !skillGenerationIdentifier.MatchString(algorithm) || len(taskIDs) < 2 || len(taskIDs) > 20 {
 		return bad()
@@ -32,7 +39,7 @@ func (s *Service) PlanWorkflowSelection(ctx context.Context, modelID string, key
 			return bad()
 		}
 	}
-	secrets := memorySecrets(s.settings, s.secret)
+	secrets := append(append([]string(nil), observedSecrets...), memorySecrets(s.settings, s.secret)...)
 	if !selectionValueClean([]any{key, group, algorithm, modelID, ids}, secrets) || ctx.Err() != nil {
 		return bad()
 	}
@@ -40,9 +47,17 @@ func (s *Service) PlanWorkflowSelection(ctx context.Context, modelID string, key
 	if err != nil {
 		return bad()
 	}
-	sources, err := ro.SkillWorkflowSources(ctx, ids)
+	var sources []skills.WorkflowSource
+	if binding == nil {
+		sources, err = ro.SkillWorkflowSources(ctx, ids)
+	} else {
+		sources, err = ro.SkillWorkflowGroupSources(ctx, ids, binding.ID)
+	}
 	ro.Close()
 	if err != nil || len(sources) != len(ids) {
+		return bad()
+	}
+	if binding != nil && (binding.Validate() != nil || binding.ID != group || binding.Algorithm != algorithm || !slices.Equal(binding.Sources, workflowSelectionCandidates(sources))) {
 		return bad()
 	}
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
@@ -59,12 +74,12 @@ func (s *Service) PlanWorkflowSelection(ctx context.Context, modelID string, key
 		return bad()
 	}
 	selection, err := skills.NewWorkflowSelection(key, group, algorithm, modelID, policy, workflowSelectionCandidates(sources), time.Now().UTC())
-	if err != nil || !selectionValueClean(selection, secrets) || ctx.Err() != nil {
+	if err != nil || !selectionValueClean(selection, secrets) || (binding != nil && !selectionValueClean(binding, secrets)) || ctx.Err() != nil {
 		return bad()
 	}
 	// Refresh before the only write: rotating credentials never enter metadata.
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
-	if !selectionValueClean(selection, secrets) {
+	if !selectionValueClean(selection, secrets) || (binding != nil && !selectionValueClean(binding, secrets)) {
 		return bad()
 	}
 	store, err := telemetry.Open(ctx, s.settings.Telemetry.Database)

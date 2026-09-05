@@ -66,7 +66,12 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 	if err != nil {
 		return bad()
 	}
-	sources, err := read.SkillWorkflowSources(ctx, ids)
+	var sources []skills.WorkflowSource
+	if selection != nil && selection.Algorithm == skills.ObservedToolsAlgorithm {
+		sources, err = read.SkillWorkflowGroupSources(ctx, ids, selection.Group)
+	} else {
+		sources, err = read.SkillWorkflowSources(ctx, ids)
+	}
 	read.Close()
 	if err != nil || len(sources) != len(ids) {
 		return bad()

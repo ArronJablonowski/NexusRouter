@@ -421,6 +421,23 @@ semantic clustering, establish source tenancy, or start a background scheduler.
 Planning alone is not a generation claim, and using the lower-level draft method
 with a fresh attempt ID does not inherit selection-based deduplication.
 
+`Client.GroupSkillWorkflows(ctx, taskIDs)` reads accepted task observations and
+groups identical ordered tool names, domain and execution profile. It uses actual
+successful paired dispatch events, not imported tool messages, arguments or
+output text. No-tool observations and groups with fewer than two distinct
+sessions are omitted. Group IDs describe the observed pattern independently of
+which tasks are members; they are not semantic equivalence or permission to run
+those tools.
+
+`Client.PlanGroupedWorkflowSelection(ctx, modelID, key, taskIDs, maxCost)` requires
+one group covering every requested source, then persists a bound selection with
+no inference. The `observed_tools_v1` algorithm is reserved: callers cannot assert
+it through `PlanWorkflowSelection`. Actual traces are revalidated in the same
+source transaction during grouped planning and selection-based generation.
+Generation still creates only an inactive proposal, with the stable selection
+ID preventing automatic redispatch. These operations do not schedule work or
+establish source tenancy.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

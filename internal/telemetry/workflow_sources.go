@@ -30,6 +30,20 @@ var workflowSourceID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 // Results are sensitive: the host must redact and enforce privacy before sending
 // them to any generator. This operation never repairs, generates or mutates data.
 func (s *Store) SkillWorkflowSources(ctx context.Context, tasks []string) (sources []skills.WorkflowSource, err error) {
+	return s.skillWorkflowSources(ctx, tasks, "")
+}
+
+// SkillWorkflowGroupSources rechecks the observed tool grouping in the same
+// transaction as accepted source extraction. Snapshot hashes alone do not bind
+// actual tool execution order or failure codes.
+func (s *Store) SkillWorkflowGroupSources(ctx context.Context, tasks []string, groupID string) ([]skills.WorkflowSource, error) {
+	if !workflowSelectionID(groupID) {
+		return nil, errWorkflowSources
+	}
+	return s.skillWorkflowSources(ctx, tasks, groupID)
+}
+
+func (s *Store) skillWorkflowSources(ctx context.Context, tasks []string, groupID string) (sources []skills.WorkflowSource, err error) {
 	if ctx == nil || s == nil || s.db == nil || len(tasks) < 2 || len(tasks) > 20 {
 		return nil, errWorkflowSources
 	}
@@ -57,6 +71,7 @@ func (s *Store) SkillWorkflowSources(ctx context.Context, tasks []string) (sourc
 	examples := make([]skills.WorkflowExample, 0, len(tasks))
 	budget := 256 << 10
 	domain := ""
+	var procedures []skills.WorkflowProcedure
 	for _, task := range tasks {
 		source, err := workflowSource(bounded, tx, task, &budget)
 		if err != nil {
@@ -69,9 +84,22 @@ func (s *Store) SkillWorkflowSources(ctx context.Context, tasks []string) (sourc
 		domain = source.Example.Domain
 		examples = append(examples, source.Example)
 		sources = append(sources, source)
+		if groupID != "" {
+			procedure, err := workflowProcedure(bounded, tx, source)
+			if err != nil {
+				return nil, err
+			}
+			procedures = append(procedures, procedure)
+		}
 	}
 	if skills.ValidateWorkflowExamples(skills.Key{Scope: "workflow", Name: "sources"}, examples) != nil {
 		return nil, errWorkflowSources
+	}
+	if groupID != "" {
+		groups, err := skills.BuildWorkflowGroups(procedures)
+		if err != nil || len(groups) != 1 || groups[0].ID != groupID || len(groups[0].Sources) != len(tasks) {
+			return nil, errWorkflowSources
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return nil, err
