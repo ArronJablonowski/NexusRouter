@@ -41,12 +41,18 @@ type entry struct {
 	Validated   map[string]Evidence `json:"validated"`
 	Activations []activation        `json:"activations"`
 }
-type activation struct {
-	From     string    `json:"from"`
-	To       string    `json:"to"`
-	At       time.Time `json:"at"`
-	Rollback bool      `json:"rollback"`
+
+// ActivationRecord records one durable transition. Regression, when present,
+// attributes an automatic rollback to a failed deterministic validator.
+type ActivationRecord struct {
+	From       string    `json:"from"`
+	To         string    `json:"to"`
+	At         time.Time `json:"at"`
+	Rollback   bool      `json:"rollback"`
+	Regression *Evidence `json:"regression,omitempty"`
 }
+
+type activation = ActivationRecord
 
 // Open creates a private directory; existing symlink path components are refused.
 // Automatic updates default off. Call SetAutomatic(true) only under host policy.

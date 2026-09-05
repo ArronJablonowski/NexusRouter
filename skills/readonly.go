@@ -11,9 +11,10 @@ func OpenReadOnly(path string, scopes []string) (*FileStore, error) {
 
 // History contains metadata only, preserving progressive workflow loading.
 type History struct {
-	Key      Key        `json:"key"`
-	Active   string     `json:"active"`
-	Versions []Metadata `json:"versions"`
+	Key         Key                `json:"key"`
+	Active      string             `json:"active"`
+	Versions    []Metadata         `json:"versions"`
+	Activations []ActivationRecord `json:"activations"`
 }
 
 // History returns draft and activated versions in creation order.
@@ -27,7 +28,7 @@ func (s *FileStore) History(ctx context.Context, key Key) (History, error) {
 		if !ok {
 			return ErrNotFound
 		}
-		result = History{Key: e.Key, Active: e.Active, Versions: e.Versions}
+		result = History{Key: e.Key, Active: e.Active, Versions: e.Versions, Activations: e.Activations}
 		return nil
 	}, false)
 	return result, err

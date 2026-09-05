@@ -14,6 +14,9 @@ func activationStack(e entry) ([]activation, error) {
 	stack := make([]activation, 0, len(e.Activations))
 	current := ""
 	for _, a := range e.Activations {
+		if a.Regression != nil && (!a.Rollback || a.Regression.Passed || !a.Regression.Deterministic || !identifier.MatchString(a.Regression.ID)) {
+			return nil, ErrInvalid
+		}
 		_, offset := a.At.Zone()
 		proof := e.Validated[a.To]
 		if a.From != current || a.To == current || !versionID(a.To) || !known[a.To] ||

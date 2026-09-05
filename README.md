@@ -874,6 +874,17 @@ stale observations even after A→B→A changes. Draft-only changes preserve the
 revision. This is a concurrency check, not authorization or an automatic
 regression detector.
 
+Trusted Go hosts can call `FileStore.RevalidateAndRollback` with an observed
+activation state and a deterministic validator after enabling automatic changes
+with `SetAutomatic(true)`. A valid failed check restores the predecessor and
+atomically records its evidence ID in the activation history. Passing checks do
+not change history; validator errors, panics, cancellation, stale revisions and
+the kill switch prevent rollback. The callback has a cooperative three-second
+deadline and is not sandboxed. `skills history` now includes transition metadata
+and regression evidence without workflow bodies. There is no daemon-triggered
+regression monitoring or statistical outcome detector yet; model-only judgments
+cannot drive this operation.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.

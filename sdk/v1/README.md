@@ -263,6 +263,17 @@ do not invalidate it. Legacy `Activate`/`Rollback` compare active versions only.
 Revision checks do not grant permission or replace deterministic validation and
 the automatic-mutation kill switch; the runtime still does not mutate skills.
 
+A trusted host using the filesystem implementation can opt into deterministic
+revalidation via `FileStore.RevalidateAndRollback(ctx, state, validator)`.
+Enable `SetAutomatic(true)` under operator policy first. Failed deterministic
+evidence rolls back one activation and is committed with that transition;
+passing evidence leaves history unchanged. The returned State is the checked
+observation, not the post-rollback revision. Re-read ActivationState before a
+subsequent decision. Error/panic/timeout is not evidence of a skill regression.
+Validators must cooperate with the three-second deadline and must not perform
+unapproved side effects. This host-invoked controller does not install background
+monitoring, automatic drafting or statistical regression detection.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

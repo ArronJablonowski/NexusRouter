@@ -82,7 +82,7 @@ func (s *FileStore) activate(ctx context.Context, key Key, id, expectedActive st
 // The legacy expectedActive check protects against changed versions, but not
 // intervening transitions that restore that version. Use RollbackAt for epoch CAS.
 func (s *FileStore) Rollback(ctx context.Context, key Key, expectedActive string, automatic bool) error {
-	return s.rollback(ctx, key, expectedActive, nil, automatic)
+	return s.rollback(ctx, key, expectedActive, nil, automatic, nil)
 }
 
 // RollbackAt undoes one activation only if the observed activation revision is
@@ -91,12 +91,15 @@ func (s *FileStore) RollbackAt(ctx context.Context, expected ActivationState, au
 	if ctx == nil || expected.Validate() != nil || !s.permitted(expected.Key) {
 		return ErrInvalid
 	}
-	return s.rollback(ctx, expected.Key, expected.Active, &expected, automatic)
+	return s.rollback(ctx, expected.Key, expected.Active, &expected, automatic, nil)
 }
 
-func (s *FileStore) rollback(ctx context.Context, key Key, expectedActive string, expected *ActivationState, automatic bool) error {
+func (s *FileStore) rollback(ctx context.Context, key Key, expectedActive string, expected *ActivationState, automatic bool, regression *Evidence) error {
 	if !s.permitted(key) || !versionID(expectedActive) {
 		return ErrInvalid
+	}
+	if regression != nil && (!automatic || expected == nil || regression.Passed || !regression.Deterministic || !identifier.MatchString(regression.ID)) {
+		return ErrValidation
 	}
 	return s.with(ctx, func(c *catalog) error {
 		if automatic && !s.automatic.Load() {
@@ -129,7 +132,12 @@ func (s *FileStore) rollback(ctx context.Context, key Key, expectedActive string
 			return ErrNotFound
 		}
 		previous := stack[len(stack)-1].From
-		e.Activations = append(e.Activations, activation{From: e.Active, To: previous, At: time.Now().UTC(), Rollback: true})
+		var proof *Evidence
+		if regression != nil {
+			copy := *regression
+			proof = &copy
+		}
+		e.Activations = append(e.Activations, activation{From: e.Active, To: previous, At: time.Now().UTC(), Rollback: true, Regression: proof})
 		e.Active = previous
 		c.Skills[key.index()] = e
 		return nil
