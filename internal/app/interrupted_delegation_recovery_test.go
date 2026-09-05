@@ -116,6 +116,10 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 			if err != nil || before.HasMore || before.State != "running" || before.Events[len(before.Events)-1].Kind != runtime.ToolStarted {
 				t.Fatal("not interrupted awaiting tool result", before.State, err)
 			}
+			readiness, err := InspectTaskContinuation(ctx, cfg.Telemetry.Database, result.TaskID)
+			if err != nil || readiness.HistoryEligible || readiness.Reason != "pending_tools" || readiness.Sequence != before.HeadSequence {
+				t.Fatal("unfinished history reported ready", readiness, err)
+			}
 			status, err = svc.SubmissionStatus(ctx, status.ID)
 			if err != nil {
 				t.Fatal(err)
@@ -167,6 +171,10 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 			tool, terminal := after.Events[len(after.Events)-2], after.Events[len(after.Events)-1]
 			if tool.Kind != runtime.ToolCompleted || tool.Data.Effect != runtime.NoEffect || tool.Data.Code != "delegation_recovered" || !strings.Contains(tool.Data.Text, "durable child answer") || terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "interrupted_after_delegation" || terminal.CausationID != tool.ID {
 				t.Fatal("incorrect recovery checkpoint", tool, terminal)
+			}
+			readiness, err = InspectTaskContinuation(ctx, cfg.Telemetry.Database, result.TaskID)
+			if err != nil || !readiness.HistoryEligible || readiness.Reason != "recovered_delegation" || readiness.Sequence != after.HeadSequence {
+				t.Fatal("restored history not reported ready", readiness, err)
 			}
 			for id, original := range children {
 				page, err := db.ReadEventPage(ctx, id, 0, 100)
@@ -222,7 +230,7 @@ func TestRecoveredContinuationRequiresExactCheckpoint(t *testing.T) {
 			end.Kind = runtime.TaskCanceled
 		}
 		reader := recoveredCheckpointReader{tool, end}
-		ok := recoveredDelegationContinuation(context.Background(), reader, sessions.Snapshot{TaskID: "task", SessionID: "session", Sequence: 9})
+		ok := recoveredDelegationContinuation(context.Background(), reader, sessions.Snapshot{TaskID: "task", SessionID: "session", State: "failed", Sequence: 9})
 		if ok != (mode == "valid") {
 			t.Fatal("checkpoint admission", mode, ok)
 		}

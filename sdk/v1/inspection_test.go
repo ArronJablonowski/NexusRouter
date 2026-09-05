@@ -2,6 +2,7 @@ package v1_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,10 @@ import (
 
 func TestSDKInspectionRejectsWithoutCreatingStorage(t *testing.T) {
 	for _, client := range []*sdk.Client{nil, {}} {
+		readiness, err := client.InspectTaskContinuation(context.Background(), "task")
+		if !errors.Is(err, sdk.ErrAdmission) || readiness.Version != 1 || readiness.TaskID != "" {
+			t.Fatal(readiness, err)
+		}
 		snapshot, err := client.InspectTask(context.Background(), "task")
 		if !errors.Is(err, sdk.ErrAdmission) || snapshot.Version != 1 || snapshot.TaskID != "" {
 			t.Fatal(snapshot, err)
@@ -33,6 +38,13 @@ func TestSDKInspectionRejectsWithoutCreatingStorage(t *testing.T) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	for _, ctx := range []context.Context{nil, canceled, context.Background()} {
+		readiness, err := client.InspectTaskContinuation(ctx, "task")
+		if err == nil || readiness.Version != 1 || readiness.TaskID != "" || readiness.HistoryEligible {
+			t.Fatal(readiness, err)
+		}
+		if ctx == canceled && !errors.Is(err, context.Canceled) {
+			t.Fatal("continuation cancellation identity lost", err)
+		}
 		snapshot, err := client.InspectTask(ctx, "task")
 		if err == nil || snapshot.Version != 1 || snapshot.TaskID != "" || len(snapshot.Messages) != 0 {
 			t.Fatal(snapshot, err)
@@ -96,6 +108,14 @@ models:
 	}
 	if snapshot.Messages[0].Content != "initial prompt" || snapshot.Messages[1].Content != "persisted answer" {
 		t.Fatal(snapshot.Messages)
+	}
+	readiness, err := client.InspectTaskContinuation(ctx, result.TaskID)
+	if err != nil || readiness.Validate() != nil || !readiness.HistoryEligible || readiness.Reason != "completed" || readiness.Sequence != snapshot.Sequence {
+		t.Fatal(readiness, err)
+	}
+	metadata, err := json.Marshal(readiness)
+	if err != nil || strings.Contains(string(metadata), "initial prompt") || strings.Contains(string(metadata), "persisted answer") {
+		t.Fatal("continuation inspection leaked conversation")
 	}
 	snapshot.Messages[0].Content = "mutated prompt"
 	snapshot.Messages[1].Content = "mutated answer"

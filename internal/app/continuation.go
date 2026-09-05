@@ -81,8 +81,8 @@ func recoveredDelegationContinuation(ctx context.Context, db sessions.Reader, hi
 	if err != nil || len(events) != 2 {
 		return false
 	}
-	tool, end := events[0], events[1]
-	return tool.TaskID == history.TaskID && end.TaskID == history.TaskID && tool.SessionID == history.SessionID && end.SessionID == history.SessionID && tool.Sequence == history.Sequence-1 && end.Sequence == history.Sequence && tool.Kind == runtime.ToolCompleted && tool.Data.Code == "delegation_recovered" && tool.Data.Effect == runtime.NoEffect && (tool.Data.ToolName == "delegate" || tool.Data.ToolName == "delegate_batch") && end.Kind == runtime.TaskFailed && end.Data.Code == "interrupted_after_delegation" && end.CausationID == tool.ID && end.TurnID == tool.TurnID && end.AttemptID == tool.AttemptID
+	status := sessions.AssessContinuation(history, events)
+	return status.HistoryEligible && status.Reason == "recovered_delegation"
 }
 
 func redactSummary(summary sessions.Summary, secrets []string) sessions.Summary {

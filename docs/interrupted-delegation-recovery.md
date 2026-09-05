@@ -38,6 +38,19 @@ request or external process has stopped.
 
 ## Explicit continuation
 
+Check history readiness without exporting conversation content:
+
+```sh
+darwin task continuation --db ./data/darwin.db --task TASK_ID
+```
+
+SDK `InspectTaskContinuation` and authenticated HTTP
+`GET /v1/tasks/{task}/continuation` expose the same metadata-only status. A
+restored eligible checkpoint reports `history_eligible: true` and
+`reason: "recovered_delegation"`, with its observed task ID, state and sequence.
+This is one bounded, replay-validated database observation; it never creates or
+migrates storage, repairs a task, or checks a selected provider's capabilities.
+
 After inspecting the restored tool result, an operator may supply the parent
 task ID through the existing `ContinueTaskID` API/SDK field or CLI
 `--continue-task TASK_ID` option. This starts a new task using the restored

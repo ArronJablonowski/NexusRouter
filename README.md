@@ -130,6 +130,19 @@ unfinished turn in an active task is not proof its worker has stopped; inspect
 lifecycle state before deciding what to do next. Missing, corrupt or oversized
 history returns an error without partial conversation output.
 
+For a metadata-only check, use `darwin task continuation --db path --task TASK_ID`,
+SDK `InspectTaskContinuation`, or authenticated `GET /v1/tasks/{task}/continuation`.
+The versioned result contains `task_id`, observed `sequence`, `state`,
+`history_eligible`, and a fixed `reason`; it excludes prompts, tool arguments and
+outputs. Eligible history is either completed or an exact restored-delegation
+checkpoint. Pending tools, uncertain effects, interrupted turns, ordinary
+failures and canceled tasks are not eligible. This observation grants no retry
+permission and does not check the selected provider, privacy, resource or context
+budget. The experimental Codex CLI provider still does not accept historical
+continuation. Inspecting readiness never repairs or resumes a task.
+The CLI exits zero for a successful inspection even when `history_eligible` is
+false; scripts must inspect that field, not treat command success as permission.
+
 ## Configuration
 
 ```sh

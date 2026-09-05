@@ -39,3 +39,34 @@ func InspectTask(ctx context.Context, path, task string) (sessions.Snapshot, err
 	}
 	return snapshot, nil
 }
+
+// InspectTaskContinuation reports only durable-history readiness. It does not
+// choose a provider, grant execution authority, or promise admission of a future
+// request. The result excludes conversation and tool payloads.
+func InspectTaskContinuation(ctx context.Context, path, task string) (sessions.ContinuationStatus, error) {
+	zero := sessions.ContinuationStatus{}
+	if ctx == nil || path == "" || !sessions.ValidEventPageID(task) {
+		return zero, ErrAdmission
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	failure := func() (sessions.ContinuationStatus, error) {
+		if ctx.Err() != nil {
+			return zero, ctx.Err()
+		}
+		return zero, ErrInspection
+	}
+	if ctx.Err() != nil {
+		return failure()
+	}
+	db, err := telemetry.OpenReadOnly(ctx, path)
+	if err != nil {
+		return failure()
+	}
+	defer db.Close()
+	status, err := db.TaskContinuation(ctx, task)
+	if err != nil {
+		return failure()
+	}
+	return status, nil
+}

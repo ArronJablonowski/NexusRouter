@@ -573,6 +573,22 @@ be sensitive even after credential redaction. Mutating the returned snapshot doe
 not change stored history. Histories beyond the inspection bounds require paged
 event inspection through `ReadEvents` or the HTTP API rather than unbounded reconstruction.
 
+`InspectTaskContinuation(ctx, taskID)` returns a versioned `ContinuationStatus`
+without conversation content. Its lowercase JSON fields are `version`, `task_id`,
+`sequence`, `state`, `history_eligible`, and `reason`. It reads replay state and
+the final recovery checkpoint in one bounded read-only transaction. Reasons
+`completed` and `recovered_delegation` mean only that the observed history can be
+used as source context for a new explicit request. Other reasons include
+`pending_tools`, `uncertain_effects`, `interrupted_turn`, `task_running`,
+`task_failed`, and `task_canceled`. If several hazards coexist, pending tools take
+precedence over uncertain effects, then interrupted turns. Missing, corrupt or
+oversized history returns an error rather than partial metadata.
+
+This is not model readiness or execution authorization. Normal provider,
+privacy, resource, budget and tool policy checks still apply; no method silently
+replays old tool calls. In particular, Codex CLI remains fresh-task-only. Use
+`Request.ContinueTaskID` only with a history-capable provider after inspection.
+
 `ReadEvents(ctx, taskID, afterSequence, limit)` provides paged durable events
 directly to embedded consumers. Start at sequence0, process a validated page, then
 save its `NextSequence` for reconnection. Limits are1–100 events with an8MiB page

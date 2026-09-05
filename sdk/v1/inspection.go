@@ -9,6 +9,19 @@ import (
 
 var ErrInspection = app.ErrInspection
 
+// ContinuationStatus is metadata-only history readiness, not provider admission
+// or permission to retry interrupted effects.
+type ContinuationStatus = sessions.ContinuationStatus
+
+func (c *Client) InspectTaskContinuation(ctx context.Context, task string) (ContinuationStatus, error) {
+	if !c.valid(ctx) {
+		return ContinuationStatus{Version: 1}, ErrAdmission
+	}
+	status, err := app.InspectTaskContinuation(ctx, c.database, task)
+	status.Version = 1
+	return status, err
+}
+
 // TaskSnapshot is a versioned, read-only view of durable task state. Its message
 // and tool payloads may be sensitive. Interrupted or uncertain state never
 // implies that repeating inference or effects is safe.

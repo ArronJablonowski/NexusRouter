@@ -115,11 +115,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
 			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
 		},
-		RunStream:     service.RunStream,
-		RunTextStream: service.RunTextStream,
-		Events:        db.ReadEventPage,
-		Run:           service.Run,
-		Inspect:       db.TaskSnapshot,
+		RunStream:        service.RunStream,
+		RunTextStream:    service.RunTextStream,
+		Events:           db.ReadEventPage,
+		Run:              service.Run,
+		Inspect:          db.TaskSnapshot,
+		TaskContinuation: db.TaskContinuation,
 		Health: func(ctx context.Context) error {
 			if dispatcher == nil || dispatcher.Health().Status != "healthy" {
 				return errors.New("supervisor unavailable")

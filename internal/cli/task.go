@@ -12,8 +12,11 @@ import (
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "continuation" {
+		return runTaskContinuation(args[1:], stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "show" {
-		fmt.Fprintln(stderr, "usage: darwin task show --db path --task id")
+		fmt.Fprintln(stderr, "usage: darwin task show|continuation --db path --task id")
 		return 2
 	}
 	fs := flag.NewFlagSet("task show", flag.ContinueOnError)
@@ -34,6 +37,27 @@ func runTaskInspection(args []string, stdout, stderr io.Writer) int {
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
 	if encoder.Encode(snapshot) != nil {
+		return 1
+	}
+	return 0
+}
+
+func runTaskContinuation(args []string, stdout, stderr io.Writer) int {
+	flags, err := parseSteeringFlags(args, "db", "task")
+	if err != nil {
+		fmt.Fprintln(stderr, "usage: darwin task continuation --db path --task id")
+		return 2
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	status, err := app.InspectTaskContinuation(ctx, flags["db"], flags["task"])
+	if err != nil {
+		fmt.Fprintln(stderr, "task history missing, incomplete or invalid")
+		return 1
+	}
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	if encoder.Encode(status) != nil {
 		return 1
 	}
 	return 0

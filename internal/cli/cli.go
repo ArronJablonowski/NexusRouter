@@ -26,6 +26,7 @@ Usage:
   darwin resources  Inspect current host memory and CPU capacity
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin task show --db path --task id  Inspect durable conversation state
+  darwin task continuation --db path --task id  Inspect continuation readiness
   darwin steer --config path --task id --key idempotency-key < guidance.txt
     Queue guidance for a running task; does not interrupt current tools
   darwin steering list --db path --task id
