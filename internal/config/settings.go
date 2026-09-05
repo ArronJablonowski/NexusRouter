@@ -119,9 +119,11 @@ type Telemetry struct {
 	OTEL     bool   `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
 }
 type Tools struct {
-	Enabled  bool   `yaml:"enabled" json:"enabled"`
-	ReadRoot string `yaml:"read_root" json:"read_root"`
-	MaxTurns int    `yaml:"max_turns" json:"max_turns"`
+	CreateEnabled bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
+	CreateRoot    string `yaml:"create_root" json:"create_root,omitempty"`
+	Enabled       bool   `yaml:"enabled" json:"enabled"`
+	ReadRoot      string `yaml:"read_root" json:"read_root"`
+	MaxTurns      int    `yaml:"max_turns" json:"max_turns"`
 }
 
 type Runtime struct {
@@ -254,6 +256,12 @@ func (s Settings) Validate() error {
 	}
 	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
 		return errors.New("enabled tools require an absolute read root")
+	}
+	if s.Tools.CreateRoot != "" && (len(s.Tools.CreateRoot) > 4096 || !utf8.ValidString(s.Tools.CreateRoot) || strings.ContainsRune(s.Tools.CreateRoot, 0)) {
+		return errors.New("invalid create root")
+	}
+	if s.Tools.CreateEnabled && (!s.Tools.Enabled || !filepath.IsAbs(s.Tools.CreateRoot)) {
+		return errors.New("create tool requires enabled tools and absolute create root")
 	}
 	if (s.Memory.Scope != "" && !memory.ValidKey(s.Memory.Scope)) || s.Memory.MaxFacts < 1 || s.Memory.MaxFacts > 64 || s.Memory.MaxBytes < 256 || s.Memory.MaxBytes > 65536 {
 		return errors.New("invalid memory context settings")
@@ -388,6 +396,9 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 	}
 	s.Telemetry.Database = "[REDACTED]"
 	s.Tools.ReadRoot = "[REDACTED]"
+	if s.Tools.CreateRoot != "" {
+		s.Tools.CreateRoot = "[REDACTED]"
+	}
 	s.Skills.Root = "[REDACTED]"
 	return json.MarshalIndent(s, "", "  ")
 }

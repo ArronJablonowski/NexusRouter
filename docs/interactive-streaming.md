@@ -22,6 +22,11 @@ cancel and join active execution. EOF waits for the active task. A normal chat
 session exits zero even after an individual failed task, as before; use headless
 `darwin run` for per-task process exit status.
 
+With opt-in local `create_file`, terminal chat also accepts `/approve ID` and
+`/deny ID` for an exact pending proposal. Review is separate from model text;
+EOF or cancellation makes unavailable review fail closed. See
+[reviewed file creation](reviewed-file-creation.md) for setup and limits.
+
 ## Safety and failure semantics
 
 - Text becomes eligible for delivery only after its corresponding lifecycle

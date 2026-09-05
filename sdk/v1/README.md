@@ -111,7 +111,7 @@ ToolPolicy: &tools.Policy{
 ```
 
 Custom tools do not enable filesystem access: `tools.enabled` controls the
-built-in workspace reader separately. Names `read_file`, `delegate` and
+built-in workspace reader separately. Names `read_file`, `create_file`, `delegate` and
 `delegate_batch` are reserved. Extension execution requires a local model with
 a known context capacity; ordinary context, resource and iteration limits remain
 active. Delegated children do not inherit custom handlers. Handlers are trusted
@@ -125,6 +125,23 @@ yet; they are never silently serialized, dropped, or substituted on dequeue.
 Durable extension identity and general lifecycle hooks remain unfinished.
 
 ### Operator-reviewed tool extensions
+
+Trusted handlers can return `runtime.ToolResult{Failed: true, Effect: ...}` with
+a nil Go error for an explicitly known tool failure. The runtime records
+`tool_failed` and fails the task while preserving the declared effect. `NoEffect`
+alone is not a success/failure flag. A Go error or panic during a side-effecting
+handler still means uncertain execution; do not downgrade an unknown effect by
+declaring a certain result. Failed tool steps cannot seed successful workflow
+grouping merely through separate positive task feedback.
+
+The same reviewer/presenter controls support the opt-in built-in `create_file`
+tool when configuration enables `tools.create_enabled` with an absolute
+`tools.create_root` and the existing local file-tool settings. No custom handler
+is needed. It creates new files only, never overwrites, and is not inherited by
+workers or accepted for durable submission execution. See
+[reviewed file creation](../../docs/reviewed-file-creation.md) for bounds and
+filesystem trust requirements. Enabling creation without a review control is
+rejected by SDK construction.
 
 Set `ConfigOptions.ApprovalReviewer` to explicitly register write handlers and
 effective `Ask` tools. Its type is

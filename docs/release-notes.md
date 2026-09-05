@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Opt-in local `create_file` with terminal per-call approval, complete bounded
+  previews, durable one-use authority and atomic no-overwrite publication.
+  Existing-file editing and unattended approval remain unfinished; see
+  [reviewed file creation](reviewed-file-creation.md).
+
 - Go runtime, CLI, Go SDK and authenticated loopback HTTP service with durable
   SQLite/WAL task/session records and explicit configuration.
 - Provisional, incrementally redacted live text through the OpenAI-compatible

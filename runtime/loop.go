@@ -42,6 +42,11 @@ type ToolExecution struct {
 type ToolResult struct {
 	Content string
 	Effect  Effect
+	// Failed reports an explicit trusted-handler failure independently of side
+	// effects. A failed operation may have no effect or a confirmed effect;
+	// neither is automatically uncertainty. The loop records tool_failed and
+	// stops the task without another model turn. Model text cannot set this flag.
+	Failed bool
 }
 type RunRequest struct {
 	SubmissionID  string
@@ -510,7 +515,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				toolErr = ErrLimit
 			}
 			code := ""
-			if toolErr != nil {
+			if toolErr != nil || out.Failed {
 				code = "tool_failed"
 			}
 			terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -522,7 +527,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if ctx.Err() != nil {
 				return fail(ctx.Err())
 			}
-			if toolErr != nil || out.Effect == UncertainEffect {
+			if toolErr != nil || out.Failed || out.Effect == UncertainEffect {
 				return fail(ErrTool)
 			}
 			inference.Messages = append(inference.Messages, providers.Message{Role: "tool", ToolCallID: call.ID, Content: out.Content})

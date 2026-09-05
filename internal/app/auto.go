@@ -100,6 +100,9 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	if s.settings.Tools.CreateEnabled && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+		return Result{}, ErrAdmission
+	}
 	// Process-local handlers have no durable identity yet. Never attach changed
 	// authority to work admitted by an earlier process or host configuration.
 	if r.submissionID != "" && len(s.toolExtension.Names()) > 0 {
@@ -265,6 +268,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	inference.Tools = r.toolExtension.Catalog()
 	if cfg.Tools.Enabled {
 		inference.Tools = append(inference.Tools, readFileSpec())
+	}
+	if cfg.Tools.CreateEnabled && r.delegatedParent == "" {
+		inference.Tools = append(inference.Tools, createFileSpec())
 	}
 	if cfg.Workers.DelegateModel != "" {
 		inference.Tools = append(inference.Tools, delegateSpec(), delegateBatchSpec())

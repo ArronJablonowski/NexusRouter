@@ -85,8 +85,12 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
 		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
+		s.Tools.CreateEnabled = false
 		s.Workers.DelegateModel = ""
 		s.Workers.DelegateReadTools = false
+	}
+	if s.Tools.CreateEnabled && r.toolReviewer == nil && r.toolPresenter == nil {
+		return result, ErrAdmission
 	}
 	var model config.Model
 	found := false
@@ -143,6 +147,14 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, err
 		}
 		defer closeTools()
+	}
+	if s.Tools.CreateEnabled {
+		closeCreate, scope, err := registerCreateTool(registry, s.Tools.CreateRoot)
+		if err != nil {
+			return result, err
+		}
+		defer closeCreate()
+		toolPolicy.Rules = append(toolPolicy.Rules, tools.Rule{Tool: "create_file", Scope: scope, Decision: tools.Ask})
 	}
 	if len(r.toolExtension.Names()) > 0 {
 		if registry == nil {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, lines <-chan chatLine, signals <-chan os.Signal, out io.Writer) int {
@@ -42,6 +43,15 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 	liveLineStart := true
 	liveBytes := 0
 	var textFilter chatTextFilter
+	var pendingApproval *chatApprovalRequest
+	var approvalDone <-chan struct{}
+	approvalRequests := hooks.Approvals
+	clearApproval := func() {
+		if pendingApproval != nil {
+			pendingApproval.respond(false, tools.ErrDenied)
+		}
+		pendingApproval, approvalDone = nil, nil
+	}
 	rawWrite := func(text string) (ok bool) {
 		if failedOutput {
 			return false
@@ -71,6 +81,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 		return rawWrite(chatSafeText(text))
 	}
 	join := func() {
+		clearApproval()
 		if cancel != nil {
 			cancel()
 			<-done
@@ -91,6 +102,26 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 	}
 	for {
 		select {
+		case <-approvalDone:
+			clearApproval()
+			if !write("Approval no longer pending.\n") {
+				join()
+				return 1
+			}
+		case proposal, ok := <-approvalRequests:
+			if !ok {
+				approvalRequests = nil
+				continue
+			}
+			if proposal.ctx == nil || proposal.ctx.Err() != nil || proposal.request.Validate() != nil || proposal.request.TaskID != task || pendingApproval != nil || cancel == nil || eof {
+				proposal.respond(false, tools.ErrDenied)
+				continue
+			}
+			pendingApproval, approvalDone = &proposal, proposal.ctx.Done()
+			if !write(proposal.preview) {
+				join()
+				return 1
+			}
 		case <-ctx.Done():
 			join()
 			return 1
@@ -157,6 +188,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				return 1
 			}
 		case finished := <-done:
+			clearApproval()
 			cancel()
 			cancel = nil
 			done = nil
@@ -191,6 +223,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			}
 		case line, ok := <-lines:
 			if !ok {
+				clearApproval()
 				lines = nil
 				eof = true
 				if cancel == nil {
@@ -200,6 +233,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			}
 			if line.Err != nil {
 				if errors.Is(line.Err, io.EOF) {
+					clearApproval()
 					lines = nil
 					eof = true
 					if cancel == nil {
@@ -222,6 +256,20 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 			if !escaped && strings.HasPrefix(text, "/") {
 				command, argument, _ := strings.Cut(text, " ")
 				argument = strings.TrimSpace(argument)
+				if command == "/approve" || command == "/deny" {
+					if pendingApproval == nil || argument != pendingApproval.request.ID || pendingApproval.ctx.Err() != nil {
+						write("Approval decision not accepted: an exact active request ID is required.\n")
+					} else {
+						pendingApproval.respond(command == "/approve", nil)
+						pendingApproval, approvalDone = nil, nil
+						write("Approval decision submitted; this is not a file-creation result.\n")
+					}
+					if failedOutput {
+						join()
+						return 1
+					}
+					continue
+				}
 				if command == "/feedback" || command == "/feedback-show" || command == "/feedback-revise" {
 					if cancel != nil {
 						write("Feedback not accepted while a task is active.\n")
@@ -246,6 +294,9 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 				switch command {
 				case "/help":
 					write("Enter text to start a task. /status /new /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
+					if hooks.Approvals != nil {
+						write("File creation requires review: /approve REQUEST_ID or /deny REQUEST_ID. No blanket approvals.\n")
+					}
 				case "/status":
 					if cancel != nil {
 						if task == "" {

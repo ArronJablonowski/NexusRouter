@@ -28,6 +28,9 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 	if cfg.Tools.Enabled {
 		names = append(names, "read_file")
 	}
+	if cfg.Tools.CreateEnabled {
+		names = append(names, "create_file")
+	}
 	if cfg.Workers.DelegateModel != "" {
 		names = append(names, "delegate", "delegate_batch")
 	}

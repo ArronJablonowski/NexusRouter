@@ -17,6 +17,7 @@ import (
 type chatHooks struct {
 	Run             taskStreamRunner
 	RunLive         func(context.Context, app.Request, func(runtime.Event) error, func(string) error) (app.Result, error)
+	Approvals       <-chan chatApprovalRequest
 	Steer           func(context.Context, string, string, string) (runtime.SteeringMessage, error)
 	Feedback        func(context.Context, string, bool, float64) error
 	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
@@ -40,7 +41,18 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stderr, "darwin: invalid chat configuration\n")
 		return 1
 	}
-	service, err := app.NewService(settings, os.Getenv)
+	var service *app.Service
+	var approvalRequests chan chatApprovalRequest
+	if settings.Tools.CreateEnabled {
+		if !chatReviewTerminal(stdin) || !chatReviewTerminal(stdout) {
+			_, _ = io.WriteString(stderr, "darwin: file creation review requires terminal input and output\n")
+			return 1
+		}
+		approvalRequests = make(chan chatApprovalRequest)
+		service, err = app.NewServiceWithToolApproval(settings, os.Getenv, nil, nil, nil, nil, nil, newChatReviewer(settings, os.Getenv, approvalRequests))
+	} else {
+		service, err = app.NewService(settings, os.Getenv)
+	}
 	if err != nil {
 		_, _ = io.WriteString(stderr, "darwin: chat service unavailable\n")
 		return 1
@@ -55,6 +67,7 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer signal.Stop(brokenPipe)
 	hooks := chatHooks{
 		RunLive: service.RunLiveStream, Steer: service.SteerTask,
+		Approvals: approvalRequests,
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, settings.Telemetry.Database, task, accepted, cost)
 		},

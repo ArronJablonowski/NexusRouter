@@ -52,7 +52,7 @@ func NewServiceWithToolApproval(settings config.Settings, secret func(string) st
 // NewServiceWithToolControls optionally presents proposals and waits for a
 // separately submitted durable decision. Reviewer and presenter are exclusive.
 func NewServiceWithToolControls(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter) (*Service, error) {
-	if (reviewer != nil && presenter != nil) || (extension.RequiresApproval() && reviewer == nil && presenter == nil) {
+	if (reviewer != nil && presenter != nil) || ((extension.RequiresApproval() || settings.Tools.CreateEnabled) && reviewer == nil && presenter == nil) {
 		return nil, ErrAdmission
 	}
 	svc, err := NewService(settings, secret)

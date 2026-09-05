@@ -441,6 +441,8 @@ Memory stores durable facts rather than procedures. Records include provenance, 
 
 Tools declare schemas, capabilities, resource scopes, effect class, timeout behavior, and permission requirements. Arguments are validated before execution. Results distinguish success, rejected execution, deterministic failure, confirmed effect, no effect, and uncertain effect.
 
+Current implementation increment: opt-in local `create_file` creates new UTF-8 files only after exact per-call review in terminal chat or a trusted SDK host. It uses pinned directories, atomic no-replace publication and durable approval consumption under a root-scoped writer lease. Children retain read-only capabilities. Existing-file editing, unattended/headless approvals and stronger isolation remain later work, not capabilities implied by this tool. See [reviewed file creation](docs/reviewed-file-creation.md) for configuration and cooperative-filesystem limits.
+
 ### 11.2 Permission Model
 
 Rules support `allow`, `deny`, and `ask`, scoped by tool and resource. Child workers inherit every parent denial and may add stricter rules. Later rules cannot weaken a non-overridable organizational or local-only policy.
