@@ -1,5 +1,7 @@
 # Implementation evidence
 
+Live qualification backup: ec56d1de1a750a5e4c9a825ba83b99be5a8f2fa5 was pushed to origin/main with local/remote heads matching. Native Linear DAR-18 comment8532c8fb was posted and read back with both live results, controlled-worker limits, full-check evidence and the missing idempotency-classification requirement. Status remains In Progress and dependencies were preserved.
+
 Live failure-repair qualification: the previous goal turn made verified progress (521fb57 production checkpoint, 2c17b7b tracking backup); this turn started from that clean matching repository. Installed codex-cli 0.153.4 still reports Logged in using ChatGPT. Official OpenAI App Server documentation was rechecked before supervised tests. No API key or credential-file extraction was used.
 
 The new opt-in TestLiveCodexRecoverableToolProtocol passed against gpt-5.6-sol in6.68s (race-enabled package8.093s). Actual runtime+temporary SQLite committed one tool_failed/NoEffect completion before its one success:false RPC; actual Codex emitted status failed/success false, Sol completed the second model turn and replay retained exactly one failed tool message. Diagnostics are metadata-only. This confirms the pinned failure tuple without changing production validation to accept a guessed alternative.
