@@ -30,6 +30,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	SubmissionID  string
 	Compaction    *ContextCompaction
 	Validation    string
 	RetryOfTaskID string
@@ -118,6 +119,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			e.RouteID = rand.Text()
 		}
 		if err := l.Journal.Append(ctx, seq, e); err != nil {
+			if errors.Is(err, ErrExecutionLeaseLost) {
+				return ErrExecutionLeaseLost
+			}
 			if errors.Is(err, ErrCancellationRequested) {
 				return ErrCancellationRequested
 			}
@@ -126,24 +130,28 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}
 	// The cancellation gate guarantees no append occurred. Unlike an ambiguous
 	// storage failure, it is safe to append one bounded cancellation terminal.
 	defer func() {
-		if !errors.Is(runErr, ErrCancellationRequested) || errors.Is(runErr, ErrPersistence) {
+		if (!errors.Is(runErr, ErrCancellationRequested) && !errors.Is(runErr, ErrExecutionLeaseLost)) || errors.Is(runErr, ErrPersistence) {
 			return
 		}
 		returned.Retryable = false
 		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if err := persist(terminal, TaskCanceled, Data{Code: "canceled"}); err != nil {
-			runErr = errors.Join(context.Canceled, err)
+		code := "canceled"
+		if errors.Is(runErr, ErrExecutionLeaseLost) {
+			code = "execution_lease_lost"
+		}
+		if err := persist(terminal, TaskCanceled, Data{Code: code}); err != nil {
+			runErr = errors.Join(context.Canceled, runErr, err)
 			return
 		}
-		runErr = context.Canceled
+		runErr = errors.Join(context.Canceled, runErr)
 	}()
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
@@ -272,7 +280,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if errors.Is(callbackErr, ErrPersistence) {
 			return result, ErrPersistence
 		}
-		if errors.Is(callbackErr, ErrCancellationRequested) {
+		if errors.Is(callbackErr, ErrCancellationRequested) || errors.Is(callbackErr, ErrExecutionLeaseLost) {
 			return result, callbackErr
 		}
 		if callbackErr != nil {

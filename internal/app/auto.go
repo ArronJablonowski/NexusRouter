@@ -28,6 +28,7 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	execution chan struct{}
 	discovery *modelHealthCache
 	settings  config.Settings
 	secret    func(string) string
@@ -38,7 +39,7 @@ type Service struct {
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
-	if s.Validate() != nil || s.Telemetry.OTEL {
+	if s.Validate() != nil || s.Telemetry.OTEL || s.Workers.Max > 64 {
 		return nil, ErrAdmission
 	}
 	// Snapshot nested configuration so callers cannot mutate running admissions.
@@ -59,11 +60,19 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: resources.Profile, draw: rand.Float64}, nil
+	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: resources.Profile, draw: rand.Float64}, nil
 }
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	if s.execution != nil {
+		select {
+		case s.execution <- struct{}{}:
+			defer func() { <-s.execution }()
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		}
+	}
 	var result Result
 	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {

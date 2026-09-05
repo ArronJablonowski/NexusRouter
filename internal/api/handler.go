@@ -19,37 +19,42 @@ import (
 	"darwinrouter/internal/app"
 	"darwinrouter/runtime"
 	"darwinrouter/sessions"
+	"darwinrouter/submissions"
 )
 
 type Services struct {
-	Cancel          func(context.Context, string) (runtime.CancellationStatus, error)
-	Cancellation    func(context.Context, string) (runtime.CancellationStatus, error)
-	Events          func(context.Context, string, int64, int) (sessions.EventPage, error)
-	RunStream       func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
-	Summarize       func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
-	SummaryAttempt  func(context.Context, string) (sessions.SummaryAttempt, error)
-	SummaryAttempts func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
-	ReviewSummary   func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
-	SummaryReviews  func(context.Context, string) ([]sessions.SummaryReview, error)
-	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
-	ReviseFeedback  func(context.Context, string, string, bool) error
-	Run             func(context.Context, app.Request) (app.Result, error)
-	Inspect         func(context.Context, string) (sessions.Snapshot, error)
-	Health          func(context.Context) error
-	Feedback        func(context.Context, string, bool, float64) error
+	Submit           func(context.Context, string, app.Request) (submissions.Status, error)
+	Submission       func(context.Context, string) (submissions.Status, error)
+	CancelSubmission func(context.Context, string) (submissions.Status, error)
+	Cancel           func(context.Context, string) (runtime.CancellationStatus, error)
+	Cancellation     func(context.Context, string) (runtime.CancellationStatus, error)
+	Events           func(context.Context, string, int64, int) (sessions.EventPage, error)
+	RunStream        func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
+	Summarize        func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
+	SummaryAttempt   func(context.Context, string) (sessions.SummaryAttempt, error)
+	SummaryAttempts  func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
+	ReviewSummary    func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
+	SummaryReviews   func(context.Context, string) ([]sessions.SummaryReview, error)
+	FeedbackHistory  func(context.Context, string) ([]evaluation.Record, error)
+	ReviseFeedback   func(context.Context, string, string, bool) error
+	Run              func(context.Context, app.Request) (app.Result, error)
+	Inspect          func(context.Context, string) (sessions.Snapshot, error)
+	Health           func(context.Context) error
+	Feedback         func(context.Context, string, bool, float64) error
 }
 type Handler struct {
 	secret   [32]byte
 	services Services
 	slots    chan struct{}
 	controls chan struct{}
+	intake   chan struct{}
 }
 
 func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2)}, nil
+	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -94,6 +99,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/submissions" || strings.HasPrefix(r.URL.Path, "/v1/submissions/"):
+		h.serveSubmissions(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && ((strings.HasSuffix(r.URL.Path, "/cancel") && r.Method == http.MethodPost) || (strings.HasSuffix(r.URL.Path, "/cancellation") && r.Method == http.MethodGet)):
 		h.serveCancellation(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:

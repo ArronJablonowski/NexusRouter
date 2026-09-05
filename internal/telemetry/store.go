@@ -84,7 +84,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 11 {
+	if version > 12 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -196,6 +196,19 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 12 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE submissions (
+		 id TEXT PRIMARY KEY,key_digest TEXT NOT NULL UNIQUE,request_digest TEXT NOT NULL,config_digest TEXT NOT NULL,
+		 request BLOB NOT NULL,state TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+		 token TEXT NOT NULL DEFAULT '',lease_expires_at TEXT NOT NULL DEFAULT '',cancel_requested INTEGER NOT NULL DEFAULT 0,
+		 result BLOB,error_code TEXT NOT NULL DEFAULT '');
+		 CREATE INDEX submissions_queue ON submissions(state,config_digest,created_at,id);
+		 CREATE INDEX events_submission_start ON events(json_extract(body,'$.data.submission_id'),sequence) WHERE json_extract(body,'$.kind')='task.started';
+		 PRAGMA user_version=12;`)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -205,6 +218,17 @@ func (s *Store) Close() error { return s.db.Close() }
 // Append commits the immutable event and task projection together. Repeating
 // exactly the same event is safe after acknowledgement loss; reuse is rejected.
 func (s *Store) Append(ctx context.Context, expected int64, e runtime.Event) error {
+	return s.appendOwned(ctx, expected, e, "", "")
+}
+
+func (s *Store) AppendSubmission(ctx context.Context, expected int64, e runtime.Event, id, token string) error {
+	if id == "" || token == "" {
+		return runtime.ErrExecutionLeaseLost
+	}
+	return s.appendOwned(ctx, expected, e, id, token)
+}
+
+func (s *Store) appendOwned(ctx context.Context, expected int64, e runtime.Event, id, token string) error {
 	body, err := e.Encode()
 	if err != nil {
 		return err
@@ -253,6 +277,9 @@ func (s *Store) Append(ctx context.Context, expected int64, e runtime.Event) err
 	}
 	if seq != expected || session != e.SessionID || state != "running" || (seq > 0 && e.Kind == runtime.TaskStarted) {
 		return ErrConflict
+	}
+	if err := submissionAppendGate(ctx, tx, e, id, token); err != nil {
+		return err
 	}
 	if e.Kind != runtime.ToolCompleted && e.Kind != runtime.TaskCanceled {
 		var requested bool

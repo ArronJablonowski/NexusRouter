@@ -21,6 +21,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
@@ -222,7 +223,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	if sessionID == "" {
 		sessionID = result.TaskID
 	}
-	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink}
+	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, submissionID: r.submissionID, submissionToken: r.submissionToken}
 	loop := runtime.Loop{Provider: p, Journal: j, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := 1
@@ -235,7 +236,7 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{SubmissionID: r.submissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {
@@ -251,9 +252,10 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 }
 
 type redactingJournal struct {
-	db        *telemetry.Store
-	secrets   []string
-	eventSink func(runtime.Event)
+	submissionID, submissionToken string
+	db                            *telemetry.Store
+	secrets                       []string
+	eventSink                     func(runtime.Event)
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
@@ -295,7 +297,13 @@ func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.
 		return errors.New("cannot redact event")
 	}
 	e.Data = redacted
-	if err := j.db.Append(ctx, expected, e); err != nil {
+	var appendErr error
+	if j.submissionID != "" {
+		appendErr = j.db.AppendSubmission(ctx, expected, e, j.submissionID, j.submissionToken)
+	} else {
+		appendErr = j.db.Append(ctx, expected, e)
+	}
+	if err := appendErr; err != nil {
 		return err
 	}
 	if j.eventSink != nil {

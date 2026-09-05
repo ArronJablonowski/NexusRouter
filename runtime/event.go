@@ -61,6 +61,7 @@ type Event struct {
 }
 
 type Data struct {
+	SubmissionID    string               `json:"submission_id,omitempty"`
 	Compaction      *ContextCompaction   `json:"compaction,omitempty"`
 	Validation      string               `json:"validation,omitempty"`
 	RetryOfTaskID   string               `json:"retry_of_task_id,omitempty"`
@@ -88,6 +89,16 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if id := e.Data.SubmissionID; id != "" {
+		if e.Kind != TaskStarted || len(id) > 128 {
+			return errors.New("invalid submission identity")
+		}
+		for _, c := range id {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				return errors.New("invalid submission identity")
+			}
+		}
+	}
 	if e.Version != 1 || e.ID == "" || e.TaskID == "" || e.SessionID == "" || e.CorrelationID == "" || e.Sequence < 1 || e.Time.IsZero() {
 		return errors.New("invalid event envelope")
 	}

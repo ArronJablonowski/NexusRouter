@@ -67,13 +67,16 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
-		Cancel:          service.CancelTask,
-		Cancellation:    service.CancellationStatus,
-		Summarize:       service.SummarizeTask,
-		SummaryAttempt:  db.SummaryAttempt,
-		SummaryAttempts: db.ListSummaryAttempts,
-		ReviewSummary:   service.ReviewSummary,
-		SummaryReviews:  db.SummaryReviews,
+		Submit:           service.Submit,
+		Submission:       service.SubmissionStatus,
+		CancelSubmission: service.CancelSubmission,
+		Cancel:           service.CancelTask,
+		Cancellation:     service.CancellationStatus,
+		Summarize:        service.SummarizeTask,
+		SummaryAttempt:   db.SummaryAttempt,
+		SummaryAttempts:  db.ListSummaryAttempts,
+		ReviewSummary:    service.ReviewSummary,
+		SummaryReviews:   db.SummaryReviews,
 		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
 			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
 		},
@@ -99,8 +102,18 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer listener.Close()
+	dispatcher, err := app.StartDispatcher(ctx, service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start task dispatcher")
+		return 1
+	}
+	defer dispatcher.Close()
 	if err := serveHTTP(ctx, listener, handler, stdout); err != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
+		return 1
+	}
+	if err := dispatcher.Close(); err != nil {
+		fmt.Fprintln(stderr, "task dispatcher requires inspection")
 		return 1
 	}
 	return 0

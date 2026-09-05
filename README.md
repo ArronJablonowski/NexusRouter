@@ -219,7 +219,45 @@ All summary endpoints share task concurrency capacity and enforce authentication
 
 `POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. SSE is buffered until durable completion and labeled `X-Darwin-Stream-Mode: buffered`; this is not live token streaming. Usage is omitted when unavailable.
 
-Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Async submission, idempotency keys, live SSE, separate cancellation, full provider health, and service installation are unfinished. Do not automatically retry a timed-out submission; a durable task may already exist.
+Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Full provider health and service installation remain unfinished. Do not automatically retry a timed-out synchronous task POST; a durable task may already exist.
+
+### Detached durable submissions
+
+`POST /v1/submissions` accepts the same native task JSON and requires one
+`Idempotency-Key` header containing 16–128 visible ASCII characters. HTTP 202
+acknowledges durable queue admission, not model eligibility or successful work.
+Retrying the same key with the same decoded request and configuration returns
+the same submission; changed intent or configuration returns 409. A terminal
+retry returns 200. Keys are hashed, not stored in plaintext. Do not put secrets
+in keys. Known provider credentials or the API token in the serialized request
+cause rejection rather than silent rewriting. Other request content is stored
+locally in the private database for execution; this is not an encrypted queue.
+
+`GET /v1/submissions/{id}` reports queued/running/succeeded/failed/canceled state,
+linked task IDs, lease expiry and a final result when available. Use each linked
+task's inspection/event-replay endpoints for committed history. Submission
+status does not expose queued request bodies, key hashes or ownership tokens.
+`POST /v1/submissions/{id}/cancel` with JSON `{}` cancels queued work immediately
+or requests cancellation of the active worker, including its auxiliary review.
+It never rolls back tool effects. Closing a submission/status HTTP connection
+does not cancel detached execution; use the explicit cancellation endpoint.
+
+The daemon polls durable queued work every 250 ms with `workers.max` workers,
+sharing the execution limit with synchronous tasks. Intake has two independent
+slots; inspection/cancellation use two shared control slots. At most 128 queued
+requests are admitted; capacity errors return 503 with `Retry-After: 1`.
+Each claimed job has a five-minute budget, a 30-second ownership lease and
+five-second heartbeats. Ownership and cancellation are checked transactionally
+before ordinary task-event writes; cleanup may still record completed effects.
+
+Queued work survives restart but is pinned to its original configuration digest:
+a daemon with changed configuration will not claim it. Cancel and resubmit
+with a new key if you intentionally change the configuration. Graceful shutdown
+cancels and joins active workers, leaving unclaimed requests queued. A crashed
+running job remains running with `lease_expired: true`; it is **not automatically
+reclaimed or retried**, because effects may already have occurred. Inspect it
+before deciding on replacement work. Orphan reconciliation, operator recovery,
+queue listing/retention and CLI submission commands remain unfinished.
 
 ## Automatic routing and local knowledge
 
