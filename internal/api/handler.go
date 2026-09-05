@@ -27,6 +27,7 @@ import (
 )
 
 type Services struct {
+	DiscoverSkillWorkflows func(context.Context, string, string, int) (skills.WorkflowCandidatePage, error)
 	GenerateSkillDraft     func(context.Context, string, string, string, []string, float64) (skills.GenerationAttempt, error)
 	PublishSkillGeneration func(context.Context, string) (skills.Version, error)
 	SkillGenerations       func(context.Context, string, string, int) ([]skills.GenerationSummary, error)
@@ -116,7 +117,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
+	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -130,6 +131,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/skills/workflows":
+		h.serveWorkflowDiscovery(w, r.WithContext(ctx))
 	case skillGenerationRoute(r.URL.Path):
 		h.serveSkillGenerations(w, r.WithContext(ctx))
 	case approvalRoute(r.URL.Path):

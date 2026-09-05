@@ -12,6 +12,9 @@ import (
 )
 
 func runSkillGenerations(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "discover" {
+		return runWorkflowDiscovery(args, stdout, stderr)
+	}
 	if len(args) > 0 && (args[0] == "generate" || args[0] == "publish") {
 		return runSkillGenerationAction(args, stdout, stderr)
 	}

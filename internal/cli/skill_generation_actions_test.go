@@ -77,6 +77,18 @@ func TestSkillGenerationActionsCLIEndToEnd(t *testing.T) {
 	if err := os.WriteFile(configPath, body, 0600); err != nil {
 		t.Fatal(err)
 	}
+	var discoveryOut, discoveryErr bytes.Buffer
+	if code := Run([]string{"skill-generations", "discover", "--config", configPath, "--domain", "creative"}, &discoveryOut, &discoveryErr, "test"); code != 0 {
+		t.Fatal("discovery failed", code, discoveryErr.String())
+	}
+	var page skills.WorkflowCandidatePage
+	if json.Unmarshal(discoveryOut.Bytes(), &page) != nil || page.Validate("", 20) != nil || len(page.Candidates) != 2 || calls.Load() != 2 {
+		t.Fatal("invalid discovery or inference", discoveryOut.String())
+	}
+	tasks = nil
+	for _, candidate := range page.Candidates {
+		tasks = append(tasks, candidate.TaskID)
+	}
 	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
 	if err != nil {
 		t.Fatal(err)

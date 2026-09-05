@@ -940,6 +940,23 @@ and let generation revalidate the resulting 2–20-task set. Discovery never
 opens the skill root, dispatches a model, publishes or activates a skill.
 Background scheduling and semantic grouping of repeated workflows remain open.
 
+Operator surfaces expose that same read-only discovery:
+
+```sh
+darwin skill-generations discover --config /path/to/config.yaml --domain creative --scan-limit 20
+```
+
+The authenticated HTTP equivalent is
+`GET /v1/skills/workflows?domain=creative&scan_limit=20`. Supply the returned
+cursor with CLI `--after` or URL-encoded HTTP `after` to continue. Limits count
+scanned records, not matches; duplicate/unknown parameters and empty explicit
+cursors reject. The route shares task capacity and has a cooperative ten-second
+deadline. Neither surface creates storage or invokes a model.
+
+Discovery inspects the configured database for one operator; a skill scope is
+the destination catalog scope, not tenant or source-project isolation. Protect
+candidate metadata exports and use separate databases where isolation is needed.
+
 Generate from two or more accepted completed tasks, then publish explicitly:
 
 ```sh

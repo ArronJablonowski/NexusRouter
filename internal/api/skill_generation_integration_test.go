@@ -63,9 +63,21 @@ func TestSkillGenerationHTTPApplicationLifecycle(t *testing.T) {
 		return svc.GenerateSkillDraft(ctx, id, model, skills.Key{Scope: cfg.Skills.Scope, Name: name}, tasks, cost)
 	}
 	s.PublishSkillGeneration = svc.PublishSkillGeneration
+	s.DiscoverSkillWorkflows = svc.DiscoverSkillWorkflows
 	h, err := New(token, 1, s)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Discover eligible sources through the same authenticated API before drafting.
+	discovered := httptest.NewRecorder()
+	h.ServeHTTP(discovered, request("GET", "/v1/skills/workflows?domain=creative&scan_limit=20", ""))
+	var page skills.WorkflowCandidatePage
+	if discovered.Code != 200 || json.Unmarshal(discovered.Body.Bytes(), &page) != nil || page.Validate("", 20) != nil || len(page.Candidates) != 2 || calls.Load() != 2 {
+		t.Fatal("discovery failed or dispatched", discovered.Code, discovered.Body.String())
+	}
+	tasks = nil
+	for _, candidate := range page.Candidates {
+		tasks = append(tasks, candidate.TaskID)
 	}
 	body, _ := json.Marshal(map[string]any{"version": 1, "id": "generation", "model_id": "generator.alias", "name": "workflow", "task_ids": tasks})
 	w := httptest.NewRecorder()
