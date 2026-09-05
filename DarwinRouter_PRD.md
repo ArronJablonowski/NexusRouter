@@ -459,6 +459,8 @@ Application tool dispatch must acquire shared leases for allowed read-only tools
 
 Workers use durable work records, leases, heartbeats, and acceptance states. Supervisors re-derive liveness from durable events, leases, and observed goroutine/provider state. Lease expiry, orphaned work, or stalls trigger safe recovery or operator attention; they do not imply that an uncertain effect can be replayed.
 
+Joined worker finalization must commit the terminal event, task projection and exact reader-lease release atomically before output delivery. Preliminary validator acceptance or `worker.completed` is not a substitute for that terminal commit. Production storage implements this boundary, while legacy journals must at least surface cleanup failure rather than returning success. An enclosing tool reader is a separate lease and is not released by worker finalization or parent journal recovery. See [worker finalization and crash boundaries](docs/worker-finalization.md) for qualification and remaining reconciliation requirements.
+
 Operator inspection must distinguish an absent/legacy observation from an observed empty scope, include expired unreleased readers and compatibility-alias holders, and never expose lease capabilities. Approval execution inspection provides a bounded versioned reader/writer count summary from the same transaction as the approval and journal. Counts are diagnostic only: they cannot prove process termination or authorize dispatch, retry, release or reassignment. General holder discovery and safe crashed-holder reconciliation remain required beyond this summary.
 
 ### 11.4 Acceptance Gate

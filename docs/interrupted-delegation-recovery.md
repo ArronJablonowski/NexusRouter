@@ -102,6 +102,13 @@ submission unresolved, produces no receipt or redispatch, and denies continuatio
 of the unfinished history. This verifies a safe refusal, not automatic recovery
 of running children.
 
+[Worker-finalization crash qualification](worker-finalization.md) additionally
+kills the application inside the worker terminal/release transaction and after
+that transaction while the enclosing tool reader is being released. Preliminary
+worker acceptance alone does not enable recovery. A committed worker can enable
+parent journal repair without releasing a separate orphaned parent reader lease.
+Journal repair and safe resource-holder reconciliation remain distinct concerns.
+
 Run the process-boundary tests with:
 
 ```sh

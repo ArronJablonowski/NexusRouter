@@ -79,7 +79,17 @@ func TestInterruptedDelegationCrashProcessHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer raw.Close()
-	if _, err := raw.ExecContext(ctx, `CREATE TRIGGER crash_before_parent_tool_result BEFORE INSERT ON events WHEN json_extract(NEW.body,'$.kind')='tool.completed' AND json_extract(NEW.body,'$.data.tool_name') IN ('delegate','delegate_batch') BEGIN SELECT darwin_test_pause_result(); END`); err != nil {
+	trigger := `CREATE TRIGGER crash_before_parent_tool_result BEFORE INSERT ON events WHEN json_extract(NEW.body,'$.kind')='tool.completed' AND json_extract(NEW.body,'$.data.tool_name') IN ('delegate','delegate_batch') BEGIN SELECT darwin_test_pause_result(); END`
+	switch os.Getenv("DARWIN_INTERRUPTED_CRASH_BOUNDARY") {
+	case "":
+	case "worker_release":
+		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE UPDATE OF released ON resource_leases WHEN OLD.scope GLOB 'delegation-*' AND OLD.writer=0 AND NEW.released=1 BEGIN SELECT darwin_test_pause_result(); END`
+	case "parent_release":
+		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE UPDATE OF released ON resource_leases WHEN OLD.scope='delegation' AND OLD.writer=0 AND NEW.released=1 BEGIN SELECT darwin_test_pause_result(); END`
+	default:
+		t.Fatal("unsupported test crash boundary")
+	}
+	if _, err := raw.ExecContext(ctx, trigger); err != nil {
 		t.Fatal(err)
 	}
 	request.submissionID, request.submissionToken = submissionID, claim.Token
