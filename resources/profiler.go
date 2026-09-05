@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,15 +32,21 @@ var ErrProfile = errors.New("host resource measurement unavailable")
 // from free, inactive and speculative pages, not a promise of allocatable RAM.
 func Profile(ctx context.Context) (Snapshot, error) {
 	s := Snapshot{Time: time.Now().UTC(), CPUs: runtime.NumCPU()}
+	if ctx == nil {
+		return s, ErrProfile
+	}
+	if ctx.Err() != nil {
+		return s, ctx.Err()
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		mem, err := exec.CommandContext(ctx, "/usr/sbin/sysctl", "-n", "hw.memsize").Output()
+		mem, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "hw.memsize")
 		if err != nil {
 			return s, ErrProfile
 		}
-		vm, err := exec.CommandContext(ctx, "/usr/bin/vm_stat").Output()
+		vm, err := runProbe(ctx, "/usr/bin/vm_stat")
 		if err != nil {
 			return s, ErrProfile
 		}
@@ -52,9 +58,9 @@ func Profile(ctx context.Context) (Snapshot, error) {
 		if err != nil || s.AvailableRAM > s.TotalRAM {
 			return s, ErrProfile
 		}
-		arm, err := exec.CommandContext(ctx, "/usr/sbin/sysctl", "-n", "hw.optional.arm64").Output()
+		arm, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "hw.optional.arm64")
 		s.UnifiedMemory = err == nil && strings.TrimSpace(string(arm)) == "1"
-		swap, err := exec.CommandContext(ctx, "/usr/sbin/sysctl", "-n", "vm.swapusage").Output()
+		swap, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "vm.swapusage")
 		if err == nil {
 			fields := strings.Fields(string(swap))
 			for i, f := range fields {
@@ -69,32 +75,13 @@ func Profile(ctx context.Context) (Snapshot, error) {
 		}
 		s.Source = "darwin-vm-stat-estimate"
 	case "linux":
-		b, err := os.ReadFile("/proc/meminfo")
+		b, err := readHostMemory(ctx, "/proc/meminfo")
 		if err != nil {
 			return s, ErrProfile
 		}
-		values := map[string]uint64{}
-		for _, line := range strings.Split(string(b), "\n") {
-			f := strings.Fields(line)
-			if len(f) == 3 && f[2] == "kB" {
-				v, err := strconv.ParseUint(f[1], 10, 64)
-				if err != nil || v > ^uint64(0)/1024 {
-					return s, ErrProfile
-				}
-				values[strings.TrimSuffix(f[0], ":")] = v * 1024
-			}
-		}
-		var ok bool
-		s.TotalRAM = values["MemTotal"]
-		s.AvailableRAM, ok = values["MemAvailable"]
-		if !ok || s.TotalRAM == 0 || s.AvailableRAM > s.TotalRAM {
+		s.TotalRAM, s.AvailableRAM, s.SwapUsed, err = parseLinuxMeminfo(b)
+		if err != nil {
 			return s, ErrProfile
-		}
-		if total, ok := values["SwapTotal"]; ok {
-			if free, present := values["SwapFree"]; present && free <= total {
-				used := total - free
-				s.SwapUsed = &used
-			}
 		}
 		s.Source = "linux-proc-meminfo-host"
 	default:
@@ -104,6 +91,31 @@ func Profile(ctx context.Context) (Snapshot, error) {
 		return s, ctx.Err()
 	}
 	return s, nil
+}
+
+// Kernel file reads remain cooperative; byte bounds do not forcibly interrupt a
+// stalled kernel read. The production caller uses only the fixed proc path.
+func readHostMemory(ctx context.Context, path string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, ErrProfile
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, ErrProfile
+	}
+	body, err := io.ReadAll(io.LimitReader(f, maxProbeBytes+1))
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil || len(body) > maxProbeBytes {
+		return nil, ErrProfile
+	}
+	return body, nil
 }
 func darwinAvailable(text string) (uint64, error) {
 	lines := strings.Split(text, "\n")
@@ -115,7 +127,7 @@ func darwinAvailable(text string) (uint64, error) {
 		return 0, ErrProfile
 	}
 	var pages uint64
-	found := 0
+	found := map[string]bool{}
 	for _, line := range lines[1:] {
 		name, value, ok := strings.Cut(line, ":")
 		if !ok {
@@ -124,14 +136,17 @@ func darwinAvailable(text string) (uint64, error) {
 		if name != "Pages free" && name != "Pages inactive" && name != "Pages speculative" {
 			continue
 		}
+		if found[name] {
+			return 0, ErrProfile
+		}
 		v, err := strconv.ParseUint(strings.TrimSuffix(strings.TrimSpace(value), "."), 10, 64)
 		if err != nil || v > ^uint64(0)-pages {
 			return 0, ErrProfile
 		}
 		pages += v
-		found++
+		found[name] = true
 	}
-	if found != 3 || pages > ^uint64(0)/page {
+	if len(found) != 3 || pages > ^uint64(0)/page {
 		return 0, ErrProfile
 	}
 	return pages * page, nil
