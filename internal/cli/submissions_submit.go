@@ -77,12 +77,12 @@ func runSubmit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "cannot load submission configuration")
 		return 1
 	}
-	prompt, err := io.ReadAll(io.LimitReader(stdin, (1<<20)+1))
-	if err != nil || len(prompt) > 1<<20 {
-		fmt.Fprintln(stderr, "cannot read prompt (maximum 1 MiB)")
+	prompt, err := readTaskPrompt(ctx, stdin)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot read UTF-8 prompt (maximum 1 MiB; submission deadline 30 seconds)")
 		return 1
 	}
-	request.Prompt = string(prompt)
+	request.Prompt = prompt
 	svc, err := app.NewService(settings, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid application configuration")

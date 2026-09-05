@@ -208,19 +208,21 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--json streams committed events and a final result as JSON lines")
 		return 2
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	options.Env = config.Environment(os.Environ())
 	s, err := config.Load(options)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot load task configuration")
 		return 1
 	}
-	prompt, err := io.ReadAll(io.LimitReader(stdin, (1<<20)+1))
-	if err != nil || len(prompt) > 1<<20 {
-		fmt.Fprintln(stderr, "cannot read prompt (maximum 1 MiB)")
+	inputCtx, finishInput := context.WithTimeout(ctx, 30*time.Second)
+	prompt, err := readTaskPrompt(inputCtx, stdin)
+	finishInput()
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot read UTF-8 prompt (maximum 1 MiB; input deadline 30 seconds)")
 		return 1
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	service, err := app.NewService(s, os.Getenv)
@@ -228,7 +230,7 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "invalid application configuration")
 		return 1
 	}
-	request.Prompt = string(prompt)
+	request.Prompt = prompt
 	if jsonMode {
 		return runTaskJSON(ctx, request, service.RunStream, stdout, stderr)
 	}
