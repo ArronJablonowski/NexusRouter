@@ -14,8 +14,9 @@ import (
 )
 
 type Snapshot struct {
-	Time                     time.Time `json:"time"`
-	CPUs                     int       `json:"cpu_threads"`
+	GPUs                     *GPUInventory `json:"gpu_inventory,omitempty"`
+	Time                     time.Time     `json:"time"`
+	CPUs                     int           `json:"cpu_threads"`
 	TotalRAM, AvailableRAM   uint64
 	SwapUsed                 *uint64
 	UnifiedMemory            bool

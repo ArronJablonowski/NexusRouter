@@ -160,10 +160,10 @@ The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdo
 `resources` also includes `gpu_inventory`, a separate per-device diagnostic survey.
 On Linux it queries `/usr/bin/nvidia-smi` and AMD DRM sysfs concurrently; each
 source reports `observed`, `unavailable`, or `unsupported` with byte counters.
-It never sums separate GPUs or changes routing admission. Model-to-device
-binding and per-device reservations remain unfinished, so these observations do
-not fill the legacy aggregate VRAM fields. The survey runs only for diagnostics,
-not on every routing decision. NVIDIA needs its existing driver utility at the
+It never sums separate GPUs. Models with an explicit `gpu_device` binding also
+use these observations for per-device admission, as described below. Unbound
+configurations keep GPU subprocesses out of the routing path. NVIDIA needs its
+existing driver utility at the
 fixed path; no software is installed. AMD cards missing PCI vendor/counter files
 make that source unavailable. Driver errors are not printed. Sysfs cancellation
 is cooperative around bounded reads, not a guarantee against a stalled kernel.
@@ -440,8 +440,11 @@ The `auto` local concurrency setting now adapts to measured usable headroom:
 below 16 GiB permits one local execution, 16–64 GiB permits up to two, and above
 64 GiB permits up to `workers.max_in_process`. Usable headroom means the memory
 percentage ceiling minus observed host use and outstanding reservations. A
-discrete-GPU request uses the smaller RAM/VRAM headroom; Apple unified memory
-uses RAM only. CPU thread count also caps automatic admission; unknown CPU count
+bound discrete-GPU request uses shared RAM headroom for the global tier and its
+own GPU headroom for a per-device tier; two independent small GPUs can each run
+one execution if shared RAM/CPU limits allow it. Unbound custom aggregate
+profiles retain the smaller RAM/VRAM tier. Apple unified memory uses RAM only.
+CPU thread count also caps automatic admission; unknown CPU count
 permits one. Every candidate must still fit its declared footprint. The policy
 recomputes at admission, so earlier reservations or increased pressure can reduce
 the next request's limit without canceling active work. A numeric concurrency
@@ -460,6 +463,35 @@ calls and independent CLI processes cannot coordinate this in-memory budget.
 Detailed health also reports local models without RAM metadata as unavailable
 (`model_metadata_missing`), even if the provider's catalog lists them. Health
 remains a coarse observation, not a reservation or guarantee of task admission.
+
+### Explicit discrete-GPU bindings
+
+For a Linux backend already pinned to a device, set a local model's `gpu_device`
+to `nvidia:GPU-<UUID>` or `amd:cardN`, using the identifier from `darwin resources`.
+Provide positive conservative `ram_bytes` and `vram_bytes` footprints. Both
+host and device observations must be fresh; missing devices, failed probes,
+ambiguous inventories and Apple unified-memory/double-pool configurations are
+denied before dispatch. Device percentages and outstanding reservations apply
+per device; host RAM, CPU and worker ceilings still apply across the service.
+
+This is **operator-declared placement**, not automatic backend affinity control.
+The backend must actually use that device; a wrong declaration can make resource
+accounting unsafe. Use separately pinned backend instances where needed. AMD
+card indices may change after reboot; recheck them. Multi-device sharding, MIG
+partition binding, automatic placement verification, cross-process reservations
+and live Linux GPU qualification remain unfinished. Unbound VRAM requests still
+fail with the built-in profiler rather than choosing an arbitrary GPU. Legacy
+custom aggregate profiles cannot hold overlapping aggregate/device reservations.
+
+Bound configurations perform GPU measurements during local/automatic admission
+and auxiliary review/summary admission. Driver latency therefore adds routing
+overhead (NVIDIA's subprocess is bounded to one second plus pipe cleanup);
+the routing latency target is not yet qualified on these systems. Cloud-only
+services do not enable these probes. Persisted automatic route records omit the
+full inventory and hardware identifiers, keeping only the selected device's
+scalar capacity observation. Adding or changing a binding changes the durable
+submission configuration fingerprint; queued work requires the existing explicit
+configuration-mismatch handling rather than silently moving devices.
 
 ### Bounded resource-pressure waiting
 

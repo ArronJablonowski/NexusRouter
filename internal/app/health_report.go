@@ -238,7 +238,16 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 					}
 				}
 			}
-			if m.Locality == "local" && (hostStatus != "healthy" || m.VRAMBytes > 0 && gpuStatus != "healthy") {
+			modelGPUStatus := gpuStatus
+			if m.GPUDevice != "" {
+				modelGPUStatus = "unknown"
+				if total, available, err := resources.DeviceMemory(snapshot, m.GPUDevice, time.Now(), 5*time.Second); err == nil {
+					deviceSnapshot := snapshot
+					deviceSnapshot.VRAMTotal, deviceSnapshot.VRAMAvailable = &total, &available
+					_, _, modelGPUStatus, _ = healthResources(deviceSnapshot, profileErr, s.settings.Hardware.MaxRAM, s.settings.Hardware.MaxVRAM)
+				}
+			}
+			if m.Locality == "local" && (hostStatus != "healthy" || m.VRAMBytes > 0 && modelGPUStatus != "healthy") {
 				status, code = "unavailable", "capacity_exhausted"
 			}
 		}

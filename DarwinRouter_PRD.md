@@ -426,12 +426,25 @@ Default allocation policy (GiB means 2^30 bytes):
 - Above 64 GiB: bounded parallel executions or ensembles when policy enables them.
 
 For automatic concurrency, usable headroom is the configured percentage ceiling
-minus observed host use and outstanding reservations. Where a model requires
-discrete VRAM, use the smaller of RAM and VRAM headroom. Cap admission by the
+minus observed host use and outstanding reservations. Where a model has a
+discrete-GPU binding, apply the RAM tier globally and the bound device's VRAM
+tier to that device's active executions. Independent GPU capacities must not be
+summed into a fungible pool. Legacy custom aggregate observations use the smaller
+RAM/VRAM tier and cannot overlap device-specific reservations. Cap admission by the
 configured worker ceiling and observed CPU thread count; missing CPU measurements
 permit only one slot. Recompute before each admission without preempting existing
 work solely because it now exceeds a lower tier. A numeric concurrency setting
 remains an explicit cap, but never bypasses memory or pressure checks.
+
+Local discrete-GPU models declare `gpu_device` as a source-qualified NVIDIA UUID
+or AMD card identifier plus positive RAM/VRAM footprint estimates. Admission
+requires fresh matching observations and rejects unavailable or ambiguous device
+state. In the initial implementation, placement is operator-declared: backend
+affinity must be configured externally, and diagnostics must clearly distinguish
+accounting from verified placement. Automatic affinity verification, stable AMD
+identity resolution, multi-device sharding and partition-aware allocation remain
+delivery requirements. Unbound models must not inherit a guessed GPU. Auxiliary
+reviews and summaries obey the same per-device and shared host reservations.
 
 Threshold crossings suspend new local admissions. Hybrid mode may use an eligible cloud route; local-only mode queues or rejects according to queue policy. Active work is canceled only for safety-critical pressure.
 

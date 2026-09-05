@@ -39,13 +39,13 @@ func strictIntegers(n *yaml.Node, target reflect.Type) error {
 			}
 		}
 		for i := 0; i < len(n.Content); i += 2 {
-			// Pressure controls are deliberately strict strings in every layer.
+			// Pressure controls and GPU bindings are strict strings in every layer.
 			// Keep legacy string coercion unchanged for unrelated settings.
 			name := n.Content[i].Value
-			if target == reflect.TypeOf(Hardware{}) && (name == "local_pressure_policy" || name == "local_queue_timeout") {
+			if target == reflect.TypeOf(Hardware{}) && (name == "local_pressure_policy" || name == "local_queue_timeout") || target == reflect.TypeOf(Model{}) && name == "gpu_device" {
 				value := n.Content[i+1]
 				if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
-					return errors.New("local pressure configuration requires string scalars")
+					return errors.New("configuration field requires a string scalar")
 				}
 			}
 			if field, ok := fields[n.Content[i].Value]; ok {

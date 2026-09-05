@@ -11,7 +11,6 @@ import (
 	"darwinrouter/internal/telemetry"
 	"darwinrouter/policy"
 	"darwinrouter/providers"
-	"darwinrouter/resources"
 	"darwinrouter/sessions"
 )
 
@@ -74,13 +73,7 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		if model.RAMBytes == 0 {
 			return bad()
 		}
-		s.mu.Lock()
-		snapshot, profileErr := s.profile(ctx)
-		var release func()
-		if profileErr == nil {
-			release, profileErr = s.budget.Reserve(snapshot, resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes}, time.Now())
-		}
-		s.mu.Unlock()
+		release, profileErr := s.reserveExplicit(ctx, model)
 		if profileErr != nil {
 			return bad()
 		}

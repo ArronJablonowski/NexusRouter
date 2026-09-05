@@ -13,7 +13,6 @@ import (
 	"darwinrouter/internal/telemetry"
 	"darwinrouter/policy"
 	"darwinrouter/providers"
-	"darwinrouter/resources"
 	"darwinrouter/runtime"
 	"darwinrouter/sessions"
 )
@@ -112,13 +111,7 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		if model.RAMBytes == 0 {
 			return bad()
 		}
-		s.mu.Lock()
-		snapshot, err := s.profile(ctx)
-		var release func()
-		if err == nil {
-			release, err = s.budget.Reserve(snapshot, resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes}, time.Now())
-		}
-		s.mu.Unlock()
+		release, err := s.reserveExplicit(ctx, model)
 		if err != nil {
 			return bad()
 		}

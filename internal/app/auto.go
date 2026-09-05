@@ -67,6 +67,14 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 		return nil, err
 	}
 	profile := resources.Profile
+	if s.Mode != "cloud_only" {
+		for _, m := range s.Models {
+			if m.Locality == "local" && m.GPUDevice != "" {
+				profile = resources.ProfileWithGPUs
+				break
+			}
+		}
+	}
 	if !s.Hardware.AutoProfile {
 		// No manual profile source is configured yet. Disabling measurement
 		// must not invent capacity or allow local execution without admission.
@@ -372,7 +380,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if model.Locality != "local" {
 			break
 		}
-		release, err = s.budget.Reserve(snapshot, resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes}, time.Now())
+		release, err = s.budget.Reserve(snapshot, modelResources(model), time.Now())
 		if err == nil {
 			break
 		}
@@ -403,6 +411,16 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	hash := sha256.Sum256(redacted)
 	r.route = &runtime.Data{ModelID: selected.Primary.Model, ProviderID: selected.Primary.Provider, Route: &selected, Domain: r.Domain, Profile: r.Profile, ConfigID: hex.EncodeToString(hash[:]), RouteCandidates: candidates, RoutePolicy: &p}
 	if profileErr == nil {
+		// Persist only the selected device's scalar observation, never the
+		// full hardware inventory or identifiers from unrelated devices.
+		for _, model := range cfg.Models {
+			if model.ID == r.ModelID && model.GPUDevice != "" {
+				if total, available, e := resources.DeviceMemory(snapshot, model.GPUDevice, time.Now(), 5*time.Second); e == nil {
+					snapshot.VRAMTotal, snapshot.VRAMAvailable = &total, &available
+				}
+			}
+		}
+		snapshot.GPUs = nil
 		r.route.Resources = &snapshot
 	}
 	if ctx.Err() != nil {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"darwinrouter/memory"
+	"darwinrouter/resources"
 )
 
 type Settings struct {
@@ -59,6 +60,7 @@ type Model struct {
 	EstimatedCost *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
 	RAMBytes      uint64   `yaml:"ram_bytes" json:"ram_bytes"`
 	VRAMBytes     uint64   `yaml:"vram_bytes" json:"vram_bytes"`
+	GPUDevice     string   `yaml:"gpu_device" json:"gpu_device,omitempty"`
 	FailureDomain string   `yaml:"failure_domain" json:"failure_domain"`
 	ID            string   `yaml:"id" json:"id"`
 	Provider      string   `yaml:"provider" json:"provider"`
@@ -289,6 +291,9 @@ func (s Settings) Validate() error {
 		}
 		if m.Locality != "local" && m.Locality != "cloud" {
 			return errors.New("invalid model locality")
+		}
+		if m.GPUDevice != "" && (m.Locality != "local" || m.VRAMBytes == 0 || !resources.ValidGPUDeviceID(m.GPUDevice)) {
+			return errors.New("invalid model GPU binding")
 		}
 		if len(m.Capabilities) == 0 {
 			return errors.New("model capabilities required")

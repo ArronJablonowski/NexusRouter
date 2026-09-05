@@ -92,7 +92,11 @@ func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (rele
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	return s.budget.Reserve(snapshot, resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes}, time.Now())
+	return s.budget.Reserve(snapshot, modelResources(model), time.Now())
+}
+
+func modelResources(model config.Model) resources.Need {
+	return resources.Need{RAM: model.RAMBytes, VRAM: model.VRAMBytes, Device: model.GPUDevice}
 }
 
 // lockResources lets admission expire while another request owns the profiler.

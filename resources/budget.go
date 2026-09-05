@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,13 +20,18 @@ type Limits struct {
 	RAMPercent, VRAMPercent float64
 	MaxAge                  time.Duration
 }
-type Need struct{ RAM, VRAM uint64 }
+type Need struct {
+	RAM, VRAM uint64
+	Device    string
+}
 type Budget struct {
-	mu       sync.Mutex
-	limits   Limits
-	used     Need
-	active   int
-	adaptive bool
+	mu           sync.Mutex
+	limits       Limits
+	used         Need
+	active       int
+	adaptive     bool
+	deviceVRAM   map[string]uint64
+	deviceActive map[string]int
 }
 
 // NewAdaptiveBudget uses MaxConcurrent as an upper ceiling, deriving each new
@@ -64,7 +70,7 @@ func NewBudget(l Limits) (*Budget, error) {
 	if l.MaxConcurrent < 1 || l.MaxConcurrent > 64 || l.MaxAge <= 0 || !percent(l.RAMPercent) || !percent(l.VRAMPercent) {
 		return nil, ErrCapacity
 	}
-	return &Budget{limits: l}, nil
+	return &Budget{limits: l, deviceVRAM: map[string]uint64{}, deviceActive: map[string]int{}}, nil
 }
 func percent(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v > 0 && v <= 100 }
 
@@ -75,14 +81,31 @@ func percent(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >
 func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	deviceKey := strings.ToLower(n.Device)
 	if n.RAM == 0 || s.Time.IsZero() || s.Time.After(now) || now.Sub(s.Time) > b.limits.MaxAge || s.TotalRAM == 0 || s.AvailableRAM > s.TotalRAM {
 		return nil, ErrResourceData
 	}
 	if s.UnifiedMemory && n.VRAM != 0 {
 		return nil, ErrResourceData
 	}
-	if n.VRAM > 0 && (s.VRAMTotal == nil || s.VRAMAvailable == nil || *s.VRAMTotal == 0 || *s.VRAMAvailable > *s.VRAMTotal) {
+	if n.Device != "" && n.VRAM == 0 {
 		return nil, ErrResourceData
+	}
+	var gpuTotal, gpuAvailable, gpuReserved uint64
+	if n.Device != "" {
+		var err error
+		gpuTotal, gpuAvailable, err = DeviceMemory(s, n.Device, now, b.limits.MaxAge)
+		if err != nil {
+			return nil, ErrResourceData
+		}
+		gpuReserved = b.deviceVRAM[deviceKey]
+	} else if n.VRAM > 0 && (s.VRAMTotal == nil || s.VRAMAvailable == nil || *s.VRAMTotal == 0 || *s.VRAMAvailable > *s.VRAMTotal) {
+		return nil, ErrResourceData
+	} else if n.VRAM > 0 {
+		gpuTotal, gpuAvailable, gpuReserved = *s.VRAMTotal, *s.VRAMAvailable, b.used.VRAM
+	}
+	if n.VRAM > 0 && ((n.Device != "" && b.used.VRAM > 0) || (n.Device == "" && len(b.deviceVRAM) > 0)) {
+		return nil, ErrCapacity
 	}
 	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) {
 		return nil, ErrCapacity
@@ -93,19 +116,18 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	}
 	usable := ramRoom
 	if n.VRAM > 0 {
-		gpuRoom, ok := headroom(*s.VRAMTotal, *s.VRAMAvailable, b.used.VRAM, b.limits.VRAMPercent)
+		gpuRoom, ok := headroom(gpuTotal, gpuAvailable, gpuReserved, b.limits.VRAMPercent)
 		if !ok || n.VRAM > gpuRoom {
 			return nil, ErrCapacity
 		}
-		usable = min(usable, gpuRoom)
+		if n.Device == "" {
+			usable = min(usable, gpuRoom)
+		} else if b.adaptive && b.deviceActive[deviceKey] >= adaptiveTier(gpuRoom, b.limits.MaxConcurrent) {
+			return nil, ErrCapacity
+		}
 	}
 	if b.adaptive {
-		limit := b.limits.MaxConcurrent
-		if usable < 16<<30 {
-			limit = 1
-		} else if usable <= 64<<30 {
-			limit = min(limit, 2)
-		}
+		limit := adaptiveTier(usable, b.limits.MaxConcurrent)
 		if s.CPUs <= 0 {
 			limit = 1
 		} else {
@@ -116,10 +138,40 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 		}
 	}
 	b.used.RAM += n.RAM
-	b.used.VRAM += n.VRAM
+	if n.Device == "" {
+		b.used.VRAM += n.VRAM
+	} else {
+		b.deviceVRAM[deviceKey] += n.VRAM
+		b.deviceActive[deviceKey]++
+	}
 	b.active++
 	var once sync.Once
 	return func() {
-		once.Do(func() { b.mu.Lock(); defer b.mu.Unlock(); b.used.RAM -= n.RAM; b.used.VRAM -= n.VRAM; b.active-- })
+		once.Do(func() {
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			b.used.RAM -= n.RAM
+			if n.Device == "" {
+				b.used.VRAM -= n.VRAM
+			} else {
+				b.deviceVRAM[deviceKey] -= n.VRAM
+				b.deviceActive[deviceKey]--
+				if b.deviceVRAM[deviceKey] == 0 {
+					delete(b.deviceVRAM, deviceKey)
+					delete(b.deviceActive, deviceKey)
+				}
+			}
+			b.active--
+		})
 	}, nil
+}
+
+func adaptiveTier(usable uint64, ceiling int) int {
+	if usable < 16<<30 {
+		return 1
+	}
+	if usable <= 64<<30 {
+		return min(ceiling, 2)
+	}
+	return ceiling
 }
