@@ -78,7 +78,42 @@ queued submissions: daemon execution uses its own configured factory.
 
 Explicit execution and provisional live text use the same injected adapter,
 with normal runtime validation, redaction, journaling and cancellation. This is
-provider construction, not a general extension-hook or tool-registration API.
+provider construction, not a general extension-hook API.
+
+### Read-only tool extensions
+
+`ConfigOptions.Tools` accepts up to 16 `sdk.Tool` definitions (an alias for
+`tools.Definition`), each with a provider-neutral JSON schema, fixed resource
+scope, `ReadOnly: true`, and a context-aware handler. `ToolPolicy` governs only
+the supplied custom definitions, not built-in tools, and accepts a
+`tools.Policy`: only explicitly allowed effective permissions advertise or execute
+a custom tool. Nil policy denies all tools; `Ask` does not grant approval.
+Inherited denials remain effective. Definitions, schema bytes and the policy
+chain are snapshotted by `New`, which rejects invalid schemas before storage.
+
+For example, a policy for a registered `lookup_fact` tool can be supplied as:
+
+```go
+ToolPolicy: &tools.Policy{
+    Default: tools.Deny,
+    Rules: []tools.Rule{{Tool: "lookup_fact", Scope: "public_facts", Decision: tools.Allow}},
+},
+```
+
+Custom tools do not enable filesystem access: `tools.enabled` controls the
+built-in workspace reader separately. Names `read_file`, `delegate` and
+`delegate_batch` are reserved. Extension execution requires a local model with
+a known context capacity; ordinary context, resource and iteration limits remain
+active. Delegated children do not inherit custom handlers. Handlers are trusted
+in-process code, must truly be read-only, return `runtime.NoEffect`, obey
+cancellation, and support concurrent tasks. They are not sandboxed or forcibly
+interruptible, and arbitrary Go code can bypass transport policy. The caller
+owns handler resources; no automatic Close is invoked. Synchronous `Run` and
+streaming execution support extensions. `Submit` and submission-bound execution
+reject active extensions because handlers have no durable implementation identity
+yet; they are never silently serialized, dropped, or substituted on dequeue.
+Durable extension identity, side-effecting tools and general lifecycle hooks
+remain unfinished.
 
 ### Replaceable factual memory storage
 
@@ -207,7 +242,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Pluggable tool/context/evaluator engines, automatic skill learning,
+qualification. Side-effecting tool/context/evaluator engines, automatic skill learning,
 resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
 remain unfinished. Existing low-level packages are not a substitute for those
 future application-level extension contracts.

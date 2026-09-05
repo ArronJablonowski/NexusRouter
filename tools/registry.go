@@ -9,6 +9,7 @@ import (
 	"io"
 	"sort"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -185,7 +186,7 @@ func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out run
 		}
 	}()
 	out, err = t.Handler(ctx, arguments)
-	if err != nil || out.Effect != runtime.NoEffect || len(out.Content) > 1<<20 {
+	if err != nil || out.Effect != runtime.NoEffect || len(out.Content) > 1<<20 || !utf8.ValidString(out.Content) {
 		return runtime.ToolResult{Effect: runtime.UncertainEffect}, ErrExecution
 	}
 	return out, nil
@@ -193,7 +194,7 @@ func (e Executor) Execute(ctx context.Context, call providers.ToolCall) (out run
 
 // Reject duplicate keys rather than allowing validator/handler disagreement.
 func decode(raw []byte) (any, error) {
-	if len(raw) == 0 || len(raw) > 1<<20 {
+	if len(raw) == 0 || len(raw) > 1<<20 || !utf8.Valid(raw) {
 		return nil, ErrArguments
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))

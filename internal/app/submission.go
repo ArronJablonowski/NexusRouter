@@ -35,6 +35,9 @@ func (s *Service) submissionConfigDigest() string {
 }
 
 func (s *Service) Submit(ctx context.Context, key string, r Request) (submissions.Status, error) {
+	if len(s.toolExtension.Names()) > 0 {
+		return submissions.Status{}, ErrAdmission
+	}
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {
 		return submissions.Status{}, ErrAdmission
 	}

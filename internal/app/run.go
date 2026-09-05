@@ -23,6 +23,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	toolExtension                   *tools.Extension
 	providerFactory                 providers.Factory
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
@@ -72,6 +73,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	if r.delegatedParent != "" {
+		r.toolExtension = nil
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
 		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
@@ -112,7 +114,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 	}
 	// File tools are local-only until an explicit data-egress approval exists.
-	if s.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
+	if (s.Tools.Enabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
 		return result, ErrAdmission
 	}
 	if s.Workers.DelegateModel != "" && model.ContextTokens == 0 {
@@ -130,6 +132,15 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, err
 		}
 		defer closeTools()
+	}
+	if len(r.toolExtension.Names()) > 0 {
+		if registry == nil {
+			registry = &tools.Registry{}
+		}
+		if r.toolExtension.RegisterInto(registry) != nil {
+			return result, ErrAdmission
+		}
+		toolPolicy.Rules = append(toolPolicy.Rules, r.toolExtension.Rules()...)
 	}
 	var provider config.Provider
 	for _, p := range s.Providers {
@@ -210,7 +221,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		messages = append(messages, r.memoryContext.Messages...)
 	}
 	if !r.skillPrepared && (model.Locality == "local" || !s.Skills.LocalOnly) {
-		r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, s.Skills, r.Domain, contextTools(s), secrets)
+		r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, s.Skills, r.Domain, contextTools(s, r.toolExtension), secrets)
 		if err != nil {
 			return result, ErrAdmission
 		}
@@ -263,7 +274,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if registry != nil {
 		inference.Tools = registry.Catalog()
 		loop.Tools = tools.Executor{Registry: registry, Policy: toolPolicy}
-		if s.Tools.Enabled {
+		if s.Tools.Enabled || len(r.toolExtension.Names()) > 0 {
 			maxTurns = min(maxTurns, s.Tools.MaxTurns)
 		}
 	}

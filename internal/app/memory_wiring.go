@@ -1,6 +1,9 @@
 package app
 
-import "github.com/ArronJablonowski/DarwinRouter/internal/config"
+import (
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
+)
 
 // Context leaves storage only after configured credentials are removed. Routing
 // itself must not carry raw facts or secrets in its explanation metadata.
@@ -17,8 +20,11 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 	return secrets
 }
 
-func contextTools(cfg config.Settings) []string {
+func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string {
 	var names []string
+	for _, extension := range extensions {
+		names = append(names, extension.Names()...)
+	}
 	if cfg.Tools.Enabled {
 		names = append(names, "read_file")
 	}
@@ -26,4 +32,15 @@ func contextTools(cfg config.Settings) []string {
 		names = append(names, "delegate", "delegate_batch")
 	}
 	return names
+}
+
+func (s *Service) bindToolExtension(r Request) Request {
+	r.toolExtension = nil
+	if r.delegatedParent == "" {
+		r.toolExtension = s.toolExtension
+		if len(r.toolExtension.Names()) > 0 {
+			r.LocalRequired = true
+		}
+	}
+	return r
 }

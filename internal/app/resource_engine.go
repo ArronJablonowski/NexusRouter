@@ -8,6 +8,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 // NewServiceWithProfiler explicitly replaces measurement, not admission or
@@ -33,6 +34,12 @@ func NewServiceWithStores(settings config.Settings, secret func(string) string, 
 // It must use the supplied policy transport and honor context cancellation.
 // Existing admission, resource accounting and output validation remain active.
 func NewServiceWithProviderFactory(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory) (*Service, error) {
+	return NewServiceWithToolExtension(settings, secret, profiler, store, skillStore, factory, nil)
+}
+
+// NewServiceWithToolExtension installs an immutable trusted read-only tool
+// catalog. It does not enable filesystem tools or grant tools to child workers.
+func NewServiceWithToolExtension(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension) (*Service, error) {
 	svc, err := NewService(settings, secret)
 	if err != nil {
 		return nil, err
@@ -45,6 +52,7 @@ func NewServiceWithProviderFactory(settings config.Settings, secret func(string)
 	svc.memoryStore = store
 	svc.skillStore = skillStore
 	svc.providerFactory = factory
+	svc.toolExtension = extension
 	return svc, nil
 }
 

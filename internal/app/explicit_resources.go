@@ -30,6 +30,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	r.providerFactory = s.providerFactory
+	r = s.bindToolExtension(r)
 	var model config.Model
 	for _, m := range s.settings.Models {
 		if m.ID == r.ModelID {
@@ -58,7 +59,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 			return Result{}, ErrAdmission
 		}
 	}
-	if r.delegatedParent == "" && s.settings.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
+	if r.delegatedParent == "" && (s.settings.Tools.Enabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
 		return Result{}, ErrAdmission
 	}
 	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {

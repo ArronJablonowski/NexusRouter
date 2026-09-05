@@ -24,12 +24,14 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 // Service shares local reservations across all concurrent explicit and automatic requests.
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	toolExtension   *tools.Extension
 	providerFactory providers.Factory
 	memoryStore     memory.Store
 	skillStore      skills.Store
@@ -90,6 +92,12 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	// Process-local handlers have no durable identity yet. Never attach changed
+	// authority to work admitted by an earlier process or host configuration.
+	if r.submissionID != "" && len(s.toolExtension.Names()) > 0 {
+		return Result{}, ErrAdmission
+	}
+	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
 	r.memoryStore = s.memoryStore
 	r.skillStore = s.skillStore
@@ -178,6 +186,7 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
+	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
 	executionCtx := ctx
 	if r.admissionContext != nil {
@@ -227,7 +236,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	if !r.skillPrepared {
 		if cfg.Mode != "cloud_only" || !cfg.Skills.LocalOnly {
-			r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, cfg.Skills, r.Domain, contextTools(cfg), memorySecrets(cfg, s.secret))
+			r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, cfg.Skills, r.Domain, contextTools(cfg, r.toolExtension), memorySecrets(cfg, s.secret))
 			if err != nil {
 				return Result{}, ErrAdmission
 			}
@@ -245,8 +254,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	// Byte count is a conservative token estimate, with framing/output reserve.
 	inference := providers.Request{Messages: messages}
+	inference.Tools = r.toolExtension.Catalog()
 	if cfg.Tools.Enabled {
-		inference.Tools = []providers.Tool{readFileSpec()}
+		inference.Tools = append(inference.Tools, readFileSpec())
 	}
 	if cfg.Workers.DelegateModel != "" {
 		inference.Tools = append(inference.Tools, delegateSpec(), delegateBatchSpec())

@@ -15,6 +15,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
 var ErrAdmission = app.ErrAdmission
@@ -29,6 +30,9 @@ type MemoryStore = memory.Store
 type SkillStore = skills.Store
 
 type ProviderFactory = providers.Factory
+
+type Tool = tools.Definition
+type ToolPolicy = tools.Policy
 
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
@@ -49,6 +53,11 @@ type ConfigOptions struct {
 	// built-in adapters. Factories are trusted code and must use the supplied
 	// policy transport, honor cancellation, and support concurrent calls.
 	ProviderFactory ProviderFactory
+	// Tools registers trusted read-only handlers independently of filesystem
+	// tools. Definitions and policy are snapshotted at construction; nil policy
+	// denies all custom tools. Handlers must honor cancellation and concurrency.
+	Tools      []Tool
+	ToolPolicy *ToolPolicy
 }
 
 type Client struct {
@@ -92,7 +101,11 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithProviderFactory(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory)
+	extension, err := tools.NewExtension(options.Tools, options.ToolPolicy)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	service, err := app.NewServiceWithToolExtension(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension)
 	if err != nil {
 		return nil, ErrAdmission
 	}
