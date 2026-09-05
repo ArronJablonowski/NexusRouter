@@ -127,11 +127,6 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return Result{}, err
 	}
 	result := Result{}
-	if r.Route != nil {
-		if err := persist(ctx, RouteSelected, *r.Route); err != nil {
-			return result, err
-		}
-	}
 	fail := func(cause error) (Result, error) {
 		kind := TaskFailed
 		code := "execution_failed"
@@ -160,6 +155,20 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		}
 		return result, cause
 	}
+	// A committed append may notify a sink that cancels the task. Observe
+	// that cancellation before the next normal append or external dispatch;
+	// an actual failed append remains ambiguous and is never retried here.
+	if ctx.Err() != nil {
+		return fail(ctx.Err())
+	}
+	if r.Route != nil {
+		if err := persist(ctx, RouteSelected, *r.Route); err != nil {
+			return result, err
+		}
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
+		}
+	}
 	used := 0
 	usageComplete := true
 	totalUsage := providers.Usage{}
@@ -179,6 +188,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		result.Turns++
 		if err := persist(ctx, TurnStarted, Data{ModelID: inference.Model, ProviderID: r.ProviderID}); err != nil {
 			return result, err
+		}
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
 		}
 		var text strings.Builder
 		calls := []providers.ToolCall{}
@@ -208,6 +220,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 					text.WriteString(c.Text)
 					if err := persist(ctx, ModelDelta, Data{Text: c.Text}); err != nil {
 						return err
+					}
+					if ctx.Err() != nil {
+						return ctx.Err()
 					}
 				}
 				if c.ToolCall != nil {
@@ -259,8 +274,14 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		if reason == "tool_calls" && len(calls) == 0 {
 			return fail(ErrProtocol)
 		}
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
+		}
 		if err := persist(ctx, TurnCompleted, Data{Text: text.String(), ToolCalls: calls, Usage: usage, FinishReason: reason}); err != nil {
 			return result, err
+		}
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
 		}
 		if usage == nil {
 			usageComplete = false
@@ -273,10 +294,16 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			if l.ValidationText != nil {
 				validationText = l.ValidationText(validationText)
 			}
+			if ctx.Err() != nil {
+				return fail(ctx.Err())
+			}
 			if r.RequireText {
 				accepted := strings.TrimSpace(validationText) != ""
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.nonempty_text.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
 					return result, err
+				}
+				if ctx.Err() != nil {
+					return fail(ctx.Err())
 				}
 				if !accepted {
 					return fail(ErrEmptyOutput)
@@ -287,9 +314,15 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.go_syntax.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
 					return result, err
 				}
+				if ctx.Err() != nil {
+					return fail(ctx.Err())
+				}
 				if !accepted {
 					return fail(ErrInvalidOutput)
 				}
+			}
+			if ctx.Err() != nil {
+				return fail(ctx.Err())
 			}
 			if err := persist(ctx, TaskCompleted, Data{}); err != nil {
 				return result, err
@@ -317,7 +350,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			if err := persist(ctx, ToolStarted, Data{ToolCallID: call.ID, ToolName: call.Name, Effect: UncertainEffect}); err != nil {
 				return result, err
 			}
-			out, toolErr := l.Tools.Execute(ctx, call)
+			out := ToolResult{Effect: NoEffect}
+			toolErr := ctx.Err()
+			if toolErr == nil {
+				out, toolErr = l.Tools.Execute(ctx, call)
+			}
 			if out.Effect != NoEffect && out.Effect != ConfirmedEffect && out.Effect != UncertainEffect {
 				out.Effect = UncertainEffect
 				toolErr = ErrTool
@@ -336,6 +373,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 			cancel()
 			if err != nil {
 				return result, err
+			}
+			if ctx.Err() != nil {
+				return fail(ctx.Err())
 			}
 			if toolErr != nil || out.Effect == UncertainEffect {
 				return fail(ErrTool)

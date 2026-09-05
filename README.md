@@ -138,10 +138,15 @@ Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model
 
 ```sh
 ./bin/darwin run --config examples/local.yaml --model local-fast < prompt.txt
+
+# Stream committed lifecycle events and the final result as JSON lines.
+./bin/darwin run --config examples/local.yaml --model local-fast --json < prompt.txt
 ./bin/darwin task show --db ./data/darwin.db --task TASK_ID
 ./bin/darwin resources
 ./bin/darwin run --config examples/local.yaml --model local-fast --continue-task TASK_ID < followup.txt
 ```
+
+`run --json` emits versioned JSONL envelopes: `{"version":1,"type":"event","event":{...}}` for each committed, redacted runtime event, then `{"version":1,"type":"result","result":{...}}`. Failure results include a generic top-level `error` and task IDs without partial output text. Exit status is 0 for success, 1 for execution/output failure, and 2 for invalid arguments. Configuration and input failures before execution are reported on stderr and may produce no JSON record. No plain answer is appended to JSON stdout. Raw token text remains suppressed; completed turn text is redacted. Closing an output pipe cancels execution and permits durable cleanup instead of terminating immediately on SIGPIPE. Actual stdout pipes also have cancelable, fifteen-second bounded writes, so a reader that stops draining cannot indefinitely block cleanup. Custom embedded writers and regular files retain their own blocking semantics. This remains headless execution with stdin consumed as one prompt before execution cancellation is installed, not interactive steering or resumable event delivery. Treat an absent final result as an unknown delivery outcome and inspect task history before retrying.
 
 The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdout; the durable task ID goes to stderr. This initial command requires an explicit project config, optionally accepts `--user-config` and repeated `--set` scalar overrides, and uses environment overrides. Unlike `config`, it does not discover user/project configuration paths yet. The task has a five-minute timeout and one model turn; tool proposals are not executed. Known configured provider keys are redacted from persisted content and the returned answer. Partial token text is not persisted. Other sensitive-content redaction policies remain unfinished. No paid/live-provider qualification has been performed.
 

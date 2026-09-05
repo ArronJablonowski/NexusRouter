@@ -13,8 +13,9 @@ Usage:
   darwin version   Print the build version
   darwin help      Show this help
   darwin config validate|show [--config path] [--set key=value]
-  darwin run --config path --model id [--validate go_source] < prompt.txt
+  darwin run --config path --model id [--validate go_source] [--json] < prompt.txt
     go_source validation expects output containing a raw full Go source file
+    --json streams committed events and a final result as versioned JSON lines
   darwin resources  Inspect current host memory and CPU capacity
   darwin task show --db path --task id  Inspect durable conversation state
   darwin serve --config path  Run the authenticated loopback HTTP service
@@ -32,7 +33,7 @@ Usage:
   darwin run --config path --model id --continue-task id --summary-attempt approved-attempt-id < prompt.txt
 
 Development status: use --model auto for constrained automatic routing.
-Interactive and live streaming are not yet implemented.
+JSON lifecycle streaming is available; interactive steering remains unavailable.
 `
 
 // Run executes a CLI invocation and returns its process exit code.

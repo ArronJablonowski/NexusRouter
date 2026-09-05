@@ -25,10 +25,22 @@ import (
 // parseRunArgs validates constraints before configuration, storage or providers
 // are opened and returns the request passed to the application service.
 func parseRunArgs(args []string) (config.Options, app.Request, error) {
+	options, request, _, err := parseRunOptions(args)
+	return options, request, err
+}
+
+func parseRunOptions(args []string) (config.Options, app.Request, bool, error) {
+	var jsonMode bool
+	options, request, err := parseRunFlagSet(args, &jsonMode)
+	return options, request, jsonMode, err
+}
+
+func parseRunFlagSet(args []string, jsonMode *bool) (config.Options, app.Request, error) {
 	var options config.Options
 	var request app.Request
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
+	fs.BoolVar(jsonMode, "json", false, "stream committed events and final result as versioned JSON lines")
 	fs.StringVar(&options.ProjectFile, "config", "", "project configuration")
 	fs.StringVar(&options.UserFile, "user-config", "", "user configuration")
 	fs.StringVar(&request.ModelID, "model", "", "configured model ID or auto")
@@ -187,12 +199,13 @@ func readCompactionSummary(path string) (sessions.Summary, error) {
 }
 
 func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	options, request, err := parseRunArgs(args)
+	options, request, jsonMode, err := parseRunOptions(args)
 	if err != nil {
 		fmt.Fprintln(stderr, "usage: darwin run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
 		fmt.Fprintln(stderr, "go_source validation expects output containing a raw full Go source file")
 		fmt.Fprintln(stderr, "continuation compaction: --continue-task id --compact-keep n --compact-summary summary.json")
 		fmt.Fprintln(stderr, "approved stored summary: --continue-task id --summary-attempt id")
+		fmt.Fprintln(stderr, "--json streams committed events and a final result as JSON lines")
 		return 2
 	}
 	options.Env = config.Environment(os.Environ())
@@ -216,6 +229,9 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	request.Prompt = string(prompt)
+	if jsonMode {
+		return runTaskJSON(ctx, request, service.RunStream, stdout, stderr)
+	}
 	result, err := service.Run(ctx, request)
 	if result.TaskID != "" {
 		if _, writeErr := fmt.Fprintln(stderr, "Task:", result.TaskID); writeErr != nil {

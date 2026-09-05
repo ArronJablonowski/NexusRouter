@@ -15,7 +15,7 @@ func TestCommands(t *testing.T) {
 		want string
 	}{
 		{"default", nil, 0, "Usage:"},
-		{"help", []string{"--help"}, 0, "not yet implemented"},
+		{"help", []string{"--help"}, 0, "interactive steering remains unavailable"},
 		{"version", []string{"version"}, 0, "darwin test-build\n"},
 		{"version flag", []string{"--version"}, 0, "darwin test-build\n"},
 		{"unknown", []string{"api-key-secret"}, 2, ""},
