@@ -17,8 +17,15 @@ are also discarded, never interpreted as task usage or available spending.
 See [the live evidence and reproduction command](initial-hybrid-test.md#first-successful-end-to-end-checkpoint).
 Normal completion left no observed standalone Codex process in the subsequent
 process snapshot, but the brief snapshots did not capture the helper's exact
-lifetime. Descendant termination, cancellation, inherited prompt/built-in tool
-isolation and production readiness remain unqualified.
+lifetime. General descendant containment, cancellation across timing windows,
+inherited prompt/built-in tool isolation and production readiness remain unqualified.
+
+A subsequent macOS live cancellation test observed both the task-owned Codex
+process and its Code Mode host at a blocked delegated HTTP request. Durable
+cancellation stopped the request, persisted all three canceled task records,
+and both observed processes disappeared. See the live cancellation checkpoint
+in the testing guide. This is bounded evidence for that timing window, not
+universal descendant containment or graceful upstream interruption.
 
 The installed Codex CLI can use its existing ChatGPT login. DarwinRouter must
 not extract tokens from its credential files or silently require direct API

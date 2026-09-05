@@ -143,3 +143,39 @@ HTTP worker transport, supervisor and SQLite journal:
 These tests do not invoke Codex or Ollama inference and do not prove live helper
 termination, process-crash recovery, or coordinator judgment quality. Reopening
 the database verifies durable outcomes, not recovery of interrupted work.
+
+## Live CLI cancellation checkpoint (macOS)
+
+On September 5, 2026, an explicitly opted-in test used real signed-in
+`gpt-5.6-sol` inference and a controlled loopback worker endpoint. The endpoint
+held its response open after Sol delegated, making the cancellation boundary
+observable without relying on Ollama generation timing.
+
+The test identified the task's direct Codex process by its test-process parent,
+then observed its `codex-code-mode-host` descendant before cancellation. A fresh
+service instance requested cancellation through SQLite. The test verified:
+
+- The application returned cancellation and the worker HTTP request disconnected.
+- Exactly one worker request occurred; no accepted task/worker output was recorded.
+- Reopened storage showed the correctly linked parent, work and execution canceled.
+- The private coordinator directory was removed.
+- Both snapshot-observed process IDs disappeared within the post-cancel deadline.
+
+The final test requires an explicitly observed Code Mode host; seeing only the
+coordinator cannot pass helper-cleanup qualification. It passed twice during
+development, including after that requirement was added. Default tests skip it:
+
+```sh
+DARWIN_CODEX_LIVE_CANCELLATION=1 go test ./internal/app \
+  -run '^TestLiveCodexCancellationDuringDelegation$' -count=1 -v
+```
+
+This command uses real account inference. It is macOS-only because Linux process
+name observation requires separate handling for truncated names. The worker is
+a controlled HTTP endpoint, not an Ollama inference run. The test observes exits;
+it never signals unrelated PIDs or reads process arguments/credentials.
+
+This does not prove termination of descendants absent from the snapshot,
+crash-time recovery, all cancellation timing windows, or upstream billing/model
+cessation. The bridge closes its transport/process; it does not yet perform and
+verify a graceful `turn/interrupt` handshake. Production isolation remains open.
