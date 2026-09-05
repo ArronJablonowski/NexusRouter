@@ -56,6 +56,26 @@ daemon execution uses the daemon's configured measurement source, not an SDK
 callback. This interface replaces measurement only; the wider extension and
 budget-recommendation contracts remain unfinished.
 
+### Replaceable factual memory storage
+
+`ConfigOptions.MemoryStore` accepts the public `memory.Store` contract (`sdk.MemoryStore`
+is an alias). Nil retains SQLite. Injection does not enable memory: configure
+`memory.enabled`, scope, privacy and context-size limits explicitly. Runtime use
+is query-only; put/correct/touch/delete/expiry operations remain explicit actions
+on the supplied store. The caller owns that store's lifetime and concurrency.
+
+Returned facts must pass schema-version, provenance, scope, expiry, privacy,
+UTF-8, count and size validation before context assembly. Configured credentials
+are redacted; facts remain untrusted data rather than tool permissions or system
+instructions. Query errors/panics fail admission without relaying backend details.
+Queries receive a three-second context allowance, but callbacks must cooperate
+with cancellation. The store must obey local-only policy and avoid unauthorized
+egress; trusted in-process extensions are not sandboxed.
+
+This store is not serialized with submissions and does not change CLI/API memory
+management storage. A daemon uses its own configured store. Automatic memory
+creation, semantic retrieval and application-level lifecycle hooks remain open.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
@@ -131,7 +151,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Pluggable provider/tool/context/memory/skill/evaluator engines,
+qualification. Pluggable provider/tool/context/skill/evaluator engines,
 resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
 remain unfinished. Existing low-level packages are not a substitute for those
 future application-level extension contracts.

@@ -27,7 +27,13 @@ type contextFact struct {
 	Confidence float64 `json:"confidence"`
 }
 
-func loadMemoryContext(ctx context.Context, db memory.Store, settings config.Memory, allowLocal bool, secrets []string) (*memoryContext, error) {
+func loadMemoryContext(ctx context.Context, db memory.Store, settings config.Memory, allowLocal bool, secrets []string) (out *memoryContext, err error) {
+	defer func() {
+		if recover() != nil {
+			out = nil
+			err = ErrAdmission
+		}
+	}()
 	if !settings.Enabled || settings.Scope == "" {
 		return nil, nil
 	}
@@ -36,8 +42,10 @@ func loadMemoryContext(ctx context.Context, db memory.Store, settings config.Mem
 	}
 	now := time.Now().UTC()
 	query := memory.Query{Scope: settings.Scope, Limit: settings.MaxFacts, Now: now, LocalOnly: allowLocal}
-	facts, err := db.QueryMemory(ctx, query)
-	if err != nil || len(facts) > settings.MaxFacts {
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	facts, err := db.QueryMemory(queryCtx, query)
+	if err != nil || queryCtx.Err() != nil || len(facts) > settings.MaxFacts {
 		return nil, ErrAdmission
 	}
 	seen := map[string]bool{}

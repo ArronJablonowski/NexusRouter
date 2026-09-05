@@ -11,6 +11,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/policy"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -21,6 +22,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	memoryStore                     memory.Store
 	admissionContext                context.Context
 	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
@@ -176,7 +178,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = history.SessionID
 	}
 	if !r.memoryPrepared && (model.Locality == "local" || !s.Memory.LocalOnly) {
-		r.memoryContext, err = loadMemoryContext(ctx, db, s.Memory, model.Locality == "local", secrets)
+		r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), s.Memory, model.Locality == "local", secrets)
 		if err != nil {
 			return result, ErrAdmission
 		}

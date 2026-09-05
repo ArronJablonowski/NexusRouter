@@ -9,6 +9,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -22,6 +23,8 @@ var ErrEventDelivery = app.ErrEventDelivery
 // reservation and route eligibility remain owned by the runtime.
 type ResourceProfiler = resources.Profiler
 
+type MemoryStore = memory.Store
+
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
 type ConfigOptions struct {
@@ -31,6 +34,9 @@ type ConfigOptions struct {
 	// ResourceProfiler replaces host measurement only; all admission checks stay
 	// active. Nil keeps configured built-in behavior. This is trusted Go code.
 	ResourceProfiler ResourceProfiler
+	// MemoryStore is trusted process-local storage. Runtime retrieval is opt-in
+	// and query-only; operator mutations remain explicit store operations.
+	MemoryStore MemoryStore
 }
 
 type Client struct {
@@ -74,7 +80,7 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithProfiler(cfg, options.LookupSecret, options.ResourceProfiler)
+	service, err := app.NewServiceWithEngines(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore)
 	if err != nil {
 		return nil, ErrAdmission
 	}

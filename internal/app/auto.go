@@ -16,6 +16,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/policy"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
@@ -28,14 +29,15 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	execution chan struct{}
-	discovery *modelHealthCache
-	settings  config.Settings
-	secret    func(string) string
-	budget    *resources.Budget
-	profile   func(context.Context) (resources.Snapshot, error)
-	draw      func() float64
-	mu        sync.Mutex
+	memoryStore memory.Store
+	execution   chan struct{}
+	discovery   *modelHealthCache
+	settings    config.Settings
+	secret      func(string) string
+	budget      *resources.Budget
+	profile     func(context.Context) (resources.Snapshot, error)
+	draw        func() float64
+	mu          sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -85,6 +87,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	r.memoryStore = s.memoryStore
 	if s.execution != nil {
 		select {
 		case s.execution <- struct{}{}:
@@ -205,7 +208,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		// Hybrid local-only memory pins this task local; shareable mode excludes
 		// private facts before ranking any possible cloud candidate.
 		if cfg.Mode != "cloud_only" || !cfg.Memory.LocalOnly {
-			r.memoryContext, err = loadMemoryContext(ctx, db, cfg.Memory, cfg.Memory.LocalOnly && cfg.Mode != "cloud_only", memorySecrets(cfg, s.secret))
+			r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), cfg.Memory, cfg.Memory.LocalOnly && cfg.Mode != "cloud_only", memorySecrets(cfg, s.secret))
 			if err != nil {
 				return Result{}, ErrAdmission
 			}
