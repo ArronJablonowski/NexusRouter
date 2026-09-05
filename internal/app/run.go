@@ -31,10 +31,11 @@ type Request struct {
 	route                           *runtime.Data
 }
 type Result struct {
-	TaskID, Text string
-	Turns        int
-	FinishReason string
-	Usage        *providers.Usage
+	AuditID, AuditStatus string
+	TaskID, Text         string
+	Turns                int
+	FinishReason         string
+	Usage                *providers.Usage
 }
 
 // RunExplicit is the initial headless application path. It executes one model

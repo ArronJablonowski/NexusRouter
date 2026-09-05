@@ -21,6 +21,7 @@ Usage:
   darwin skills list|show|history|draft|rollback --root path --scope scope
   darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
   darwin audits list|show --db path [--task id] [--id audit-id]
+  darwin audit --config path --task id --reviewer model-id [--max-cost amount]
 
 Development status: use --model auto for constrained automatic routing.
 Interactive and live streaming are not yet implemented.
@@ -33,6 +34,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "audit" {
+		return runAudit(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "audits" {
 		return runAudits(args[1:], stdout, stderr)
 	}

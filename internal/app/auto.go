@@ -61,10 +61,22 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+	var result Result
+	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {
-		return RunExplicit(ctx, s.settings, r, s.secret)
+		result, err = RunExplicit(ctx, s.settings, r, s.secret)
+	} else {
+		result, err = s.runAuto(ctx, r)
 	}
-	return s.runAuto(ctx, r)
+	if err == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
+		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
+		result.AuditStatus = "failed"
+		if auditErr == nil {
+			result.AuditID = audit.ID
+			result.AuditStatus = "recorded"
+		}
+	}
+	return result, err
 }
 
 // RunAuto is a one-shot convenience. Daemons must reuse Service.Run instead.

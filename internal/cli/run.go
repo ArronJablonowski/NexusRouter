@@ -101,6 +101,11 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	if result.AuditStatus != "" {
+		if _, writeErr := fmt.Fprintln(stderr, "Audit:", result.AuditStatus, result.AuditID); writeErr != nil {
+			return 1
+		}
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "task failed; inspect local task history before retrying")
 		return 1

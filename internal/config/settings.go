@@ -79,8 +79,10 @@ type Memory struct {
 	LocalOnly bool `yaml:"local_only" json:"local_only"`
 }
 type Evaluation struct {
-	Judge      bool     `yaml:"llm_judge_enabled" json:"llm_judge_enabled"`
-	Precedence []string `yaml:"evidence_precedence" json:"evidence_precedence"`
+	AutoReviewModel   string   `yaml:"auto_review_model" json:"auto_review_model"`
+	AutoReviewMaxCost float64  `yaml:"auto_review_max_cost" json:"auto_review_max_cost"`
+	Judge             bool     `yaml:"llm_judge_enabled" json:"llm_judge_enabled"`
+	Precedence        []string `yaml:"evidence_precedence" json:"evidence_precedence"`
 }
 type Security struct {
 	Egress     string `yaml:"local_only_egress" json:"local_only_egress"`
@@ -101,7 +103,7 @@ func Defaults() Settings {
 		Hardware: Hardware{true, 80, 85, "auto"}, Workers: Workers{3, "5s", "30s", "single_writer"},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{true, true, true, true}, Memory: Memory{true, true},
-		Evaluation: Evaluation{true, []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
+		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
 }
 
@@ -191,6 +193,20 @@ func (s Settings) Validate() error {
 		return errors.New("database path required")
 	}
 	want := Defaults().Evaluation.Precedence
+	if s.Evaluation.AutoReviewMaxCost < 0 || math.IsNaN(s.Evaluation.AutoReviewMaxCost) || math.IsInf(s.Evaluation.AutoReviewMaxCost, 0) {
+		return errors.New("invalid audit cost ceiling")
+	}
+	if s.Evaluation.AutoReviewModel != "" {
+		found := false
+		for _, m := range s.Models {
+			if m.ID == s.Evaluation.AutoReviewModel {
+				found = true
+			}
+		}
+		if !found {
+			return errors.New("unknown automatic reviewer")
+		}
+	}
 	if len(s.Evaluation.Precedence) != len(want) {
 		return errors.New("invalid evidence precedence")
 	}
