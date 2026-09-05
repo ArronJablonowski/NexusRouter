@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -112,7 +113,7 @@ func TestApprovalExactBindingAndPolicySnapshot(t *testing.T) {
 		}
 	}
 	hash := func(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
-	if len(bindings) != 2 || bindings[0] != bindings[1] {
+	if len(bindings) != 2 || !reflect.DeepEqual(bindings[0], bindings[1]) {
 		t.Fatal("unstable binding")
 	}
 	a := bindings[0]

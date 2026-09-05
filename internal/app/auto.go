@@ -32,6 +32,7 @@ import (
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
 	toolExtension   *tools.Extension
+	toolReviewer    tools.ApprovalReviewer
 	providerFactory providers.Factory
 	memoryStore     memory.Store
 	skillStore      skills.Store

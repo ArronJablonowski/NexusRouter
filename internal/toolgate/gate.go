@@ -4,6 +4,9 @@ package toolgate
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"time"
 	"unicode/utf8"
 
@@ -19,8 +22,12 @@ import (
 // They must honor cancellation, and handlers must join any work they start
 // before returning. A canceled callback is never abandoned or retried.
 type Gate struct {
-	Store  *telemetry.Store
+	Store *telemetry.Store
+	// Review is the legacy metadata-only hook. Configure exactly one reviewer.
 	Review func(context.Context, approvals.Request) (actor string, allowed bool, err error)
+	// ReviewPrompt receives an isolated, ephemeral argument preview. It must not
+	// log secrets or persist raw arguments; the ledger contains only digests.
+	ReviewPrompt tools.ApprovalReviewer
 }
 
 var _ tools.Authority = (*Gate)(nil)
@@ -29,8 +36,21 @@ var _ tools.Authority = (*Gate)(nil)
 // It deliberately cannot resume an earlier approval: duplicate calls fail closed.
 func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handler func(context.Context) (runtime.ToolResult, error)) (runtime.ToolResult, error) {
 	noEffect := runtime.ToolResult{Effect: runtime.NoEffect}
-	if g == nil || g.Store == nil || g.Review == nil || handler == nil || ctx.Err() != nil {
+	if g == nil || g.Store == nil || (g.Review == nil && g.ReviewPrompt == nil) || (g.Review != nil && g.ReviewPrompt != nil) || handler == nil || ctx.Err() != nil {
 		return noEffect, tools.ErrDenied
+	}
+	// Legacy metadata fixtures may omit arguments. Preview-based approval never
+	// permits an absent, mismatched, oversized, or malformed preview.
+	var arguments json.RawMessage
+	if g.ReviewPrompt != nil || a.Arguments != nil {
+		if len(a.Arguments) > 1<<20 || !utf8.Valid(a.Arguments) || !json.Valid(a.Arguments) || len(a.Description) > 4096 || !utf8.ValidString(a.Description) {
+			return noEffect, tools.ErrDenied
+		}
+		arguments = append(json.RawMessage(nil), a.Arguments...)
+		digest := sha256.Sum256(arguments)
+		if hex.EncodeToString(digest[:]) != a.ArgumentsDigest {
+			return noEffect, tools.ErrDenied
+		}
 	}
 	now := time.Now().UTC()
 	req := approvals.Request{Version: approvals.Version, ID: rand.Text(), TaskID: a.TaskID, TurnID: a.TurnID, ToolCallID: a.ToolCallID, ToolName: a.ToolName, Scope: a.Scope, ArgumentsDigest: a.ArgumentsDigest, SchemaDigest: a.SchemaDigest, PolicyDigest: a.PolicyDigest, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}
@@ -46,7 +66,13 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 		return noEffect, tools.ErrDenied
 	}
 	reviewCtx, cancel := context.WithDeadline(ctx, req.ExpiresAt)
-	actor, allowed, err := review(reviewCtx, g.Review, req)
+	var actor string
+	var allowed bool
+	if g.ReviewPrompt != nil {
+		actor, allowed, err = reviewPrompt(reviewCtx, g.ReviewPrompt, tools.ApprovalPrompt{Request: req, Arguments: arguments, Description: a.Description})
+	} else {
+		actor, allowed, err = review(reviewCtx, g.Review, req)
+	}
 	late := reviewCtx.Err() != nil
 	cancel()
 	if err != nil || late {
@@ -90,6 +116,15 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 		return runtime.ToolResult{Effect: runtime.UncertainEffect}, tools.ErrExecution
 	}
 	return out, nil
+}
+
+func reviewPrompt(ctx context.Context, fn tools.ApprovalReviewer, prompt tools.ApprovalPrompt) (actor string, allowed bool, err error) {
+	defer func() {
+		if recover() != nil {
+			actor, allowed, err = "", false, tools.ErrDenied
+		}
+	}()
+	return fn(ctx, prompt)
 }
 
 func review(ctx context.Context, fn func(context.Context, approvals.Request) (string, bool, error), req approvals.Request) (actor string, allowed bool, err error) {

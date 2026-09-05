@@ -112,8 +112,42 @@ owns handler resources; no automatic Close is invoked. Synchronous `Run` and
 streaming execution support extensions. `Submit` and submission-bound execution
 reject active extensions because handlers have no durable implementation identity
 yet; they are never silently serialized, dropped, or substituted on dequeue.
-Durable extension identity, side-effecting tools and general lifecycle hooks
-remain unfinished.
+Durable extension identity and general lifecycle hooks remain unfinished.
+
+### Operator-reviewed tool extensions
+
+Set `ConfigOptions.ApprovalReviewer` to explicitly register write handlers and
+effective `Ask` tools. Its type is
+`func(context.Context, sdk.ApprovalPrompt) (actor string, allowed bool, err error)`.
+The embedding application must authenticate the operator and obtain their
+decision; do not use a model evaluator or an unconditional approval callback.
+Nil preserves the read-only registration behavior described above. An inherited
+denial cannot be overridden, and even an `Allow` write requires review per call.
+
+The prompt includes a versioned request with task/call identity, exact scope,
+argument/schema/policy digests and expiry, plus an isolated copy of the exact
+arguments and tool description. Treat arguments as untrusted model output:
+render them safely for inspection, never execute them as review instructions.
+The copy may contain secrets. Raw preview fields are excluded from JSON
+serialization and the approval ledger, but your callback must still avoid
+logging or retaining them unnecessarily. Mutating the preview cannot change
+the arguments sent to the handler. Known configured credentials in persisted
+scope/tool identity or returned actor attribution cause rejection.
+
+Review has a cooperative one-minute deadline. The runtime records the decision,
+acquires a writer lease for the exact scope and consumes approval once before
+dispatch. Handlers may return `runtime.ConfirmedEffect` after successful writes;
+failures or uncertain results must not be retried automatically. Cancellation
+and observed lease loss cancel the handler, but ownership is not released until
+it returns. Handlers must join all work they start and obey cancellation: this
+is trusted Go execution, not an OS sandbox. Scope equality is exact, not a
+hierarchical path lock; the host must assign overlapping resources consistently.
+
+Reviewed tools work in local `Run`, `RunStream`, and `RunTextStream`, subject to
+normal admission and iteration limits. They do not grant filesystem access or
+authority to delegated children. Durable queue intake remains rejected for active
+custom tools. Built-in CLI/API approval controls, approval inspection endpoints,
+and process-crash reconciliation of interrupted effects are not implemented yet.
 
 ### Replaceable factual memory storage
 
@@ -242,7 +276,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Side-effecting tool/context/evaluator engines, automatic skill learning,
+qualification. General context/evaluator engines, automatic skill learning,
 resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
 remain unfinished. Existing low-level packages are not a substitute for those
 future application-level extension contracts.

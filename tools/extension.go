@@ -10,16 +10,32 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
-// Extension is an immutable set of explicitly allowed read-only tools.
+// Extension is an immutable set of tools admitted by an explicit host policy.
 // Handlers are trusted host code: the registry cannot sandbox effects, network
 // access, or mutable closure state. The host owns cancellation and concurrency.
 // Extension policy applies only to these definitions, never to built-in tools.
-type Extension struct{ entries []entry }
+type Extension struct{ entries []extensionEntry }
+
+type extensionEntry struct {
+	entry
+	decision Decision
+}
 
 // NewExtension compiles schemas and resolves a bounded snapshot of inherited
 // policy. Ask is not approval, so only Allow tools enter the executable catalog.
 // Unsupported write tools and reserved runtime identities fail at construction.
 func NewExtension(definitions []Definition, policy *Policy) (*Extension, error) {
+	return newExtension(definitions, policy, false)
+}
+
+// NewApprovalExtension admits effective Allow and Ask tools, including writes.
+// It does not grant execution authority: writes and Ask require a scoped
+// Authority at dispatch. Inherited denials are never relaxed.
+func NewApprovalExtension(definitions []Definition, policy *Policy) (*Extension, error) {
+	return newExtension(definitions, policy, true)
+}
+
+func newExtension(definitions []Definition, policy *Policy, reviewed bool) (*Extension, error) {
 	if len(definitions) == 0 {
 		return nil, nil
 	}
@@ -33,7 +49,7 @@ func NewExtension(definitions []Definition, policy *Policy) (*Extension, error) 
 	registry := &Registry{}
 	total := 0
 	for _, d := range definitions {
-		if !extensionName(d.Tool.Name) || !extensionScope(d.Scope) || !d.ReadOnly || d.Handler == nil || !utf8.ValidString(d.Tool.Description) || len(d.Tool.Description) > 4096 || !utf8.Valid(d.Tool.Parameters) || len(d.Tool.Parameters) > 64<<10 {
+		if !extensionName(d.Tool.Name) || !extensionScope(d.Scope) || (!reviewed && !d.ReadOnly) || d.Handler == nil || !utf8.ValidString(d.Tool.Description) || len(d.Tool.Description) > 4096 || !utf8.Valid(d.Tool.Parameters) || len(d.Tool.Parameters) > 64<<10 {
 			return nil, ErrDefinition
 		}
 		switch d.Tool.Name {
@@ -51,8 +67,9 @@ func NewExtension(definitions []Definition, policy *Policy) (*Extension, error) 
 	}
 	out := &Extension{}
 	for _, e := range registry.entries {
-		if snapshot.Decide(e.Tool.Name, e.Scope) == Allow {
-			out.entries = append(out.entries, e)
+		decision := snapshot.Decide(e.Tool.Name, e.Scope)
+		if decision == Allow || (reviewed && decision == Ask) {
+			out.entries = append(out.entries, extensionEntry{entry: e, decision: decision})
 		}
 	}
 	sort.Slice(out.entries, func(i, j int) bool { return out.entries[i].Tool.Name < out.entries[j].Tool.Name })
@@ -89,9 +106,21 @@ func (e *Extension) Rules() []Rule {
 	}
 	out := make([]Rule, 0, len(e.entries))
 	for _, item := range e.entries {
-		out = append(out, Rule{Tool: item.Tool.Name, Scope: item.Scope, Decision: Allow})
+		out = append(out, Rule{Tool: item.Tool.Name, Scope: item.Scope, Decision: item.decision})
 	}
 	return out
+}
+
+// RequiresApproval reports whether any admitted tool writes or requires Ask.
+func (e *Extension) RequiresApproval() bool {
+	if e != nil {
+		for _, item := range e.entries {
+			if !item.ReadOnly || item.decision == Ask {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // RegisterInto is atomic with respect to identity collisions. Compiled schemas
@@ -115,7 +144,7 @@ func (e *Extension) RegisterInto(registry *Registry) error {
 	}
 	for _, item := range e.entries {
 		item.Tool.Parameters = append(json.RawMessage(nil), item.Tool.Parameters...)
-		registry.entries[item.Tool.Name] = item
+		registry.entries[item.Tool.Name] = item.entry
 	}
 	return nil
 }

@@ -40,6 +40,15 @@ func NewServiceWithProviderFactory(settings config.Settings, secret func(string)
 // NewServiceWithToolExtension installs an immutable trusted read-only tool
 // catalog. It does not enable filesystem tools or grant tools to child workers.
 func NewServiceWithToolExtension(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension) (*Service, error) {
+	return NewServiceWithToolApproval(settings, secret, profiler, store, skillStore, factory, extension, nil)
+}
+
+// NewServiceWithToolApproval binds an explicit, trusted operator-review adapter.
+// Review authority is process-local and is never inherited by worker children.
+func NewServiceWithToolApproval(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer) (*Service, error) {
+	if extension.RequiresApproval() && reviewer == nil {
+		return nil, ErrAdmission
+	}
 	svc, err := NewService(settings, secret)
 	if err != nil {
 		return nil, err
@@ -53,6 +62,7 @@ func NewServiceWithToolExtension(settings config.Settings, secret func(string) s
 	svc.skillStore = skillStore
 	svc.providerFactory = factory
 	svc.toolExtension = extension
+	svc.toolReviewer = reviewer
 	return svc, nil
 }
 

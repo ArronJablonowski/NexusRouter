@@ -36,8 +36,10 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 
 func (s *Service) bindToolExtension(r Request) Request {
 	r.toolExtension = nil
+	r.toolReviewer = nil
 	if r.delegatedParent == "" {
 		r.toolExtension = s.toolExtension
+		r.toolReviewer = s.toolReviewer
 		if len(r.toolExtension.Names()) > 0 {
 			r.LocalRequired = true
 		}

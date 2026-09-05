@@ -14,12 +14,30 @@ import (
 )
 
 // Authorization binds an already schema-validated proposal to runtime identity.
-// Raw arguments stay inside the executor and never enter approval metadata.
+// Arguments and Description are ephemeral review previews for trusted host
+// callbacks. Arguments may contain secrets: never persist or log these fields.
+// Digest-only approvals.Request is the durable authorization record.
 type Authorization struct {
 	TaskID, SessionID, TurnID, AttemptID        string
 	ToolCallID, ToolName, Scope                 string
 	ArgumentsDigest, SchemaDigest, PolicyDigest string
+	Arguments                                   json.RawMessage `json:"-"`
+	Description                                 string          `json:"-"`
 }
+
+// ApprovalPrompt supplies the exact proposed arguments to a trusted operator
+// review callback. Arguments may be sensitive and must never be persisted or
+// logged. This private copy may be changed without changing execution arguments.
+type ApprovalPrompt struct {
+	Request     approvals.Request
+	Arguments   json.RawMessage `json:"-"`
+	Description string          `json:"-"`
+}
+
+// ApprovalReviewer authenticates the returned actor and asks the operator to
+// approve this exact request. Callbacks must honor cancellation and never log
+// raw Arguments. A returned actor name alone is not authentication.
+type ApprovalReviewer func(context.Context, ApprovalPrompt) (actor string, allowed bool, err error)
 
 // Authority is trusted host code, not model-controlled permission. It must
 // obtain operator approval, consume durable authority under an active writer
@@ -37,6 +55,8 @@ func (e Executor) approved(ctx context.Context, x runtime.ToolExecution, t entry
 		return out, ErrDenied
 	}
 	a := Authorization{TaskID: x.TaskID, SessionID: x.SessionID, TurnID: x.TurnID, AttemptID: x.AttemptID, ToolCallID: x.Call.ID, ToolName: x.Call.Name, Scope: t.Scope, ArgumentsDigest: hash(arguments), SchemaDigest: hash(t.Tool.Parameters), PolicyDigest: hash(body)}
+	a.Arguments = append(json.RawMessage(nil), arguments...)
+	a.Description = t.Tool.Description
 	// Validate identities before a host authority or callback sees the proposal.
 	now := time.Now().UTC()
 	r := approvals.Request{Version: 1, ID: "validation", TaskID: a.TaskID, TurnID: a.TurnID, ToolCallID: a.ToolCallID, ToolName: a.ToolName, Scope: a.Scope, ArgumentsDigest: a.ArgumentsDigest, SchemaDigest: a.SchemaDigest, PolicyDigest: a.PolicyDigest, CreatedAt: now, ExpiresAt: now.Add(time.Minute)}

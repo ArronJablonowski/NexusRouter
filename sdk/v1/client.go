@@ -33,6 +33,8 @@ type ProviderFactory = providers.Factory
 
 type Tool = tools.Definition
 type ToolPolicy = tools.Policy
+type ApprovalPrompt = tools.ApprovalPrompt
+type ApprovalReviewer = tools.ApprovalReviewer
 
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
@@ -53,11 +55,17 @@ type ConfigOptions struct {
 	// built-in adapters. Factories are trusted code and must use the supplied
 	// policy transport, honor cancellation, and support concurrent calls.
 	ProviderFactory ProviderFactory
-	// Tools registers trusted read-only handlers independently of filesystem
+	// Tools registers trusted handlers independently of filesystem
 	// tools. Definitions and policy are snapshotted at construction; nil policy
 	// denies all custom tools. Handlers must honor cancellation and concurrency.
 	Tools      []Tool
 	ToolPolicy *ToolPolicy
+	// ApprovalReviewer explicitly enables reviewed writes and Ask tools. It must
+	// authenticate the operator, inspect the exact proposed arguments and honor
+	// cancellation. Arguments may contain sensitive data; never log them blindly.
+	// Nil preserves read-only Allow-only registration. This is trusted host code,
+	// not a model evaluator; its presence never grants authority to child workers.
+	ApprovalReviewer ApprovalReviewer
 }
 
 type Client struct {
@@ -101,11 +109,15 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	extension, err := tools.NewExtension(options.Tools, options.ToolPolicy)
+	constructor := tools.NewExtension
+	if options.ApprovalReviewer != nil {
+		constructor = tools.NewApprovalExtension
+	}
+	extension, err := constructor(options.Tools, options.ToolPolicy)
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithToolExtension(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension)
+	service, err := app.NewServiceWithToolApproval(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer)
 	if err != nil {
 		return nil, ErrAdmission
 	}
