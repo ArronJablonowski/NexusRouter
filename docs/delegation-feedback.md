@@ -48,8 +48,8 @@ prevents resuming the coordinator, while its rejection record remains durable.
 
 Single delegation and noncanceled batch items share this projection. Batch
 cancellation still suppresses all item outputs. Standalone auxiliary audits now
-verify rich single-delegation failure references and project child validation
-and terminal metadata; see [audit evidence scope and limits](delegated-audit-evidence.md).
-Batch and successful-child audit traversal remain separate work. No change is
-made here to fitness updates, subjective feedback weighting, model pruning
-permissions or automatic retry behavior.
+verify single and batch result references and project child validation and
+terminal metadata; successful results additionally require durable supervisor
+acceptance and matching output. See [audit evidence scope and limits](delegated-audit-evidence.md).
+No change is made here to fitness updates, subjective feedback weighting, model
+pruning permissions or automatic retry behavior.

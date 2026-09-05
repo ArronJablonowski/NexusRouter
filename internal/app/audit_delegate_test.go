@@ -227,10 +227,10 @@ func TestAuditDelegationSupervisorProjectionHasDistinctAttribution(t *testing.T)
 }
 
 func TestAuditDelegationLegacyAndBounds(t *testing.T) {
-	for _, body := range []string{`{"error":"delegate_unavailable_or_rejected"}`, `{"work_task_id":"missing","execution_task_id":"missing","untrusted_output":"success"}`} {
-		ref, err := auditDelegationReference(runtime.Event{Kind: runtime.ToolCompleted, Data: runtime.Data{ToolName: "delegate", Text: body}})
+	for _, body := range []string{`{"error":"delegate_unavailable_or_rejected"}`} {
+		ref, err := auditDelegationReference(runtime.Event{Kind: runtime.ToolCompleted, Data: runtime.Data{ToolName: "delegate", Text: body, Effect: runtime.NoEffect}})
 		if err != nil || ref != nil {
-			t.Fatal("legacy or success traversal changed", err)
+			t.Fatal("generic rejection traversal changed", err)
 		}
 	}
 	if boundAuditExecutionEvidence(make([]evaluation.ReviewEvidence, 253)) || boundAuditExecutionEvidence([]evaluation.ReviewEvidence{{Content: strings.Repeat("x", (64<<10)+1)}}) {

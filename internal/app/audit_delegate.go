@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
@@ -15,46 +14,22 @@ import (
 )
 
 type auditDelegation struct {
-	parent runtime.Event
-	report delegateFailure
+	parent     runtime.Event
+	report     delegateFailure
+	success    *auditDelegateSuccess
+	batchIndex *int
 }
 
-// Only the single delegate tool's rich failure projection is traversed. Success
-// envelopes and legacy generic rejections remain ordinary untrusted history.
+// Retained for callers inspecting one single-delegation envelope.
 func auditDelegationReference(e runtime.Event) (*auditDelegation, error) {
-	if e.Kind != runtime.ToolCompleted || e.Data.ToolName != "delegate" {
+	if e.Data.ToolName != "delegate" {
 		return nil, nil
 	}
-	var fields map[string]json.RawMessage
-	if json.Unmarshal([]byte(e.Data.Text), &fields) != nil || fields == nil {
-		return nil, ErrAdmission
+	refs, err := auditDelegationReferences(e)
+	if err != nil || len(refs) == 0 {
+		return nil, err
 	}
-	if bytes.Equal(bytes.TrimSpace([]byte(e.Data.Text)), []byte(`{"error":"delegate_unavailable_or_rejected"}`)) {
-		return nil, nil
-	}
-	rich := false
-	for key := range fields {
-		for _, reserved := range []string{"error", "version", "reason", "evidence"} {
-			if strings.EqualFold(key, reserved) {
-				rich = true
-			}
-		}
-	}
-	if !rich {
-		return nil, nil
-	}
-	var report delegateFailure
-	if len(e.Data.Text) > 2048 || e.Data.Effect != runtime.NoEffect || json.Unmarshal([]byte(e.Data.Text), &report) != nil {
-		return nil, ErrAdmission
-	}
-	canonical, err := json.Marshal(report)
-	// The runtime producer uses this exact shape. Reject aliases, duplicates,
-	// omitted required fields and unknown additions instead of normalizing them.
-	if err != nil || !bytes.Equal(bytes.TrimSpace([]byte(e.Data.Text)), canonical) || report.Version != 1 || report.Error != "delegate_unavailable_or_rejected" || !sessions.ValidEventPageID(report.WorkID) || (report.ExecutionID != "" && !sessions.ValidEventPageID(report.ExecutionID)) || len(report.Evidence) < 1 || len(report.Evidence) > 2 {
-		return nil, ErrAdmission
-	}
-	e.Data = runtime.Data{ToolCallID: e.Data.ToolCallID, ToolName: e.Data.ToolName, Effect: e.Data.Effect}
-	return &auditDelegation{parent: e, report: report}, nil
+	return &refs[0], nil
 }
 
 type auditChildHistory struct {
@@ -118,7 +93,10 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 	seen := map[string]bool{}
 	for _, d := range delegations {
 		work, err := readAuditChild(ctx, db, d.report.WorkID, &budget)
-		if err != nil || seen[d.report.WorkID] || work.snapshot.ParentTaskID != d.parent.TaskID || work.snapshot.SessionID != d.parent.SessionID || (work.snapshot.State != "failed" && work.snapshot.State != "canceled") {
+		if err != nil || seen[d.report.WorkID] || work.snapshot.ParentTaskID != d.parent.TaskID || work.snapshot.SessionID != d.parent.SessionID {
+			return nil, ErrAdmission
+		}
+		if (d.success == nil && work.snapshot.State != "failed" && work.snapshot.State != "canceled") || (d.success != nil && work.snapshot.State != "completed") {
 			return nil, ErrAdmission
 		}
 		seen[d.report.WorkID] = true
@@ -130,6 +108,9 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 			}
 			seen[d.report.ExecutionID] = true
 			histories = append(histories, child)
+		}
+		if d.success != nil && (len(histories) != 2 || histories[1].snapshot.State != "completed" || !auditSuccessfulDelegation(work, histories[1], d.success.Output)) {
+			return nil, ErrAdmission
 		}
 		var refs []delegateFailureEvidence
 		reason := ""
@@ -148,18 +129,21 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 			if index == 1 {
 				role = "execution"
 			}
-			projected, err := projectAuditChild(d.parent.Sequence, role, h.events, secrets)
+			projected, err := projectAuditChildItem(d.parent.Sequence, d.batchIndex, role, h.events, secrets)
 			if err != nil {
 				return nil, err
 			}
 			out = append(out, projected...)
+			if !boundAuditExecutionEvidence(out) {
+				return nil, ErrAdmission
+			}
 		}
 		if work.snapshot.State == "canceled" {
 			reason = "canceled"
 		}
 		expected, _ := json.Marshal(refs)
 		actual, _ := json.Marshal(d.report.Evidence)
-		if !bytes.Equal(expected, actual) || d.report.Reason != reason {
+		if d.success == nil && (!bytes.Equal(expected, actual) || d.report.Reason != reason) {
 			return nil, ErrAdmission
 		}
 	}
@@ -170,6 +154,10 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 }
 
 func projectAuditChild(parentSequence int64, role string, events []runtime.Event, secrets []string) ([]evaluation.ReviewEvidence, error) {
+	return projectAuditChildItem(parentSequence, nil, role, events, secrets)
+}
+
+func projectAuditChildItem(parentSequence int64, batchIndex *int, role string, events []runtime.Event, secrets []string) ([]evaluation.ReviewEvidence, error) {
 	var turn, attempt string
 	var out []evaluation.ReviewEvidence
 	for _, e := range events {
@@ -191,6 +179,7 @@ func projectAuditChild(parentSequence int64, role string, events []runtime.Event
 		p := struct {
 			Version            int          `json:"version"`
 			ParentToolSequence int64        `json:"parent_tool_sequence"`
+			BatchIndex         *int         `json:"batch_index,omitempty"`
 			Role               string       `json:"role"`
 			TaskID             string       `json:"task_id"`
 			Sequence           int64        `json:"sequence"`
@@ -200,7 +189,7 @@ func projectAuditChild(parentSequence int64, role string, events []runtime.Event
 			Code               string       `json:"code,omitempty"`
 			Validation         string       `json:"validation,omitempty"`
 			Accepted           *bool        `json:"accepted,omitempty"`
-		}{Version: 1, ParentToolSequence: parentSequence, Role: role, TaskID: e.TaskID, Sequence: e.Sequence, Kind: e.Kind, TurnID: e.TurnID, AttemptID: e.AttemptID, Code: e.Data.Code}
+		}{Version: 1, ParentToolSequence: parentSequence, BatchIndex: batchIndex, Role: role, TaskID: e.TaskID, Sequence: e.Sequence, Kind: e.Kind, TurnID: e.TurnID, AttemptID: e.AttemptID, Code: e.Data.Code}
 		if e.Kind == runtime.EvaluationRecorded {
 			p.Validation, p.Accepted = e.Data.Validation, e.Data.Accepted
 		}
@@ -215,7 +204,11 @@ func projectAuditChild(parentSequence int64, role string, events []runtime.Event
 		if err != nil || len(content) > 64<<10 || !json.Valid([]byte(content)) {
 			return nil, ErrAdmission
 		}
-		out = append(out, evaluation.ReviewEvidence{ID: "delegated_" + strconv.FormatInt(parentSequence, 10) + "_" + role + "_" + strconv.FormatInt(e.Sequence, 10), Content: content})
+		prefix := "delegated_" + strconv.FormatInt(parentSequence, 10)
+		if batchIndex != nil {
+			prefix += "_item_" + strconv.Itoa(*batchIndex)
+		}
+		out = append(out, evaluation.ReviewEvidence{ID: prefix + "_" + role + "_" + strconv.FormatInt(e.Sequence, 10), Content: content})
 	}
 	return out, nil
 }
