@@ -364,6 +364,8 @@ Models crossing configurable failure or value thresholds become deprecation cand
 
 Repeated successful workflows may produce an automatic skill draft. A draft records source sessions, generalized steps, required tools, configuration, risks, and validation cases. Activation requires configured validation. Each revision retains prior versions and rolls back automatically when validation fails or post-activation outcomes materially regress.
 
+Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
+
 ## 10. Sessions, Context, and Memory
 
 ### 10.1 Durable Sessions

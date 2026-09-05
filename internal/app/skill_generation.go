@@ -26,6 +26,10 @@ var skillGenerationIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,
 // started records after failure are uncertain and never authorize redispatch.
 // This does not publish, activate, or mutate the configured SkillStore.
 func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID string, key skills.Key, taskIDs []string, maxCost float64) (skills.GenerationAttempt, error) {
+	return s.generateSkillDraft(ctx, attemptID, modelID, key, taskIDs, maxCost, nil, nil)
+}
+
+func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID string, key skills.Key, taskIDs []string, maxCost float64, selection *skills.WorkflowSelection, observedSecrets []string) (skills.GenerationAttempt, error) {
 	bad := func() (skills.GenerationAttempt, error) { return skills.GenerationAttempt{}, ErrAdmission }
 	if s == nil || ctx == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(attemptID) || len(taskIDs) < 2 || len(taskIDs) > 20 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
 		return bad()
@@ -42,7 +46,7 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 			return bad()
 		}
 	}
-	secrets := memorySecrets(s.settings, s.secret)
+	secrets := append(append([]string(nil), observedSecrets...), memorySecrets(s.settings, s.secret)...)
 	identities := append([]string{attemptID, modelID, key.Scope, key.Name}, ids...)
 	for _, id := range identities {
 		if redact(id, secrets) != id {
@@ -66,6 +70,14 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 	read.Close()
 	if err != nil || len(sources) != len(ids) {
 		return bad()
+	}
+	if selection != nil {
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+		fingerprint, observed, err := s.workflowSelectionPolicy(modelID, sources, maxCost, secrets)
+		secrets = observed
+		if err != nil || selection.Validate() != nil || selection.ID != attemptID || selection.ModelID != modelID || selection.Key != key || selection.PolicyDigest != fingerprint || !slices.Equal(selection.Sources, workflowSelectionCandidates(sources)) || !selectionValueClean(selection, secrets) {
+			return bad()
+		}
 	}
 	localRequired := s.settings.Skills.LocalOnly
 	examples := make([]skills.WorkflowExample, 0, len(sources))
@@ -138,6 +150,16 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 	if provider.APIKeyEnv != "" && apiKey == "" {
 		return bad()
 	}
+	if apiKey != "" {
+		secrets = append(secrets, apiKey)
+	}
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	metadataClean := func() bool {
+		return selectionValueClean([]any{identities, workflowSelectionCandidates(sources), sourceSessions, sourceEvidence, model.ID, model.Model, provider.ID}, secrets) && (selection == nil || selectionValueClean(selection, secrets))
+	}
+	if !metadataClean() {
+		return bad()
+	}
 	if local {
 		if model.RAMBytes == 0 {
 			return bad()
@@ -153,9 +175,23 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 		return bad()
 	}
 	defer transport.CloseIdleConnections()
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	if !metadataClean() {
+		return bad()
+	}
 	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: apiKey, Transport: transport})
 	if err != nil {
 		return bad()
+	}
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	if !metadataClean() {
+		return bad()
+	}
+	for i := range sources {
+		for j := range sources[i].Example.Steps {
+			sources[i].Example.Steps[j] = redact(sources[i].Example.Steps[j], secrets)
+		}
+		examples[i] = sources[i].Example
 	}
 	body, err := json.Marshal(struct {
 		Version                                  int
@@ -209,6 +245,10 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 			code = "canceled"
 		}
 		return fail(code)
+	}
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	if !metadataClean() {
+		return fail("generation_failed")
 	}
 	draft := result.Draft
 	draft.Description = redact(draft.Description, secrets)

@@ -396,10 +396,30 @@ sorts source metadata. `Validate` recomputes the versioned ID, including privacy
 and source/evaluation bindings but excluding creation time. These are trusted
 host inputs, not semantic grouping proof or policy authority.
 
-SQLite schema 17 persists such records idempotently, preserving the first saved
-creation time. This is a storage prerequisite only: no public Client selection
-planning/claiming method or automatic scheduler exists yet, and a saved selection
-does not prevent rebilling until generation is explicitly bound to its identity.
+`Client.PlanWorkflowSelection(ctx, modelID, key, group, algorithm, taskIDs,
+maxCost)` verifies explicitly chosen sources and persists their identity plus
+effective generation-policy binding. Planning performs no inference. SQLite
+schema 17 preserves the first saved creation time when identical inputs are
+planned again, including after a client restart.
+
+`Client.GenerateSkillSelection(ctx, selectionID, maxCost)` rechecks saved source
+and policy bindings before using the selection ID as a single-winner generation
+attempt ID. Changed evidence or policy rejects instead of silently selecting new
+inputs. Repeating a dispatched selection never authorizes another inference;
+inspect the saved attempt after uncertain completion. Success remains an inactive
+proposal; publication and deterministic activation are separate operations.
+
+Policy binding currently conservatively includes the entire validated configuration
+and explicit cost ceiling. Even an unrelated configuration change requires a new
+plan. Credentials are excluded; injected provider/estimator implementations have
+no durable identity and remain trusted host code. Source verification is against
+the coherent snapshot used for generation, not a promise that feedback cannot
+change during inference.
+
+The caller chooses tasks and owns the grouping rule. These methods do not perform
+semantic clustering, establish source tenancy, or start a background scheduler.
+Planning alone is not a generation claim, and using the lower-level draft method
+with a fresh attempt ID does not inherit selection-based deduplication.
 
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
