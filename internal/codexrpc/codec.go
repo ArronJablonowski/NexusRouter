@@ -37,12 +37,15 @@ const (
 // integer IDs. Payloads may contain sensitive content; do not log envelopes.
 // A nil Result means absent; json.RawMessage("null") is a valid result.
 type Envelope struct {
-	JSONRPC string          `json:"jsonrpc,omitempty"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Method  string          `json:"method,omitempty"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *RemoteError    `json:"error,omitempty"`
+	// Observed on CLI0.153.4 notifications although omitted by its generated
+	// base envelope schema. Diagnostic metadata only, never ordering authority.
+	EmittedAtMS *int64          `json:"emittedAtMs,omitempty"`
+	JSONRPC     string          `json:"jsonrpc,omitempty"`
+	ID          json.RawMessage `json:"id,omitempty"`
+	Method      string          `json:"method,omitempty"`
+	Params      json.RawMessage `json:"params,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	Error       *RemoteError    `json:"error,omitempty"`
 }
 
 // RemoteError is protocol data, not a Go error: callers must not surface its
@@ -65,6 +68,9 @@ func validID(id json.RawMessage) bool {
 
 // Kind validates the entire envelope before classifying it.
 func (e Envelope) Kind() (Kind, error) {
+	if e.EmittedAtMS != nil && (*e.EmittedAtMS < 0 || e.Method == "" || e.ID != nil) {
+		return 0, ErrFrame
+	}
 	if e.JSONRPC != "" && e.JSONRPC != "2.0" {
 		return 0, ErrFrame
 	}
@@ -133,7 +139,7 @@ func decode(raw []byte) (Envelope, error) {
 	if !utf8.Valid(raw) {
 		return e, ErrFrame
 	}
-	f, err := object(raw, map[string]bool{"jsonrpc": true, "id": true, "method": true, "params": true, "result": true, "error": true})
+	f, err := object(raw, map[string]bool{"jsonrpc": true, "id": true, "method": true, "params": true, "result": true, "error": true, "emittedAtMs": true})
 	if err != nil {
 		return e, err
 	}
@@ -145,6 +151,15 @@ func decode(raw []byte) (Envelope, error) {
 		}
 	}
 	e.ID, e.Params, e.Result = f["id"], f["params"], f["result"]
+	if v, ok := f["emittedAtMs"]; ok {
+		if !integer.Match(v) {
+			return Envelope{}, ErrFrame
+		}
+		e.EmittedAtMS = new(int64)
+		if json.Unmarshal(v, e.EmittedAtMS) != nil {
+			return Envelope{}, ErrFrame
+		}
+	}
 	if v, ok := f["error"]; ok {
 		fields, err := object(v, map[string]bool{"code": true, "message": true, "data": true})
 		if err != nil || !integer.Match(fields["code"]) || len(fields["message"]) == 0 || fields["message"][0] != '"' {

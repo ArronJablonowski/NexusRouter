@@ -15,6 +15,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		`{"id":999999999999999999999999999999999,"method":"initialize","params":{}}`,
 		`{"id":"<\\escaped\u0061>","method":"item/tool/call","params":{"x":1}}`,
 		`{"jsonrpc":"2.0","method":"initialized"}`,
+		`{"method":"fixture/notice","params":{},"emittedAtMs":1234}`,
 		`{"id":-2,"result":null}`,
 		`{"id":"x","error":{"code":-32600,"message":"secret message","data":{"secret":true}}}`,
 	} {
@@ -53,6 +54,9 @@ func TestRejectAmbiguousEnvelopes(t *testing.T) {
 		`{"method":"x","params":null}`, `{"method":"x","params":"secret"}`,
 		`{"jsonrpc":"1.0","method":"x"}`, `{"jsonrpc":null,"method":"x"}`,
 		`{"method":"x","unknown":"secret"}`, `{"id":1,"error":null}`,
+		`{"method":"x","emittedAtMs":null}`, `{"method":"x","emittedAtMs":-1}`,
+		`{"method":"x","emittedAtMs":1.5}`, `{"method":"x","emittedAtMs":1,"emittedAtMs":2}`,
+		`{"id":1,"result":{},"emittedAtMs":1}`, `{"id":1,"method":"x","emittedAtMs":1}`,
 		`{"id":1,"error":{"code":1}}`, `{"id":1,"error":{"message":"secret"}}`,
 		`{"id":1,"error":{"code":1,"message":null}}`,
 		`{"id":1,"error":{"code":1,"message":"a","message":"secret"}}`,

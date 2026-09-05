@@ -113,6 +113,34 @@ been qualified as a complete capability-isolation boundary for this adapter.
 
 ## Acceptance still required
 
+### Observed launch configuration (CLI 0.153.4)
+
+An opt-in no-inference probe now performs only initialization and `config/read`
+in an empty temporary working directory. It uses the existing login locations,
+an explicit environment allowlist and process-local configuration overrides;
+it does not copy credentials or edit user configuration. Startup can still
+refresh authentication, initialize extensions or write Codex state.
+
+The probe requested all 135 advertised features disabled except
+`skip_host_skill_discovery=true`. The effective configuration exposed 134
+matching features; `apps_mcp_path_override` was absent and remains unknown.
+Project-document loading, notify commands and web search were observed disabled.
+However, `mcp_servers={}` and `plugins={}` left two MCP and twelve plugin entries
+in the merged configuration. Empty-table overrides are therefore not evidence
+of isolation. Entry counts alone also do not prove which tools are callable.
+No thread or turn was created, and no task data was submitted.
+
+Strict configuration rejected the legacy `tools.view_image` key; the probe
+uses `features.view_image=false`. A real notification included `emittedAtMs`,
+absent from the generated base envelope schema. The decoder now accepts this
+only as a nonnegative integer on notifications, never as ordering authority.
+The probe discards notification payloads and prints only projected metadata.
+Default tests skip this live diagnostic; opt in with
+`DARWIN_CODEX_LIVE_PROBE=1 go test ./internal/codexbridge -run '^TestLiveCodexLaunchConfigProbe$' -count=1 -v`.
+
+These observations do not admit the launcher for inference. Per-entry extension
+controls, actual capability verification and lifecycle containment remain open.
+
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed
 durable boundaries. Then run the requested supervised live test: Sol proposes
