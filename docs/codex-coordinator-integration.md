@@ -138,8 +138,38 @@ The probe discards notification payloads and prints only projected metadata.
 Default tests skip this live diagnostic; opt in with
 `DARWIN_CODEX_LIVE_PROBE=1 go test ./internal/codexbridge -run '^TestLiveCodexLaunchConfigProbe$' -count=1 -v`.
 
-These observations do not admit the launcher for inference. Per-entry extension
-controls, actual capability verification and lifecycle containment remain open.
+### Explicit extension and skill controls
+
+The probe now closes discovery before starting a second process with explicit
+per-entry MCP/plugin disables. Overrides use sorted, quoted literal TOML keys
+inside table values, preserving identifiers containing dots or `@` without
+turning them into CLI key paths. The helper copies no original commands, URLs,
+environment settings or credentials. Counts, identifiers and generated output
+are bounded; returned arguments contain private identifiers and must not be
+logged. Missing catalogs and malformed entries fail with static errors.
+
+The second process observed both MCP entries and all twelve plugins explicitly
+disabled. Its MCP inventory listed two servers with zero tools; hooks inventory
+was empty, without errors or warnings. However, skill inventory still listed six
+enabled skills despite `skip_host_skill_discovery=true`. A third process applies
+`skills.config` entries disabling every observed skill at its exact path. It
+reported all six disabled, zero MCP tools and zero hooks. No user configuration
+was written. Skill paths and descriptions are withheld from diagnostic output.
+Inventory errors, unknown enablement and new entries must never be interpreted
+as disabled; a later real launcher must repeat checks on its own live process.
+
+The [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+documents MCP and skill enablement controls. The observed installed CLI also
+accepted plugin-level `enabled=false`. The [app-server reference](https://learn.chatgpt.com/docs/app-server)
+documents the inventory calls used here. These calls are not a complete catalog
+of built-in model tools, nor proof of process containment or prompt isolation.
+The probe still submits no thread, turn or task data. CLI metadata capture is
+now bounded during reading rather than checked only after allocation.
+
+These observations do not admit the launcher for inference. Same-process
+admission, built-in tool/context verification, application wiring and lifecycle
+containment remain open. The absent `apps_mcp_path_override` feature remains
+unknown rather than silently counted as disabled.
 
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed

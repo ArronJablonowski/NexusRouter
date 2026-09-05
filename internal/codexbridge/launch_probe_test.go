@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -26,11 +27,11 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 	if err != nil {
 		t.Fatal("Codex executable unavailable")
 	}
-	version, err := exec.CommandContext(ctx, bin, "--version").Output()
+	version, err := probeMetadata(ctx, bin, "--version")
 	if err != nil || strings.TrimSpace(string(version)) != "codex-cli 0.153.4" {
 		t.Fatal("unsupported probe CLI version")
 	}
-	inventory, err := exec.CommandContext(ctx, bin, "features", "list").Output()
+	inventory, err := probeMetadata(ctx, bin, "features", "list")
 	if err != nil || len(inventory) > 64<<10 {
 		t.Fatal("feature inventory unavailable")
 	}
@@ -62,6 +63,59 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 		}
 	}
 	// These are the existing host locations, not replacement credential roots.
+	result := probeLaunchConfig(t, ctx, bin, args, env, false)
+	logLaunchObservation(t, result.config, features)
+	disables, err := ExtensionDisableOverrides(result.config)
+	if err != nil {
+		t.Fatal("extension overrides unavailable")
+	}
+	for _, override := range disables {
+		args = append(args, "-c", override)
+	}
+	// The discovery process is closed before this second process starts.
+	// Re-observe instead of assuming the earlier inventory stayed unchanged.
+	result = probeLaunchConfig(t, ctx, bin, args, env, true)
+	logLaunchObservation(t, result.config, features)
+	args = append(args, "-c", result.skillOverride)
+	result = probeLaunchConfig(t, ctx, bin, args, env, true)
+	logLaunchObservation(t, result.config, features)
+	report, err := InspectLaunchConfig(result.config, features)
+	if err != nil || !report.MCPEntriesKnown || !report.PluginEntriesKnown || report.MCPEntries != report.MCPEntriesDisabled || report.PluginEntries != report.PluginEntriesDisabled {
+		t.Fatal("extension disable controls not fully observed")
+	}
+	if !result.skillsDisabled {
+		t.Fatal("skill disable controls not fully observed")
+	}
+}
+
+// Bound capture while reading, not after an unbounded exec.Output allocation.
+func probeMetadata(ctx context.Context, bin string, args ...string) ([]byte, error) {
+	out := &probeMetadataBuffer{}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Stdout = out
+	if cmd.Run() != nil {
+		return nil, ErrLaunchObservation
+	}
+	return out.buf.Bytes(), nil
+}
+
+type probeMetadataBuffer struct{ buf bytes.Buffer }
+
+func (b *probeMetadataBuffer) Write(p []byte) (int, error) {
+	if len(p) > (64<<10)-b.buf.Len() {
+		return 0, errors.New("probe metadata limit")
+	}
+	return b.buf.Write(p)
+}
+
+type launchProbeSnapshot struct {
+	config         json.RawMessage
+	skillOverride  string // Private paths; never log this structure.
+	skillsDisabled bool
+}
+
+func probeLaunchConfig(t *testing.T, ctx context.Context, bin string, args, env []string, inspectInventory bool) launchProbeSnapshot {
+	t.Helper()
 	p, err := codexrpc.StartProcess(ctx, codexrpc.ProcessSpec{Executable: bin, Args: args, Env: env, Dir: t.TempDir()})
 	if err != nil {
 		t.Fatal("probe process unavailable")
@@ -98,12 +152,21 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 		t.Fatal("probe initialization failed")
 	}
 	result := request("2", "config/read", json.RawMessage(`{"includeLayers":false}`))
+	snapshot := launchProbeSnapshot{config: result}
+	if inspectInventory {
+		snapshot.skillOverride, snapshot.skillsDisabled = probeLaunchInventory(t, request)
+	}
+	t.Logf("bounded unsolicited notifications: %d", notifications)
+	return snapshot
+}
+
+func logLaunchObservation(t *testing.T, result json.RawMessage, features []string) {
+	t.Helper()
 	report, err := InspectLaunchConfig(result, features)
 	if err != nil {
 		t.Fatal("configuration could not be safely projected")
 	}
 	t.Logf("configuration observation only (not launch approval): %+v", report)
-	t.Logf("bounded unsolicited notifications: %d", notifications)
 	// Only names already supplied by the pinned CLI inventory may be logged.
 	// Configuration keys and values themselves are never diagnostic output.
 	var observed struct {

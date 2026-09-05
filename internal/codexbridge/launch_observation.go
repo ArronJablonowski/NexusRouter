@@ -17,6 +17,7 @@ type LaunchObservation struct {
 	AdditionalFeatures                                        int
 	MCPEntriesKnown, PluginEntriesKnown                       bool
 	MCPEntries, PluginEntries                                 int
+	MCPEntriesDisabled, PluginEntriesDisabled                 int
 	ProjectContextDisabled, NotifyDisabled, WebSearchDisabled bool
 }
 
@@ -73,10 +74,19 @@ func InspectLaunchConfig(result json.RawMessage, features []string) (LaunchObser
 			return LaunchObservation{}, ErrLaunchObservation
 		}
 		*target = len(entries)
+		disabled := 0
+		for _, value := range entries {
+			var entry map[string]json.RawMessage
+			if json.Unmarshal(value, &entry) == nil && bytes.Equal(bytes.TrimSpace(entry["enabled"]), []byte("false")) {
+				disabled++
+			}
+		}
 		if key == "mcp_servers" {
 			report.MCPEntriesKnown = true
+			report.MCPEntriesDisabled = disabled
 		} else {
 			report.PluginEntriesKnown = true
+			report.PluginEntriesDisabled = disabled
 		}
 	}
 	report.ProjectContextDisabled = bytes.Equal(bytes.TrimSpace(response.Config["project_doc_max_bytes"]), []byte("0"))
