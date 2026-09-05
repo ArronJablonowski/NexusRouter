@@ -133,6 +133,8 @@ HTTP worker transport, supervisor and SQLite journal:
 - Invalid Go output is rejected locally. The coordinator receives only the
   bounded rejection envelope, not the invalid candidate as accepted output.
   Reopened storage preserves the parent/work/execution linkage and child failure.
+  [Verified failure metadata](delegation-feedback.md) now provides the reason and
+  exact terminal-record references when available.
 - Caller-context cancellation and a durable cancellation request from a fresh
   service instance both stop a blocked worker HTTP request. The coordinator is
   closed once and never resumed with the canceled worker's result.

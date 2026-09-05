@@ -142,7 +142,7 @@ func TestHybridSolCoordinatorDelegatesToIsolatedOllama(t *testing.T) {
 				t.Fatal("missing worker result")
 			}
 			if scenario == "worker_empty" {
-				if toolResult != `{"error":"delegate_unavailable_or_rejected"}` {
+				if !validDelegateRejection(toolResult) {
 					t.Fatal("empty worker output reported as accepted", toolResult)
 				}
 				return

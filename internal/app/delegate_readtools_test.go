@@ -154,13 +154,13 @@ func TestDelegateReadToolsInheritedScopeAndNoRecursion(t *testing.T) {
 				t.Fatal("nested worker created", workers, err)
 			}
 			if mode == "recursive" {
-				if output != `{"error":"delegate_unavailable_or_rejected"}` || children.Load() != 1 {
+				if !validDelegateRejection(output) || children.Load() != 1 {
 					t.Fatal("recursive tool accepted", output, children.Load())
 				}
 				return
 			}
 			if mode == "turn_limit" {
-				if output != `{"error":"delegate_unavailable_or_rejected"}` || children.Load() != 2 {
+				if !validDelegateRejection(output) || children.Load() != 2 {
 					t.Fatal("child exceeded iteration limit", output, children.Load())
 				}
 				return

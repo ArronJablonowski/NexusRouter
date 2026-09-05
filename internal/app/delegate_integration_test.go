@@ -146,7 +146,7 @@ func TestDelegateRealLoopIsolationValidationAndCapacity(t *testing.T) {
 				t.Fatal("unexpected child dispatch", children.Load())
 			}
 			if mode != "success" && mode != "submitted" {
-				if output != `{"error":"delegate_unavailable_or_rejected"}` || strings.Contains(output, "private") {
+				if !validDelegateRejection(output) || strings.Contains(output, "private") {
 					t.Fatal("invalid child output escaped", output)
 				}
 				return

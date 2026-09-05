@@ -59,7 +59,7 @@ func TestCodexTaskRejectsInvalidLocalGoWithDurableEvidence(t *testing.T) {
 	if err != nil || result.TaskID == "" || p.calls != 2 || calls.Load() != 1 {
 		t.Fatal(result, err, p.calls, calls.Load())
 	}
-	if p.result != `{"error":"delegate_unavailable_or_rejected"}` || strings.Contains(p.result, "untrusted_output") || strings.Contains(p.result, invalid) {
+	if strings.Contains(p.result, "untrusted_output") || strings.Contains(p.result, invalid) {
 		t.Fatalf("invalid worker output released: %q", p.result)
 	}
 	if p.closed != 1 || dir == "" {
@@ -131,6 +131,7 @@ func TestCodexTaskRejectsInvalidLocalGoWithDurableEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	verifyCodexDelegateRejection(t, ctx, db, p.result, "invalid_output", work, execution)
 	for _, id := range []string{work, execution} {
 		snapshot, err := db.TaskSnapshot(ctx, id)
 		if err != nil || snapshot.State != "failed" {
@@ -138,6 +139,46 @@ func TestCodexTaskRejectsInvalidLocalGoWithDurableEvidence(t *testing.T) {
 		}
 		if id == execution && snapshot.Privacy != "local_only" {
 			t.Fatal("local child privacy missing")
+		}
+	}
+}
+
+// Assert the public JSON projection, independently of its production Go type,
+// against freshly read terminal evidence. Neither output nor retry permission
+// belongs in a rejection; the coordinator gets only bounded diagnostic facts.
+func verifyCodexDelegateRejection(t *testing.T, ctx context.Context, db *telemetry.Store, body, reason, work, execution string) {
+	t.Helper()
+	var report struct {
+		Version     int    `json:"version"`
+		Error       string `json:"error"`
+		Reason      string `json:"reason"`
+		WorkID      string `json:"work_task_id"`
+		ExecutionID string `json:"execution_task_id"`
+		Evidence    []struct {
+			TaskID   string       `json:"task_id"`
+			Sequence int64        `json:"sequence"`
+			Kind     runtime.Kind `json:"kind"`
+			Code     string       `json:"code"`
+		} `json:"evidence"`
+	}
+	decoder := json.NewDecoder(strings.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if len(body) > 2048 || !json.Valid([]byte(body)) || decoder.Decode(&report) != nil || report.Version != 1 || report.Error != "delegate_unavailable_or_rejected" || report.Reason != reason || report.WorkID != work || report.ExecutionID != execution || len(report.Evidence) != 2 {
+		t.Fatalf("missing bounded rejection attribution: %s", body)
+	}
+	seen := map[string]bool{}
+	for _, ref := range report.Evidence {
+		if ref.Sequence < 1 || seen[ref.TaskID] || (ref.TaskID != work && ref.TaskID != execution) || (ref.Kind != runtime.TaskFailed && ref.Kind != runtime.TaskCanceled) {
+			t.Fatal("invalid rejection evidence reference")
+		}
+		seen[ref.TaskID] = true
+		page, err := db.ReadEventPage(ctx, ref.TaskID, ref.Sequence-1, 1)
+		if err != nil || len(page.Events) != 1 || page.HeadSequence != ref.Sequence || page.HasMore {
+			t.Fatal("rejection did not cite terminal durable evidence", err)
+		}
+		e := page.Events[0]
+		if e.Sequence != ref.Sequence || e.Kind != ref.Kind || e.Data.Code != ref.Code {
+			t.Fatal("rejection evidence differs from durable record")
 		}
 	}
 }

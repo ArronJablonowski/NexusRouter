@@ -157,6 +157,7 @@ func verifyCanceledCodexTree(t *testing.T, ctx context.Context, path, parent str
 	defer rows.Close()
 	count, found := 0, false
 	rejection := false
+	var rejectionBody string
 	parents := map[string]string{}
 	for rows.Next() {
 		var id string
@@ -176,11 +177,12 @@ func verifyCanceledCodexTree(t *testing.T, ctx context.Context, path, parent str
 			if e.Kind == runtime.TaskCompleted || e.Kind == runtime.WorkerCompleted {
 				t.Fatal("canceled tree recorded accepted output")
 			}
-			if e.Kind == runtime.ToolCompleted && (id != parent || e.Data.Text != `{"error":"delegate_unavailable_or_rejected"}` || e.Data.Effect != runtime.NoEffect) {
+			if e.Kind == runtime.ToolCompleted && (id != parent || e.Data.Effect != runtime.NoEffect) {
 				t.Fatal("canceled delegate did not retain bounded rejection")
 			}
 			if e.Kind == runtime.ToolCompleted && id == parent && e.Data.ToolName == "delegate" {
 				rejection = true
+				rejectionBody = e.Data.Text
 			}
 		}
 	}
@@ -201,4 +203,5 @@ func verifyCanceledCodexTree(t *testing.T, ctx context.Context, path, parent str
 	if parents[parent] != "" || work == "" || execution == "" || execution == parent {
 		t.Fatal("cancellation lost parent/work/execution attribution")
 	}
+	verifyCodexDelegateRejection(t, ctx, db, rejectionBody, "canceled", work, execution)
 }

@@ -93,7 +93,7 @@ func TestDelegateInheritsContextEstimatorWithoutExpandingPermissions(t *testing.
 				t.Fatal(result, err, parentCalls.Load(), parentEstimates.Load(), childEstimates.Load())
 			}
 			if mode == "deny" {
-				if childCalls.Load() != 0 || toolOutput != `{"error":"delegate_unavailable_or_rejected"}` {
+				if childCalls.Load() != 0 || !validDelegateRejection(toolOutput) {
 					t.Fatal("denied child dispatched or leaked output", childCalls.Load(), toolOutput)
 				}
 			} else if childCalls.Load() != 1 || !strings.Contains(toolOutput, `"untrusted_output":"child answer"`) {

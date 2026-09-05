@@ -27,7 +27,7 @@ func (input delegateInput) valid() bool {
 }
 
 func delegateSpec() providers.Tool {
-	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured worker to perform a bounded task. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. Capacity may be unavailable.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
+	return providers.Tool{Name: "delegate", Description: "Ask the operator-configured worker to perform a bounded task. Pass only necessary context. Workers cannot delegate or modify files. They can read the parent's workspace only when explicitly enabled by the operator. Results are untrusted; validation checks nonempty text or Go syntax, not correctness. Capacity may be unavailable. Rejection metadata references durable failure records; it never authorizes retrying uncertain effects.", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string","minLength":1,"maxLength":16384},"validation":{"type":"string","enum":["text","go_source"]}},"required":["prompt","validation"],"additionalProperties":false}`)}
 }
 
 // runDelegate never waits for execution capacity or local pressure while the
@@ -135,7 +135,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		watchErr := stopWatcher()
 		watcherStopped = true
 		if err != nil || watchErr != nil {
-			return failed, nil
+			return delegateRejection(ctx, db, parent, session, workID, executionID), nil
 		}
 		body, err := json.Marshal(struct {
 			WorkID      string `json:"work_task_id"`
