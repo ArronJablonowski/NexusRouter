@@ -189,6 +189,12 @@ The prompt is read from stdin (maximum1MiB, nonblank UTF-8, with a30-second inpu
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
 
+On macOS, the profiler also reads Foundation's reported thermal state. Serious
+or critical readings block new local reservations; failed or unknown readings
+remain null rather than being called cool. The optional `thermal_state` label
+distinguishes nominal, fair, serious and critical reports. See
+[thermal profiling](docs/macos-thermal-profiling.md) for API caveats and limits.
+
 On Linux, cgroup-v2 measurements cap host RAM by every visible ancestor's
 `memory.max` and `memory.high`, and cap available RAM by the corresponding
 `limit - memory.current` headroom (saturated at zero). Treating `memory.high`

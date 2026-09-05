@@ -78,6 +78,15 @@ func MeasureSnapshot(ctx context.Context, profiler Profiler) (snapshot Snapshot,
 		return Snapshot{}, ErrProfile
 	}
 	snapshot = measurement.Snapshot
+	if snapshot.ThermalState != "" {
+		if len(snapshot.ThermalState) > 8 {
+			return Snapshot{}, ErrProfile
+		}
+		state, pressure := parseDarwinThermal([]byte(snapshot.ThermalState))
+		if state != snapshot.ThermalState || pressure == nil || snapshot.ThermalPressure == nil || *pressure != *snapshot.ThermalPressure {
+			return Snapshot{}, ErrProfile
+		}
+	}
 	cloneUint := func(p *uint64) *uint64 {
 		if p == nil {
 			return nil

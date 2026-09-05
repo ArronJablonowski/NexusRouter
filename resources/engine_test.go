@@ -42,7 +42,7 @@ func TestMeasureSnapshotDetachedAndUnknownFactsPreserved(t *testing.T) {
 }
 
 func TestMeasureSnapshotRejectsInvalidVersionsErrorsAndMetadata(t *testing.T) {
-	for _, mode := range []string{"version", "error", "panic", "source", "sources", "devices", "gpu_text", "typednil", "nil"} {
+	for _, mode := range []string{"version", "error", "panic", "source", "sources", "devices", "gpu_text", "thermal_text", "thermal_case", "thermal_missing", "thermal_conflict", "typednil", "nil"} {
 		t.Run(mode, func(t *testing.T) {
 			p := engineProfiler(func(context.Context) (Measurement, error) {
 				s := deviceSnapshot(time.Now())
@@ -61,6 +61,16 @@ func TestMeasureSnapshotRejectsInvalidVersionsErrorsAndMetadata(t *testing.T) {
 					s.GPUs.Sources[0].Devices = make([]GPUDevice, 33)
 				case "gpu_text":
 					s.GPUs.Sources[0].Devices[0].ID = "private\x1b[31m"
+				case "thermal_text":
+					s.ThermalState = "private thermal data"
+				case "thermal_case":
+					pressure := false
+					s.ThermalState, s.ThermalPressure = "Nominal", &pressure
+				case "thermal_missing":
+					s.ThermalState = "nominal"
+				case "thermal_conflict":
+					pressure := false
+					s.ThermalState, s.ThermalPressure = "critical", &pressure
 				}
 				return Measurement{Version: 1, Snapshot: s}, nil
 			})

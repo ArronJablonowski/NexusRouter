@@ -22,6 +22,7 @@ type Snapshot struct {
 	UnifiedMemory            bool
 	VRAMTotal, VRAMAvailable *uint64
 	ThermalPressure          *bool
+	ThermalState             string `json:"thermal_state,omitempty"`
 	Source                   string
 }
 
@@ -40,49 +41,12 @@ func Profile(ctx context.Context) (Snapshot, error) {
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-		mem, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "hw.memsize")
-		if err != nil {
-			return s, ErrProfile
-		}
-		vm, err := runProbe(ctx, "/usr/bin/vm_stat")
-		if err != nil {
-			return s, ErrProfile
-		}
-		s.TotalRAM, err = strconv.ParseUint(strings.TrimSpace(string(mem)), 10, 64)
-		if err != nil {
-			return s, ErrProfile
-		}
-		s.AvailableRAM, err = darwinAvailable(string(vm))
-		if err != nil || s.AvailableRAM > s.TotalRAM {
-			return s, ErrProfile
-		}
-		arm, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "hw.optional.arm64")
-		s.UnifiedMemory = err == nil && strings.TrimSpace(string(arm)) == "1"
-		swap, err := runProbe(ctx, "/usr/sbin/sysctl", "-n", "vm.swapusage")
-		if err == nil {
-			fields := strings.Fields(string(swap))
-			for i, f := range fields {
-				if f == "used" && i+2 < len(fields) {
-					v, err := unitBytes(fields[i+2])
-					if err == nil {
-						s.SwapUsed = &v
-					}
-					break
-				}
-			}
-		}
-		s.Source = "darwin-vm-stat-estimate"
+		return profileDarwin(ctx, runProbe)
 	case "linux":
 		return profileLinux(ctx, readLinuxProfileFile)
 	default:
 		return s, ErrProfile
 	}
-	if ctx.Err() != nil {
-		return s, ctx.Err()
-	}
-	return s, nil
 }
 
 // Kernel file reads remain cooperative; byte bounds do not forcibly interrupt a
