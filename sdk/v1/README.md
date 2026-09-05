@@ -274,6 +274,18 @@ Validators must cooperate with the three-second deadline and must not perform
 unapproved side effects. This host-invoked controller does not install background
 monitoring, automatic drafting or statistical regression detection.
 
+For host-driven automatic drafting, filesystem stores provide
+`DraftFromWorkflows(ctx, key, examples, generator)` with `skills.DraftGenerator`
+or `DraftGeneratorFunc`. Supply 2–20 distinct successful task/session examples
+in one domain, including trusted evaluation checks and redacted workflow steps.
+LLM-only evidence is ineligible; accepted user feedback can support subjective
+workflows without outranking objective failures. The generator receives owned
+copies, and cannot invent the stored SourceSessions/SourceEvidence provenance.
+The 30-second deadline is cooperative. Scope, automatic-change policy, output
+shape and size are checked before storing an inactive version. The host owns
+model routing, privacy and generation costs. The runtime does not yet discover
+examples or schedule this operation automatically; activation is separate.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

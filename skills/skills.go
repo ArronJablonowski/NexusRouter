@@ -33,6 +33,7 @@ type Draft struct {
 	Description     string   `json:"description"`
 	Tags            []string `json:"tags"`
 	SourceSessions  []string `json:"source_sessions"`
+	SourceEvidence  []string `json:"source_evidence,omitempty"`
 	Steps           []string `json:"steps"`
 	RequiredTools   []string `json:"required_tools"`
 	Configuration   string   `json:"configuration"`
@@ -44,7 +45,7 @@ func (d Draft) valid() bool {
 	if !d.Key.valid() || d.Description == "" || len(d.Description) > 1024 || len(d.Steps) == 0 || len(d.SourceSessions) == 0 || len(d.ValidationCases) == 0 {
 		return false
 	}
-	for _, list := range [][]string{d.SourceSessions, d.Tags, d.RequiredTools} {
+	for _, list := range [][]string{d.SourceSessions, d.SourceEvidence, d.Tags, d.RequiredTools} {
 		for _, value := range list {
 			if !identifier.MatchString(value) {
 				return false

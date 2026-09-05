@@ -50,7 +50,7 @@ func ValidateContextVersion(m Metadata, v Version, scope, domain string) error {
 	if !contextStrings(&budget, []string{m.Key.Scope, m.Key.Name, m.Version, m.Digest, m.Description}) || !contextStrings(&budget, m.Tags) || !contextStrings(&budget, []string{v.ID, v.Parent, v.Draft.Key.Scope, v.Draft.Key.Name, v.Draft.Description, v.Draft.Configuration}) {
 		return ErrInvalid
 	}
-	for _, list := range [][]string{v.Draft.Tags, v.Draft.SourceSessions, v.Draft.Steps, v.Draft.RequiredTools, v.Draft.Risks, v.Draft.ValidationCases} {
+	for _, list := range [][]string{v.Draft.Tags, v.Draft.SourceSessions, v.Draft.SourceEvidence, v.Draft.Steps, v.Draft.RequiredTools, v.Draft.Risks, v.Draft.ValidationCases} {
 		if !contextStrings(&budget, list) {
 			return ErrInvalid
 		}

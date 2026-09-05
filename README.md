@@ -885,6 +885,17 @@ and regression evidence without workflow bodies. There is no daemon-triggered
 regression monitoring or statistical outcome detector yet; model-only judgments
 cannot drive this operation.
 
+`FileStore.DraftFromWorkflows` lets a trusted host generate an inactive skill from
+2–20 successful examples in one domain, from distinct tasks and sessions.
+Evidence uses the normal deterministic/tool/user precedence; judge-only examples
+are rejected. The host must supply verified, redacted completed-work records.
+Session and winning evidence IDs are recorded from those inputs, overriding any
+generator-proposed provenance. Generation is cooperatively bounded to 30 seconds,
+and the automatic-change switch is checked again before persistence. Drafts still
+require separate deterministic validation and activation. A model-backed generator
+must use the host's privacy, routing and cost controls; this callback API does not
+install a model adapter or background workflow discovery.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
