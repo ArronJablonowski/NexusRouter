@@ -23,6 +23,10 @@ Usage:
   darwin resources  Inspect current host memory and CPU capacity
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin task show --db path --task id  Inspect durable conversation state
+  darwin steer --config path --task id --key idempotency-key < guidance.txt
+    Queue guidance for a running task; does not interrupt current tools
+  darwin steering list --db path --task id
+  darwin steering show --db path --task id --id message-id
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
   darwin skills list|show|history|draft|rollback --root path --scope scope
@@ -38,7 +42,7 @@ Usage:
   darwin run --config path --model id --continue-task id --summary-attempt approved-attempt-id < prompt.txt
 
 Development status: use --model auto for constrained automatic routing.
-JSON lifecycle streaming is available; interactive steering remains unavailable.
+JSON lifecycle streaming and separate-command steering are available; an interactive prompt UI remains unfinished.
 `
 
 // Run executes a CLI invocation and returns its process exit code.
@@ -48,6 +52,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "steer" {
+		return runSteer(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "steering" {
+		return runSteering(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "metrics" {
 		return runMetrics(args[1:], stdout, stderr)
 	}

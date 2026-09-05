@@ -21,11 +21,12 @@ func (h *Handler) serveSteering(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/")
 	post := r.Method == http.MethodPost && len(parts) == 2
 	get := r.Method == http.MethodGet && len(parts) == 3
-	if (!post && !get) || !replayTaskID(parts[0]) || parts[1] != "steering" || (get && !replayTaskID(parts[2])) {
+	list := r.Method == http.MethodGet && len(parts) == 2
+	if (!post && !get && !list) || !replayTaskID(parts[0]) || parts[1] != "steering" || (get && !replayTaskID(parts[2])) {
 		failure(w, 404, "not_found")
 		return
 	}
-	if post && h.services.Steer == nil || get && h.services.Steering == nil {
+	if post && h.services.Steer == nil || get && h.services.Steering == nil || list && h.services.SteeringList == nil {
 		failure(w, 503, "steering_unavailable")
 		return
 	}
@@ -38,6 +39,14 @@ func (h *Handler) serveSteering(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	if list {
+		if r.ContentLength != 0 || len(r.TransferEncoding) > 0 {
+			failure(w, 400, "invalid_request")
+			return
+		}
+		h.serveSteeringList(ctx, w, parts[0])
+		return
+	}
 	var message runtime.SteeringMessage
 	var err error
 	if post {
@@ -93,12 +102,36 @@ func (h *Handler) serveSteering(w http.ResponseWriter, r *http.Request) {
 		status = 202
 	}
 	// Never echo submitted guidance or idempotency keys in control responses.
-	writeJSON(w, status, struct {
-		Version         int       `json:"version"`
-		ID              string    `json:"id"`
-		TaskID          string    `json:"task_id"`
-		State           string    `json:"state"`
-		CreatedAt       time.Time `json:"created_at"`
-		AppliedSequence *int64    `json:"applied_sequence,omitempty"`
-	}{message.Version, message.ID, message.TaskID, message.State, message.CreatedAt, message.AppliedSequence})
+	writeJSON(w, status, message.Receipt())
+}
+
+func (h *Handler) serveSteeringList(ctx context.Context, w http.ResponseWriter, task string) {
+	messages, err := h.services.SteeringList(ctx, task)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			failure(w, 404, "steering_not_found")
+		} else {
+			failure(w, 500, "steering_unavailable")
+		}
+		return
+	}
+	if len(messages) > runtime.MaxSteeringMessages {
+		failure(w, 500, "invalid_steering_status")
+		return
+	}
+	receipts := make([]runtime.SteeringReceipt, 0, len(messages))
+	seen := map[string]bool{}
+	for _, m := range messages {
+		if m.Validate() != nil || m.TaskID != task || seen[m.ID] {
+			failure(w, 500, "invalid_steering_status")
+			return
+		}
+		seen[m.ID] = true
+		receipts = append(receipts, m.Receipt())
+	}
+	writeJSON(w, 200, struct {
+		Version  int                       `json:"version"`
+		TaskID   string                    `json:"task_id"`
+		Messages []runtime.SteeringReceipt `json:"messages"`
+	}{1, task, receipts})
 }

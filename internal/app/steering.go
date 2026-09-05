@@ -17,6 +17,24 @@ import (
 
 var ErrSteeringControl = errors.New("task steering unavailable")
 
+func (s *Service) ListSteering(ctx context.Context, task string) ([]runtime.SteeringMessage, error) {
+	if !sessions.ValidEventPageID(task) {
+		return nil, ErrAdmission
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if _, err := s.CancellationStatus(ctx, task); err != nil {
+		return nil, err
+	}
+	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return nil, ErrSteeringControl
+	}
+	defer db.Close()
+	messages, err := db.ListSteering(ctx, task)
+	return messages, steeringError(err)
+}
+
 // SteerTask durably queues user guidance. Acceptance is not execution: the
 // runtime applies it at a safe boundary without changing tools/privacy/budgets.
 func (s *Service) SteerTask(ctx context.Context, task, key, text string) (runtime.SteeringMessage, error) {

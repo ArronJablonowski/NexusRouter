@@ -25,6 +25,7 @@ import (
 )
 
 type Services struct {
+	SteeringList         func(context.Context, string) ([]runtime.SteeringMessage, error)
 	Steer                func(context.Context, string, string, string) (runtime.SteeringMessage, error)
 	Steering             func(context.Context, string, string) (runtime.SteeringMessage, error)
 	Metrics              func(context.Context) (metrics.Snapshot, error)

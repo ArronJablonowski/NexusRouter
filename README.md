@@ -184,6 +184,9 @@ With the daemon running, authenticated clients can send
 
 The response is202 while pending and includes a message ID, not the submitted
 text or key. Inspect with `GET /v1/tasks/{task_id}/steering/{message_id}`.
+`GET /v1/tasks/{task_id}/steering` lists all pending/applied message receipts in
+insertion order. The lifetime cap makes the list bounded; no pagination or query
+parameters are needed. List responses never include guidance text.
 Reusing a key with the same persisted text returns the original record;
 different text conflicts. Keys are hashed before storage and configured secrets
 are redacted from guidance. Task/session content still needs privacy care.
@@ -210,8 +213,31 @@ retrievable. Use completed-session continuation for a new follow-up task.
 Storage migrates transactionally to schema14. Back up operational databases
 before upgrades; older binaries cannot open this schema. The new runtime turn
 configuration changes durable submission fingerprints, so older queued requests
-require explicit configuration-mismatch handling. Interactive CLI steering,
-pending-guidance listing and general interrupted-session recovery remain unfinished.
+require explicit configuration-mismatch handling. A full interactive prompt UI
+and general interrupted-session recovery remain unfinished.
+
+From a second terminal using configuration that points to the same task database:
+
+```sh
+./bin/darwin steer --config examples/local.yaml --task TASK_ID --key unique-message-1 < guidance.txt
+./bin/darwin steering list --db ./data/darwin.db --task TASK_ID
+./bin/darwin steering show --db ./data/darwin.db --task TASK_ID --id MESSAGE_ID
+```
+
+`steer` stores guidance only; the already-running task consumes it at its next
+safe boundary. It does not launch or resume a stopped task. Retrying after an
+uncertain CLI/output error must use the same key and text. Enqueue and list
+commands print metadata only; `show` explicitly exports the stored guidance and
+should be treated as sensitive. Listing and inspection open existing storage
+read-only and never initialize missing databases or migrate legacy stores.
+
+Input must be a UTF-8 file or pipe, not a directly attached terminal, and finish
+within a five-second input allowance. Size remains 64 KiB; blank and invalid
+UTF-8 input is rejected. Pipe cancellation borrows a descriptor, restores its
+flags and leaves the caller's descriptor open. Regular-file kernel reads and
+custom embedded readers remain cooperative rather than forcibly interruptible.
+Output uses existing cancellation/broken-pipe handling. An integrated interactive
+editor with continuous steering/follow-ups remains future work.
 
 To shorten a completed conversation, supply an operator-reviewed summary file:
 

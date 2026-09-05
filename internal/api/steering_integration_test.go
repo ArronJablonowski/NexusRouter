@@ -72,6 +72,7 @@ func TestHTTPSteeringAppliesAtNextTurnAndPersistsStatus(t *testing.T) {
 	hooks.Run = svc.Run
 	hooks.Steer = svc.SteerTask
 	hooks.Steering = svc.SteeringStatus
+	hooks.SteeringList = svc.ListSteering
 	h, err := New(token, 1, hooks)
 	if err != nil {
 		t.Fatal(err)
@@ -141,6 +142,11 @@ func TestHTTPSteeringAppliesAtNextTurnAndPersistsStatus(t *testing.T) {
 	if json.Unmarshal(accepted["id"], &id) != nil || id == "" {
 		t.Fatal(accepted)
 	}
+	status, listed := control("GET", path, "")
+	var receipts []runtime.SteeringReceipt
+	if status != 200 || json.Unmarshal(listed["messages"], &receipts) != nil || len(receipts) != 1 || receipts[0].ID != id || receipts[0].State != "pending" {
+		t.Fatal(status, listed)
+	}
 	close(release)
 	select {
 	case result := <-done:
@@ -154,6 +160,10 @@ func TestHTTPSteeringAppliesAtNextTurnAndPersistsStatus(t *testing.T) {
 	var sequence int64
 	if status != 200 || string(applied["state"]) != `"applied"` || json.Unmarshal(applied["applied_sequence"], &sequence) != nil || sequence < 2 || calls.Load() != 2 {
 		t.Fatal(status, applied, calls.Load())
+	}
+	status, listed = control("GET", path, "")
+	if status != 200 || json.Unmarshal(listed["messages"], &receipts) != nil || len(receipts) != 1 || receipts[0].State != "applied" {
+		t.Fatal(status, listed)
 	}
 	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
 	if err != nil {

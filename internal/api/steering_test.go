@@ -83,7 +83,7 @@ func TestSteeringAPIAdmission(t *testing.T) {
 		{"bad id", "GET", "/v1/tasks/task/steering/a:b", "", 404, nil},
 		{"suffix", "POST", "/v1/tasks/task/steering-extra", `{}`, 404, nil},
 		{"method", "DELETE", "/v1/tasks/task/steering", `{}`, 404, nil},
-		{"get collection", "GET", "/v1/tasks/task/steering", "", 404, nil},
+		{"missing collection hook", "GET", "/v1/tasks/task/steering", "", 503, nil},
 		{"post detail", "POST", "/v1/tasks/task/steering/id", `{}`, 404, nil},
 		{"missing hook", "POST", "/v1/tasks/task/steering", `{}`, 503, func(h *Handler, _ *http.Request) { h.services.Steer = nil }},
 		{"capacity", "POST", "/v1/tasks/task/steering", `{}`, 503, func(h *Handler, r *http.Request) {
