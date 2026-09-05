@@ -20,6 +20,7 @@ Usage:
   darwin memory list|show|put|delete --db path --scope scope
   darwin skills list|show|history|draft|rollback --root path --scope scope
   darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
+  darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
   darwin audits list|show --db path [--task id] [--id audit-id]
   darwin audit --config path --task id --reviewer model-id [--max-cost amount]
 

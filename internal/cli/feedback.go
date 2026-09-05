@@ -12,6 +12,9 @@ import (
 )
 
 func runFeedback(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && (args[0] == "show" || args[0] == "revise") {
+		return runFeedbackRevision(args, stdout, stderr)
+	}
 	fs := flag.NewFlagSet("feedback", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	db := fs.String("db", "", "existing task database")

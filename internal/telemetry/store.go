@@ -84,7 +84,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 5 {
+	if version > 6 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -137,6 +137,18 @@ func (s *Store) initialize(ctx context.Context) error {
 		 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES task_heads(task_id), body BLOB NOT NULL);
 		 CREATE INDEX audit_records_task ON audit_records(task_id,id);
 		 PRAGMA user_version=5;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 6 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE evaluation_heads (
+		 base_id TEXT PRIMARY KEY REFERENCES evaluations(id), current_id TEXT NOT NULL UNIQUE);
+		 INSERT INTO evaluation_heads SELECT id,id FROM evaluations;
+		 CREATE TABLE evaluation_revisions (
+		 id TEXT PRIMARY KEY, base_id TEXT NOT NULL REFERENCES evaluations(id), supersedes TEXT NOT NULL UNIQUE, body BLOB NOT NULL);
+		 CREATE INDEX evaluation_revisions_base ON evaluation_revisions(base_id);
+		 PRAGMA user_version=6;`)
 		if err != nil {
 			return err
 		}

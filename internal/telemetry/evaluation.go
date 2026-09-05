@@ -13,7 +13,7 @@ import (
 
 // RecordEvaluation atomically commits immutable evidence and aggregate fitness.
 // One accepted record per model attempt prevents repeated feedback from inflating
-// sample counts. Revisions require a future explicit supersession protocol.
+// sample counts. SupersedeEvaluation provides explicit subjective revisions.
 func (s *Store) RecordEvaluation(ctx context.Context, r evaluation.Record) error {
 	if err := r.Validate(); err != nil {
 		return err
@@ -46,6 +46,13 @@ func (s *Store) RecordEvaluation(ctx context.Context, r evaluation.Record) error
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
+	var reused int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM evaluation_revisions WHERE id=?", r.ID).Scan(&reused); err != nil {
+		return err
+	}
+	if reused != 0 {
+		return ErrConflict
+	}
 	var attempts int
 	// Verify attribution to a persisted model attempt, not an arbitrary caller key.
 	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.started' AND json_extract(body,'$.data.model_id')=? AND json_extract(body,'$.data.provider_id')=?`, r.TaskID, r.AttemptID, r.Key.Model, r.Key.Provider).Scan(&attempts)
@@ -66,6 +73,9 @@ func (s *Store) RecordEvaluation(ctx context.Context, r evaluation.Record) error
 		return ErrConflict
 	}
 	quality, reliability, compliance, schemas := 0, 0, 0, 0
+	if _, err = tx.ExecContext(ctx, "INSERT INTO evaluation_heads VALUES(?,?)", r.ID, r.ID); err != nil {
+		return err
+	}
 	if out.Accepted {
 		quality = 1
 	}
