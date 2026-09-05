@@ -205,6 +205,29 @@ discrete-GPU inventory.
 
 `--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined input is limited to 4 MiB and configured per-model context admission still applies.
 
+### Inspecting tool approvals
+
+Inspect durable approval metadata without invoking the reviewer or executing work:
+
+```sh
+darwin approvals list --db path/to/events.db --task task-id --limit 25
+darwin approvals show --db path/to/events.db --task task-id --id approval-id
+```
+
+The authenticated daemon exposes `GET /v1/tasks/{task_id}/approvals?limit=25`
+and `GET /v1/tasks/{task_id}/approvals/{approval_id}`. Lists accept `after` as an
+exclusive tool-call ID cursor and limits from 1 to 100 (default 25). Continue with
+the response's `next_after_call_id`; an absent cursor ends that scan. Ordering is
+lexical tool-call ID order, not time order. Pages are individually consistent,
+not a frozen snapshot: restart a scan to find intervening insertions before a cursor.
+
+Responses contain scope, digests, validity window, state and operator decisions,
+not raw arguments or lease tokens. Treat actor/scope metadata as private.
+`consumed` means dispatch authority was spent, not that a write succeeded or is
+safe to repeat. These read-only commands never migrate/create a database or
+approve, revoke, resume or retry anything. Decisions still require the explicit
+SDK reviewer integration; built-in CLI/API approval decisions remain pending.
+
 ### Steering an active task
 
 With the daemon running, authenticated clients can send

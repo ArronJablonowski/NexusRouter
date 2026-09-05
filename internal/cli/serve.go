@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/approvals"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/api"
@@ -68,6 +69,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		Approval: func(ctx context.Context, task, id string) (approvals.Record, error) {
+			return app.InspectApproval(ctx, s.Telemetry.Database, task, id)
+		},
+		Approvals: func(ctx context.Context, opts approvals.ListOptions) (approvals.Page, error) {
+			return app.ListApprovals(ctx, s.Telemetry.Database, opts)
+		},
 		Metrics:              service.Metrics,
 		Submit:               service.Submit,
 		Submissions:          service.ListSubmissions,

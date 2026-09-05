@@ -146,8 +146,18 @@ hierarchical path lock; the host must assign overlapping resources consistently.
 Reviewed tools work in local `Run`, `RunStream`, and `RunTextStream`, subject to
 normal admission and iteration limits. They do not grant filesystem access or
 authority to delegated children. Durable queue intake remains rejected for active
-custom tools. Built-in CLI/API approval controls, approval inspection endpoints,
-and process-crash reconciliation of interrupted effects are not implemented yet.
+custom tools. Built-in CLI/API approval decisions and process-crash reconciliation
+of interrupted effects are not implemented yet.
+
+`client.InspectApproval(ctx, taskID, approvalID)` reads one task-bound record;
+`client.ListApprovals(ctx, approvals.ListOptions{TaskID: taskID, Limit: 25})`
+reads a metadata page using the public `approvals` package. Set `AfterCallID` to
+`page.NextAfterCallID` to continue, stopping when it is empty. Limits are 1–100.
+Pages are ordered lexically by tool-call ID and are not a frozen multi-page
+snapshot. Restart the scan to find new IDs sorting before a previous cursor.
+These operations never invoke review or execution, create/migrate storage, or
+expose raw arguments/lease tokens. Actor/scope metadata may still be sensitive;
+`Consumed` is spent authority, not evidence that repeating an effect is safe.
 
 ### Replaceable factual memory storage
 

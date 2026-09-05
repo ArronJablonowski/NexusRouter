@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ArronJablonowski/DarwinRouter/approvals"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
@@ -25,6 +26,8 @@ import (
 )
 
 type Services struct {
+	Approval             func(context.Context, string, string) (approvals.Record, error)
+	Approvals            func(context.Context, approvals.ListOptions) (approvals.Page, error)
 	SteeringList         func(context.Context, string) ([]runtime.SteeringMessage, error)
 	Steer                func(context.Context, string, string, string) (runtime.SteeringMessage, error)
 	Steering             func(context.Context, string, string) (runtime.SteeringMessage, error)
@@ -61,13 +64,14 @@ type Handler struct {
 	healthSlots   chan struct{}
 	metricsSlots  chan struct{}
 	steeringSlots chan struct{}
+	approvalSlots chan struct{}
 }
 
 func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2)}, nil
+	return &Handler{secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -105,7 +109,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && r.URL.Path == "/v1/submissions") {
+	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || approvalRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -119,6 +123,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case approvalRoute(r.URL.Path):
+		h.serveApprovals(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.Contains(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/steering"):
 		h.serveSteering(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/metrics" && r.Method == http.MethodGet:

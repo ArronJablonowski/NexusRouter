@@ -136,6 +136,17 @@ func TestSDKApprovalBackedWrite(t *testing.T) {
 				if strings.Contains(string(body), secret) {
 					t.Fatal("credential persisted in approval")
 				}
+				inspected, err := client.InspectApproval(context.Background(), reviewed.TaskID, reviewed.ID)
+				if err != nil || inspected.State != record.State {
+					t.Fatal("SDK approval inspection", inspected, err)
+				}
+				page, err := client.ListApprovals(context.Background(), approvals.ListOptions{TaskID: reviewed.TaskID, Limit: 1})
+				if err != nil || page.Validate() != nil || len(page.Records) != 1 || page.Records[0].Request.ID != reviewed.ID || page.NextAfterCallID != "" {
+					t.Fatal("SDK approval page", page, err)
+				}
+				if _, err = client.InspectApproval(context.Background(), "other", reviewed.ID); err == nil {
+					t.Fatal("cross-task approval returned")
+				}
 			}
 		})
 	}
@@ -176,5 +187,33 @@ func TestSDKReviewedToolsCannotEnterDurableQueue(t *testing.T) {
 	}
 	if _, err = os.Stat(database); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("rejected queue touched storage", err)
+	}
+}
+
+func TestSDKApprovalInspectionDoesNotCreateStorage(t *testing.T) {
+	options, path := sdkToolOptions(t)
+	client, err := sdk.New(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ctx := range []context.Context{nil, context.Background()} {
+		r, err := client.InspectApproval(ctx, "task", "approval")
+		if err == nil || r.Request.ID != "" {
+			t.Fatal("unexpected record", r, err)
+		}
+		p, err := client.ListApprovals(ctx, approvals.ListOptions{TaskID: "task", Limit: 25})
+		if err == nil || p.Version != 0 {
+			t.Fatal("unexpected page", p, err)
+		}
+	}
+	var missing *sdk.Client
+	if _, err = missing.InspectApproval(context.Background(), "task", "approval"); !errors.Is(err, sdk.ErrAdmission) {
+		t.Fatal(err)
+	}
+	if _, err = missing.ListApprovals(context.Background(), approvals.ListOptions{TaskID: "task", Limit: 25}); !errors.Is(err, sdk.ErrAdmission) {
+		t.Fatal(err)
+	}
+	if _, err = os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("inspection created storage", err)
 	}
 }
