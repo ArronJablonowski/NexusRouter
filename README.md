@@ -115,6 +115,13 @@ The module path is `github.com/ArronJablonowski/DarwinRouter`. The development
 see [the compilable example](examples/sdk/main.go). It is not yet a tagged stable
 release, and full application-level extension contracts remain unfinished.
 
+SDK `InspectTask`, CLI `task show` and the daemon task-inspection route reconstruct
+one bounded SQLite snapshot (at most10,000 events/8MiB of serialized history).
+Inspection does not resume execution or clear uncertain tool effects. An
+unfinished turn in an active task is not proof its worker has stopped; inspect
+lifecycle state before deciding what to do next. Missing, corrupt or oversized
+history returns an error without partial conversation output.
+
 ## Configuration
 
 ```sh

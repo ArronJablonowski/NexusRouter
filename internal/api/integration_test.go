@@ -52,7 +52,7 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 				return ""
 			})
 		},
-		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
+		Inspect: db.TaskSnapshot,
 		Health:  func(context.Context) error { return nil },
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)

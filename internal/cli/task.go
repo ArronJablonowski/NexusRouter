@@ -8,8 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {
@@ -27,13 +26,7 @@ func runTaskInspection(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := telemetry.OpenReadOnly(ctx, *path)
-	if err != nil {
-		fmt.Fprintln(stderr, "cannot open existing task database")
-		return 1
-	}
-	defer db.Close()
-	snapshot, err := sessions.Replay(ctx, db, *task)
+	snapshot, err := app.InspectTask(ctx, *path, *task)
 	if err != nil {
 		fmt.Fprintln(stderr, "task history missing, incomplete or invalid")
 		return 1

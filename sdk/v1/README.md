@@ -43,8 +43,8 @@ error or panic cancels work and returns `ErrEventDelivery`; a committed event is
 not treated as an uncommitted append. Callbacks must return promptly, must not
 wait for their own task to finish, and should treat model/tool content as
 untrusted. Persisted state can outlive delivery: inspect it before retrying a
-failed call using the CLI/API inspection commands (the client does not yet expose
-session replay). SDK embedding is trusted-process access, not an authentication or
+failed call using `client.InspectTask(ctx, taskID)` or the CLI/API inspection
+commands. SDK embedding is trusted-process access, not an authentication or
 isolation boundary.
 
 Task cancellation and steering use durable controls. Steering applies only at
@@ -53,6 +53,18 @@ completed task can be followed with `ContinueTaskID`; interrupted work is not
 silently resumed. Feedback and prior-ID revisions use existing immutable
 accounting; costs are explicit, subjective feedback cannot overwrite objective
 failures, and identical retries do not add fitness samples.
+
+`InspectTask` returns a versioned `TaskSnapshot` with messages, sequence, task
+state, pending tool calls and uncertainty flags. It reads one coherent SQLite
+snapshot, bounded to10,000 events and8MiB of serialized history, with a ten-second
+maximum context allowance. Missing, corrupt or oversized history returns no
+partial content. Inspection never creates a missing database, migrates it,
+executes a model/tool, or assumes an interrupted task is safe to retry.
+`InterruptedTurn` indicates an unfinished turn in the observed log; for an active
+task this is not proof the worker stopped. Returned conversation/tool content can
+be sensitive even after credential redaction. Mutating the returned snapshot does
+not change stored history. Histories beyond the inspection bounds require paged
+event inspection through the HTTP API rather than unbounded reconstruction.
 
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local

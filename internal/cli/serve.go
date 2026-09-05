@@ -20,7 +20,6 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {
@@ -94,7 +93,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		RunStream: service.RunStream,
 		Events:    db.ReadEventPage,
 		Run:       service.Run,
-		Inspect:   func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
+		Inspect:   db.TaskSnapshot,
 		Health: func(ctx context.Context) error {
 			if dispatcher == nil || dispatcher.Health().Status != "healthy" {
 				return errors.New("supervisor unavailable")
