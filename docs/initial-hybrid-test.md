@@ -121,6 +121,25 @@ completed a model turn but produced no delegation and is not counted as success.
 Only exact known deprecation/unstable-feature notices and bounded, discarded
 account-rate metadata are accepted; unknown warnings still fail closed.
 
-Next qualification: negative worker results, cancellation while delegated work
+Next live qualification: negative worker results, cancellation while delegated work
 is active, restart behavior, and helper-process cleanup/containment. These are
 not established by one successful prompt. Background learning remains disabled.
+
+## Application failure and cancellation regression coverage
+
+Controlled coordinator fixtures now exercise the real application service,
+HTTP worker transport, supervisor and SQLite journal:
+
+- Invalid Go output is rejected locally. The coordinator receives only the
+  bounded rejection envelope, not the invalid candidate as accepted output.
+  Reopened storage preserves the parent/work/execution linkage and child failure.
+- Caller-context cancellation and a durable cancellation request from a fresh
+  service instance both stop a blocked worker HTTP request. The coordinator is
+  closed once and never resumed with the canceled worker's result.
+- The parent, work record and execution are durably canceled. A tool completion
+  may record the rejection for audit; it is not accepted work or successful task
+  completion. The task-owned coordinator directory is removed.
+
+These tests do not invoke Codex or Ollama inference and do not prove live helper
+termination, process-crash recovery, or coordinator judgment quality. Reopening
+the database verifies durable outcomes, not recovery of interrupted work.
