@@ -11,8 +11,6 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
@@ -167,6 +165,9 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		return bad()
 	}
 	cleanMessages, err := redactSummaryMessages(history.Messages, secrets)
+	if provider.Kind == "codex_app_server" {
+		cleanMessages, err = redactCodexHistoryMessages(history.Messages, secrets)
+	}
 	if err != nil {
 		return bad()
 	}
@@ -193,21 +194,18 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		}
 		defer release()
 	}
-	transport, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{provider.Endpoint})
+	adapter, closeProvider, err := s.openAuditProvider(ctx, provider, model, history.Privacy, key)
 	if err != nil {
 		return bad()
 	}
-	defer transport.CloseIdleConnections()
-	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: transport})
-	if err != nil {
-		return bad()
-	}
+	defer closeProvider()
 	evidence := append([]evaluation.ReviewEvidence{{ID: "session_history", Content: redact(string(contextBody), secrets)}, {ID: "candidate_execution", Content: string(candidateIdentity)}}, executionEvidence...)
 	refs := []string{"requirements", "candidate"}
 	for _, item := range evidence {
 		refs = append(refs, item.ID)
 	}
 	reviewer := evaluation.Reviewer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	reviewer.StructuredOutput = provider.Kind == "codex_app_server"
 	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		return evaluation.AuditRecord{}, err

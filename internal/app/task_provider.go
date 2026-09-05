@@ -41,6 +41,16 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 	if ctx.Err() != nil || privacy != "cloud_allowed" || model.Locality != "cloud" || r.LocalRequired || s.Mode == "local_only" || r.Compaction != nil || r.SummaryAttemptID != "" || codexbridge.ValidateInitialMessages(messages) != nil || (r.ContinueTaskID == "" && (len(messages) != 1 || messages[0].Role != "user")) {
 		return nil, nil, ErrAdmission
 	}
+	return openOwnedCodexProvider(ctx, s, provider, model, privacy, r.codexLauncher)
+}
+
+// The caller admits its own request shape and privacy before this shared
+// task-owned launch. Audits invoke it lazily after their durable attempt and
+// context checks, never by pretending to be task continuations.
+func openOwnedCodexProvider(ctx context.Context, s config.Settings, provider config.Provider, model config.Model, privacy string, launch codexLaunch) (adapter providers.Provider, closeProvider func(), err error) {
+	if ctx == nil || ctx.Err() != nil || provider.Kind != "codex_app_server" || model.Locality != "cloud" || privacy != "cloud_allowed" || (s.Mode != "hybrid" && s.Mode != "cloud_only") {
+		return nil, nil, ErrAdmission
+	}
 	dir, err := os.MkdirTemp("", "darwin-codex-task-")
 	if err != nil {
 		return nil, nil, ErrAdmission
@@ -51,21 +61,35 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 			env = append(env, name+"="+value)
 		}
 	}
-	launch := r.codexLauncher
 	if launch == nil {
 		launch = func(ctx context.Context, spec codexbridge.LaunchSpec) (taskProvider, error) {
 			return codexbridge.LaunchChecked(ctx, spec)
 		}
 	}
-	p, err := launch(ctx, codexbridge.LaunchSpec{Executable: provider.Executable, CWD: dir, Model: model.Model, Mode: s.Mode, Privacy: privacy, Env: env})
-	if err != nil || p == nil || (reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
-		if p != nil && !(reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
-			_ = p.Close()
+	var p taskProvider
+	var once sync.Once
+	closeProvider = func() {
+		once.Do(func() {
+			defer os.RemoveAll(dir) // Only this invocation's private directory.
+			defer func() { _ = recover() }()
+			if p != nil && !(reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
+				_ = p.Close()
+			}
+		})
+	}
+	cleanup := closeProvider
+	defer func() {
+		if recover() != nil {
+			err = ErrAdmission
 		}
-		_ = os.RemoveAll(dir) // Only this task's newly-created private directory.
+		if err != nil {
+			cleanup()
+			adapter, closeProvider = nil, nil
+		}
+	}()
+	p, err = launch(ctx, codexbridge.LaunchSpec{Executable: provider.Executable, CWD: dir, Model: model.Model, Mode: s.Mode, Privacy: privacy, Env: env})
+	if err != nil || p == nil || (reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
 		return nil, nil, ErrAdmission
 	}
-	var once sync.Once
-	closeProvider := func() { once.Do(func() { _ = p.Close(); _ = os.RemoveAll(dir) }) }
 	return p, closeProvider, nil
 }

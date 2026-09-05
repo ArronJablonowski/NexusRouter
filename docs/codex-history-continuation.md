@@ -99,7 +99,9 @@ was disabled for the new task. This was not a new Ollama generation, execution
 of that Go code, or a live recovered-crash continuation.
 
 Automatic restart/resume, in-flight steering, compaction/summary requests,
-auxiliary judging via the Codex provider, broad model/version compatibility,
+broad model/version compatibility,
 full host/process containment, and crash recovery during import remain open.
 Live tests are skipped by default. The pinned profile and limits are still
 experimental, not a production or privacy-isolation certification.
+Bounded [output audits through the Codex provider](codex-output-audits.md) are
+now supported separately; other auxiliary workflows remain unqualified.

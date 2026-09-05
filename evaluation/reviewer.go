@@ -34,6 +34,9 @@ type ReviewResult struct {
 // judging. The host owns privacy admission and supplies a policy-bound provider.
 // EstimatedCost is an operator upper estimate, not a measured billing guarantee.
 type Reviewer struct {
+	// StructuredOutput opts into a trusted, closed output schema. Parsing and
+	// evidence validation remain authoritative even when a provider accepts it.
+	StructuredOutput bool
 	// ContextEstimator is a trusted optional measurement engine. It may raise,
 	// but never reduce, the built-in context floor for the assembled audit prompt.
 	ContextEstimator       providers.ContextEstimator
@@ -77,6 +80,9 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 		return ReviewResult{}, ErrAudit
 	}
 	request := providers.Request{Model: v.Model, Messages: []providers.Message{{Role: "system", Content: reviewInstructions}, {Role: "user", Content: string(body)}}}
+	if v.StructuredOutput {
+		request.JSONSchema = reviewOutputSchema(trusted)
+	}
 	ctx, cancel := context.WithTimeout(ctx, v.Timeout)
 	defer cancel()
 	if ctx.Err() != nil {

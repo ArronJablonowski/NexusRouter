@@ -79,8 +79,9 @@ ChatGPT login, and an absolute CLI executable path (adjust it on another host).
 No HTTP endpoint or API-key setting belongs on this provider. Select the model
 explicitly with `--model coordinator`. Fresh tasks and bounded explicit history
 continuations are supported; see [the continuation guide](codex-history-continuation.md).
-Automatic health/routing discovery, auxiliary judging and compaction remain
-unsupported for this provider. Memory and skills remain off in the sample.
+Bounded [output audits](codex-output-audits.md) are also supported. Automatic
+health/routing discovery and compaction remain unsupported for this provider.
+Memory, skills and judging remain off in the sample.
 
 The first CLI-backed application attempt created durable task
 `BQJR6VQWJRF4GCVVMDL3G4R4SR` in the ignored sample database and failed before
