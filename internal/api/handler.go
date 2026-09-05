@@ -174,6 +174,17 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 			return req, bad
 		}
 		seen[key] = true
+		if key == "compaction" {
+			var raw json.RawMessage
+			if d.Decode(&raw) != nil {
+				return req, bad
+			}
+			req.Compaction, err = decodeCompactionRequest(raw)
+			if err != nil {
+				return req, bad
+			}
+			continue
+		}
 		var value any
 		if d.Decode(&value) != nil {
 			return req, bad
@@ -254,7 +265,7 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 	if _, err := d.Token(); err != io.EOF {
 		return req, bad
 	}
-	if req.ModelID == "" || strings.TrimSpace(req.Prompt) == "" {
+	if req.ModelID == "" || strings.TrimSpace(req.Prompt) == "" || (req.Compaction != nil && req.ContinueTaskID == "") {
 		return req, bad
 	}
 	return req, nil

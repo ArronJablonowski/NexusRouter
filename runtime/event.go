@@ -61,6 +61,7 @@ type Event struct {
 }
 
 type Data struct {
+	Compaction      *ContextCompaction   `json:"compaction,omitempty"`
 	Validation      string               `json:"validation,omitempty"`
 	RetryOfTaskID   string               `json:"retry_of_task_id,omitempty"`
 	RouteCandidates []routing.Candidate  `json:"route_candidates,omitempty"`
@@ -89,6 +90,9 @@ type Data struct {
 func (e Event) Validate() error {
 	if e.Version != 1 || e.ID == "" || e.TaskID == "" || e.SessionID == "" || e.CorrelationID == "" || e.Sequence < 1 || e.Time.IsZero() {
 		return errors.New("invalid event envelope")
+	}
+	if e.Data.Compaction != nil && (e.Kind != TaskStarted || e.Data.Compaction.Validate(e.Data.ParentTaskID) != nil) {
+		return errors.New("invalid context compaction")
 	}
 	switch e.Kind {
 	case TaskStarted, TaskCompleted, TaskFailed, TaskCanceled:

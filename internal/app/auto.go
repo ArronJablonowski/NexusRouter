@@ -46,9 +46,11 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	if json.Unmarshal(body, &s) != nil {
+	var snapshot config.Settings
+	if json.Unmarshal(body, &snapshot) != nil {
 		return nil, ErrAdmission
 	}
+	s = snapshot
 	concurrent := 1 // auto is deliberately conservative until adaptive sizing exists.
 	if s.Hardware.Concurrent != "auto" {
 		concurrent, _ = strconv.Atoi(s.Hardware.Concurrent)
@@ -105,6 +107,9 @@ func RunAuto(ctx context.Context, s config.Settings, r Request, secret func(stri
 }
 
 func validateInput(r Request) error {
+	if r.Compaction != nil && (r.ContinueTaskID == "" || sessions.ValidateCompactionRequest(r.Compaction) != nil) {
+		return ErrAdmission
+	}
 	if r.Validation != "" && r.Validation != "go_source" {
 		return ErrAdmission
 	}
@@ -147,10 +152,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	defer db.Close()
 	messages := []providers.Message{}
 	if r.ContinueTaskID != "" {
-		history, e := sessions.Replay(ctx, db, r.ContinueTaskID)
-		if e != nil || history.State != "completed" || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
-			return Result{}, ErrAdmission
+		if r.continuation == nil {
+			r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(cfg, s.secret))
+			if err != nil {
+				return Result{}, err
+			}
 		}
+		history := r.continuation
 		if history.Privacy != "cloud_allowed" {
 			r.LocalRequired = true
 		}

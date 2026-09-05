@@ -6,9 +6,10 @@ import (
 	"unicode/utf8"
 
 	"darwinrouter/providers"
+	"darwinrouter/runtime"
 )
 
-type Summary struct{ Decisions, PendingWork, Failures, Artifacts []string }
+type Summary = runtime.ContextSummary
 type Compaction struct {
 	Version         int
 	Summary         Summary

@@ -147,7 +147,21 @@ The prompt is read from stdin (maximum 1 MiB). The completed answer goes to stdo
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
 
-`--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined history is limited to 4 MiB pending token-budget/compaction integration.
+`--continue-task` starts a new task from a completed task's saved conversation in the same database and session. The source remains immutable, and the new task records its parent. Missing, unfinished or uncertain-effect histories are rejected. Histories created on local models (and legacy histories without a privacy marker) cannot be continued on cloud models. This is completed-session continuation, not interrupted-task recovery. Combined input is limited to 4 MiB and configured per-model context admission still applies.
+
+To shorten a completed conversation, supply an operator-reviewed summary file:
+
+```json
+{"decisions":["Keep the existing public API"],"pending_work":["Add integration coverage"],"failures":[],"artifacts":["src/router.go"]}
+```
+
+```sh
+./bin/darwin run --config examples/local.yaml --model auto --continue-task TASK_ID --compact-keep 6 --compact-summary summary.json < followup.txt
+```
+
+Compaction retains at least the requested recent message count, expanding backward to keep tool-call/result batches complete. All original system messages remain. Summary fields are untrusted reference data, not permissions; each category permits at most 128 nonblank entries and the serialized summary is limited to 64 KiB. At least one summary entry and one removable non-system message are required. Configured credentials are redacted before summary use. Models need known `context_tokens`; compaction does not guarantee that the resulting input fits.
+
+The new task atomically records its compacted input and a versioned summary checkpoint with source task, event sequence, source-conversation SHA-256 and removed-message count. Inspect it with `task show` or `GET /v1/tasks/{id}` after restart. The original history remains untouched, including any sensitive content; compaction is not deletion. Automatic summary generation, summary-accuracy validation and mid-task compaction are not yet implemented.
 
 ## Local HTTP service
 
@@ -156,7 +170,7 @@ Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters,
 All endpoints require `Authorization: Bearer <token>`:
 
 - `GET /health`: application/database health; provider health is explicitly not checked yet.
-- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
+- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, optional `compaction` accepts `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` using the same safety checks as the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `POST /v1/feedback`: JSON `{"task_id":"TASK_ID","outcome":"accepted","attempt_cost":0}` (or `rejected`). Requires an observed final-attempt cost. Identical retries return 200 without adding samples; conflicts return 409, and ineligible task histories return 422. The body limit is 4 KiB and feedback shares daemon admission capacity with tasks.
 - `GET /v1/feedback/{task_id}`: original final-attempt evaluation followed by its revision history.
@@ -205,7 +219,7 @@ Review execution persists `started` before calling the reviewer, then records th
 
 1. Connect authorized tools and bounded delegation to application execution.
 2. Expand safe fallback qualification and automatic validated outcome updates.
-3. Integrate context compaction, factual memory and procedural skills into prompts.
+3. Add automatic context summarization and knowledge maintenance beyond current operator-compacted continuation, scoped factual memory and validated procedural-skill retrieval.
 4. Add live events, recovery and cross-provider qualification.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

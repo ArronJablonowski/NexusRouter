@@ -30,6 +30,7 @@ type ToolResult struct {
 	Effect  Effect
 }
 type RunRequest struct {
+	Compaction    *ContextCompaction
 	Validation    string
 	RetryOfTaskID string
 	// RequireText applies only to a final answer, never an intermediate tool
@@ -75,6 +76,9 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
+	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
+		return Result{}, ErrInvalidRun
+	}
 	if r.MaxContextTokens < 0 || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) {
 		return Result{}, ErrInvalidRun
 	}
@@ -82,6 +86,13 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		return Result{}, ErrInvalidRun
 	}
 	// Snapshot nested caller-owned data before the provider receives it.
+	var compaction *ContextCompaction
+	if r.Compaction != nil {
+		body, err := json.Marshal(r.Compaction)
+		if err != nil || json.Unmarshal(body, &compaction) != nil {
+			return Result{}, ErrInvalidRun
+		}
+	}
 	if providers.ValidateMessages(r.Inference.Messages) != nil {
 		return Result{}, ErrInvalidRun
 	}
@@ -112,7 +123,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (Result, error) {
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

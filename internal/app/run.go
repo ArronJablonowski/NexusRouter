@@ -21,6 +21,8 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	Compaction                      *sessions.CompactionRequest
+	continuation                    *continuationContext
 	skillPrepared                   bool
 	skillContext                    *skillContext
 	memoryPrepared                  bool
@@ -49,9 +51,9 @@ type Result struct {
 	Usage                *providers.Usage
 }
 
-// RunExplicit is the initial headless application path. It executes one model
-// turn, with no tools or implicit fallback. A local model always receives a
-// loopback-only transport, even when the application mode permits cloud use.
+// RunExplicit executes an admitted model with optional bounded read-only tools
+// and no implicit fallback. A local model always receives a loopback-only
+// transport, even when the application mode permits cloud use.
 func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
 	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || s.Telemetry.OTEL {
@@ -73,6 +75,9 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 	// Zero cost retains the legacy explicit-model operator override; automatic
 	// routing instead interprets zero as a strict zero-cost ceiling.
 	if r.ContextTokens > 0 && model.ContextTokens < r.ContextTokens {
+		return result, ErrAdmission
+	}
+	if r.Compaction != nil && model.ContextTokens < 1 {
 		return result, ErrAdmission
 	}
 	if r.MaxCost > 0 && (model.EstimatedCost == nil || *model.EstimatedCost > r.MaxCost) {
@@ -150,10 +155,13 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		privacy = "local_only"
 	}
 	if r.ContinueTaskID != "" {
-		history, err := sessions.Replay(ctx, db, r.ContinueTaskID)
-		if err != nil || history.State != "completed" || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
-			return result, ErrAdmission
+		if r.continuation == nil {
+			r.continuation, err = loadContinuation(ctx, db, r, secrets)
+			if err != nil {
+				return result, err
+			}
 		}
+		history := r.continuation
 		// Unknown legacy privacy is never interpreted as cloud consent.
 		if history.Privacy != "cloud_allowed" && model.Locality != "local" {
 			return result, ErrAdmission
@@ -210,7 +218,11 @@ func RunExplicit(ctx context.Context, s config.Settings, r Request, secret func(
 		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
 		maxTurns = s.Tools.MaxTurns
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
+	var compaction *runtime.ContextCompaction
+	if r.continuation != nil {
+		compaction = r.continuation.Compaction
+	}
+	out, err := loop.Run(ctx, runtime.RunRequest{Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
 	result.retryable = out.Retryable
 	result.Text = redact(out.Text, secrets)
 	result.Turns = out.Turns

@@ -22,6 +22,7 @@ type Pending struct {
 	Dispatched bool
 }
 type Snapshot struct {
+	Compaction               *runtime.ContextCompaction
 	RetryOfTaskID            string
 	ParentTaskID, Privacy    string
 	TaskID, SessionID, State string
@@ -72,6 +73,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.ParentTaskID = e.Data.ParentTaskID
 				s.RetryOfTaskID = e.Data.RetryOfTaskID
 				s.Privacy = e.Data.Privacy
+				s.Compaction = e.Data.Compaction
 				s.Messages = e.Data.Messages
 				if len(s.Messages) > 0 {
 					if providers.ValidateMessages(s.Messages) != nil {
