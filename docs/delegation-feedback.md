@@ -47,7 +47,9 @@ delegation with confirmed or uncertain effects. Parent cancellation still
 prevents resuming the coordinator, while its rejection record remains durable.
 
 Single delegation and noncanceled batch items share this projection. Batch
-cancellation still suppresses all item outputs. The standalone auxiliary audit
-projection does not yet traverse these child references; that remains separate
-work. No change is made here to fitness updates, subjective feedback weighting,
-model pruning permissions or automatic retry behavior.
+cancellation still suppresses all item outputs. Standalone auxiliary audits now
+verify rich single-delegation failure references and project child validation
+and terminal metadata; see [audit evidence scope and limits](delegated-audit-evidence.md).
+Batch and successful-child audit traversal remain separate work. No change is
+made here to fitness updates, subjective feedback weighting, model pruning
+permissions or automatic retry behavior.
