@@ -532,7 +532,23 @@ All endpoints require `Authorization: Bearer <token>`:
 
 All summary endpoints share task concurrency capacity and enforce authentication, origin denial and request deadlines. Summary POST bodies require JSON and are limited to 8 KiB; review notes remain limited to 4 KiB. Overload returns 503 with `Retry-After`. Review is still operator attestation, not an automatic quality judge. The OpenAI-compatible endpoint does not accept these Darwin-native extensions.
 
-`POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. Streaming responses use live, incrementally redacted assistant text (`X-Darwin-Stream-Mode: live-redacted`). Known credentials are withheld across chunk boundaries; partial secret matches can delay text delivery. Content is provisional and may include intermediate assistant turns; tool arguments/results and delegated child streams are not exposed. Only successful durable task completion produces the finish chunk and `[DONE]`. Failures after headers produce a sanitized SSE error without a success marker. Disconnects cancel execution. Token text is not durably replayable; native lifecycle events remain the inspection/replay interface. Usage is omitted when unavailable and is not sent in streaming responses (stream options are unsupported).
+`POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, optional `stream`, and `stream_options.include_usage` when streaming. Other OpenAI parameters are rejected. Streaming responses use live, incrementally redacted assistant text (`X-Darwin-Stream-Mode: live-redacted`). Known credentials are withheld across chunk boundaries; partial secret matches can delay text delivery. Content is provisional and may include intermediate assistant turns; tool arguments/results and delegated child streams are not exposed. Only successful durable task completion can produce the finish chunk and `[DONE]`. Failures after headers produce a sanitized SSE error without a success marker. Disconnects cancel execution. Token text is not durably replayable; native lifecycle events remain the inspection/replay interface.
+
+With `"stream_options":{"include_usage":true}`, ordinary chunks carry
+`usage:null`. After successful completion, a separate chunk with `choices:[]`
+reports known prompt, completion and total token counts before `[DONE]`, following
+the [OpenAI streaming usage shape](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+`X-Darwin-Usage-Scope: successful-task-model-turns` identifies Darwin's accounting
+scope: all model turns in the successful task, excluding failed routing attempts,
+delegated child tasks and auxiliary audit/summarization calls. This is not a
+whole-request billing total. Missing, invalid or overflowing counts produce a
+sanitized `usage_unavailable` stream error instead of fabricated totals, a finish
+chunk or `[DONE]`; the underlying task may already be durably completed, so this
+metadata error is not permission to retry side effects. Explicit reported zero
+counts are valid. Without the option (or with `false`, `{}` or `null`), streaming
+usage is omitted. Nonstreaming responses omit unavailable usage. Options are only
+accepted with `stream:true`; obfuscation and full OpenAI parameter parity remain
+unsupported.
 
 Requests are bounded by configured worker concurrency, a 1 MiB JSON body limit, and a five-minute execution deadline. Duplicate and unknown JSON fields, browser-origin requests, and unauthenticated requests are rejected. API token text is included in application credential redaction. Inference qualification and operating-system service installation remain unfinished. Do not automatically retry a timed-out synchronous task POST; a durable task may already exist.
 

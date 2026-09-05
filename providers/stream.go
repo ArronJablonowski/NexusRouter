@@ -2,10 +2,12 @@ package providers
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -76,12 +78,9 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 				} `json:"delta"`
 				Finish *string `json:"finish_reason"`
 			} `json:"choices"`
-			Usage *struct {
-				Input  int64 `json:"prompt_tokens"`
-				Output int64 `json:"completion_tokens"`
-			} `json:"usage"`
+			Usage json.RawMessage `json:"usage"`
 		}
-		if !utf8.ValidString(payload) || json.Unmarshal([]byte(payload), &chunk) != nil || (len(chunk.Error) > 0 && string(chunk.Error) != "null") || len(chunk.Choices) > 1 {
+		if !utf8.ValidString(payload) || !uniqueAccountingKeys([]byte(payload), "usage") || json.Unmarshal([]byte(payload), &chunk) != nil || (len(chunk.Error) > 0 && string(chunk.Error) != "null") || len(chunk.Choices) > 1 {
 			return false, fail()
 		}
 		for _, choice := range chunk.Choices {
@@ -121,12 +120,13 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 				reason = *choice.Finish
 			}
 		}
-		if chunk.Usage != nil {
-			if usageSeen || chunk.Usage.Input < 0 || chunk.Usage.Output < 0 {
+		if len(chunk.Usage) != 0 && !bytes.Equal(bytes.TrimSpace(chunk.Usage), []byte("null")) {
+			usage, valid := parseSSEUsage(chunk.Usage)
+			if usageSeen || !valid {
 				return false, fail()
 			}
 			usageSeen = true
-			if err := emit(Chunk{Usage: &Usage{chunk.Usage.Input, chunk.Usage.Output}}); err != nil {
+			if err := emit(Chunk{Usage: &usage}); err != nil {
 				return false, err
 			}
 		}
@@ -166,6 +166,62 @@ func readSSE(reader io.Reader, emit func(Chunk) error) error {
 	return fail()
 }
 
+// Missing counts are unknown, not zero. Decode token-by-token so duplicate
+// accounting keys cannot silently overwrite one another. Detail objects are
+// provider-specific and intentionally ignored rather than schema-restricted.
+func parseSSEUsage(raw json.RawMessage) (Usage, bool) {
+	if !uniqueAccountingKeys(raw, "prompt_tokens", "completion_tokens", "total_tokens") {
+		return Usage{}, false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return Usage{}, false
+	}
+	counts := map[string]int64{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return Usage{}, false
+		}
+		name, ok := key.(string)
+		if !ok {
+			return Usage{}, false
+		}
+		var value json.RawMessage
+		if decoder.Decode(&value) != nil {
+			return Usage{}, false
+		}
+		if name != "prompt_tokens" && name != "completion_tokens" && name != "total_tokens" {
+			continue
+		}
+		if _, duplicate := counts[name]; duplicate || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return Usage{}, false
+		}
+		var count int64
+		if json.Unmarshal(value, &count) != nil || count < 0 {
+			return Usage{}, false
+		}
+		counts[name] = count
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return Usage{}, false
+	}
+	if _, err = decoder.Token(); err != io.EOF {
+		return Usage{}, false
+	}
+	input, hasInput := counts["prompt_tokens"]
+	output, hasOutput := counts["completion_tokens"]
+	if !hasInput || !hasOutput || input > math.MaxInt64-output {
+		return Usage{}, false
+	}
+	if total, exists := counts["total_tokens"]; exists && total != input+output {
+		return Usage{}, false
+	}
+	return Usage{InputTokens: input, OutputTokens: output}, true
+}
+
 func readOllama(reader io.Reader, emit func(Chunk) error) error {
 	prefix := fmt.Sprintf("call_%x", rand.Text())
 	calls := []ToolCall{}
@@ -178,11 +234,11 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 		line := scanner.Bytes()
 		total += len(line) + 1
 		var c struct {
-			Error   string `json:"error"`
-			Done    bool   `json:"done"`
-			Reason  string `json:"done_reason"`
-			Input   int64  `json:"prompt_eval_count"`
-			Output  int64  `json:"eval_count"`
+			Error   string          `json:"error"`
+			Done    bool            `json:"done"`
+			Reason  string          `json:"done_reason"`
+			Input   json.RawMessage `json:"prompt_eval_count"`
+			Output  json.RawMessage `json:"eval_count"`
 			Message struct {
 				Content string `json:"content"`
 				Calls   []struct {
@@ -193,7 +249,7 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 				} `json:"tool_calls"`
 			} `json:"message"`
 		}
-		if total > maxStreamBytes || !utf8.Valid(line) || json.Unmarshal(line, &c) != nil || c.Error != "" {
+		if total > maxStreamBytes || !utf8.Valid(line) || !uniqueAccountingKeys(line, "prompt_eval_count", "eval_count") || json.Unmarshal(line, &c) != nil || c.Error != "" {
 			return &Failure{Code: "invalid_stream", Partial: partial}
 		}
 		if c.Message.Content != "" {
@@ -211,21 +267,80 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 			calls = append(calls, ToolCall{fmt.Sprintf("%s_%d", prefix, index), call.Function.Name, call.Function.Arguments})
 		}
 		if c.Done {
-			if c.Input < 0 || c.Output < 0 {
-				return &Failure{Code: "invalid_usage", Partial: partial}
+			var usage *Usage
+			if len(c.Input) != 0 || len(c.Output) != 0 {
+				input, inputOK := parseUsageCount(c.Input)
+				output, outputOK := parseUsageCount(c.Output)
+				if !inputOK || !outputOK || input > math.MaxInt64-output {
+					return &Failure{Code: "invalid_usage", Partial: partial}
+				}
+				usage = &Usage{InputTokens: input, OutputTokens: output}
 			}
 			for _, call := range calls {
 				if err := emit(Chunk{ToolCall: &call}); err != nil {
 					return err
 				}
 			}
-			if err := emit(Chunk{Usage: &Usage{c.Input, c.Output}}); err != nil {
-				return err
+			if usage != nil {
+				if err := emit(Chunk{Usage: usage}); err != nil {
+					return err
+				}
 			}
 			return emit(Chunk{Done: true, FinishReason: c.Reason})
 		}
 	}
 	return &Failure{Code: "incomplete_stream", Partial: partial}
+}
+
+func parseUsageCount(raw json.RawMessage) (int64, bool) {
+	if len(raw) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return 0, false
+	}
+	var value int64
+	if json.Unmarshal(raw, &value) != nil || value < 0 {
+		return 0, false
+	}
+	return value, true
+}
+
+// encoding/json accepts case-insensitive struct field names and last-wins
+// duplicate keys. Accounting fields need exact spelling and one occurrence,
+// while unrelated provider extension fields remain forward-compatible.
+func uniqueAccountingKeys(raw []byte, names ...string) bool {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return false
+	}
+	seen := make(map[string]bool, len(names))
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		name, ok := key.(string)
+		if !ok {
+			return false
+		}
+		for _, canonical := range names {
+			if strings.EqualFold(name, canonical) {
+				if name != canonical || seen[canonical] {
+					return false
+				}
+				seen[canonical] = true
+			}
+		}
+		var value json.RawMessage
+		if decoder.Decode(&value) != nil {
+			return false
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return false
+	}
+	_, err = decoder.Token()
+	return err == io.EOF
 }
 
 func jsonObject(raw []byte) bool {

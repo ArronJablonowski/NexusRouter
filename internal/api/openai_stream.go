@@ -16,7 +16,7 @@ import (
 // serveChatStream emits provisional redacted text, never tool arguments or raw
 // journal deltas. Only successful service completion authorizes finish/DONE.
 // An error after headers is an OpenAI-shaped error frame with no success marker.
-func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req app.Request) {
+func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req app.Request, includeUsage bool) {
 	if h.services.RunTextStream == nil {
 		chatFailure(w, 503, "server_error", "streaming_unavailable")
 		return
@@ -76,18 +76,29 @@ func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req ap
 		}
 	}()
 	id, created := "chatcmpl-"+rand.Text(), time.Now().Unix()
-	chunk := func(delta map[string]string, finish any) error {
-		body, err := json.Marshal(map[string]any{"id": id, "object": "chat.completion.chunk", "created": created, "model": req.ModelID,
-			"choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}})
+	frame := func(choices []any, usage any) error {
+		payload := map[string]any{"id": id, "object": "chat.completion.chunk", "created": created, "model": req.ModelID, "choices": choices}
+		if includeUsage {
+			payload["usage"] = usage
+		}
+		body, err := json.Marshal(payload)
 		if err != nil {
 			return err
 		}
 		return write(string(body))
 	}
+	chunk := func(delta map[string]string, finish any) error {
+		return frame([]any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}, nil)
+	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.Header().Set("X-Darwin-Stream-Mode", "live-redacted")
+	if includeUsage {
+		// The runtime total covers this successful task's model turns, not
+		// independent child tasks, failed routes or auxiliary audit calls.
+		w.Header().Set("X-Darwin-Usage-Scope", "successful-task-model-turns")
+	}
 	w.WriteHeader(http.StatusOK)
 	if chunk(map[string]string{"role": "assistant"}, nil) != nil {
 		return
@@ -132,12 +143,27 @@ func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req ap
 		fail("invalid_upstream_response")
 		return
 	}
+	var usage map[string]int64
+	if includeUsage {
+		u := result.Usage
+		if u == nil || u.InputTokens < 0 || u.OutputTokens < 0 || u.InputTokens > (1<<63-1)-u.OutputTokens {
+			// An execution can be durable and successful while its provider did
+			// not report usage. Do not turn unknown metadata into a zero total.
+			fail("usage_unavailable")
+			return
+		}
+		usage = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
+	}
 	var finish any
 	switch result.FinishReason {
 	case "stop", "length", "content_filter", "tool_calls", "function_call":
 		finish = result.FinishReason
 	}
-	if chunk(map[string]string{}, finish) == nil {
-		_ = write("[DONE]")
+	if chunk(map[string]string{}, finish) != nil {
+		return
 	}
+	if includeUsage && frame([]any{}, usage) != nil {
+		return
+	}
+	_ = write("[DONE]")
 }

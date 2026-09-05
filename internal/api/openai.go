@@ -52,8 +52,8 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if r.Context().Err() != nil {
 		return
 	}
-	if stream {
-		h.serveChatStream(w, r, req)
+	if stream.Enabled {
+		h.serveChatStream(w, r, req, stream.IncludeUsage)
 		return
 	}
 	result, err := h.services.Run(r.Context(), req)
@@ -96,32 +96,53 @@ func chatFailure(w http.ResponseWriter, status int, kind, code string) {
 	writeJSON(w, status, map[string]any{"error": map[string]any{"message": code, "type": kind, "param": nil, "code": code}})
 }
 
-func decodeChatRequest(body []byte) (app.Request, bool, error) {
+type chatStreamOptions struct {
+	Enabled, IncludeUsage bool
+}
+
+func decodeChatRequest(body []byte) (app.Request, chatStreamOptions, error) {
 	bad := errors.New("unsupported or invalid chat request")
 	req := app.Request{}
-	fields, err := chatObject(body, "model", "messages", "stream")
+	stream := chatStreamOptions{}
+	fields, err := chatObject(body, "model", "messages", "stream", "stream_options")
 	if err != nil || chatString(fields["model"], &req.ModelID) != nil || strings.TrimSpace(req.ModelID) == "" || len(req.ModelID) > 256 {
-		return req, false, bad
+		return req, stream, bad
 	}
-	stream := false
 	if raw, ok := fields["stream"]; ok {
 		if string(raw) != "true" && string(raw) != "false" {
-			return req, false, bad
+			return req, stream, bad
 		}
-		stream = string(raw) == "true"
+		stream.Enabled = string(raw) == "true"
+	}
+	if raw, ok := fields["stream_options"]; ok {
+		if !stream.Enabled {
+			return req, stream, bad
+		}
+		if string(raw) != "null" {
+			options, err := chatObject(raw, "include_usage")
+			if err != nil {
+				return req, stream, bad
+			}
+			if include, ok := options["include_usage"]; ok {
+				if string(include) != "true" && string(include) != "false" {
+					return req, stream, bad
+				}
+				stream.IncludeUsage = string(include) == "true"
+			}
+		}
 	}
 	var messages []json.RawMessage
 	if json.Unmarshal(fields["messages"], &messages) != nil || len(messages) == 0 || len(messages) > 256 {
-		return req, false, bad
+		return req, stream, bad
 	}
 	for _, raw := range messages {
 		fields, err := chatObject(raw, "role", "content")
 		m := providers.Message{}
 		if err != nil || chatString(fields["role"], &m.Role) != nil || chatString(fields["content"], &m.Content) != nil {
-			return req, false, bad
+			return req, stream, bad
 		}
 		if m.Role != "system" && m.Role != "user" && m.Role != "assistant" {
-			return req, false, bad
+			return req, stream, bad
 		}
 		req.Messages = append(req.Messages, m)
 	}
