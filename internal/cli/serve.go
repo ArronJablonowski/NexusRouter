@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"darwinrouter/evaluation"
 	"darwinrouter/internal/api"
 	"darwinrouter/internal/app"
 	"darwinrouter/internal/config"
@@ -66,6 +67,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
+			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
+		},
+		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
+			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
+		},
 		Run:     service.Run,
 		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:  func(ctx context.Context) error { _, err := db.Read(ctx, "__health__", 0, 1); return err },

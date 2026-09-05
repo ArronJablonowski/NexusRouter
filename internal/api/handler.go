@@ -14,15 +14,18 @@ import (
 	"strings"
 	"time"
 
+	"darwinrouter/evaluation"
 	"darwinrouter/internal/app"
 	"darwinrouter/sessions"
 )
 
 type Services struct {
-	Run      func(context.Context, app.Request) (app.Result, error)
-	Inspect  func(context.Context, string) (sessions.Snapshot, error)
-	Health   func(context.Context) error
-	Feedback func(context.Context, string, bool, float64) error
+	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
+	ReviseFeedback  func(context.Context, string, string, bool) error
+	Run             func(context.Context, app.Request) (app.Result, error)
+	Inspect         func(context.Context, string) (sessions.Snapshot, error)
+	Health          func(context.Context) error
+	Feedback        func(context.Context, string, bool, float64) error
 }
 type Handler struct {
 	secret   [32]byte
@@ -79,6 +82,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/feedback/revisions" && r.Method == http.MethodPost:
+		h.serveFeedbackRevision(w, r.WithContext(ctx))
+	case strings.HasPrefix(r.URL.Path, "/v1/feedback/") && r.Method == http.MethodGet:
+		h.serveFeedbackHistory(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/feedback" && r.Method == http.MethodPost:
 		h.serveFeedback(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/chat/completions" && r.Method == http.MethodPost:

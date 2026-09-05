@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"darwinrouter/evaluation"
 	"darwinrouter/internal/app"
 	"darwinrouter/internal/config"
 	"darwinrouter/internal/telemetry"
@@ -37,6 +38,12 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 	}
 	defer db.Close()
 	h, err := New(token, 1, Services{
+		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
+			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
+		},
+		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
+			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
+		},
 		Run: func(ctx context.Context, r app.Request) (app.Result, error) {
 			return app.RunExplicit(ctx, s, r, func(name string) string {
 				if name == "DARWIN_API_TOKEN" {
@@ -117,5 +124,35 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 	fitness, err := db.Fitness(context.Background(), routing.Key{Model: "fixture", Provider: "local", Domain: "general", Profile: "default"})
 	if err != nil || fitness.Samples != 1 || fitness.Quality != 1 {
 		t.Fatalf("%+v %v", fitness, err)
+	}
+	r, _ = http.NewRequest("GET", server.URL+"/v1/feedback/"+result.Task, nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	response, err = server.Client().Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var history []evaluation.Record
+	err = json.NewDecoder(response.Body).Decode(&history)
+	response.Body.Close()
+	if err != nil || response.StatusCode != 200 || len(history) != 1 {
+		t.Fatalf("%+v %v", history, err)
+	}
+	for i := 0; i < 2; i++ {
+		payload, _ := json.Marshal(map[string]string{"task_id": result.Task, "expected_id": history[0].ID, "outcome": "rejected"})
+		r, _ = http.NewRequest("POST", server.URL+"/v1/feedback/revisions", strings.NewReader(string(payload)))
+		r.Header.Set("Authorization", "Bearer "+token)
+		r.Header.Set("Content-Type", "application/json")
+		response, err = server.Client().Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 200 {
+			t.Fatal(response.StatusCode)
+		}
+	}
+	fitness, err = db.Fitness(context.Background(), routing.Key{Model: "fixture", Provider: "local", Domain: "general", Profile: "default"})
+	if err != nil || fitness.Samples != 1 || fitness.Quality != 0 {
+		t.Fatalf("revised %+v %v", fitness, err)
 	}
 }
