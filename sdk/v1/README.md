@@ -286,6 +286,17 @@ shape and size are checked before storing an inactive version. The host owns
 model routing, privacy and generation costs. The runtime does not yet discover
 examples or schedule this operation automatically; activation is separate.
 
+Use `skills.ModelGenerator` as a built-in `DraftGenerator` when a provider has
+already passed host policy and resource admission. Configure Provider, Model,
+ContextTokens, Timeout (at most30seconds), EstimatedCost and MaxCost; optional
+ContextEstimator can only increase the conservative context floor. One tools-free
+call must complete with stop and produce the exact workflow schema within64KiB.
+`GenerateDetailed` returns the Draft, Model, optional cloned Usage and total
+Elapsed time; `Generate` adapts it to the draft-only interface. Unknown usage is
+nil, not zero. Estimated cost is not billing evidence. The host remains responsible
+for privacy/redaction, resource reservation and durable attempt/accounting records.
+No daemon route selection, retry or activation occurs in this component.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

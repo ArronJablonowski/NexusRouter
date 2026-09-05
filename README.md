@@ -894,7 +894,17 @@ generator-proposed provenance. Generation is cooperatively bounded to 30 seconds
 and the automatic-change switch is checked again before persistence. Drafts still
 require separate deterministic validation and activation. A model-backed generator
 must use the host's privacy, routing and cost controls; this callback API does not
-install a model adapter or background workflow discovery.
+install background workflow discovery.
+
+`skills.ModelGenerator` implements that callback using one tools-free provider
+call. It enforces context admission, a maximum 30-second cooperative timeout,
+estimated cost limits and a strict 64 KiB workflow-only response schema. Tools,
+partial completion, malformed output and invented provenance are rejected.
+`GenerateDetailed` additionally returns the model, optional reported token usage
+and elapsed time; missing usage remains unknown. The host must supply an admitted
+policy-bound provider and reserve resources, redact content and durably record
+the attempt. There is no retry or activation inside the generator, and daemon
+routing/scheduling of generation is not yet wired.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
