@@ -53,7 +53,18 @@ func auditDelegateFixture(t *testing.T, mutation string) (*Service, *telemetry.S
 	if mutation == "foreign session" {
 		workSession = "foreign-session"
 	}
-	appendEvent("audit-work", workSession, runtime.Event{Kind: runtime.TaskStarted, Data: runtime.Data{ParentTaskID: owner, Privacy: "local_only"}})
+	origin := &runtime.DelegationOrigin{Version: 1, TurnID: "parent-tool", AttemptID: "parent-attempt", ToolCallID: "delegate-call", ToolName: "delegate"}
+	switch mutation {
+	case "missing origin":
+		origin = nil
+	case "wrong origin call":
+		origin.ToolCallID = "sibling-call"
+	case "wrong origin turn":
+		origin.TurnID = "sibling-turn"
+	case "wrong origin attempt":
+		origin.AttemptID = "sibling-attempt"
+	}
+	appendEvent("audit-work", workSession, runtime.Event{Kind: runtime.TaskStarted, Data: runtime.Data{ParentTaskID: owner, Privacy: "local_only", DelegationOrigin: origin}})
 	appendEvent("audit-work", workSession, runtime.Event{Kind: runtime.WorkerStarted, WorkerID: "worker-1"})
 	appendEvent("audit-work", workSession, runtime.Event{Kind: runtime.TaskFailed, Data: runtime.Data{Code: "worker_failed"}})
 	owner = "audit-work"
@@ -180,7 +191,7 @@ func TestAuditTaskTraversesDelegatedFailureValidation(t *testing.T) {
 }
 
 func TestAuditTaskRejectsForgedDelegationBeforeDispatch(t *testing.T) {
-	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "wrong reference", "wrong code", "wrong reason", "duplicate reference", "wrong evaluation attempt", "aliases", "duplicate field"} {
+	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "wrong reference", "wrong code", "wrong reason", "duplicate reference", "wrong evaluation attempt", "aliases", "duplicate field", "missing origin", "wrong origin call", "wrong origin turn", "wrong origin attempt"} {
 		t.Run(mutation, func(t *testing.T) {
 			svc, db := auditDelegateFixture(t, mutation)
 			var calls atomic.Int32

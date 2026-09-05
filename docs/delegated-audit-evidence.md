@@ -4,7 +4,7 @@
 and `delegate_batch`. The Codex adapter exposes these tools in the `darwin`
 namespace. Before constructing the reviewer provider or recording a review
 attempt, the audit verifies canonical envelope shapes, parent-owned work/session
-lineage and execution-to-work lineage. Failure references must match the exact
+lineage, the persisted originating tool invocation, and execution-to-work lineage. Failure references must match the exact
 durable terminal sequence, kind, code and reason. Malformed or forged references
 fail closed.
 
@@ -43,12 +43,17 @@ Creative judgments continue to defer to explicit user preferences.
   cancellation still suppresses every item into a generic rejection, so it
   cannot supply child evidence through this path. No background or automatic
   review job is introduced.
-- Work records identify their parent and session but do not independently store
-  the parent tool-call ID. `parent_tool_sequence` means *referenced by that parent
-  journal event*, not independently proven call-specific ownership. Substituting
-  sibling work within the same trusted parent journal cannot be independently
-  ruled out using the present schema. Batch count and position checks do not
-  independently bind each child to its specific input prompt.
+- New work-start records contain a versioned `delegation_origin`: originating
+  turn, attempt, tool-call ID, tool name and optional zero-based batch index.
+  Audits match this to the replay-paired parent tool completion, in addition to
+  parent/session and execution ancestry. Swapping siblings between calls or
+  batch positions fails closed. The link records host execution provenance,
+  not a cryptographic proof against database tampering or semantic proof that
+  a model followed the prompt.
+- Historical records remain readable without this additive origin field, but
+  referenced work lacking it is no longer traversable by standalone audits.
+  No origins are inferred or backfilled. Generic rejection envelopes still
+  have no references to traverse.
 - Child traversal uses a five-second deadline derived from caller cancellation.
   Storage replay is separately bounded to 8 MiB/10,000 events per task. Traversal
   then admits at most 1,000 events per task, 32 bounded pages per task and 1 MiB of
@@ -65,10 +70,21 @@ Creative judgments continue to defer to explicit user preferences.
   create a cryptographic attestation against database tampering. Child event
   payloads are read locally for verification but only metadata is exported.
 
+The application obtains invocation identity from the scoped tool executor after
+schema/policy admission, not from tool arguments. Its context accessor returns
+an immutable value and exposes no setter. Unscoped tool execution masks inherited
+identity; application delegation without matching scoped identity is rejected
+before worker persistence or dispatch. The host's batch fan-out assigns each
+index, and the supervisor clones/validates the origin before waiting for capacity
+and persists it before execution. The event field is optional for historical
+compatibility and valid only on a task start with a parent.
+
 Verification is fixture-based: positive/negative validator metadata reaches the
 reviewer for single and mixed batch results; forged lineage, missing acceptance,
 mismatched output, terminal references and malformed envelopes stop before
-dispatch. Child-only raw text is excluded from reviewer input, and accepted
+dispatch. Tests read the origin while the worker callback is running, verify
+single/batch indices and match cancellation/rejection records to the actual
+coordinator tool call. Child-only raw text is excluded from reviewer input, and accepted
 output already present in parent history is not duplicated as execution evidence.
 This change does not add live-model, multi-worker recovery or full PRD
 qualification.

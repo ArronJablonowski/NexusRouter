@@ -96,6 +96,9 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 		if err != nil || seen[d.report.WorkID] || work.snapshot.ParentTaskID != d.parent.TaskID || work.snapshot.SessionID != d.parent.SessionID {
 			return nil, ErrAdmission
 		}
+		if !auditDelegationOriginMatches(d, work) {
+			return nil, ErrAdmission
+		}
 		if (d.success == nil && work.snapshot.State != "failed" && work.snapshot.State != "canceled") || (d.success != nil && work.snapshot.State != "completed") {
 			return nil, ErrAdmission
 		}

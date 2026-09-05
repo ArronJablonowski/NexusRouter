@@ -19,7 +19,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
-func delegateSafetyExecutor(t *testing.T, db *telemetry.Store, journal runtime.Journal, run delegateRunner) tools.Executor {
+func delegateSafetyExecutor(t *testing.T, db *telemetry.Store, journal runtime.Journal, run delegateRunner) scopedDelegateTestExecutor {
 	t.Helper()
 	cfg := config.Defaults()
 	cfg.Workers.DelegateMaxCalls = 1
@@ -27,7 +27,7 @@ func delegateSafetyExecutor(t *testing.T, db *telemetry.Store, journal runtime.J
 	if err := registerDelegate(registry, db, journal, cfg, "parent", "session", "", true, run); err != nil {
 		t.Fatal(err)
 	}
-	return tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}
+	return scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}}
 }
 func delegateSafetyCall(raw string) providers.ToolCall {
 	return providers.ToolCall{ID: "call", Name: "delegate", Arguments: json.RawMessage(raw)}
@@ -197,7 +197,7 @@ func TestDelegateSafetyStaleSubmissionCannotDispatch(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	executor := tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}
+	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}}
 	out, err := executor.Execute(ctx, delegateSafetyCall(`{"prompt":"request","validation":"text"}`))
 	if err != nil || called || out.Effect != runtime.NoEffect || !strings.Contains(out.Content, "delegate_unavailable_or_rejected") {
 		t.Fatal(called, out, err)

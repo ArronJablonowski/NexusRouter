@@ -163,6 +163,11 @@ func (e Executor) ExecuteScoped(ctx context.Context, execution runtime.ToolExecu
 func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, scoped bool) (out runtime.ToolResult, err error) {
 	call := execution.Call
 	out.Effect = runtime.NoEffect
+	if ctx == nil {
+		return out, ErrDenied
+	}
+	// Mask a previous handler's identity before any nested execution path.
+	ctx = context.WithValue(ctx, executionIdentityKey{}, ExecutionIdentity{})
 	if ctx.Err() != nil {
 		return out, ctx.Err()
 	}
@@ -194,6 +199,13 @@ func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, 
 	}
 	if ctx.Err() != nil {
 		return out, ctx.Err()
+	}
+	if scoped {
+		identity := ExecutionIdentity{TaskID: execution.TaskID, SessionID: execution.SessionID, TurnID: execution.TurnID, AttemptID: execution.AttemptID, ToolCallID: call.ID, ToolName: call.Name}
+		if !identity.valid() {
+			return out, ErrDenied
+		}
+		ctx = context.WithValue(ctx, executionIdentityKey{}, identity)
 	}
 	if needsApproval {
 		return e.approved(ctx, execution, t, policy, arguments)

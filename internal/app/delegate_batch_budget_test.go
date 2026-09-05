@@ -39,7 +39,7 @@ func TestDelegateBatchSharesAtomicParentBudget(t *testing.T) {
 			}, applicationToolPolicy()); err != nil {
 				t.Fatal(err)
 			}
-			executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy()}
+			executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}
 			invoke := func(name, raw string) string {
 				t.Helper()
 				out, err := executor.Execute(ctx, providers.ToolCall{ID: "call", Name: name, Arguments: json.RawMessage(raw)})

@@ -148,6 +148,28 @@ func TestCodexTaskRejectsInvalidLocalGoWithDurableEvidence(t *testing.T) {
 // belongs in a rejection; the coordinator gets only bounded diagnostic facts.
 func verifyCodexDelegateRejection(t *testing.T, ctx context.Context, db *telemetry.Store, body, reason, work, execution string) {
 	t.Helper()
+	workPage, err := db.ReadEventPage(ctx, work, 0, 1)
+	if err != nil || len(workPage.Events) != 1 {
+		t.Fatal("missing work origin record", err)
+	}
+	start := workPage.Events[0]
+	origin := start.Data.DelegationOrigin
+	if origin == nil || origin.Validate() != nil || origin.ToolName != "delegate" || origin.BatchIndex != nil {
+		t.Fatal("missing single-call provenance")
+	}
+	parentPage, err := db.ReadEventPage(ctx, start.Data.ParentTaskID, 0, 100)
+	if err != nil || parentPage.HasMore || parentPage.SessionID != start.SessionID {
+		t.Fatal("parent provenance unavailable", err)
+	}
+	matched := false
+	for _, e := range parentPage.Events {
+		if e.Kind == runtime.ToolCompleted && e.Data.Text == body {
+			matched = e.TurnID == origin.TurnID && e.AttemptID == origin.AttemptID && e.Data.ToolCallID == origin.ToolCallID && e.Data.ToolName == origin.ToolName
+		}
+	}
+	if !matched {
+		t.Fatal("work origin does not match actual coordinator call")
+	}
 	var report struct {
 		Version     int    `json:"version"`
 		Error       string `json:"error"`

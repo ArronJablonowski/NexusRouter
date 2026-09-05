@@ -30,6 +30,7 @@ type LeaseJournal interface {
 type Work struct {
 	TaskID, SessionID, ParentID, Scope string
 	SubmissionID                       string
+	DelegationOrigin                   *runtime.DelegationOrigin
 	// Execute must honor cancellation. Only inference and read-only tools are
 	// admitted here; there is no safe forced termination of arbitrary Go code.
 	Execute  func(context.Context) (string, error)
@@ -58,6 +59,12 @@ func New(limit int, heartbeat, ttl time.Duration, store LeaseStore, journal runt
 func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 	if w.TaskID == "" || w.SessionID == "" || w.ParentID == "" || w.Scope == "" || w.Execute == nil || w.Validate == nil {
 		return "", ErrWork
+	}
+	if w.DelegationOrigin != nil {
+		w.DelegationOrigin = w.DelegationOrigin.Clone()
+		if w.DelegationOrigin.Validate() != nil {
+			return "", ErrWork
+		}
 	}
 	select {
 	case s.slots <- struct{}{}:
@@ -98,7 +105,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 		}
 		return cause
 	}
-	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID}); err != nil {
+	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID, DelegationOrigin: w.DelegationOrigin}); err != nil {
 		return "", err
 	}
 	l, err := s.store.AcquireLease(ctx, w.TaskID, worker, w.Scope, false, time.Now(), s.ttl)

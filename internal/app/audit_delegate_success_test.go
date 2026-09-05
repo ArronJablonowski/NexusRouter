@@ -55,7 +55,25 @@ func auditSuccessfulDelegateFixture(t *testing.T, batch bool, mutation string) (
 		if success && mutation == "foreign session" {
 			session = "another-session"
 		}
-		appendEvent(work, session, runtime.Event{Kind: runtime.TaskStarted, WorkerID: prefix, Data: runtime.Data{ParentTaskID: owner}})
+		origin := &runtime.DelegationOrigin{Version: 1, TurnID: "tool-turn", AttemptID: "tool-attempt", ToolCallID: "call", ToolName: "delegate"}
+		if batch {
+			index := 0
+			if prefix == "second" {
+				index = 1
+			}
+			origin.ToolName, origin.BatchIndex = "delegate_batch", &index
+		}
+		if success && mutation == "sibling origin" {
+			origin.ToolCallID = "sibling-call"
+		}
+		if success && mutation == "swapped batch origin" {
+			index := 1
+			origin.BatchIndex = &index
+		}
+		if success && mutation == "missing origin" {
+			origin = nil
+		}
+		appendEvent(work, session, runtime.Event{Kind: runtime.TaskStarted, WorkerID: prefix, Data: runtime.Data{ParentTaskID: owner, DelegationOrigin: origin}})
 		appendEvent(work, session, runtime.Event{Kind: runtime.WorkerStarted, WorkerID: prefix})
 		if success {
 			accepted := mutation != "false acceptance"
@@ -251,7 +269,7 @@ func TestAuditSuccessfulAndMixedBatchEvidence(t *testing.T) {
 }
 
 func TestAuditSuccessAndBatchForgeryRejectedBeforeDispatch(t *testing.T) {
-	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "missing acceptance", "false acceptance", "missing worker completion", "worker mismatch", "terminal worker mismatch", "failed execution", "changed output", "aliased field", "duplicate field", "duplicate child", "aliased batch", "empty batch", "unknown item", "dropped slot", "extra slot"} {
+	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "missing acceptance", "false acceptance", "missing worker completion", "worker mismatch", "terminal worker mismatch", "failed execution", "changed output", "aliased field", "duplicate field", "duplicate child", "aliased batch", "empty batch", "unknown item", "dropped slot", "extra slot", "sibling origin", "swapped batch origin", "missing origin"} {
 		t.Run(mutation, func(t *testing.T) {
 			svc, db := auditSuccessfulDelegateFixture(t, true, mutation)
 			var calls atomic.Int32

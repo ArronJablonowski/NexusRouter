@@ -92,6 +92,10 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 	}
 	execute := func(ctx context.Context, input delegateInput) (runtime.ToolResult, error) {
 		failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}
+		origin, originErr := delegationOrigin(ctx, parent, session)
+		if originErr != nil {
+			return failed, nil
+		}
 		if input.Validation == "text" {
 			input.Validation = ""
 		}
@@ -120,6 +124,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		var executionID string
 		answer, err := supervisor.Run(childCtx, workers.Work{
 			TaskID: workID, SessionID: session, ParentID: parent, Scope: "delegation-" + parent, SubmissionID: submissionID,
+			DelegationOrigin: origin,
 			Execute: func(ctx context.Context) (string, error) {
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
 				executionID = result.TaskID

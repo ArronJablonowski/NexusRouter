@@ -54,7 +54,7 @@ func registerDelegateBatch(registry *tools.Registry, reserve func(int) bool, exe
 					if ctx.Err() != nil {
 						return
 					}
-					out, err := execute(ctx, item)
+					out, err := execute(context.WithValue(ctx, delegationBatchIndexKey{}, i), item)
 					if ctx.Err() != nil || err != nil || out.Effect != runtime.NoEffect || len(out.Content) > 128<<10 || !utf8.ValidString(out.Content) || !json.Valid([]byte(out.Content)) {
 						return
 					}
