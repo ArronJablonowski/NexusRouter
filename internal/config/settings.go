@@ -45,10 +45,13 @@ type Hardware struct {
 	LocalQueueTimeout   string  `yaml:"local_queue_timeout" json:"local_queue_timeout"`
 }
 type Workers struct {
-	Max          int    `yaml:"max_in_process" json:"max_in_process"`
-	Heartbeat    string `yaml:"heartbeat_interval" json:"heartbeat_interval"`
-	Lease        string `yaml:"lease_timeout" json:"lease_timeout"`
-	EffectPolicy string `yaml:"side_effect_policy" json:"side_effect_policy"`
+	Max              int     `yaml:"max_in_process" json:"max_in_process"`
+	Heartbeat        string  `yaml:"heartbeat_interval" json:"heartbeat_interval"`
+	Lease            string  `yaml:"lease_timeout" json:"lease_timeout"`
+	EffectPolicy     string  `yaml:"side_effect_policy" json:"side_effect_policy"`
+	DelegateModel    string  `yaml:"delegate_model" json:"delegate_model"`
+	DelegateMaxCalls int     `yaml:"delegate_max_calls" json:"delegate_max_calls"`
+	DelegateMaxCost  float64 `yaml:"delegate_max_cost" json:"delegate_max_cost"`
 }
 type Provider struct {
 	ID        string `yaml:"id" json:"id"`
@@ -119,7 +122,7 @@ type Runtime struct {
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
-		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{3, "5s", "30s", "single_writer"},
+		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0},
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
@@ -180,6 +183,27 @@ func (s Settings) Validate() error {
 	l, le := Duration(s.Workers.Lease)
 	if s.Workers.Max < 1 || he != nil || le != nil || l <= h || s.Workers.EffectPolicy != "single_writer" {
 		return errors.New("invalid worker limits or lease policy")
+	}
+	if s.Workers.DelegateMaxCalls < 1 || s.Workers.DelegateMaxCalls > 16 || !finite(s.Workers.DelegateMaxCost) || s.Workers.DelegateMaxCost < 0 {
+		return errors.New("invalid delegation limits")
+	}
+	if s.Workers.DelegateModel != "" {
+		if !identifier.MatchString(s.Workers.DelegateModel) || h < time.Millisecond || l > 10*time.Minute || l <= 2*h {
+			return errors.New("invalid delegation model or lease policy")
+		}
+		found := false
+		for _, model := range s.Models {
+			if model.ID == s.Workers.DelegateModel {
+				if model.ContextTokens < 1 || model.EstimatedCost == nil || !finite(*model.EstimatedCost) || *model.EstimatedCost < 0 || *model.EstimatedCost > s.Workers.DelegateMaxCost || (s.Mode == "local_only" && model.Locality != "local") || (s.Mode == "cloud_only" && model.Locality != "cloud") {
+					return errors.New("delegation model unavailable within configured limits")
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("delegation model unavailable within configured limits")
+		}
 	}
 	if !finite(s.Routing.Exploration) || s.Routing.Exploration < 0 || s.Routing.Exploration > .25 || s.Routing.MinSamples < 1 {
 		return errors.New("invalid routing exploration or sample count")

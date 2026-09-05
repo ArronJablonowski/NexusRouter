@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	_ "modernc.org/sqlite"
@@ -241,6 +242,19 @@ func (s *Store) AppendSubmission(ctx context.Context, expected int64, e runtime.
 }
 
 func (s *Store) appendOwned(ctx context.Context, expected int64, e runtime.Event, id, token string) error {
+	return s.appendFenced(ctx, expected, e, id, token, "", "")
+}
+
+// AppendWorker checks worker and optional submission ownership in the same
+// transaction as the event. An exact committed retry remains acknowledgement-safe.
+func (s *Store) AppendWorker(ctx context.Context, expected int64, e runtime.Event, leaseToken, owner, submissionID, submissionToken string) error {
+	if leaseToken == "" || owner == "" {
+		return runtime.ErrExecutionLeaseLost
+	}
+	return s.appendFenced(ctx, expected, e, submissionID, submissionToken, leaseToken, owner)
+}
+
+func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string) error {
 	body, err := e.Encode()
 	if err != nil {
 		return err
@@ -292,6 +306,19 @@ func (s *Store) appendOwned(ctx context.Context, expected int64, e runtime.Event
 	}
 	if err := submissionAppendGate(ctx, tx, e, id, token); err != nil {
 		return err
+	}
+	if leaseToken != "" {
+		var held bool
+		// Cancellation may durably clean up an expired lease, but release or
+		// reassignment fences even cleanup from its former owner.
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases
+			WHERE token=? AND task_id=? AND owner=? AND released=0 AND (expires>? OR ?))`,
+			leaseToken, e.TaskID, owner, time.Now().UnixNano(), e.Kind == runtime.TaskCanceled).Scan(&held); err != nil {
+			return err
+		}
+		if !held {
+			return runtime.ErrExecutionLeaseLost
+		}
 	}
 	if e.Kind != runtime.ToolCompleted && e.Kind != runtime.TaskCanceled {
 		var requested bool

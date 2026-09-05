@@ -23,6 +23,8 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	delegatedParent                 string
+	delegate                        delegateRunner
 	memoryStore                     memory.Store
 	skillStore                      skills.Store
 	admissionContext                context.Context
@@ -66,6 +68,12 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || s.Telemetry.OTEL {
 		return result, ErrAdmission
 	}
+	if r.delegatedParent != "" {
+		// Children receive only their explicit prompt, never ambient workspace,
+		// memory, skills, continuation history or recursive delegation authority.
+		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = false, false, false
+		s.Workers.DelegateModel = ""
+	}
 	var model config.Model
 	found := false
 	for _, m := range s.Models {
@@ -101,6 +109,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	}
 	// File tools are local-only until an explicit data-egress approval exists.
 	if s.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
+		return result, ErrAdmission
+	}
+	if s.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return result, ErrAdmission
 	}
 	var registry *tools.Registry
@@ -228,19 +239,33 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = result.TaskID
 	}
 	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, submissionID: r.submissionID, submissionToken: r.submissionToken}
+	if s.Workers.DelegateModel != "" && r.delegate != nil {
+		if registry == nil {
+			registry = &tools.Registry{}
+		}
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate); err != nil {
+			return result, ErrAdmission
+		}
+	}
 	loop := runtime.Loop{Provider: p, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()
-		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}}
-		maxTurns = min(maxTurns, s.Tools.MaxTurns)
+		loop.Tools = tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}, {Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}
+		if s.Tools.Enabled {
+			maxTurns = min(maxTurns, s.Tools.MaxTurns)
+		}
+	}
+	parentID, maxOutput := r.ContinueTaskID, 1<<20
+	if r.delegatedParent != "" {
+		parentID, maxTurns, maxOutput = r.delegatedParent, 1, 64<<10
 	}
 	var compaction *runtime.ContextCompaction
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SubmissionID: r.submissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: r.ContinueTaskID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: 1 << 20})
+	out, err := loop.Run(ctx, runtime.RunRequest{SubmissionID: r.submissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {
@@ -263,6 +288,14 @@ type redactingJournal struct {
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
+	return j.appendLeased(ctx, expected, e, "", "")
+}
+
+func (j redactingJournal) AppendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
+	return j.appendLeased(ctx, expected, e, token, owner)
+}
+
+func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
 	// Partial deltas can split a credential across records. Persist lifecycle
 	// markers without delta text; the complete turn contains redacted text.
 	if e.Kind == runtime.ModelDelta {
@@ -302,7 +335,9 @@ func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.
 	}
 	e.Data = redacted
 	var appendErr error
-	if j.submissionID != "" {
+	if token != "" {
+		appendErr = j.db.AppendWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
+	} else if j.submissionID != "" {
 		appendErr = j.db.AppendSubmission(ctx, expected, e, j.submissionID, j.submissionToken)
 	} else {
 		appendErr = j.db.Append(ctx, expected, e)

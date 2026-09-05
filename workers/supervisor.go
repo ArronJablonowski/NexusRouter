@@ -21,8 +21,15 @@ type LeaseStore interface {
 	RenewLease(context.Context, string, string, time.Time, time.Duration) error
 	ReleaseLease(context.Context, string, string) error
 }
+
+// LeaseJournal atomically checks worker ownership with each durable append.
+// Production hosts should implement this on the same store as LeaseStore.
+type LeaseJournal interface {
+	AppendLeased(context.Context, int64, runtime.Event, string, string) error
+}
 type Work struct {
 	TaskID, SessionID, ParentID, Scope string
+	SubmissionID                       string
 	// Execute must honor cancellation. Only inference and read-only tools are
 	// admitted here; there is no safe forced termination of arbitrary Go code.
 	Execute  func(context.Context) (string, error)
@@ -62,10 +69,17 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 		return "", ctx.Err()
 	}
 	worker := rand.Text()
+	leaseToken := ""
 	seq := int64(0)
 	persist := func(ctx context.Context, kind runtime.Kind, data runtime.Data) error {
-		e := runtime.Event{Version: 1, ID: rand.Text(), TaskID: w.TaskID, SessionID: w.SessionID, CorrelationID: w.ParentID, WorkerID: worker, Sequence: seq + 1, Time: time.Now().UTC(), Kind: kind, Data: data}
-		if s.journal.Append(ctx, seq, e) != nil {
+		e := runtime.Event{Version: 1, ID: rand.Text(), TaskID: w.TaskID, SessionID: w.SessionID, CorrelationID: w.TaskID, WorkerID: worker, Sequence: seq + 1, Time: time.Now().UTC(), Kind: kind, Data: data}
+		var err error
+		if fenced, ok := s.journal.(LeaseJournal); ok && leaseToken != "" {
+			err = fenced.AppendLeased(ctx, seq, e, leaseToken, worker)
+		} else {
+			err = s.journal.Append(ctx, seq, e)
+		}
+		if err != nil {
 			return ErrDurability
 		}
 		seq++
@@ -84,13 +98,14 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (string, error) {
 		}
 		return cause
 	}
-	if err := persist(ctx, runtime.TaskStarted, runtime.Data{}); err != nil {
+	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID}); err != nil {
 		return "", err
 	}
 	l, err := s.store.AcquireLease(ctx, w.TaskID, worker, w.Scope, false, time.Now(), s.ttl)
 	if err != nil {
 		return "", finish(ErrWork)
 	}
+	leaseToken = l.Token
 	// Defer runs only after Execute and Validate have returned.
 	defer func() {
 		release, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)

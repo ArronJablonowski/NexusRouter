@@ -16,6 +16,12 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 	if err != nil {
 		return Result{}, ErrAdmission
 	}
+	select {
+	case svc.execution <- struct{}{}:
+		defer func() { <-svc.execution }()
+	case <-ctx.Done():
+		return Result{}, ctx.Err()
+	}
 	return svc.runWithPressure(ctx, r, svc.runExplicit)
 }
 
@@ -51,7 +57,10 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 			return Result{}, ErrAdmission
 		}
 	}
-	if s.settings.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
+	if r.delegatedParent == "" && s.settings.Tools.Enabled && (model.Locality != "local" || model.ContextTokens == 0) {
+		return Result{}, ErrAdmission
+	}
+	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return Result{}, ErrAdmission
 	}
 	admission := ctx
@@ -70,6 +79,9 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	}
 	if ctx.Err() != nil || admission.Err() != nil {
 		return Result{}, ErrAdmission
+	}
+	if r.delegatedParent == "" {
+		r.delegate = s.bindDelegate(r)
 	}
 	return runExplicitAdmitted(ctx, s.settings, r, s.secret)
 }

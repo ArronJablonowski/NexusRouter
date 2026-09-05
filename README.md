@@ -342,6 +342,54 @@ Review is a local operator attestation, not automated proof of accuracy, and doe
 
 Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation and mid-task compaction remain unfinished.
 
+### Model-callable inference workers
+
+Delegation is opt-in. Set `workers.delegate_model` to an existing configured
+model ID with a known `context_tokens` capacity and `estimated_cost`:
+
+```yaml
+workers:
+  max_in_process: 3
+  delegate_model: local-worker
+  delegate_max_calls: 4
+  delegate_max_cost: 0
+```
+
+The parent receives a `delegate` tool accepting a prompt (up to 16 KiB) and
+`validation: text` or `go_source`. The operator chooses the worker model; model
+output cannot select a different provider or grant permissions. Each child has
+one inference turn, a 30-second deadline and a 64-KiB output limit. It receives
+only the explicit prompt, with no ambient history, memory, skills or tools.
+It cannot delegate recursively. A local-only parent cannot send its child to
+the cloud, even in hybrid mode.
+
+Parents retain their task slots and hardware reservations. Children acquire
+additional capacity without waiting; unavailable capacity produces a bounded
+tool error that lets the parent continue. Thus a one-slot or one-model system
+cannot delegate yet. Sharing/unloading a parent's local model reservation is
+not implemented. Current model tool calls are sequential, while independent
+parents may run workers concurrently within the shared service ceiling.
+
+Each invocation records a supervisor work task and a separate inference task.
+The work task links to the parent; the inference task links to the work task.
+Successful tool results contain both IDs and `untrusted_output`. Worker acceptance
+and completion are durable before the result is released. `text` checks only
+nonempty output; `go_source` additionally parses Go syntax, not types or tests.
+These checks do not prove task correctness or replace user feedback. The inference
+task holds the answer history; work-task lifecycle events hold acceptance evidence.
+
+Parent cancellation and work-task cancellation cancel and join the child.
+Submission ownership fences all three logs; stale ownership cannot begin a child
+turn. General recovery of interrupted delegation, including automatic projection
+of completed multi-task submission trees, remains operator-inspection-only.
+Delegation does not automatically update fitness or audit the child.
+
+`delegate_max_calls` is 1–16 per parent execution, including failed admitted
+attempts. `delegate_max_cost` is a separate **per-call configured estimate** ceiling,
+not the parent's request budget or a measured billing cap. Up to max-calls times
+that estimate can be spent in addition to parent inference. Provider billing
+can differ from estimates. Disable delegation by leaving `delegate_model` empty.
+
 ## Local HTTP service
 
 Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters, then run `darwin serve --config examples/local.yaml`. The configured daemon address must be loopback. This foreground process stops on SIGINT/SIGTERM and cancels active requests during shutdown. It is not yet an installed operating-system service.
@@ -711,7 +759,7 @@ and production-scale metrics qualification remain unfinished.
 
 ## Next sprints
 
-1. Connect authorized tools and bounded delegation to application execution.
+1. Extend inference-only delegation to scoped read-only tools, parallel child batches and approved single-writer tools.
 2. Expand safe fallback qualification and automatic validated outcome updates.
 3. Add automatic context summarization and knowledge maintenance beyond current operator-compacted continuation, scoped factual memory and validated procedural-skill retrieval.
 4. Add live events, recovery and cross-provider qualification.

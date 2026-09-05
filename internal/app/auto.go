@@ -245,6 +245,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	if cfg.Tools.Enabled {
 		inference.Tools = []providers.Tool{readFileSpec()}
 	}
+	if cfg.Workers.DelegateModel != "" {
+		inference.Tools = append(inference.Tools, delegateSpec())
+	}
 	contextTokens, estimateErr := providers.EstimateContext(inference)
 	if estimateErr != nil {
 		return Result{}, ErrAdmission
@@ -432,6 +435,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	if ctx.Err() != nil {
 		return Result{}, ErrAdmission
 	}
+	r.delegate = s.bindDelegate(r)
 	result, runErr := runExplicitAdmitted(executionCtx, cfg, r, s.secret)
 	if runErr != nil {
 		s.discovery.clear()

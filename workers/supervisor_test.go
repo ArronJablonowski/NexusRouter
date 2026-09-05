@@ -42,8 +42,8 @@ func TestWorkerAcceptanceDurable(t *testing.T) {
 	want := []runtime.Kind{runtime.TaskStarted, runtime.WorkerStarted, runtime.EvaluationRecorded, runtime.WorkerCompleted, runtime.TaskCompleted}
 	filtered := []runtime.Kind{}
 	for _, e := range events {
-		if e.CorrelationID != "parent" {
-			t.Fatal("parent correlation lost")
+		if e.CorrelationID != "child" || (e.Kind == runtime.TaskStarted && e.Data.ParentTaskID != "parent") {
+			t.Fatal("task correlation or parent linkage lost")
 		}
 		if e.Kind != runtime.WorkerHeartbeat {
 			filtered = append(filtered, e.Kind)

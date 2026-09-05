@@ -18,8 +18,12 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 }
 
 func contextTools(cfg config.Settings) []string {
+	var names []string
 	if cfg.Tools.Enabled {
-		return []string{"read_file"}
+		names = append(names, "read_file")
 	}
-	return nil
+	if cfg.Workers.DelegateModel != "" {
+		names = append(names, "delegate")
+	}
+	return names
 }
