@@ -255,6 +255,14 @@ provide concurrency safety, cancellation, honest activation validation and local
 egress compliance: this is not a sandbox or a proof of workflow correctness.
 Automatic drafting, regression detection and lifecycle hooks remain unfinished.
 
+Filesystem stores also implement the optional `skills.RevisionStore` extension.
+Read `ActivationState`, then use `ActivateAt` or `RollbackAt` for delayed decisions
+that must reject intervening activations, including A→B→A. The full revision is
+checked under the mutation lock after candidate validation. Draft-only changes
+do not invalidate it. Legacy `Activate`/`Rollback` compare active versions only.
+Revision checks do not grant permission or replace deterministic validation and
+the automatic-mutation kill switch; the runtime still does not mutate skills.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

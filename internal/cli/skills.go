@@ -9,11 +9,12 @@ import (
 	"flag"
 	"io"
 	"regexp"
+	"strings"
 
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
-const skillsUsage = "usage: darwin skills list|show|history|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--limit 100]\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable."
+const skillsUsage = "usage: darwin skills list|show|history|state|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--expected-revision sha256] [--limit 100]\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable."
 
 var skillIdentifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
@@ -35,9 +36,23 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	command := args[0]
 	switch command {
-	case "list", "show", "history", "draft", "rollback":
+	case "list", "show", "history", "state", "draft", "rollback":
 	default:
 		return skillsError(stderr, skillsUsage, 2)
+	}
+	seen := map[string]bool{}
+	for i := 1; i < len(args); i++ {
+		if !strings.HasPrefix(args[i], "-") {
+			return skillsError(stderr, skillsUsage, 2)
+		}
+		key, _, equal := strings.Cut(strings.TrimLeft(args[i], "-"), "=")
+		if key == "" || seen[key] {
+			return skillsError(stderr, skillsUsage, 2)
+		}
+		seen[key] = true
+		if !equal {
+			i++ // All supported flags consume exactly one value.
+		}
 	}
 	f := flag.NewFlagSet("skills", flag.ContinueOnError)
 	f.SetOutput(io.Discard)
@@ -46,11 +61,12 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	name := f.String("name", "", "skill name")
 	version := f.String("version", "", "version to inspect; default active")
 	expected := f.String("expected-version", "", "current active version required for rollback")
+	revision := f.String("expected-revision", "", "optional exact activation revision required for rollback")
 	limit := f.Int("limit", 100, "maximum active metadata entries")
 	if f.Parse(args[1:]) != nil || f.NArg() != 0 || *root == "" || !skillIdentifier.MatchString(*scope) {
 		return skillsError(stderr, skillsUsage, 2)
 	}
-	if (command == "show" || command == "history" || command == "rollback") && !skillIdentifier.MatchString(*name) {
+	if (command == "show" || command == "history" || command == "state" || command == "rollback") && !skillIdentifier.MatchString(*name) {
 		return skillsError(stderr, skillsUsage, 2)
 	}
 	invalidFlag := false
@@ -58,6 +74,7 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if v.Name == "name" && (command == "list" || command == "draft") ||
 			v.Name == "version" && command != "show" ||
 			v.Name == "expected-version" && command != "rollback" ||
+			v.Name == "expected-revision" && command != "rollback" ||
 			v.Name == "limit" && command != "list" {
 			invalidFlag = true
 		}
@@ -66,6 +83,10 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return skillsError(stderr, skillsUsage, 2)
 	}
 	key := skills.Key{Scope: *scope, Name: *name}
+	state := skills.ActivationState{Version: 1, Key: key, Active: *expected, Revision: *revision}
+	if seen["expected-revision"] && state.Validate() != nil {
+		return skillsError(stderr, skillsUsage, 2)
+	}
 	var draft skills.Draft
 	if command == "draft" {
 		b, err := io.ReadAll(io.LimitReader(stdin, (256<<10)+1))
@@ -108,10 +129,16 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		result, err = store.Load(ctx, key, *version)
 	case "history":
 		result, err = store.History(ctx, key)
+	case "state":
+		result, err = store.ActivationState(ctx, key)
 	case "draft":
 		result, err = store.Draft(ctx, draft, false)
 	case "rollback":
-		err = store.Rollback(ctx, key, *expected, false)
+		if seen["expected-revision"] {
+			err = store.RollbackAt(ctx, state, false)
+		} else {
+			err = store.Rollback(ctx, key, *expected, false)
+		}
 		result = struct {
 			Key            skills.Key `json:"key"`
 			RolledBackFrom string     `json:"rolled_back_from"`
@@ -120,7 +147,7 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	err = errors.Join(err, store.Close())
 	if err != nil {
 		if errors.Is(err, skills.ErrConflict) {
-			return skillsError(stderr, "skills: active version changed; inspect before retrying", 1)
+			return skillsError(stderr, "skills: activation state changed; inspect before retrying", 1)
 		}
 		return skillsError(stderr, "skills: operation failed; requested record unavailable or invalid", 1)
 	}

@@ -6,8 +6,23 @@ import (
 )
 
 // Activate validates outside the storage lock, then compares the active version
-// against expectedActive. Concurrent activation cannot silently overwrite it.
+// against expectedActive. This legacy check detects version changes, not an
+// intervening activation followed by restoration; use ActivateAt for epoch CAS.
 func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive string, validator Validator, automatic bool) error {
+	return s.activate(ctx, key, id, expectedActive, nil, validator, automatic)
+}
+
+// ActivateAt validates a candidate outside the storage lock, then atomically
+// compares the complete activation revision. Returning to the same version
+// after an intervening transition does not make a stale observation current.
+func (s *FileStore) ActivateAt(ctx context.Context, expected ActivationState, id string, validator Validator, automatic bool) error {
+	if ctx == nil || expected.Validate() != nil || !s.permitted(expected.Key) {
+		return ErrInvalid
+	}
+	return s.activate(ctx, expected.Key, id, expected.Active, &expected, validator, automatic)
+}
+
+func (s *FileStore) activate(ctx context.Context, key Key, id, expectedActive string, expected *ActivationState, validator Validator, automatic bool) error {
 	if !versionID(id) || (expectedActive != "" && !versionID(expectedActive)) {
 		return ErrInvalid
 	}
@@ -33,6 +48,15 @@ func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive st
 			return ErrDisabled
 		}
 		e := c.Skills[key.index()]
+		if expected != nil {
+			current, err := stateForEntry(e)
+			if err != nil {
+				return err
+			}
+			if current != *expected {
+				return ErrConflict
+			}
+		}
 		if e.Active != expectedActive {
 			return ErrConflict
 		}
@@ -55,8 +79,22 @@ func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive st
 
 // Rollback reverses the latest activation not already undone. It cannot activate
 // an unvalidated draft or undo the same historical activation twice.
-// expectedActive protects against a stale regression detector.
+// The legacy expectedActive check protects against changed versions, but not
+// intervening transitions that restore that version. Use RollbackAt for epoch CAS.
 func (s *FileStore) Rollback(ctx context.Context, key Key, expectedActive string, automatic bool) error {
+	return s.rollback(ctx, key, expectedActive, nil, automatic)
+}
+
+// RollbackAt undoes one activation only if the observed activation revision is
+// still current. The comparison and transition share the storage mutation lock.
+func (s *FileStore) RollbackAt(ctx context.Context, expected ActivationState, automatic bool) error {
+	if ctx == nil || expected.Validate() != nil || !s.permitted(expected.Key) {
+		return ErrInvalid
+	}
+	return s.rollback(ctx, expected.Key, expected.Active, &expected, automatic)
+}
+
+func (s *FileStore) rollback(ctx context.Context, key Key, expectedActive string, expected *ActivationState, automatic bool) error {
 	if !s.permitted(key) || !versionID(expectedActive) {
 		return ErrInvalid
 	}
@@ -67,6 +105,15 @@ func (s *FileStore) Rollback(ctx context.Context, key Key, expectedActive string
 		e, ok := c.Skills[key.index()]
 		if !ok {
 			return ErrNotFound
+		}
+		if expected != nil {
+			current, err := stateForEntry(e)
+			if err != nil {
+				return err
+			}
+			if current != *expected {
+				return ErrConflict
+			}
 		}
 		if e.Active != expectedActive {
 			return ErrConflict

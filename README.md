@@ -859,7 +859,7 @@ Automatic execution permits one fallback after a provider-declared retryable fir
 
 `darwin memory list|show|put|delete --db path --scope scope` inspects and maintains factual memory. Put reads a complete fact record as JSON from stdin; corrections and deletion require an expected revision. Deletion is logical, not secure erasure of WAL or backups.
 
-`darwin skills list|show|history|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
+`darwin skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
 
 Rollback undoes the latest activation that has not already been reversed, not
 the latest appearance of a version ID. Reactivating an older version therefore
@@ -867,8 +867,12 @@ does not make past undo operations reusable. Rollback stops at the first active
 version; it does not deactivate that version or delete immutable drafts. Reads
 validate the complete activation chain, validation evidence and final active
 pointer. Inconsistent histories are rejected without automatic repair or file
-changes. `--expected-version` guards the current version, not a unique activation
-epoch; automatic regression detection and epoch-bound decisions remain future work.
+changes. `--expected-version` alone guards the current version, not a unique
+activation epoch. Read `skills state --name NAME` and supply its `revision` as
+`rollback --expected-revision REVISION` alongside its active version to reject
+stale observations even after A→B→A changes. Draft-only changes preserve the
+revision. This is a concurrency check, not authorization or an automatic
+regression detector.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

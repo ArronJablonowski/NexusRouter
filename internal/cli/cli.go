@@ -36,7 +36,7 @@ Usage:
   darwin approval-decision --config path < decision.json
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
-  darwin skills list|show|history|draft|rollback --root path --scope scope
+  darwin skills list|show|history|state|draft|rollback --root path --scope scope
   darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
   darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
   darwin audits list|show|attempts --db path [--task id] [--id audit-id]
