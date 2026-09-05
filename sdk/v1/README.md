@@ -85,7 +85,23 @@ executes a model/tool, or assumes an interrupted task is safe to retry.
 task this is not proof the worker stopped. Returned conversation/tool content can
 be sensitive even after credential redaction. Mutating the returned snapshot does
 not change stored history. Histories beyond the inspection bounds require paged
-event inspection through the HTTP API rather than unbounded reconstruction.
+event inspection through `ReadEvents` or the HTTP API rather than unbounded reconstruction.
+
+`ReadEvents(ctx, taskID, afterSequence, limit)` provides paged durable events
+directly to embedded consumers. Start at sequence0, process a validated page, then
+save its `NextSequence` for reconnection. Limits are1–100 events with an8MiB page
+payload budget; the reader also validates the current head independently.
+An individually oversized event fails with `sessions.ErrEventTooLarge`; a cursor
+beyond the current head fails with `sessions.ErrEventCursor`. Missing/corrupt
+storage returns a generic inspection error and no partial events.
+
+Each page is transactionally consistent, but the head can advance between pages.
+`HasMore == false` means caught up at that read, not that an active task ended.
+Check `State`, and poll again only as needed using your own deadline/backoff.
+This method never dispatches, resumes or cancels work. It is not a live
+subscription or an exactly-once delivery guarantee: persist your cursor only
+after processing, and deduplicate consumer side effects across retries. Event
+content can include sensitive prompts/tool output; render and store it safely.
 
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local

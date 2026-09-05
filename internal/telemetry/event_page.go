@@ -24,9 +24,14 @@ func (s *Store) ReadEventPage(ctx context.Context, task string, after int64, lim
 		return p, err
 	}
 	defer tx.Rollback()
-	if err = tx.QueryRowContext(ctx, "SELECT session_id,state,sequence FROM task_heads WHERE task_id=?", task).Scan(&p.SessionID, &p.State, &p.HeadSequence); err != nil {
+	var session, state sql.NullString
+	if err = tx.QueryRowContext(ctx, "SELECT CASE WHEN length(CAST(session_id AS BLOB))<=128 THEN session_id END,CASE WHEN length(CAST(state AS BLOB))<=16 THEN state END,sequence FROM task_heads WHERE task_id=?", task).Scan(&session, &state, &p.HeadSequence); err != nil {
 		return p, err
 	}
+	if !session.Valid || !state.Valid {
+		return p, sessions.ErrEventPage
+	}
+	p.SessionID, p.State = session.String, state.String
 	if p.HeadSequence < 1 || !sessions.ValidEventPageID(p.SessionID) {
 		return p, sessions.ErrEventPage
 	}
@@ -35,10 +40,10 @@ func (s *Store) ReadEventPage(ctx context.Context, task string, after int64, lim
 	}
 	// Prove the complete head even for an empty page. Bound its extra read
 	// independently before loading any payload into the process.
-	var headID string
+	var headID sql.NullString
 	var headSize int64
-	err = tx.QueryRowContext(ctx, "SELECT id,length(CAST(body AS BLOB)) FROM events WHERE task_id=? AND sequence=?", task, p.HeadSequence).Scan(&headID, &headSize)
-	if err != nil || headSize < 1 {
+	err = tx.QueryRowContext(ctx, "SELECT CASE WHEN length(CAST(id AS BLOB))<=128 THEN id END,length(CAST(body AS BLOB)) FROM events WHERE task_id=? AND sequence=?", task, p.HeadSequence).Scan(&headID, &headSize)
+	if err != nil || !headID.Valid || headID.String == "" || headSize < 1 {
 		return p, sessions.ErrEventPage
 	}
 	if headSize > sessions.MaxEventPageBytes {
@@ -49,11 +54,11 @@ func (s *Store) ReadEventPage(ctx context.Context, task string, after int64, lim
 		return p, sessions.ErrEventPage
 	}
 	var head runtime.Event
-	if int64(len(headBody)) != headSize || json.Unmarshal(headBody, &head) != nil || head.Validate() != nil || headID != head.ID || head.TaskID != task || head.SessionID != p.SessionID || head.CorrelationID != task || head.Sequence != p.HeadSequence || !sessions.EventPageStateMatches(p.State, head.Kind) || (head.Sequence == 1) != (head.Kind == runtime.TaskStarted) {
+	if int64(len(headBody)) != headSize || json.Unmarshal(headBody, &head) != nil || head.Validate() != nil || headID.String != head.ID || head.TaskID != task || head.SessionID != p.SessionID || head.CorrelationID != task || head.Sequence != p.HeadSequence || !sessions.EventPageStateMatches(p.State, head.Kind) || (head.Sequence == 1) != (head.Kind == runtime.TaskStarted) {
 		return p, sessions.ErrEventPage
 	}
 	headBody = nil
-	rows, err := tx.QueryContext(ctx, "SELECT id,sequence,length(CAST(body AS BLOB)) FROM events WHERE task_id=? AND sequence>? AND sequence<=? ORDER BY sequence LIMIT ?", task, after, p.HeadSequence, limit)
+	rows, err := tx.QueryContext(ctx, "SELECT CASE WHEN length(CAST(id AS BLOB))<=128 THEN id END,sequence,length(CAST(body AS BLOB)) FROM events WHERE task_id=? AND sequence>? AND sequence<=? ORDER BY sequence LIMIT ?", task, after, p.HeadSequence, limit)
 	if err != nil {
 		return p, err
 	}
@@ -64,10 +69,16 @@ func (s *Store) ReadEventPage(ctx context.Context, task string, after int64, lim
 	entries := []entry{}
 	for rows.Next() {
 		var e entry
-		if err := rows.Scan(&e.id, &e.sequence, &e.size); err != nil {
+		var id sql.NullString
+		if err := rows.Scan(&id, &e.sequence, &e.size); err != nil {
 			rows.Close()
 			return p, err
 		}
+		if !id.Valid || id.String == "" {
+			rows.Close()
+			return p, sessions.ErrEventPage
+		}
+		e.id = id.String
 		entries = append(entries, e)
 	}
 	err = rows.Err()

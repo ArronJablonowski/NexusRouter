@@ -33,6 +33,48 @@ func eventPageStore(t *testing.T) (*Store, string) {
 	return db, path
 }
 
+func TestEventPageBoundsMetadataBeforePayloads(t *testing.T) {
+	for _, target := range []string{"session", "state", "head_id", "entry_id", "empty_head", "empty_entry"} {
+		t.Run(target, func(t *testing.T) {
+			db, _ := eventPageStore(t)
+			huge := strings.Repeat("private-metadata", 100000)
+			var err error
+			switch target {
+			case "session":
+				_, err = db.db.Exec(`UPDATE task_heads SET session_id=?`, huge)
+			case "state":
+				_, err = db.db.Exec(`UPDATE task_heads SET state=?`, huge)
+			case "head_id":
+				_, err = db.db.Exec(`UPDATE events SET id=? WHERE sequence=4`, huge)
+			case "entry_id":
+				_, err = db.db.Exec(`UPDATE events SET id=? WHERE sequence=2`, huge)
+			case "empty_head":
+				_, err = db.db.Exec(`UPDATE events SET id='' WHERE sequence=4`)
+			case "empty_entry":
+				_, err = db.db.Exec(`UPDATE events SET id='' WHERE sequence=2`)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := db.ReadEventPage(context.Background(), "task", 0, 100)
+			if !errors.Is(err, sessions.ErrEventPage) || len(page.Events) != 0 || strings.Contains(page.SessionID, "private-metadata") || strings.Contains(page.State, "private-metadata") {
+				t.Fatal("metadata leak or late validation", page, err)
+			}
+		})
+	}
+}
+
+func TestEventPageAllowsOpaqueColonEventIDs(t *testing.T) {
+	db, _ := eventPageStore(t)
+	if _, err := db.db.Exec(`UPDATE events SET id='event:'||sequence,body=json_set(body,'$.id','event:'||sequence)`); err != nil {
+		t.Fatal(err)
+	}
+	page, err := db.ReadEventPage(context.Background(), "task", 0, 100)
+	if err != nil || len(page.Events) != 4 || page.Events[0].ID != "event:1" || page.Events[3].ID != "event:4" {
+		t.Fatal(page, err)
+	}
+}
+
 func TestReadEventPageRestartAndCursor(t *testing.T) {
 	db, path := eventPageStore(t)
 	ctx := context.Background()

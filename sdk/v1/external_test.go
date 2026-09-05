@@ -162,6 +162,16 @@ func main() {
  snapshot,err:=client.InspectTask(ctx,task)
  check(err==nil&&snapshot.Version==1&&snapshot.TaskID==task&&snapshot.State=="completed"&&len(snapshot.Messages)==2,"inspection failed")
  check(strings.Contains(snapshot.Messages[1].Content,"answer")&&!strings.Contains(snapshot.Messages[1].Content,"fake-sdk-private-marker"),"inspection secret")
+ reopened,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1]});check(err==nil,"reader construction")
+ var cursor int64
+ for {
+  page,err:=reopened.ReadEvents(ctx,task,cursor,2)
+  check(err==nil&&page.Validate()==nil&&page.FromSequence==cursor,"event page failed")
+  for _,e:=range page.Events {check(e.Sequence==cursor+1,"replay order");cursor=e.Sequence;check(!strings.Contains(e.Data.Text,"fake-sdk-private-marker"),"replay secret")}
+  check(cursor==page.NextSequence,"cursor mismatch")
+  if !page.HasMore {check(page.State=="completed"&&cursor==seq,"incomplete replay");break}
+ }
+ tail,err:=reopened.ReadEvents(ctx,task,cursor,2);check(err==nil&&len(tail.Events)==0&&!tail.HasMore,"tail failed")
  check(client.Feedback(ctx,task,false,0)==nil,"feedback failed")
  check(client.Feedback(ctx,task,false,0)==nil,"feedback retry failed")
  history,err:=client.FeedbackHistory(ctx,task)
