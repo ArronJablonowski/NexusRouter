@@ -67,6 +67,11 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		Summarize:       service.SummarizeTask,
+		SummaryAttempt:  db.SummaryAttempt,
+		SummaryAttempts: db.ListSummaryAttempts,
+		ReviewSummary:   service.ReviewSummary,
+		SummaryReviews:  db.SummaryReviews,
 		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
 			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
 		},

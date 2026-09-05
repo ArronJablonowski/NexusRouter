@@ -21,6 +21,11 @@ import (
 )
 
 type Services struct {
+	Summarize       func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
+	SummaryAttempt  func(context.Context, string) (sessions.SummaryAttempt, error)
+	SummaryAttempts func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
+	ReviewSummary   func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
+	SummaryReviews  func(context.Context, string) ([]sessions.SummaryReview, error)
 	FeedbackHistory func(context.Context, string) ([]evaluation.Record, error)
 	ReviseFeedback  func(context.Context, string, string, bool) error
 	Run             func(context.Context, app.Request) (app.Result, error)
@@ -83,6 +88,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/summaries" || strings.HasPrefix(r.URL.Path, "/v1/summaries/"):
+		h.serveSummaries(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/feedback/revisions" && r.Method == http.MethodPost:
 		h.serveFeedbackRevision(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/feedback/") && r.Method == http.MethodGet:

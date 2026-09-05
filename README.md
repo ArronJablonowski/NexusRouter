@@ -187,7 +187,7 @@ Drafting never modifies the source, starts a continuation or affects fitness. In
 
 Review is a local operator attestation, not automated proof of accuracy, and does not itself run a model. Rejection blocks subsequent direct admissions of that stored draft; it does not cancel already-started work or erase summary copies in existing sessions. Newly configured redaction that changes an approved summary requires a fresh draft and review. The manual summary-file route remains available for explicitly operator-supplied summaries.
 
-Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation, HTTP draft/review management and mid-task compaction remain unfinished.
+Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation and mid-task compaction remain unfinished.
 
 ## Local HTTP service
 
@@ -198,9 +198,16 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /health`: application/database health; provider health is explicitly not checked yet.
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
+- `POST /v1/summaries`: JSON `{"task_id":"TASK_ID","model_id":"SUMMARY_MODEL_ID","keep":6,"max_cost":0}` generates one draft and returns its persisted summary-attempt record with HTTP 201. It waits for completion; it does not activate the draft. A failed admitted invocation returns a generic error and `summary_attempt_id` for inspection.
+- `GET /v1/summaries/{id}`: inspect a stored summary attempt, including draft content when available.
+- `POST /v1/summaries/query`: read-only JSON query with optional `task_id`, exclusive `after` ID cursor and `limit` (1–100, default 100). `{}` lists the first page across tasks. Query parameters remain disallowed; filters use this bounded body instead.
+- `POST /v1/summaries/reviews`: JSON `{"attempt_id":"SUMMARY_ATTEMPT_ID","decision":"approved","note":"Describe your source checks"}` records an operator decision with HTTP 201. Use `rejected` to deny direct reuse and supply `expected_id` with the current review ID for later decisions. Stale decisions return 409; admission/policy denials return 422. Possession of the daemon token authorizes this operator action; keep it out of model-accessible files.
+- `GET /v1/summaries/{id}/reviews`: read the immutable review chain, capped at 100 entries.
 - `POST /v1/feedback`: JSON `{"task_id":"TASK_ID","outcome":"accepted","attempt_cost":0}` (or `rejected`). Requires an observed final-attempt cost. Identical retries return 200 without adding samples; conflicts return 409, and ineligible task histories return 422. The body limit is 4 KiB and feedback shares daemon admission capacity with tasks.
 - `GET /v1/feedback/{task_id}`: original final-attempt evaluation followed by its revision history.
 - `POST /v1/feedback/revisions`: JSON `{"task_id":"TASK_ID","expected_id":"EVALUATION_ID","outcome":"rejected"}` (or `accepted`). Uses the same subjective-only correction policy as the CLI, with a 4 KiB body limit and shared capacity. Identical retries return 200; stale/conflicting corrections return 409; evidence-policy denials return 422. Execution measurements cannot be changed through this endpoint.
+
+All summary endpoints share task concurrency capacity and enforce authentication, origin denial and request deadlines. Summary POST bodies require JSON and are limited to 8 KiB; review notes remain limited to 4 KiB. Overload returns 503 with `Retry-After`. Review is still operator attestation, not an automatic quality judge. The OpenAI-compatible endpoint does not accept these Darwin-native extensions.
 
 `POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, and optional `stream`. Other OpenAI parameters are rejected. SSE is buffered until durable completion and labeled `X-Darwin-Stream-Mode: buffered`; this is not live token streaming. Usage is omitted when unavailable.
 
