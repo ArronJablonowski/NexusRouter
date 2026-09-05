@@ -43,6 +43,11 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 			t.Fatal("invalid feature metadata")
 		}
 		name := fields[0]
+		// CLI0.153.4 advertises this removed flag but omits it from config.
+		// Do not submit an obsolete override and treat its absence as safety.
+		if name == "apps_mcp_path_override" && fields[1] == "removed" {
+			continue
+		}
 		features = append(features, name)
 		value := "false"
 		if name == "skip_host_skill_discovery" {
@@ -86,6 +91,21 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 	if !result.skillsDisabled {
 		t.Fatal("skill disable controls not fully observed")
 	}
+	dir := t.TempDir()
+	p, err := codexrpc.StartProcess(ctx, codexrpc.ProcessSpec{Executable: bin, Args: args, Env: env, Dir: dir})
+	if err != nil {
+		t.Fatal("checked process unavailable")
+	}
+	defer p.Close()
+	session, err := NewCheckedSession(ctx, p, Options{Model: "gpt-5.6-sol", CWD: dir}, features)
+	if err != nil {
+		t.Fatal("checked session unavailable")
+	}
+	defer session.Close()
+	if session.Prepare(ctx) != nil {
+		t.Fatal("same-wire launch checks failed")
+	}
+	t.Log("same-wire session preparation passed; no thread, turn or task input sent")
 }
 
 // Bound capture while reading, not after an unbounded exec.Output allocation.
@@ -138,6 +158,12 @@ func probeLaunchConfig(t *testing.T, ctx context.Context, bin string, args, env 
 			}
 			if kind == codexrpc.Notification {
 				notifications++
+				switch e.Method {
+				case "configWarning", "deprecationNotice", "warning", "account/updated", "account/rateLimits/updated", "remoteControl/status/changed", "app/list/updated", "skills/changed", "error":
+					t.Logf("known startup notification: %s (payload withheld)", e.Method)
+				default:
+					t.Log("startup notification outside diagnostic allowlist (method and payload withheld)")
+				}
 				continue
 			}
 			// Do not answer requests, print errors, or create threads to make a

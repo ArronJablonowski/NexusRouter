@@ -47,6 +47,9 @@ type Session struct {
 	items                      map[string]*itemState
 	usageTotal, usageReported  providers.Usage
 	usageUpdated               bool
+	prepared                   bool
+	launchFeatures             []string
+	launchRequestID            int
 }
 
 func NewSession(ctx context.Context, w Wire, options Options) (*Session, error) {
@@ -153,18 +156,8 @@ func (s *Session) begin(req providers.Request) error {
 		names[tool.Name] = true
 		definitions = append(definitions, map[string]any{"type": "function", "name": tool.Name, "description": tool.Description, "inputSchema": tool.Parameters})
 	}
-	initialized, err := s.call("1", "initialize", map[string]any{"clientInfo": map[string]string{"name": "darwin_router", "version": "0.1.0"}, "capabilities": map[string]bool{"experimentalApi": true}})
-	if err != nil {
+	if err := s.prepare(); err != nil {
 		return err
-	}
-	var initialization struct {
-		UserAgent string `json:"userAgent"`
-	}
-	if decodePayload(initialized, &initialization) != nil || initialization.UserAgent == "" {
-		return failure(false)
-	}
-	if s.w.Write(codexrpc.Envelope{Method: "initialized"}) != nil {
-		return failure(false)
 	}
 	dynamic := []map[string]any{}
 	if len(definitions) > 0 {
@@ -252,6 +245,9 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 			return nil, err
 		}
 		kind, _ := e.Kind()
+		if s.launchFeatures != nil && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
+			continue
+		}
 		if kind == codexrpc.Response || kind == codexrpc.ErrorResponse {
 			if !bytes.Equal(e.ID, []byte(id)) || kind == codexrpc.ErrorResponse {
 				return nil, failure(s.emitted)
@@ -261,7 +257,7 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 		if kind == codexrpc.Request && (method != "turn/start" || e.Method != "item/tool/call") {
 			return nil, failure(s.emitted)
 		}
-		if method == "initialize" || (method == "thread/start" && (kind != codexrpc.Notification || (e.Method != "thread/started" && e.Method != "thread/status/changed"))) {
+		if (method != "thread/start" && method != "turn/start") || (method == "thread/start" && (kind != codexrpc.Notification || (e.Method != "thread/started" && e.Method != "thread/status/changed"))) {
 			return nil, failure(s.emitted)
 		}
 		if len(s.queue) >= 64 {

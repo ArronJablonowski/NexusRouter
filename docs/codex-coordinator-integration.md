@@ -166,10 +166,41 @@ of built-in model tools, nor proof of process containment or prompt isolation.
 The probe still submits no thread, turn or task data. CLI metadata capture is
 now bounded during reading rather than checked only after allocation.
 
-These observations do not admit the launcher for inference. Same-process
-admission, built-in tool/context verification, application wiring and lifecycle
-containment remain open. The absent `apps_mcp_path_override` feature remains
-unknown rather than silently counted as disabled.
+These observations do not admit the launcher for inference. Built-in tool/context
+verification, application wiring and lifecycle containment remain open.
+
+### Same-wire session preflight
+
+`NewCheckedSession` accepts a trusted host feature profile and an already-owned
+wire. Construction is inert. `Prepare` performs initialization once, then checks
+effective configuration and MCP/skill/hook inventories on that same connection
+without creating a thread or sending input. `Stream` uses the same path and
+rechecks immediately before thread creation even after an earlier `Prepare`.
+Control request IDs are distinct across checks; a prior successful observation
+is not a reusable permission token. Failures close the connection and cannot
+answer a server tool request or send task data.
+
+Checks require exact feature values, explicit per-entry disables, zero MCP
+tools, disabled skills, empty hooks/errors/warnings and matching skill/hook cwd.
+Missing inventories, pagination, aliases and malformed fields fail closed.
+These are configuration/inventory checks, not atomic protection against external
+configuration changes or a complete built-in capability attestation. The host
+must supply the full supported feature profile and enforce privacy before launch.
+
+Installed CLI metadata identifies `apps_mcp_path_override` as **removed**; the
+pinned diagnostic now omits that obsolete override. All 134 remaining supplied
+feature controls are observed with their expected values. The unsolicited
+startup notice is `remoteControl/status/changed`; checked RPC calls accept only
+an explicit `disabled` status and discard identity metadata. Other statuses or
+unrecognized traffic fail. A disabled notice during later answer streaming still
+fails closed; that availability case is not qualified by startup observations.
+
+The opt-in diagnostic adds a fourth process using the actual checked-session
+`Prepare` path. It passed with the existing login and submitted no thread, turn
+or user input. Controlled-wire tests separately verify Prepare-to-Stream reuse,
+fresh checks after preparation, changed-state rejection, cancellation and no
+task-data release after failed checks. Real inference and integrated delegation
+remain pending, as do task-owned launcher/application integration and containment.
 
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed
