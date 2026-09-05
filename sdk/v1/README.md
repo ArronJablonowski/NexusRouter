@@ -340,6 +340,25 @@ it. File catalogs upgrade to schema 2 on first publication; older binaries rejec
 that schema. Receipts and version visibility commit together, but pre-commit
 failures may leave unreferenced files. There is no automatic cleanup.
 
+`Client.SkillActivationState(ctx, key)` reads the configured file store's current
+activation revision without creating it. `Client.ActivateSkillVersion(ctx,
+expected, versionID, validator)` validates an existing immutable version and
+activates it only if the observed revision remains current. Enable
+`skills.auto_activate_after_validation`; the configured scope must match and
+injected retrieval stores cannot be mutated. Read state again after success to
+obtain the new revision. A stale observation rejects rather than silently
+replacing another activation.
+
+Supply a trusted `skills.Validator` that checks the actual candidate and returns
+attributable deterministic evidence. Serialization validity or an LLM's opinion
+is not sufficient. Validators are host Go code, not sandboxed tools: they must be
+read-only, safe to invoke again, honor cancellation, and must not bypass tool or
+privacy policy. Core activation uses a cooperative three-second deadline and
+sanitizes callback failures; it cannot forcibly stop an uncooperative callback.
+Current credential collisions in the candidate or proof identifier reject, not
+silently rewrite evidence. There is no remote endpoint accepting self-declared
+validation proof and no background activation scheduler.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records

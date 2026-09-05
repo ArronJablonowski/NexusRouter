@@ -1000,6 +1000,16 @@ visibility and its receipt share one catalog commit. A failure before that commi
 can leave an unreferenced version file; automatic cleanup and power-loss
 qualification remain open.
 
+Go hosts can validate and activate a published version through
+`SkillActivationState` and `ActivateSkillVersion`, using the configured scope
+and an observed activation revision. The activation setting must be enabled and
+a trusted deterministic validator must accept the actual candidate. Model review
+alone is not activation evidence. Validators are cooperative read-only host code,
+not sandboxed commands; they must obey privacy/tool policy and support repeated
+invocation. Stale revisions, failed validation, credential collisions and
+callback errors reject without activating the candidate. This does not schedule
+automatic learning or expose remote proof submission through CLI/HTTP.
+
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.

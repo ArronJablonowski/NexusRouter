@@ -8,6 +8,9 @@ import (
 // Activate validates outside the storage lock, then compares the active version
 // against expectedActive. This legacy check detects version changes, not an
 // intervening activation followed by restoration; use ActivateAt for epoch CAS.
+// Validators are trusted cooperative host code, not sandboxed execution. The
+// three-second deadline includes validation and commit; callbacks are joined,
+// never abandoned, and their error/panic payloads are not exposed.
 func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive string, validator Validator, automatic bool) error {
 	return s.activate(ctx, key, id, expectedActive, nil, validator, automatic)
 }
@@ -16,27 +19,48 @@ func (s *FileStore) Activate(ctx context.Context, key Key, id, expectedActive st
 // compares the complete activation revision. Returning to the same version
 // after an intervening transition does not make a stale observation current.
 func (s *FileStore) ActivateAt(ctx context.Context, expected ActivationState, id string, validator Validator, automatic bool) error {
-	if ctx == nil || expected.Validate() != nil || !s.permitted(expected.Key) {
+	if ctx == nil || s == nil || expected.Validate() != nil || !s.permitted(expected.Key) {
 		return ErrInvalid
 	}
 	return s.activate(ctx, expected.Key, id, expected.Active, &expected, validator, automatic)
 }
 
 func (s *FileStore) activate(ctx context.Context, key Key, id, expectedActive string, expected *ActivationState, validator Validator, automatic bool) error {
-	if !versionID(id) || (expectedActive != "" && !versionID(expectedActive)) {
+	if ctx == nil || s == nil || !s.permitted(key) || !versionID(id) || (expectedActive != "" && !versionID(expectedActive)) {
 		return ErrInvalid
 	}
-	if validator == nil {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if s.readOnly || (automatic && !s.automatic.Load()) {
+		return ErrDisabled
+	}
+	if validator == nil || nilRegressionValidator(validator) {
 		return ErrValidation
 	}
-	if automatic && !s.automatic.Load() {
-		return ErrDisabled
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	current, err := s.ActivationState(ctx, key)
+	if err != nil {
+		return err
+	}
+	if current.Active != expectedActive || (expected != nil && current != *expected) {
+		return ErrConflict
 	}
 	v, err := s.Load(ctx, key, id)
 	if err != nil {
 		return err
 	}
-	evidence, err := validator.Validate(ctx, v)
+	if v.Validate() != nil {
+		return ErrValidation
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	evidence, err := regressionEvidence(ctx, validator, v)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if err != nil {
 		return ErrValidation
 	}
