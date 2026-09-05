@@ -106,6 +106,8 @@ Automatic routing defaults to a zero-cost ceiling. CLI routing controls are `--d
 
 `darwin skills list|show|history|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
 
+`darwin audits list --db path --task TASK_ID` and `darwin audits show --db path --id AUDIT_ID` inspect immutable advisory audits. Lists accept `--after` and `--limit` (1–100); inspection never creates storage. Audit records are separate from fitness and retain reported usage rather than fabricated dollar costs. Automatic audit production is not yet connected; records currently require the programmatic storage interface. Findings may contain sensitive content, so protect exports.
+
 ## Next sprints
 
 1. Connect authorized tools and bounded delegation to application execution.
