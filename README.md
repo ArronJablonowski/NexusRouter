@@ -331,6 +331,14 @@ does not prove its process stopped, and an open call cannot distinguish a crash
 before a write from one after a write. Neither observation permits automatic
 retry or lease release; interrupted-effect reconciliation remains unfinished.
 
+The additive `scope_leases` object counts live/expired readers and writers
+across every overlapping scope, including `workspace` and legacy `create_*`
+aliases. Both live and expired unreleased holders still conflict. The existing
+`scope_writer_state` retains its exact-scope meaning and can say `none` while
+alias blockers exist. Missing `scope_leases` means a legacy/unknown observation,
+not zero blockers. Counts expose no holder tokens or identities, and even all
+zero counts are not permission to dispatch. See [reader/writer execution](docs/reader-writer-execution.md).
+
 ### Recording an operator approval decision
 
 For SDK tasks configured with `ApprovalPresenter`, inspect the exact private

@@ -81,6 +81,10 @@ func (s *Store) ApprovalExecutionStatus(ctx context.Context, task, id string, no
 	if err != nil {
 		return zero, err
 	}
+	out.ScopeLeases, err = observeScopeLeases(ctx, tx, r.Request.Scope, now)
+	if err != nil {
+		return zero, err
+	}
 	if out.Validate() != nil {
 		return zero, approvals.ErrInvalid
 	}

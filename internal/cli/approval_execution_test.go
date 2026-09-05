@@ -26,6 +26,9 @@ func TestApprovalExecutionCLIReadsBoundStatus(t *testing.T) {
 	if strings.Contains(out.String(), "sensitive-arguments") || strings.Contains(out.String(), `"token"`) {
 		t.Fatal("private tool data exposed")
 	}
+	if status.ScopeLeases == nil || *status.ScopeLeases != (approvals.ScopeLeaseObservation{Version: 1, OverlapPolicyVersion: 1}) {
+		t.Fatal("missing explicit empty blocker observation", status.ScopeLeases)
+	}
 	after, err := os.ReadFile(path)
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatal("status inspection changed database", err)

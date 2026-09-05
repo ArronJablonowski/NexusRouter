@@ -14,6 +14,9 @@ type ExecutionStatus struct {
 	RecordedEffect   string    `json:"recorded_effect,omitempty"`
 	ScopeWriterState string    `json:"scope_writer_state"`
 	ObservedAt       time.Time `json:"observed_at"`
+	// Nil is legacy/unavailable observation, not zero blockers. ScopeWriterState
+	// retains its exact-scope meaning; ScopeLeases includes compatibility aliases.
+	ScopeLeases *ScopeLeaseObservation `json:"scope_leases,omitempty"`
 }
 
 func (s ExecutionStatus) Validate() error {
@@ -29,6 +32,11 @@ func (s ExecutionStatus) Validate() error {
 	case "none", "live", "expired":
 	default:
 		return ErrInvalid
+	}
+	if s.ScopeLeases != nil {
+		if s.ScopeLeases.Validate() != nil || (s.ScopeWriterState == "live" && s.ScopeLeases.LiveWriters == 0) || (s.ScopeWriterState == "expired" && s.ScopeLeases.ExpiredWriters == 0) {
+			return ErrInvalid
+		}
 	}
 	switch s.CallState {
 	case "open":

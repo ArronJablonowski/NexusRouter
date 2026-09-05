@@ -459,6 +459,8 @@ Application tool dispatch must acquire shared leases for allowed read-only tools
 
 Workers use durable work records, leases, heartbeats, and acceptance states. Supervisors re-derive liveness from durable events, leases, and observed goroutine/provider state. Lease expiry, orphaned work, or stalls trigger safe recovery or operator attention; they do not imply that an uncertain effect can be replayed.
 
+Operator inspection must distinguish an absent/legacy observation from an observed empty scope, include expired unreleased readers and compatibility-alias holders, and never expose lease capabilities. Approval execution inspection provides a bounded versioned reader/writer count summary from the same transaction as the approval and journal. Counts are diagnostic only: they cannot prove process termination or authorize dispatch, retry, release or reassignment. General holder discovery and safe crashed-holder reconciliation remain required beyond this summary.
+
 ### 11.4 Acceptance Gate
 
 A worker reporting completion produces a candidate result. The orchestrator releases it only after required validators accept it and the acceptance record is durable. Rejected candidates retain diagnostics for a bounded safe retry or fallback.

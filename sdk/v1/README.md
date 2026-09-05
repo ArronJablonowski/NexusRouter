@@ -235,6 +235,17 @@ expiry does not establish process termination, and open calls do not establish
 whether an effect occurred. This method never retries work or releases leases;
 general interrupted-effect reconciliation is not implemented.
 
+`ScopeLeases`, when non-nil, adds a versioned overlapping-scope observation:
+`LiveReaders`, `ExpiredReaders`, `LiveWriters` and `ExpiredWriters`. Version 1
+and overlap-policy version 1 cover at most 1,000 unreleased holders, using exact
+generic scopes and the shared `workspace`/`create_*` filesystem family. Invalid
+or overflowing observations fail without a partial status. A nil pointer is
+legacy/unavailable data, not zero holders. `ScopeWriterState` remains exact;
+it may be `none` while aliases have writers. Counts share the approval/journal
+snapshot, expose no tokens/owners/holder task IDs, and never grant dispatch,
+retry or release authority. `Live` describes unexpired leases, not proven
+process health. Readers remain blockers for writers even when expired.
+
 ### Replaceable task context estimates
 
 `ConfigOptions.ContextEstimator` implements the public `providers.ContextEstimator`

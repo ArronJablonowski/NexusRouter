@@ -50,6 +50,18 @@ remain blockers without rewriting stored scope identities or approval records.
 Approval validation and consumption retain their exact original scope binding.
 Approval execution's `ScopeWriterState` is still an exact-scope observation;
 `none` there is not proof of availability against all legacy overlap blockers.
+The additive `ScopeLeases`/`scope_leases` observation provides live/expired
+reader/writer counts across the complete overlap family in the same snapshot.
+It is available through CLI `approvals execution`, SDK `ApprovalExecutionStatus`
+and the authenticated task-approval execution endpoint. Nil/missing means a
+legacy or unavailable observation, not zero. New storage-backed responses
+always supply version 1 and overlap-policy version 1, bound the total to 1,000
+holders, and reject malformed/overflowing data without a partial status.
+No holder identities, owners or tokens are included. Multiple distinct legacy
+writer scopes can legitimately coexist from before upgrade; they are counted,
+not treated as authorization. Duplicate writers in one exact stored scope are
+rejected as inconsistent. Expiry still does not prove termination, and even an
+empty observation cannot guarantee availability after the snapshot is taken.
 Do not run older binaries concurrently with this version: older admission code
 does not implement the new overlap/expired-reader rules.
 
