@@ -135,12 +135,17 @@ import (
  "time"
  sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
  "github.com/ArronJablonowski/DarwinRouter/runtime"
+ "github.com/ArronJablonowski/DarwinRouter/resources"
  "github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 func check(ok bool, label string) { if !ok { panic(label) } }
+type fixtureProfiler struct{}
+func (fixtureProfiler) Measure(ctx context.Context)(resources.Measurement,error){
+ return resources.Measurement{Version:1,Snapshot:resources.Snapshot{Time:time.Now(),CPUs:2,TotalRAM:8<<30,AvailableRAM:8<<30}},ctx.Err()
+}
 func main() {
  ctx,cancel:=context.WithTimeout(context.Background(),20*time.Second);defer cancel()
- client,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1],LookupSecret:func(name string)string{if name=="SDK_FIXTURE_SECRET" {return "fake-sdk-private-marker"};return ""}})
+ client,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1],ResourceProfiler:fixtureProfiler{},LookupSecret:func(name string)string{if name=="SDK_FIXTURE_SECRET" {return "fake-sdk-private-marker"};return ""}})
  check(err==nil,"construction failed")
  var seq int64
  var task string

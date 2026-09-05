@@ -10,6 +10,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
@@ -17,12 +18,19 @@ import (
 var ErrAdmission = app.ErrAdmission
 var ErrEventDelivery = app.ErrEventDelivery
 
+// ResourceProfiler is the versioned measurement-engine contract. Resource
+// reservation and route eligibility remain owned by the runtime.
+type ResourceProfiler = resources.Profiler
+
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
 type ConfigOptions struct {
 	UserFile, ProjectFile  string
 	Environment, Overrides map[string]string
 	LookupSecret           func(string) string
+	// ResourceProfiler replaces host measurement only; all admission checks stay
+	// active. Nil keeps configured built-in behavior. This is trusted Go code.
+	ResourceProfiler ResourceProfiler
 }
 
 type Client struct {
@@ -66,7 +74,7 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewService(cfg, options.LookupSecret)
+	service, err := app.NewServiceWithProfiler(cfg, options.LookupSecret, options.ResourceProfiler)
 	if err != nil {
 		return nil, ErrAdmission
 	}

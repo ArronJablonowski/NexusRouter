@@ -31,6 +31,31 @@ implicitly. `LookupSecret` resolves configured environment/secret names; supply
 `os.Getenv` or a concurrent-safe secret-store function. Never put credentials in
 override maps. Files and maps use the same strict validation as the CLI.
 
+### Replaceable resource measurements
+
+Set `ConfigOptions.ResourceProfiler` to a `ResourceProfiler` implementation with
+`Measure(context.Context) (resources.Measurement, error)`. Return
+`Measurement{Version: 1, Snapshot: measuredSnapshot}` with fresh, truthful
+measurements. `resources.HostProfiler{IncludeGPUs: true}` provides an optional
+built-in implementation. Nil retains normal configured host profiling; an explicit
+engine also supplies manual measurements when `hardware.auto_profile` is false.
+Without an engine, disabling automatic profiling still denies local execution.
+
+Admission retains its configured RAM/VRAM percentages, freshness checks, model
+estimates, privacy rules and shared concurrency reservations. Unknown measurements
+must remain unknown, not optimistic defaults. Errors, panics and incompatible
+measurement versions fail closed; snapshot data is detached and its source label
+normalized before use. Providers remain responsible for accurate facts: the runtime
+cannot prove that an in-process callback measured the hardware honestly.
+
+Engines are trusted Go code, not sandboxed plugins. They must honor cancellation,
+support concurrent calls, avoid unauthorized network access, and return data they
+do not mutate concurrently. A noncooperative callback cannot be forcibly stopped
+without leaving work behind. Engines are not serialized into queued requests;
+daemon execution uses the daemon's configured measurement source, not an SDK
+callback. This interface replaces measurement only; the wider extension and
+budget-recommendation contracts remain unfinished.
+
 `Request.Version` must be1; missing or incompatible versions reject before
 execution. Request/result records do not expose internal admission or lease
 fields. Public provider messages, runtime events and session compaction records
@@ -106,7 +131,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Pluggable provider/tool/context/memory/skill/evaluator/resource
-engines, extension hooks, a signed release and full PRD SDK contract coverage
+qualification. Pluggable provider/tool/context/memory/skill/evaluator engines,
+resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
 remain unfinished. Existing low-level packages are not a substitute for those
 future application-level extension contracts.
