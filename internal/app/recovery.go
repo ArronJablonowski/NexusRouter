@@ -50,6 +50,9 @@ func (d *Dispatcher) recoverPage(ctx context.Context, configDigest, after string
 			var recovered bool
 			recovered, err = d.db.RecoverTerminalSubmission(ctx, item.ID, configDigest, time.Now().UTC())
 			if err == nil && !recovered {
+				recovered, err = d.db.RecoverInterruptedModel(ctx, item.ID, configDigest, time.Now().UTC())
+			}
+			if err == nil && !recovered {
 				_, err = d.db.RecoverInterruptedDelegation(ctx, item.ID, configDigest, time.Now().UTC())
 			}
 		}

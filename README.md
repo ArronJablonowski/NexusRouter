@@ -654,8 +654,11 @@ with a new key if you intentionally change the configuration. Graceful shutdown
 cancels and joins active workers, leaving unclaimed requests queued. A crashed
 running job can be requeued only if it has **no durable task start**, as described
 below. Already-terminal histories can instead restore the result without any
-reexecution. Partial histories remain running with `lease_expired: true` and
-are not automatically retried: effects may already have occurred. Inspect them
+reexecution. Eligible single-task model-only histories are closed as failed (or
+canceled when requested), preserving partial output without returning it as an
+answer or retrying inference. See [interrupted model recovery](docs/interrupted-model-recovery.md).
+Other partial histories may remain running with `lease_expired: true` and are
+not automatically retried: effects may already have occurred. Inspect them
 before deciding on replacement work. General
 orphan reconciliation, safe operator reassignment and queue retention remain
 unfinished.

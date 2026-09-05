@@ -107,7 +107,7 @@ func TestRecoveryStartupOnlyExecutesUndispatchedClaims(t *testing.T) {
 			}
 			if dispatched {
 				status, err := s.SubmissionStatus(ctx, claim.Status.ID)
-				if err != nil || status.State != "running" || !status.LeaseExpired {
+				if err != nil || status.State != "failed" || status.LeaseExpired || status.Result == nil || status.Result.TaskID != "task" || status.Result.Text != "" {
 					t.Fatal(status, err)
 				}
 			}

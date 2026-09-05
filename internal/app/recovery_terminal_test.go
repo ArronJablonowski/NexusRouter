@@ -76,7 +76,7 @@ func TestRecoveryStartupReconstructsTerminalHistoryWithoutExecution(t *testing.T
 	}
 }
 
-func TestRecoveryLeavesPartialLinkedHistoryUntouched(t *testing.T) {
+func TestRecoveryClosesModelOnlyStartedHistoryWithoutExecution(t *testing.T) {
 	ctx := context.Background()
 	s, db, calls := recoveryFixture(t)
 	claim := recoveryClaim(t, s, db)
@@ -90,15 +90,15 @@ func TestRecoveryLeavesPartialLinkedHistoryUntouched(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err := s.SubmissionStatus(ctx, claim.Status.ID)
-	if err != nil || status.State != "running" || !status.LeaseExpired || status.Result != nil || calls.Load() != 0 {
+	if err != nil || status.State != "failed" || status.LeaseExpired || status.Result == nil || status.Result.TaskID != e.TaskID || status.Result.Text != "" || calls.Load() != 0 {
 		t.Fatal(status, err, calls.Load())
 	}
 	history, err := db.RecoveryHistory(ctx, claim.Status.ID)
-	if err != nil || len(history) != 0 {
+	if err != nil || len(history) != 1 || history[0].Action != "failed" || history[0].Reason != "interrupted_model" {
 		t.Fatal(history, err)
 	}
 	events, err := db.Read(ctx, e.TaskID, 0, 100)
-	if err != nil || len(events) != 1 || !reflect.DeepEqual(events[0], e) {
-		t.Fatal("partial history was changed", events, err)
+	if err != nil || len(events) != 2 || !reflect.DeepEqual(events[0], e) || events[1].Kind != runtime.TaskFailed || events[1].Data.Code != "interrupted_model" {
+		t.Fatal("recovery changed the prefix or omitted its terminal receipt", events, err)
 	}
 }

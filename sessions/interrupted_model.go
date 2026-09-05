@@ -1,0 +1,73 @@
+package sessions
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"strconv"
+	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+)
+
+// PlanInterruptedModel records failure of an unfinished model-only journal,
+// including pre-dispatch and post-turn boundaries lacking a terminal receipt.
+// It neither reconstructs partial text nor authorizes a retry. Prior tool pairs
+// embedded in TaskStarted.Messages are context, never current tool execution.
+// Unsupported journals return ErrHistory with no partial plan.
+func PlanInterruptedModel(histories [][]runtime.Event, now time.Time, canceled bool) (InterruptionRecovery, error) {
+	bad := func() (InterruptionRecovery, error) { return InterruptionRecovery{}, ErrHistory }
+	if len(histories) != 1 || len(histories[0]) < 1 || len(histories[0]) > 10000 || now.IsZero() || now.Year() < 1970 || now.Year() >= 2261 {
+		return bad()
+	}
+	history := histories[0]
+	start := history[0]
+	if !ValidEventPageID(start.TaskID) || !ValidEventPageID(start.SessionID) || start.Data.RetryOfTaskID != "" || (start.Data.ParentTaskID != "" && (!ValidEventPageID(start.Data.ParentTaskID) || start.Data.ParentTaskID == start.TaskID)) {
+		return bad()
+	}
+	budget := 8 << 20
+	var active runtime.Event
+	for _, event := range history {
+		body, err := event.Encode()
+		if err != nil || len(body) > budget || event.Time.After(now) || event.Time.Year() < 1970 || event.Time.Year() >= 2261 || !ValidEventPageID(event.ID) || event.CorrelationID != start.TaskID || event.WorkerID != "" || event.Data.DelegationOrigin != nil || event.Data.ToolCallID != "" || event.Data.ToolName != "" || event.Data.Effect != "" || len(event.Data.ToolCalls) != 0 {
+			return bad()
+		}
+		budget -= len(body)
+		if event.Data.Accepted != nil || (event.Kind != runtime.TaskStarted && (len(event.Data.Messages) != 0 || event.Data.ParentTaskID != "" || event.Data.RetryOfTaskID != "")) {
+			return bad()
+		}
+		if (event.TurnID != "" && !ValidEventPageID(event.TurnID)) || (event.AttemptID != "" && !ValidEventPageID(event.AttemptID)) {
+			return bad()
+		}
+		switch event.Kind {
+		case runtime.TaskStarted, runtime.ModelDelta, runtime.RouteSelected, runtime.SteeringApplied:
+		case runtime.TurnStarted:
+			active = event
+		case runtime.TurnCompleted:
+		default:
+			// Error/evaluation records have no model-only attribution contract
+			// here; reject rather than assume they contain no approval evidence.
+			return bad()
+		}
+	}
+	snapshot, err := Replay(context.Background(), terminalReader(history), start.TaskID)
+	if err != nil || snapshot.State != "running" || snapshot.UncertainEffects || len(snapshot.Pending) != 0 {
+		return bad()
+	}
+	kind, code := runtime.TaskFailed, "interrupted_model"
+	if canceled {
+		kind, code = runtime.TaskCanceled, "canceled"
+	}
+	sequence := snapshot.Sequence + 1
+	sum := sha256.Sum256([]byte(start.TaskID + "\x00" + history[len(history)-1].ID + "\x00" + strconv.FormatInt(sequence, 10) + "\x00" + string(kind) + "\x00" + now.UTC().Format(time.RFC3339Nano)))
+	terminal := runtime.Event{Version: 1, ID: hex.EncodeToString(sum[:]), TaskID: start.TaskID, SessionID: start.SessionID, CorrelationID: start.TaskID, Sequence: sequence, Time: now.UTC(), Kind: kind, TurnID: active.TurnID, AttemptID: active.AttemptID, CausationID: active.ID, Data: runtime.Data{Code: code}}
+	if terminal.CausationID == "" {
+		terminal.CausationID = history[len(history)-1].ID
+	}
+	full := append(append([]runtime.Event(nil), history...), terminal)
+	verified, err := Replay(context.Background(), terminalReader(full), start.TaskID)
+	if err != nil || verified.InterruptedTurn != snapshot.InterruptedTurn || (verified.State != "failed" && verified.State != "canceled") {
+		return bad()
+	}
+	return InterruptionRecovery{ParentTaskID: start.TaskID, ExpectedSequence: snapshot.Sequence, Events: []runtime.Event{terminal}}, nil
+}

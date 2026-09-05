@@ -19,6 +19,17 @@ import (
 // and fails its interrupted parent. It never dispatches work or releases leases.
 // Journal repair, submission fencing and its receipt share one writer transaction.
 func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDigest string, now time.Time) (bool, error) {
+	return s.recoverInterruptedSubmission(ctx, id, configDigest, now, "interrupted_delegation", 2, sessions.PlanInterruptedDelegation)
+}
+
+// RecoverInterruptedModel resolves expired model-only execution as failed or
+// canceled. It preserves partial stream events without publishing an answer,
+// retrying generation, or granting continuation of an incomplete turn.
+func (s *Store) RecoverInterruptedModel(ctx context.Context, id, configDigest string, now time.Time) (bool, error) {
+	return s.recoverInterruptedSubmission(ctx, id, configDigest, now, "interrupted_model", 1, sessions.PlanInterruptedModel)
+}
+
+func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDigest string, now time.Time, reason string, appended int64, planner func([][]runtime.Event, time.Time, bool) (sessions.InterruptionRecovery, error)) (bool, error) {
 	if !sessions.ValidEventPageID(id) || !submissionDigest(configDigest) || now.IsZero() {
 		return false, submissions.ErrInvalid
 	}
@@ -50,14 +61,14 @@ func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDige
 	if len(histories) == 0 {
 		return false, nil
 	}
-	plan, err := sessions.PlanInterruptedDelegation(histories, now, canceled == 1)
+	plan, err := planner(histories, now, canceled == 1)
 	if errors.Is(err, sessions.ErrHistory) {
 		return false, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	if len(plan.Events) != 2 {
+	if int64(len(plan.Events)) != appended {
 		return false, submissions.ErrInvalid
 	}
 	var parent []runtime.Event
@@ -75,7 +86,7 @@ func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDige
 	}
 	if parentCanceled && canceled == 0 {
 		canceled = 1
-		plan, err = sessions.PlanInterruptedDelegation(histories, now, true)
+		plan, err = planner(histories, now, true)
 		if err != nil {
 			return false, err
 		}
@@ -101,7 +112,7 @@ func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDige
 	if canceled == 1 {
 		action, code = "canceled", "canceled"
 	}
-	if projection.State != action || projection.Sequence != plan.ExpectedSequence+2 {
+	if projection.State != action || projection.Sequence != plan.ExpectedSequence+appended {
 		return false, submissions.ErrInvalid
 	}
 	for i, event := range plan.Events {
@@ -140,7 +151,7 @@ func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDige
 	if count >= 4 {
 		return false, submissions.ErrInvalid
 	}
-	receipt := submissions.Recovery{Version: 1, ID: rand.Text(), SubmissionID: id, Time: now.UTC(), Action: action, Reason: "interrupted_delegation"}
+	receipt := submissions.Recovery{Version: 1, ID: rand.Text(), SubmissionID: id, Time: now.UTC(), Action: action, Reason: reason}
 	if receipt.Validate() != nil {
 		return false, submissions.ErrInvalid
 	}

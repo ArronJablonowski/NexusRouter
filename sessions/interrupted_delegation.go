@@ -12,11 +12,14 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
-type DelegationRecovery struct {
+type InterruptionRecovery struct {
 	ParentTaskID     string
 	ExpectedSequence int64
 	Events           []runtime.Event
 }
+
+// DelegationRecovery retains source compatibility for the original planner.
+type DelegationRecovery = InterruptionRecovery
 
 type recoveryCall struct {
 	pending   Pending

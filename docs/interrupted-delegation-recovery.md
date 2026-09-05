@@ -113,6 +113,8 @@ They use synthetic loopback provider responses, not live model inference, and
 manually expire the fixture claim rather than waiting for a production lease.
 They do not establish power-loss durability, automatic daemon restart, recovery
 from arbitrary transaction instructions, or stopping remote generation/billing.
-General interrupted inference, running children, missing batch slots, uncertain
+Separate [model-only interruption recovery](interrupted-model-recovery.md) can
+close eligible single-task inference journals as failed or canceled, without
+resuming inference. Running children, missing batch slots, uncertain
 effects, automatic continuation and broader crash qualification remain required
 follow-up work.
