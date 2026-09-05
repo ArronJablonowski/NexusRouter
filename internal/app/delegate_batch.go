@@ -22,7 +22,7 @@ func registerDelegateBatch(registry *tools.Registry, reserve func(int) bool, exe
 	return registry.Register(tools.Definition{Tool: delegateBatchSpec(), Scope: "delegation", ReadOnly: true,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			const failure = `{"error":"delegate_unavailable_or_rejected"}`
-			failed := runtime.ToolResult{Content: failure, Effect: runtime.NoEffect}
+			failed := runtime.ToolResult{Content: failure, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
 			var input struct {
 				Tasks []delegateInput `json:"tasks"`
 			}
@@ -40,33 +40,58 @@ func registerDelegateBatch(registry *tools.Registry, reserve func(int) bool, exe
 				return failed, nil
 			}
 			results := make([]json.RawMessage, len(input.Tasks))
+			outcomes := make([]runtime.ToolResult, len(input.Tasks))
 			var joined sync.WaitGroup
 			for i, item := range input.Tasks {
 				joined.Add(1)
 				go func(i int, item delegateInput) {
 					defer joined.Done()
 					results[i] = json.RawMessage(failure)
+					outcomes[i] = failed
 					defer func() {
 						if recover() != nil {
 							results[i] = json.RawMessage(failure)
+							outcomes[i] = runtime.ToolResult{Failed: true, Effect: runtime.UncertainEffect}
 						}
 					}()
 					if ctx.Err() != nil {
 						return
 					}
 					out, err := execute(context.WithValue(ctx, delegationBatchIndexKey{}, i), item)
-					if ctx.Err() != nil || err != nil || out.Effect != runtime.NoEffect || len(out.Content) > 128<<10 || !utf8.ValidString(out.Content) || !json.Valid([]byte(out.Content)) {
+					if err != nil || out.Effect != runtime.NoEffect || (out.Recoverable && !out.Failed) {
+						outcomes[i] = runtime.ToolResult{Failed: true, Effect: runtime.UncertainEffect}
+						return
+					}
+					outcomes[i] = out
+					if ctx.Err() != nil || len(out.Content) > 128<<10 || !utf8.ValidString(out.Content) || !json.Valid([]byte(out.Content)) {
+						outcomes[i].Failed, outcomes[i].Recoverable = true, false
 						return
 					}
 					encoded, err := json.Marshal(json.RawMessage(out.Content))
 					if err != nil || len(encoded) > 128<<10 {
+						outcomes[i].Failed, outcomes[i].Recoverable = true, false
 						return
 					}
 					results[i] = encoded
+					outcomes[i] = out
 				}(i, item)
 			}
 			joined.Wait()
+			aggregate := runtime.ToolResult{Effect: runtime.NoEffect}
+			allRecoverable := true
+			for _, outcome := range outcomes {
+				if outcome.Failed {
+					aggregate.Failed = true
+					allRecoverable = allRecoverable && outcome.Recoverable
+				}
+				if outcome.Effect != runtime.NoEffect {
+					aggregate.Effect = runtime.UncertainEffect
+					aggregate.Failed = true
+					allRecoverable = false
+				}
+			}
 			if ctx.Err() != nil {
+				aggregate.Failed = true
 				for i := range results {
 					results[i] = json.RawMessage(failure)
 				}
@@ -75,9 +100,14 @@ func registerDelegateBatch(registry *tools.Registry, reserve func(int) bool, exe
 				Results []json.RawMessage `json:"results"`
 			}{results})
 			if err != nil || len(body) >= 1<<20 {
-				return failed, nil
+				aggregate.Content = failure
+				aggregate.Failed = true
+				allRecoverable = false
+			} else {
+				aggregate.Content = string(body)
 			}
-			return runtime.ToolResult{Content: string(body), Effect: runtime.NoEffect}, nil
+			aggregate.Recoverable = aggregate.Failed && allRecoverable && aggregate.Effect == runtime.NoEffect
+			return aggregate, nil
 		},
 	})
 }

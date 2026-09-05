@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -45,7 +46,7 @@ func TestDelegateBatchConcurrentOrdered(t *testing.T) {
 		return runtime.ToolResult{Content: `{"prompt":"` + in.Prompt + `"}`, Effect: runtime.NoEffect}, nil
 	})
 	out, err := e.Execute(ctx, batchCall(batchTwo))
-	if err != nil || out.Content != `{"results":[{"prompt":"first"},{"prompt":"second"}]}` {
+	if err != nil || out.Failed || out.Recoverable || out.Effect != runtime.NoEffect || out.Content != `{"results":[{"prompt":"first"},{"prompt":"second"}]}` {
 		t.Fatal(out, err)
 	}
 }
@@ -108,9 +109,52 @@ func TestDelegateBatchJoinsAndSanitizes(t *testing.T) {
 				return runtime.ToolResult{}, nil
 			})
 			out, err := e.Execute(ctx, batchCall(batchTwo))
+			if mode == "panic" || mode == "error" || mode == "effect" || mode == "cancel" {
+				if err == nil || out.Effect != runtime.UncertainEffect || out.Recoverable || finished.Load() != 2 || out.Content != "" {
+					t.Fatal("uncertainty was made recoverable", out, err, finished.Load())
+				}
+				return
+			}
 			if err != nil || finished.Load() != 2 || strings.Count(out.Content, "delegate_unavailable_or_rejected") != 2 || strings.Contains(out.Content, "private") {
 				t.Fatal(out, err, finished.Load())
 			}
 		})
+	}
+}
+
+func TestDelegateBatchTypedPartialFailurePreservesOrderAndBudget(t *testing.T) {
+	for _, recoverable := range []bool{false, true} {
+		t.Run(fmt.Sprint(recoverable), func(t *testing.T) {
+			var reserved, executed atomic.Int32
+			e := batchExecutor(t, func(n int) bool { return reserved.CompareAndSwap(0, int32(n)) }, func(_ context.Context, in delegateInput) (runtime.ToolResult, error) {
+				executed.Add(1)
+				if in.Prompt == "second" {
+					return runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected","reason":"invalid_output"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: recoverable}, nil
+				}
+				return runtime.ToolResult{Content: `{"untrusted_output":"error-looking model prose is not a typed failure"}`, Effect: runtime.NoEffect}, nil
+			})
+			out, err := e.Execute(context.Background(), batchCall(batchTwo))
+			if err != nil || !out.Failed || out.Recoverable != recoverable || out.Effect != runtime.NoEffect || out.Content != `{"results":[{"untrusted_output":"error-looking model prose is not a typed failure"},{"error":"delegate_unavailable_or_rejected","reason":"invalid_output"}]}` || reserved.Load() != 2 || executed.Load() != 2 {
+				t.Fatal(out, err, reserved.Load(), executed.Load())
+			}
+			denied, err := e.Execute(context.Background(), batchCall(batchTwo))
+			if err != nil || !denied.Failed || !denied.Recoverable || denied.Effect != runtime.NoEffect || executed.Load() != 2 {
+				t.Fatal("batch repair bypassed spent call budget", denied, err, executed.Load())
+			}
+		})
+	}
+}
+
+func TestDelegateBatchMalformedChildCannotBecomeRecoverable(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		for _, content := range []string{`{invalid`, `"` + strings.Repeat("x", 129<<10) + `"`} {
+			e := batchExecutor(t, func(int) bool { return true }, func(context.Context, delegateInput) (runtime.ToolResult, error) {
+				return runtime.ToolResult{Content: content, Effect: runtime.NoEffect, Failed: failed}, nil
+			})
+			out, err := e.Execute(context.Background(), batchCall(batchTwo))
+			if err != nil || !out.Failed || out.Recoverable || out.Effect != runtime.NoEffect || strings.Count(out.Content, "delegate_unavailable_or_rejected") != 2 {
+				t.Fatal("malformed child upgraded to repairable", out, err)
+			}
+		}
 	}
 }

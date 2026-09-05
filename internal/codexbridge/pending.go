@@ -36,7 +36,8 @@ type CallRequest struct {
 // history that produced it. The host must keep the server request unanswered
 // until its runtime has persisted and authorized the proposal and its result.
 // This binding verifies correspondence, NOT approval or durable persistence.
-// A failed/uncertain tool must abort the server turn, not resume this exchange.
+// An uncertain tool must abort the server turn. A host-validated recoverable
+// failure may resume with ToolFailed=true, producing native success:false.
 type Pending struct {
 	mu       sync.Mutex
 	request  providers.Request
@@ -104,8 +105,8 @@ func (p *Pending) Proposal() providers.ToolCall {
 }
 
 // Resume accepts only the original request followed by the exact assistant
-// proposal and one successful tool result. The existing runtime only appends
-// tool messages after successful durable completion. Steering, compaction,
+// proposal and one durably recorded tool result. Only the host runtime decides
+// whether a failed result is recoverable. Steering, compaction,
 // model/catalog changes and retry reconstruction require separate handling;
 // they must not silently mutate a paused Codex turn. A successful call is
 // single-use even if delivery of the returned RPC response later fails.
@@ -139,7 +140,7 @@ func (p *Pending) Resume(next providers.Request) (json.RawMessage, error) {
 	response, err := json.Marshal(struct {
 		ContentItems []map[string]string `json:"contentItems"`
 		Success      bool                `json:"success"`
-	}{[]map[string]string{{"type": "inputText", "text": result.Content}}, true})
+	}{[]map[string]string{{"type": "inputText", "text": result.Content}}, !result.ToolFailed})
 	if err != nil {
 		return nil, ErrContinuation
 	}

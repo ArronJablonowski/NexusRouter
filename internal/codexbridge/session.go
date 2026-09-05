@@ -138,6 +138,7 @@ func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(p
 			return failure(s.emitted)
 		}
 		s.items[s.pendingCall].responded = true
+		s.items[s.pendingCall].responseSuccess = !req.Messages[len(req.Messages)-1].ToolFailed
 		s.pending, s.pendingID, s.pendingCall = nil, nil, ""
 	}
 	return s.segment(ctx, req, emit)

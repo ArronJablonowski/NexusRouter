@@ -217,7 +217,7 @@ func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, 
 		}
 	}()
 	out, err = t.Handler(ctx, arguments)
-	if err != nil || out.Effect != runtime.NoEffect || len(out.Content) > 1<<20 || !utf8.ValidString(out.Content) {
+	if err != nil || out.Effect != runtime.NoEffect || (out.Recoverable && !out.Failed) || len(out.Content) > 1<<20 || !utf8.ValidString(out.Content) {
 		return runtime.ToolResult{Effect: runtime.UncertainEffect}, ErrExecution
 	}
 	return out, nil

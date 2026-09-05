@@ -160,7 +160,7 @@ func TestWorkflowGroupingSecretAndContextGuards(t *testing.T) {
 	}
 }
 
-func TestGroupedGenerationRechecksExecutionBeyondConversationDigest(t *testing.T) {
+func TestGroupedGenerationRechecksChangedToolOutcome(t *testing.T) {
 	svc, tasks, calls := groupedAppFixture(t)
 	ctx := context.Background()
 	selection, err := svc.PlanGroupedWorkflowSelection(ctx, "a", skills.Key{Scope: "project", Name: "workflow"}, tasks, 0)
@@ -185,8 +185,8 @@ func TestGroupedGenerationRechecksExecutionBeyondConversationDigest(t *testing.T
 	}
 	defer db.Close()
 	sources, err := db.SkillWorkflowSources(ctx, tasks)
-	if err != nil || !reflect.DeepEqual(workflowSelectionCandidates(sources), selection.Sources) {
-		t.Fatal("fixture did not preserve old candidate digests", err)
+	if err != nil || reflect.DeepEqual(workflowSelectionCandidates(sources), selection.Sources) {
+		t.Fatal("changed tool failure did not change candidate digests", err)
 	}
 	if _, err := svc.GenerateSkillSelection(ctx, selection.ID, 0); err == nil || calls.Load() != 0 {
 		t.Fatal("changed execution dispatched despite group check", err, calls.Load())

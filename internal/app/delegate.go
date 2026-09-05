@@ -91,7 +91,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		}
 	}
 	execute := func(ctx context.Context, input delegateInput) (runtime.ToolResult, error) {
-		failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}
+		failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
 		origin, originErr := delegationOrigin(ctx, parent, session)
 		if originErr != nil {
 			return failed, nil
@@ -122,11 +122,14 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 			}
 		}()
 		var executionID string
+		var entered, returned atomic.Bool
 		answer, err := supervisor.Run(childCtx, workers.Work{
 			TaskID: workID, SessionID: session, ParentID: parent, Scope: "delegation-" + parent, SubmissionID: submissionID,
 			DelegationOrigin: origin,
 			Execute: func(ctx context.Context) (string, error) {
+				entered.Store(true)
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)
+				returned.Store(true)
 				executionID = result.TaskID
 				return result.Text, err
 			},
@@ -139,6 +142,10 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		})
 		watchErr := stopWatcher()
 		watcherStopped = true
+		if entered.Load() && !returned.Load() {
+			failed.Effect, failed.Recoverable = runtime.UncertainEffect, false
+			return failed, nil
+		}
 		if err != nil || watchErr != nil {
 			return delegateRejection(ctx, db, parent, session, workID, executionID), nil
 		}
@@ -157,7 +164,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			var input delegateInput
 			if ctx.Err() != nil || json.Unmarshal(raw, &input) != nil || !input.valid() || !reserve(1) {
-				return runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}, nil
+				return runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}, nil
 			}
 			return execute(ctx, input)
 		},

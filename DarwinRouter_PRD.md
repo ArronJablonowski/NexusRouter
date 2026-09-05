@@ -441,6 +441,8 @@ Memory stores durable facts rather than procedures. Records include provenance, 
 
 Tools declare schemas, capabilities, resource scopes, effect class, timeout behavior, and permission requirements. Arguments are validated before execution. Results distinguish success, rejected execution, deterministic failure, confirmed effect, no effect, and uncertain effect.
 
+Known effect-free failures may explicitly permit a new model turn, without automatically replaying the failed call or resetting budgets. Persist the failed completion before delivering it to the model; preserve its failure identity across provider handoff, replay, compaction and audit. A repaired final task and positive user feedback do not erase failed procedural steps or qualify them as successful skill-learning evidence. Generic execution errors, panics, uncertain effects and nonrecoverable failures remain terminal. Every newly proposed action must pass normal policy and approval gates. See [recoverable tool failures](docs/recoverable-tool-failures.md) for the current read/delegation scope and provider qualification limits.
+
 Current implementation increment: opt-in local `create_file` creates new UTF-8 files only after exact per-call review in terminal chat or a trusted SDK host. It uses pinned directories, atomic no-replace publication and durable approval consumption under a root-scoped writer lease. Children retain read-only capabilities. Existing-file editing, unattended/headless approvals and stronger isolation remain later work, not capabilities implied by this tool. See [reviewed file creation](docs/reviewed-file-creation.md) for configuration and cooperative-filesystem limits.
 
 ### 11.2 Permission Model

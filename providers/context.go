@@ -14,5 +14,13 @@ func EstimateContext(r Request) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return len(b) + 1024, nil
+	overhead := 0
+	for _, m := range r.Messages {
+		if m.Role == "tool" && m.ToolFailed {
+			overhead += len(toolFailurePrefix) + 1
+		}
+	}
+	// Include the prefix's serialized newline escape, in addition to the
+	// internal status field already present in the conservative byte estimate.
+	return len(b) + overhead + 1024, nil
 }

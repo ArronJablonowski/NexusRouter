@@ -145,7 +145,7 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 		if m.Role != "system" && m.Role != "user" && m.Role != "assistant" && m.Role != "tool" {
 			return &Failure{Code: "invalid_role"}
 		}
-		wire := map[string]any{"role": m.Role, "content": m.Content}
+		wire := map[string]any{"role": m.Role, "content": ToolResultContent(m)}
 		if m.ToolCallID != "" {
 			if p.kind == "ollama" {
 				name, ok := callNames[m.ToolCallID]

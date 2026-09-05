@@ -30,7 +30,7 @@ func readTools(path string) (*tools.Registry, func(), error) {
 		Tool:  readFileSpec(),
 		Scope: "workspace", ReadOnly: true,
 		Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
-			failed := runtime.ToolResult{Content: `{"error":"file_unavailable"}`, Effect: runtime.NoEffect}
+			failed := runtime.ToolResult{Content: `{"error":"file_unavailable"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
 			var args struct {
 				Path string `json:"path"`
 			}

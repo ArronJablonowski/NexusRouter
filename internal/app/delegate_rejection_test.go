@@ -17,6 +17,7 @@ import (
 // Shared rejection assertion for tests whose primary concern is isolation or
 // admission, not the particular diagnostic reason. Unknown/output fields fail.
 func validDelegateRejection(content string) bool {
+	content = strings.TrimPrefix(content, "Tool execution failed.\n")
 	if content == `{"error":"delegate_unavailable_or_rejected"}` {
 		return true
 	}
@@ -101,7 +102,11 @@ func TestDelegateRejectionUsesOnlyAttributedDurableMetadata(t *testing.T) {
 				execution = ""
 			}
 			out := delegateRejection(ctx, db, parent, session, "work", execution)
-			if out.Effect != runtime.NoEffect || !validDelegateRejection(out.Content) || strings.Contains(out.Content, "PRIVATE_FAILURE_PAYLOAD") {
+			wantEffect := runtime.NoEffect
+			if mode == "wrong_child" || mode == "missing_child" {
+				wantEffect = runtime.UncertainEffect
+			}
+			if out.Effect != wantEffect || !out.Failed || out.Recoverable != (wantEffect == runtime.NoEffect) || !validDelegateRejection(out.Content) || strings.Contains(out.Content, "PRIVATE_FAILURE_PAYLOAD") {
 				t.Fatal("unsafe rejection", out)
 			}
 			if mode != "invalid" && mode != "canceled" && mode != "work_only" && mode != "completed_execution" {

@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Explicit effect-free read/delegation failure feedback with bounded model repair,
+  durable failed-step history and learning exclusion. Native Codex failure
+  handoff is fixture-qualified, not yet live-qualified; see
+  [recoverable tool failures](recoverable-tool-failures.md).
+
 - Opt-in local `create_file` with terminal per-call approval, complete bounded
   previews, durable one-use authority and atomic no-overwrite publication.
   Existing-file editing and unattended approval remain unfinished; see

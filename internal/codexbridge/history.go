@@ -50,7 +50,7 @@ func initialHistory(messages []providers.Message) ([]json.RawMessage, string, er
 				appendItem(map[string]string{"type": "function_call", "namespace": "darwin", "name": call.Name, "call_id": call.ID, "arguments": string(call.Arguments)})
 			}
 		case "tool":
-			appendItem(map[string]string{"type": "function_call_output", "call_id": message.ToolCallID, "output": message.Content})
+			appendItem(map[string]string{"type": "function_call_output", "call_id": message.ToolCallID, "output": providers.ToolResultContent(message)})
 		}
 	}
 	if len(items) > 0 {

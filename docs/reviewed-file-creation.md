@@ -42,6 +42,9 @@ inspect the final outcome and durable records before retrying uncertain work.
 
 A certain creation failure records `tool_failed` separately from `no_effect`
 and fails the task. No effect describes filesystem state, not successful work.
+Creation failures remain nonrecoverable; the separate
+[read/delegation repair path](recoverable-tool-failures.md) does not change write
+approval or retry policy.
 That failure cannot become a successful procedural workflow merely because
 separate feedback accepted an overall answer. The current loop stops rather
 than automatically retrying a failed tool, including a proven no-effect failure.

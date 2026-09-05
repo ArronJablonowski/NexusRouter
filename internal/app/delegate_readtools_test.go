@@ -102,7 +102,7 @@ func TestDelegateReadToolsInheritedScopeAndNoRecursion(t *testing.T) {
 				if mode == "read" && !strings.Contains(last.Content, "workspace evidence") {
 					t.Error("scoped file missing", last)
 				}
-				if mode == "escape" && last.Content != `{"error":"file_unavailable"}` {
+				if mode == "escape" && last.Content != "Tool execution failed.\n"+`{"error":"file_unavailable"}` {
 					t.Error("escape not rejected", last)
 				}
 				fmt.Fprintln(w, `{"message":{"content":"child final"},"done":true,"done_reason":"stop"}`)

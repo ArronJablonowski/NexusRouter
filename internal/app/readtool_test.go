@@ -46,6 +46,9 @@ func TestReadToolConfinement(t *testing.T) {
 		if path == "ok.txt" && !strings.Contains(out.Content, "evidence") {
 			t.Fatal(out)
 		}
+		if out.Failed != (path != "ok.txt") || out.Recoverable != (path != "ok.txt") {
+			t.Fatal("incorrect read outcome flags", path, out)
+		}
 		if path != "ok.txt" && out.Content != `{"error":"file_unavailable"}` {
 			t.Fatalf("escape exposed: %s", out.Content)
 		}

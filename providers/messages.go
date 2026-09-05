@@ -13,6 +13,9 @@ func ValidateMessages(messages []Message) error {
 	pending := map[string]bool{}
 	used := map[string]bool{}
 	for _, m := range messages {
+		if m.ToolFailed && m.Role != "tool" {
+			return invalid
+		}
 		if m.Role != "system" && m.Role != "user" && m.Role != "assistant" && m.Role != "tool" {
 			return invalid
 		}
@@ -44,4 +47,15 @@ func ValidateMessages(messages []Message) error {
 		return invalid
 	}
 	return nil
+}
+
+const toolFailurePrefix = "Tool execution failed.\n"
+
+// ToolResultContent projects failure status for transports without a native
+// tool-result status field. It never grants retry or tool authority.
+func ToolResultContent(m Message) string {
+	if m.Role == "tool" && m.ToolFailed {
+		return toolFailurePrefix + m.Content
+	}
+	return m.Content
 }

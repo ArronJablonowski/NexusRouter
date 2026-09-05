@@ -106,7 +106,7 @@ func (e Executor) approved(ctx context.Context, x runtime.ToolExecution, t entry
 			return result, handlerErr
 		}
 		result, handlerErr = t.Handler(runCtx, arguments)
-		if handlerErr != nil || runCtx.Err() != nil || approvedCtx.Err() != nil || len(result.Content) > 1<<20 || !utf8.ValidString(result.Content) || (result.Effect != runtime.NoEffect && result.Effect != runtime.ConfirmedEffect) || (t.ReadOnly && result.Effect != runtime.NoEffect) {
+		if handlerErr != nil || runCtx.Err() != nil || approvedCtx.Err() != nil || len(result.Content) > 1<<20 || !utf8.ValidString(result.Content) || (result.Recoverable && (!result.Failed || result.Effect != runtime.NoEffect)) || (result.Effect != runtime.NoEffect && result.Effect != runtime.ConfirmedEffect) || (t.ReadOnly && result.Effect != runtime.NoEffect) {
 			result = runtime.ToolResult{Effect: runtime.UncertainEffect}
 			handlerErr = ErrExecution
 		}

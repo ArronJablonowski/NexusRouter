@@ -100,7 +100,7 @@ func TestDelegateBatchParallelOrderedDurableAndAtomicCallLimit(t *testing.T) {
 				t.Fatal("missing batch output")
 			}
 			if limit == 1 {
-				if children.Load() != 0 || content != `{"error":"delegate_unavailable_or_rejected"}` {
+				if children.Load() != 0 || !validDelegateRejection(content) {
 					t.Fatal("partial batch admission", children.Load(), content)
 				}
 				return

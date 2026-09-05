@@ -14,6 +14,12 @@ The executable supports layered configuration, automatic or explicit-model tasks
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
+Known effect-free read/delegation failures can return explicit failure evidence
+to the coordinator for a fresh, bounded repair turn. Failed steps remain in the
+audit history and cannot become successful workflow-learning evidence. This is
+not automatic replay of tools or permission to retry uncertain writes. See
+[recoverable tool failures](docs/recoverable-tool-failures.md).
+
 Automatic routing separately tracks nonempty-output validity from the latest 100 checked terminal attempts per model/provider/domain/profile. It verifies each check against saved final output and task status. Failures discount the quality component using sample confidence and recency decay; passing this check never proves semantic quality or creates cost/latency measurements. This objective signal remains active when LLM judging is disabled. Legacy tasks without a check contribute no assumed outcome. Compiler/test validation and broader objective checks remain unfinished.
 
 For Go-generation tasks, opt into `darwin run --config path --model auto --validate go_source < prompt.txt`, or supply `"validation":"go_source"` to native `POST /v1/tasks`. Ask for a raw complete Go source file: prose and Markdown fences are rejected, not extracted. The check parses at most 1 MiB of UTF-8 source without loading imports, compiling, or executing anything. Invalid syntax fails the task and records objective evidence; syntax-valid code can still have type errors, missing dependencies, security bugs or failing tests. Validation uses the redacted output that is persisted and delivered. Validity populations are separated by requested validation mode; the OpenAI-compatible endpoint does not expose this extension.

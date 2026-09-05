@@ -83,7 +83,9 @@ func TestDelegateSafetyWorkCancellationJoinsAndSuppressesOutput(t *testing.T) {
 	}
 	select {
 	case out := <-done:
-		if out.err != nil || out.result.Effect != runtime.NoEffect || !strings.Contains(out.result.Content, "delegate_unavailable_or_rejected") || strings.Contains(out.result.Content, "private") {
+		// The callback claimed a child ID without a journal. It was joined, but
+		// that missing execution proof cannot establish an effect-free outcome.
+		if out.err == nil || out.result.Effect != runtime.UncertainEffect || out.result.Recoverable || out.result.Content != "" {
 			t.Fatal(out)
 		}
 	case <-ctx.Done():

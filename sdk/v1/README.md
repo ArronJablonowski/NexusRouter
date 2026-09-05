@@ -128,11 +128,16 @@ Durable extension identity and general lifecycle hooks remain unfinished.
 
 Trusted handlers can return `runtime.ToolResult{Failed: true, Effect: ...}` with
 a nil Go error for an explicitly known tool failure. The runtime records
-`tool_failed` and fails the task while preserving the declared effect. `NoEffect`
-alone is not a success/failure flag. A Go error or panic during a side-effecting
+`tool_failed` and, by default, fails the task while preserving the declared effect.
+Only `Failed: true, Recoverable: true, Effect: runtime.NoEffect` with a nil Go
+error permits a fresh model turn within existing budgets. This is not automatic
+tool replay: each new proposal passes the same permissions and approvals. The
+paired provider message carries `ToolFailed: true`, including after replay.
+`NoEffect` alone is not a success/failure flag. A Go error or panic during a side-effecting
 handler still means uncertain execution; do not downgrade an unknown effect by
 declaring a certain result. Failed tool steps cannot seed successful workflow
 grouping merely through separate positive task feedback.
+See [recoverable tool failures](../../docs/recoverable-tool-failures.md).
 
 The same reviewer/presenter controls support the opt-in built-in `create_file`
 tool when configuration enables `tools.create_enabled` with an absolute

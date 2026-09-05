@@ -30,12 +30,32 @@ type delegateFailure struct {
 // envelope. Evidence is diagnostic, not permission to retry uncertain effects.
 // On missing/ambiguous storage evidence retain the original generic rejection.
 func delegateRejection(ctx context.Context, db *telemetry.Store, parent, session, workID, executionID string) runtime.ToolResult {
-	failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect}
+	failed := runtime.ToolResult{Content: `{"error":"delegate_unavailable_or_rejected"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
+	uncertain := failed
+	uncertain.Effect, uncertain.Recoverable = runtime.UncertainEffect, false
 	if db == nil || ctx == nil {
+		if executionID != "" {
+			return uncertain
+		}
 		return failed
 	}
 	query, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer cancel()
+	// A joined worker is not evidence that its last tool completed without an
+	// effect. Preserve an uncertain or missing execution journal as terminal;
+	// never relabel it as a repairable rejection merely because tools were
+	// advertised read-only. Tool panics and invalid outcomes remain uncertain.
+	if executionID != "" {
+		execution, err := db.TaskSnapshot(query, executionID)
+		if err != nil || execution.ParentTaskID != workID || execution.UncertainEffects {
+			return uncertain
+		}
+		for _, call := range execution.Pending {
+			if call.Dispatched {
+				return uncertain
+			}
+		}
+	}
 	work, err := db.TaskSnapshot(query, workID)
 	if err != nil || work.ParentTaskID != parent || work.SessionID != session || (work.State != "failed" && work.State != "canceled") {
 		return failed

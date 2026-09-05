@@ -25,6 +25,7 @@ type itemState struct {
 	start                                    item
 	delta                                    strings.Builder
 	hasDelta, complete, requested, responded bool
+	responseSuccess                          bool
 }
 
 func (s *Session) segment(ctx context.Context, req providers.Request, emit func(providers.Chunk) error) error {
@@ -187,7 +188,11 @@ func (s *Session) segment(ctx context.Context, req providers.Request, emit func(
 				final = n.Item.Phase == "final_answer"
 				candidate = final || n.Item.Phase == ""
 			case "dynamicToolCall":
-				if !state.responded || n.Item.Status != "completed" || n.Item.Success == nil || !*n.Item.Success || n.Item.Namespace != state.start.Namespace || n.Item.Tool != state.start.Tool || !equalJSON(n.Item.Arguments, state.start.Arguments) {
+				status := "failed"
+				if state.responseSuccess {
+					status = "completed"
+				}
+				if !state.responded || n.Item.Status != status || n.Item.Success == nil || *n.Item.Success != state.responseSuccess || n.Item.Namespace != state.start.Namespace || n.Item.Tool != state.start.Tool || !equalJSON(n.Item.Arguments, state.start.Arguments) {
 					return failure(s.emitted)
 				}
 			}

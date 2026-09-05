@@ -44,9 +44,13 @@ type ToolResult struct {
 	Effect  Effect
 	// Failed reports an explicit trusted-handler failure independently of side
 	// effects. A failed operation may have no effect or a confirmed effect;
-	// neither is automatically uncertainty. The loop records tool_failed and
-	// stops the task without another model turn. Model text cannot set this flag.
+	// neither is automatically uncertainty. The loop records tool_failed.
+	// Model text cannot set this flag.
 	Failed bool
+	// Recoverable permits a new model turn after a known, effect-free failure.
+	// It is valid only with Failed and NoEffect; it never retries the tool call,
+	// bypasses budgets, or grants authority to a subsequent proposed operation.
+	Recoverable bool
 }
 type RunRequest struct {
 	SubmissionID  string
@@ -509,6 +513,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				out.Effect = UncertainEffect
 				toolErr = ErrTool
 			}
+			if out.Recoverable && (!out.Failed || out.Effect != NoEffect) {
+				toolErr = ErrTool
+			}
 			used += len(out.Content)
 			if used > r.MaxOutputBytes {
 				out.Content = ""
@@ -527,10 +534,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if ctx.Err() != nil {
 				return fail(ctx.Err())
 			}
-			if toolErr != nil || out.Failed || out.Effect == UncertainEffect {
+			if toolErr != nil || (out.Failed && !out.Recoverable) || out.Effect == UncertainEffect {
 				return fail(ErrTool)
 			}
-			inference.Messages = append(inference.Messages, providers.Message{Role: "tool", ToolCallID: call.ID, Content: out.Content})
+			inference.Messages = append(inference.Messages, providers.Message{Role: "tool", ToolCallID: call.ID, Content: out.Content, ToolFailed: out.Failed})
 		}
 	}
 	return fail(ErrLimit)

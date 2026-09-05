@@ -11,6 +11,7 @@ type Message struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolFailed bool       `json:"tool_failed,omitempty"`
 }
 type ToolCall struct {
 	ID        string          `json:"id"`
