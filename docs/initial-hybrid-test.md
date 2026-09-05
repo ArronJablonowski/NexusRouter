@@ -2,8 +2,8 @@
 
 The first live test uses **GPT-5.6 Sol (`gpt-5.6-sol`) as coordinator** and an
 operator-selected installed Ollama model as the local worker. This is a
-supervised qualification target, not a claim that live interoperability has
-already passed.
+supervised test profile. One real coordinator → local worker → coordinator
+round trip passed on September 5, 2026; broader qualification remains open.
 
 OpenAI documents streaming and function calling for the exact requested model:
 [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
@@ -33,8 +33,8 @@ local-only privacy.
 ## Prerequisites and readiness evidence
 
 - For the preferred CLI route, a working authenticated Codex CLI. The experimental
-  native adapter is wired for explicit fresh tasks; live notification compatibility
-  is still failing, so it is not yet qualified for normal use.
+  native adapter is wired for explicit fresh tasks and has passed the small
+  live test below. It remains experimental, not production-qualified.
 - For the optional direct-HTTP route only, a locally configured
   `OPENAI_API_KEY`; never paste the credential into chat or commit it.
 - A hybrid configuration with Sol pinned as the parent and an explicit local
@@ -68,10 +68,9 @@ printf '%s\n' 'Reply with exactly DARWIN_LOCAL_READY. Do not call tools.' |
 ```
 
 Cost fields are admission estimates, not hard billing or output-token caps.
-The CLI coordinator uses the signed-in account's Codex usage limits. A complete
-live coordinator-to-worker-to-coordinator run, CLI adapter safety/cancellation,
-and sustained qualification remain unfinished. Full MVP work continues
-separately from these initial checks.
+The CLI coordinator uses the signed-in account's Codex usage limits.
+CLI adapter safety/cancellation and sustained qualification remain unfinished.
+Full MVP work continues separately from these initial checks.
 
 ## Experimental CLI profile and first integrated attempt
 
@@ -89,5 +88,39 @@ thread and turn creation, then sent startup deprecation/warning notifications
 which the strict adapter rejected. Diagnostics associated the notices with
 `use_legacy_landlock`, `web_search_cached`, `web_search_request`,
 `skip_host_skill_discovery`, and `code_mode_host`. This is not proof those warnings
-are harmless; handling remains under investigation. No worker result or successful
-full round trip is claimed. Raw warning payloads and credentials are not persisted.
+were harmless. That initial failure was resolved in the checkpoint below.
+Raw warning payloads and credentials are not persisted.
+
+## First successful end-to-end checkpoint
+
+Task `6BE4WNSJV2MLSJMAFQSSOJKTKU` completed on September 5, 2026 in about
+12 seconds from the persisted start to completion. This is one observation,
+not a latency benchmark. It used the existing ChatGPT login, with no API key.
+
+- Sol emitted exactly one `delegate` call requesting raw Go source.
+- Local execution `XKZTM6QHSJDNICFUU2VYI3XLOV` ran
+  `gemma4:12b-it-q4_K_M`, with a `local_only` child privacy policy.
+- The child returned `package answer` and `func Answer() int { return 42 }`.
+  Darwin recorded accepted `deterministic.go_syntax.v1` evidence.
+- The persisted tool result carried the child output as `untrusted_output`.
+- Sol received that result, reviewed the package/signature/return value, and
+  the parent completed. Its review is model feedback, not compiler/test evidence.
+
+Reproduce from the repository root with this non-sensitive prompt:
+
+```sh
+printf '%s\n' 'Use only darwin.delegate exactly once. Ask the worker to output raw Go source: package answer with func Answer() int returning 42. Set validation to go_source. Review the result. Do not use other tools or read files.' |
+  go run ./cmd/darwin run --config examples/sol-codex-local-smoke.yaml \
+    --model coordinator --domain code --json
+```
+
+The pinned CLI profile enables its installed local `code_mode_host` to support
+Sol's tool invocation path. Shell and other feature controls stay disabled;
+extension/skill/hook inventories are still checked. The host-disabled diagnostic
+completed a model turn but produced no delegation and is not counted as success.
+Only exact known deprecation/unstable-feature notices and bounded, discarded
+account-rate metadata are accepted; unknown warnings still fail closed.
+
+Next qualification: negative worker results, cancellation while delegated work
+is active, restart behavior, and helper-process cleanup/containment. These are
+not established by one successful prompt. Background learning remains disabled.

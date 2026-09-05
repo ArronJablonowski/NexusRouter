@@ -29,7 +29,7 @@ func launcherFrames(cwd string) ([]codexrpc.Envelope, []codexrpc.Envelope) {
 	features, _, _ := launchProfile([]byte("codex-cli 0.153.4"), []byte(profileInventory()))
 	flags := map[string]bool{}
 	for _, f := range features {
-		flags[f] = f == "skip_host_skill_discovery"
+		flags[f] = f == "skip_host_skill_discovery" || f == "code_mode_host"
 	}
 	config := marshal(map[string]any{"config": map[string]any{"features": flags, "mcp_servers": map[string]any{}, "plugins": map[string]any{}, "project_doc_max_bytes": 0, "notify": []any{}, "web_search": "disabled"}})
 	checks := checkedResponses(cwd, 10)

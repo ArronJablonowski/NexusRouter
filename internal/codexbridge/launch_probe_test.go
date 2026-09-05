@@ -50,7 +50,7 @@ func TestLiveCodexLaunchConfigProbe(t *testing.T) {
 		}
 		features = append(features, name)
 		value := "false"
-		if name == "skip_host_skill_discovery" {
+		if name == "skip_host_skill_discovery" || name == "code_mode_host" {
 			value = "true"
 		}
 		overrides = append(overrides, name+"="+value)

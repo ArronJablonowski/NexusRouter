@@ -1,8 +1,24 @@
 # Authenticated Codex coordinator integration
 
-Status: controlled-wire session adapter, framing, direct-process ownership and
-paused-tool correspondence implemented; no launchable DarwinRouter Codex
-profile yet. Target model remains `gpt-5.6-sol`.
+Status: experimental configured provider and one live Sol → Ollama → Sol
+round trip verified on September 5, 2026. Target model remains `gpt-5.6-sol`.
+Use `examples/sol-codex-local-smoke.yaml` with `--model coordinator` for fresh,
+supervised, non-sensitive tasks. Historical sections below record earlier
+implementation stages; they do not imply production qualification.
+
+The current pinned profile enables only `skip_host_skill_discovery` and
+`code_mode_host` among its 134 feature controls. The latter is necessary for
+the observed Sol tool path; the bundled host must be installed. A disabled-host
+warning is a failure, not an informational notice to ignore. Explicit disabled
+MCP/plugin/skill/hook inventories remain required. Exact known feature notices
+are discarded without logging their text. Sparse account rate-limit objects
+are also discarded, never interpreted as task usage or available spending.
+
+See [the live evidence and reproduction command](initial-hybrid-test.md#first-successful-end-to-end-checkpoint).
+Normal completion left no observed standalone Codex process in the subsequent
+process snapshot, but the brief snapshots did not capture the helper's exact
+lifetime. Descendant termination, cancellation, inherited prompt/built-in tool
+isolation and production readiness remain unqualified.
 
 The installed Codex CLI can use its existing ChatGPT login. DarwinRouter must
 not extract tokens from its credential files or silently require direct API

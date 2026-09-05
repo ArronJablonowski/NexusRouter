@@ -51,14 +51,17 @@ func TestLiveCodexProposalProtocol(t *testing.T) {
 	}
 	defer s.Close()
 	proposals := 0
+	answerBytes := 0
 	err = s.Stream(ctx, providers.Request{Model: "gpt-5.6-sol", Messages: []providers.Message{{Role: "user", Content: "Protocol smoke test. Call darwin.delegate exactly once with prompt Write a Go function returning 42 and validation go_source. Do not call any other tool."}}, Tools: []providers.Tool{{Name: "delegate", Description: "Request bounded local work", Parameters: json.RawMessage(`{"type":"object","properties":{"prompt":{"type":"string"},"validation":{"type":"string"}},"required":["prompt","validation"],"additionalProperties":false}`)}}}, func(c providers.Chunk) error {
 		if c.ToolCall != nil {
 			proposals++
 		}
+		answerBytes += len(c.Text)
 		return nil
 	})
 	t.Logf("protocol metadata: prepared=%t thread=%t turn=%t frames=%d proposals=%d", s.prepared, s.thread != "", s.turn != "", s.frames, proposals)
 	t.Logf("last frame classification: %s", lastMethod)
+	t.Logf("answer bytes observed: %d", answerBytes)
 	if err != nil {
 		t.Fatal("live protocol failed; payload withheld")
 	}
@@ -83,6 +86,8 @@ func (w *liveDiagnosticWire) Read() (codexrpc.Envelope, error) {
 		classification = "legacy codex event"
 	}
 	switch e.Method {
+	case "item/tool/call", "account/rateLimits/updated", "turn/moderationMetadata", "model/safetyBuffering/updated", "configWarning", "guardianWarning", "turn/plan/updated", "turn/diff/updated", "thread/name/updated", "serverRequest/resolved":
+		classification = e.Method
 	case "thread/started", "turn/started", "turn/completed", "item/started", "item/completed", "error", "warning", "deprecationNotice", "model/verification", "model/rerouted", "modelProvider/authRecoveryStarted", "modelProvider/authRecoveryCompleted", "remoteControl/status/changed", "thread/settings/updated", "thread/status/changed", "thread/tokenUsage/updated", "item/agentMessage/delta", "item/reasoning/summaryTextDelta":
 		classification = e.Method
 	}

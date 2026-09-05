@@ -88,6 +88,9 @@ func (s *Session) segment(ctx context.Context, req providers.Request, emit func(
 		if kind != codexrpc.Notification {
 			return failure(s.emitted)
 		}
+		if s.compatibilityNotice(e) {
+			continue
+		}
 		var n struct {
 			ThreadID string `json:"threadId"`
 			TurnID   string `json:"turnId"`

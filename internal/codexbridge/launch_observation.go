@@ -23,8 +23,8 @@ type LaunchObservation struct {
 
 // InspectLaunchConfig projects a bounded config/read result without returning
 // raw values, extension names, provider URLs, paths, errors or secrets. Feature
-// names come from trusted CLI metadata. Only skip_host_skill_discovery is
-// expected true; every other named feature must be explicitly false.
+// names come from trusted CLI metadata. Only skip_host_skill_discovery and
+// code_mode_host are expected true; other features must be explicitly false.
 func InspectLaunchConfig(result json.RawMessage, features []string) (LaunchObservation, error) {
 	var report LaunchObservation
 	if len(features) == 0 || len(features) > 256 {
@@ -57,7 +57,7 @@ func InspectLaunchConfig(result json.RawMessage, features []string) (LaunchObser
 		}
 		report.ObservedFeatures++
 		want := []byte("false")
-		if name == "skip_host_skill_discovery" {
+		if name == "skip_host_skill_discovery" || name == "code_mode_host" {
 			want = []byte("true")
 		}
 		if bytes.Equal(bytes.TrimSpace(value), want) {

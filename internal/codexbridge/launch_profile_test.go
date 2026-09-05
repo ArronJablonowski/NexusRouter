@@ -9,7 +9,7 @@ import (
 )
 
 func profileInventory() string {
-	rows := []string{"apps_mcp_path_override removed false", "skip_host_skill_discovery experimental false", "shell_tool stable true", "plugins experimental true", "hooks experimental true", "apps experimental true"}
+	rows := []string{"apps_mcp_path_override removed false", "skip_host_skill_discovery experimental false", "shell_tool stable true", "plugins experimental true", "hooks experimental true", "apps experimental true", "code_mode_host stable true"}
 	for len(rows) < 135 {
 		rows = append(rows, fmt.Sprintf("feature_%03d under development false", len(rows)))
 	}
@@ -22,7 +22,7 @@ func TestLaunchProfile(t *testing.T) {
 		t.Fatal("pinned inventory rejected")
 	}
 	if !reflect.DeepEqual(args[:5], []string{"app-server", "--strict-config", "--listen", "stdio://", "-c"}) ||
-		strings.Contains(args[5], "apps_mcp_path_override") || !strings.Contains(args[5], "skip_host_skill_discovery=true") || strings.Count(args[5], "=true") != 1 || strings.Count(args[5], "=false") != 133 {
+		strings.Contains(args[5], "apps_mcp_path_override") || !strings.Contains(args[5], "skip_host_skill_discovery=true") || !strings.Contains(args[5], "code_mode_host=true") || strings.Count(args[5], "=true") != 2 || strings.Count(args[5], "=false") != 132 {
 		t.Fatal("incorrect feature override profile")
 	}
 	want := []string{"-c", `mcp_servers={}`, "-c", `plugins={}`, "-c", `project_doc_max_bytes=0`, "-c", `notify=[]`, "-c", `web_search="disabled"`}
@@ -48,10 +48,10 @@ func TestLaunchProfileRejectsMetadata(t *testing.T) {
 	}
 	inventory := profileInventory()
 	cases := []string{"", "\xff", inventory + "\nextra stable false", strings.Join(strings.Split(inventory, "\n")[1:], "\n"), strings.Repeat("x", 64<<10+1)}
-	for _, row := range []string{"feature_006 stable", "feature_006 stable false extra", "feature_006 unknown false", "feature_006 under development extra false", "feature_006 stable maybe", "feature_006\x00 stable false", "shell_tool stable false", strings.Repeat("a", 129) + " stable false"} {
-		cases = append(cases, strings.Replace(inventory, "feature_006 under development false", row, 1))
+	for _, row := range []string{"feature_007 stable", "feature_007 stable false extra", "feature_007 unknown false", "feature_007 under development extra false", "feature_007 stable maybe", "feature_007\x00 stable false", "shell_tool stable false", strings.Repeat("a", 129) + " stable false"} {
+		cases = append(cases, strings.Replace(inventory, "feature_007 under development false", row, 1))
 	}
-	for _, name := range []string{"apps_mcp_path_override", "skip_host_skill_discovery", "shell_tool", "plugins", "hooks", "apps"} {
+	for _, name := range []string{"apps_mcp_path_override", "skip_host_skill_discovery", "code_mode_host", "shell_tool", "plugins", "hooks", "apps"} {
 		cases = append(cases, strings.Replace(inventory, name+" ", "unexpected_name ", 1))
 	}
 	cases = append(cases, strings.Replace(inventory, "apps_mcp_path_override removed false", "apps_mcp_path_override stable false", 1), strings.Replace(inventory, "apps_mcp_path_override removed false", "apps_mcp_path_override removed true", 1))

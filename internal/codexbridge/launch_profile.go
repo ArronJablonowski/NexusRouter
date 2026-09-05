@@ -42,7 +42,7 @@ func launchProfile(version, inventory []byte) (features []string, args []string,
 		}
 		features = append(features, name)
 	}
-	for _, name := range []string{"apps_mcp_path_override", "skip_host_skill_discovery", "shell_tool", "plugins", "hooks", "apps"} {
+	for _, name := range []string{"apps_mcp_path_override", "skip_host_skill_discovery", "code_mode_host", "shell_tool", "plugins", "hooks", "apps"} {
 		if !seen[name] {
 			return nil, nil, ErrLaunchObservation
 		}
@@ -51,7 +51,7 @@ func launchProfile(version, inventory []byte) (features []string, args []string,
 	overrides := make([]string, 0, len(features))
 	for _, name := range features {
 		value := "false"
-		if name == "skip_host_skill_discovery" {
+		if name == "skip_host_skill_discovery" || name == "code_mode_host" {
 			value = "true"
 		}
 		overrides = append(overrides, name+"="+value)
