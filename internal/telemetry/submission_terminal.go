@@ -41,7 +41,7 @@ func (s *Store) RecoverTerminalSubmission(ctx context.Context, id, configDigest 
 	if now.Before(at) {
 		return false, nil
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(task_id AS BLOB))<=128 THEN task_id END FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.submission_id')=? ORDER BY rowid LIMIT 3`, id)
+	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(task_id AS BLOB))<=128 THEN task_id END FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.submission_id')=? ORDER BY rowid LIMIT 67`, id)
 	if err != nil {
 		return false, err
 	}
@@ -63,11 +63,21 @@ func (s *Store) RecoverTerminalSubmission(ctx context.Context, id, configDigest 
 	if err != nil {
 		return false, err
 	}
-	if len(ids) == 0 || len(ids) > 2 {
+	if len(ids) == 0 || len(ids) > 66 {
 		return false, nil
 	}
-	var outcome sessions.TerminalOutcome
-	for i, task := range ids {
+	histories := make([][]runtime.Event, 0, len(ids))
+	var bytes, eventCount int64
+	for _, task := range ids {
+		var size, events int64
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(sum(length(CAST(body AS BLOB))),0),count(*) FROM events WHERE task_id=?`, task).Scan(&size, &events); err != nil {
+			return false, err
+		}
+		if size < 1 || events < 1 || size > (8<<20)-bytes || events > 10000-eventCount {
+			return false, submissions.ErrInvalid
+		}
+		bytes += size
+		eventCount += events
 		history, complete, e := terminalSubmissionHistory(ctx, tx, task)
 		if e != nil {
 			return false, e
@@ -78,36 +88,37 @@ func (s *Store) RecoverTerminalSubmission(ctx context.Context, id, configDigest 
 		if history[0].Data.SubmissionID != id {
 			return false, submissions.ErrInvalid
 		}
-		if i == 0 && history[0].Data.RetryOfTaskID != "" {
+		histories = append(histories, history)
+	}
+	outcome, err := sessions.ProjectTerminalTree(histories)
+	if err != nil {
+		return false, err
+	}
+	// External continuation parents must come from the original intake, not
+	// from treating an orphaned inference child as a new root.
+	var continuation sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT CASE
+		WHEN json_type(request,'$.request.ContinueTaskID') IS NULL THEN ''
+		WHEN json_type(request,'$.request.ContinueTaskID')='text' AND length(CAST(json_extract(request,'$.request.ContinueTaskID') AS BLOB))<=128
+		THEN json_extract(request,'$.request.ContinueTaskID') END FROM submissions WHERE id=?`, id).Scan(&continuation); err != nil {
+		return false, err
+	}
+	if !continuation.Valid || (continuation.String != "" && !sessions.ValidEventPageID(continuation.String)) {
+		return false, submissions.ErrInvalid
+	}
+	rootIDs := map[string]bool{}
+	if outcome.Result != nil {
+		rootIDs[outcome.Result.TaskID] = true
+		for _, previous := range outcome.Result.PreviousTaskIDs {
+			rootIDs[previous] = true
+		}
+	}
+	for _, history := range histories {
+		if rootIDs[history[0].TaskID] && history[0].Data.ParentTaskID != continuation.String {
 			return false, submissions.ErrInvalid
-		}
-		if i == 1 && history[0].Data.RetryOfTaskID != ids[0] {
-			return false, submissions.ErrInvalid
-		}
-		outcome, e = sessions.ProjectTerminalSubmission(history)
-		if e != nil {
-			return false, e
-		}
-		if i == 0 && len(ids) == 2 && (history[len(history)-1].Kind != runtime.TaskFailed || history[len(history)-1].Data.Code != "provider_retryable_no_output") {
-			return false, submissions.ErrInvalid
-		}
-		if i == 0 && len(ids) == 2 {
-			turns := 0
-			for _, event := range history {
-				if event.Kind == runtime.TurnStarted {
-					turns++
-				}
-				if event.Kind == runtime.TurnCompleted || event.Kind == runtime.ToolStarted || event.Kind == runtime.ToolCompleted || len(event.Data.ToolCalls) > 0 || (event.Kind == runtime.ModelDelta && event.Data.Text != "") {
-					return false, submissions.ErrInvalid
-				}
-			}
-			if turns != 1 {
-				return false, submissions.ErrInvalid
-			}
 		}
 	}
 	if outcome.Result != nil {
-		outcome.Result.PreviousTaskIDs = append([]string{}, ids[:len(ids)-1]...)
 		outcome.Result.AuditStatus = "not_recovered"
 		outcome.Result.AuditID = ""
 	}

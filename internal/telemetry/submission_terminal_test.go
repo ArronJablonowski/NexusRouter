@@ -125,7 +125,7 @@ func TestTerminalSubmissionRecovery(t *testing.T) {
 }
 
 func TestTerminalSubmissionRecoveryRejectsUnsafeHistory(t *testing.T) {
-	for _, mode := range []string{"gap", "head", "body", "oversize", "partial", "link", "fallback_output"} {
+	for _, mode := range []string{"gap", "head", "body", "oversize", "partial", "link", "fallback_output", "continuation"} {
 		t.Run(mode, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
@@ -134,6 +134,8 @@ func TestTerminalSubmissionRecoveryRejectsUnsafeHistory(t *testing.T) {
 			terminalFixture(t, db, claim, "task", "", "success")
 			var query string
 			switch mode {
+			case "continuation":
+				query = `UPDATE events SET body=json_set(body,'$.data.parent_task_id','missing-work') WHERE sequence=1`
 			case "gap":
 				query = `DELETE FROM events WHERE sequence=2`
 			case "head":

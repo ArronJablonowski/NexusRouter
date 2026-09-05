@@ -410,8 +410,8 @@ task holds the answer history; work-task lifecycle events hold acceptance eviden
 
 Parent cancellation and work-task cancellation cancel and join the child.
 Submission ownership fences all three logs; stale ownership cannot begin a child
-turn. General recovery of interrupted delegation, including automatic projection
-of completed multi-task submission trees, remains operator-inspection-only.
+turn. Completed submission trees can be reconstructed without rerunning children;
+incomplete delegation remains operator-inspection-only.
 Delegation does not automatically update fitness or audit the child.
 
 `delegate_max_calls` is 1–16 per parent execution, including failed admitted
@@ -598,14 +598,21 @@ not implemented.
 If execution reached a durable terminal event but the process died before saving
 the submission result, the same supervisor can restore that result from history.
 It requires an expired claim, matching configuration and complete validated
-journals for all linked tasks. The current one-fallback shape permits at most
-two linked tasks, each bounded to 10,000 events and 8 MiB. Unsupported or corrupt
+journals for all linked tasks. Recovery supports one parent, an optional prior
+no-output fallback attempt, and depth-one worker/inference children, including
+parallel batches. The entire tree is bounded to66 tasks,10,000 events and8MiB.
+Unsupported or corrupt
 histories remain inspection-required; they are not replayed or declared successful.
 
 Successful reconstruction checks final output, paired tool events, model and
 provider identity, nonempty-output evidence, and requested Go-syntax evidence.
 Fallback lineage must identify a preceding retryable no-output failure. The
-result retains the original task IDs, final text and finish reason. Usage is
+worker lifecycle must contain durable validation before acceptance, and accepted
+text must match its sole successful inference child. Child privacy cannot exceed
+the parent's policy. Missing or nonterminal nodes prevent reconstruction.
+The result retains the original parent task ID, final text and finish reason;
+PreviousTaskIDs contains only a preceding fallback attempt, never child tasks.
+All child IDs remain inspectable through submission status. Usage is
 summed only when every turn has complete, nonnegative, nonoverflowing usage;
 otherwise it remains unknown. Failed/canceled outcomes never expose partial text.
 A pending submission cancellation overrides delivery without rewriting the
