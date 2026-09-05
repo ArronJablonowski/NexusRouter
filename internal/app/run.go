@@ -25,6 +25,7 @@ var ErrAdmission = errors.New("task admission failed")
 type Request struct {
 	toolExtension                   *tools.Extension
 	toolReviewer                    tools.ApprovalReviewer
+	toolPresenter                   tools.ApprovalPresenter
 	providerFactory                 providers.Factory
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
@@ -76,6 +77,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.delegatedParent != "" {
 		r.toolExtension = nil
 		r.toolReviewer = nil
+		r.toolPresenter = nil
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
 		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
@@ -276,8 +278,8 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if registry != nil {
 		inference.Tools = registry.Catalog()
 		executor := tools.Executor{Registry: registry, Policy: toolPolicy}
-		if r.toolReviewer != nil && r.delegatedParent == "" {
-			executor.Authority = newToolAuthority(db, r.toolReviewer, secrets)
+		if (r.toolReviewer != nil || r.toolPresenter != nil) && r.delegatedParent == "" {
+			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
 		}
 		loop.Tools = executor
 		if s.Tools.Enabled || len(r.toolExtension.Names()) > 0 {

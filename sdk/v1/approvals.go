@@ -24,3 +24,12 @@ func (c *Client) ListApprovals(ctx context.Context, options approvals.ListOption
 	}
 	return app.ListApprovals(ctx, c.database, options)
 }
+
+// DecideApproval accepts a host-authenticated actor, stable decision ID and the
+// exact inspected request. Replaying a decision never restores spent authority.
+func (c *Client) DecideApproval(ctx context.Context, command approvals.Command, actor string) (approvals.Record, error) {
+	if !c.valid(ctx) {
+		return approvals.Record{}, ErrAdmission
+	}
+	return c.service.DecideApproval(ctx, command, actor)
+}

@@ -33,6 +33,7 @@ import (
 type Service struct {
 	toolExtension   *tools.Extension
 	toolReviewer    tools.ApprovalReviewer
+	toolPresenter   tools.ApprovalPresenter
 	providerFactory providers.Factory
 	memoryStore     memory.Store
 	skillStore      skills.Store

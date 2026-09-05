@@ -50,6 +50,10 @@ func approvalListQuery(task, raw string) (approvals.ListOptions, error) {
 
 func (h *Handler) serveApprovals(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/")
+	if len(parts) == 4 && parts[1] == "approvals" && parts[3] == "decision" && replayTaskID(parts[0]) && replayTaskID(parts[2]) && r.Method == http.MethodPost {
+		h.serveApprovalDecision(w, r, parts[0], parts[2])
+		return
+	}
 	if r.Method != http.MethodGet || (len(parts) != 2 && len(parts) != 3) || !replayTaskID(parts[0]) || parts[1] != "approvals" || (len(parts) == 3 && !replayTaskID(parts[2])) {
 		failure(w, 404, "not_found")
 		return

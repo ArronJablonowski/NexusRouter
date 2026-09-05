@@ -46,7 +46,13 @@ func NewServiceWithToolExtension(settings config.Settings, secret func(string) s
 // NewServiceWithToolApproval binds an explicit, trusted operator-review adapter.
 // Review authority is process-local and is never inherited by worker children.
 func NewServiceWithToolApproval(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer) (*Service, error) {
-	if extension.RequiresApproval() && reviewer == nil {
+	return NewServiceWithToolControls(settings, secret, profiler, store, skillStore, factory, extension, reviewer, nil)
+}
+
+// NewServiceWithToolControls optionally presents proposals and waits for a
+// separately submitted durable decision. Reviewer and presenter are exclusive.
+func NewServiceWithToolControls(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter) (*Service, error) {
+	if (reviewer != nil && presenter != nil) || (extension.RequiresApproval() && reviewer == nil && presenter == nil) {
 		return nil, ErrAdmission
 	}
 	svc, err := NewService(settings, secret)
@@ -63,6 +69,7 @@ func NewServiceWithToolApproval(settings config.Settings, secret func(string) st
 	svc.providerFactory = factory
 	svc.toolExtension = extension
 	svc.toolReviewer = reviewer
+	svc.toolPresenter = presenter
 	return svc, nil
 }
 

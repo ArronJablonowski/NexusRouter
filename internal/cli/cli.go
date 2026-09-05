@@ -32,6 +32,7 @@ Usage:
   darwin steering show --db path --task id --id message-id
   darwin approvals list --db path --task id [--after call-id --limit 25]
   darwin approvals show --db path --task id --id approval-id
+  darwin approval-decision --config path < decision.json
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin memory list|show|put|delete --db path --scope scope
   darwin skills list|show|history|draft|rollback --root path --scope scope
@@ -57,6 +58,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "approval-decision" {
+		return runApprovalDecision(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "approvals" {
 		return runApprovals(args[1:], stdout, stderr)
 	}

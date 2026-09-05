@@ -13,6 +13,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -91,6 +92,37 @@ func TestApprovalAPIReadsDurableLedgerWithoutMutation(t *testing.T) {
 		if w.Code == 200 {
 			t.Fatal("cross-task read accepted", w.Body.String())
 		}
+	}
+	// The separate authenticated decision control changes authority, not task
+	// execution. A stable command retry returns the same persisted decision.
+	cfg := config.Defaults()
+	cfg.Telemetry.Database = path
+	svc, err := app.NewService(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.DecideApproval = func(ctx context.Context, c approvals.Command) (approvals.Record, error) {
+		return svc.DecideApproval(ctx, c, "api_operator")
+	}
+	h, err = New(token, 1, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := approvals.Command{Expected: r.Request, ID: "http-decision", Allowed: true}
+	for range 2 {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, request("POST", "/v1/tasks/task/approvals/approval/decision", decisionCommandBody(command)))
+		if w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	stored, err = db.ReadApproval(ctx, r.Request.ID)
+	if err != nil || stored.State != approvals.Approved || len(stored.Decisions) != 1 || stored.Decisions[0].Actor != "api_operator" {
+		t.Fatal(stored, err)
+	}
+	after, err = db.Read(ctx, "task", 0, 100)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatal("decision invoked task execution", err)
 	}
 }
 

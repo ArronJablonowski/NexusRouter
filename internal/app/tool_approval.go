@@ -15,17 +15,20 @@ type toolAuthority struct {
 	secrets []string
 }
 
-func newToolAuthority(db *telemetry.Store, reviewer tools.ApprovalReviewer, secrets []string) tools.Authority {
+func newToolAuthority(db *telemetry.Store, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, secrets []string) tools.Authority {
 	a := &toolAuthority{secrets: append([]string(nil), secrets...)}
-	a.gate = &toolgate.Gate{Store: db, ReviewPrompt: func(ctx context.Context, p tools.ApprovalPrompt) (string, bool, error) {
-		actor, allowed, err := reviewer(ctx, p)
-		// Actor attribution is persisted verbatim. Reject credentials rather than
-		// silently changing the claimed operator identity through redaction.
-		if a.containsSecret(actor) {
-			return "", false, tools.ErrDenied
+	a.gate = &toolgate.Gate{Store: db, Present: presenter}
+	if reviewer != nil {
+		a.gate.ReviewPrompt = func(ctx context.Context, p tools.ApprovalPrompt) (string, bool, error) {
+			actor, allowed, err := reviewer(ctx, p)
+			// Actor attribution is persisted verbatim. Reject credentials rather than
+			// silently changing the claimed operator identity through redaction.
+			if a.containsSecret(actor) {
+				return "", false, tools.ErrDenied
+			}
+			return actor, allowed, err
 		}
-		return actor, allowed, err
-	}}
+	}
 	return a
 }
 

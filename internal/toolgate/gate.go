@@ -28,6 +28,9 @@ type Gate struct {
 	// ReviewPrompt receives an isolated, ephemeral argument preview. It must not
 	// log secrets or persist raw arguments; the ledger contains only digests.
 	ReviewPrompt tools.ApprovalReviewer
+	// Present displays the preview then waits for a separately recorded operator
+	// decision. Exactly one of Review, ReviewPrompt, or Present may be configured.
+	Present tools.ApprovalPresenter
 }
 
 var _ tools.Authority = (*Gate)(nil)
@@ -36,13 +39,13 @@ var _ tools.Authority = (*Gate)(nil)
 // It deliberately cannot resume an earlier approval: duplicate calls fail closed.
 func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handler func(context.Context) (runtime.ToolResult, error)) (runtime.ToolResult, error) {
 	noEffect := runtime.ToolResult{Effect: runtime.NoEffect}
-	if g == nil || g.Store == nil || (g.Review == nil && g.ReviewPrompt == nil) || (g.Review != nil && g.ReviewPrompt != nil) || handler == nil || ctx.Err() != nil {
+	if g == nil || g.Store == nil || !g.oneReviewer() || handler == nil || ctx.Err() != nil {
 		return noEffect, tools.ErrDenied
 	}
 	// Legacy metadata fixtures may omit arguments. Preview-based approval never
 	// permits an absent, mismatched, oversized, or malformed preview.
 	var arguments json.RawMessage
-	if g.ReviewPrompt != nil || a.Arguments != nil {
+	if g.ReviewPrompt != nil || g.Present != nil || a.Arguments != nil {
 		if len(a.Arguments) > 1<<20 || !utf8.Valid(a.Arguments) || !json.Valid(a.Arguments) || len(a.Description) > 4096 || !utf8.ValidString(a.Description) {
 			return noEffect, tools.ErrDenied
 		}
@@ -68,7 +71,12 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 	reviewCtx, cancel := context.WithDeadline(ctx, req.ExpiresAt)
 	var actor string
 	var allowed bool
-	if g.ReviewPrompt != nil {
+	if g.Present != nil {
+		err = present(reviewCtx, g.Present, tools.ApprovalPrompt{Request: req, Arguments: arguments, Description: a.Description})
+		if err == nil {
+			err = g.awaitDecision(reviewCtx, req)
+		}
+	} else if g.ReviewPrompt != nil {
 		actor, allowed, err = reviewPrompt(reviewCtx, g.ReviewPrompt, tools.ApprovalPrompt{Request: req, Arguments: arguments, Description: a.Description})
 	} else {
 		actor, allowed, err = review(reviewCtx, g.Review, req)
@@ -78,9 +86,11 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 	if err != nil || late {
 		return noEffect, tools.ErrDenied
 	}
-	decision := approvals.Decision{ID: rand.Text(), Actor: actor, Allowed: allowed, Time: time.Now().UTC()}
-	if _, err = g.Store.DecideApproval(ctx, req.ID, decision); err != nil || !allowed {
-		return noEffect, tools.ErrDenied
+	if g.Present == nil {
+		decision := approvals.Decision{ID: rand.Text(), Actor: actor, Allowed: allowed, Time: time.Now().UTC()}
+		if _, err = g.Store.DecideApproval(ctx, req.ID, decision); err != nil || !allowed {
+			return noEffect, tools.ErrDenied
+		}
 	}
 	owner := rand.Text()
 	lease, err := g.Store.AcquireLease(ctx, a.TaskID, owner, a.Scope, true, time.Now().UTC(), 30*time.Second)
@@ -97,7 +107,9 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 	renewed := make(chan error, 1)
 	go func() { renewed <- g.renew(workCtx, stop, done, a.TaskID, lease.Token, owner) }()
 	var out runtime.ToolResult
-	if workCtx.Err() == nil {
+	// Consumption may wait for a database lock after its supplied timestamp was
+	// captured. Do not dispatch on observably expired authority or ownership.
+	if dispatchWindow(workCtx, time.Now().UTC(), req.ExpiresAt, lease.Expires) {
 		out, err = invoke(workCtx, handler)
 	} else {
 		err = tools.ErrExecution
@@ -116,6 +128,10 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 		return runtime.ToolResult{Effect: runtime.UncertainEffect}, tools.ErrExecution
 	}
 	return out, nil
+}
+
+func dispatchWindow(ctx context.Context, now, approvalExpiry, leaseExpiry time.Time) bool {
+	return ctx.Err() == nil && now.Before(approvalExpiry) && now.Before(leaseExpiry)
 }
 
 func reviewPrompt(ctx context.Context, fn tools.ApprovalReviewer, prompt tools.ApprovalPrompt) (actor string, allowed bool, err error) {

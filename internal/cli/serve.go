@@ -69,6 +69,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	var dispatcher *app.Dispatcher
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		DecideApproval: func(ctx context.Context, command approvals.Command) (approvals.Record, error) {
+			return service.DecideApproval(ctx, command, "api_operator")
+		},
 		Approval: func(ctx context.Context, task, id string) (approvals.Record, error) {
 			return app.InspectApproval(ctx, s.Telemetry.Database, task, id)
 		},

@@ -225,8 +225,39 @@ Responses contain scope, digests, validity window, state and operator decisions,
 not raw arguments or lease tokens. Treat actor/scope metadata as private.
 `consumed` means dispatch authority was spent, not that a write succeeded or is
 safe to repeat. These read-only commands never migrate/create a database or
-approve, revoke, resume or retry anything. Decisions still require the explicit
-SDK reviewer integration; built-in CLI/API approval decisions remain pending.
+approve, revoke, resume or retry anything.
+
+### Recording an operator approval decision
+
+For SDK tasks configured with `ApprovalPresenter`, inspect the exact private
+preview before approving. The presenter must display the arguments safely; an
+inspection digest alone is not a substitute for understanding the proposed effect.
+Submit a JSON object containing `expected` (the complete inspected `request`),
+`id` (a stable, unique decision ID), and `allowed` (a JSON boolean):
+
+```sh
+darwin approval-decision --config path/to/config.yaml < decision.json
+```
+
+The daemon also accepts authenticated
+`POST /v1/tasks/{task_id}/approvals/{approval_id}/decision` with that JSON body.
+No actor or timestamp fields are accepted. CLI attribution uses the invoking
+OS user ID; the API uses `api_operator`, representing its shared bearer credential,
+not per-person identity. SDK `DecideApproval` instead requires host-authenticated
+actor attribution. Decision bodies are limited to16KiB and reject duplicate,
+missing, unknown and null fields, including inside the expected request.
+
+The full request must still match. A fresh approval/denial requires an unexpired,
+uncanceled pending call; denying an approved but unconsumed request revokes it.
+Reuse the same decision ID, action, actor and expected request after uncertain
+acknowledgement. A retry returns current state without changing the original
+decision time; it cannot restore consumed authority. Never switch actor/transport
+identity on such a retry. These controls open only existing current-schema WAL
+storage, without creation or migration, and never themselves execute a tool.
+
+The waiting SDK runtime polls durable decisions and consumes approval under its
+writer lease before dispatch. CLI/API controls do not register write handlers or
+resume crashed tasks. Interrupted-effect reconciliation remains unfinished.
 
 ### Steering an active task
 

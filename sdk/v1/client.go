@@ -35,6 +35,7 @@ type Tool = tools.Definition
 type ToolPolicy = tools.Policy
 type ApprovalPrompt = tools.ApprovalPrompt
 type ApprovalReviewer = tools.ApprovalReviewer
+type ApprovalPresenter = tools.ApprovalPresenter
 
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
@@ -66,6 +67,9 @@ type ConfigOptions struct {
 	// Nil preserves read-only Allow-only registration. This is trusted host code,
 	// not a model evaluator; its presence never grants authority to child workers.
 	ApprovalReviewer ApprovalReviewer
+	// ApprovalPresenter publishes a private preview then waits for a separately
+	// authenticated decision through DecideApproval. Exclusive with reviewer.
+	ApprovalPresenter ApprovalPresenter
 }
 
 type Client struct {
@@ -110,14 +114,14 @@ func New(options ConfigOptions) (*Client, error) {
 		return nil, ErrAdmission
 	}
 	constructor := tools.NewExtension
-	if options.ApprovalReviewer != nil {
+	if options.ApprovalReviewer != nil || options.ApprovalPresenter != nil {
 		constructor = tools.NewApprovalExtension
 	}
 	extension, err := constructor(options.Tools, options.ToolPolicy)
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	service, err := app.NewServiceWithToolApproval(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer)
+	service, err := app.NewServiceWithToolControls(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter)
 	if err != nil {
 		return nil, ErrAdmission
 	}

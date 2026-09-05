@@ -146,8 +146,21 @@ hierarchical path lock; the host must assign overlapping resources consistently.
 Reviewed tools work in local `Run`, `RunStream`, and `RunTextStream`, subject to
 normal admission and iteration limits. They do not grant filesystem access or
 authority to delegated children. Durable queue intake remains rejected for active
-custom tools. Built-in CLI/API approval decisions and process-crash reconciliation
-of interrupted effects are not implemented yet.
+custom tools. Process-crash reconciliation of interrupted effects remains unfinished.
+
+For separately submitted decisions, set `ApprovalPresenter` instead of
+`ApprovalReviewer` (configuring both is rejected). The presenter receives the
+same private preview and returns after safely displaying it; returning nil is
+not approval. The runtime waits within the same one-minute deadline for a
+durable decision. Call `client.DecideApproval(ctx, approvals.Command{Expected:
+preview.Request, ID: stableDecisionID, Allowed: true}, authenticatedActor)` from
+the operator control flow, or use the CLI/API decision controls documented in
+the repository README. The actor must be authenticated by the embedding host.
+The full request is matched atomically before idempotency or state transitions.
+Fresh-clock retries with the same ID/action/actor preserve the original decision
+and may return a now-consumed or revoked record; they never restore authority.
+Denial, cancellation, expiry, failed presentation or prior consumption prevents
+dispatch. Presenter authority is never inherited by delegated children.
 
 `client.InspectApproval(ctx, taskID, approvalID)` reads one task-bound record;
 `client.ListApprovals(ctx, approvals.ListOptions{TaskID: taskID, Limit: 25})`

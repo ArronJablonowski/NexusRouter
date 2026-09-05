@@ -39,6 +39,11 @@ type ApprovalPrompt struct {
 // raw Arguments. A returned actor name alone is not authentication.
 type ApprovalReviewer func(context.Context, ApprovalPrompt) (actor string, allowed bool, err error)
 
+// ApprovalPresenter presents an ephemeral approval preview without granting
+// authority. An authenticated operator records the decision separately. The
+// callback must honor cancellation and must not persist or log raw Arguments.
+type ApprovalPresenter func(context.Context, ApprovalPrompt) error
+
 // Authority is trusted host code, not model-controlled permission. It must
 // obtain operator approval, consume durable authority under an active writer
 // lease, cancel on lease loss, and retain ownership until handler returns.
