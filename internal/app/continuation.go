@@ -23,18 +23,23 @@ func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secret
 	if r.Compaction != nil {
 		// Redact before both provider assembly and checkpoint persistence.
 		request := *r.Compaction
-		fields := []*[]string{&request.Summary.Decisions, &request.Summary.PendingWork, &request.Summary.Failures, &request.Summary.Artifacts, &request.Summary.Requirements, &request.Summary.Activity}
-		for _, field := range fields {
-			copy := append([]string(nil), (*field)...)
-			for i := range copy {
-				copy[i] = redact(copy[i], secrets)
-			}
-			*field = copy
-		}
+		request.Summary = redactSummary(request.Summary, secrets)
 		result.Messages, result.Compaction, err = sessions.PrepareContinuation(history, request)
 		if err != nil {
 			return nil, ErrAdmission
 		}
 	}
 	return result, nil
+}
+
+func redactSummary(summary sessions.Summary, secrets []string) sessions.Summary {
+	fields := []*[]string{&summary.Decisions, &summary.PendingWork, &summary.Failures, &summary.Artifacts, &summary.Requirements, &summary.Activity}
+	for _, field := range fields {
+		copy := append([]string(nil), (*field)...)
+		for i := range copy {
+			copy[i] = redact(copy[i], secrets)
+		}
+		*field = copy
+	}
+	return summary
 }

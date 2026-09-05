@@ -24,6 +24,9 @@ Usage:
   darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
   darwin audits list|show|attempts --db path [--task id] [--id audit-id]
   darwin audit --config path --task id --reviewer model-id [--max-cost amount]
+  darwin summary --config path --task id --model id --keep n [--max-cost amount]
+    Generate a stored summary draft; does not activate compaction
+  darwin summaries list|show --db path [--task id --after id --limit n] [--id id]
 
 Development status: use --model auto for constrained automatic routing.
 Interactive and live streaming are not yet implemented.
@@ -36,6 +39,12 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "summary" {
+		return runSummary(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "summaries" {
+		return runSummaries(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "audit" {
 		return runAudit(args[1:], stdout, stderr)
 	}

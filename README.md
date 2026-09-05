@@ -163,7 +163,19 @@ Compaction retains at least the requested recent message count, expanding backwa
 
 The new task atomically records its compacted input and a versioned summary checkpoint with source task, event sequence, source-conversation SHA-256 and removed-message count. It also records the first retained recent-message index and its source event sequence, plus before/after context estimates. These estimates cover the source and compacted history only, excluding the next prompt, freshly retrieved knowledge and tool catalog; they use conservative serialized-byte accounting, not a tokenizer. Legacy checkpoints may omit these additive fields. Inspect with `task show` or `GET /v1/tasks/{id}` after restart. The original history remains untouched, including any sensitive content; compaction is not deletion.
 
-The Go `sessions.Summarizer` component can generate a bounded draft with requirements, decisions, open work, failures, artifacts and activity. It makes one auxiliary call with no tools or retries, enforces time/context/operator-estimated-cost limits, and rejects malformed or truncated output. The returned proposal includes source provenance and context estimates, but is neither persisted nor activated. Its host must enforce privacy/resource admission, redact sensitive data, persist attempt lifecycle, and validate accuracy before use. This component is not yet wired to daemon/CLI automatic summarization. Summary-accuracy validation and mid-task compaction remain unfinished.
+The Go `sessions.Summarizer` component generates bounded proposals, and the application now exposes explicit draft generation through the CLI:
+
+```sh
+./bin/darwin summary --config path/to/config.yaml --task TASK_ID --model SUMMARY_MODEL_ID --keep 6 --max-cost 0
+./bin/darwin summaries list --db ./data/darwin.db --task TASK_ID
+./bin/darwin summaries show --db ./data/darwin.db --id SUMMARY_ATTEMPT_ID
+```
+
+The selected model needs configured `context_tokens` and `estimated_cost`; local models also need `ram_bytes`. The default zero cost ceiling permits only a configured zero-cost estimate. The sample local configuration needs this operator-supplied metadata before summary generation. Summarization may use the source model because it is not an independent quality audit; `evaluation.judge` does not disable explicitly requested summaries.
+
+Generation makes one auxiliary call without tools or retries. Application admission enforces deployment mode, source privacy, resource reservation and cost metadata, then persists a `started` attempt before dispatch. Configured credentials are redacted from input and draft content. Success atomically stores the proposal with `drafted` status; failure stores a generic code. Cancellation cleanup is bounded independently. A crash or unavailable store can leave `started` indeterminate—it is not proof that a summarizer is still running. Inspection opens storage read-only and supports up to 100 records per page, with optional task filtering and an exclusive `--after` ID cursor.
+
+Drafting never modifies the source, starts a continuation or affects fitness. Inspect the full proposal and verify its accuracy before using its `Draft.Request.summary` object as an operator-reviewed summary file. Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries and inspection output can contain sensitive session information. Automatic application, semantic validation, crash reconciliation, HTTP summary endpoints and mid-task compaction remain unfinished.
 
 ## Local HTTP service
 

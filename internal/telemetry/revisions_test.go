@@ -143,7 +143,7 @@ func TestRevisionMigrationAndBound(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := revisionBase(t, s)
-	if _, err := s.db.Exec("DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; PRAGMA user_version=5;"); err != nil {
+	if _, err := s.db.Exec("DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; PRAGMA user_version=5;"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
