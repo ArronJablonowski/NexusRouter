@@ -30,7 +30,7 @@ type Report struct {
 
 func (c Check) Validate() error {
 	switch c.Component {
-	case "daemon", "database", "supervisor", "learning", "resources", "provider", "model":
+	case "daemon", "database", "supervisor", "learning", "skill_regression", "resources", "provider", "model":
 	default:
 		return ErrInvalid
 	}
@@ -40,7 +40,7 @@ func (c Check) Validate() error {
 	if (c.Component == "provider" || c.Component == "model") && c.ID == "" {
 		return ErrInvalid
 	}
-	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "learning") && c.ID != "" {
+	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "learning" || c.Component == "skill_regression") && c.ID != "" {
 		return ErrInvalid
 	}
 	switch c.Status {
@@ -83,7 +83,7 @@ func (c Check) Validate() error {
 // Outcome derives readiness from operational prerequisites and at least one
 // discovered configured model. Unknown supplemental measurements degrade the
 // report but do not assert that an otherwise usable model is unavailable.
-// An included learning supervisor must be healthy or explicitly disabled;
+// Included learning and regression supervisors must be healthy or disabled;
 // older reports without this optional component retain their prior semantics.
 func Outcome(checks []Check) (string, bool) {
 	core := map[string]bool{}
@@ -95,8 +95,8 @@ func Outcome(checks []Check) (string, bool) {
 		if c.Component == "model" && c.Status == "healthy" {
 			model = true
 		}
-		if c.Component == "learning" {
-			learningReady = c.Status == "healthy" || c.Status == "disabled"
+		if c.Component == "learning" || c.Component == "skill_regression" {
+			learningReady = learningReady && (c.Status == "healthy" || c.Status == "disabled")
 		}
 		if c.Status != "healthy" && c.Status != "disabled" {
 			all = false

@@ -472,6 +472,17 @@ credential, trusted-callback and cooperative-deadline rules apply as activation.
 An initial version has no predecessor to restore. This method does not schedule
 continuous checks or infer statistical regressions from task outcomes.
 
+For periodic checks, explicitly call
+`Client.StartSkillRegression(ctx, interval, validator)`. The caller owns the
+returned `SkillRegressionMonitor` and must call `Close()`; `Health()` reports
+operational status without skill identities. Each tick checks one active skill,
+advances past individual validation errors, and retains sticky degraded health.
+Intervals are 1 second–24 hours. `Client.SkillRegressionStep(ctx, after, validator)`
+supports manual bounded driving; retain its returned cursor even on check error.
+The scheduling cursor is not proof of rollback; restart reads the current catalog.
+Neither API enables learning or new activation. See
+[regression monitoring](../../docs/skill-regression-monitor.md) for full limitations.
+
 `Client.DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` discovers accepted
 source candidates from durable tasks. It requires enabled skill drafting and a
 configured root/scope, but reads only the existing telemetry database. Limits are

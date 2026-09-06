@@ -387,8 +387,10 @@ Go host API supports operation-keyed activation and receipt inspection. Opt-in
 Go-host learning additionally binds a named trusted validator into the learner
 policy and saves a schema-26 activation intent before a later validation tick.
 Receipt reconciliation resumes cursor progression without reactivation after
-rollback. Standalone daemon validation-engine configuration and automatic
-regression monitoring remain required.
+rollback. Go hosts can also explicitly start periodic deterministic regression
+monitoring with automatic rollback via `StartSkillRegression`. Standalone daemon
+validation-engine configuration and statistical outcome-based regression
+monitoring remain required. See [regression monitoring](docs/skill-regression-monitor.md).
 See [activation operations](docs/skill-activation-operations.md).
 
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.

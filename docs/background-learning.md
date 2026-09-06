@@ -147,8 +147,12 @@ or confer activation authority. See [activation operations](skill-activation-ope
 Stop older writers and back up the database before schema-26 migration. The
 activation itself separately upgrades the file catalog to schema 3. Only trusted
 Go-host integration is supported here; standalone daemon validator configuration,
-operator intent resolution, automatic regression monitoring, and power-loss
+operator intent resolution, statistical outcome regression monitoring, and power-loss
 qualification across both stores remain open.
+
+Trusted Go hosts can separately start [periodic deterministic regression
+monitoring](skill-regression-monitor.md). Its rollback policy is independent of
+learning and new activation; it does not start automatically with a learner.
 
 Ordinary aggregate-budget or cooldown exhaustion waits and retries the same
 pinned identity at the configured interval. Health reports show

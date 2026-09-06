@@ -1,5 +1,35 @@
 # Implementation evidence
 
+Regression-monitor checkpoint: the previous goal turn made verified progress
+with opt-in validated learning and backup 00b5327. This turn confirmed a clean
+worktree; native Linear is still locked and no issue status was changed.
+The Go-host API/SDK now supports explicitly started periodic deterministic
+revalidation with automatic revision-fenced rollback. Each tick checks one
+current active skill, advances past individual callback failures and retains
+sticky degraded health. Scope-isolated read-only pagination covers more than
+100 active entries. Cancellation joins cooperative validation; restart derives
+authority from the current durable catalog rather than an in-memory cursor.
+Three agents supplied enumeration, SDK integration, tests and independent review;
+root implemented the monitor, health/readiness integration and documentation.
+
+Focused evidence: skills pagination race tests passed 1.746s, app monitor tests
+passed three race repetitions 13.019s, SDK monitor tests passed three repetitions
+2.309s, and health race tests passed 1.396s. App/skills vet passed. Actual background
+fixtures verified deterministic rollback, failure isolation and joined shutdown;
+all data was synthetic. No inference, user monitor, or user catalog migration was
+performed. Review found no rollback-authority or cancellation defect, but unsafe
+metadata/secret admission can still prevent later-key discovery; this is documented.
+Standalone daemon validators, semantic/statistical outcome regression detection,
+persisted passing-check audit records and durable scan fairness across frequent
+restarts remain open.
+
+Final `make check` passed formatting/LOC, vet, full native race tests and build:
+app 135.470s, telemetry 104.423s, CLI 31.354s, API 10.350s, SDK 21.675s and
+skills 15.613s. Native build and CGO-free Linux amd64 production build plus app
+test-binary compilation passed. Linux binaries were not executed. Fetch confirmed
+HEAD/origin-main 0/0 before commit; no user files, credentials, catalogs or
+databases are included in the checkpoint.
+
 Validated-learning checkpoint: the previous goal turn delivered operation-keyed
 activation and backup7a729aa. This turn confirmed a clean worktree; native Linear
 remains locked. A new opt-in Go-host learning path binds validator identity into

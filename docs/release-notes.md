@@ -5,6 +5,12 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Opt-in periodic skill regression monitoring for trusted Go hosts: paginated
+  active-state inspection, revision-fenced deterministic rollback, failure
+  isolation, sticky health and joined cancellation. No daemon validator or
+  statistical outcome detector is enabled. See
+  [regression monitoring](skill-regression-monitor.md).
+
 - Opt-in validated learning for trusted Go hosts, with a named validator,
   schema-26 activation intents and restart-safe operation reconciliation.
   The standard daemon remains draft-only. See

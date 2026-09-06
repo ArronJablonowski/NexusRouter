@@ -148,8 +148,9 @@ Local-only skill context pins hybrid tasks local and is omitted for explicit
 cloud/cloud-only tasks. Setting `local_only: false` authorizes sharing selected
 content from that scope with configured cloud models. Loading never drafts,
 activates or revises a skill. Explicit generation, validated activation and
-deterministic regression rollback are available to trusted hosts; automatic
-scheduling, production workflow validators and semantic relevance selection
+deterministic regression rollback are available to trusted hosts; opt-in Go-host
+learning and regression supervisors can schedule those operations. Standalone
+daemon validator configuration, production workflow validators and semantic relevance selection
 remain unfinished. As with memory, old skill snapshots remain in continuation
 history; changing an active version does not rewrite prior session messages.
 
@@ -1222,8 +1223,13 @@ The ordinary daemon remains draft-only. See
 can restore the validated predecessor of the observed active version. Passing
 checks are non-mutating; callback errors or model opinions do not cause rollback.
 The returned state identifies the version checked, so inspect activation state
-again after rollback. New activation may be disabled independently. Continuous
-monitoring and statistical regression detection are not yet scheduled.
+again after rollback. New activation may be disabled independently. Go hosts can
+explicitly start `StartSkillRegression(ctx, interval, validator)` for periodic,
+scope-wide checks with caller-owned cancellation and health. Ordinary validation
+failures advance to later keys while health stays degraded. The monitor does not
+infer statistical regressions from task outcomes or run generated test commands.
+See [regression monitoring](docs/skill-regression-monitor.md) for policy, restart,
+admission-failure and cooperative-shutdown limits.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
