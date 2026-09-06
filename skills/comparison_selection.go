@@ -1,6 +1,28 @@
 package skills
 
-import "github.com/ArronJablonowski/DarwinRouter/evaluation"
+import (
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
+)
+
+// ComparisonSources identifies the exact observed tasks, not a query to rerun.
+// Nil Sources on older reports means unrecorded; a nonnil empty Tasks is known empty.
+type ComparisonSources struct {
+	Version int      `json:"version"`
+	Tasks   []string `json:"tasks"`
+}
+
+func (s ComparisonSources) Validate() error {
+	if s.Version != 1 || s.Tasks == nil || len(s.Tasks) > 200 {
+		return ErrInvalid
+	}
+	for i, id := range s.Tasks {
+		if !sessions.ValidEventPageID(id) || i > 0 && s.Tasks[i-1] >= id {
+			return ErrInvalid
+		}
+	}
+	return nil
+}
 
 // ComparisonSelectionRequest selects an outcome-independent bounded historical
 // window; it does not ask a model to nominate successful examples.
@@ -43,6 +65,7 @@ type ComparisonSelectionReport struct {
 	Baseline          ComparisonWindow          `json:"baseline"`
 	Candidate         ComparisonWindow          `json:"candidate"`
 	Comparison        *ComparisonReport         `json:"comparison,omitempty"`
+	Sources           *ComparisonSources        `json:"sources,omitempty"`
 }
 
 func (r ComparisonSelectionRequest) Validate() error {
@@ -78,6 +101,9 @@ func (r ComparisonSelectionReport) Validate() error {
 			}
 		}
 		total += w.Selected
+	}
+	if r.Sources != nil && (r.Sources.Validate() != nil || len(r.Sources.Tasks) != total) {
+		return ErrInvalid
 	}
 	if total == 0 {
 		if r.Comparison != nil {

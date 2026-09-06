@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -57,6 +58,11 @@ func (s *Store) SkillComparisonSelection(ctx context.Context, policy skills.Comp
 	}
 	report.Candidate = window
 	selected := append(baseline, candidate...)
+	report.Sources = &skills.ComparisonSources{Version: 1, Tasks: make([]string, 0, len(selected))}
+	for _, exposure := range selected {
+		report.Sources.Tasks = append(report.Sources.Tasks, exposure.task)
+	}
+	slices.Sort(report.Sources.Tasks)
 	observations = make([]skills.TaskOutcome, 0, len(selected))
 	if len(selected) != 0 {
 		ids := make([]string, 0, len(selected))

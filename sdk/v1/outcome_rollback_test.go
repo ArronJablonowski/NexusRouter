@@ -19,7 +19,8 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
-func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
+func sdkOutcomeRollbackEvidence(t *testing.T) (*sdk.Client, sdk.ConfigOptions, string, string, skills.ActivationState, skills.ComparisonSelectionRequest) {
+	t.Helper()
 	ctx := context.Background()
 	options, path := sdkToolOptions(t)
 	parent, err := filepath.EvalSymlinks(t.TempDir())
@@ -102,12 +103,19 @@ func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
+	return client, options, path, root, expected, request
+}
+
+func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
+	ctx := context.Background()
+	client, options, path, _, expected, request := sdkOutcomeRollbackEvidence(t)
+	key := expected.Key
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	receipt, err := client.OutcomeRollbackOnce(ctx, "sdk-outcome", expected, request)
-	if err != nil || receipt.Validate() != nil || receipt.Decision != "rolled_back" || receipt.After.Active != versions[0].ID {
+	if err != nil || receipt.Validate() != nil || receipt.Decision != "rolled_back" || receipt.After.Active != request.BaselineVersion {
 		t.Fatal(receipt, err)
 	}
 	restarted, err := sdk.New(options)

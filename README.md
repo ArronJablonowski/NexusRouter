@@ -83,8 +83,9 @@ requires an exact first-activation/predecessor binding, and preserves a durable
 receipt for rollback or no-action decisions. A durable preselection intent fences
 failed or interrupted attempts against automatic reselection; trusted hosts can
 inspect intents, selected-evidence checkpoints and receipts. Exact retries can
-finish from a saved checkpoint without rereading feedback, subject to current
-policy and activation checks. No daemon loop starts automatically.
+finish from a saved checkpoint only after its fixed source tasks still match
+current evidence, policy and activation checks. Corrected feedback blocks
+completion without selecting replacement tasks. No daemon loop starts automatically.
 
 ### Managed local model residency
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +13,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"modernc.org/sqlite"
 )
@@ -116,7 +120,7 @@ func TestOutcomeCheckpointSelectionGuardRejectsNewSensitiveMetadata(t *testing.T
 	}
 }
 
-func TestOutcomeCheckpointRetryUsesFrozenReportAfterFeedbackAndDatabaseChange(t *testing.T) {
+func TestOutcomeCheckpointRetryRejectsChangedFeedbackAndMissingDatabase(t *testing.T) {
 	svc, expected, request, checkpoint, tasks := appOutcomeCheckpointFixture(t)
 	ctx := context.Background()
 	for _, task := range tasks[20:] {
@@ -128,6 +132,11 @@ func TestOutcomeCheckpointRetryUsesFrozenReportAfterFeedbackAndDatabaseChange(t 
 	if err != nil || current.Comparison == nil || current.Comparison.Status != "no_regression_signal" || current.Comparison.EvidenceDigest == checkpoint.Report.Comparison.EvidenceDigest {
 		t.Fatal("changed evidence fixture not qualified", current, err)
 	}
+	path := filepath.Join(svc.settings.Skills.Root, "catalog.json")
+	before, _ := os.ReadFile(path)
+	if out, err := svc.OutcomeRollbackOnce(ctx, "saved-selection", expected, request); err == nil || out.Version != 0 {
+		t.Fatal("changed feedback authorized old signal", out, err)
+	}
 	database := svc.settings.Telemetry.Database
 	if err := os.Rename(database, database+".saved"); err != nil {
 		t.Fatal(err)
@@ -137,11 +146,22 @@ func TestOutcomeCheckpointRetryUsesFrozenReportAfterFeedbackAndDatabaseChange(t 
 		t.Fatal(err)
 	}
 	receipt, err := restarted.OutcomeRollbackOnce(ctx, "saved-selection", expected, request)
-	if err != nil || receipt.Validate() != nil || receipt.Decision != "rolled_back" || receipt.After.Active != request.BaselineVersion || !reflect.DeepEqual(receipt.Selection, checkpoint.Report) {
-		t.Fatal("retry did not use original frozen observation", receipt, err)
+	if err == nil || receipt.Version != 0 {
+		t.Fatal("missing evidence authorized checkpoint", receipt, err)
 	}
 	if _, err := os.Stat(database); !os.IsNotExist(err) {
-		t.Fatal("checkpoint retry reopened/created database", err)
+		t.Fatal("checkpoint retry created database", err)
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Fatal("denied freshness check rewrote catalog")
+	}
+	state, err := restarted.SkillActivationState(ctx, expected.Key)
+	if err != nil || state != expected {
+		t.Fatal("denied freshness changed activation", state, err)
+	}
+	if out, err := restarted.OutcomeRollbackOperation(ctx, expected.Key, "saved-selection"); err == nil || out.Version != 0 {
+		t.Fatal("denied freshness fabricated receipt")
 	}
 	persisted, err := restarted.OutcomeSelectionCheckpoint(ctx, expected.Key, "saved-selection")
 	if err != nil || !reflect.DeepEqual(checkpoint, persisted) {
@@ -154,10 +174,91 @@ func TestOutcomeCheckpointRetryUsesFrozenReportAfterFeedbackAndDatabaseChange(t 
 	}
 }
 
+func TestOutcomeCheckpointFreshRetryChecksFixedSourcesWithoutLatestSelection(t *testing.T) {
+	svc, expected, request, checkpoint, tasks := appOutcomeCheckpointFixture(t)
+	if checkpoint.Report.Sources == nil || checkpoint.Report.Sources.Version != 1 || !reflect.DeepEqual(checkpoint.Report.Sources.Tasks, tasks) {
+		t.Fatal("checkpoint lacks exact sorted selected source identities")
+	}
+	var queried atomic.Int32
+	function := fmt.Sprintf("app_checkpoint_no_reselection_%d", appOutcomeCheckpointProbe.Add(1))
+	if err := sqlite.RegisterScalarFunction(function, 1, func(_ *sqlite.FunctionContext, _ []driver.Value) (driver.Value, error) {
+		queried.Add(1)
+		return nil, errors.New("fixture latest-window trap")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", svc.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`ALTER TABLE skill_exposures RENAME TO freshness_exposure_rows; CREATE VIEW skill_exposures AS SELECT task_id,scope,name,version,` + function + `(digest) AS digest,ordinal,privacy FROM freshness_exposure_rows`); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	db.Close()
+	// First qualify the trap against the automatic latest-window selector.
+	if _, err := svc.SelectSkillComparison(context.Background(), request); err == nil || queried.Load() == 0 {
+		t.Fatal("latest-window trap was not reached", err)
+	}
+	queried.Store(0)
+	receipt, err := svc.OutcomeRollbackOnce(context.Background(), "saved-selection", expected, request)
+	if err != nil || receipt.Decision != "rolled_back" || !reflect.DeepEqual(receipt.Selection, checkpoint.Report) || queried.Load() != 0 {
+		t.Fatal("fixed-source retry reran selection or changed report", receipt, err, queried.Load())
+	}
+	if err := os.Rename(svc.settings.Telemetry.Database, svc.settings.Telemetry.Database+".saved"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.OutcomeRollbackOnce(context.Background(), "saved-selection", expected, request)
+	if err != nil || !reflect.DeepEqual(again, receipt) {
+		t.Fatal("completed receipt unnecessarily rechecked unavailable sources", again, err)
+	}
+}
+
+func TestOutcomeCheckpointLegacySourcelessReportInspectableButNotResumable(t *testing.T) {
+	svc, expected, request, checkpoint, _ := appOutcomeCheckpointFixture(t)
+	path := filepath.Join(svc.settings.Skills.Root, "catalog.json")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var catalog map[string]json.RawMessage
+	if json.Unmarshal(body, &catalog) != nil {
+		t.Fatal("fixture catalog")
+	}
+	var checkpoints map[string]skills.OutcomeSelectionCheckpoint
+	if json.Unmarshal(catalog["outcome_selections"], &checkpoints) != nil {
+		t.Fatal("fixture checkpoints")
+	}
+	checkpoint.Report.Sources = nil
+	checkpoints["saved-selection"] = checkpoint
+	catalog["outcome_selections"], err = json.Marshal(checkpoints)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, legacy, 0600); err != nil {
+		t.Fatal(err)
+	}
+	inspected, err := svc.OutcomeSelectionCheckpoint(context.Background(), expected.Key, "saved-selection")
+	if err != nil || inspected.Report.Sources != nil || inspected.Validate() != nil {
+		t.Fatal("legacy source-less checkpoint unavailable for audit", inspected, err)
+	}
+	if out, err := svc.OutcomeRollbackOnce(context.Background(), "saved-selection", expected, request); err == nil || out.Version != 0 {
+		t.Fatal("legacy source-less checkpoint resumed", out, err)
+	}
+	after, _ := os.ReadFile(path)
+	if string(legacy) != string(after) {
+		t.Fatal("source-less rejection mutated catalog")
+	}
+}
+
 func TestOutcomeCheckpointRetryPreservesCurrentGuards(t *testing.T) {
-	for _, mode := range []string{"stale", "policy", "model-binding", "secret", "disabled"} {
+	for _, mode := range []string{"stale", "policy", "model-binding", "secret", "disabled", "new-session-sibling", "missing-database"} {
 		t.Run(mode, func(t *testing.T) {
-			svc, expected, request, checkpoint, _ := appOutcomeCheckpointFixture(t)
+			svc, expected, request, checkpoint, tasks := appOutcomeCheckpointFixture(t)
 			switch mode {
 			case "stale":
 				store, err := skills.Open(svc.settings.Skills.Root, []string{expected.Key.Scope})
@@ -177,6 +278,21 @@ func TestOutcomeCheckpointRetryPreservesCurrentGuards(t *testing.T) {
 				svc.secret = func(string) string { return checkpoint.Report.Comparison.EvidenceDigest }
 			case "disabled":
 				svc.settings.Skills.OutcomeRollback = false
+			case "missing-database":
+				if err := os.Rename(svc.settings.Telemetry.Database, svc.settings.Telemetry.Database+".saved"); err != nil {
+					t.Fatal(err)
+				}
+			case "new-session-sibling":
+				db, err := telemetry.Open(context.Background(), svc.settings.Telemetry.Database)
+				if err != nil {
+					t.Fatal(err)
+				}
+				e := runtime.Event{Version: 1, ID: "new-sibling-start", TaskID: "new-sibling", SessionID: tasks[0], CorrelationID: "new-sibling", Sequence: 1, Time: time.Now().UTC(), Kind: runtime.TaskStarted}
+				err = db.Append(context.Background(), 0, e)
+				db.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			path := filepath.Join(svc.settings.Skills.Root, "catalog.json")
 			before, _ := os.ReadFile(path)

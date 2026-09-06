@@ -106,17 +106,26 @@ The checkpointed path saves a validated selection report before the final
 decision. A checkpoint contains the exact intent, aggregate report and selection
 save time; it is **not a completion receipt**. If that save succeeds but final
 commit is interrupted or denied, retrying the same binding uses the saved report
-without invoking the selector or reopening SQLite. It rechecks current policy,
-credentials, candidate/predecessor content and the exact activation revision.
-Changed feedback is not silently substituted, even if the database later becomes
-unavailable. A stale activation prevents completion; its expected state is never
-refreshed to make the old report fit.
+without invoking the selector. The application/SDK reopens SQLite read-only and
+checks only the report's saved task IDs in one current snapshot, before saving
+the checkpoint and again before final completion. Original attribution, privacy,
+ordinal bounds, journal outcomes, current evaluation revisions and global
+same-session correlation must still reproduce the saved comparison and evidence
+digest. Corrected feedback, changed task results, missing evidence, or new
+same-session correlation prevents completion. The checkpoint and claim remain
+inspectable; no replacement window, fabricated result or automatic reset follows.
+Unrelated new tasks do not expand the saved membership. Known empty sources stay
+empty, rather than triggering a fresh selection.
 
-This can apply an older report even after a user has corrected its underlying
-feedback. Recovery guarantees evidence identity, not evidence freshness. There is
-no checkpoint-expiry policy in this slice. Operators should withhold the action
-permission if the saved observation is no longer appropriate; a current-feedback
-invalidation policy remains part of the broader monitoring work.
+Current policy, credentials, candidate/predecessor content and the exact
+activation revision are also checked. A stale activation prevents completion;
+its expected state is never refreshed to make the old report fit. Unfinished
+legacy checkpoints without recorded source IDs remain inspectable but cannot
+complete through the application/SDK. Direct core hosts remain responsible for
+their explicit selection guard; the core itself has no SQLite dependency.
+
+This provides fixed-source invalidation, not a refreshed latest-window report or
+checkpoint age/expiry policy. Workload drift and repeated monitoring remain open.
 
 An intent with no checkpoint and no receipt remains unresolved and cannot
 reselect. This includes old schema7 attempts and death before checkpoint save.
@@ -142,8 +151,9 @@ not rewritten, and no `Evidence.Deterministic` success/failure is fabricated.
 New checkpoint-backed receipts link the saved selection with `selection_id`;
 legacy receipts are not given invented checkpoint provenance.
 
-SQLite selection and the later catalog write are not one distributed transaction.
-The report records a coherent historical snapshot; feedback can change afterward.
+SQLite selection/source checks and the later catalog write are not one distributed
+transaction. Each check records a coherent snapshot; a writer can commit changed
+feedback after the last check and before the catalog replacement.
 `SelectedAt` is the checkpoint save time, and `CheckedAt` is the catalog decision
 time, not a claim that feedback is still
 current then. The catalog activation is checked again under its write lock before
@@ -155,7 +165,8 @@ metadata, cumulative credential changes, and per-call catalog/database path
 bindings. Intent, selection-save and final metadata guards run under the catalog lock and must be bounded,
 non-reentrant and cancellation-cooperative. Selector and guard values are copied
 to prevent retained mutable aliases. The core has an eight-second cooperative
-deadline; the application has ten seconds and SQLite selection five seconds.
+deadline; the application has ten seconds and each SQLite selection/source check
+has five seconds, bounded by the enclosing deadline.
 
 An error after commit can suppress an already-persisted response. Inspect or retry
 the same binding; do not assume no action occurred or invent another operation ID.
@@ -169,6 +180,9 @@ readable without invented historical intent or checkpoint records.
 Schemas1–7 remain readable; subsequent activation, publication and deterministic
 monitor writes do not downgrade it. Stop older writers before adopting schema8.
 This operation does not migrate SQLite, whose selector requires schema27.
+Source membership is an additive optional report field; catalog schema8 and
+SQLite schema27 are unchanged. Completed historical receipts, including those
+without sources, remain acknowledgeable without reopening the evidence database.
 Outcome records reserve at most 1,000 distinct activation revision slots across
 intents and legacy receipts, with at most one selection checkpoint per intent,
 and share the catalog's existing 8 MiB limit;

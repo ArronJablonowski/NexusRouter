@@ -90,8 +90,11 @@ func TestSkillComparisonSelectionHTTPActualIndex(t *testing.T) {
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &got) != nil || got.Validate() != nil || got.Baseline.Selected != 1 || got.Candidate.Selected != 1 || got.Watermark != 3 || got.Comparison == nil || got.Comparison.Excluded["nonfinal_outcome"] != 2 {
 		t.Fatal("index selection failed", w.Code, w.Body.String())
 	}
-	if strings.Contains(w.Body.String(), "private-") || !got.Comparison.AdvisoryOnly {
-		t.Fatal("private metadata or authority escaped")
+	if strings.Contains(w.Body.String(), "private-prompt") || strings.Contains(w.Body.String(), "private-task-2") || !got.Comparison.AdvisoryOnly {
+		t.Fatal("payload, excluded source or authority escaped")
+	}
+	if got.Sources == nil || len(got.Sources.Tasks) != 2 || got.Sources.Tasks[0] != "private-task-0" || got.Sources.Tasks[1] != "private-task-1" {
+		t.Fatal("exact selected source metadata missing")
 	}
 	w = call()
 	if w.Code != 200 {

@@ -1,5 +1,56 @@
 # Implementation evidence
 
+Fixed-source freshness checkpoint: the previous turn made verified progress,
+committed and pushed a6da473; this turn started clean. The opt-in application/SDK
+outcome action now invalidates an unfinished selection when its original evidence
+changes. This supersedes the previous checkpoint's ability to complete from old
+feedback after correction or evidence-database loss. Completed receipts remain
+historical acknowledgements and do not require current source availability.
+
+Selection reports capture sorted exact task IDs in their original SQLite
+snapshot. Before checkpoint save and final completion, a bounded read-only check
+replays only those fixed sources, verifies original attribution/privacy/ordinal
+bounds, and recomputes the comparison with current evaluation revisions and global
+session correlation. It requires the saved report/evidence digest to match.
+Changed feedback, task outcomes, new same-session correlation, missing journals
+or unavailable storage fails closed, preserving the intent and saved checkpoint
+without a receipt or activation change. It never reruns latest-window selection
+or substitutes newer tasks. Unrelated new traffic leaves membership unchanged;
+known empty sources remain empty. Source-less legacy checkpoints are inspectable
+but not completable through the application/SDK. Core hosts remain responsible
+for their explicit guards. No catalog/SQLite migration was introduced.
+
+Public comparison metadata now includes selected task IDs, not prompts, outputs
+or unselected/sibling IDs. Scope and cumulative secret checks cover source
+observations and report metadata before persistence/export. Treat identifiers as
+sensitive if they encode private information. Current configuration, credential,
+activation and immutable-version guards remain required. The source read snapshot
+and later catalog write are not one distributed transaction: a concurrent writer
+can change evidence after the last check. No checkpoint expiry, automatic reset,
+new CLI/HTTP mutation or unattended monitoring loop is introduced.
+
+Focused race tests passed three times for source selection/checking (skills1.292s,
+telemetry8.868s), app outcome paths85.897s and SDK9.330s; a separate app missing-DB
+case passed three times5.408s. A real SQLite/WAL barrier proves snapshot
+coherence: a feedback commit during a pinned check is seen by the next check,
+not partially by the current one. A qualified latest-window trap proves retry
+does not reselect. API qualification checks exact source-ID export while keeping
+prompt content and privacy-excluded tasks out. Independent review found no
+concrete blocker.
+
+Full make check passed formatting/LOC, vet, the native race suite and build
+(app197.575s, telemetry124.869s, CLI39.135s, API14.657s, SDK29.682s,
+skills25.976s). Native and Linux amd64 CLI binaries built. Source-contract,
+telemetry freshness, app checkpoint and SDK outcome tests also executed as
+CGO-free Linux arm64 binaries in the existing Alpine3.22 image, without network,
+with a read-only root and unprivileged UID. Linux execution was not race-enabled.
+
+Native Linear was checked this turn but the Mac remained locked; no issue update
+or completion is claimed. No user database/configuration or live inference was
+changed. Qualified production validators, current-activation attribution,
+repeated-statistical-monitoring policy, atomic cross-store coordination and full
+PRD/Linear acceptance remain open.
+
 Selected-evidence recovery checkpoint: previous turn made verified progress,
 committed/pushed 19285f7, and this turn started clean. The opt-in application/SDK
 outcome action now saves an independently guarded selection checkpoint before

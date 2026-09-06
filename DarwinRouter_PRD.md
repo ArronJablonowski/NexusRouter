@@ -446,8 +446,11 @@ intent now binds the configured model, policy and exact activation before readin
 outcomes. Failed or interrupted attempts remain inspectable and cannot silently
 reselect evidence under the same or a different operation ID. The checkpointed
 host path additionally saves validated selected reports before final commit;
-exact recovery uses the saved report without rereading feedback and rechecks
-current policy and activation. Saved evidence is not a completion receipt.
+exact recovery uses the saved report and rechecks its fixed source tasks against
+current journal, feedback and session-correlation evidence, plus current policy
+and activation. Changed evidence invalidates unfinished work without selecting a
+replacement window. This SQLite snapshot check is not atomic with the later
+catalog commit. Saved evidence is not a completion receipt.
 Reactivation attribution, confounder controls, repeated-monitoring policy and
 unattended daemon supervision remain required.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).

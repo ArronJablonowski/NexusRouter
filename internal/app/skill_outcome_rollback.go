@@ -94,6 +94,16 @@ func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, exp
 		if call.Err() != nil || s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || policyErr != nil || currentPolicy != policy || checkpoint.Validate() != nil || checkpoint.OperationID != operation || checkpoint.Intent.Expected != expected || checkpoint.Intent.Policy != policy || checkpoint.Intent.ConfiguredModelID != request.ModelID || checkpoint.Report.Policy != policy || checkpoint.Report.ConfiguredModelID != request.ModelID || !selectionValueClean([]any{operation, expected, request, checkpoint}, secrets) || !skillActivationCandidateClean(candidate, secrets) || !skillActivationCandidateClean(baseline, secrets) {
 			return ErrAdmission
 		}
+		observedSecrets, sourceErr := s.checkOutcomeSelectionSources(call, database, checkpoint.Report, secrets)
+		if sourceErr != nil {
+			return ErrAdmission
+		}
+		secrets = append(secrets, observedSecrets...)
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+		currentPolicy, policyErr = s.skillComparisonSelectionPolicy(request)
+		if call.Err() != nil || s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || policyErr != nil || currentPolicy != policy || !selectionValueClean([]any{operation, expected, request, checkpoint}, secrets) {
+			return ErrAdmission
+		}
 		return nil
 	})
 	selector := skills.OutcomeSelector(func(call context.Context) (skills.ComparisonSelectionReport, error) {

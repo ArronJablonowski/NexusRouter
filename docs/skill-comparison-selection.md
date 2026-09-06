@@ -58,6 +58,13 @@ result. Otherwise the nested comparison is always advisory. Correlation metadata
 is included in the evidence digest, without returning sibling IDs. Empty global
 correlation metadata preserves prior explicit-comparison digest encoding.
 
+New reports also contain `sources: {"version": 1, "tasks": [...]}`: the exact
+sorted selected task IDs, including excluded observations, captured in that same
+snapshot. These are inspectable metadata, not task messages or sibling IDs; treat
+exports as sensitive if your task identifiers carry sensitive information.
+A known empty selection records an empty list. Older reports without `sources`
+remain readable but do not establish recoverable source membership.
+
 ## Persistence and bounds
 
 Schema27 stores fresh exposure metadata atomically with TaskStarted and adds
