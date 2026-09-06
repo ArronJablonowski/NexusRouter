@@ -1,5 +1,37 @@
 # Implementation evidence
 
+Process-separated recovery continuation qualification: this turn started clean
+from GitHub-backed 66295c9, a verified implementation checkpoint. The existing
+owned-process model-crash test now covers explicit continuation in a second
+fresh subprocess. The first process is joined with verified SIGKILL after a
+durable model delta; its provider disconnect is observed before recovery.
+The original stale-owner rejection and idempotent recovery checks remain.
+
+The second process loads the exact configuration/source ID from an allowlisted
+environment and reports only a bounded task ID or explicit ErrAdmission denial.
+For a recovered failure, the test requires exactly one new inference with the
+original user message plus explicit follow-up, excluding partial output. It
+replays the new completed task and checks parent, session, privacy, model,
+provider and durable final answer. For a canceled source, it requires no new
+task and no additional inference. Full source journal, submission status and
+recovery receipt remain identical after continuation and another recovery pass;
+total task counts exclude hidden extra attempts. Both children are joined.
+
+Final focused native race tests passed three runs in 9.616s. The same final test
+also ran three times as a CGO-free Linux ARM64 binary in an unprivileged,
+read-only, network-disabled container, passing both recovered and canceled
+cases. The providers and hardware profiles are deterministic fixtures; lease
+expiry is advanced in owned storage. This is actual process-death/separation
+and durable-context evidence, not live Codex/Ollama, real pressure, automatic
+daemon restart, arbitrary side effects or full crash-window qualification.
+No production implementation or schema changed in this checkpoint. Independent
+read-only review found no blocker. Native Linear DAR-43 is now In Progress;
+its broader provider/tool/fitness/compaction/skill/worker acceptance remains open.
+
+Final `make check` passed: formatting and 1,000-line enforcement, go vet,
+the full race-enabled suite, and go build. App tests took 224.480s, telemetry
+150.231s, CLI 41.579s and SDK 25.468s; unchanged packages used cached results.
+
 Recovered model-only continuation checkpoint: the previous goal turn made
 verified progress and was backed up as 99637d1. Current Linear DAR-14 requires
 queued steering/follow-up, cancellation and safe resumption from durable state;

@@ -22,7 +22,9 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 func TestInterruptedModelCrashProcessHelper(t *testing.T) {
@@ -81,10 +83,25 @@ func TestInterruptedModelRecoveredAfterAbruptProcessDeath(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			var calls atomic.Int32
+			requests := make(chan []providers.Message, 2)
 			disconnected := make(chan struct{}, 1)
 			provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				_, _ = io.Copy(io.Discard, r.Body)
-				calls.Add(1)
+				var request struct {
+					Messages []providers.Message `json:"messages"`
+				}
+				if json.NewDecoder(r.Body).Decode(&request) != nil {
+					t.Error("invalid owned provider request")
+					return
+				}
+				select {
+				case requests <- request.Messages:
+				case <-ctx.Done():
+					return
+				}
+				if calls.Add(1) > 1 {
+					fmt.Fprintln(w, `{"message":{"content":"fresh continuation answer"},"done":true,"done_reason":"stop"}`)
+					return
+				}
 				fmt.Fprintln(w, `{"message":{"content":"partial-not-a-final-answer"},"done":false}`)
 				w.(http.Flusher).Flush()
 				select {
@@ -249,6 +266,79 @@ func TestInterruptedModelRecoveredAfterAbruptProcessDeath(t *testing.T) {
 			againReceipts, err := db.RecoveryHistory(ctx, id)
 			if err != nil || !reflect.DeepEqual(receipts, againReceipts) {
 				t.Fatal("duplicate recovery receipt", err)
+			}
+			var firstRequest []providers.Message
+			select {
+			case firstRequest = <-requests:
+			case <-ctx.Done():
+				t.Fatal("original request missing")
+			}
+			if !reflect.DeepEqual(firstRequest, []providers.Message{{Role: "user", Content: "start model-only work"}}) {
+				t.Fatal("wrong original request")
+			}
+			childTask := runRecoveredModelContinuationChild(t, ctx, configuration, task, cancelRequested)
+			wantCalls := int32(2)
+			if cancelRequested {
+				wantCalls = 1
+			}
+			if calls.Load() != wantCalls {
+				t.Fatal("unexpected continuation inference")
+			}
+			if cancelRequested {
+				if childTask != "" {
+					t.Fatal("canceled source continued")
+				}
+			} else {
+				var next []providers.Message
+				select {
+				case next = <-requests:
+				case <-ctx.Done():
+					t.Fatal("continuation request missing")
+				}
+				if !reflect.DeepEqual(next, []providers.Message{{Role: "user", Content: "start model-only work"}, {Role: "user", Content: "explicit recovered follow-up"}}) {
+					t.Fatal("partial output imported")
+				}
+				child, err := sessions.Replay(ctx, db, childTask)
+				if err != nil || child.State != "completed" || child.ParentTaskID != task || child.SessionID != before.Events[0].SessionID || child.Privacy != "local_only" {
+					t.Fatal("fresh subprocess continuation lineage", err)
+				}
+				if len(child.Messages) != 3 || child.Messages[2].Role != "assistant" || child.Messages[2].Content != "fresh continuation answer" {
+					t.Fatal("durable continuation answer missing")
+				}
+				childEvents, err := db.Read(ctx, childTask, 0, 100)
+				if err != nil || len(childEvents) == 0 || childEvents[0].Data.ModelID != "fixture" || childEvents[0].Data.ProviderID != "local" || childEvents[len(childEvents)-1].Kind != runtime.TaskCompleted {
+					t.Fatal("continuation model binding", err)
+				}
+			}
+			if _, err = dispatcher.recoverPage(ctx, svc.submissionConfigDigest(), ""); err != nil || calls.Load() != wantCalls {
+				t.Fatal("recovery redispatched after continuation", err)
+			}
+			finalSource, err := db.ReadEventPage(ctx, task, 0, 100)
+			if err != nil || !reflect.DeepEqual(after, finalSource) {
+				t.Fatal("continuation changed old source")
+			}
+			finalStatus, err := svc.SubmissionStatus(ctx, id)
+			if err != nil || !reflect.DeepEqual(status, finalStatus) {
+				t.Fatal("continuation changed old submission")
+			}
+			finalReceipts, err := db.RecoveryHistory(ctx, id)
+			if err != nil || !reflect.DeepEqual(receipts, finalReceipts) {
+				t.Fatal("continuation changed recovery receipt")
+			}
+			counts, err := db.Metrics(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var total int64
+			for _, count := range counts.Groups[0].Counts {
+				total += count.Value
+			}
+			wantTasks := int64(2)
+			if cancelRequested {
+				wantTasks = 1
+			}
+			if total != wantTasks {
+				t.Fatal("extra continuation tasks")
 			}
 		})
 	}

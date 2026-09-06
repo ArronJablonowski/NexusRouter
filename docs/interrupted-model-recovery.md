@@ -61,6 +61,22 @@ result, no redispatch, and idempotent repeated recovery. The running-child crash
 test first proves this parent-only path refuses; the full daemon then uses the
 separate worker-tree proof to record failure without replaying inference.
 
+The model-only crash test additionally launches a second fresh owned process
+after recovery. That process loads the same configuration and exact saved task
+ID and requests an explicit follow-up. The test compares the exact outbound
+messages, verifies one additional inference and a new completed task with the
+original parent/session/privacy binding, and checks the durable final answer.
+The failed source journal, complete submission status and recovery receipt must
+remain unchanged, including after another recovery pass. A canceled source must
+produce an admission denial with no additional inference or task creation.
+
+Both children are joined; the first child's SIGKILL and provider disconnection
+are verified before recovery. The second child's environment and stdout are
+bounded. Lease expiry is advanced in owned fixture storage rather than waiting
+for wall-clock expiry, and hardware profiles are deterministic fixtures. This
+qualifies actual process separation and persisted-state reuse, not automatic
+daemon restart, physical hardware pressure or live-provider compatibility.
+
 ```sh
 go test -race ./internal/app -run 'Test(InterruptedModelRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRecoversFailure)$' -count=1
 ```
