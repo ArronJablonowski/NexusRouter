@@ -417,7 +417,7 @@ It requires enabled skills and auto-draft, rejects injected SkillStore instances
 and rejects current credential collisions without rewriting the proposal.
 Identical retries return the same version; conflicting attempt reuse rejects.
 Publication does not revalidate source feedback, validate the workflow or activate
-it. File catalogs upgrade to schema 2 on first publication; older binaries reject
+it. File catalogs upgrade to at least schema 2 on first publication; older binaries reject
 that schema. Receipts and version visibility commit together, but pre-commit
 failures may leave unreferenced files. There is no automatic cleanup.
 
@@ -429,6 +429,14 @@ activates it only if the observed revision remains current. Enable
 injected retrieval stores cannot be mutated. Read state again after success to
 obtain the new revision. A stale observation rejects rather than silently
 replacing another activation.
+
+For a retriable controller decision, use `ActivateSkillVersionOnce(ctx,
+operationID, expected, versionID, validator)` and preserve all three binding
+values across retries. `SkillActivationOperation(ctx, key, operationID)` inspects
+its receipt. Exact retries acknowledge historical completion without validating
+again or reversing a later rollback. First use upgrades the file catalog to
+schema 3; stop old writers and back up first. See
+[activation operations](../../docs/skill-activation-operations.md).
 
 Supply a trusted `skills.Validator` that checks the actual candidate and returns
 attributable deterministic evidence. Serialization validity or an LLM's opinion

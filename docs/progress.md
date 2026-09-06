@@ -1,5 +1,35 @@
 # Implementation evidence
 
+Activation-operation checkpoint: the previous goal turn made verified sweep
+progress and backupe902eff. This turn confirmed a clean worktree and found a
+durable-retry prerequisite for automatic skill activation. File catalog schema3
+now records operation ID, prior revision and deterministic evidence alongside
+the activation in one replacement. Exact retries recognize historical completion
+without invoking validation or reactivating after rollback; conflicting bindings
+fail. App/SDK wrappers retain scope, policy, secret and validator gates. Legacy
+catalog revisions remain compatible and publication cannot downgrade schema3.
+Three agents contributed contracts, adapters, tests and independent review;
+root implemented execution and concurrent-retry handling. Background validation
+engine integration and activation remain unfinished; no model was run or learner
+enabled. Native Linear remains locked and no issue mutation is claimed.
+
+Activation-operation focused evidence: full skills race tests passed13.408s and
+operation tests passed three repetitions6.320s. App/SDK guarded tests passed
+three repetitions4.561s/1.988s, including a validator that rotates credentials to
+the operation ID: no receipt or activation is persisted. Independent review
+verified preflight/commit operation binding, epoch checks and retry after rollback.
+The first aggregate gate caught a test copying Service's mutex; the fixture now
+constructs a fresh Service instead. Native build and CGO-free Linux amd64
+production/skills test-binary compilation passed; Linux execution and power-loss
+qualification were not tested. All catalogs were synthetic, not user data.
+
+Activation-operation final gate passed: make check completed formatting/LOC, vet,
+full native race tests and build, including app117.702s, telemetry102.612s,
+CLI30.271s, API10.792s, SDK20.453s and skills15.539s. Git fetch confirmed no
+divergence. No live inference or user-catalog migration occurred. This is durable
+activation retry recognition, not completion of automatic learning/validation or
+the full PRD; Linear updates remain pending while the Mac is locked.
+
 Attention-sweep checkpoint: the previous goal turn delivered verified atomic
 history and GitHub backup16adb7e. This turn confirmed a clean worktree and native
 Linear remains locked. The daemon now selects a bounded candidate page, releases

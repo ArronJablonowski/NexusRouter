@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Operation-keyed skill activation for trusted Go hosts, with atomic receipts,
+  retry recognition after restart/rollback and deterministic validation gates.
+  This upgrades the file skill catalog to schema 3; it does not enable background
+  activation. See [activation operations](skill-activation-operations.md).
+
 - Corrupt-tolerant daemon attention sweeps: candidate-local failures remain
   visible but no longer block observation of later leases. No automatic repair,
   release or task retry is authorized. See [lease attention](lease-attention.md).

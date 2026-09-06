@@ -1205,6 +1205,12 @@ invocation. Stale revisions, failed validation, credential collisions and
 callback errors reject without activating the candidate. This does not schedule
 automatic learning or expose remote proof submission through CLI/HTTP.
 
+`ActivateSkillVersionOnce` adds durable operation IDs for retry after a lost
+acknowledgement. A matching receipt never reactivates a version after rollback.
+Inspect it with `SkillActivationOperation`; validation and policy gates still
+apply. See [activation operations](docs/skill-activation-operations.md) for the
+file-catalog schema-3 upgrade and remaining controller work.
+
 `RevalidateSkillVersion` completes the host-driven recovery path: with
 `skills.rollback_on_regression` enabled, a trusted deterministic failing check
 can restore the validated predecessor of the observed active version. Passing

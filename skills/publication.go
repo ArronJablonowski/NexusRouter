@@ -14,8 +14,8 @@ import (
 // active version. A receipt and version visibility commit in one catalog write;
 // retrying the identical attempt returns the same version, even if the active
 // skill changed meanwhile. Reusing its ID for a different proposal conflicts.
-// The first publication upgrades the catalog to schema 2 so older writers
-// cannot silently discard publication receipts.
+// The first publication upgrades older catalogs to schema 2 so older writers
+// cannot silently discard receipts; a newer catalog is never downgraded.
 // The host must establish the supplied attempt's authenticity and authorization.
 func (s *FileStore) PublishGeneration(ctx context.Context, a GenerationAttempt, automatic bool) (Version, error) {
 	if ctx == nil || s == nil || !s.permitted(a.Key) || a.Validate() != nil || a.Status != "drafted" {
@@ -98,7 +98,9 @@ func (s *FileStore) PublishGeneration(ctx context.Context, a GenerationAttempt, 
 			c.Publications = map[string]PublicationRecord{}
 		}
 		c.Publications[owned.ID] = PublicationRecord{Key: owned.Key, Version: version.ID, AttemptDigest: attemptDigest}
-		c.Schema = 2
+		if c.Schema < 2 {
+			c.Schema = 2
+		}
 		return nil
 	}, true)
 	if err != nil {

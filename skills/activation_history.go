@@ -14,6 +14,9 @@ func activationStack(e entry) ([]activation, error) {
 	stack := make([]activation, 0, len(e.Activations))
 	current := ""
 	for _, a := range e.Activations {
+		if !validActivationOperationFields(a) {
+			return nil, ErrInvalid
+		}
 		if a.Regression != nil && (!a.Rollback || a.Regression.Passed || !a.Regression.Deterministic || !identifier.MatchString(a.Regression.ID)) {
 			return nil, ErrInvalid
 		}
