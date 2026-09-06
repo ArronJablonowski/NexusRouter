@@ -2,7 +2,8 @@
 
 New resource leases are bound to private local execution-image ownership, in
 addition to their task, owner and token. This is a prerequisite for safe orphan
-reconciliation, **not an automatic reclamation implementation**.
+reconciliation. Schema 23 now uses it for narrowly scoped
+[terminal reader reclamation](terminal-reader-recovery.md), not general recovery.
 
 ## Ownership protocol
 
@@ -40,16 +41,17 @@ substitution, damaged permissions/content, missing paths and invalid metadata
 produce an error, never an inferred exit. Probe does not create or repair paths.
 Closing a probe does not release a live owner's independent lock.
 
-An unlocked observation retains its probe lock until explicitly closed. A future
-reclaimer must hold such a verified observation through its database fencing
-transaction; a check followed by an unlocked gap is insufficient.
+An unlocked observation retains its probe lock until explicitly closed. The
+terminal-reader reclaimer holds and revalidates that observation through its
+database fencing transaction; a check followed by an unlocked gap is insufficient.
 
 Descriptors have close-on-exec set. Consequently **process exit or exec-image
 replacement** releases ownership. Exec can leave the same PID alive while
 replacing every in-process Go callback. This is not general PID-death proof, nor
 proof that descendant processes, remote generation, billing or external effects
 have stopped. Arbitrary trusted handlers spawning detached activity are outside
-this in-process ownership guarantee. No reclaimer currently consumes the probe.
+this in-process ownership guarantee. The reclaimer additionally requires resolved
+terminal task history and never releases a writer on this evidence alone.
 
 ## Platforms and retention
 
@@ -83,7 +85,8 @@ registration rollback, corrupt metadata and foreign-process mutation/approval
 denial. All resources and tokens in those tests are synthetic, not user records.
 
 General holder discovery, authoritative reconciliation of running workers,
-release of orphaned reader/writer leases, idempotent reassignment, persistent
+release of nonterminal or unknown readers and orphaned writer leases, idempotent reassignment, persistent
 operator attention and automatic continuation remain required PRD work. No
 expiry-based release, model retry, tool retry, model disabling or approval policy
-change is introduced here.
+change is introduced by the ownership protocol. Terminal-reader reclamation has
+its own atomic receipts and stricter eligibility conditions.

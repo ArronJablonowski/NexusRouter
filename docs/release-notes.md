@@ -53,10 +53,13 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses schema 22. New resource leases carry private
+The current durable store uses schema 23. New resource leases carry private
 [execution-image ownership](process-lifetime-ownership.md); foreign processes
 cannot mutate a bound lease merely by copying its token. Legacy leases remain
-unbound and no automatic orphan release is introduced. Guard storage currently
+unbound. The daemon can now reclaim only
+[verified terminal orphan readers](terminal-reader-recovery.md), with atomic
+audit receipts and no model/tool replay. Running work, writers and unknown
+ownership remain unresolved. Guard storage currently
 requires a supported local temporary filesystem and retained guard paths; review
 the documented platform and retention limits before unattended use.
 

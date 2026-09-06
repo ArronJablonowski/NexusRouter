@@ -11,6 +11,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	after := ""
+	readerAfter := ""
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -23,6 +24,18 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			}
 		} else {
 			after = next
+		}
+		if ctx.Err() == nil {
+			query, cancel := context.WithTimeout(ctx, 5*time.Second)
+			nextReader, _, readerErr := d.db.RecoverTerminalReadersPage(query, readerAfter, 32, time.Now().UTC())
+			cancel()
+			// The internal rowid cursor advances even past an ineligible or
+			// corrupt candidate; one bad record must not pin later pages.
+			readerAfter = nextReader
+			d.supervisorHeartbeat(-1)
+			if readerErr != nil && ctx.Err() == nil {
+				d.recordError()
+			}
 		}
 		select {
 		case <-ctx.Done():

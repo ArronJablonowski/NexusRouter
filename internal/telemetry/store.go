@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 22 {
+	if version > 23 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -286,6 +286,12 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 22 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE lease_processes(id TEXT PRIMARY KEY,body BLOB NOT NULL); ALTER TABLE resource_leases ADD COLUMN process_id TEXT REFERENCES lease_processes(id); PRAGMA user_version=22;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 23 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE lease_recoveries(lease_token TEXT PRIMARY KEY REFERENCES resource_leases(token),digest TEXT NOT NULL UNIQUE,body BLOB NOT NULL); PRAGMA user_version=23;`)
 		if err != nil {
 			return err
 		}

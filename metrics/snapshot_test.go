@@ -8,7 +8,7 @@ import (
 )
 
 func TestSnapshotSchemaAvailability(t *testing.T) {
-	for schema := 1; schema <= 22; schema++ {
+	for schema := 1; schema <= 23; schema++ {
 		s := NewSnapshot(schema, time.Now().UTC())
 		if err := s.Validate(); err != nil {
 			t.Fatal(schema, err)
@@ -32,7 +32,7 @@ func TestSnapshotSchemaAvailability(t *testing.T) {
 func TestSnapshotRejectsInvalidOrUnboundedLabels(t *testing.T) {
 	cases := map[string]func(*Snapshot){
 		"version":              func(s *Snapshot) { s.Version++ },
-		"future schema":        func(s *Snapshot) { s.StorageSchema = 23 },
+		"future schema":        func(s *Snapshot) { s.StorageSchema = 24 },
 		"missing schema":       func(s *Snapshot) { s.StorageSchema = 0 },
 		"missing time":         func(s *Snapshot) { s.ObservedAt = time.Time{} },
 		"unserializable time":  func(s *Snapshot) { s.ObservedAt = time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC) },

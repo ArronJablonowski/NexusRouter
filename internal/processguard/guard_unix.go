@@ -161,6 +161,27 @@ type Observation struct {
 	State State
 	mu    sync.Mutex
 	owner *holder
+	// The public state is descriptive only. It cannot be changed to forge
+	// proof of an acquired lock for a reclamation transaction.
+	acquired bool
+}
+
+// ConfirmUnlocked revalidates a still-held independent probe lock. Callers must
+// retain this observation through the transaction that uses its proof. This
+// never upgrades a Held observation or reacquires an already closed handle.
+func (o *Observation) ConfirmUnlocked(ctx context.Context) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	if o == nil {
+		return ErrUnavailable
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.acquired || o.owner == nil || verify(o.owner) != nil {
+		return ErrUnavailable
+	}
+	return checkContext(ctx)
 }
 
 func (o *Observation) Close() error {
@@ -174,6 +195,7 @@ func (o *Observation) Close() error {
 	}
 	fileErr, rootErr := o.owner.file.Close(), o.owner.root.Close()
 	o.owner = nil
+	o.acquired = false
 	if fileErr != nil || rootErr != nil {
 		return ErrUnavailable
 	}
@@ -235,5 +257,5 @@ func Probe(ctx context.Context, ref Reference) (_ *Observation, err error) {
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	return &Observation{State: state, owner: h}, nil
+	return &Observation{State: state, owner: h, acquired: state == Unlocked}, nil
 }

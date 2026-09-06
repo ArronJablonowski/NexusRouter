@@ -1,0 +1,83 @@
+//go:build darwin || linux
+
+package telemetry
+
+import (
+	"context"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestTerminalReaderPageAdvancesMalformedAndHeld(t *testing.T) {
+	s, token, kill := startTerminalReaderOwner(t, "completed")
+	ctx := context.Background()
+	now := time.Now().UTC()
+	var original int64
+	if err := s.db.QueryRow(`SELECT rowid FROM resource_leases WHERE token=?`, token).Scan(&original); err != nil {
+		t.Fatal(err)
+	}
+	next, n, err := s.RecoverTerminalReadersPage(ctx, "", 1, now)
+	if err != nil || n != 0 || next != strconv.FormatInt(original, 10) {
+		t.Fatal(next, n, err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,process_id) SELECT ? ,task_id,'other',scope,writer,expires,process_id FROM resource_leases WHERE token=?`, strings.Repeat("x", 513), token); err != nil {
+		t.Fatal(err)
+	}
+	next, n, err = s.RecoverTerminalReadersPage(ctx, next, 1, now)
+	if err != ErrLeaseRecovery || n != 0 || next != strconv.FormatInt(original+1, 10) {
+		t.Fatal("malformed cursor stuck", next, n, err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,process_id) SELECT 'valid-next',task_id,'third',scope,writer,expires,process_id FROM resource_leases WHERE token=?`, token); err != nil {
+		t.Fatal(err)
+	}
+	kill()
+	next, n, err = s.RecoverTerminalReadersPage(ctx, next, 1, now)
+	if err != nil || n != 1 || next != strconv.FormatInt(original+2, 10) {
+		t.Fatal("later row starved", next, n, err)
+	}
+	next, n, err = s.RecoverTerminalReadersPage(ctx, next, 1, now)
+	if err != nil || n != 0 || next != "" {
+		t.Fatal(next, n, err)
+	}
+	for _, cursor := range []string{"-1", "0", "01", "+1", "9223372036854775808", "token"} {
+		if _, _, err = s.RecoverTerminalReadersPage(ctx, cursor, 1, now); err == nil {
+			t.Fatal("invalid cursor", cursor)
+		}
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	next, n, err = s.RecoverTerminalReadersPage(canceled, "7", 1, now)
+	if err == nil || next != "7" || n != 0 {
+		t.Fatal("lost error cursor", next, n, err)
+	}
+}
+
+func TestTerminalReaderMigrationKeepsGuardBindings(t *testing.T) {
+	s, token, kill := startTerminalReaderOwner(t, "completed")
+	kill()
+	ctx := context.Background()
+	before, err := readRecoveryLease(ctx, s.db, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`DROP TABLE lease_recoveries; PRAGMA user_version=22`); err != nil {
+		t.Fatal(err)
+	}
+	// initialize serializes the same schema22-to23 migration used by Open.
+	if err = s.initialize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	after, err := readRecoveryLease(ctx, s.db, token)
+	if err != nil || after != before {
+		t.Fatal("migration changed binding", err)
+	}
+	var version int
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 23 {
+		t.Fatal(version, err)
+	}
+	if recovered, err := s.RecoverTerminalReader(ctx, token, time.Now().UTC()); err != nil || !recovered {
+		t.Fatal(recovered, err)
+	}
+}

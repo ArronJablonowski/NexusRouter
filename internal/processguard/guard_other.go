@@ -8,6 +8,13 @@ type Observation struct{ State State }
 
 func (*Observation) Close() error { return nil }
 
+func (*Observation) ConfirmUnlocked(ctx context.Context) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	return ErrUnavailable
+}
+
 func Current(ctx context.Context) (Reference, error) {
 	if err := checkContext(ctx); err != nil {
 		return Reference{}, err

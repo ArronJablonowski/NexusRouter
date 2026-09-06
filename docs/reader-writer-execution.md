@@ -36,6 +36,11 @@ over availability: a crashed holder can leave an unresolved lease. General
 operator reconciliation with proof of termination remains unfinished; never
 release a lease solely because its timer expired.
 
+The daemon can now reclaim a narrow subset: terminal readers with fully resolved
+journals and a retained, verified unlocked process guard. See
+[terminal reader recovery](terminal-reader-recovery.md). Running tasks, writers,
+unknown ownership and unresolved effects remain blockers.
+
 ## Built-in filesystem scope and upgrades
 
 `read_file` and `create_file` both use the reserved `workspace` scope within

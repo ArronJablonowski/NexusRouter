@@ -65,7 +65,7 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 // leak model names, task IDs, secret-bearing errors or arbitrary label values.
 // Canonical order also makes snapshots deterministic apart from observation time.
 func (s Snapshot) Validate() error {
-	if s.Version != 1 || s.StorageSchema < 1 || s.StorageSchema > 22 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
+	if s.Version != 1 || s.StorageSchema < 1 || s.StorageSchema > 23 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
 		return ErrInvalid
 	}
 	if _, err := s.ObservedAt.MarshalJSON(); err != nil {

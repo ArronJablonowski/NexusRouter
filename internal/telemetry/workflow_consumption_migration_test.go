@@ -29,7 +29,7 @@ func TestWorkflowConsumptionMigrationPreservesScanAndEvidence(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT body FROM workflow_scans WHERE scope='scope' AND name='learning'`).Scan(&headBody); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; PRAGMA user_version=18`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; PRAGMA user_version=18`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -56,7 +56,7 @@ func TestWorkflowConsumptionMigrationPreservesScanAndEvidence(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 22 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 23 {
 			t.Fatal(version, err)
 		}
 		if !reflect.DeepEqual(before, workflowSourceRawBodies(t, s)) {

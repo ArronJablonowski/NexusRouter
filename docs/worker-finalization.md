@@ -53,7 +53,9 @@ loopback providers and cover two distinct boundaries:
    Existing interrupted-delegation recovery reconstructs the parent tool result
    and closes the parent as interrupted/failed, never as a successful answer.
    It preserves the child histories and the enclosing orphan lease. Repeating
-   reconciliation changes no journal, receipt or lease and dispatches no model.
+   journal reconciliation changes no journal, receipt or lease and dispatches no
+   model. A subsequent [terminal-reader sweep](terminal-reader-recovery.md) can
+   now release that reader after verified owner exit, with its own atomic receipt.
 
 These checks distinguish the per-worker `delegation-<parent>` scope from the
 parent tool's `delegation` scope. Completing one is not proof that every enclosing
@@ -79,7 +81,7 @@ continuation or forced in-process termination is provided by this change.
 New schema-22 leases additionally bind to a private
 [local execution-image guard](process-lifetime-ownership.md), preventing active
 mutation by an unrelated process with a copied lease token. Internal guard
-observation is not yet wired to reclamation or running-worker recovery.
+observation now enables terminal-reader reclamation, but not running-worker recovery.
 Unresolved readers can still block availability. Even when the test knows its
 child died, production recovery has no such trusted observation and does not
 release those leases. Stronger lifecycle ownership and safe reconciliation are

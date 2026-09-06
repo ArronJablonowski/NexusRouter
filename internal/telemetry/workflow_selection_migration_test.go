@@ -25,7 +25,7 @@ func TestWorkflowSelectionMigrationFrom16PreservesExistingData(t *testing.T) {
 	if err := s.BeginSkillGeneration(ctx, a); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; PRAGMA user_version=16`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; PRAGMA user_version=16`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -46,7 +46,7 @@ func TestWorkflowSelectionMigrationFrom16PreservesExistingData(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 22 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 23 {
 			t.Fatal(schema, err)
 		}
 		events, err := s.Read(ctx, "task", 0, 10)

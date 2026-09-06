@@ -108,6 +108,10 @@ that transaction while the enclosing tool reader is being released. Preliminary
 worker acceptance alone does not enable recovery. A committed worker can enable
 parent journal repair without releasing a separate orphaned parent reader lease.
 Journal repair and safe resource-holder reconciliation remain distinct concerns.
+The daemon now follows journal recovery with a separate
+[terminal-reader reclamation page](terminal-reader-recovery.md), which requires
+verified unlocked ownership and effect-resolved terminal replay. Running,
+uncertain, legacy, missing-guard and writer cases still remain unresolved.
 
 Run the process-boundary tests with:
 

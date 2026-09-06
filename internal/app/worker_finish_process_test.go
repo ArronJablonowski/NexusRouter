@@ -220,6 +220,19 @@ func TestWorkerFinalizationProcessDeathRecoveryBoundary(t *testing.T) {
 					t.Fatal("recovery altered orphan ownership or redispatched inference")
 				}
 			}
+			// Journal repair alone still preserves leases. The separate daemon
+			// sweep may now reclaim only the terminal parent's verified orphan.
+			if boundary == "parent_release" {
+				journals[parent] = recoveredParent
+				qualifyTerminalReaderSweep(t, ctx, svc, db, raw, parentLeases[0], journals)
+			} else {
+				if _, reclaimed, err := db.RecoverTerminalReadersPage(ctx, "", 32, time.Now().UTC()); err != nil || reclaimed != 0 {
+					t.Fatal("running worker reader was reclaimed", err, reclaimed)
+				}
+			}
+			if parents.Load() != 1 || children.Load() != 1 {
+				t.Fatal("reader sweep dispatched inference")
+			}
 		})
 	}
 }
