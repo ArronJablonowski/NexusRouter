@@ -18,8 +18,12 @@ import (
 // The fixture's actual process has exited by SIGKILL and its in-flight child
 // request has disconnected. The production daemon must fail the interrupted
 // child and worker, then resolve the parent, without executing any callback.
-func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db *telemetry.Store, submission, parent string, journals map[string][]runtime.Event) {
+func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db *telemetry.Store, submission, parent string, journals map[string][]runtime.Event, expectedCode ...string) {
 	t.Helper()
+	childCode := "interrupted_model"
+	if len(expectedCode) == 1 {
+		childCode = expectedCode[0]
+	}
 	parentLeases, err := db.InspectLeases(ctx, "delegation")
 	if err != nil || len(parentLeases) != 1 || parentLeases[0].TaskID != parent {
 		t.Fatal("missing interrupted parent reader", err)
@@ -40,7 +44,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 	}
 	initial, err := db.TaskSnapshot(ctx, child)
 	if err != nil || !initial.InterruptedTurn || len(initial.Pending) != 0 || initial.UncertainEffects {
-		t.Fatal("fixture did not interrupt a pure provider turn", err)
+		t.Fatal("fixture did not interrupt a provider turn with no pending effects", err)
 	}
 	dispatcher, err := StartDispatcher(ctx, svc)
 	if err != nil {
@@ -89,7 +93,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		case child, worker:
 			code := "worker_owner_interrupted"
 			if task == child {
-				code = "interrupted_model"
+				code = childCode
 			}
 			if len(suffix) != 1 || suffix[0].Kind != runtime.TaskFailed || suffix[0].Data.Code != code || suffix[0].Data.Text != "" {
 				t.Fatal("recovery invented completion or accepted output", task)
@@ -104,7 +108,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 				Work   string `json:"work_task_id"`
 				Child  string `json:"execution_task_id"`
 			}
-			if json.Unmarshal([]byte(suffix[0].Data.Text), &result) != nil || result.Error != "delegate_unavailable_or_rejected" || result.Reason != "interrupted_model" || result.Work != worker || result.Child != child || strings.Contains(suffix[0].Data.Text, "untrusted_output") {
+			if json.Unmarshal([]byte(suffix[0].Data.Text), &result) != nil || result.Error != "delegate_unavailable_or_rejected" || result.Reason != childCode || result.Work != worker || result.Child != child || strings.Contains(suffix[0].Data.Text, "untrusted_output") {
 				t.Fatal("parent tool result accepted unfinished child")
 			}
 		}

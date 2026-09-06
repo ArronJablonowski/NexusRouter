@@ -1,8 +1,9 @@
 # Interrupted worker recovery
 
 The daemon can now fail a verified orphaned in-process worker whose execution
-child finished before the worker's terminal commit, or whose model-only child
-was interrupted. This closes both the finalization and model-stream crash gaps. It does not
+child finished before the worker's terminal commit, whose model-only child was
+interrupted, or whose child finished explicitly read-only tools before its
+interruption. This covers these finalization and model-stream crash boundaries. It does not
 accept the output, rerun inference, resume a task, or reassign work.
 
 ## Required evidence
@@ -15,10 +16,16 @@ accept the output, rerun inference, resume a task, or reassign work.
 - The running worker journal follows the supported supervisor lifecycle. Its
   preliminary validation/output records remain source facts, not success.
 - Exactly one direct, non-worker execution child has a valid terminal projection,
-  or a running model-only history with no current tools or acceptance records.
+  or an eligible running history with no pending tools or acceptance records.
   Pending tools, uncertain/confirmed effects, nested, missing and ambiguous
   children remain unsupported. A running child must have no independently held
   resource lease; worker ownership cannot authorize releasing another holder.
+- A tool-aware running child must have at least one completed current-journal
+  tool pair. Every dispatch and result must explicitly declare `read_only`, and
+  every result must record `none` effects. A dispatch's initial `uncertain`
+  marker is permitted only when its matching result resolves it. Legacy behavior,
+  writes, delegation tools, missing results, evaluation and error records remain
+  excluded. Initial-context tool pairs alone are not current execution evidence.
 - Parent history binds the worker's delegation origin to the actual dispatched
   pending call, including turn, attempt, tool, session, submission and batch index.
   The child may use its own session; submission identities must match. Empty
@@ -46,6 +53,14 @@ plan derived from its source prefix; a matching error string alone is not proof.
 Partial deltas and the replayed `InterruptedTurn` flag remain intact. No
 `turn.completed`, output, evaluation or success is invented. Worker preliminary
 acceptance is inconsistent with an interrupted child and is rejected.
+
+For a child with resolved read-only tool history, the child terminal code is
+`interrupted_read_only_model`. Its exact deterministic terminal is independently
+re-derived from the full source prefix, just like the model-only terminal. Both
+tool-call/result pairs and partial later model deltas remain unchanged. The same
+transaction, zero-unreleased-child-lease checks and worker process proof apply.
+This does not broaden model-only submission recovery or release any child tool
+lease; the completed tool's lease must already have been released normally.
 
 The transaction revalidates ownership, source event content, child and parent
 history before commit. Any failure rolls back all changes. Repeating recovery
@@ -90,13 +105,24 @@ damage and reference/child/parent drift. Pure planner tests cover lifecycle
 ordering, invalid metadata, independent sessions and non-submitted work.
 
 ```sh
+export DARWIN_PROCESS_OWNER_DIR="$(mktemp -d)"
 go test -race ./sessions -run PlanInterruptedWorker -count=3
-go test -race ./internal/telemetry -run '^TestOrphan(Worker|Child)' -count=3
-go test -race ./internal/app -run '^Test(WorkerFinalizationProcessDeathRecoveryBoundary|UnfinishedDelegationAfterSIGKILLRecoversFailure)$' -count=3
+go test -race ./internal/telemetry -run '^TestOrphan(Worker|Child|ReadOnly)' -count=3
+go test -race ./internal/app -run '^Test(WorkerFinalizationProcessDeathRecoveryBoundary|UnfinishedDelegationAfterSIGKILLRecoversFailure|ReadOnlyWorkerAfterSIGKILLRecoversFailure)$' -count=3
 ```
 
-Still required: interrupted tool-aware child recovery, missing outcomes, writer and
+The read-only SIGKILL case uses the actual built-in `read_file`, verifies its
+released reader and recorded result before interrupting the next child request,
+then checks the real daemon's child/worker/parent failure and idempotent receipts.
+Provider counts remain one coordinator request and two child requests. Preserved
+source pairs and no additional read lease establish that recovery did not rerun
+the read tool. This qualifies synthetic loopback execution, not live model
+behavior or remote-generation cessation.
+
+Still required: pending tool-aware child recovery, missing outcomes, writer and
 uncertain-effect resolution, persistent operator attention, idempotent
-reassignment, automatic continuation, stronger isolation and durable guard
-retention. This is not full worker recovery or complete PRD acceptance. Native
+reassignment, automatic continuation, stronger isolation and guard garbage
+collection/reboot qualification. New guards now use durable private storage;
+see [ownership retention](process-lifetime-ownership.md).
+This is not full worker recovery or complete PRD acceptance. Native
 qualification uses synthetic providers on macOS, not live inference or power loss.

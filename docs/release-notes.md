@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Failure-only orphan recovery after a worker child's completed read-only tools,
+  preserving paired results and later interrupted inference without tool/model
+  retries. Explicit behavior, no-effect results and retained ownership proof are
+  required. See [interrupted workers](orphan-worker-recovery.md).
+
 - New process-ownership guards default to durable private application storage,
   with an explicit location override and continued support for existing temporary
   references. No expiry-based recovery or cleanup authority is added. See

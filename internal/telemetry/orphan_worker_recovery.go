@@ -15,7 +15,7 @@ import (
 )
 
 // RecoverOrphanWorker records failure, never acceptance, for a stopped local
-// worker whose execution child is terminal or a provably model-only interruption.
+// worker whose child is terminal or a provable model/read-only interruption.
 // Ownership proof, event, projection, reader release and receipt share one commit.
 func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.Time) (bool, error) {
 	now = now.UTC()
@@ -97,8 +97,9 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 		return false, ErrLeaseRecovery
 	}
 	if tree.Child != nil {
-		// A model-only child has no current tool dispatch. A separate resource
-		// holder is contradictory ownership, not another lease to reclaim.
+		// An eligible child has no pending tool dispatch; any earlier read-only
+		// tool leases must already be released. A separate holder is contradictory
+		// ownership, not another lease this worker proof can reclaim.
 		var held bool
 		if tree.Child.ParentTaskID != histories[1][0].TaskID || len(tree.Child.Events) != 1 || tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
 			return false, ErrLeaseRecovery

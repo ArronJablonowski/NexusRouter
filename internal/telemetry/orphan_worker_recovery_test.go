@@ -76,7 +76,27 @@ func TestOrphanWorkerOwnerHelper(t *testing.T) {
 	appendEvent("work", runtime.WorkerStarted, runtime.Data{})
 	appendEvent("child", runtime.TaskStarted, runtime.Data{ParentTaskID: "work"})
 	appendEvent("child", runtime.TurnStarted, runtime.Data{})
-	if mode != "interrupted" {
+	readOnly := mode == "readonly_active" || mode == "readonly_complete"
+	if readOnly {
+		appendEvent("child", runtime.TurnCompleted, runtime.Data{FinishReason: "tool_calls", ToolCalls: []providers.ToolCall{{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{}`)}}})
+		appendEvent("child", runtime.ToolStarted, runtime.Data{ToolCallID: "read", ToolName: "read_file", ToolBehavior: runtime.BehaviorReadOnly, Effect: runtime.UncertainEffect})
+		appendEvent("child", runtime.ToolCompleted, runtime.Data{ToolCallID: "read", ToolName: "read_file", ToolBehavior: runtime.BehaviorReadOnly, Effect: runtime.NoEffect, Text: "private file content"})
+		// The next turn has its own identity, as emitted by the real agent loop.
+		seq["child"]++
+		stamp = stamp.Add(time.Millisecond)
+		e := runtime.Event{Version: 1, ID: "child-6", TaskID: "child", SessionID: "child", CorrelationID: "child", Sequence: 6, Time: stamp, Kind: runtime.TurnStarted, TurnID: "next-turn", AttemptID: "next-attempt", Data: runtime.Data{ProviderID: "fixture", ModelID: "model"}}
+		if err := s.AppendSubmission(ctx, 5, e, claim.Status.ID, claim.Token); err != nil {
+			t.Fatal(err)
+		}
+		if mode == "readonly_complete" {
+			e.ID, e.Sequence, e.Kind, e.Time = "child-7", 7, runtime.TurnCompleted, stamp.Add(time.Millisecond)
+			e.Data.Text, e.Data.FinishReason = "private candidate output", "stop"
+			if err := s.AppendSubmission(ctx, 6, e, claim.Status.ID, claim.Token); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if mode != "interrupted" && !readOnly {
 		data := runtime.Data{Text: "private candidate output", FinishReason: "stop"}
 		if mode == "pending" || mode == "confirmed" || mode == "uncertain" {
 			data = runtime.Data{ToolCalls: []providers.ToolCall{{ID: "effect", Name: "tool", Arguments: json.RawMessage(`{}`)}}}
@@ -93,7 +113,7 @@ func TestOrphanWorkerOwnerHelper(t *testing.T) {
 			}
 		}
 	}
-	if mode != "active" {
+	if mode != "active" && !readOnly {
 		terminal := runtime.TaskCompleted
 		if mode == "failed" || mode == "pending" || mode == "interrupted" || mode == "uncertain" {
 			terminal = runtime.TaskFailed

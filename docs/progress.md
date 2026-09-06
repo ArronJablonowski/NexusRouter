@@ -1,5 +1,36 @@
 # Implementation evidence
 
+Read-only-child final verification: make check passed format/LOC, vet, full
+native race suite and build, including app106.793s, telemetry91.878s, CLI29.032s
+and SDK16.616s. Full sessions race4.279s covers exact 10,000-event/8MiB limits,
+multiple tools and forged terminal rejection. All orphan storage regressions
+passed8.019s; new and existing real model-stream SIGKILL application cases passed
+three repetitions3.762s. Tests cover completed read_file before interruption,
+released read lease, actual request disconnection, child/worker/parent failure,
+unchanged source pairs, idempotent receipts, no repeated model/tool work, six
+atomic rollback boundaries and commit-time conflicting child ownership.
+
+Native make build and CGO-free Linux amd64 production/application/telemetry
+test-binary builds passed; Linux execution and power loss were not tested.
+Independent review found no concrete unsafe acceptance/reclamation path. Only
+synthetic providers/databases were used; no user content/configuration or live
+inference was accessed. Git fetch found no divergence. Pending tools, uncertain
+writes, unknown ownership, persistent operator attention, reassignment and full
+PRD acceptance remain unfinished; the overall goal stays active.
+
+Read-only interrupted-child checkpoint: the previous turn made verified durable
+guard-location implementation and backup progress (e18f328). This turn rechecked
+a clean worktree; native Linear remains locked and no issue mutation is claimed.
+The worker recovery planner now distinguishes a model-only child from one with
+fully resolved, explicitly read-only current-journal tool pairs. The latter gets
+interrupted_read_only_model failure, never accepted output. Initial uncertain
+dispatch markers require matching no-effect completions; pending tools, writes,
+legacy behavior, delegation tools, evaluation/errors and independent unreleased
+child holders remain excluded. Existing worker ownership proof, transaction,
+receipt binding and parent failure reconciliation remain in force. Model-only
+submission recovery is not broadened. Three agents supplied planner, storage and
+actual application crash qualification; final verification follows below.
+
 Durable-location final verification: make check passed format/LOC, vet, full
 native race tests and build, including app106.445s, telemetry91.102s,
 processguard3.766s, CLI28.302s and SDK16.364s. The final additional CLI environment

@@ -12,7 +12,7 @@ import (
 )
 
 // PlanInterruptedWorker plans failure, never acceptance, of an unfinished
-// supervisor journal with one resolved or provably interrupted-model child. The caller must
+// supervisor journal with one resolved or provably interrupted child. The caller must
 // independently prove and retain original process ownership loss transactionally.
 func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (InterruptionRecovery, error) {
 	bad := func() (InterruptionRecovery, error) { return InterruptionRecovery{}, ErrHistory }
@@ -34,7 +34,8 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 			}
 			budget -= len(body)
 			count++
-			if e.Data.Effect != "" && e.Data.Effect != runtime.NoEffect {
+			readOnlyStart := history[len(history)-1].Data.Code == "interrupted_read_only_model" && e.Kind == runtime.ToolStarted && e.Data.ToolBehavior == runtime.BehaviorReadOnly && e.Data.Effect == runtime.UncertainEffect
+			if e.Data.Effect != "" && e.Data.Effect != runtime.NoEffect && !readOnlyStart {
 				return bad()
 			}
 		}
@@ -66,7 +67,7 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 		}
 	}
 	childState, err := Replay(context.Background(), terminalReader(child), execution.TaskID)
-	interrupted := child[len(child)-1].Data.Code == "interrupted_model"
+	interrupted := interruptedModelCode(child[len(child)-1].Data.Code)
 	if err != nil || (childState.InterruptedTurn && !interrupted) || (interrupted && !isInterruptedModelTerminal(child)) || childState.UncertainEffects || len(childState.Pending) != 0 {
 		return bad()
 	}
@@ -135,7 +136,8 @@ type InterruptedWorkerTreeRecovery struct {
 	Child  *InterruptionRecovery
 }
 
-// PlanInterruptedWorkerTree also handles a running, model-only execution child.
+// PlanInterruptedWorkerTree also handles a running model-only child or one whose
+// explicitly read-only tools are fully resolved without effects.
 // Ownership loss must be independently proven for the entire tree by the caller.
 func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (InterruptedWorkerTreeRecovery, error) {
 	bad := func() (InterruptedWorkerTreeRecovery, error) { return InterruptedWorkerTreeRecovery{}, ErrHistory }
@@ -165,6 +167,9 @@ func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (Inte
 	if last != runtime.TaskCompleted && last != runtime.TaskFailed && last != runtime.TaskCanceled {
 		planned, err := PlanInterruptedModel([][]runtime.Event{child}, now, false)
 		if err != nil {
+			planned, err = PlanInterruptedReadOnlyModel([][]runtime.Event{child}, now)
+		}
+		if err != nil {
 			return bad()
 		}
 		childPlan = &planned
@@ -178,16 +183,23 @@ func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (Inte
 	return InterruptedWorkerTreeRecovery{Worker: worker, Child: childPlan}, nil
 }
 
-// Recognize only the exact deterministic terminal derived from a model-only
-// prefix. A matching failure code alone is not proof of safe interruption.
+// Recognize only the exact deterministic terminal derived from an eligible
+// model-only or resolved read-only prefix. A failure code alone is not proof.
 func isInterruptedModelTerminal(history []runtime.Event) bool {
 	if len(history) < 2 {
 		return false
 	}
 	end := history[len(history)-1]
-	if end.Kind != runtime.TaskFailed || end.Data.Code != "interrupted_model" {
+	if end.Kind != runtime.TaskFailed || !interruptedModelCode(end.Data.Code) {
 		return false
 	}
 	plan, err := PlanInterruptedModel([][]runtime.Event{history[:len(history)-1]}, end.Time, false)
+	if end.Data.Code == "interrupted_read_only_model" {
+		plan, err = PlanInterruptedReadOnlyModel([][]runtime.Event{history[:len(history)-1]}, end.Time)
+	}
 	return err == nil && len(plan.Events) == 1 && reflect.DeepEqual(plan.Events[0], end)
+}
+
+func interruptedModelCode(code string) bool {
+	return code == "interrupted_model" || code == "interrupted_read_only_model"
 }
