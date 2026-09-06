@@ -24,6 +24,21 @@ cancel and join active execution. EOF waits for the active task. A normal chat
 session exits zero even after an individual failed task, as before; use headless
 `darwin run` for per-task process exit status.
 
+When idle, `/resume TASK_ID` selects eligible saved history from the configured
+database. Selection is read-only and does not launch inference or rerun tools.
+Enter your next prompt to create a new task linked to that source; all normal
+privacy, provider, context-budget and permission checks still run at submission.
+Completed histories and validated recovered-delegation histories are eligible;
+ordinary failed, canceled, running or uncertain-effect histories are not.
+This is context continuation, not automatic restart of an interrupted task.
+
+A successful selection clears any source-specific compaction/summary option
+and the current feedback target. Feedback becomes available after a new
+successful answer. Failed selections preserve the prior conversation context.
+Selection is rejected while work is active. `/new` clears the selected context.
+You can also start chat with `--continue-task TASK_ID`; use explicit startup
+compaction options when the saved history needs a reviewed summary to fit.
+
 With opt-in local `create_file`, terminal chat also accepts `/approve ID` and
 `/deny ID` for an exact pending proposal. Review is separate from model text;
 EOF or cancellation makes unavailable review fail closed. See
@@ -56,7 +71,7 @@ EOF or cancellation makes unavailable review fail closed. See
   operations retain their own blocking semantics.
 - Failure or cancellation after partial output does not turn that text into a
   successful answer. Chat reports that the task did not complete successfully,
-  retains the previous successful continuation source, and disallows feedback
+  retains the previously selected continuation source, and disallows feedback
   on the failed attempt through the current conversation's feedback commands.
   Successful completion is still distinct from semantic correctness: use the
   appropriate deterministic validators and feedback.

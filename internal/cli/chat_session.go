@@ -13,6 +13,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
@@ -214,7 +215,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					return 1
 				}
 			} else {
-				if !write("Task did not complete successfully. Previous successful context retained.\n") {
+				if !write("Task did not complete successfully. Previous conversation context retained.\n") {
 					return 1
 				}
 			}
@@ -284,7 +285,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					}
 					continue
 				}
-				if command != "/steer" && argument != "" {
+				if command != "/steer" && command != "/resume" && argument != "" {
 					if !write("Command takes no arguments.\n") {
 						join()
 						return 1
@@ -292,8 +293,29 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					continue
 				}
 				switch command {
+				case "/resume":
+					if cancel != nil {
+						write("Cannot select saved context while a task is active.\n")
+					} else if !sessions.ValidEventPageID(argument) || hooks.Continuation == nil {
+						write("Saved context not selected: provide an eligible task ID.\n")
+					} else {
+						inspectCtx, stop := context.WithTimeout(ctx, 5*time.Second)
+						status, err := hooks.Continuation(inspectCtx, argument)
+						inspectionErr := inspectCtx.Err()
+						stop()
+						if err != nil || inspectionErr != nil || status.Validate() != nil || status.TaskID != argument || !status.HistoryEligible {
+							write("Saved context not selected: history is unavailable or ineligible.\n")
+						} else {
+							last = argument
+							base.ContinueTaskID = argument
+							base.Compaction = nil
+							base.SummaryAttemptID = ""
+							feedbackTask = ""
+							write("Saved context selected: " + argument + ". Enter a prompt to create a continuation task; admission checks still apply.\n")
+						}
+					}
 				case "/help":
-					write("Enter text to start a task. /status /new /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
+					write("Enter text to start a task. /status /new /resume TASK_ID /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
 					if hooks.Approvals != nil {
 						write("File creation requires review: /approve REQUEST_ID or /deny REQUEST_ID. No blanket approvals.\n")
 					}

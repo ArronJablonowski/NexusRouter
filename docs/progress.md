@@ -1,5 +1,43 @@
 # Implementation evidence
 
+Interactive saved-context selection checkpoint: the preceding goal turn
+confirmed authentication without advancing implementation. Work resumed from
+clean GitHub-backed c968c8b. Chat now accepts `/resume TASK_ID` while idle,
+using the existing read-only, replay-validated continuation assessment against
+the configured database. Matching valid eligible metadata is required; canceled
+inspection, unknown/corrupt/ineligible history and active work reject without
+changing context. Selection does not dispatch inference or restart old work.
+The next ordinary prompt creates a parent-linked task through normal admission,
+including privacy, capacity, provider and tool policy. A successful selection
+clears source-specific compaction/summary options and feedback targeting;
+`/new` clears the selection. Failed selection preserves the previous context.
+
+Focused race tests passed three repetitions in 2.523s. Unit fixtures cover
+completed/recovered selections, deferred execution, invalid IDs and status,
+foreign responses, backend failure, active-work rejection, canceled inspection,
+compaction/feedback clearing and `/new`. Real RunWithInput tests use temporary
+YAML, SQLite, actual input pipes and local HTTP inference fixtures with no chat
+hooks: selection causes no model call or new task, the next request contains
+the saved user/assistant messages, replay proves the new completed parent link,
+and source events remain unchanged before/after selection and continuation.
+Missing-store selection leaves the database absent. These fixtures are not new
+live Sol/Ollama tests or automatic interrupted-task recovery qualification.
+The user unlocked the Mac during this checkpoint. Native Linear then confirmed
+DAR-38 (Build interactive and JSON task CLI) is In Progress and includes events,
+cancellation, steering, feedback and session resume in its acceptance criteria.
+Full interrupted-task resume and full PRD qualification remain open; this
+checkpoint does not mark the issue complete.
+
+Verification: make check passed formatting/LOC, vet, full native race suite and
+build (app 221.709s, CLI 40.471s, telemetry 148.386s, API 12.947s, SDK 25.112s;
+unchanged packages cached). make build passed. Final review corrected a test's
+invalid-ID disclosure sentinel; the final focused native race suite passed
+three times in 2.596s. Final resume tests also executed three times as CGO-free
+Linux ARM64 tests in an unprivileged, read-only, network-disabled container;
+this is not Linux race or live-provider qualification. The native app now shows
+a posted DAR-45 comment linking c968c8b's previously verified live Sol/Ollama
+steering evidence with its limits. Issue statuses and dependencies are retained.
+
 Live chat steering checkpoint: the previous goal turn made verified progress
 and was backed up as 4ac2c71; this turn started clean. A new opt-in CLI subprocess
 qualification enters production RunWithInput/runChat without injected hooks or
