@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -143,6 +144,16 @@ func (g ModelGenerator) GenerateDetailed(ctx context.Context, key Key, examples 
 		return ModelDraftResult{}, bounded.Err()
 	}
 	if err != nil {
+		return ModelDraftResult{}, ErrValidation
+	}
+	// Discovery uses the admitted source domain. An omitted model tag must not
+	// make a successfully validated workflow invisible to that domain. This is
+	// host-derived metadata, not permission or evidence of workflow correctness.
+	if !slices.Contains(draft.Tags, owned[0].Domain) {
+		draft.Tags = append(draft.Tags, owned[0].Domain)
+	}
+	// Preserve the runtime discovery metadata bound after adding the host tag.
+	if len(draft.Tags) > 4096 || validateGeneratedDraft(draft) != nil {
 		return ModelDraftResult{}, ErrValidation
 	}
 	return ModelDraftResult{Draft: draft, Model: g.Model, Usage: usage, Elapsed: time.Since(start)}, nil

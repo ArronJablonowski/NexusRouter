@@ -55,6 +55,11 @@ durable cursor with `darwin skills learning status --config config.yaml`.
 See [background learning](docs/background-learning.md) for setup, recovery,
 privacy boundaries and validation requirements.
 
+Trusted Go hosts can register a named deterministic validator and explicitly
+start learning plus durable regression monitoring through the shared
+[configured lifecycle](docs/configured-learning-supervision.md). The stock binary
+ships no qualified domain validator and fails closed on unknown selections.
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

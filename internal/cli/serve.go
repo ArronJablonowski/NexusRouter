@@ -27,6 +27,12 @@ import (
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {
+	return runServeWithValidators(args, stdout, stderr, nil)
+}
+
+// The stock CLI supplies no executable validation policy. Embedding hosts may
+// explicitly bind configured identities to trusted, cooperative callbacks.
+func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *skills.ValidatorRegistry) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := fs.String("config", "", "configuration file")
@@ -60,6 +66,16 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "DARWIN_API_TOKEN must contain at least 32 characters")
 		return 1
 	}
+	service, err := app.NewService(s, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
+	learningPlan, err := app.PrepareConfiguredLearning(service, registry)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot prepare skill learning supervisor")
+		return 1
+	}
 	// Binding is the single-instance gate. Do not migrate or dispatch against
 	// storage if another process already owns this endpoint.
 	listener, err := net.Listen("tcp", net.JoinHostPort(host, port))
@@ -82,13 +98,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer db.Close()
-	service, err := app.NewService(s, os.Getenv)
-	if err != nil {
-		fmt.Fprintln(stderr, "invalid application configuration")
-		return 1
-	}
 	var dispatcher *app.Dispatcher
-	var learner *app.Learner
+	var learner *app.ConfiguredLearning
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
@@ -98,7 +109,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner)) {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner)) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -169,7 +180,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			return app.InspectLeaseAttentionHistory(ctx, s.Telemetry.Database, id, options)
 		},
 		Health: func(ctx context.Context) error {
-			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner) {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) {
 				return errors.New("supervisor unavailable")
 			}
 			_, err := db.Read(ctx, "__health__", 0, 1)
@@ -183,7 +194,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			if err != nil {
 				return health.Report{}, err
 			}
-			return withLearningHealth(report, learner.Health())
+			return withConfiguredLearningHealth(report, learner.Health())
 		},
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
@@ -193,18 +204,18 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "invalid daemon configuration")
 		return 1
 	}
+	learner, err = learningPlan.Start(ctx)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start skill learning supervisor")
+		return 1
+	}
+	defer learner.Close()
 	dispatcher, err = app.StartDispatcher(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start task dispatcher")
 		return 1
 	}
 	defer dispatcher.Close()
-	learner, err = app.StartLearning(ctx, service)
-	if err != nil {
-		fmt.Fprintln(stderr, "cannot start skill learning supervisor")
-		return 1
-	}
-	defer learner.Close()
 	if err := serveHTTP(ctx, listener, handler, stdout); err != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
 		return 1

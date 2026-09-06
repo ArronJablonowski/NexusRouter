@@ -4,7 +4,10 @@ The daemon can discover repeated successful tool workflows, generate an
 untrusted procedural draft, and publish it as an **inactive** skill version.
 The ordinary daemon path does not manufacture validation evidence or activate a
 skill automatically. An explicitly configured Go host can additionally supply
-a trusted validator through the opt-in path described below.
+a trusted validator through the opt-in path described below or the
+[configured learning lifecycle](configured-learning-supervision.md), which also
+owns optional durable regression monitoring. The stock CLI has no registered
+domain validator and rejects unknown enabled selections.
 The default remains off; upgrading DarwinRouter does not enable model calls.
 
 ## Enable deliberately
@@ -145,14 +148,16 @@ inspection, including when learning is disabled. It does not initialize storage
 or confer activation authority. See [activation operations](skill-activation-operations.md).
 
 Stop older writers and back up the database before schema-26 migration. The
-activation itself separately upgrades the file catalog to schema 3. Only trusted
-Go-host integration is supported here; standalone daemon validator configuration,
-operator intent resolution, statistical outcome regression monitoring, and power-loss
-qualification across both stores remain open.
+activation itself separately upgrades the file catalog to schema 3. Named trusted
+validators can now be selected through [configured supervision](configured-learning-supervision.md).
+The stock binary has no installed qualified domain validator. Production validator
+qualification, operator intent resolution, statistical outcome regression monitoring,
+and power-loss qualification across both stores remain open.
 
 Trusted Go hosts can separately start [periodic deterministic regression
 monitoring](skill-regression-monitor.md). Its rollback policy is independent of
-learning and new activation; it does not start automatically with a learner.
+learning and new activation. Direct learner APIs do not start that monitor;
+the configured lifecycle starts and owns both when explicitly selected.
 
 Ordinary aggregate-budget or cooldown exhaustion waits and retries the same
 pinned identity at the configured interval. Health reports show

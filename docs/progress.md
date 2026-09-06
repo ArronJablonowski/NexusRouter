@@ -1,5 +1,55 @@
 # Implementation evidence
 
+Configured learning lifecycle checkpoint: this turn started clean from verified
+GitHub backup845302d. Optional learning.validator_id, regression_name and
+regression_interval select a bounded immutable registry of trusted Go validators;
+configuration never supplies executable validation or model self-approval. Empty
+selections preserve existing serialized policy digests. The stock CLI has no
+qualified domain validator and rejects unknown enabled selections before binding
+or database initialization. SDK StartConfiguredLearning exposes the same explicit,
+caller-owned lifecycle; no user configuration or background work is enabled by default.
+
+Before either configured controller starts, a separate ten-second read-only
+preflight validates existing learner and monitor policy bindings. An existing
+task database is required for SDK use; configured regression requires a compatible
+existing catalog. Missing bindings can start fresh but conflicts/corruption fail
+without inference, validation or state mutation. This is not a cross-store atomic
+lock: existing operation/revision fences remain authoritative. The daemon performs
+this startup before task dispatch. Shared cancellation stops both controllers
+before joining either, and readiness includes both learning and regression health.
+Trusted validators must be read-only, repeat-safe, concurrent and cooperative.
+
+End-to-end review exposed that a model could omit domain tags, leaving an activated
+generated skill invisible to ordinary domain discovery. New model generations now
+retain the verified common source domain without duplicating an existing tag and
+revalidate the complete draft and4096-tag discovery limit. Prior saved drafts,
+receipts and operator versions are not rewritten. The scheduled fixture now covers
+generation, deterministic test validation, activation, retrieval of the exact active
+version into a later actual runtime model request, regression rollback, and restart
+without regeneration/reactivation. Retrieval is not arbitrary skill semantic execution;
+the controlled lookup oracle is not a qualified production domain-validation engine.
+
+Focused skill/application/configuration/CLI/SDK tests passed three native race runs
+(app19.971s, SDK2.278s). Linux arm64 application, CLI and SDK tests executed from
+CGO-free binaries in the existing Alpine3.22 image with unprivileged UID, no external
+network, read-only root, bounded resources and a disposable tmpfs. They passed,
+including the scheduled learning/rollback/restart test; Linux was not race-instrumented.
+Native make build and Linux amd64 production cross-build passed. Independent review
+found no remaining concrete issue after durable-policy startup preflight and the
+source-domain discovery fix. Full native make check passed (format/LOC, vet,
+complete native race suite and production build), including app162.082s,
+telemetry114.168s, CLI36.805s, SDK23.233s and skills18.887s.
+
+Codex CLI recheck: installed0.153.4 reports ChatGPT login; the actual task-owned
+gpt-5.6-sol checked launcher and same-session recheck passed under race detection
+without submitting a thread, turn or prompt. This follows the supported managed
+ChatGPT authentication and app-server integration documented at
+https://learn.chatgpt.com/docs/auth and https://learn.chatgpt.com/docs/app-server.
+No new live model inference was performed. Native Linear remains locked; no issue
+update or completion is claimed. Production skill validators, statistical outcome
+regression, long-term receipt retention and full PRD acceptance remain open.
+See docs/configured-learning-supervision.md for operational constraints.
+
 HTTP memory-export checkpoint: prior CLI/SDK snapshot progress was verified and
 backed up as98df5c5; this turn began clean and extends the same application
 operation to authenticated POST `/v1/memory/export`. Request JSON accepts exactly
