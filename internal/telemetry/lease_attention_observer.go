@@ -17,6 +17,12 @@ import (
 // or executing anything. The private rowid sweep is separate from public IDs.
 // A page commits atomically; an invalid page returns its original cursor.
 func (s *Store) ObserveLeaseAttentionPage(ctx context.Context, after string, now time.Time, limit int) (string, int, error) {
+	return s.observeLeaseAttentionPage(ctx, after, now, limit, 0)
+}
+
+// through bounds an internal sweep to exactly one selected row. A vanished or
+// newly ineligible candidate must not make the query fall through to a later row.
+func (s *Store) observeLeaseAttentionPage(ctx context.Context, after string, now time.Time, limit int, through int64) (string, int, error) {
 	bad := func() (string, int, error) { return after, 0, workers.ErrLeaseAttention }
 	now = now.UTC()
 	var cursor int64
@@ -27,7 +33,7 @@ func (s *Store) ObserveLeaseAttentionPage(ctx context.Context, after string, now
 			return bad()
 		}
 	}
-	if ctx == nil || limit < 1 || limit > 100 || now.Year() < 1970 || now.Year() >= 2261 {
+	if ctx == nil || limit < 1 || limit > 100 || now.Year() < 1970 || now.Year() >= 2261 || through < 0 || through > 0 && through <= cursor {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -40,14 +46,22 @@ func (s *Store) ObserveLeaseAttentionPage(ctx context.Context, after string, now
 	if err = reserveLeaseAttention(ctx, tx); err != nil {
 		return bad()
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT l.rowid,
+	query := `SELECT l.rowid,
 CASE WHEN typeof(l.token)='text' AND length(CAST(l.token AS BLOB)) BETWEEN 1 AND 512 THEN l.token END,
 CASE WHEN typeof(l.task_id)='text' AND length(CAST(l.task_id AS BLOB)) BETWEEN 1 AND 128 THEN l.task_id END,
 CASE WHEN typeof(l.expires)='integer' THEN l.expires END,
 CASE WHEN typeof(l.writer)='integer' THEN l.writer END,
 CASE WHEN typeof(l.released)='integer' THEN l.released END,
 EXISTS(SELECT 1 FROM task_heads h WHERE h.task_id=l.task_id)
-FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR EXISTS(SELECT 1 FROM lease_attention a WHERE a.lease_token=l.token)) ORDER BY l.rowid LIMIT ?`, cursor, now.UnixNano(), limit)
+FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR EXISTS(SELECT 1 FROM lease_attention a WHERE a.lease_token=l.token))`
+	args := []any{cursor, now.UnixNano()}
+	if through > 0 {
+		query += " AND l.rowid<=?"
+		args = append(args, through)
+	}
+	query += " ORDER BY l.rowid LIMIT ?"
+	args = append(args, limit)
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return bad()
 	}

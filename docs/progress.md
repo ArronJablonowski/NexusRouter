@@ -1,5 +1,37 @@
 # Implementation evidence
 
+Attention-sweep checkpoint: the previous goal turn delivered verified atomic
+history and GitHub backup16adb7e. This turn confirmed a clean worktree and native
+Linear remains locked. The daemon now selects a bounded candidate page, releases
+that read snapshot, and observes each exact row in its own writer transaction.
+Malformed metadata or rejected writes roll back only that candidate; later valid
+observations/history can commit. Errors remain visible in supervisor health, and
+failed candidates are revisited after cursor wrap. Selection failures preserve
+the input cursor; mid-sweep cancellation advances only through attempted rows.
+The existing whole-page atomic storage API remains unchanged. No migration,
+automatic repair, lease release, ownership probe or task retry was introduced.
+Three agents supplied storage fault tests, real dispatcher integration and
+independent boundary review. Final verification follows; full PRD work remains.
+
+Sweep-focused race tests passed three repetitions4.702s after all test additions,
+including exact-row deletion/renewal, maximum row ID, malformed first/middle
+candidates, ignored/aborted history insert rollback and deterministic cancellation
+during the second candidate. The real dispatcher later-page test passed6.641s:
+attention/history was created beyond a poisoned first page while supervisor_error
+remained visible, with no lease/journal changes, recovery receipts or model calls.
+Independent review found no correctness blocker. Native build and CGO-free Linux
+amd64 production/telemetry test-binary compilation passed; Linux execution was not
+tested. All fixtures were synthetic; no user database or live model was used.
+
+Sweep final verification: make check passed formatting/LOC, vet, full native
+race suite and build, including app114.985s, telemetry98.603s, CLI29.959s,
+API9.771s and SDK17.479s. An earlier aggregate run used the cancellation fixture
+before its SQLite callback was registered prior to connection creation; corrected
+focused tests and the frozen-file aggregate rerun passed. No production change
+was required for that fixture issue. Git fetch confirmed no divergence. This
+closes corrupt-candidate sweep starvation, not general database repair or full
+PRD acceptance; native Linear issue updates remain pending while locked.
+
 Attention-history checkpoint: the previous goal turn made verified API and
 observer-race progress backed up as 52a19dd. This turn confirmed a clean worktree;
 native Linear remains locked and no issue mutation is claimed. Schema25 adds

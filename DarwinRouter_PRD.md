@@ -552,7 +552,10 @@ maintained by bounded daemon sweeps and inspectable through CLI `resources
 attention`, SDK `ListLeaseAttention`, and authenticated `GET
 /v1/resources/attention`. Renewal/release resolves observations;
 expiry recurrence reopens the same record. These are diagnostic snapshots, not
-execution or recovery authority. Schema 25 appends changed observations atomically
+execution or recovery authority. Daemon sweeps isolate each candidate transaction
+so malformed metadata does not starve later leases; errors remain visible and
+failed candidates are revisited after cursor wrap, without repair or release.
+Schema 25 appends changed observations atomically
 with the current projection, with byte-preserving migration baselines for existing
 records. History is inspectable through CLI `resources attention-history`, SDK
 `ListLeaseAttentionHistory`, and authenticated HTTP

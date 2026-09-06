@@ -5,6 +5,10 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Corrupt-tolerant daemon attention sweeps: candidate-local failures remain
+  visible but no longer block observation of later leases. No automatic repair,
+  release or task retry is authorized. See [lease attention](lease-attention.md).
+
 - Schema-25 append-only attention history, including labeled migration baselines,
   atomic projection/history changes and CLI/SDK/authenticated HTTP inspection.
   Schema-24 durable attention for expired unreleased leases is maintained by the

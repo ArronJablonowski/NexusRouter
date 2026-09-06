@@ -94,8 +94,9 @@ Schema 24 adds a private table linked to the original lease and task. The daemon
 visits up to 32 candidates after each recovery pass, starting immediately and
 then on its five-second tick. Previously observed leases remain candidates so
 renewal/release can resolve them. A separate private rowid cursor advances each
-successful page and wraps at the end. Pages use a five-second cooperative
-deadline and commit atomically. This bounds returned rows, not database scan
+attempted candidate and wraps at the end. Sweeps use a five-second cooperative
+deadline. Each candidate's current observation and history commit atomically,
+but the whole sweep is not one transaction. This bounds selected rows, not database scan
 cost or total delay with a large retained population.
 
 Each observation transaction reserves the SQLite writer before its first schema
@@ -104,9 +105,22 @@ The reservation changes no rows; the current-schema guard still precedes observa
 
 Records validate bounded canonical metadata. Task/writer identity drift,
 malformed records, clock regression before the previous update or other page
-errors roll back the whole page and degrade supervisor health. The cursor is
-retained on errors; persistent corruption can block subsequent attention pages.
-This is deliberately visible failure, not automatic repair of uncertain state.
+errors roll back the affected candidate and degrade supervisor health. The daemon
+continues to later candidates and advances past attempted failures; those records
+are revisited after wrapping. Corrupt records are never repaired automatically.
+Selection/schema/whole-database failures retain the input cursor. Cancellation
+retains progress through the last attempted candidate without skipping unattempted
+rows. Healthy candidates can commit even when another candidate reports an error.
+
+Selection releases its read snapshot before individually checking current rows
+under writer reservation. A deleted or newly ineligible candidate cannot cause
+the bounded query to fall through to another row. Row IDs are traversal positions,
+not identity or ownership proof; a replacement at the same row position is checked
+as current data. No persisted sweep cursor, exactly-once traversal, lease release
+or reassignment is implied. Read-only public list/history inspection still fails
+closed on invalid requested data; sweep isolation does not hide that corruption.
+The internal batch observation method retains whole-page atomicity for callers
+that explicitly need it; the daemon uses the isolated sweep instead.
 
 Read-only access to schemas 1–23 reports `available: false` and an empty array,
 distinct from an observed empty attention table. History inspection on schemas
@@ -128,6 +142,12 @@ control capacity, read-only SQLite access and actual daemon wiring. A
 two-connection regression reproduces the former stale-snapshot failure and
 checks writer reservation, schema rejection and lock release.
 
-Acknowledgment/assignment, notifications, retention/garbage collection, corruption-tolerant page
-advancement and broader stall reasons remain follow-up work. This feature neither
+Sweep tests isolate malformed first/middle rows, rejected and ignored writes,
+history corruption and mid-page cancellation. They cover cursor wrap, maximum
+row IDs and selected-row deletion/renewal without touching a different row. A
+real dispatcher fixture observes a later-page lease despite first-page corruption
+while reporting degraded health and preserving all lease/journal state.
+
+Acknowledgment/assignment, notifications, retention/garbage collection and broader
+stall reasons remain follow-up work. This feature neither
 resolves uncertain tool effects nor implements idempotent reassignment.

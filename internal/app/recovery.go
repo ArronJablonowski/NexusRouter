@@ -52,15 +52,17 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		}
 		if ctx.Err() == nil {
 			query, cancel := context.WithTimeout(ctx, 5*time.Second)
-			nextAttention, _, attentionErr := d.db.ObserveLeaseAttentionPage(query, attentionAfter, time.Now().UTC(), 32)
+			nextAttention, _, attentionErr := d.db.SweepLeaseAttentionPage(query, attentionAfter, time.Now().UTC(), 32)
 			cancel()
+			// Failed candidates remain visible but do not starve later leases.
+			// The sweep preserves the input cursor on selection failure and
+			// advances only past attempted candidates on partial failure.
+			attentionAfter = nextAttention
 			d.supervisorHeartbeat(-1)
 			if attentionErr != nil {
 				if ctx.Err() == nil {
 					d.recordError()
 				}
-			} else {
-				attentionAfter = nextAttention
 			}
 		}
 		select {
