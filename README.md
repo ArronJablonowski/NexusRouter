@@ -72,6 +72,11 @@ evidence. Reports are advisory; creative tasks require user feedback and no mode
 judge can qualify. See [outcome comparison](docs/skill-outcome-comparison.md) for
 the SDK/HTTP interfaces, sample requirements and statistical limitations.
 
+`darwin skills compare-select --config config.yaml` automatically selects bounded
+latest exposure windows before examining outcomes. See [selection rules and
+schema27 migration](docs/skill-comparison-selection.md). This remains diagnostic;
+it cannot automatically roll back a skill.
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

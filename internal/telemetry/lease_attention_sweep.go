@@ -71,7 +71,7 @@ func (s *Store) attentionSweepCandidates(ctx context.Context, after int64, now t
 	}
 	defer tx.Rollback()
 	var schema int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema != 26 {
+	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || (schema < 26 || schema > 27) {
 		return nil, workers.ErrLeaseAttention
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT l.rowid FROM resource_leases l

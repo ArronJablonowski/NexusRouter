@@ -93,7 +93,11 @@ it is not a signature or independent validation of evidence truth.
 
 ## Remaining delivery work
 
-Automatic comparable-cohort selection/indexing, difficulty controls, repeated
+An [automatic latest-window selector](skill-comparison-selection.md) now uses
+indexed recorded exposures and snapshot-wide session exclusions before comparing
+current feedback. It selects before inspecting outcomes, not only from successes.
+
+Difficulty controls, repeated
 monitoring policy, qualified production validators, and durable activation-bound
 outcome rollback are still required. This diagnostic must not be substituted for
 those PRD requirements or wired directly to mutation authority.

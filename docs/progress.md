@@ -1,5 +1,63 @@
 # Implementation evidence
 
+Automatic comparison-window checkpoint: previous turn made verified progress,
+committed/pushed e77573a, and this turn started clean. PRD9.4 now has automatic
+outcome-independent exposure selection instead of requiring individual task IDs.
+Schema27 adds exact recorded skill exposures and indexed insertion-order/privacy
+and all-task session lookup. Fresh complete references commit in the same
+transaction as TaskStarted; failed index insertion rolls back event/head/ordinal
+changes. Exact retries do not duplicate records. Legacy absent/incomplete/empty
+attribution remains absent, not guessed from prompts. Migration validates bounded
+first-event bodies, binds envelope identities to the original journal, backfills
+existing ordinals, and rolls back schema changes on invalid provenance. No user
+database was opened or migrated during this work.
+
+The selector fixes scope/name/versions/privacy and takes at most100 latest
+insertion-order exposures per version before examining state, execution or quality.
+It never searches older records to fill the window with successes. Selected
+running/canceled/unknown-quality/wrong-execution tasks remain visible exclusions.
+All-task session lookup additionally catches siblings without skill references
+or outside the window. Selected index metadata is checked against replayed
+journals, and current feedback and correlation observations share one read-only
+SQLite snapshot. Existing aggregate journal/evidence/body limits apply with no
+partial report or silent skipping. Exposure index data accelerates lookup, not
+independent proof of semantic workflow execution or database completeness.
+
+Reports bind configured model ID on outer and nested aggregates, expose selected
+window counts/ordinals/has_more and the snapshot insertion watermark, and omit
+comparison entirely when no exposures match. Global correlation metadata is
+bound into the evidence digest; empty metadata preserves previous explicit
+comparison digest encoding. SDK SelectSkillComparison, strict CLI
+`skills compare-select --config path` JSON input and authenticated POST
+`/v1/skills/comparison/select` all use the configured service, including complete
+selected-evidence secret checks, no catalog creation and cooperative deadlines.
+Read-only inspection requires schema27 and never migrates. Compatible existing
+schema26 control/read features remain accepted, while public schema caps and
+future-schema rejection tests now recognize27/reject28.
+
+Focused race tests passed three repetitions for migration/indexing, pure
+selection/correlation contracts, storage windows and actual WAL feedback
+concurrency, app, SDK, CLI and HTTP. Tests verify older successes do not replace
+new unknown/rejected outcomes, separate privacy strata, global unexposed siblings,
+current negative/corrected feedback, tampered projections, atomic rollback,
+empty windows and no inference/write behavior. Independent review found no
+actionable blocker. Full make check passed formatting/LOC, vet, the complete
+native race suite and production build (app164.362s, telemetry117.714s,
+CLI37.007s, API12.402s, SDK21.700s). Native and Linux amd64 binaries built.
+New schema/index/selection/WAL, application, API, CLI, SDK and pure comparison
+tests executed successfully as CGO-free Linux arm64 binaries in the existing
+Alpine3.22 image with network disabled, read-only root, unprivileged UID and
+bounded memory/processes/tmpfs. Linux tests were not race-instrumented.
+
+Insertion order is not wall-clock time; pre-schema18 ordinals reflect the old
+lexicographic backfill. Latest-window comparison is observational, not random
+sampling, a complete population, causal attribution or repeated-testing proof.
+Production validators, confounder handling, durable repeated-monitoring policy
+and activation-bound outcome rollback remain required. Native Linear was checked
+again but the Mac remains locked, so no issue update is claimed. No live model
+inference or user configuration changes were performed. See
+[automatic selection rules](skill-comparison-selection.md).
+
 Skill outcome comparison checkpoint: resumed from GitHub-backed 2cfd61e and the
 in-progress comparator/batch work. The preceding user-facing turn confirmed the
 authenticated Codex CLI but did not itself advance implementation. PRD9.4 now

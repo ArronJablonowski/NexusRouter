@@ -58,7 +58,7 @@ func TestApprovalControlRejectsWithoutCreationOrMigration(t *testing.T) {
 				}
 				version := "14"
 				if kind == "future" {
-					version = "27"
+					version = "28"
 				}
 				if kind == "rollback" {
 					version = "26"

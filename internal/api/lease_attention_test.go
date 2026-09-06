@@ -185,7 +185,7 @@ func TestLeaseAttentionHTTPBackendValidation(t *testing.T) {
 				case "version":
 					out.Version = 2
 				case "schema":
-					out.StorageSchema = 27
+					out.StorageSchema = 28
 				case "unavailable":
 					out.Available = false
 				case "nil_items":

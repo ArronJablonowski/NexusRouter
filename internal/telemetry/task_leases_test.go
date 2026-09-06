@@ -87,7 +87,7 @@ func TestTaskLeaseStatusLegacy(t *testing.T) {
 	for _, schema := range []int{1, 2, 3, 21, 22} {
 		t.Run(fmt.Sprint(schema), func(t *testing.T) {
 			s, path, req := approvalFixture(t)
-			if _, err := s.db.Exec(`DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries`); err != nil {
+			if _, err := s.db.Exec(`DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries`); err != nil {
 				t.Fatal(err)
 			}
 			if schema < 22 {

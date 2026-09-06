@@ -47,6 +47,7 @@ Usage:
   darwin memory list|show|put|delete --db path --scope scope (raw storage)
   darwin skills list|show|history|state|draft|rollback --root path --scope scope
   darwin skills compare --config path < request.json
+  darwin skills compare-select --config path < request.json
   darwin skill-generations list --db path --scope id [--after id --limit 25]
   darwin skill-generations show --db path --scope id --id generation-id
   darwin skill-generations discover --config path --domain id [--after cursor --scan-limit 20]

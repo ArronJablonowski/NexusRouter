@@ -35,6 +35,9 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return skillsError(stderr, skillsUsage, 2)
 	}
 	command := args[0]
+	if command == "compare-select" {
+		return runSkillComparisonSelection(args[1:], stdin, stdout, stderr)
+	}
 	if command == "compare" {
 		return runSkillComparison(args[1:], stdin, stdout, stderr)
 	}

@@ -71,7 +71,7 @@ func TestLeaseAttentionReservationPrecedesSnapshot(t *testing.T) {
 }
 
 func TestLeaseAttentionReservationRejectsSchemaWithoutMutation(t *testing.T) {
-	for _, version := range []int{25, 27} {
+	for _, version := range []int{25, 28} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			s, path, req := approvalFixture(t)
 			insertObservedLease(t, s, "schema-token", req.TaskID, "scope", 0, req.CreatedAt.UnixNano())

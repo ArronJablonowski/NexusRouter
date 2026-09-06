@@ -17,7 +17,7 @@ func TestLeaseAttentionMigrationPreservesLeaseAndJournal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; INSERT INTO lease_recoveries(lease_token,digest,body) VALUES('private-token','preserved-digest','preserved-receipt'); PRAGMA user_version=23`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; INSERT INTO lease_recoveries(lease_token,digest,body) VALUES('private-token','preserved-digest','preserved-receipt'); PRAGMA user_version=23`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.initialize(context.Background()); err != nil {
@@ -36,7 +36,7 @@ func TestLeaseAttentionMigrationPreservesLeaseAndJournal(t *testing.T) {
 		t.Fatal("prior receipt changed", err)
 	}
 	var version, count int
-	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 26 || s.db.QueryRow(`SELECT count(*) FROM lease_attention`).Scan(&count) != nil || count != 0 {
+	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 27 || s.db.QueryRow(`SELECT count(*) FROM lease_attention`).Scan(&count) != nil || count != 0 {
 		t.Fatal(version, count)
 	}
 	if _, err := s.db.Exec(`INSERT INTO lease_attention(id,lease_token,task_id,state,body) VALUES('attention','private-token',?,'open','{}')`, req.TaskID); err != nil {

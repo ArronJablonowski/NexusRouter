@@ -45,7 +45,7 @@ type LeaseAttentionHistoryPage struct {
 }
 
 func (p LeaseAttentionHistoryPage) Validate() error {
-	if p.Version != 1 || p.StorageSchema < 1 || p.StorageSchema > 26 || p.Available != (p.StorageSchema >= 25) || !sessions.ValidEventPageID(p.AttentionID) || p.Items == nil || len(p.Items) > 100 || p.NextSequence < 0 || p.HasMore != (p.NextSequence != 0) || (!p.Available && (len(p.Items) != 0 || p.HasMore)) {
+	if p.Version != 1 || p.StorageSchema < 1 || p.StorageSchema > 27 || p.Available != (p.StorageSchema >= 25) || !sessions.ValidEventPageID(p.AttentionID) || p.Items == nil || len(p.Items) > 100 || p.NextSequence < 0 || p.HasMore != (p.NextSequence != 0) || (!p.Available && (len(p.Items) != 0 || p.HasMore)) {
 		return ErrLeaseAttention
 	}
 	for i, item := range p.Items {

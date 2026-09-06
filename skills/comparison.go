@@ -8,6 +8,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 type ComparisonPolicy struct {
@@ -66,17 +67,24 @@ type ComparisonReport struct {
 // CompareTaskOutcomes never reads stores or grants validator authority. Inputs
 // must be trusted projections, not model-authored declarations of skill use.
 func CompareTaskOutcomes(input []TaskOutcome, policy ComparisonPolicy) (ComparisonReport, error) {
+	return CompareTaskOutcomesWithCorrelatedSessions(input, policy, nil)
+}
+
+// CompareTaskOutcomesWithCorrelatedSessions accepts trusted store observations
+// of selected sessions having sibling tasks outside the selected window. It
+// never infers session independence from a truncated window alone.
+func CompareTaskOutcomesWithCorrelatedSessions(input []TaskOutcome, policy ComparisonPolicy, correlated []string) (ComparisonReport, error) {
 	if policy.Validate() != nil || len(input) < 1 || len(input) > 200 {
 		return ComparisonReport{}, ErrInvalid
 	}
-	tasks, sessions := map[string]bool{}, map[string]int{}
+	tasks, sessionCounts := map[string]bool{}, map[string]int{}
 	digests := map[string]string{}
 	for _, o := range input {
 		if o.Validate() != nil || tasks[o.TaskID] {
 			return ComparisonReport{}, ErrInvalid
 		}
 		tasks[o.TaskID] = true
-		sessions[o.SessionID]++
+		sessionCounts[o.SessionID]++
 		if o.SkillContext != nil {
 			for _, ref := range o.SkillContext.References {
 				if ref.Scope != policy.Key.Scope || ref.Name != policy.Key.Name || ref.Version != policy.BaselineVersion && ref.Version != policy.CandidateVersion {
@@ -89,19 +97,33 @@ func CompareTaskOutcomes(input []TaskOutcome, policy ComparisonPolicy) (Comparis
 			}
 		}
 	}
+	if len(correlated) > len(input) {
+		return ComparisonReport{}, ErrInvalid
+	}
+	correlated = append([]string(nil), correlated...)
+	sort.Strings(correlated)
+	for i, id := range correlated {
+		if !sessions.ValidEventPageID(id) || sessionCounts[id] == 0 || i > 0 && correlated[i-1] == id {
+			return ComparisonReport{}, ErrInvalid
+		}
+		if sessionCounts[id] < 2 {
+			sessionCounts[id] = 2
+		}
+	}
 	ordered := append([]TaskOutcome(nil), input...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].TaskID < ordered[j].TaskID })
 	body, err := json.Marshal(struct {
-		Policy   ComparisonPolicy `json:"policy"`
-		Outcomes []TaskOutcome    `json:"outcomes"`
-	}{policy, ordered})
+		Policy             ComparisonPolicy `json:"policy"`
+		Outcomes           []TaskOutcome    `json:"outcomes"`
+		CorrelatedSessions []string         `json:"correlated_sessions,omitempty"`
+	}{policy, ordered, correlated})
 	if err != nil {
 		return ComparisonReport{}, ErrInvalid
 	}
 	sum := sha256.Sum256(body)
 	report := ComparisonReport{Version: 1, Policy: policy, Sampled: len(input), Excluded: map[string]int{}, Baseline: ComparisonCohort{Version: policy.BaselineVersion, Digest: digests[policy.BaselineVersion]}, Candidate: ComparisonCohort{Version: policy.CandidateVersion, Digest: digests[policy.CandidateVersion]}, AdvisoryOnly: true, Method: "wilson_95_separation_v1", EvidenceDigest: hex.EncodeToString(sum[:])}
 	for _, o := range ordered {
-		reason := comparisonExclusion(o, policy, sessions[o.SessionID])
+		reason := comparisonExclusion(o, policy, sessionCounts[o.SessionID])
 		if reason != "" {
 			report.Excluded[reason]++
 			continue
