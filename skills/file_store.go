@@ -32,14 +32,15 @@ type FileStore struct {
 }
 
 type catalog struct {
-	Schema                  int                               `json:"schema"`
-	Skills                  map[string]entry                  `json:"skills"`
-	Publications            map[string]PublicationRecord      `json:"publications,omitempty"`
-	RegressionOperations    map[string]RegressionOperation    `json:"regression_operations,omitempty"`
-	RegressionMonitors      map[string]RegressionMonitorState `json:"regression_monitors,omitempty"`
-	RegressionMonitorChecks map[string]RegressionMonitorCheck `json:"regression_monitor_checks,omitempty"`
-	OutcomeOperations       map[string]OutcomeRollbackReceipt `json:"outcome_operations,omitempty"`
-	OutcomeIntents          map[string]OutcomeRollbackIntent  `json:"outcome_intents,omitempty"`
+	Schema                  int                                   `json:"schema"`
+	Skills                  map[string]entry                      `json:"skills"`
+	Publications            map[string]PublicationRecord          `json:"publications,omitempty"`
+	RegressionOperations    map[string]RegressionOperation        `json:"regression_operations,omitempty"`
+	RegressionMonitors      map[string]RegressionMonitorState     `json:"regression_monitors,omitempty"`
+	RegressionMonitorChecks map[string]RegressionMonitorCheck     `json:"regression_monitor_checks,omitempty"`
+	OutcomeOperations       map[string]OutcomeRollbackReceipt     `json:"outcome_operations,omitempty"`
+	OutcomeIntents          map[string]OutcomeRollbackIntent      `json:"outcome_intents,omitempty"`
+	OutcomeSelections       map[string]OutcomeSelectionCheckpoint `json:"outcome_selections,omitempty"`
 }
 type entry struct {
 	Key         Key                 `json:"key"`
@@ -171,7 +172,7 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := s.read("catalog.json", &c); err != nil && (s.readOnly || !os.IsNotExist(err)) {
 		return err
 	}
-	if (c.Schema < 1 || c.Schema > 7) || c.Skills == nil || len(c.Skills) > 1000 {
+	if (c.Schema < 1 || c.Schema > 8) || c.Skills == nil || len(c.Skills) > 1000 {
 		return ErrInvalid
 	}
 	for index, e := range c.Skills {
@@ -215,6 +216,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 		return err
 	}
 	if err := validateOutcomeIntents(&c); err != nil {
+		return err
+	}
+	if err := validateOutcomeSelections(&c); err != nil {
 		return err
 	}
 	if err := fn(&c); err != nil {

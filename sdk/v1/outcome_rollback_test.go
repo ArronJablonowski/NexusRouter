@@ -126,6 +126,15 @@ func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
 	if err != nil || intent.Validate() != nil || intent.Expected != expected || intent.OperationID != "sdk-outcome" || intent.ConfiguredModelID != "chat" || intent.Policy != receipt.Policy {
 		t.Fatal("operation intent not durable", err)
 	}
+	checkpoint, err := restarted.OutcomeSelectionCheckpoint(ctx, key, "sdk-outcome")
+	if err != nil || checkpoint.Validate() != nil || checkpoint.Intent != intent || !reflect.DeepEqual(checkpoint.Report, receipt.Selection) {
+		t.Fatal("selected evidence checkpoint not durable", err)
+	}
+	checkpoint.Report.Comparison.Excluded["caller-mutation"] = 1
+	checkpoint, err = restarted.OutcomeSelectionCheckpoint(ctx, key, "sdk-outcome")
+	if err != nil || checkpoint.Validate() != nil || !reflect.DeepEqual(checkpoint.Report, receipt.Selection) {
+		t.Fatal("checkpoint inspection returned mutable alias", err)
+	}
 	state, err := restarted.SkillActivationState(ctx, key)
 	if err != nil || state != receipt.After {
 		t.Fatal("rollback state differs", err)
@@ -149,6 +158,10 @@ func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
 	inspected, err := disabled.OutcomeRollbackIntent(ctx, key, "sdk-outcome")
 	if err != nil || !reflect.DeepEqual(inspected, intent) {
 		t.Fatal("disabled intent inspection unavailable", err)
+	}
+	savedSelection, err := disabled.OutcomeSelectionCheckpoint(ctx, key, "sdk-outcome")
+	if err != nil || !reflect.DeepEqual(savedSelection, checkpoint) {
+		t.Fatal("disabled checkpoint inspection unavailable", err)
 	}
 }
 

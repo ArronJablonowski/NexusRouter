@@ -23,9 +23,13 @@ type OutcomeRollbackReceipt struct {
 	CheckedAt       time.Time                 `json:"checked_at"`
 	Decision        string                    `json:"decision"`
 	IntentID        string                    `json:"intent_id,omitempty"`
+	SelectionID     string                    `json:"selection_id,omitempty"`
 }
 
 func (r OutcomeRollbackReceipt) Validate() error {
+	if r.SelectionID != "" && (r.SelectionID != r.OperationID || r.IntentID != r.OperationID) {
+		return ErrInvalid
+	}
 	if r.IntentID != "" && r.IntentID != r.OperationID {
 		return ErrInvalid
 	}
@@ -101,6 +105,12 @@ func lookupOutcomeOperation(c *catalog, key Key, id string) (OutcomeRollbackRece
 	if r.IntentID != "" {
 		intent, err := lookupOutcomeIntent(c, key, r.IntentID)
 		if err != nil || !outcomeIntentReceiptMatches(intent, r) {
+			return OutcomeRollbackReceipt{}, ErrInvalid
+		}
+	}
+	if r.SelectionID != "" {
+		checkpoint, err := lookupOutcomeSelection(c, key, r.SelectionID)
+		if err != nil || !outcomeSelectionReceiptMatches(checkpoint, r) {
 			return OutcomeRollbackReceipt{}, ErrInvalid
 		}
 	}

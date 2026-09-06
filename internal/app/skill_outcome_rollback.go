@@ -88,6 +88,14 @@ func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, exp
 		}
 		return nil
 	})
+	selectionGuard := skills.OutcomeSelectionGuard(func(call context.Context, checkpoint skills.OutcomeSelectionCheckpoint) error {
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+		currentPolicy, policyErr := s.skillComparisonSelectionPolicy(request)
+		if call.Err() != nil || s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || policyErr != nil || currentPolicy != policy || checkpoint.Validate() != nil || checkpoint.OperationID != operation || checkpoint.Intent.Expected != expected || checkpoint.Intent.Policy != policy || checkpoint.Intent.ConfiguredModelID != request.ModelID || checkpoint.Report.Policy != policy || checkpoint.Report.ConfiguredModelID != request.ModelID || !selectionValueClean([]any{operation, expected, request, checkpoint}, secrets) || !skillActivationCandidateClean(candidate, secrets) || !skillActivationCandidateClean(baseline, secrets) {
+			return ErrAdmission
+		}
+		return nil
+	})
 	selector := skills.OutcomeSelector(func(call context.Context) (skills.ComparisonSelectionReport, error) {
 		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 		if s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || !selectionValueClean([]any{operation, expected, request, policy}, secrets) {
@@ -99,7 +107,7 @@ func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, exp
 		}
 		return r, nil
 	})
-	receipt, err = store.OutcomeRollbackOnceGuarded(ctx, operation, request.ModelID, expected, policy, selector, guard, intentGuard)
+	receipt, err = store.OutcomeRollbackOnceCheckpointed(ctx, operation, request.ModelID, expected, policy, selector, guard, intentGuard, selectionGuard)
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if err != nil || ctx.Err() != nil || !cleanReceipt(receipt) {
 		return out, ErrAdmission

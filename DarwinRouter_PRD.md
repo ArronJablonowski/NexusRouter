@@ -444,9 +444,12 @@ rollback atomically bound to its validated predecessor. The report remains
 observational, never fabricated deterministic evidence. A durable preselection
 intent now binds the configured model, policy and exact activation before reading
 outcomes. Failed or interrupted attempts remain inspectable and cannot silently
-reselect evidence under the same or a different operation ID. Reactivation
-attribution, confounder controls, repeated-monitoring policy, recovery of selected
-but uncommitted reports and unattended daemon supervision remain required.
+reselect evidence under the same or a different operation ID. The checkpointed
+host path additionally saves validated selected reports before final commit;
+exact recovery uses the saved report without rereading feedback and rechecks
+current policy and activation. Saved evidence is not a completion receipt.
+Reactivation attribution, confounder controls, repeated-monitoring policy and
+unattended daemon supervision remain required.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).
 See [outcome comparison and limitations](docs/skill-outcome-comparison.md).
 See [automatic window selection](docs/skill-comparison-selection.md).

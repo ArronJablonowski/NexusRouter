@@ -1,5 +1,61 @@
 # Implementation evidence
 
+Selected-evidence recovery checkpoint: previous turn made verified progress,
+committed/pushed 19285f7, and this turn started clean. The opt-in application/SDK
+outcome action now saves an independently guarded selection checkpoint before
+final adjudication. Schema8 links checkpoint, exact intent, configured model,
+policy, selected aggregate and save time; new completion receipts bind that
+checkpoint. A checkpoint is selected historical evidence, not a completed
+rollback or positive validation. Exact retries can complete from the frozen
+report without invoking the selector or reopening SQLite, subject to current
+activation CAS, permissions, secrets and immutable version checks.
+
+Intent-only attempts still cannot retry selection. Report/guard failures before
+checkpoint persistence leave the original claim unresolved. Errors after a
+checkpoint save permit only completion from that saved report, never substitution
+of newer feedback. Changed activation or policy fails visibly rather than
+refreshing the expected state. Current secrets and both version files are checked
+again on resumed uncompleted work; historical completed receipt retries remain
+independent of evidence databases and version-file availability. Old schema6/7
+receipts remain readable without fabricated checkpoint provenance. Fresh direct
+core non-checkpointing entry points retain their prior behavior; the new core
+checkpointed entry point requires an explicit selection persistence guard.
+
+Application tests use actual catalog/SQLite feedback and deny finalization only
+after observing the saved checkpoint. Corrected later feedback is independently
+qualified as no-signal, then the owned database is moved away. Exact retry must
+complete using the original saved signal/report, without recreating or reading
+the database. Other cases cover stale activation, changed model/policy, sensitive
+metadata, disabled mutation and read-only inspection. Independent review caught
+and fixed a lower-level resume path that skipped immutable version-file reads.
+No user configuration, database or live inference is involved. Native Linear was
+rechecked but the Mac remained locked; no issue status change is claimed.
+
+Explicit host recovery is not an unattended daemon lifecycle, repeated statistical
+monitoring, current-activation exposure attribution, qualified domain validation,
+or power-loss qualification. Those broader PRD requirements remain open.
+
+Focused application outcome tests passed three race runs (65.035s). Final core
+outcome and selection-specific tests passed three race runs (15.833s and 7.207s),
+including concurrent saved-report recovery, altered/missing checkpoint linkage,
+corrupted reports, current activation mismatch, schema6/7 receipt compatibility,
+and missing or corrupted candidate/predecessor bodies. SDK checkpoint inspection
+checks detached values, disabled mutation and no store creation. An owned child
+was killed in its final guard after checkpoint persistence and before receipt
+commit; reopen preserved the unchanged activation and no completion receipt, and
+explicit retry committed exactly once with the saved report and zero selector
+calls. This is not a filesystem fsync/rename or physical power-loss guarantee.
+
+Full production make check passed formatting/LOC, vet, all native race tests and
+build (app201.308s, telemetry127.607s, CLI39.941s, API14.982s, SDK27.177s,
+skills24.366s). The final skill-store test tree, including the last checkpoint
+cases, also passed its complete race suite (21.647s). Native and Linux amd64
+binaries built. Final core outcome, application and SDK tests executed successfully
+as CGO-free Linux arm64 binaries in the existing Alpine3.22 image with no network,
+read-only root and an unprivileged UID; Linux execution was not race-instrumented.
+Saved evidence may predate corrected feedback: identity is preserved, not current
+freshness. Checkpoint expiry/current-feedback invalidation remain explicit gaps.
+
 Durable preselection checkpoint: the prior turn made verified progress, committed
 and pushed a256ee3; this turn started clean. PRD9.4's outcome-policy action now
 claims an exact activation before selecting evidence. Schema7 intents retain

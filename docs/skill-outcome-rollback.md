@@ -35,6 +35,7 @@ The versioned SDK exposes:
 receipt, err := client.OutcomeRollbackOnce(ctx, operationID, expected, selectionRequest)
 historical, err := client.OutcomeRollbackOperation(ctx, expected.Key, operationID)
 intent, err := client.OutcomeRollbackIntent(ctx, expected.Key, operationID)
+selected, err := client.OutcomeSelectionCheckpoint(ctx, expected.Key, operationID)
 ```
 
 `expected` is an inspected `skills.ActivationState`; `selectionRequest` is the
@@ -50,8 +51,15 @@ Direct `skills.FileStore` hosts that attach a configured model ID must now use
 intent permission guard. Fresh calls through the simpler core
 `OutcomeRollbackOnce` require an empty configured model ID; it cannot discover
 that binding after dispatch. Exact completed retries retain their stored model
-binding, including older nonempty-ID receipts. The application and SDK use the
-guarded entry point automatically.
+binding, including older nonempty-ID receipts. Those direct-core entry points
+retain their non-checkpointing behavior for fresh execution. To persist selected
+evidence, use `OutcomeRollbackOnceCheckpointed` with an explicit
+`OutcomeSelectionGuard` in addition to the intent and receipt guards. The
+application and SDK use this checkpointed entry point automatically. Reports
+are never newly persisted under an implicit no-op selection permission guard.
+An unfinished checkpoint must also be resumed through the checkpointed entry
+point; older entry points cannot silently skip its selection guard. They can
+still acknowledge an already-completed receipt through the receipt guard.
 
 ## Decision and retry rules
 
@@ -91,9 +99,29 @@ Either completed decision also consumes the revision's adjudication. The new
 path provides at most one selector invocation per durable intent under supported
 catalog locking, not exactly-once completion. A crash after claim persistence
 can mean zero invocations. Older receipts created before intents remain readable
-and retryable, but do not gain a retroactive single-attempt guarantee. General
-repeated-monitoring policy and recovery of a selected-but-uncommitted report
-remain future work.
+and retryable, but do not gain a retroactive single-attempt guarantee. These
+guarantees do not establish a general repeated-monitoring policy.
+
+The checkpointed path saves a validated selection report before the final
+decision. A checkpoint contains the exact intent, aggregate report and selection
+save time; it is **not a completion receipt**. If that save succeeds but final
+commit is interrupted or denied, retrying the same binding uses the saved report
+without invoking the selector or reopening SQLite. It rechecks current policy,
+credentials, candidate/predecessor content and the exact activation revision.
+Changed feedback is not silently substituted, even if the database later becomes
+unavailable. A stale activation prevents completion; its expected state is never
+refreshed to make the old report fit.
+
+This can apply an older report even after a user has corrected its underlying
+feedback. Recovery guarantees evidence identity, not evidence freshness. There is
+no checkpoint-expiry policy in this slice. Operators should withhold the action
+permission if the saved observation is no longer appropriate; a current-feedback
+invalidation policy remains part of the broader monitoring work.
+
+An intent with no checkpoint and no receipt remains unresolved and cannot
+reselect. This includes old schema7 attempts and death before checkpoint save.
+Selection and receipt guards may run again during recovery and must be trusted,
+read-only and retry-safe. Recovery is an explicit host retry, not a daemon loop.
 
 An exact retry returns the saved historical receipt without reading SQLite or
 selecting newer outcomes, even after later activations or loss of the evidence
@@ -103,24 +131,28 @@ available with rollback disabled and scoped skills still configured.
 
 ## Atomicity, evidence and privacy
 
-The intent is a separate earlier catalog replacement. The final catalog
+The intent and optional selection checkpoint are separate earlier catalog
+replacements. The final catalog
 replacement commits the receipt and optional rollback together. The
 receipt retains operation ID, expected state, selection policy/report, after state,
 decision time and activation-history position. A distinct `outcome_operation_id`
 on the rollback transition links it to that receipt. It cannot also carry
 deterministic regression or activation evidence. Existing validation proofs are
 not rewritten, and no `Evidence.Deterministic` success/failure is fabricated.
+New checkpoint-backed receipts link the saved selection with `selection_id`;
+legacy receipts are not given invented checkpoint provenance.
 
 SQLite selection and the later catalog write are not one distributed transaction.
 The report records a coherent historical snapshot; feedback can change afterward.
-`CheckedAt` is the catalog decision time, not a claim that feedback is still
+`SelectedAt` is the checkpoint save time, and `CheckedAt` is the catalog decision
+time, not a claim that feedback is still
 current then. The catalog activation is checked again under its write lock before
 commit; stale expected state is never refreshed automatically.
 
 Complete selected observations undergo the existing scope/secret checks. The
 action additionally checks candidate/predecessor content, policy and receipt
 metadata, cumulative credential changes, and per-call catalog/database path
-bindings. Intent and final metadata guards run under the catalog lock and must be bounded,
+bindings. Intent, selection-save and final metadata guards run under the catalog lock and must be bounded,
 non-reentrant and cancellation-cooperative. Selector and guard values are copied
 to prevent retained mutable aliases. The core has an eight-second cooperative
 deadline; the application has ten seconds and SQLite selection five seconds.
@@ -131,13 +163,15 @@ The receipt's `After` state is historical, not necessarily the current activatio
 
 ## Catalog compatibility and qualification
 
-The first preselection intent promotes the file catalog to schema7. Existing
-schema6 receipts remain readable without an invented historical intent.
-Schemas1–6 remain readable; subsequent activation, publication and deterministic
-monitor writes do not downgrade it. Stop older writers before adopting schema7.
+The first preselection intent promotes the file catalog to schema7; saving a
+selection checkpoint promotes it to schema8. Existing schema6/7 receipts remain
+readable without invented historical intent or checkpoint records.
+Schemas1–7 remain readable; subsequent activation, publication and deterministic
+monitor writes do not downgrade it. Stop older writers before adopting schema8.
 This operation does not migrate SQLite, whose selector requires schema27.
 Outcome records reserve at most 1,000 distinct activation revision slots across
-intents and legacy receipts and share the catalog's existing 8 MiB limit;
+intents and legacy receipts, with at most one selection checkpoint per intent,
+and share the catalog's existing 8 MiB limit;
 capacity failure does not silently delete audit records.
 
 Ordinary catalog reads validate structural receipt/transition bindings without

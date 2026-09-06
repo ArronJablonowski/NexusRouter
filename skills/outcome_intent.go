@@ -123,6 +123,14 @@ func matchingOutcomeIntent(c *catalog, id, model string, expected ActivationStat
 // different key must not free the original revision. Ordinary catalog reads
 // remain structural, and exact receipt/intent lookup verifies only that record.
 func validateOutcomeAdmission(ctx context.Context, c *catalog) error {
+	for id, checkpoint := range c.OutcomeSelections {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, err := lookupOutcomeSelection(c, checkpoint.Intent.Expected.Key, id); err != nil {
+			return err
+		}
+	}
 	for id, i := range c.OutcomeIntents {
 		if err := ctx.Err(); err != nil {
 			return err

@@ -82,7 +82,9 @@ Trusted Go hosts can separately opt into operation-bound
 requires an exact first-activation/predecessor binding, and preserves a durable
 receipt for rollback or no-action decisions. A durable preselection intent fences
 failed or interrupted attempts against automatic reselection; trusted hosts can
-inspect both intents and receipts. No daemon loop starts automatically.
+inspect intents, selected-evidence checkpoints and receipts. Exact retries can
+finish from a saved checkpoint without rereading feedback, subject to current
+policy and activation checks. No daemon loop starts automatically.
 
 ### Managed local model residency
 
