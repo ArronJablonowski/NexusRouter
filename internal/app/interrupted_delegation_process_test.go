@@ -86,6 +86,10 @@ func TestInterruptedDelegationCrashProcessHelper(t *testing.T) {
 		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE UPDATE OF released ON resource_leases WHEN OLD.scope GLOB 'delegation-*' AND OLD.writer=0 AND NEW.released=1 BEGIN SELECT darwin_test_pause_result(); END`
 	case "parent_release":
 		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE UPDATE OF released ON resource_leases WHEN OLD.scope='delegation' AND OLD.writer=0 AND NEW.released=1 BEGIN SELECT darwin_test_pause_result(); END`
+	case "before_child":
+		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE INSERT ON events WHEN json_extract(NEW.body,'$.kind')='task.started' AND COALESCE(json_extract(NEW.body,'$.worker_id'),'')='' AND EXISTS(SELECT 1 FROM events WHERE task_id=json_extract(NEW.body,'$.data.parent_task_id') AND sequence=1 AND COALESCE(json_extract(body,'$.worker_id'),'')!='') BEGIN SELECT darwin_test_pause_result(); END`
+	case "before_worker_started":
+		trigger = `CREATE TRIGGER crash_before_parent_tool_result BEFORE INSERT ON events WHEN json_extract(NEW.body,'$.kind')='worker.started' BEGIN SELECT darwin_test_pause_result(); END`
 	default:
 		t.Fatal("unsupported test crash boundary")
 	}

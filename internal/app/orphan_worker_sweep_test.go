@@ -18,8 +18,12 @@ import (
 // The real subprocess has been killed during the worker's terminal transaction.
 // Its child succeeded and preliminary acceptance exists, but the worker must be
 // failed, never promoted to accepted output, by the daemon's recovery chain.
-func qualifyOrphanWorkerSweep(t *testing.T, ctx context.Context, svc *Service, db *telemetry.Store, raw *sql.DB, submission string, parentLease, workerLease telemetry.Lease, journals map[string][]runtime.Event) {
+func qualifyOrphanWorkerSweep(t *testing.T, ctx context.Context, svc *Service, db *telemetry.Store, raw *sql.DB, submission string, parentLease, workerLease telemetry.Lease, journals map[string][]runtime.Event, expectedWorkerReason ...string) {
 	t.Helper()
+	workerReason := "orphan_worker_owner_unlocked"
+	if len(expectedWorkerReason) == 1 {
+		workerReason = expectedWorkerReason[0]
+	}
 	dispatcher, err := StartDispatcher(ctx, svc)
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +115,7 @@ func qualifyOrphanWorkerSweep(t *testing.T, ctx context.Context, svc *Service, d
 		}
 		reason := "terminal_reader_owner_unlocked"
 		if lease.Token == workerLease.Token {
-			reason = "orphan_worker_owner_unlocked"
+			reason = workerReason
 		}
 		hash := sha256.Sum256([]byte(lease.Token))
 		if len(body) > 2048 || json.Unmarshal(body, &receipt) != nil || receipt.Version != 1 || receipt.Task != lease.TaskID || receipt.Sequence != int64(len(repaired[lease.TaskID])) || receipt.State != "failed" || receipt.Reason != reason || receipt.Digest != hex.EncodeToString(hash[:]) || strings.Contains(string(body), lease.Token) || strings.Contains(string(body), "durable worker candidate") || strings.Contains(string(body), "darwin-owner-") {

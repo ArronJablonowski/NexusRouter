@@ -240,6 +240,14 @@ storage beneath the OS user configuration directory. Set
 directory. Keep referenced guard files: deleting them does not safely release
 leases. See [ownership and retention](docs/process-lifetime-ownership.md).
 
+The daemon can also fail a verified orphaned read-only worker before any execution
+child was recorded, including death after acquiring its reader but before
+`worker.started`. Recovery preserves source events, creates no child or accepted
+output, and atomically releases the exact worker reader with a distinct receipt.
+The parent requires separate reconciliation and ownership proof. See
+[interrupted worker recovery](docs/orphan-worker-recovery.md) for eligibility,
+actual SIGKILL qualification and unsupported pending-tool/write cases.
+
 ```sh
 ./bin/darwin config validate --config examples/local.yaml
 ./bin/darwin config show --config examples/local.yaml --set workers.max_in_process=1

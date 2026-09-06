@@ -126,7 +126,7 @@ func existingLeaseRecovery(ctx context.Context, q recoveryQuery, c recoveryLease
 		if r.EventID != "" || r.ChildTaskID != "" || r.ChildSequence != 0 || r.ChildEventID != "" {
 			return false, ErrLeaseRecovery
 		}
-	case "orphan_worker_owner_unlocked":
+	case "orphan_worker_owner_unlocked", "orphan_worker_without_child_unlocked":
 		if !sessions.ValidEventPageID(r.EventID) || state.String != "failed" {
 			return false, ErrLeaseRecovery
 		}
@@ -134,6 +134,16 @@ func existingLeaseRecovery(ctx context.Context, q recoveryQuery, c recoveryLease
 		var terminal runtime.Event
 		if q.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(body AS BLOB)) BETWEEN 1 AND 8388608 THEN body END FROM events WHERE task_id=? AND sequence=? AND id=?`, c.Task, seq, r.EventID).Scan(&encoded) != nil || json.Unmarshal(encoded, &terminal) != nil || terminal.Validate() != nil || terminal.TaskID != c.Task || terminal.ID != r.EventID || terminal.Sequence != seq || terminal.WorkerID != c.Owner || terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "worker_owner_interrupted" || !terminal.Time.Equal(r.Time) {
 			return false, ErrLeaseRecovery
+		}
+		if r.Reason == "orphan_worker_without_child_unlocked" {
+			canonicalTerminal, encodeErr := terminal.Encode()
+			var child bool
+			if r.ChildTaskID != "" || r.ChildSequence != 0 || r.ChildEventID != "" || encodeErr != nil || !bytes.Equal(encoded, canonicalTerminal) || q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM events WHERE json_extract(body,'$.data.parent_task_id')=?)`, c.Task).Scan(&child) != nil || child {
+				return false, ErrLeaseRecovery
+			}
+			if err := validateOrphanWithoutChildReceipt(ctx, q, r); err != nil {
+				return false, err
+			}
 		}
 		if err := validateOrphanChildReceipt(ctx, q, r); err != nil {
 			return false, err

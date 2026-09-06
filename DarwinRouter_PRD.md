@@ -509,6 +509,14 @@ Rules support `allow`, `deny`, and `ask`, scoped by tool and resource. Child wor
 
 The MVP runs one orchestrator and a configurable bounded worker pool. Inference and declared read-only tools may execute concurrently. Side-effecting tools require a single-writer lease for each affected resource scope.
 
+Pre-child orphan recovery must also cover an owned reader after `task.started`
+but before `worker.started`, and after worker start with optional heartbeats.
+Require explicit read-only parent dispatch, strict execution-free worker history,
+retained original process-death proof and transactional absence of all linked
+child records. Append worker failure, release the exact reader and record
+`orphan_worker_without_child_unlocked` atomically; never synthesize a child or
+success. Exact retries re-derive the failure from canonical bounded history.
+
 Application tool dispatch must acquire shared leases for allowed read-only tools and retain ownership until handlers actually return. Expired but unreleased readers must still exclude writers; cancellation and expiry are not proof of termination. Built-in file tools conservatively share a single `workspace` scope across all roots, covering nesting and aliases; legacy `create_*` scopes remain conflicting during upgrades. SDK hosts must canonicalize overlapping custom resources. Busy admission must not silently replay a tool. See [reader/writer execution](docs/reader-writer-execution.md) for the implemented boundary and outstanding crash-reconciliation limits.
 
 Workers use durable work records, leases, heartbeats, and acceptance states. Supervisors re-derive liveness from durable events, leases, and observed goroutine/provider state. Lease expiry, orphaned work, or stalls trigger safe recovery or operator attention; they do not imply that an uncertain effect can be replayed.

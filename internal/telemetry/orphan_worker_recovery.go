@@ -82,7 +82,8 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	if err != nil || len(plan.Events) != 1 || plan.ParentTaskID != c.Task || histories[0][0].WorkerID != c.Owner {
 		return false, ErrLeaseRecovery
 	}
-	parent, err := orphanWorkerParent(ctx, tx, histories[0][0], now)
+	withoutChild := len(histories) == 1
+	parent, err := orphanWorkerParent(ctx, tx, histories[0][0], now, withoutChild)
 	if err != nil {
 		return false, ErrLeaseRecovery
 	}
@@ -113,6 +114,9 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	}
 	h := sha256.Sum256([]byte(token))
 	r := leaseRecoveryReceipt{Version: 1, Task: c.Task, Sequence: event.Sequence, State: "failed", Time: now, Process: c.Process, Reason: "orphan_worker_owner_unlocked", Digest: hex.EncodeToString(h[:]), CandidateDigest: recoveryDigest(c, event.Sequence, "failed"), EventID: event.ID}
+	if withoutChild {
+		r.Reason = "orphan_worker_without_child_unlocked"
+	}
 	if tree.Child != nil {
 		r.ChildTaskID, r.ChildSequence, r.ChildEventID = tree.Child.ParentTaskID, tree.Child.Events[0].Sequence, tree.Child.Events[0].ID
 	}
@@ -132,7 +136,7 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 			return false, ErrLeaseRecovery
 		}
 	}
-	finalParent, err := orphanWorkerParent(ctx, tx, histories[0][0], now)
+	finalParent, err := orphanWorkerParent(ctx, tx, histories[0][0], now, withoutChild)
 	a, _ := json.Marshal(parent)
 	b, _ := json.Marshal(finalParent)
 	if err != nil || string(a) != string(b) {
@@ -180,7 +184,7 @@ func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.Interrup
 
 // Bind the worker's origin to the parent's actual dispatched delegation. This
 // check does not authorize parent continuation or alter its journal/ownership.
-func orphanWorkerParent(ctx context.Context, tx *sql.Tx, start runtime.Event, now time.Time) ([]runtime.Event, error) {
+func orphanWorkerParent(ctx context.Context, tx *sql.Tx, start runtime.Event, now time.Time, requireReadOnly bool) ([]runtime.Event, error) {
 	var history []runtime.Event
 	snapshot, err := taskSnapshotWithEvents(ctx, tx, start.Data.ParentTaskID, &history)
 	if err != nil || len(history) == 0 || history[0].WorkerID != "" || history[0].SessionID != start.SessionID || history[0].Data.SubmissionID != start.Data.SubmissionID {
@@ -192,6 +196,9 @@ func orphanWorkerParent(ctx context.Context, tx *sql.Tx, start runtime.Event, no
 	}
 	pending, ok := snapshot.Pending[origin.ToolCallID]
 	if !ok || !pending.Dispatched || pending.TurnID != origin.TurnID || pending.AttemptID != origin.AttemptID || pending.Call.Name != origin.ToolName || (pending.ToolBehavior != "" && pending.ToolBehavior != runtime.BehaviorReadOnly) {
+		return nil, ErrLeaseRecovery
+	}
+	if requireReadOnly && pending.ToolBehavior != runtime.BehaviorReadOnly {
 		return nil, ErrLeaseRecovery
 	}
 	if origin.ToolName == "delegate_batch" {
@@ -211,10 +218,13 @@ func orphanWorkerParent(ctx context.Context, tx *sql.Tx, start runtime.Event, no
 }
 
 func orphanHistoriesMatch(before, after [][]runtime.Event, event runtime.Event, child *sessions.InterruptionRecovery) bool {
-	if len(before) != 2 || len(after) != 2 || len(after[0]) != len(before[0])+1 {
+	if (len(before) != 1 && len(before) != 2) || len(after) != len(before) || len(after[0]) != len(before[0])+1 || len(before) == 1 && child != nil {
 		return false
 	}
-	want := [][]runtime.Event{append(append([]runtime.Event(nil), before[0]...), event), before[1]}
+	want := [][]runtime.Event{append(append([]runtime.Event(nil), before[0]...), event)}
+	if len(before) == 2 {
+		want = append(want, before[1])
+	}
 	if child != nil {
 		want[1] = append(append([]runtime.Event(nil), before[1]...), child.Events...)
 	}
@@ -223,7 +233,7 @@ func orphanHistoriesMatch(before, after [][]runtime.Event, event runtime.Event, 
 	return string(a) == string(b)
 }
 
-// Only one direct, leaf execution child is admitted. Each raw journal and their
+// Zero or one direct, leaf execution child is admitted. Each raw journal and their
 // aggregate are bounded before loading payloads; nested work is unsupported.
 func orphanWorkerHistories(ctx context.Context, tx *sql.Tx, worker string) ([][]runtime.Event, error) {
 	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(task_id AS BLOB)) BETWEEN 1 AND 128 THEN task_id END FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.parent_task_id')=? LIMIT 2`, worker)
@@ -246,18 +256,25 @@ func orphanWorkerHistories(ctx context.Context, tx *sql.Tx, worker string) ([][]
 	if rows.Close() != nil {
 		return nil, ErrLeaseRecovery
 	}
-	if len(ids) != 2 {
-		return nil, sessions.ErrHistory
+	if len(ids) == 1 {
+		// A malformed/non-start linked event is contradictory evidence, not
+		// proof that no execution child was created.
+		var linked bool
+		if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM events WHERE json_extract(body,'$.data.parent_task_id')=?)`, worker).Scan(&linked) != nil || linked {
+			return nil, ErrLeaseRecovery
+		}
 	}
-	var nested bool
-	if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.parent_task_id')=?)`, ids[1]).Scan(&nested) != nil {
-		return nil, ErrLeaseRecovery
-	}
-	if nested {
-		return nil, sessions.ErrHistory
+	if len(ids) == 2 {
+		var nested bool
+		if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.parent_task_id')=?)`, ids[1]).Scan(&nested) != nil {
+			return nil, ErrLeaseRecovery
+		}
+		if nested {
+			return nil, sessions.ErrHistory
+		}
 	}
 	var bytes, count int64
-	histories := make([][]runtime.Event, 2)
+	histories := make([][]runtime.Event, len(ids))
 	for i, id := range ids {
 		var size, events int64
 		if tx.QueryRowContext(ctx, `SELECT COALESCE(sum(length(CAST(body AS BLOB))),0),count(*) FROM events WHERE task_id=?`, id).Scan(&size, &events) != nil || size < 1 || events < 1 || size > (8<<20)-bytes || events > 10000-count {

@@ -142,6 +142,13 @@ type InterruptedWorkerTreeRecovery struct {
 func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (InterruptedWorkerTreeRecovery, error) {
 	bad := func() (InterruptedWorkerTreeRecovery, error) { return InterruptedWorkerTreeRecovery{}, ErrHistory }
 	now = now.UTC()
+	if len(histories) == 1 {
+		worker, err := PlanInterruptedWorkerWithoutChild(histories[0], now)
+		if err != nil {
+			return bad()
+		}
+		return InterruptedWorkerTreeRecovery{Worker: worker}, nil
+	}
 	if len(histories) != 2 {
 		return bad()
 	}

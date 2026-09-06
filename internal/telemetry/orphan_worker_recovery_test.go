@@ -67,13 +67,30 @@ func TestOrphanWorkerOwnerHelper(t *testing.T) {
 	appendEvent("parent", runtime.TaskStarted, runtime.Data{})
 	appendEvent("parent", runtime.TurnStarted, runtime.Data{})
 	appendEvent("parent", runtime.TurnCompleted, runtime.Data{FinishReason: "tool_calls", ToolCalls: []providers.ToolCall{{ID: "call", Name: "delegate", Arguments: json.RawMessage(`{"prompt":"question","validation":"text"}`)}}})
-	appendEvent("parent", runtime.ToolStarted, runtime.Data{ToolCallID: "call", ToolName: "delegate", Effect: runtime.NoEffect})
+	parentDispatch := runtime.Data{ToolCallID: "call", ToolName: "delegate", Effect: runtime.NoEffect}
+	if strings.HasPrefix(mode, "no_child") {
+		parentDispatch.ToolBehavior = runtime.BehaviorReadOnly
+	}
+	appendEvent("parent", runtime.ToolStarted, parentDispatch)
 	appendEvent("work", runtime.TaskStarted, runtime.Data{ParentTaskID: "parent", DelegationOrigin: &runtime.DelegationOrigin{Version: 1, TurnID: "turn", AttemptID: "attempt", ToolCallID: "call", ToolName: "delegate"}})
 	lease, err := s.AcquireLease(ctx, "work", "owner", "scope", mode == "writer", time.Now(), time.Minute)
 	if err != nil || lease.Token == "" {
 		t.Fatal(err)
 	}
+	if mode == "no_child_before_started" {
+		fmt.Println("orphan-worker-ready")
+		<-ctx.Done()
+		t.Fatal("parent did not kill helper")
+	}
 	appendEvent("work", runtime.WorkerStarted, runtime.Data{})
+	if mode == "no_child" || mode == "no_child_heartbeat" {
+		if mode == "no_child_heartbeat" {
+			appendEvent("work", runtime.WorkerHeartbeat, runtime.Data{})
+		}
+		fmt.Println("orphan-worker-ready")
+		<-ctx.Done()
+		t.Fatal("parent did not kill helper")
+	}
 	appendEvent("child", runtime.TaskStarted, runtime.Data{ParentTaskID: "work"})
 	appendEvent("child", runtime.TurnStarted, runtime.Data{})
 	readOnly := mode == "readonly_active" || mode == "readonly_complete"

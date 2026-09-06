@@ -1,5 +1,47 @@
 # Implementation evidence
 
+Pre-child worker recovery checkpoint: previous turn made verified configured
+memory CLI progress and backed up a523604; this turn began from a clean worktree.
+Inspection confirmed model-stream and resolved-read-only-tool child recovery were
+already implemented, but a killed reader owner before child creation remained
+unresolved. New pure planning and transactional recovery support `task.started`
+alone after lease acquisition, or `task.started`, `worker.started` and optional
+heartbeats. They require strict execution-free metadata, explicit read-only parent
+dispatch and the existing exact reader/owner/process-guard proof. A broad child
+linkage check includes non-start/malformed linked records before and after writes.
+
+Recovery appends only worker failure, updates its head, releases its original
+reader and records `orphan_worker_without_child_unlocked` in existing schema23
+storage. No child is invented or executed, no output is accepted, no fitness
+changes and no retry/reassignment authority is granted. Subsequent parent failure
+and reader recovery remain separate proven transitions. Receipt acknowledgement
+checks actual bounded raw row sizes, canonical prefix bytes, exact re-derived
+terminal and absence of child linkage. Old receipt reasons remain unchanged.
+
+Three agents contributed session planner/tests, telemetry implementation/tests,
+and independent review. Review tightened broad child absence and receipt-history
+revalidation; root identified and included the earlier lease-before-WorkerStarted
+boundary instead of leaving another equivalent held-reader window. Session worker
+race tests passed three runs6.713s; all telemetry orphan tests passed11.071s and
+new no-child tests passed three runs9.558s. Actual application SIGKILL tests passed
+three runs3.636s across both boundaries: real dispatcher fails parent+worker,
+retains source prefixes and exactly two submitted task IDs, releases both proven
+readers, preserves repeat receipts and admits new writers. Fixture call counts
+remain one parent and zero child inferences. Pause hooks exist only in tests.
+
+Full make check passed (format/LOC, vet, native race suite and production build),
+including app152.407s, telemetry109.299s, CLI35.851s, SDK23.946s and sessions7.851s.
+Native make build and Linux amd64 production cross-build passed. New session,
+telemetry and application cases also executed successfully as Linux arm64 test
+binaries in the existing Alpine image, with no external network, read-only root,
+unprivileged user and only owned binaries mounted. Both actual pre-child SIGKILL
+boundaries ran on Linux; CGO-free Linux tests were not race-instrumented. No live
+Sol/Ollama inference, user database/configuration mutation or power-loss claim.
+Native Linear remains locked; no issue update or completion is claimed. Pending
+tool recovery, ambiguous outcomes, writer/uncertain-effect resolution, automatic
+reassignment/continuation, stronger isolation and full PRD acceptance remain open.
+See docs/orphan-worker-recovery.md for scope and compatibility.
+
 Configured CLI memory checkpoint: the previous turn made verified durable-monitor
 progress and backed up cdc68e7; this turn began from a clean worktree. Requirement
 audit found that raw CLI memory commands bypassed the configured-scope/redaction

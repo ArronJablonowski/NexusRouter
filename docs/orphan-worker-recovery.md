@@ -1,7 +1,7 @@
 # Interrupted worker recovery
 
-The daemon can now fail a verified orphaned in-process worker whose execution
-child finished before the worker's terminal commit, whose model-only child was
+The daemon can now fail a verified orphaned in-process worker before an execution
+child was recorded, whose child finished before the worker's terminal commit, whose model-only child was
 interrupted, or whose child finished explicitly read-only tools before its
 interruption. This covers these finalization and model-stream crash boundaries. It does not
 accept the output, rerun inference, resume a task, or reassign work.
@@ -17,7 +17,8 @@ accept the output, rerun inference, resume a task, or reassign work.
   preliminary validation/output records remain source facts, not success.
 - Exactly one direct, non-worker execution child has a valid terminal projection,
   or an eligible running history with no pending tools or acceptance records.
-  Pending tools, uncertain/confirmed effects, nested, missing and ambiguous
+  Alternatively, the strict pre-child lifecycle described below has no linked
+  child record at all. Pending tools, uncertain/confirmed effects, nested and ambiguous
   children remain unsupported. A running child must have no independently held
   resource lease; worker ownership cannot authorize releasing another holder.
 - A tool-aware running child must have at least one completed current-journal
@@ -34,6 +35,42 @@ accept the output, rerun inference, resume a task, or reassign work.
 This proof concerns cooperative local in-process lifetime, including exec
 replacement. It does not prove that remote generation, detached subprocesses or
 external effects stopped. Expiry and preliminary acceptance are never death proof.
+
+## Workers interrupted before child creation
+
+The supported pre-child prefix is `task.started` alone, or `task.started`,
+`worker.started`, followed by optional worker heartbeats. The first form covers
+the window after reader acquisition but before `worker.started` commits. Any
+model/tool event, evaluation, preliminary acceptance, output, error, terminal,
+unexpected metadata or heartbeat before worker start makes this path ineligible.
+
+The exact parent delegation must explicitly declare `read_only` and remain
+dispatched/pending with the recorded worker origin. Missing/legacy behavior is
+not sufficient here. Recovery retains the original unlocked process guard and
+the SQLite writer transaction while proving absence of **any** event linked by
+`data.parent_task_id` to the worker. A malformed/non-start linked record is not
+treated as absence. This check repeats after all writes; a child appearing during
+commit invalidates and rolls back the whole recovery.
+
+Recovery appends only the worker's deterministic `task.failed` /
+`worker_owner_interrupted`, changes its head, releases its exact historical
+reader and writes the distinct `orphan_worker_without_child_unlocked` receipt.
+It creates no execution child, tool result, model response or acceptance record.
+Existing parent reconciliation can then record a bounded failed delegation and
+fail the parent; the parent's reader requires its own ownership proof.
+
+Receipt retry verifies no child linkage, bounds and canonical bytes for every
+worker event, and re-derives the exact failure from the strict source prefix.
+It rejects altered metadata or extra terminal fields rather than acknowledging
+a matching error string. Read queries bound both preflight sizes and actual row
+bytes; limits remain 10,000 events/8 MiB including the appended terminal. The
+receipt uses existing schema 23 storage; older binaries do not recognize its new
+reason and must not be used for recovery after upgrading. No database migration
+or change to old receipt reasons is required.
+
+This relies on the trusted store's durable parent linkage and read-only work
+contract. It cannot discover an unrecorded external action or an entirely
+unlinked corrupt history, prove remote generation stopped, or authorize retries.
 
 ## Atomic failure and supervision
 
@@ -64,9 +101,11 @@ lease; the completed tool's lease must already have been released normally.
 
 The transaction revalidates ownership, source event content, child and parent
 history before commit. Any failure rolls back all changes. Repeating recovery
-does not append another event or rewrite the receipt. Repeat receipt validation
-checks its binding and terminal metadata; it is not a full historical corruption
-audit. Existing source events and learning evidence are never rewritten.
+does not append another event or rewrite the receipt. Existing child-recovery
+receipt validation checks its binding and terminal metadata; it is not a full
+historical corruption audit. The new pre-child receipt additionally validates
+its strict worker prefix as described above. Source events and learning evidence
+are never rewritten.
 
 At startup and each tick, the dispatcher visits at most 32 running worker-reader
 candidates using an independent private rowid cursor. It then runs submission
@@ -84,6 +123,16 @@ Unsupported histories remain untouched; corruption/operational errors degrade
 supervisor health. The public API does not expose private recovery capabilities.
 
 ## Qualification and remaining work
+
+Actual application SIGKILL tests pause inside the first execution-child INSERT
+and separately inside `worker.started` INSERT after reader acquisition. They kill
+and join only the owned subprocess, then reopen the database and start the real
+dispatcher. Both cases retain exactly parent+worker, fail both without creating a
+child, release both proven readers, preserve source prefixes and acknowledge
+repeat recovery without journal or receipt changes. A new writer can acquire
+both recovered scopes. Provider counts stay at one fixture coordinator request
+and zero execution-child requests. These are test-only SQLite pause points,
+not production fault hooks or power-loss simulation.
 
 The actual app SIGKILL test interrupts worker finalization after child success.
 Starting the real dispatcher then produces a failed worker and failed parent,
@@ -119,10 +168,14 @@ source pairs and no additional read lease establish that recovery did not rerun
 the read tool. This qualifies synthetic loopback execution, not live model
 behavior or remote-generation cessation.
 
-Still required: pending tool-aware child recovery, missing outcomes, writer and
+Still required: pending tool-aware child recovery, ambiguous/malformed missing
+outcomes, writer and
 uncertain-effect resolution, persistent operator attention, idempotent
 reassignment, automatic continuation, stronger isolation and guard garbage
 collection/reboot qualification. New guards now use durable private storage;
 see [ownership retention](process-lifetime-ownership.md).
 This is not full worker recovery or complete PRD acceptance. Native
-qualification uses synthetic providers on macOS, not live inference or power loss.
+qualification uses synthetic providers, not live inference or power loss. The
+pre-child cases additionally execute on isolated Linux arm64, including actual
+owned-process SIGKILL at both pre-child boundaries; Linux tests are CGO-free
+without race instrumentation, while the macOS suite runs with race detection.
