@@ -552,8 +552,12 @@ maintained by bounded daemon sweeps and inspectable through CLI `resources
 attention`, SDK `ListLeaseAttention`, and authenticated `GET
 /v1/resources/attention`. Renewal/release resolves observations;
 expiry recurrence reopens the same record. These are diagnostic snapshots, not
-execution or recovery authority. Operator acknowledgment,
-notifications, transition history, retention and broader stall reasons remain
+execution or recovery authority. Schema 25 appends changed observations atomically
+with the current projection, with byte-preserving migration baselines for existing
+records. History is inspectable through CLI `resources attention-history`, SDK
+`ListLeaseAttentionHistory`, and authenticated HTTP
+`GET /v1/resources/attention/{id}/history`. Operator acknowledgment,
+notifications, retention and broader stall reasons remain
 required. See [lease attention](docs/lease-attention.md).
 See [task lease inspection](docs/task-lease-inspection.md) and
 [scope holder inspection](docs/scope-holder-inspection.md).

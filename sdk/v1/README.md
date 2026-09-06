@@ -698,6 +698,13 @@ without migration. Opaque IDs and first-observed times remain stable across
 renewal/reopening; results are stored observations, not admission authority.
 See [lease attention](../../docs/lease-attention.md).
 
+`ListLeaseAttentionHistory(ctx, id, LeaseAttentionHistoryOptions{Limit: 25})`
+reads per-record transitions from schema 25. Use `AfterSequence` to continue;
+save the last returned sequence when caught up. Migration baselines preserve
+only the last known pre-migration state, not earlier transitions. Old schemas
+report unavailable without migration; a missing current-schema record returns
+`sql.ErrNoRows`. These content-free observations remain diagnostic only.
+
 `InspectScopeLeases(ctx, scope)` returns `ScopeLeaseStatus` with sorted
 `ScopeLeaseHolder` task IDs and live/expired reader/writer counts. It uses the
 admission overlap policy and includes expired unreleased holders. The requested

@@ -230,7 +230,8 @@ The daemon durably flags expired unreleased leases. Inspect them with
 `darwin resources attention --db path`, SDK `ListLeaseAttention`, or authenticated
 `GET /v1/resources/attention?state=open&limit=25`; an alert
 never grants release or retry authority. See [lease attention](docs/lease-attention.md)
-for schema-24 upgrade guidance and observation limits.
+for schema-25 upgrade guidance and observation limits. Inspect recorded transitions
+with `darwin resources attention-history --db path --id ATTENTION_ID`.
 
 Process-ownership guards default to private `DarwinRouter/process-owners`
 storage beneath the OS user configuration directory. Set
@@ -652,6 +653,8 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /v1/resources/attention`: read-only paginated lease-attention records;
   optional `state`, `after`, and `limit`, with defaults `open` and `25`.
   See [lease attention](docs/lease-attention.md) for observation and upgrade limits.
+- `GET /v1/resources/attention/{id}/history`: append-only observation history;
+  optional `after_sequence` and `limit`, with defaults `0` and `25`.
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `POST /v1/tasks/{id}/cancel`: send JSON `{}` to durably request cancellation. HTTP202 means the request was recorded while the task was running, not that execution has already stopped; HTTP200 reports an already-terminal task. Repeating the request is naturally idempotent for that task and retains the original request ID/time. `GET /v1/tasks/{id}/cancellation` reports durable request status and the current task state. Two independent control slots keep these operations available when execution capacity is full. Current runners observe requests through SQLite, including requests from another service instance/process. Database transaction order resolves cancellation versus completion: a cancellation recorded first prevents later normal events and completion, while a terminal event recorded first remains terminal. Already-started tool effects may finish and must be recorded; cancellation does not roll them back. A stopped/orphaned runner can retain a pending request until recovery is implemented. Post-completion auxiliary audits have their own lifecycle and are not canceled through this task endpoint.

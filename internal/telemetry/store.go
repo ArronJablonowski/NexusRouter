@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 24 {
+	if version > 25 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -298,6 +298,12 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 24 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE lease_attention(id TEXT PRIMARY KEY,lease_token TEXT NOT NULL UNIQUE REFERENCES resource_leases(token),task_id TEXT NOT NULL REFERENCES task_heads(task_id),state TEXT NOT NULL CHECK(state IN('open','resolved')),body BLOB NOT NULL); CREATE INDEX lease_attention_state_id ON lease_attention(state,id); PRAGMA user_version=24;`)
+		if err != nil {
+			return err
+		}
+	}
+	if version < 25 {
+		_, err = conn.ExecContext(ctx, `CREATE TABLE lease_attention_history(attention_id TEXT NOT NULL REFERENCES lease_attention(id),sequence INTEGER NOT NULL CHECK(sequence>0),kind TEXT NOT NULL CHECK(kind IN('baseline','observed')),body BLOB NOT NULL,PRIMARY KEY(attention_id,sequence)); INSERT INTO lease_attention_history(attention_id,sequence,kind,body) SELECT id,1,'baseline',body FROM lease_attention; PRAGMA user_version=25;`)
 		if err != nil {
 			return err
 		}

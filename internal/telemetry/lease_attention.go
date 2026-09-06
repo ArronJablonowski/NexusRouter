@@ -37,7 +37,7 @@ func (s *Store) ListLeaseAttention(ctx context.Context, options workers.LeaseAtt
 	}
 	defer tx.Rollback()
 	var schema int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema < 1 || schema > 24 {
+	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema < 1 || schema > 25 {
 		return zero, workers.ErrLeaseAttention
 	}
 	page := workers.LeaseAttentionPage{Version: 1, StorageSchema: schema, Available: schema >= 24, Items: []workers.LeaseAttention{}}

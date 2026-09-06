@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -92,7 +93,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	var attention workers.LeaseAttentionPage
 	decodeErr := json.NewDecoder(response.Body).Decode(&attention)
 	closeErr := response.Body.Close()
-	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 24 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
+	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 25 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
 		t.Fatal("real daemon attention inspection failed", response.StatusCode, decodeErr, closeErr)
 	}
 	databaseURL := url.URL{Scheme: "file", Path: filepath.Join(dir, "tasks.db"), RawQuery: "mode=ro"}
@@ -105,6 +106,80 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	closeErr = database.Close()
 	if queryErr != nil || closeErr != nil || taskCount != 0 {
 		t.Fatal("attention inspection created execution", queryErr, closeErr, taskCount)
+	}
+	// A missing history returns 404, not a missing service hook or an invented
+	// empty result. Then seed metadata only in this owned daemon fixture DB.
+	historyURL := "http://" + address + "/v1/resources/attention/daemon-history/history"
+	readHistory := func() (*http.Response, []byte) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, historyURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal("history endpoint request failed", err)
+		}
+		body, readErr := io.ReadAll(io.LimitReader(res.Body, 8193))
+		if closeErr := res.Body.Close(); readErr != nil || closeErr != nil || len(body) > 8192 {
+			t.Fatal("history response unreadable", readErr, closeErr)
+		}
+		return res, body
+	}
+	res, body := readHistory()
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatal("missing history route not wired", res.StatusCode, string(body))
+	}
+	databaseURL.RawQuery = "mode=rw"
+	fixtureDB, err := sql.Open("sqlite", databaseURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fixtureDB.Close()
+	if _, err := fixtureDB.ExecContext(ctx, `PRAGMA busy_timeout=5000`); err != nil {
+		t.Fatal(err)
+	}
+	fixtureTx, err := fixtureDB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fixtureTx.Rollback()
+	now := time.Now().UTC()
+	observation := workers.LeaseAttention{Version: 1, ID: "daemon-history", TaskID: "history-fixture", State: "resolved", Reason: "lease_released", FirstObserved: now, UpdatedAt: now, LeaseExpires: now.Add(-time.Minute)}
+	observationBody, err := json.Marshal(observation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []struct {
+		query string
+		args  []any
+	}{
+		{`INSERT INTO task_heads(task_id,session_id,sequence,state) VALUES('history-fixture','history-fixture',1,'failed')`, nil},
+		{`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,released) VALUES('private-history-token','history-fixture','private-owner','private-scope',0,?,1)`, []any{observation.LeaseExpires.UnixNano()}},
+		{`INSERT INTO lease_attention(id,lease_token,task_id,state,body) VALUES('daemon-history','private-history-token','history-fixture','resolved',?)`, []any{observationBody}},
+		{`INSERT INTO lease_attention_history(attention_id,sequence,kind,body) VALUES('daemon-history',1,'baseline',?)`, []any{observationBody}},
+	} {
+		if _, err := fixtureTx.ExecContext(ctx, statement.query, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := fixtureTx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	res, body = readHistory()
+	var history workers.LeaseAttentionHistoryPage
+	if res.StatusCode != http.StatusOK || json.Unmarshal(body, &history) != nil || history.Version != 1 || history.StorageSchema != 25 || !history.Available || history.AttentionID != "daemon-history" || len(history.Items) != 1 || history.Items[0].Sequence != 1 || history.Items[0].Kind != "baseline" || history.Items[0].Observation != observation {
+		t.Fatal("positive history route not wired", res.StatusCode, string(body))
+	}
+	for _, private := range []string{token, "private-history-token", "private-owner", "private-scope"} {
+		if bytes.Contains(body, []byte(private)) {
+			t.Fatal("history exposed private metadata")
+		}
+	}
+	var eventCount int
+	if err := fixtureDB.QueryRowContext(ctx, `SELECT count(*) FROM events`).Scan(&eventCount); err != nil || eventCount != 0 {
+		t.Fatal("history inspection executed task", err, eventCount)
 	}
 	if _, err := run("start"); err == nil {
 		t.Fatal("duplicate start accepted")

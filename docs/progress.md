@@ -1,5 +1,38 @@
 # Implementation evidence
 
+Attention-history checkpoint: the previous goal turn made verified API and
+observer-race progress backed up as 52a19dd. This turn confirmed a clean worktree;
+native Linear remains locked and no issue mutation is claimed. Schema25 adds
+per-record append-only observation transitions. Migration preserves existing
+state as a labeled baseline without inventing prior events. New and changed
+observations append history in the same transaction as the current projection;
+unchanged observations do not append. CLI, SDK and authenticated HTTP expose
+bounded read-only history. Three agents contributed contracts/migration, adapters
+and API tests while the root implemented storage and atomic observer integration.
+Final verification follows. History is not execution authority or cryptographic
+tamper evidence; acknowledgment, retention, broader supervision and full PRD
+qualification remain unfinished.
+
+History qualification covers observed lifecycle sequences, unchanged scans,
+baseline migration preservation, strict pagination and privacy, read-only reopen,
+head/projection mismatch, missing history, malformed canonical snapshots, sequence
+gaps/overflow and rejected/ignored inserts rolling back both projections. Actual
+daemon HTTP wiring verifies missing404 and a synthetic baseline without execution.
+The first aggregate run exposed an old corruption fixture deleting an attention
+row without its new dependent history; the fixture now removes both synthetic
+records before exercising page rollback. No runtime deletion path was added.
+
+Attention-history final verification: make check passed formatting/LOC, vet,
+full native race tests and build, including app111.183s, telemetry99.331s,
+CLI29.148s, API9.346s and SDK17.465s. Storage history/migration race tests passed
+three repetitions4.928s; the separately added concurrent two-connection observer
+test passed three repetitions1.770s. Real daemon HTTP history passed2.682s;
+SDK/CLI focused race tests passed three repetitions1.875s/2.074s. Native make build
+and CGO-free Linux amd64 production/API test-binary compilation passed; Linux
+execution was not tested. The schema cap is25, future26 is rejected, and existing
+feature thresholds remain unchanged. Only synthetic databases were migrated.
+Git fetch confirmed no divergence; full PRD completion is not claimed.
+
 HTTP attention checkpoint: the previous turn made verified schema24 durable
 attention implementation and backup progress (0550c75). This turn rechecked a
 clean worktree; native Linear remains locked and no issue update is claimed.

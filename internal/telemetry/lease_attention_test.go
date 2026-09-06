@@ -181,6 +181,11 @@ func TestLeaseAttentionPageRollbackAndMalformedEvidence(t *testing.T) {
 				if _, err := s.db.Exec(`UPDATE lease_attention SET body='{}' WHERE lease_token=?`, second.Token); err != nil {
 					t.Fatal(err)
 				}
+				// Remove the first synthetic observation's dependent history too,
+				// so the next sweep attempts a new insert before the corrupt row.
+				if _, err := s.db.Exec(`DELETE FROM lease_attention_history WHERE attention_id IN (SELECT id FROM lease_attention WHERE lease_token=?)`, first.Token); err != nil {
+					t.Fatal(err)
+				}
 				if _, err := s.db.Exec(`DELETE FROM lease_attention WHERE lease_token=?`, first.Token); err != nil {
 					t.Fatal(err)
 				}
@@ -220,7 +225,7 @@ func TestLeaseAttentionReadOnlyListAndCorruption(t *testing.T) {
 	}
 	defer ro.Close()
 	first, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "open", Limit: 2})
-	if err != nil || first.Version != 1 || first.StorageSchema != 24 || !first.Available || len(first.Items) != 2 || !first.HasMore {
+	if err != nil || first.Version != 1 || first.StorageSchema != 25 || !first.Available || len(first.Items) != 2 || !first.HasMore {
 		t.Fatal(first, err)
 	}
 	second, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "all", After: first.Items[1].ID, Limit: 2})
@@ -261,7 +266,7 @@ func TestLeaseAttentionReadOnlyListAndCorruption(t *testing.T) {
 func TestLeaseAttentionLegacyListDoesNotCreateSchema(t *testing.T) {
 	s, path := leaseStore(t)
 	ctx := context.Background()
-	if _, err := s.db.Exec(`DROP TABLE lease_attention; PRAGMA user_version=23`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE lease_attention_history; DROP TABLE lease_attention; PRAGMA user_version=23`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

@@ -24,7 +24,7 @@ func TestWorkflowScanMigrationFrom17BackfillsAndPreservesHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := workflowSourceRawBodies(t, s)
-	if _, err := s.db.Exec(`DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; PRAGMA user_version=17`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; PRAGMA user_version=17`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -45,7 +45,7 @@ func TestWorkflowScanMigrationFrom17BackfillsAndPreservesHistory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 24 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 25 {
 			t.Fatal(version, err)
 		}
 		if !reflect.DeepEqual(before, workflowSourceRawBodies(t, s)) {

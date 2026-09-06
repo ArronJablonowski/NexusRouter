@@ -164,6 +164,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		LeaseAttention: func(ctx context.Context, options workers.LeaseAttentionOptions) (workers.LeaseAttentionPage, error) {
 			return app.InspectLeaseAttention(ctx, s.Telemetry.Database, options)
 		},
+		LeaseAttentionHistory: func(ctx context.Context, id string, options workers.LeaseAttentionHistoryOptions) (workers.LeaseAttentionHistoryPage, error) {
+			return app.InspectLeaseAttentionHistory(ctx, s.Telemetry.Database, id, options)
+		},
 		Health: func(ctx context.Context) error {
 			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner) {
 				return errors.New("supervisor unavailable")

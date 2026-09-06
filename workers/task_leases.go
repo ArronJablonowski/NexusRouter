@@ -39,7 +39,7 @@ type TaskRecoveryCounts struct {
 
 func (s TaskLeaseStatus) Validate() error {
 	_, offset := s.ObservedAt.Zone()
-	if s.Version != 1 || !sessions.ValidEventPageID(s.TaskID) || s.Sequence < 1 || s.Sequence > 10000 || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > 24 || (s.Leases == nil) != (s.StorageSchema < 3) || (s.Recoveries == nil) != (s.StorageSchema < 23) {
+	if s.Version != 1 || !sessions.ValidEventPageID(s.TaskID) || s.Sequence < 1 || s.Sequence > 10000 || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > 25 || (s.Leases == nil) != (s.StorageSchema < 3) || (s.Recoveries == nil) != (s.StorageSchema < 23) {
 		return ErrTaskLeaseStatus
 	}
 	switch s.TaskState {

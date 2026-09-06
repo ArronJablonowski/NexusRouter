@@ -84,6 +84,7 @@ FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR E
 		}
 		var id, task, state sql.NullString
 		var body []byte
+		var historySequence int64
 		err := tx.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(id AS BLOB)) BETWEEN 1 AND 128 THEN id END,CASE WHEN length(CAST(task_id AS BLOB)) BETWEEN 1 AND 128 THEN task_id END,CASE WHEN length(CAST(state AS BLOB)) BETWEEN 1 AND 16 THEN state END,CASE WHEN length(CAST(body AS BLOB)) BETWEEN 1 AND 4096 THEN body END FROM lease_attention WHERE lease_token=?`, c.token).Scan(&id, &task, &state, &body)
 		exists := err == nil
 		if exists {
@@ -92,6 +93,10 @@ FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR E
 				return bad()
 			}
 			record.ID, record.FirstObserved = previous.ID, previous.FirstObserved
+			historySequence, err = attentionHistoryHead(ctx, tx, previous)
+			if err != nil {
+				return bad()
+			}
 			if previous.State == record.State && previous.Reason == record.Reason && previous.LeaseExpires.Equal(record.LeaseExpires) {
 				continue
 			}
@@ -117,6 +122,9 @@ FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR E
 		if n, err := result.RowsAffected(); err != nil || n != 1 {
 			return bad()
 		}
+		if appendAttentionTransition(ctx, tx, record, historySequence) != nil {
+			return bad()
+		}
 		changed++
 	}
 	if len(candidates) == limit {
@@ -140,7 +148,7 @@ func reserveLeaseAttention(ctx context.Context, tx *sql.Tx) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil {
 		return err
 	}
-	if schema != 24 {
+	if schema != 25 {
 		return workers.ErrLeaseAttention
 	}
 	return nil
