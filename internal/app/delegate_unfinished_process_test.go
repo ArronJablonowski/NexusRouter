@@ -82,7 +82,7 @@ func TestUnfinishedDelegationAfterSIGKILLRecoversFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDelegateTreeProcessHelper$", "-test.count=1")
-	cmd.Env = []string{"DARWIN_DELEGATE_TREE_HELPER=1", "DARWIN_DELEGATE_TREE_CONFIG=" + path}
+	cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_DELEGATE_TREE_HELPER=1", "DARWIN_DELEGATE_TREE_CONFIG=" + path}
 	cmd.WaitDelay = time.Second
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

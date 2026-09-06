@@ -5,8 +5,10 @@ package processguard
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -54,17 +56,38 @@ func Current(ctx context.Context) (Reference, error) {
 }
 
 func newHolder() (_ *holder, err error) {
-	directory, err := os.MkdirTemp("", "darwin-owner-")
+	parent, err := ownerDirectory()
 	if err != nil {
 		return nil, err
 	}
-	// Persist canonical spelling, not a /var or TMPDIR symlink alias. Never
-	// delete guard paths: losing a path makes ownership unknown, not dead.
-	directory, err = filepath.EvalSymlinks(directory)
+	return newHolderIn(parent)
+}
+
+func newHolderIn(parent string) (_ *holder, err error) {
+	parentInfo, err := os.Lstat(parent)
+	if err != nil || !privateNode(parentInfo, true) {
+		return nil, ErrUnavailable
+	}
+	parentRoot, err := os.OpenRoot(parent)
 	if err != nil {
 		return nil, err
 	}
-	root, err := os.OpenRoot(directory)
+	defer parentRoot.Close()
+	pinned, err := parentRoot.Stat(".")
+	if err != nil || identity(pinned) != identity(parentInfo) || !localFilesystem(parentRoot) {
+		return nil, ErrUnavailable
+	}
+	var nonce [8]byte
+	if _, err = rand.Read(nonce[:]); err != nil {
+		return nil, err
+	}
+	name := "darwin-owner-" + strconv.FormatUint(binary.LittleEndian.Uint64(nonce[:]), 10)
+	if err = parentRoot.Mkdir(name, 0700); err != nil {
+		return nil, err
+	}
+	directory := filepath.Join(parent, name)
+	// Never delete guard paths: losing one means unknown ownership, not death.
+	root, err := parentRoot.OpenRoot(name)
 	if err != nil {
 		return nil, err
 	}
@@ -106,19 +129,14 @@ func newHolder() (_ *holder, err error) {
 	if err = file.Sync(); err != nil {
 		return nil, err
 	}
-	// Missing entries after a power loss remain unknown. These syncs are not
-	// a claim of power-loss qualification for the filesystem or temp parent.
-	dirFile, err := root.Open(".")
-	if err != nil {
-		return nil, err
+	// Persist both directory entries before a database can reference this guard.
+	// This is not a claim of power-loss or cross-host qualification.
+	if syncDirectory(root) != nil || syncDirectory(parentRoot) != nil {
+		return nil, ErrUnavailable
 	}
-	err = dirFile.Sync()
-	closeErr := dirFile.Close()
-	if err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return nil, err
+	currentParent, err := os.Lstat(parent)
+	if err != nil || !privateNode(currentParent, true) || identity(currentParent) != identity(parentInfo) || verify(owner) != nil {
+		return nil, ErrUnavailable
 	}
 	return owner, nil
 }

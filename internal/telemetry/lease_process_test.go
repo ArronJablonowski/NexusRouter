@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -192,7 +193,7 @@ func TestLeaseProcessRejectsOtherProcessWithKnownToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLeaseProcessForeignHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_FOREIGN_LEASE_HELPER=1", "DARWIN_FOREIGN_LEASE_DB=" + path, "DARWIN_FOREIGN_LEASE_TOKEN=" + lease.Token}
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_FOREIGN_LEASE_HELPER=1", "DARWIN_FOREIGN_LEASE_DB=" + path, "DARWIN_FOREIGN_LEASE_TOKEN=" + lease.Token}
 	cmd.WaitDelay = time.Second
 	if err = cmd.Run(); err != nil {
 		t.Fatal("foreign process fixture failed", err)
@@ -225,7 +226,7 @@ func TestLeaseProcessForeignApprovalConsumption(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLeaseProcessForeignHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_FOREIGN_LEASE_HELPER=1", "DARWIN_FOREIGN_LEASE_DB=" + path, "DARWIN_FOREIGN_LEASE_TOKEN=" + lease.Token, "DARWIN_FOREIGN_APPROVAL_ID=" + req.ID}
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_FOREIGN_LEASE_HELPER=1", "DARWIN_FOREIGN_LEASE_DB=" + path, "DARWIN_FOREIGN_LEASE_TOKEN=" + lease.Token, "DARWIN_FOREIGN_APPROVAL_ID=" + req.ID}
 	cmd.WaitDelay = time.Second
 	if err = cmd.Run(); err != nil {
 		t.Fatal("foreign approval fixture failed", err)

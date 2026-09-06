@@ -226,6 +226,12 @@ read-only list grants no execution or recovery authority. See
 
 ## Configuration
 
+Process-ownership guards default to private `DarwinRouter/process-owners`
+storage beneath the OS user configuration directory. Set
+`DARWIN_PROCESS_OWNER_DIR` before startup to override it with an absolute private
+directory. Keep referenced guard files: deleting them does not safely release
+leases. See [ownership and retention](docs/process-lifetime-ownership.md).
+
 ```sh
 ./bin/darwin config validate --config examples/local.yaml
 ./bin/darwin config show --config examples/local.yaml --set workers.max_in_process=1

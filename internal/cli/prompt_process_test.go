@@ -50,6 +50,7 @@ func TestPromptBlockedProcessSIGTERM(t *testing.T) {
 					cmd.Env = append(cmd.Env, entry)
 				}
 			}
+			cmd.Env = append(cmd.Env, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(t.TempDir(), "owners"))
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			if err := cmd.Start(); err != nil {

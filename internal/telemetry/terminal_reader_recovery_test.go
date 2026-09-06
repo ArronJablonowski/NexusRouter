@@ -162,7 +162,7 @@ func startTerminalReaderOwner(t *testing.T, mode string) (*Store, string, func()
 	t.Cleanup(cancel)
 	path := filepath.Join(t.TempDir(), "terminal.db")
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestTerminalReaderOwnerHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_TERMINAL_OWNER=" + mode, "DARWIN_TERMINAL_DB=" + path}
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_TERMINAL_OWNER=" + mode, "DARWIN_TERMINAL_DB=" + path}
 	cmd.Stderr = io.Discard
 	cmd.WaitDelay = time.Second
 	pipe, err := cmd.StdoutPipe()

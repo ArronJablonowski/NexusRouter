@@ -9,13 +9,28 @@ reconciliation. Schema 23 now uses it for narrowly scoped
 ## Ownership protocol
 
 The first lease acquisition lazily creates one private `darwin-owner-*` directory
-under the operating system's temporary directory. Its `owner.lock` file contains
+under `DarwinRouter/process-owners` in the operating system's user configuration
+directory (on macOS, `~/Library/Application Support`; on Linux,
+`$XDG_CONFIG_HOME` or `~/.config`). Set `DARWIN_PROCESS_OWNER_DIR` before startup
+to select an alternate absolute directory. Its `owner.lock` file contains
 an immutable random identity. DarwinRouter holds an exclusive, nonblocking OS
 flock on that file for the execution image's lifetime. The owning file and
 directory handles remain strongly referenced; there is no owning Close method,
 finalizer or Store.Close cleanup. Every database and Store handle in that process
 shares the same identity, avoiding a retained descriptor for every short-lived
 database connection.
+
+The selected root is created with mode 0700 when absent; an existing root must
+already be private and owned by the effective user. Empty, relative, unclean,
+invalid-text, insecure and final-symlink locations fail closed without chmod or
+fallback to temporary storage. Canonical ancestor aliases are supported. New
+guard directories are created through a pinned root handle; lock contents,
+child-directory and root entries are synced before publishing a reference.
+Missing root ancestors are created privately and synced with their parents.
+This is not power-loss qualification. Root identity/permissions are checked at
+creation; ongoing verification binds the individual guard directory and file,
+not every ancestor's permissions. The process selects its location only on first
+acquisition; later environment changes cannot rotate its established identity.
 
 Schema 22 stores the canonical reference privately in `lease_processes` and adds
 nullable `resource_leases.process_id`. Registration and lease insertion share a
@@ -63,12 +78,20 @@ local deployment assumption, not distributed fencing or remote-filesystem
 qualification. Linux cross-compilation is not evidence of Linux runtime behavior.
 
 Guard directories are not automatically deleted. Existing guards are never
-silently recreated after damage. Temporary-directory cleanup, reboot removal,
-permission changes or copied databases can therefore make ownership unknown and
-block availability. Do not manually remove live guards. A durable configurable
-guard location, retained-guard garbage collection and reboot/host identity
-handling remain operational follow-up work; this foundation does not qualify
+silently recreated after damage. New default locations avoid ordinary temporary
+directory cleanup; an explicit temporary/tmpfs override does not. Legacy
+temporary references remain at their original locations and are probed without
+consulting the new setting. They are not moved or backfilled. Reboot removal,
+permission changes, lost files or copied databases can still make ownership
+unknown and block availability. Do not manually remove live or referenced guards.
+Retained-guard garbage collection, disk-growth bounds and reboot/host identity
+handling remain operational follow-up work; this change does not qualify
 unattended daemon availability across those conditions.
+
+`make check` and `make test` select a disposable private root for synthetic guard
+fixtures, rather than writing the developer's application state. For direct
+`go test` runs that acquire leases, set `DARWIN_PROCESS_OWNER_DIR` to a private
+test directory. The production runtime never cleans up retained guards.
 
 ## Upgrade and remaining work
 

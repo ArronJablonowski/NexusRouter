@@ -117,7 +117,7 @@ func startOrphanWorkerOwner(t *testing.T, mode string) (*Store, string, string, 
 	t.Cleanup(cancel)
 	path := filepath.Join(t.TempDir(), "orphan.db")
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestOrphanWorkerOwnerHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_ORPHAN_WORKER=" + mode, "DARWIN_ORPHAN_DB=" + path}
+	cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "PATH=/usr/bin:/bin", "DARWIN_ORPHAN_WORKER=" + mode, "DARWIN_ORPHAN_DB=" + path}
 	cmd.Stderr = io.Discard
 	cmd.WaitDelay = time.Second
 	pipe, err := cmd.StdoutPipe()

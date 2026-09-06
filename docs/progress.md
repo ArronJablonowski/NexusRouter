@@ -1,5 +1,39 @@
 # Implementation evidence
 
+Durable-location final verification: make check passed format/LOC, vet, full
+native race tests and build, including app106.445s, telemetry91.102s,
+processguard3.766s, CLI28.302s and SDK16.364s. The final additional CLI environment
+isolation change passed the complete CLI race suite27.945s. Native make build,
+CGO-free Linux amd64 production build and processguard/application/telemetry
+test-binary compilation passed; Linux tests were not executed. Focused repeated
+guard and real subprocess SIGKILL/exec/recovery tests passed after all isolated
+root fixes. Independent review found no unsafe ownership/reclamation path.
+Git fetch found no divergence. Full PRD qualification remains open.
+
+Durable ownership-location checkpoint: the previous turn delivered verified
+scope-holder inspection and GitHub backup (3684df7). This turn rechecked a clean
+worktree; native Linear remains locked, so no issue mutation is claimed. New
+process guards default to UserConfigDir/DarwinRouter/process-owners, with an
+explicit DARWIN_PROCESS_OWNER_DIR override resolved only at first acquisition.
+Private roots are validated without repair, children are created through pinned
+handles, and file/child/root entries are synced before publishing ownership.
+Existing reference version/schema and root-independent probes are unchanged;
+old temporary references are neither moved nor recreated. Environment changes
+do not rotate an established singleton. Creation-time parent trust is distinct
+from ongoing per-guard identity verification. Garbage collection, disk-growth
+bounds, reboot/host proof and power-loss qualification remain unfinished.
+
+Two agents provided design/security review and one supplied location and
+subprocess tests. Makefile check/test now isolate synthetic ownership roots;
+stripped-environment crash fixtures explicitly supply private roots. Initial
+qualification caught test-fixture permissions and a missing test import; final
+verification is recorded after correction. Additional stripped/filtering child
+environments were found during broad qualification and now receive isolated
+roots. The initial filtering fixtures created private guard metadata in the
+default application directory; it is retained, not confused with user-task
+ownership or automatically deleted. No user database or live inference was used.
+See docs/process-lifetime-ownership.md.
+
 Scope-holder final verification: make check passed format/LOC, vet, the full
 native race suite and build (app105.695s, telemetry90.457s, CLI28.507s,
 SDK16.430s, API8.739s). Native make build and CGO-free Linux amd64 production

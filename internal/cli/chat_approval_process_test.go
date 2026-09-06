@@ -69,7 +69,7 @@ func TestChatCreateApprovalRealPTY(t *testing.T) {
 					env = append(env, entry)
 				}
 			}
-			env = append(env, "DARWIN_CHAT_LIVE_PROCESS_CHILD=1", "DARWIN_CHAT_LIVE_PROCESS_CONFIG="+path, "GORACE=atexit_sleep_ms=0")
+			env = append(env, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(t.TempDir(), "owners"), "DARWIN_CHAT_LIVE_PROCESS_CHILD=1", "DARWIN_CHAT_LIVE_PROCESS_CONFIG="+path, "GORACE=atexit_sleep_ms=0")
 			if mode == "pipe_input" || mode == "pipe_output" {
 				cmd := exec.CommandContext(ctx, "/usr/bin/script", "-q", "/dev/null", os.Args[0], "-test.run=^TestChatCreateApprovalPipeChild$")
 				cmd.Env = append(env, "DARWIN_CREATE_PIPE_SIDE="+mode)

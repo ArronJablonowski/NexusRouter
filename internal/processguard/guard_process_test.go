@@ -51,6 +51,13 @@ func TestProcessGuardOwnedChild(t *testing.T) {
 			t.Fatal("concurrent current identity changed")
 		}
 	}
+	// First successful use freezes the owner even if later configuration changes.
+	if err := os.Setenv("DARWIN_PROCESS_OWNER_DIR", filepath.Join(first.Directory, "unused-replacement")); err != nil {
+		t.Fatal(err)
+	}
+	if ref, err := processguard.Current(ctx); err != nil || ref != first {
+		t.Fatal("environment change rotated lifetime guard", err)
+	}
 	// Closing an observation must never release the process-lifetime owner.
 	for range 2 {
 		observation, err := processguard.Probe(ctx, first)
@@ -70,8 +77,9 @@ func TestProcessGuardOwnedChild(t *testing.T) {
 				t.Fatal("damaged owner silently repaired")
 			}
 		}
-		entries, err := os.ReadDir(os.TempDir())
-		if err != nil || len(entries) != 1 || filepath.Join(os.TempDir(), entries[0].Name()) != first.Directory {
+		parent := filepath.Dir(first.Directory)
+		entries, err := os.ReadDir(parent)
+		if err != nil || len(entries) != 1 || filepath.Join(parent, entries[0].Name()) != first.Directory {
 			t.Fatal("damaged owner created replacement directory", err)
 		}
 	}
@@ -127,11 +135,11 @@ func startOwnedGuard(t *testing.T, mode ...string) *ownedGuard {
 		t.Fatal(err)
 	}
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "TMPDIR=") && !strings.HasPrefix(value, "DARWIN_PROCESS_GUARD_TEST_CHILD=") {
+		if !strings.HasPrefix(value, "TMPDIR=") && !strings.HasPrefix(value, "DARWIN_PROCESS_OWNER_DIR=") && !strings.HasPrefix(value, "DARWIN_PROCESS_GUARD_TEST_CHILD=") {
 			command.Env = append(command.Env, value)
 		}
 	}
-	command.Env = append(command.Env, "DARWIN_PROCESS_GUARD_TEST_CHILD=1", "TMPDIR="+privateTemp)
+	command.Env = append(command.Env, "DARWIN_PROCESS_GUARD_TEST_CHILD=1", "TMPDIR="+privateTemp, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(privateTemp, "owners"))
 	if len(mode) > 0 && mode[0] == "exec" {
 		command.Env = append(command.Env, "DARWIN_PROCESS_GUARD_TEST_EXEC=1")
 	}

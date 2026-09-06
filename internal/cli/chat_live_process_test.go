@@ -99,7 +99,7 @@ func TestChatLiveProcessStdoutAndBrokenPipe(t *testing.T) {
 					cmd.Env = append(cmd.Env, value)
 				}
 			}
-			cmd.Env = append(cmd.Env, "DARWIN_CHAT_LIVE_PROCESS_CHILD=1", "DARWIN_CHAT_LIVE_PROCESS_CONFIG="+path)
+			cmd.Env = append(cmd.Env, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(t.TempDir(), "owners"), "DARWIN_CHAT_LIVE_PROCESS_CHILD=1", "DARWIN_CHAT_LIVE_PROCESS_CONFIG="+path)
 			cmd.Stdin, cmd.Stdout = input, outputWriter
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr

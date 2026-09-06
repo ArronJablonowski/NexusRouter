@@ -56,7 +56,7 @@ func TestToolGateSIGKILLLeavesSpentAuthorityAndOrphanWriter(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestToolGateCrashChild$", "-test.count=1")
-			cmd.Env = []string{"DARWIN_TOOLGATE_CRASH_DIR=" + dir, "DARWIN_TOOLGATE_CRASH_STAGE=" + stage}
+			cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_TOOLGATE_CRASH_DIR=" + dir, "DARWIN_TOOLGATE_CRASH_STAGE=" + stage}
 			var stderr crashDiagnostics
 			cmd.Stderr = &stderr
 			stdout, err := cmd.StdoutPipe()

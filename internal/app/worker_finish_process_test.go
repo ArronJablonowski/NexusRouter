@@ -249,7 +249,7 @@ func killWorkerFinishFixture(t *testing.T, ctx context.Context, cfg config.Setti
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestInterruptedDelegationCrashProcessHelper$")
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_INTERRUPTED_CRASH_HELPER=1", "DARWIN_INTERRUPTED_CRASH_CONFIG=" + path, "DARWIN_INTERRUPTED_CRASH_BOUNDARY=" + boundary}
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "DARWIN_INTERRUPTED_CRASH_HELPER=1", "DARWIN_INTERRUPTED_CRASH_CONFIG=" + path, "DARWIN_INTERRUPTED_CRASH_BOUNDARY=" + boundary}
 	cmd.WaitDelay, cmd.Stderr = time.Second, io.Discard
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {

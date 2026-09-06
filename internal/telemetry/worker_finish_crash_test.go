@@ -97,7 +97,7 @@ func TestWorkerFinishSIGKILLAtomicity(t *testing.T) {
 				t.Fatal(err)
 			}
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestWorkerFinishCrashHelper$")
-			cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_FINISH_CRASH_MODE=" + mode, "DARWIN_FINISH_CRASH_DB=" + path}
+			cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "PATH=/usr/bin:/bin", "DARWIN_FINISH_CRASH_MODE=" + mode, "DARWIN_FINISH_CRASH_DB=" + path}
 			cmd.Stderr = io.Discard
 			cmd.WaitDelay = time.Second
 			pipe, err := cmd.StdoutPipe()

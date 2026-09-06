@@ -117,7 +117,7 @@ func TestInterruptedModelRecoveredAfterAbruptProcessDeath(t *testing.T) {
 				t.Fatal(err)
 			}
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestInterruptedModelCrashProcessHelper$", "-test.count=1")
-			cmd.Env = []string{"PATH=/usr/bin:/bin", "DARWIN_MODEL_CRASH_HELPER=1", "DARWIN_MODEL_CRASH_CONFIG=" + configuration}
+			cmd.Env = []string{"DARWIN_PROCESS_OWNER_DIR=" + filepath.Join(t.TempDir(), "owners"), "PATH=/usr/bin:/bin", "DARWIN_MODEL_CRASH_HELPER=1", "DARWIN_MODEL_CRASH_CONFIG=" + configuration}
 			cmd.WaitDelay = time.Second
 			cmd.Stderr = io.Discard
 			pipe, err := cmd.StdoutPipe()

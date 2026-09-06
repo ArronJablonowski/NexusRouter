@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- New process-ownership guards default to durable private application storage,
+  with an explicit location override and continued support for existing temporary
+  references. No expiry-based recovery or cleanup authority is added. See
+  [execution-image ownership](process-lifetime-ownership.md).
+
 - Bounded read-only resource-scope holder lists through CLI, SDK and authenticated
   HTTP, preserving expired holders and admission overlap rules without granting
   release authority. See [scope holder inspection](scope-holder-inspection.md).
