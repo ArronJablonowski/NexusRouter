@@ -202,6 +202,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if provider.APIKeyEnv != "" && key == "" {
 		return result, ErrAdmission
 	}
+	if value := metricsExportSecret(s, secret); value != "" {
+		secrets = append(secrets, value)
+	}
 	db, err := telemetry.Open(ctx, s.Telemetry.Database)
 	if err != nil {
 		return result, errors.New("cannot open task storage")
@@ -264,17 +267,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	messages, err = prepareTaskContext(ctx, &r, secrets)
 	if err != nil {
 		return result, ErrAdmission
-	}
-	if provider.Kind == "codex_app_server" && r.ContinueTaskID != "" && r.contextEngine == nil {
-		// Credentials may have rotated since this history was recorded. Own and
-		// scrub decoded fields before importing them into a new CLI session;
-		// never rewrite the original journal or send raw saved context first.
-		// Custom-engine assembly already scrubbed its frozen messages. Repeating
-		// replacement here can change them if a secret overlaps the marker.
-		messages, err = redactCodexHistoryMessages(messages, secrets)
-		if err != nil {
-			return result, ErrAdmission
-		}
 	}
 	encoded, err := json.Marshal(messages)
 	if err != nil || len(encoded) > 4<<20 {

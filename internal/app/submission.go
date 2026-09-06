@@ -54,6 +54,9 @@ func (s *Service) Submit(ctx context.Context, key string, r Request) (submission
 				names = append(names, p.APIKeyEnv)
 			}
 		}
+		if m := s.settings.Telemetry.MetricsExport; m != nil && m.APIKeyEnv != "" {
+			names = append(names, m.APIKeyEnv)
+		}
 		for _, name := range names {
 			secret := s.secret(name)
 			if secret == "" {

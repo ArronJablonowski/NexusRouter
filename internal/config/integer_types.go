@@ -39,6 +39,16 @@ func strictIntegers(n *yaml.Node, target reflect.Type) error {
 			}
 		}
 		for i := 0; i < len(n.Content); i += 2 {
+			if target == reflect.TypeOf(MetricsExport{}) {
+				value := n.Content[i+1]
+				want := "!!str"
+				if n.Content[i].Value == "enabled" {
+					want = "!!bool"
+				}
+				if value.Kind != yaml.ScalarNode || value.Tag != want {
+					return errors.New("invalid metrics export scalar type")
+				}
+			}
 			// Pressure controls and GPU bindings are strict strings in every layer.
 			// Keep legacy string coercion unchanged for unrelated settings.
 			name := n.Content[i].Value

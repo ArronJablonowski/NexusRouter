@@ -9,11 +9,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,7 +39,27 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	address := l.Addr().String()
 	l.Close()
 	configuration := filepath.Join(dir, "daemon.yaml")
-	if err := os.WriteFile(configuration, []byte(fmt.Sprintf("daemon:\n  listen: %q\ntelemetry:\n  database: %q\n", address, filepath.Join(dir, "tasks.db"))), 0600); err != nil {
+	exports := make(chan struct{}, 8)
+	var collectorFail atomic.Bool
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 65537))
+		if err != nil || r.Method != http.MethodPost || r.URL.Path != "/v1/metrics" || !bytes.Contains(body, []byte("resourceMetrics")) {
+			t.Error("invalid daemon export")
+		}
+		select {
+		case exports <- struct{}{}:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if collectorFail.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = io.WriteString(w, `{"error":"private-collector-detail"}`)
+			return
+		}
+		_, _ = io.WriteString(w, "{}")
+	}))
+	defer collector.Close()
+	if err := os.WriteFile(configuration, []byte(fmt.Sprintf("daemon:\n  listen: %q\ntelemetry:\n  database: %q\n  metrics_export:\n    enabled: true\n    endpoint: %q\n    interval: 1s\n", address, filepath.Join(dir, "tasks.db"), collector.URL+"/v1/metrics")), 0600); err != nil {
 		t.Fatal(err)
 	}
 	token := strings.Repeat("lifecycle-fixture-", 3)
@@ -72,6 +94,11 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 			_, _ = client.Stop(cleanup, liveID)
 		}
 	}()
+	select {
+	case <-exports:
+	case <-ctx.Done():
+		t.Fatal("owned daemon did not export configured metrics")
+	}
 	status, err := run("status")
 	if err != nil || status.InstanceID != first.InstanceID {
 		t.Fatal("status identity", status, err)
@@ -86,6 +113,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	transport := &http.Transport{Proxy: nil}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	qualifyDaemonMetricsFailure(t, ctx, client, address, token, &collectorFail, run)
 	response, err := client.Do(request)
 	if err != nil {
 		t.Fatal("attention endpoint request failed", err)

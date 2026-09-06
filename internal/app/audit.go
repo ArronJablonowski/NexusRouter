@@ -152,6 +152,9 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 	if provider.APIKeyEnv != "" && key == "" {
 		return bad()
 	}
+	if value := metricsExportSecret(s.settings, s.secret); value != "" {
+		secrets = append(secrets, value)
+	}
 	executionEvidence, err := auditExecutionEvidence(executionEvents, secrets)
 	if err != nil {
 		return bad()

@@ -18,13 +18,20 @@ import (
 // a scheduler, dispatches a model, writes storage, follows redirects or retries.
 // An error may occur after the collector accepted data; no durable delivery or
 // exactly-once acknowledgement is implied.
-func (s *Service) ExportMetrics(ctx context.Context, options metrics.ExportOptions) (err error) {
+func (s *Service) ExportMetrics(ctx context.Context, options metrics.ExportOptions) error {
+	return s.exportMetrics(ctx, options, nil)
+}
+
+func (s *Service) exportMetrics(ctx context.Context, options metrics.ExportOptions, authorized func() bool) (err error) {
 	defer func() {
 		if recover() != nil || err != nil {
 			err = metrics.ErrExport
 		}
 	}()
 	if s == nil || ctx == nil || ctx.Err() != nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || options.Validate() != nil {
+		return metrics.ErrExport
+	}
+	if authorized != nil && !authorized() {
 		return metrics.ErrExport
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -58,6 +65,9 @@ func (s *Service) ExportMetrics(ctx context.Context, options metrics.ExportOptio
 		return metrics.ErrExport
 	}
 	if ctx.Err() != nil || s.settings.Mode != mode || s.settings.Telemetry.Database != database || s.settings.Validate() != nil || s.settings.Telemetry.OTEL {
+		return metrics.ErrExport
+	}
+	if authorized != nil && !authorized() {
 		return metrics.ErrExport
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, options.Endpoint, bytes.NewReader(body))

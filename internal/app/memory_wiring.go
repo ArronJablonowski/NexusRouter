@@ -17,7 +17,19 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 			secrets = append(secrets, secret(p.APIKeyEnv))
 		}
 	}
+	if value := metricsExportSecret(cfg, secret); value != "" {
+		secrets = append(secrets, value)
+	}
 	return secrets
+}
+
+// A configured collector credential remains sensitive while delivery is off.
+// No resolver lookup is added for configurations without a credential name.
+func metricsExportSecret(cfg config.Settings, secret func(string) string) string {
+	if secret == nil || cfg.Telemetry.MetricsExport == nil || cfg.Telemetry.MetricsExport.APIKeyEnv == "" {
+		return ""
+	}
+	return secret(cfg.Telemetry.MetricsExport.APIKeyEnv)
 }
 
 func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string {

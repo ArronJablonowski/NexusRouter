@@ -705,7 +705,9 @@ An explicit one-shot CLI/SDK OTLP/HTTP JSON export now delivers the existing
 content-free lifecycle gauges through the configured deployment-mode network
 policy. It reads existing storage only and introduces no implicit background
 network access. See [metric export](docs/metrics-export.md) for delivery semantics,
-credential handling and bounds. Periodic exporter lifecycle, runtime traces,
+credential handling and bounds. Opt-in daemon scheduling and an owned SDK
+exporter now send fresh snapshots sequentially and report supplemental health,
+without blocking task readiness on collector failure. Runtime traces,
 histograms and the complete instrumentation list above still require implementation;
 the reserved runtime `opentelemetry_enabled` flag is not yet supported.
 

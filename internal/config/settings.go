@@ -116,8 +116,9 @@ type Security struct {
 	ToolPolicy string `yaml:"default_tool_policy" json:"default_tool_policy"`
 }
 type Telemetry struct {
-	Database string `yaml:"database" json:"database"`
-	OTEL     bool   `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
+	Database      string         `yaml:"database" json:"database"`
+	OTEL          bool           `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
+	MetricsExport *MetricsExport `yaml:"metrics_export,omitempty" json:"metrics_export,omitempty"`
 }
 type Tools struct {
 	CreateEnabled  bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
@@ -139,7 +140,7 @@ func Defaults() Settings {
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{"darwin.db", false}}
+		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -301,6 +302,9 @@ func (s Settings) Validate() error {
 	if s.Telemetry.Database == "" {
 		return errors.New("database path required")
 	}
+	if err := s.Telemetry.MetricsExport.validate(s.Mode); err != nil {
+		return err
+	}
 	want := Defaults().Evaluation.Precedence
 	if s.Evaluation.AutoReviewMaxCost < 0 || math.IsNaN(s.Evaluation.AutoReviewMaxCost) || math.IsInf(s.Evaluation.AutoReviewMaxCost, 0) {
 		return errors.New("invalid audit cost ceiling")
@@ -407,6 +411,13 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 		}
 	}
 	s.Telemetry.Database = "[REDACTED]"
+	if s.Telemetry.MetricsExport != nil {
+		copy := *s.Telemetry.MetricsExport
+		if copy.Endpoint != "" {
+			copy.Endpoint = "[REDACTED]"
+		}
+		s.Telemetry.MetricsExport = &copy
+	}
 	s.Tools.ReadRoot = "[REDACTED]"
 	if s.Tools.CreateRoot != "" {
 		s.Tools.CreateRoot = "[REDACTED]"

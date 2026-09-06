@@ -1,10 +1,11 @@
-# Explicit OTLP metrics export
+# OTLP metrics export
 
 The CLI and Go SDK can send one content-free lifecycle snapshot to an
 OpenTelemetry collector using OTLP/HTTP JSON. This is an explicit operation,
-not a background exporter. The existing `telemetry.opentelemetry_enabled` flag
-remains unsupported by runtime startup and must stay false; periodic export,
-traces and full instrumentation remain unfinished.
+not a background exporter. Optional periodic export is separately available
+through daemon configuration or an explicitly owned SDK handle below. The
+existing `telemetry.opentelemetry_enabled` flag remains unsupported by runtime
+startup and must stay false; traces and full instrumentation remain unfinished.
 
 ```sh
 darwin metrics export --config config.yaml --endpoint http://127.0.0.1:4318/v1/metrics
@@ -28,6 +29,64 @@ err := client.ExportMetrics(ctx, sdk.MetricsExportOptions{
 The collector examples are placeholders, not services contacted by default.
 `darwin metrics --db path` remains an independent, local-only JSON inspection
 command. No new daemon HTTP endpoint accepts arbitrary export destinations.
+
+## Periodic daemon and SDK export
+
+Daemon export is off when `telemetry.metrics_export` is absent or disabled. To
+opt in, add the following to the daemon's configuration before starting it:
+
+```yaml
+telemetry:
+  database: ./data/darwin.db
+  opentelemetry_enabled: false
+  metrics_export:
+    enabled: true
+    endpoint: http://127.0.0.1:4318/v1/metrics
+    interval: 60s
+    # api_key_env: OTEL_COLLECTOR_TOKEN
+```
+
+The interval defaults to 60 seconds and must be between one second and 24 hours.
+The normal user/project/environment/flag precedence applies. For example,
+`DARWIN__TELEMETRY__METRICS_EXPORT__ENABLED=false` disables configured delivery.
+Configuration is snapshotted at startup: change it and restart the daemon to
+apply it. The collector endpoint is redacted in configuration display; credential
+values stay in the secret resolver and join task/context redaction rules even
+when delivery is disabled. A remote collector is invalid in fully local mode.
+
+The daemon starts one immediate attempt only after acquiring its listening socket
+and opening storage. It owns the exporter through shutdown. Each attempt reads a
+new snapshot, and the interval begins after that attempt completes. There are no
+overlapping attempts within a handle, queued missed ticks, failed-body retries or
+shutdown flush. Scheduling and delivery history are not durable; restarting
+starts a new immediate observation. Separate daemons/SDK handles are independent
+and require operator coordination to avoid duplicate streams.
+
+The Go SDK exposes explicit lifecycle ownership:
+
+```go
+exporter, err := client.StartMetricsExport(ctx, sdk.MetricsExportOptions{
+    Endpoint: "https://collector.example/v1/metrics",
+    APIKeyEnv: "OTEL_COLLECTOR_TOKEN",
+}, time.Minute)
+if err != nil {
+    return err
+}
+defer exporter.Close()
+// exporter.Health() reports only bounded status/code metadata.
+```
+
+The caller must keep the context alive and close the handle. `Close` is
+idempotent, cancels and joins the current attempt, and returns the last recorded
+attempt's generic error if it has not since recovered. Cancellation alone does
+not assert a delivery failure or non-delivery. Trusted secret callbacks must
+return promptly; the runtime cannot forcibly interrupt arbitrary Go callbacks.
+
+The optional `metrics_export` health component starts unknown, becomes healthy
+after an acknowledged snapshot, degrades on failure, and recovers after a later
+success. Collector failure degrades the health report and daemon status but does
+not block task readiness. A stopped enabled exporter reports unavailable. No
+collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
@@ -74,11 +133,13 @@ that own delivery. It performs no network or filesystem access.
 CLI success returns `{"exported":true}`. This means collector acknowledgement,
 not downstream persistence. A timeout, cancellation or output failure can occur
 after acceptance; failures do not prove zero delivery. No durable delivery ledger,
-automatic retry, exactly-once guarantee or acknowledgement history is introduced.
+automatic failed-body retry, exactly-once guarantee or acknowledgement history is introduced.
 Explicitly rerunning the command sends a new snapshot and can repeat observations.
 
 Tests cover wire shape and integer limits, legacy availability, real SQLite
 snapshots, owned loopback collectors, strict arguments, credential/policy changes,
 no storage mutation, cancellation, response bounds, partial rejection and redirect
-denial. They do not qualify a production collector deployment, fleet cardinality,
-automatic scheduling, traces, histogram coverage or the full PRD telemetry scope.
+denial. Periodic tests additionally exercise sequential scheduling, cancellation,
+failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
+not qualify a production collector deployment, fleet cardinality, durable export
+delivery, traces, histogram coverage or the full PRD telemetry scope.

@@ -1,5 +1,67 @@
 # Implementation evidence
 
+Periodic metrics delivery checkpoint: the previous goal turn made verified
+progress, committed/pushed bc615a6; this turn started clean. PRD13 optional
+observability now has opt-in daemon scheduling and a caller-owned Go SDK exporter,
+not just a manual snapshot sender. telemetry.metrics_export is absent/disabled
+by default and preserves prior default serialized configuration fingerprints.
+It specifies an exact endpoint, named credential and interval (default60s,
+bounds1s..24h); layered overrides, strict scalars and endpoint redaction are tested.
+The reserved opentelemetry_enabled flag remains unsupported: this feature exports
+existing lifecycle gauges, not traces or the full required instrumentation.
+
+Each handle starts immediately and waits its interval after each completed
+attempt. Every attempt reads fresh SQLite state and reuses the bounded one-shot
+delivery policy. No overlapping attempts, accumulated ticks, saved-body retries,
+shutdown flush or durable schedule is introduced. Close cancels/joins cooperative
+work, is idempotent and reports the last recorded attempt error until recovery.
+Separate handles/processes remain independent and require stream coordination.
+Configured export authority is snapshotted and checked again after credential
+callbacks; a callback cannot silently disable/repoint the setting and still send.
+
+The daemon owns export only after the bind/storage gates, closes it before the
+database, and includes a supplemental metrics_export health check. Collector
+failure degrades diagnostic status but does not block task readiness; later
+acknowledgement restores export health. Configured collector credentials also
+join task/context/admission/health redaction even when delivery is disabled.
+See docs/metrics-export.md for configuration, lifecycle and delivery limitations.
+
+Native Linear was rechecked but the Mac remains locked; no issue update is
+claimed. Owned-loopback/temporary-store tests and independent reviews are recorded
+below after final qualification. No user configuration or live collector was
+enabled, and no model inference was dispatched. Full PRD completion remains open.
+
+Focused race tests passed three times for config/health (5.254s/1.392s), runtime
+lifecycle (15.699s), fresh database observations (4.928s), SDK wiring (2.446s)
+and actual failing/recovering collector daemon lifecycle (10.885s). The owned
+daemon test observes degraded-to-ready status recovery and HTTP /health200 during
+collector failure. Its model inventory is empty, so diagnostic readiness is
+compared with the exporter omitted rather than asserting a usable model exists.
+No external collector or inference is involved.
+
+Credential qualification exposed an existing default-context gap: fresh prompts
+were journal-redacted but could reach the provider raw without a custom context
+engine. Assembly now validates and owns redacted tiers for every engine; the
+redundant later Codex-only pass is removed, while raw compacted-tool preflight
+remains. Actual fresh provider/collector credentials are scrubbed before provider
+dispatch and from results/journal/health; submissions containing the collector
+credential fail before storage creation. Context and Codex history/compaction
+race tests passed three times (14.528s), including prepared-message reuse and
+marker-overlap behavior. Default structured tool history now shares the custom
+engine's fail-closed JSON checks; arbitrary repeated redaction is not claimed
+idempotent. Full verification follows below.
+
+Final make check passed formatting/LOC, vet, all native race tests and build
+(app205.154s, telemetry136.084s, CLI39.965s, API12.057s, SDK23.892s,
+config3.750s, health1.261s). Native and Linux amd64 CLI builds passed. Focused
+configuration, runtime exporter/redaction/context/Codex-history and SDK exporter
+suites executed successfully as CGO-free Linux arm64 binaries in existing
+Alpine3.22 with no external network, read-only root and an unprivileged UID.
+Linux tests were not race-instrumented; actual daemon subprocess qualification
+was native macOS. Independent final lifecycle review found no concrete blocker.
+Durable delivery, production collectors, traces, histograms and full PRD
+instrumentation remain unqualified or incomplete.
+
 Shared transport pinning checkpoint: the previous goal turn made verified progress
 and was committed/pushed as 87c80be; this turn started clean. Following the metrics
 export finding, inspection showed the shared provider transport still delegated

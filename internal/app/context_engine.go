@@ -50,20 +50,18 @@ func prepareTaskContext(ctx context.Context, r *Request, secrets []string) ([]pr
 	if len(parts.Current) == 0 {
 		parts.Current = []providers.Message{{Role: "user", Content: r.Prompt}}
 	}
-	if r.contextEngine != nil {
-		if contextengine.CheckMessages(parts.History, parts.Memory, parts.Skills, parts.Current) != nil {
+	if contextengine.CheckMessages(parts.History, parts.Memory, parts.Skills, parts.Current) != nil {
+		return nil, ErrAdmission
+	}
+	for _, tier := range []*[]providers.Message{&parts.History, &parts.Memory, &parts.Skills, &parts.Current} {
+		if len(*tier) == 0 {
+			continue
+		}
+		clean, err := redactCodexHistoryMessages(*tier, secrets)
+		if err != nil {
 			return nil, ErrAdmission
 		}
-		for _, tier := range []*[]providers.Message{&parts.History, &parts.Memory, &parts.Skills, &parts.Current} {
-			if len(*tier) == 0 {
-				continue
-			}
-			clean, err := redactCodexHistoryMessages(*tier, secrets)
-			if err != nil {
-				return nil, ErrAdmission
-			}
-			*tier = clean
-		}
+		*tier = clean
 	}
 	prepared, err := contextengine.Assemble(ctx, r.contextEngine, parts)
 	if err != nil {

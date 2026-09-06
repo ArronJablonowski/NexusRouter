@@ -69,6 +69,9 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 			}
 		}
 	}
+	if value := metricsExportSecret(s.settings, s.secret); value != "" {
+		secrets = append(secrets, value)
+	}
 	usedIDs := map[string]bool{}
 	safeID := func(component, id string, index int) string {
 		if !sessions.ValidEventPageID(id) || strings.Contains(id, "/") {

@@ -53,6 +53,9 @@ func Load(options Options) (Settings, error) {
 		merge(root, n)
 	}
 	for _, overrides := range []map[string]string{options.Env, options.Flags} {
+		if err := seedMetricsExportOverrides(root, overrides); err != nil {
+			return Settings{}, err
+		}
 		keys := make([]string, 0, len(overrides))
 		for k := range overrides {
 			keys = append(keys, k)
