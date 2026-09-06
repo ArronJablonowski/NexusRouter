@@ -60,6 +60,7 @@ type Services struct {
 	Cancellation           func(context.Context, string) (runtime.CancellationStatus, error)
 	TaskContinuation       func(context.Context, string) (sessions.ContinuationStatus, error)
 	TaskLeases             func(context.Context, string) (workers.TaskLeaseStatus, error)
+	ScopeLeases            func(context.Context, string) (workers.ScopeLeaseStatus, error)
 	Events                 func(context.Context, string, int64, int) (sessions.EventPage, error)
 	RunStream              func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	RunTextStream          func(context.Context, app.Request, func(string) error) (app.Result, error)
@@ -131,7 +132,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
+	if r.URL.RawQuery != "" && !(r.URL.Path == "/v1/resources/leases" || r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -145,6 +146,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/resources/leases":
+		h.serveResourceLeases(w, r.WithContext(ctx))
 	case memoryManagementRoute(r.URL.Path):
 		h.serveMemoryManagement(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/models/deprecation":

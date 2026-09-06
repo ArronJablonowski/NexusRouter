@@ -691,6 +691,15 @@ is counted on the worker lease's receipt. Inspection never probes guard files,
 reclaims ownership, retries work or returns prompts, tokens, owner/scope names or
 receipt bodies. See [task lease inspection](../../docs/task-lease-inspection.md).
 
+`InspectScopeLeases(ctx, scope)` returns `ScopeLeaseStatus` with sorted
+`ScopeLeaseHolder` task IDs and live/expired reader/writer counts. It uses the
+admission overlap policy and includes expired unreleased holders. The requested
+scope is echoed, but actual alias names and private capabilities are omitted.
+Schemas before 3 report `Available == false`; over 1,000 matching lease rows
+fail without partial results. Unexpired does not prove liveness, and an empty
+list grants no admission or release authority. See
+[scope holder inspection](../../docs/scope-holder-inspection.md).
+
 `ReadEvents(ctx, taskID, afterSequence, limit)` provides paged durable events
 directly to embedded consumers. Start at sequence0, process a validated page, then
 save its `NextSequence` for reconnection. Limits are1–100 events with an8MiB page

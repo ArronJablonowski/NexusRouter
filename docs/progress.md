@@ -1,5 +1,33 @@
 # Implementation evidence
 
+Scope-holder final verification: make check passed format/LOC, vet, the full
+native race suite and build (app105.695s, telemetry90.457s, CLI28.507s,
+SDK16.430s, API8.739s). Native make build and CGO-free Linux amd64 production
+build plus API/telemetry test-binary compilation passed; Linux tests were not
+executed. Git fetch confirmed no divergence. No live inference or user database
+was used. This checkpoint completes bounded per-scope inspection, not the full
+PRD or automatic lease recovery requirements.
+
+Scope-holder inspection checkpoint: CLI resources leases, SDK InspectScopeLeases
+and authenticated GET /v1/resources/leases now identify task holders in a bounded,
+coherent read-only snapshot. Matching uses exact scopes plus the existing
+workspace/create_* compatibility family. Expired unreleased holders remain;
+released rows do not. Responses expose requested scope and task IDs (potentially
+sensitive), but not stored alias names, owner/token/guard capabilities or content.
+Schemas 1–2 explicitly report unavailable; schemas 3–23 support the observation.
+More than 1,000 overlapping rows, invalid metadata and duplicate exact-scope
+writers fail closed without partial results. Task heads are checked, not entire
+holder histories. No process probing, migration, release or retry is introduced.
+
+Three agents supplied storage/contracts, app/SDK/CLI adapters and HTTP tests.
+Focused race tests passed for workers/telemetry, repeated SDK/CLI tests, and the
+full API suite. Only synthetic databases were used, including unchanged main DB
+byte checks and missing-store noncreation; SQLite coordination sidecars remain
+possible. Full checkpoint verification is recorded below after completion.
+Native Linear remains locked; no issue update is claimed. Persistent attention,
+global listing, uncertain writes, reassignment and full PRD acceptance remain
+open. See docs/scope-holder-inspection.md.
+
 Final task-lease inspection verification passed: make check completed after the exact-limit addition, including telemetry83.442s and cached passes for the remaining previously qualified packages. Format/LOC, vet and build passed; no production changes followed the successful native/Linux builds. Git fetch confirmed no divergence. This checkpoint adds inspection only, not resource release or completion of the full PRD.
 
 Task lease inspection checkpoint: the previous goal turn made verified interrupted-child implementation and GitHub backup progress (555be6b); this turn rechecked a clean worktree. Native Linear remains locked, so no issue status/comment was submitted. CLI task leases, SDK InspectTaskLeases and authenticated GET /v1/tasks/{id}/leases now report one coherent bounded task/head/lease/recovery summary. The response excludes prompts, outputs, tool arguments, tokens, owners, scopes, guard paths and receipt bodies. Counts are task-owned, not a global blocker list or admission/proof-of-death decision. Explicit null groups distinguish older schemas lacking leases/recoveries from actual zero counts. No schema migration or new recovery authority is introduced.

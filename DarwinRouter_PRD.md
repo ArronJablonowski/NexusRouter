@@ -543,8 +543,13 @@ Provide read-only task lease/recovery metadata through CLI `task leases`, SDK
 bounded coherent snapshot, distinguish unavailable legacy feature groups from
 measured zero, omit execution capabilities and content, and never interpret
 expiry/counts as process-death or retry authority. The implemented diagnostic
-covers task-owned aggregate counts; general per-scope holder discovery and
-persistent operator attention remain required. See [task lease inspection](docs/task-lease-inspection.md).
+covers task-owned aggregate counts. Bounded per-scope holder discovery is also
+implemented through CLI `resources leases`, SDK `InspectScopeLeases`, and
+authenticated `GET /v1/resources/leases?scope=...`, using the admission overlap
+policy. It reveals requested scope and holder task IDs, not private lease
+capabilities. Global discovery and persistent operator attention remain required.
+See [task lease inspection](docs/task-lease-inspection.md) and
+[scope holder inspection](docs/scope-holder-inspection.md).
 
 SQLite operates in WAL mode with serialized, versioned migrations. Event appends and corresponding state projections are transactional. Startup verifies database integrity and migration compatibility before readiness.
 

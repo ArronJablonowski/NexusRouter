@@ -218,6 +218,12 @@ leases are not proof of living owners; counts do not authorize release or retry.
 See [task lease inspection](docs/task-lease-inspection.md) for limits and schema
 availability.
 
+To identify tasks holding an overlapping resource scope, use
+`darwin resources leases --db path --scope workspace`, SDK `InspectScopeLeases`,
+or authenticated `GET /v1/resources/leases?scope=workspace`. This bounded,
+read-only list grants no execution or recovery authority. See
+[scope holder inspection](docs/scope-holder-inspection.md).
+
 ## Configuration
 
 ```sh

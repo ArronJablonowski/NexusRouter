@@ -24,6 +24,7 @@ Usage:
   darwin submissions list --db path [--state state --after cursor --limit 25]
   darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
+  darwin resources leases --db path --scope scope  Inspect overlapping lease holders
   darwin models deprecation --config path --model id [--domain general --profile default --window 50 --minimum-samples 20 --failure-threshold 0.35]
     Read-only recommendation; never disables or removes a model
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON

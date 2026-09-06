@@ -5,6 +5,10 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Bounded read-only resource-scope holder lists through CLI, SDK and authenticated
+  HTTP, preserving expired holders and admission overlap rules without granting
+  release authority. See [scope holder inspection](scope-holder-inspection.md).
+
 - Read-only task lease and recovery counts through CLI, SDK and authenticated
   HTTP, with explicit legacy availability and no execution capabilities or
   conversation content. See [task lease inspection](task-lease-inspection.md).
