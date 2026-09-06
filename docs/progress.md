@@ -1,5 +1,32 @@
 # Implementation evidence
 
+Durable named monitor checkpoint: starting from
+ce65bdc, added catalog-schema5 scheduling state and check intents before trusted
+validation, exact pending restart, persisted cadence and lexical fairness. A
+definite check failure retains a fixed-code tombstone; receipt-first completion
+and failure-first late-callback fencing are enforced under the catalog lock.
+No callback exactly-once claim: concurrent read-only validation remains possible.
+Application/SDK opt-in driving, caller-owned supervision and read-only inspection
+preserve policy and rotating-secret guards. Legacy monitoring is unchanged.
+
+Core focused race tests passed three runs (8.338s); application/SDK durable tests
+passed three runs (12.670s/1.703s). Three subagents contributed core, facade tests
+and independent review; no blocking safety defect was found. Review qualified
+fixed polling as minimum spacing, not an exact check frequency.
+No daemon validator or user monitor was enabled. Catalog maps are bounded without
+silent eviction; long-term retention, statistical outcome attribution and complete
+PRD/Linear qualification remain open. See docs/durable-skill-regression-monitor.md.
+
+Checkpoint verification: make check passed (format/LOC, vet, full native race
+suite and production build), make build passed, and Linux amd64 production
+cross-build passed. Full race results include app152.604s, telemetry107.093s,
+SDK23.716s and skills19.368s. The core, application and SDK durable-monitor tests
+also executed successfully as Linux arm64 binaries inside the existing Alpine
+container with network disabled, read-only root, unprivileged user and only an
+owned test-binary directory mounted. Those Linux runs were CGO-free, not race
+instrumented. No new live inference or physical power-loss qualification was run.
+Native Linear remains blocked by the locked Mac; no issue status was changed.
+
 Durable regression-operation checkpoint: the previous turn made verified progress
 with Linux thermal admission and backup 3da51ce; this turn began from a clean
 worktree. Inspection of the skill-learning path found that explicit passing

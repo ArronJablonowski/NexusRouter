@@ -85,6 +85,30 @@ func StartSkillRegression(ctx context.Context, s *Service, interval time.Duratio
 	if ctx == nil || ctx.Err() != nil || !s.skillRegressionConfigured(validator) || interval < time.Second || interval > 24*time.Hour {
 		return nil, ErrAdmission
 	}
+	after := ""
+	return startSkillRegressionMonitor(ctx, interval, func(ctx context.Context) error {
+		next, err := s.SkillRegressionStep(ctx, after, validator)
+		after = next
+		return err
+	})
+}
+
+// StartDurableSkillRegression retains the named cursor, due time and pending
+// check across restarts. It does not enable daemon learning or invent a validator.
+func StartDurableSkillRegression(ctx context.Context, s *Service, name, validatorID string, interval time.Duration, validator skills.Validator) (*SkillRegressionMonitor, error) {
+	if ctx == nil || ctx.Err() != nil || !s.skillRegressionConfigured(validator) {
+		return nil, ErrAdmission
+	}
+	if _, err := s.regressionMonitorPolicy(name, validatorID, interval); err != nil {
+		return nil, err
+	}
+	return startSkillRegressionMonitor(ctx, interval, func(ctx context.Context) error {
+		_, err := s.DurableSkillRegressionStep(ctx, name, validatorID, interval, validator)
+		return err
+	})
+}
+
+func startSkillRegressionMonitor(ctx context.Context, interval time.Duration, step func(context.Context) error) (*SkillRegressionMonitor, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	m := &SkillRegressionMonitor{cancel: cancel, done: make(chan struct{}), status: "unknown", code: "supervisor_starting"}
 	go func() {
@@ -97,7 +121,6 @@ func StartSkillRegression(ctx context.Context, s *Service, interval time.Duratio
 		}()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
-		after := ""
 		for {
 			if ctx.Err() != nil {
 				return
@@ -105,11 +128,10 @@ func StartSkillRegression(ctx context.Context, s *Service, interval time.Duratio
 			m.mu.Lock()
 			m.stepStarted = time.Now()
 			m.mu.Unlock()
-			next, err := s.SkillRegressionStep(ctx, after, validator)
+			err := step(ctx)
 			if ctx.Err() != nil {
 				return
 			}
-			after = next
 			m.mu.Lock()
 			m.stepStarted = time.Time{}
 			if err != nil {

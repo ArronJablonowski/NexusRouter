@@ -31,10 +31,12 @@ type FileStore struct {
 }
 
 type catalog struct {
-	Schema               int                            `json:"schema"`
-	Skills               map[string]entry               `json:"skills"`
-	Publications         map[string]PublicationRecord   `json:"publications,omitempty"`
-	RegressionOperations map[string]RegressionOperation `json:"regression_operations,omitempty"`
+	Schema                  int                               `json:"schema"`
+	Skills                  map[string]entry                  `json:"skills"`
+	Publications            map[string]PublicationRecord      `json:"publications,omitempty"`
+	RegressionOperations    map[string]RegressionOperation    `json:"regression_operations,omitempty"`
+	RegressionMonitors      map[string]RegressionMonitorState `json:"regression_monitors,omitempty"`
+	RegressionMonitorChecks map[string]RegressionMonitorCheck `json:"regression_monitor_checks,omitempty"`
 }
 type entry struct {
 	Key         Key                 `json:"key"`
@@ -165,7 +167,7 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := s.read("catalog.json", &c); err != nil && (s.readOnly || !os.IsNotExist(err)) {
 		return err
 	}
-	if (c.Schema < 1 || c.Schema > 4) || c.Skills == nil || len(c.Skills) > 1000 {
+	if (c.Schema < 1 || c.Schema > 5) || c.Skills == nil || len(c.Skills) > 1000 {
 		return ErrInvalid
 	}
 	for index, e := range c.Skills {
@@ -200,6 +202,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 		return err
 	}
 	if err := validateRegressionOperations(&c); err != nil {
+		return err
+	}
+	if err := validateRegressionMonitors(&c); err != nil {
 		return err
 	}
 	if err := fn(&c); err != nil {

@@ -1256,9 +1256,16 @@ For a durable check receipt, Go hosts can use `RevalidateSkillVersionOnce` with
 an operation ID, stable validator identity and exact expected activation. Passes
 retain an audit receipt without changing activation revisions; failure receipts
 and rollback commit together. Exact retries do not rerun validation or rollback.
-This schema-4 catalog extension does not yet change the periodic monitor. See
+This schema-4 catalog extension leaves the legacy periodic monitor unchanged. See
 [regression operations](docs/skill-regression-operations.md) for compatibility,
 inspection and limits.
+
+For restart-safe scheduling, opt into `StartDurableSkillRegression` or drive
+`DurableSkillRegressionStep` with a stable monitor name and validator identity.
+The schema-5 catalog persists cadence, exact pending checks and failure fences;
+callbacks may run concurrently, but closed failed checks cannot commit a late
+rollback. See [durable monitoring](docs/durable-skill-regression-monitor.md) for
+bounded retention, policy bindings, inspection and remaining daemon limitations.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

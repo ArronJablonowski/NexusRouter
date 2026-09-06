@@ -11,6 +11,10 @@ import (
 // after later activation changes. Concurrent callbacks can both run; validators
 // must remain trusted, read-only, retry-safe and cancellation-cooperative.
 func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, validatorID string, expected ActivationState, validator Validator) (RegressionOperation, error) {
+	return s.revalidateAndRollbackOnce(ctx, operationID, validatorID, expected, validator, nil)
+}
+
+func (s *FileStore) revalidateAndRollbackOnce(ctx context.Context, operationID, validatorID string, expected ActivationState, validator Validator, monitor *regressionMonitorExecution) (RegressionOperation, error) {
 	zero := RegressionOperation{}
 	if s == nil || ctx == nil || !identifier.MatchString(operationID) || !identifier.MatchString(validatorID) || expected.Validate() != nil || expected.Active == "" || !s.permitted(expected.Key) {
 		return zero, ErrInvalid
@@ -26,7 +30,7 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if o, err := s.matchRegressionOperation(ctx, operationID, validatorID, expected); !errors.Is(err, ErrNotFound) {
+	if o, err := s.matchRegressionOperation(ctx, operationID, validatorID, expected, monitor); !errors.Is(err, ErrNotFound) {
 		return o, err
 	}
 	current, err := s.ActivationState(ctx, expected.Key)
@@ -34,7 +38,10 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 		return zero, err
 	}
 	if current != expected {
-		return s.regressionConcurrentResult(ctx, operationID, validatorID, expected, ErrConflict)
+		if monitor != nil {
+			monitor.failureCode = "stale_activation"
+		}
+		return s.regressionConcurrentResult(ctx, operationID, validatorID, expected, ErrConflict, monitor)
 	}
 	v, err := s.Load(ctx, expected.Key, expected.Active)
 	if err != nil {
@@ -51,12 +58,18 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 		return zero, ctx.Err()
 	}
 	if err != nil || !proof.Deterministic || !identifier.MatchString(proof.ID) {
-		return s.regressionConcurrentResult(ctx, operationID, validatorID, expected, ErrValidation)
+		if monitor != nil {
+			monitor.failureCode = "check_failed"
+		}
+		return s.regressionConcurrentResult(ctx, operationID, validatorID, expected, ErrValidation, monitor)
 	}
 	var out RegressionOperation
 	err = s.with(ctx, func(c *catalog) error {
 		if !s.automatic.Load() {
 			return ErrDisabled
+		}
+		if err := regressionMonitorFence(ctx, c, operationID, monitor); err != nil {
+			return err
 		}
 		existing, err := matchingRegressionOperation(c, operationID, validatorID, expected)
 		if err == nil {
@@ -78,6 +91,9 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 			return err
 		}
 		if state != expected {
+			if monitor != nil {
+				monitor.failureCode = "stale_activation"
+			}
 			return ErrConflict
 		}
 		out = RegressionOperation{Version: 1, OperationID: operationID, ValidatorID: validatorID, Expected: expected, Result: RegressionResult{State: expected, Evidence: proof, RolledBack: !proof.Passed}, After: expected, ActivationCount: len(e.Activations), CheckedAt: time.Now().UTC()}
@@ -90,6 +106,9 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 				return err
 			}
 			if len(stack) == 0 || stack[len(stack)-1].From == "" {
+				if monitor != nil {
+					monitor.failureCode = "check_failed"
+				}
 				return ErrNotFound
 			}
 			previous := stack[len(stack)-1].From
@@ -109,7 +128,9 @@ func (s *FileStore) RevalidateAndRollbackOnce(ctx context.Context, operationID, 
 			c.RegressionOperations = map[string]RegressionOperation{}
 		}
 		c.RegressionOperations[operationID] = out
-		c.Schema = 4
+		if c.Schema < 4 {
+			c.Schema = 4
+		}
 		return nil
 	}, true)
 	if err != nil {
@@ -129,11 +150,14 @@ func matchingRegressionOperation(c *catalog, operationID, validatorID string, ex
 	return o, nil
 }
 
-func (s *FileStore) matchRegressionOperation(ctx context.Context, operationID, validatorID string, expected ActivationState) (RegressionOperation, error) {
+func (s *FileStore) matchRegressionOperation(ctx context.Context, operationID, validatorID string, expected ActivationState, monitor *regressionMonitorExecution) (RegressionOperation, error) {
 	var out RegressionOperation
 	err := s.with(ctx, func(c *catalog) error {
 		if !s.automatic.Load() {
 			return ErrDisabled
+		}
+		if err := regressionMonitorFence(ctx, c, operationID, monitor); err != nil {
+			return err
 		}
 		var err error
 		out, err = matchingRegressionOperation(c, operationID, validatorID, expected)
@@ -148,8 +172,8 @@ func (s *FileStore) matchRegressionOperation(ctx context.Context, operationID, v
 	return out, nil
 }
 
-func (s *FileStore) regressionConcurrentResult(ctx context.Context, operationID, validatorID string, expected ActivationState, original error) (RegressionOperation, error) {
-	o, err := s.matchRegressionOperation(ctx, operationID, validatorID, expected)
+func (s *FileStore) regressionConcurrentResult(ctx context.Context, operationID, validatorID string, expected ActivationState, original error, monitor *regressionMonitorExecution) (RegressionOperation, error) {
+	o, err := s.matchRegressionOperation(ctx, operationID, validatorID, expected, monitor)
 	if errors.Is(err, ErrNotFound) {
 		return RegressionOperation{}, original
 	}

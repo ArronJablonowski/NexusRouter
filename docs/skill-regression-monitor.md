@@ -81,6 +81,8 @@ outcome-based regression detection still needs skill-version attribution,
 baselines, minimum samples, and task-appropriate user-feedback weighting.
 Explicit [regression operations](skill-regression-operations.md) now provide
 passing-check audit and exact lost-acknowledgement recognition for Go hosts; this
-monitor has not yet adopted their durable operation identities. Standalone daemon
-validator configuration, durable scheduling fairness across frequent restarts, and cross-store power-loss
+legacy monitor retains its in-memory cursor. The separate opt-in
+[durable named monitor](durable-skill-regression-monitor.md) now persists operation
+identities, scheduling progress and failed-check fences across restarts.
+Standalone daemon validator configuration and cross-store power-loss
 qualification remain open. No user monitor is enabled by this change.
