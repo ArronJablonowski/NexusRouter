@@ -111,7 +111,7 @@ ToolPolicy: &tools.Policy{
 ```
 
 Custom tools do not enable filesystem access: `tools.enabled` controls the
-built-in workspace reader separately. Names `read_file`, `create_file`, `delegate` and
+built-in workspace reader separately. Names `read_file`, `create_file`, `replace_file`, `delegate` and
 `delegate_batch` are reserved. Extension execution requires a local model with
 a known context capacity; ordinary context, resource and iteration limits remain
 active. Delegated children do not inherit custom handlers. Handlers are trusted
@@ -171,6 +171,15 @@ workers or accepted for durable submission execution. See
 [reviewed file creation](../../docs/reviewed-file-creation.md) for bounds and
 filesystem trust requirements. Enabling creation without a review control is
 rejected by SDK construction.
+
+The same controls support `replace_file` when `tools.replace_enabled` and an
+absolute `tools.replace_root` are configured. No custom handler is needed.
+Review all three exact arguments (path, expected old content, new content);
+authenticate a human decision rather than delegating approval to a model.
+Replacement retains a private recovery copy but does not preserve extended
+metadata or fence external writers. Children do not inherit it, and `Submit`
+rejects replacement-enabled settings before creating a durable submission.
+See [reviewed replacement](../../docs/reviewed-file-replacement.md).
 
 Set `ConfigOptions.ApprovalReviewer` to explicitly register write handlers and
 effective `Ask` tools. Its type is

@@ -100,7 +100,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
 func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
-	if s.settings.Tools.CreateEnabled && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled) && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
 		return Result{}, ErrAdmission
 	}
 	// Process-local handlers have no durable identity yet. Never attach changed
@@ -271,6 +271,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	if cfg.Tools.CreateEnabled && r.delegatedParent == "" {
 		inference.Tools = append(inference.Tools, createFileSpec())
+	}
+	if cfg.Tools.ReplaceEnabled && r.delegatedParent == "" {
+		inference.Tools = append(inference.Tools, replaceFileSpec())
 	}
 	if cfg.Workers.DelegateModel != "" {
 		inference.Tools = append(inference.Tools, delegateSpec(), delegateBatchSpec())

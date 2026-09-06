@@ -103,3 +103,7 @@ Children remain read-only even when the parent has creation enabled.
 Existing-file modification, bulk writes, executable tools and unattended
 approval policies are not implemented by this increment. Full PRD acceptance
 still requires the broader tool, recovery and isolation requirements.
+
+A separate opt-in [reviewed replacement](reviewed-file-replacement.md) tool now
+supports bounded full-content edits of existing files with private recovery
+copies. Enabling creation does not enable replacement.

@@ -1,5 +1,41 @@
 # Implementation evidence
 
+Reviewed replacement checkpoint: opt-in local replace_file adds full-content
+editing of existing UTF-8 regular files, bounded to 64 KiB per preimage/new body.
+Exact per-call old/new review is consumed under the shared workspace writer
+lease. Pinned roots, two preimage checks, synced staged bytes, atomic rename
+visibility and private retained original copies are implemented. This is not
+external-writer compare-and-swap: a noncooperating editor can race after the last
+check, and the backup preserves the reviewed preimage, not intervening edits.
+Basic permission bits survive; ownership/ACLs/extended attributes/hard-link
+identity do not. Before-publication cleanup failure and after-publication
+uncertainty are not replay authority. No automatic recovery/cleanup is enabled.
+
+Configuration defaults off and redacts its root. Cloud routes, unattended calls,
+durable submissions and delegated workers cannot use this built-in write tool.
+SDK and terminal chat reuse existing exact approval controls; the complete
+ASCII-quoted OLD/NEW preview includes hashes and limits and rejects configured
+secrets instead of redacting the proposed edit. Repository recovery copies are
+ignored by Git; other configured workspaces need their own exclusion.
+
+Three agents implemented wiring/SDK tests, CLI/PTY coverage and handler/runtime
+failure fixtures. Focused race tests passed three repetitions: application
+4.913s, CLI 9.113s, config 1.222s, tools 1.372s and SDK 2.284s; focused vet passed.
+Tests include changed content during approval, retained original bytes/private
+modes, final-target rejection, pinned-root behavior, real terminal approve/deny,
+input/output pipe rejection, and a post-effect SQL completion failure leaving
+spent approval and uncertain journal state without another execution. Independent
+review found no blocker under the cooperating-writer assumptions and prompted
+clearer backup caveats and matching preview/handler argument validation.
+Final preview-path/no-op hardening passed race tests three times (3.418s) and
+CLI vet. Full make check passed formatting/LOC enforcement, vet, native race
+tests and production build: application 138.985s, telemetry 102.451s, CLI 29.846s,
+API 10.491s and SDK 18.635s. Native make build and CGO-free Linux amd64 production
+and application-test cross-compilation passed; Linux execution is not claimed.
+No live inference,
+user-file editing, user configuration enablement or Linear update is claimed.
+Native Linear was locked; complete PRD/Linear qualification remains open.
+
 Native skill-generation checkpoint: previous goal turn made verified progress
 with periodic deterministic regression monitoring and backup f268d17. Worktree
 was clean at entry; native Linear remains locked and no issue mutation is claimed.

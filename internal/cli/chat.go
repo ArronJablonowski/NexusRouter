@@ -43,9 +43,9 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	var service *app.Service
 	var approvalRequests chan chatApprovalRequest
-	if settings.Tools.CreateEnabled {
+	if settings.Tools.CreateEnabled || settings.Tools.ReplaceEnabled {
 		if !chatReviewTerminal(stdin) || !chatReviewTerminal(stdout) {
-			_, _ = io.WriteString(stderr, "darwin: file creation review requires terminal input and output\n")
+			_, _ = io.WriteString(stderr, "darwin: file write review requires terminal input and output\n")
 			return 1
 		}
 		approvalRequests = make(chan chatApprovalRequest)

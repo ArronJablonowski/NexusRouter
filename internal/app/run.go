@@ -86,10 +86,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		// read-only capability. Never grant memory, skills or recursion.
 		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
 		s.Tools.CreateEnabled = false
+		s.Tools.ReplaceEnabled = false
 		s.Workers.DelegateModel = ""
 		s.Workers.DelegateReadTools = false
 	}
-	if s.Tools.CreateEnabled && r.toolReviewer == nil && r.toolPresenter == nil {
+	if (s.Tools.CreateEnabled || s.Tools.ReplaceEnabled) && r.toolReviewer == nil && r.toolPresenter == nil {
 		return result, ErrAdmission
 	}
 	var model config.Model
@@ -155,6 +156,14 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 		defer closeCreate()
 		toolPolicy.Rules = append(toolPolicy.Rules, tools.Rule{Tool: "create_file", Scope: scope, Decision: tools.Ask})
+	}
+	if s.Tools.ReplaceEnabled {
+		closeReplace, scope, err := registerReplaceTool(registry, s.Tools.ReplaceRoot)
+		if err != nil {
+			return result, err
+		}
+		defer closeReplace()
+		toolPolicy.Rules = append(toolPolicy.Rules, tools.Rule{Tool: "replace_file", Scope: scope, Decision: tools.Ask})
 	}
 	if len(r.toolExtension.Names()) > 0 {
 		if registry == nil {

@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Opt-in local existing-file replacement after exact old/new approval, with
+  checked preimages, shared writer leases and private recovery copies. No
+  delegated or unattended writes, external-writer fencing or extended-metadata
+  preservation are claimed. See [reviewed replacement](reviewed-file-replacement.md).
+
 - Signed-in Sol skill drafting through the native Codex app-server adapter,
   with schema-inclusive context admission, durable-before-launch execution,
   scoped privacy gates and inactive proposals. One bounded live synthetic check

@@ -53,7 +53,7 @@ func newExtension(definitions []Definition, policy *Policy, reviewed bool) (*Ext
 			return nil, ErrDefinition
 		}
 		switch d.Tool.Name {
-		case "read_file", "create_file", "delegate", "delegate_batch":
+		case "read_file", "create_file", "replace_file", "delegate", "delegate_batch":
 			return nil, ErrDefinition
 		}
 		body, err := json.Marshal(d.Tool)
