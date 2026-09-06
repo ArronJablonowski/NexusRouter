@@ -16,12 +16,35 @@ func (s *FileStore) SetOutcomeRollback(enabled bool) {
 }
 
 func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected ActivationState, policy ComparisonSelectionPolicy, selector OutcomeSelector, guard OutcomeRollbackGuard) (out OutcomeRollbackReceipt, err error) {
+	if s == nil || ctx == nil || !s.permitted(expected.Key) || !identifier.MatchString(id) || expected.Validate() != nil || policy.Validate() != nil || policy.Comparison.Key != expected.Key || policy.Comparison.CandidateVersion != expected.Active || selector == nil || guard == nil {
+		return out, ErrInvalid
+	}
+	if ctx.Err() != nil {
+		return out, ctx.Err()
+	}
+	if s.readOnly || !s.automatic.Load() || !s.outcomeRollback.Load() {
+		return out, ErrDisabled
+	}
+	modelID := ""
+	prior, e := s.OutcomeRollbackOperation(ctx, expected.Key, id)
+	if e == nil {
+		if prior.Expected != expected || prior.Policy != policy {
+			return out, ErrConflict
+		}
+		modelID = prior.Selection.ConfiguredModelID
+	} else if !errors.Is(e, ErrNotFound) {
+		return out, e
+	}
+	return s.OutcomeRollbackOnceGuarded(ctx, id, modelID, expected, policy, selector, guard, func(context.Context, OutcomeRollbackIntent) error { return nil })
+}
+
+func (s *FileStore) OutcomeRollbackOnceGuarded(ctx context.Context, id, configuredModelID string, expected ActivationState, policy ComparisonSelectionPolicy, selector OutcomeSelector, guard OutcomeRollbackGuard, intentGuard OutcomeIntentGuard) (out OutcomeRollbackReceipt, err error) {
 	defer func() {
 		if recover() != nil {
 			out, err = OutcomeRollbackReceipt{}, ErrInvalid
 		}
 	}()
-	if s == nil || ctx == nil || !s.permitted(expected.Key) || !identifier.MatchString(id) || expected.Validate() != nil || policy.Validate() != nil || policy.Comparison.Key != expected.Key || policy.Comparison.CandidateVersion != expected.Active || selector == nil || guard == nil {
+	if s == nil || ctx == nil || !s.permitted(expected.Key) || !identifier.MatchString(id) || configuredModelID != "" && !identifier.MatchString(configuredModelID) || expected.Validate() != nil || policy.Validate() != nil || policy.Comparison.Key != expected.Key || policy.Comparison.CandidateVersion != expected.Active || selector == nil || guard == nil || intentGuard == nil {
 		return out, ErrInvalid
 	}
 	if ctx.Err() != nil {
@@ -36,6 +59,9 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 	err = s.with(ctx, func(c *catalog) error {
 		r, e := matchingOutcomeOperation(c, id, expected, policy)
 		if e == nil {
+			if r.Selection.ConfiguredModelID != configuredModelID {
+				return ErrConflict
+			}
 			if e = s.outcomeGuard(ctx, guard, r); e != nil {
 				return e
 			}
@@ -46,8 +72,16 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 		if !errors.Is(e, ErrNotFound) {
 			return e
 		}
+		if _, e = matchingOutcomeIntent(c, id, configuredModelID, expected, policy); e == nil {
+			return ErrOutcomePending
+		} else if !errors.Is(e, ErrNotFound) {
+			return e
+		}
 		if len(c.OutcomeOperations) >= 1000 {
 			return ErrInvalid
+		}
+		if e = validateOutcomeAdmission(ctx, c); e != nil {
+			return e
 		}
 		entry, ok := c.Skills[expected.Key.index()]
 		if !ok {
@@ -68,6 +102,81 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 			return OutcomeRollbackReceipt{}, err
 		}
 	}
+	// Reserve this revision durably before the selector can observe outcomes.
+	// A write error or cancellation suppresses dispatch even if replacement may
+	// have happened; later calls inspect the durable claim and never reselect.
+	var claim OutcomeRollbackIntent
+	err = s.with(ctx, func(c *catalog) error {
+		if !s.automatic.Load() || !s.outcomeRollback.Load() {
+			return ErrDisabled
+		}
+		r, e := matchingOutcomeOperation(c, id, expected, policy)
+		if e == nil {
+			if r.Selection.ConfiguredModelID != configuredModelID {
+				return ErrConflict
+			}
+			if e = s.outcomeGuard(ctx, guard, r); e != nil {
+				return e
+			}
+			out = r
+			found = true
+			return errCatalogUnchanged
+		}
+		if !errors.Is(e, ErrNotFound) {
+			return e
+		}
+		if _, e = matchingOutcomeIntent(c, id, configuredModelID, expected, policy); e == nil {
+			return ErrOutcomePending
+		} else if !errors.Is(e, ErrNotFound) {
+			return e
+		}
+		if len(c.OutcomeOperations) >= 1000 || len(c.OutcomeIntents) >= 1000 {
+			return ErrInvalid
+		}
+		if e = validateOutcomeAdmission(ctx, c); e != nil {
+			return e
+		}
+		entry, ok := c.Skills[expected.Key.index()]
+		if !ok {
+			return ErrNotFound
+		}
+		if e = outcomeCandidate(entry, expected, policy); e != nil {
+			return e
+		}
+		claim = OutcomeRollbackIntent{Version: 1, OperationID: id, ConfiguredModelID: configuredModelID, Expected: expected, Policy: policy, ActivationCount: len(entry.Activations), PreparedAt: time.Now().UTC()}
+		if claim.Validate() != nil {
+			return ErrInvalid
+		}
+		if e = intentGuard(ctx, claim); e != nil {
+			return e
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if !s.automatic.Load() || !s.outcomeRollback.Load() {
+			return ErrDisabled
+		}
+		if c.OutcomeIntents == nil {
+			c.OutcomeIntents = map[string]OutcomeRollbackIntent{}
+		}
+		c.OutcomeIntents[id] = claim
+		if c.Schema < 7 {
+			c.Schema = 7
+		}
+		return validateOutcomeIntents(c)
+	}, true)
+	if err != nil {
+		return OutcomeRollbackReceipt{}, err
+	}
+	if found {
+		return out, nil
+	}
+	if ctx.Err() != nil {
+		return OutcomeRollbackReceipt{}, ctx.Err()
+	}
+	if !s.automatic.Load() || !s.outcomeRollback.Load() {
+		return OutcomeRollbackReceipt{}, ErrDisabled
+	}
 	selection, err := selector(ctx)
 	if err != nil {
 		return OutcomeRollbackReceipt{}, err
@@ -75,7 +184,7 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 	if ctx.Err() != nil {
 		return OutcomeRollbackReceipt{}, ctx.Err()
 	}
-	if selection.Validate() != nil || selection.Policy != policy {
+	if selection.Validate() != nil || selection.Policy != policy || selection.ConfiguredModelID != configuredModelID {
 		return OutcomeRollbackReceipt{}, ErrInvalid
 	}
 	// Own all callback-returned maps/pointers before validation and persistence.
@@ -94,6 +203,9 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 		}
 		r, e := matchingOutcomeOperation(c, id, expected, policy)
 		if e == nil {
+			if r.Selection.ConfiguredModelID != configuredModelID {
+				return ErrConflict
+			}
 			if e = s.outcomeGuard(ctx, guard, r); e != nil {
 				return e
 			}
@@ -102,6 +214,13 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 		}
 		if !errors.Is(e, ErrNotFound) {
 			return e
+		}
+		saved, e := matchingOutcomeIntent(c, id, configuredModelID, expected, policy)
+		if e != nil {
+			return e
+		}
+		if saved != claim {
+			return ErrConflict
 		}
 		if len(c.OutcomeOperations) >= 1000 {
 			return ErrInvalid
@@ -117,6 +236,7 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 			return e
 		}
 		out = OutcomeRollbackReceipt{Version: 1, OperationID: id, Expected: expected, Policy: policy, Selection: selection, After: expected, ActivationCount: len(entry.Activations), CheckedAt: time.Now().UTC(), Decision: "no_action"}
+		out.IntentID = id
 		if selection.Comparison != nil && selection.Comparison.Status == "regression_signal" {
 			if len(entry.Activations) >= 10000 {
 				return ErrInvalid
@@ -146,6 +266,9 @@ func (s *FileStore) OutcomeRollbackOnce(ctx context.Context, id string, expected
 		if e = validateOutcomeOperations(c); e != nil {
 			return e
 		}
+		if e = validateOutcomeIntents(c); e != nil {
+			return e
+		}
 		_, e = lookupOutcomeOperation(c, expected.Key, id)
 		return e
 	}, true)
@@ -167,8 +290,14 @@ func matchingOutcomeOperation(c *catalog, id string, expected ActivationState, p
 		return OutcomeRollbackReceipt{}, err
 	}
 	for _, prior := range c.OutcomeOperations {
-		if prior.Expected.Key == expected.Key && prior.Expected.Revision == expected.Revision {
-			return OutcomeRollbackReceipt{}, ErrConflict
+		if prior.Expected.Key == expected.Key {
+			verified, e := lookupOutcomeOperation(c, expected.Key, prior.OperationID)
+			if e != nil {
+				return OutcomeRollbackReceipt{}, e
+			}
+			if verified.Expected.Revision == expected.Revision {
+				return OutcomeRollbackReceipt{}, ErrConflict
+			}
 		}
 	}
 	return OutcomeRollbackReceipt{}, ErrNotFound

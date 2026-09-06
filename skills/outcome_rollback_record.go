@@ -22,9 +22,13 @@ type OutcomeRollbackReceipt struct {
 	ActivationCount int                       `json:"activation_count"`
 	CheckedAt       time.Time                 `json:"checked_at"`
 	Decision        string                    `json:"decision"`
+	IntentID        string                    `json:"intent_id,omitempty"`
 }
 
 func (r OutcomeRollbackReceipt) Validate() error {
+	if r.IntentID != "" && r.IntentID != r.OperationID {
+		return ErrInvalid
+	}
 	_, offset := r.CheckedAt.Zone()
 	if r.Version != 1 || !identifier.MatchString(r.OperationID) || r.Expected.Validate() != nil || r.Expected.Active == "" || r.Policy.Validate() != nil || r.Policy.Comparison.Key != r.Expected.Key || r.Policy.Comparison.CandidateVersion != r.Expected.Active || r.Selection.Validate() != nil || r.Selection.Policy != r.Policy || r.After.Validate() != nil || r.After.Key != r.Expected.Key || r.ActivationCount < 2 || r.ActivationCount > 10000 || offset != 0 || r.CheckedAt.Year() < 1970 || r.CheckedAt.Year() >= 2261 {
 		return ErrInvalid
@@ -93,6 +97,12 @@ func lookupOutcomeOperation(c *catalog, key Key, id string) (OutcomeRollbackRece
 	e, ok := c.Skills[key.index()]
 	if !ok || r.Validate() != nil || r.ActivationCount > len(e.Activations) {
 		return OutcomeRollbackReceipt{}, ErrInvalid
+	}
+	if r.IntentID != "" {
+		intent, err := lookupOutcomeIntent(c, key, r.IntentID)
+		if err != nil || !outcomeIntentReceiptMatches(intent, r) {
+			return OutcomeRollbackReceipt{}, ErrInvalid
+		}
 	}
 	prefix := e
 	prefix.Activations = e.Activations[:r.ActivationCount]

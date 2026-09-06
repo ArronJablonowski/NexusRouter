@@ -11,7 +11,8 @@ import (
 // OutcomeRollbackOnce is an opt-in trusted-host policy action, not a
 // deterministic validator. Reports come only from the configured SQLite
 // selector. A successful no-action receipt also consumes this activation's
-// adjudication; exact receipt retries never select newer evidence.
+// adjudication; exact receipt retries never select newer evidence. A durable
+// preselection intent consumes the attempt even when selection is interrupted.
 func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, expected skills.ActivationState, request skills.ComparisonSelectionRequest) (out skills.OutcomeRollbackReceipt, err error) {
 	defer func() {
 		if recover() != nil {
@@ -79,6 +80,14 @@ func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, exp
 		}
 		return nil
 	})
+	intentGuard := skills.OutcomeIntentGuard(func(call context.Context, intent skills.OutcomeRollbackIntent) error {
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+		currentPolicy, policyErr := s.skillComparisonSelectionPolicy(request)
+		if call.Err() != nil || s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || policyErr != nil || currentPolicy != policy || intent.Validate() != nil || intent.OperationID != operation || intent.ConfiguredModelID != request.ModelID || intent.Expected != expected || intent.Policy != policy || !selectionValueClean([]any{operation, expected, request, intent}, secrets) || !skillActivationCandidateClean(candidate, secrets) || !skillActivationCandidateClean(baseline, secrets) {
+			return ErrAdmission
+		}
+		return nil
+	})
 	selector := skills.OutcomeSelector(func(call context.Context) (skills.ComparisonSelectionReport, error) {
 		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 		if s.settings.Skills.Root != root || s.settings.Telemetry.Database != database || !s.outcomeRollbackConfigured(expected) || !selectionValueClean([]any{operation, expected, request, policy}, secrets) {
@@ -90,7 +99,7 @@ func (s *Service) OutcomeRollbackOnce(ctx context.Context, operation string, exp
 		}
 		return r, nil
 	})
-	receipt, err = store.OutcomeRollbackOnce(ctx, operation, expected, policy, selector, guard)
+	receipt, err = store.OutcomeRollbackOnceGuarded(ctx, operation, request.ModelID, expected, policy, selector, guard, intentGuard)
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if err != nil || ctx.Err() != nil || !cleanReceipt(receipt) {
 		return out, ErrAdmission

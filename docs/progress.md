@@ -1,5 +1,58 @@
 # Implementation evidence
 
+Durable preselection checkpoint: the prior turn made verified progress, committed
+and pushed a256ee3; this turn started clean. PRD9.4's outcome-policy action now
+claims an exact activation before selecting evidence. Schema7 intents retain
+operation ID, configured model identity, policy and historical activation position.
+Only the call that successfully persists the claim proceeds. Failed, canceled,
+panicking or interrupted attempts remain inspectable without a fabricated result;
+same-ID retries and alternate IDs/policies cannot silently reread later feedback.
+The final receipt still commits with optional rollback, and binds its intent.
+Existing schema6 receipts remain historical, retryable records without retroactive
+claims about how many times selection ran before they committed.
+
+Independent review found that structurally valid but corrupted stored revisions
+or moved keys could otherwise free an attempt slot. New claim admission now
+verifies all outcome intent/receipt historical prefixes before trusting those
+fences, with cancellation between records and a second check under the claim
+lock. Ordinary catalog reads retain cheap structural checks; exact lookups fully
+validate their own records. Tests prove corrupted pending and legacy completed
+records reject new-ID dispatch. Legacy direct-core receipt retries also preserve
+nonempty configured model identities; fresh unbound direct-core calls must use
+empty IDs or the new guarded entry point with an explicit binding.
+
+The application guards metadata, version contents, current policy, cumulative
+secrets and storage bindings before the intent write and again before the final
+receipt. Go SDK intent inspection is read-only and available when rollback is
+disabled. Pending attempts cannot be cleared or taken over automatically. This
+provides at most one selector call for a claimed attempt under supported locking,
+not exactly-once completion or a general repeated-monitoring procedure. A crash
+after claim may leave no callback invocation; no lease expiry is treated as proof
+that it is safe to retry. Recovery of a selected-but-uncommitted report, automatic
+monitor scheduling, current-activation attribution and domain validators remain
+required. Native Linear was rechecked but the Mac was locked; no issue changes
+are claimed. No user database/configuration or live inference is involved.
+
+Focused core outcome/intent tests passed under race three times (11.332s).
+Application intent/rollback tests passed three times (45.159s), including a
+qualified restored SQLite exposure-view probe proving blocked retries perform
+zero selection reads. SDK actual-catalog tests cover both completed and unresolved
+inspection, disabled mutation and no database creation. An owned subprocess was
+killed inside the selector after durable claim persistence; reopen produced no
+receipt, no activation change and zero subsequent selector calls for exact or
+changed bindings. This qualifies that process-death boundary, not rename/fsync
+interruption or physical power loss.
+
+Final production make check passed formatting/LOC, vet, the complete native race
+suite and build (app181.609s, telemetry123.573s, CLI38.960s, API13.775s,
+SDK25.393s, skills21.599s). A subsequent test-only strengthening asserts that a
+competing operation never enters the selector, not merely that only one result
+commits; it passed 20 race repetitions. Final core outcome tests, application and
+SDK tests executed successfully as CGO-free Linux arm64 binaries in the existing
+Alpine3.22 image with networking disabled, read-only root and unprivileged UID.
+Linux tests were not race-instrumented. Native and Linux amd64 binaries built.
+Independent review verified both corruption and legacy-compatibility fixes.
+
 Outcome-policy rollback checkpoint: started from clean, verified/pushed 44458e2.
 PRD9.4 now has a default-off trusted-Go-host action that binds automatic exposure
 selection to an exact first activation and its validated undo predecessor. The

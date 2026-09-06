@@ -80,7 +80,9 @@ it cannot automatically roll back a skill.
 Trusted Go hosts can separately opt into operation-bound
 [outcome-policy rollback](docs/skill-outcome-rollback.md). It is disabled by default,
 requires an exact first-activation/predecessor binding, and preserves a durable
-receipt for rollback or no-action decisions. No daemon loop starts automatically.
+receipt for rollback or no-action decisions. A durable preselection intent fences
+failed or interrupted attempts against automatic reselection; trusted hosts can
+inspect both intents and receipts. No daemon loop starts automatically.
 
 ### Managed local model residency
 

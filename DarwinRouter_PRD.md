@@ -441,9 +441,12 @@ selects recorded exposures before examining outcomes, with snapshot-wide session
 exclusions. Trusted Go hosts can now explicitly opt into one committed
 outcome-policy adjudication per first candidate activation, with a receipt and
 rollback atomically bound to its validated predecessor. The report remains
-observational, never fabricated deterministic evidence. Reactivation attribution,
-confounder controls, durable preselection/repeated-monitoring policy and unattended
-daemon supervision remain required.
+observational, never fabricated deterministic evidence. A durable preselection
+intent now binds the configured model, policy and exact activation before reading
+outcomes. Failed or interrupted attempts remain inspectable and cannot silently
+reselect evidence under the same or a different operation ID. Reactivation
+attribution, confounder controls, repeated-monitoring policy, recovery of selected
+but uncommitted reports and unattended daemon supervision remain required.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).
 See [outcome comparison and limitations](docs/skill-outcome-comparison.md).
 See [automatic window selection](docs/skill-comparison-selection.md).

@@ -122,6 +122,10 @@ func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(got, receipt) {
 		t.Fatal("receipt not durable", err)
 	}
+	intent, err := restarted.OutcomeRollbackIntent(ctx, key, "sdk-outcome")
+	if err != nil || intent.Validate() != nil || intent.Expected != expected || intent.OperationID != "sdk-outcome" || intent.ConfiguredModelID != "chat" || intent.Policy != receipt.Policy {
+		t.Fatal("operation intent not durable", err)
+	}
 	state, err := restarted.SkillActivationState(ctx, key)
 	if err != nil || state != receipt.After {
 		t.Fatal("rollback state differs", err)
@@ -141,6 +145,10 @@ func TestSDKOutcomeRollbackReceiptAndRetry(t *testing.T) {
 	got, err = disabled.OutcomeRollbackOperation(ctx, key, "sdk-outcome")
 	if err != nil || !reflect.DeepEqual(got, receipt) {
 		t.Fatal("disabled inspection unavailable", err)
+	}
+	inspected, err := disabled.OutcomeRollbackIntent(ctx, key, "sdk-outcome")
+	if err != nil || !reflect.DeepEqual(inspected, intent) {
+		t.Fatal("disabled intent inspection unavailable", err)
 	}
 }
 

@@ -34,6 +34,7 @@ The versioned SDK exposes:
 ```go
 receipt, err := client.OutcomeRollbackOnce(ctx, operationID, expected, selectionRequest)
 historical, err := client.OutcomeRollbackOperation(ctx, expected.Key, operationID)
+intent, err := client.OutcomeRollbackIntent(ctx, expected.Key, operationID)
 ```
 
 `expected` is an inspected `skills.ActivationState`; `selectionRequest` is the
@@ -43,6 +44,14 @@ interface is trusted-host-only: there is no new CLI/HTTP mutation endpoint and
 no automatically started daemon loop. Constructing a client starts no work.
 The application builds the report through its actual SQLite selector; callers
 cannot submit an invented report through the SDK.
+
+Direct `skills.FileStore` hosts that attach a configured model ID must now use
+`OutcomeRollbackOnceGuarded` and supply it before selection, together with the
+intent permission guard. Fresh calls through the simpler core
+`OutcomeRollbackOnce` require an empty configured model ID; it cannot discover
+that binding after dispatch. Exact completed retries retain their stored model
+binding, including older nonempty-ID receipts. The application and SDK use the
+guarded entry point automatically.
 
 ## Decision and retry rules
 
@@ -63,13 +72,28 @@ The host observes an outcome-independent window and then commits one decision:
 - `no_action`: all other valid reports, including empty windows or insufficient
   evidence, write a receipt without changing the activation revision.
 
-Either decision consumes this activation revision's adjudication. Another
-operation ID or changed policy cannot create a second committed decision for it.
+Before reading outcomes, the host now commits an immutable preselection intent
+that binds the operation ID, configured model ID, policy, exact activation and
+activation-history position. A guarded permission check runs before that write.
+The write consumes this activation revision's single attempt: another ID or
+changed binding cannot select evidence, even if the original attempt failed.
+Only the call that successfully created the intent proceeds to selection.
+
 Do not call prematurely if the host intends to wait for sufficient samples.
-Policy/validation/callback errors commit no decision. Concurrent or interrupted
-callbacks can run more than once before a decision commits: this is **not** a
-strict cap on statistical looks or exactly-once callback execution. Durable
-preselection intents and repeated-monitoring policy remain future work.
+Selection failure, cancellation, panic, process death or a later guard denial
+leaves an inspectable intent without a decision receipt. It does not become
+`no_action`, positive validation, or permission to select again. An exact retry
+with only an intent returns an error and invokes no selector. This favors an
+explicit unresolved result over silently rereading changed feedback. There is no
+automatic clearing, lease takeover, force retry or operator-reset endpoint.
+
+Either completed decision also consumes the revision's adjudication. The new
+path provides at most one selector invocation per durable intent under supported
+catalog locking, not exactly-once completion. A crash after claim persistence
+can mean zero invocations. Older receipts created before intents remain readable
+and retryable, but do not gain a retroactive single-attempt guarantee. General
+repeated-monitoring policy and recovery of a selected-but-uncommitted report
+remain future work.
 
 An exact retry returns the saved historical receipt without reading SQLite or
 selecting newer outcomes, even after later activations or loss of the evidence
@@ -79,7 +103,8 @@ available with rollback disabled and scoped skills still configured.
 
 ## Atomicity, evidence and privacy
 
-The catalog replacement commits the receipt and optional rollback together. The
+The intent is a separate earlier catalog replacement. The final catalog
+replacement commits the receipt and optional rollback together. The
 receipt retains operation ID, expected state, selection policy/report, after state,
 decision time and activation-history position. A distinct `outcome_operation_id`
 on the rollback transition links it to that receipt. It cannot also carry
@@ -95,7 +120,7 @@ commit; stale expected state is never refreshed automatically.
 Complete selected observations undergo the existing scope/secret checks. The
 action additionally checks candidate/predecessor content, policy and receipt
 metadata, cumulative credential changes, and per-call catalog/database path
-bindings. Metadata guards run under the catalog lock and must be bounded,
+bindings. Intent and final metadata guards run under the catalog lock and must be bounded,
 non-reentrant and cancellation-cooperative. Selector and guard values are copied
 to prevent retained mutable aliases. The core has an eight-second cooperative
 deadline; the application has ten seconds and SQLite selection five seconds.
@@ -106,16 +131,23 @@ The receipt's `After` state is historical, not necessarily the current activatio
 
 ## Catalog compatibility and qualification
 
-The first committed outcome decision promotes the file catalog to schema6.
-Schemas1–5 remain readable; subsequent activation, publication and deterministic
-monitor writes do not downgrade it. Stop older writers before adopting schema6.
+The first preselection intent promotes the file catalog to schema7. Existing
+schema6 receipts remain readable without an invented historical intent.
+Schemas1–6 remain readable; subsequent activation, publication and deterministic
+monitor writes do not downgrade it. Stop older writers before adopting schema7.
 This operation does not migrate SQLite, whose selector requires schema27.
-Outcome receipts are capped at1,000 and share the catalog's existing8 MiB limit;
+Outcome records reserve at most 1,000 distinct activation revision slots across
+intents and legacy receipts and share the catalog's existing 8 MiB limit;
 capacity failure does not silently delete audit records.
 
 Ordinary catalog reads validate structural receipt/transition bindings without
-rehashing every historical prefix. Requested receipt reads and new commits fully
-verify the exact before/after history and version binding. These are local-storage
+rehashing every historical prefix. Requested receipt and intent reads fully
+verify their historical binding. Admission of a new claim validates all existing
+outcome intent/receipt prefixes before trusting the revision fences, so a damaged
+revision or moved key cannot silently free an attempt slot. This heavier check
+runs for new claims, not unrelated ordinary reads, with cancellation checks
+between records. New commits also verify the exact before/after history and
+version binding. These are local-storage
 consistency checks, not cryptographic attestation of an experiment.
 
 Tests cover actual catalog/SQLite feedback-driven rollback, no-action decisions,
