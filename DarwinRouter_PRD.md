@@ -489,15 +489,18 @@ and [compacted continuation](docs/codex-compacted-continuation.md).
 
 Memory stores durable facts rather than procedures. Records include provenance, confidence, creation time, last-use time, optional expiry, and privacy classification. Users can inspect, export, correct, or delete records. Local-only policy prevents external memory providers and keeps stored memory on the host.
 
-The configured CLI and Go SDK provide a consistent scoped factual-memory export.
+The configured CLI, Go SDK and authenticated HTTP API provide a consistent scoped factual-memory export.
 Built-in storage uses one SQLite read snapshot, includes current expired/private
 facts, and leaves revisions and last-use unchanged. Versioned JSON contains
 scope, observation time and ordered facts, with configured-secret redaction.
 At most 1,000 facts and an 8 MiB encoded envelope are supported; overflow or
 invalid records fails without partial output or silent pagination. Optional
 custom exporters must guarantee equivalent completeness/isolation. This is not
-a database backup or restore operation. Larger exports and an HTTP export
-endpoint remain unimplemented. See [memory management](docs/memory-management.md).
+a database backup or restore operation. POST `/v1/memory/export` accepts only
+`{"version":1}`, uses the shared bounded memory-operation pool, and buffers the
+validated response before writing. Native HTTP writes have a fifteen-second
+deadline and explicit content length; failed transfers must not be accepted as
+complete exports. Larger exports remain unimplemented. See [memory management](docs/memory-management.md).
 
 ## 11. Tools and Worker Safety
 

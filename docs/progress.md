@@ -1,5 +1,51 @@
 # Implementation evidence
 
+HTTP memory-export checkpoint: prior CLI/SDK snapshot progress was verified and
+backed up as98df5c5; this turn began clean and extends the same application
+operation to authenticated POST `/v1/memory/export`. Request JSON accepts exactly
+`{"version":1}`; callers cannot select scope or a partial page. Existing bearer
+authentication, browser-origin denial, strict UTF-8/JSON/body admission,
+two-request shared memory capacity and five-second cooperative operation deadline
+apply. The CLI daemon wiring uses Service.ExportMemory directly. Backend errors,
+including custom conflict errors, are generic503 rather than mutation-CAS409.
+
+Snapshot validation and compact buffering precede success headers. The envelope
+retains the1,000-fact/8MiB limit plus a newline; exact Content-Length advertises
+the complete response. Native HTTP writes have a fifteen-second deadline;
+embedded writers without deadline support must bound their own I/O. Review
+identified that outer handler panic recovery could append an error after a
+partial writer panic; local committed-response containment now prevents this,
+including panics while clearing write deadlines. No write retry, second error
+document, inference, memory mutation or automatic exported-file storage occurs.
+
+Agents supplied API security/unit tests and actual HTTP→application→SQLite
+integration, with independent review. Unit tests passed three race runs5.713s
+covering strict/auth admission, invalid/oversized/canceled backend snapshots,
+shared capacity, deadline setup failure, short/error writes and write/reset
+panics. Integration tests passed three race runs5.628s, proving configured scope,
+private/expired inclusion, old stored credential redaction without changing
+stored content or last-use, retired omission, empty snapshots,1001-fact overflow
+without partial output and zero inference requests. Native make build and Linux
+amd64 production cross-build passed. New API export tests also executed as a
+CGO-free Linux arm64 binary in existing Alpine3.22, with unprivileged user,
+read-only root and no external network; this includes actual HTTP/SQLite tests,
+not just cross-compilation. Linux tests were not race-instrumented. Full make
+check passed (format/LOC, vet, native race suite and production build), including
+API10.900s, app149.547s, telemetry110.620s, CLI36.010s and SDK19.464s. No live
+model inference or user database/configuration changes were performed. Larger
+exports and full PRD acceptance remain
+open. Native Linear was rechecked and remains locked; no issue update or
+completion is claimed.
+
+Next learning-gap audit: PRD9.4 still leaves standalone daemon validator
+configuration open. CLI serve starts StartLearning; the learner drafts but only
+activates when supplied a trusted validator. Validated application/SDK paths and
+durable regression monitoring already exist. The next end-to-end milestone is
+explicit versioned validator selection and daemon lifecycle integration, with
+qualified deterministic validation rather than structural/model self-approval,
+plus activation/use/regression/restart evidence. This is an inspected gap and
+proposed next milestone, not implemented functionality or acceptance evidence.
+
 Consistent memory-export checkpoint: the previous dispatched-read recovery turn
 made verified progress and was pushed as9fa4788; this turn started from a clean
 worktree. PRD10.4 requires operator export, while existing live pages could mix

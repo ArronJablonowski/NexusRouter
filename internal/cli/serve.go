@@ -92,6 +92,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
+		ExportMemory:     service.ExportMemory,
 		Memories:         service.Memories,
 		PutMemory:        service.PutMemory,
 		DeleteMemory:     service.DeleteMemory,

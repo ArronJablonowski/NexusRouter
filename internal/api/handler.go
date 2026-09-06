@@ -31,6 +31,7 @@ import (
 
 type Services struct {
 	Memory                 func(context.Context, string) (memory.Fact, error)
+	ExportMemory           func(context.Context) (memory.ExportSnapshot, error)
 	Memories               func(context.Context, string, string, int, bool) ([]memory.Fact, error)
 	PutMemory              func(context.Context, memory.Fact, int64) error
 	DeleteMemory           func(context.Context, string, int64) error

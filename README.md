@@ -1040,8 +1040,9 @@ legacy raw-storage access without configured credential redaction; never mix it
 with `--config`. Deletion is logical, not secure erasure of WAL or backups.
 
 The CLI, daemon and Go SDK provide configured-scope memory inspection,
-creation/correction and revision-checked deletion. CLI `memory export --config`
-and SDK `ExportMemory` also return one consistent scoped snapshot of all current
+creation/correction and revision-checked deletion. CLI `memory export --config`,
+SDK `ExportMemory` and authenticated POST `/v1/memory/export` also return one
+consistent scoped snapshot of all current
 facts, including expired/private facts, with configured-secret redaction. The
 bounded snapshot supports at most 1,000 facts and an 8 MiB encoded envelope;
 overflow fails instead of silently truncating or collecting inconsistent pages.

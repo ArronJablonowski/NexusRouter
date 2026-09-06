@@ -27,7 +27,7 @@ type memoryCommand struct {
 
 func memoryManagementRoute(path string) bool {
 	switch path {
-	case "/v1/memory/get", "/v1/memory/query", "/v1/memory/put", "/v1/memory/delete":
+	case "/v1/memory/get", "/v1/memory/query", "/v1/memory/put", "/v1/memory/delete", "/v1/memory/export":
 		return true
 	}
 	return false
@@ -93,6 +93,10 @@ func (h *Handler) serveMemoryManagement(w http.ResponseWriter, r *http.Request) 
 		failure(w, 503, "memory_unavailable")
 		return
 	}
+	if r.URL.Path == "/v1/memory/export" {
+		writeMemorySnapshot(ctx, w, out)
+		return
+	}
 	writeJSON(w, 200, out)
 }
 
@@ -100,6 +104,8 @@ func decodeMemoryCommand(path string, body []byte) (memoryCommand, error) {
 	var command memoryCommand
 	keys := []string{"version"}
 	switch path {
+	case "/v1/memory/export":
+		// Export cannot override the configured scope or select a partial page.
 	case "/v1/memory/get":
 		keys = append(keys, "id")
 	case "/v1/memory/query":
@@ -166,6 +172,19 @@ func (h *Handler) callMemoryCommand(ctx context.Context, path string, c memoryCo
 		}
 	}()
 	switch path {
+	case "/v1/memory/export":
+		if h.services.ExportMemory == nil {
+			return nil, memory.ErrInput
+		}
+		snapshot, err := h.services.ExportMemory(ctx)
+		if err != nil {
+			// Export is read-only: backend conflicts are not operator CAS errors.
+			return nil, memory.ErrInput
+		}
+		if ctx.Err() != nil || snapshot.Validate() != nil {
+			return nil, memory.ErrInput
+		}
+		return snapshot, nil
 	case "/v1/memory/get":
 		if h.services.Memory == nil {
 			return nil, memory.ErrInput

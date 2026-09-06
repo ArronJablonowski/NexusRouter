@@ -74,12 +74,12 @@ failed output write can still leave a partial external copy and returns nonzero.
 No output file is created by Darwin; secure any redirected copy yourself.
 
 This is a factual-memory export, not a database backup, restore format or secure
-erasure mechanism. Larger snapshot exports and an HTTP export endpoint remain
-future work. Exported facts do not authorize import or reuse of retired IDs.
+erasure mechanism. Larger snapshot exports remain future work. Exported facts
+do not authorize import or reuse of retired IDs.
 
 ## HTTP contract
 
-All four routes use POST with `Content-Type: application/json`, the daemon's
+All five routes use POST with `Content-Type: application/json`, the daemon's
 Bearer token, and an explicit version of 1. They reject browser origins, query
 strings, chunked/unknown-length bodies, duplicate/unknown/case-alias keys, null
 fields, malformed UTF-8, and unpaired Unicode surrogate escapes. Request bodies
@@ -90,6 +90,7 @@ are required, including empty cursors/filters and `include_expired`.
 | --- | --- | --- |
 | `/v1/memory/get` | `{"version":1,"id":"language"}` | Complete versioned fact |
 | `/v1/memory/query` | `{"version":1,"after_id":"","contains":"","limit":20,"include_expired":false}` | `{"version":1,"facts":[...]}` |
+| `/v1/memory/export` | `{"version":1}` | Complete `ExportSnapshot` object described above |
 | `/v1/memory/put` | `{"version":1,"fact":{...},"expected_revision":0}` | `{"version":1,"id":"language","revision":1}` |
 | `/v1/memory/delete` | `{"version":1,"id":"language","expected_revision":1}` | `{"version":1,"id":"language","deleted":true}` |
 
@@ -122,6 +123,23 @@ continue until an empty page. Limits are 1–100 facts and 8 MiB encoded output;
 an oversized page fails rather than silently truncating (reduce `limit`). Pages
 are live observations, not a consistent export snapshot across concurrent edits.
 Inspection never updates `last_use`.
+
+Export uses the identical application operation as CLI/SDK, not a loop over
+query pages. It returns current private/expired records from the configured scope
+only; requests cannot override scope, filter or pagination. The complete compact
+envelope is validated and buffered before success headers, bounded to 8 MiB plus
+one newline. `Content-Length` covers the entire response so clients can detect
+truncated transfers. Always check HTTP status and parse the complete JSON object
+before accepting an export. Failed backend validation, overflow, missing exporter
+support or backend errors return generic 503 with no partial factual payload.
+
+Export shares the existing two-request memory pool and cooperative five-second
+operation deadline. Its response additionally uses a fifteen-second write deadline
+on native HTTP connections. Embedded response writers that do not support
+deadlines must bound their own I/O. After success headers are committed, output
+errors or writer panics never trigger a retry or append a second error document;
+a partial external copy remains possible. No automatic persistence, import or
+backup of the response is performed.
 
 All successful responses are HTTP 200 and `Cache-Control: no-store`. Invalid
 input receives 400, unsupported media 415, and oversized declared bodies 413.
