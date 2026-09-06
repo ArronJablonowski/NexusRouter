@@ -4,6 +4,9 @@ The first live test uses **GPT-5.6 Sol (`gpt-5.6-sol`) as coordinator** and an
 operator-selected installed Ollama model as the local worker. This is a
 supervised test profile. One real coordinator → local worker → coordinator
 round trip passed on September 5, 2026; broader qualification remains open.
+An opt-in [live chat steering test](live-chat-steering.md) subsequently passed
+with real Sol and Ollama on September 6, including durable user guidance during
+delegation. It uses a disposable database and does not modify the smoke store.
 
 OpenAI documents streaming and function calling for the exact requested model:
 [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol).

@@ -1,5 +1,54 @@
 # Implementation evidence
 
+Live chat steering checkpoint: the previous goal turn made verified progress
+and was backed up as 4ac2c71; this turn started clean. A new opt-in CLI subprocess
+qualification enters production RunWithInput/runChat without injected hooks or
+synthetic providers. It clones the reviewed Sol/Gemma smoke configuration into
+an owned temporary database and resolves the installed Codex executable. A
+prelaunch guard pins model/provider identities, local endpoint and budgets, and
+rejects extra tools, credentials, memory, learning, judges/reviews or export.
+Child environment is allowlisted, input/output are real pipes, output is bounded,
+and cleanup signals/joins only the owned child. Default checks skip live inference.
+
+The first live run passed on September 6, 2026 in 22.02s (package 23.546s):
+signed-in Codex CLI 0.153.4 / exact gpt-5.6-sol delegated once to actual installed
+Ollama gemma4:12b-it-q4_K_M. At the unprefixed delegate-start status, the test sent
+/steer guidance. Reopened SQLite proved three completed tasks with parent/work/
+execution lineage and matching delegation origin, exact parent/local model
+attribution, one tool pair and one accepted worker result. The local completed
+turn's output matched the published work result and passed nonempty/Go syntax
+evidence plus independent syntax validation. The steering creation timestamp lay
+between tool start and completion; its committed application followed the tool
+result and preceded another coordinator turn. The durable final answer exactly
+matched the revised marker. Rendered queue/application/completion counts agreed.
+
+Pre-run review corrected the verifier to use final TurnCompleted text rather
+than empty TaskCompleted data, and actual deterministic journal events rather
+than assuming evaluation-table rows. It also required durable final-answer
+equality instead of accepting a marker merely echoed in output. No user feedback
+or evaluation rows were fabricated. Final independent review found no remaining
+concrete blocker. Fast default tests cover authority mutations, status parsing
+and output bounds; no positive synthetic journal-verifier fixture is claimed.
+
+Only synthetic prompts/guidance and generated local output reached cloud
+coordination. Existing configuration/task stores were untouched; no model pull,
+file tool or background learning ran. The subprocess exercised the real CLI
+entry point in a test executable with pipes, not a packaged binary/manual TTY
+usability test. Syntax acceptance did not compile or execute the generated Go.
+See docs/live-chat-steering.md for reproduction. This single run is not an SLA,
+general obedience, crash-window or production qualification. Native Linear is
+still locked; no issue update is claimed. Full PRD/Linear acceptance remains open.
+
+Live-chat checkpoint verification: make check passed formatting/LOC, vet, full
+native race suite and build (app 218.504s, telemetry 148.706s, CLI 40.150s,
+API 13.137s, SDK 25.660s; unchanged packages cached). Focused final authority/
+render tests passed three race-enabled repetitions in 1.811s; final format/vet
+checks passed. Those default tests also executed three times as a CGO-free Linux
+ARM64 binary in a read-only, unprivileged, network-disabled container with only
+the test artifact and reviewed sample mounted. No live Linux inference or Linux
+race result is claimed. The final post-run addition only logs bounded validated
+counts after successful qualification; it does not alter acceptance conditions.
+
 Codex boundary-steering checkpoint: the preceding goal turn made verified
 progress and was backed up as 84b44d6; this turn started clean. Inspection found
 that line-oriented chat already supports interactive guidance, while the PRD's

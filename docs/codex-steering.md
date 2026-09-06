@@ -74,5 +74,7 @@ Explicit supervised reproduction (uses account inference usage):
 DARWIN_CODEX_LIVE_STEERING=1 go test -race ./internal/codexbridge -run '^TestLiveCodexSteeringBoundaries$' -count=1 -v
 ```
 
-Default CI skips this test. Live application/interactive-chat steering with actual
-Ollama work, all cancellation/crash windows and broad compatibility remain open.
+Default CI skips this test. A subsequent [live chat qualification](live-chat-steering.md)
+passed the actual CLI entry point with real Sol/Ollama work and durable steering
+evidence. Manual terminal usability, all cancellation/crash windows and broad
+compatibility remain open.
