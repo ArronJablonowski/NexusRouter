@@ -12,11 +12,14 @@ import (
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "leases" {
+		return runTaskLeases(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "continuation" {
 		return runTaskContinuation(args[1:], stdout, stderr)
 	}
 	if len(args) == 0 || args[0] != "show" {
-		fmt.Fprintln(stderr, "usage: darwin task show|continuation --db path --task id")
+		fmt.Fprintln(stderr, "usage: darwin task show|continuation|leases --db path --task id")
 		return 2
 	}
 	fs := flag.NewFlagSet("task show", flag.ContinueOnError)

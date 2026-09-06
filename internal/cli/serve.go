@@ -23,6 +23,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {
@@ -154,6 +155,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Run:              service.Run,
 		Inspect:          db.TaskSnapshot,
 		TaskContinuation: db.TaskContinuation,
+		TaskLeases: func(ctx context.Context, task string) (workers.TaskLeaseStatus, error) {
+			return app.InspectTaskLeases(ctx, s.Telemetry.Database, task)
+		},
 		Health: func(ctx context.Context) error {
 			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner) {
 				return errors.New("supervisor unavailable")

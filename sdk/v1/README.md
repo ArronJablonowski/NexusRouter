@@ -682,6 +682,15 @@ through typed history import into a new ephemeral thread, subject to its 1 MiB
 injection-frame limit. Compaction/summary requests and in-flight steering remain
 unsupported for that provider; see [the continuation guide](../../docs/codex-history-continuation.md).
 
+`InspectTaskLeases(ctx, taskID)` returns `TaskLeaseStatus`: task/head metadata,
+live/expired/released reader/writer counts, and validated recovery counts. The
+SDK aliases `TaskLeaseCounts` and `TaskRecoveryCounts`. Feature groups are nil
+when unsupported by an older database, not zero. Counts concern leases owned by
+this task, not all conflicting scopes or descendants. Interrupted-child recovery
+is counted on the worker lease's receipt. Inspection never probes guard files,
+reclaims ownership, retries work or returns prompts, tokens, owner/scope names or
+receipt bodies. See [task lease inspection](../../docs/task-lease-inspection.md).
+
 `ReadEvents(ctx, taskID, afterSequence, limit)` provides paged durable events
 directly to embedded consumers. Start at sequence0, process a validated page, then
 save its `NextSequence` for reconnection. Limits are1–100 events with an8MiB page

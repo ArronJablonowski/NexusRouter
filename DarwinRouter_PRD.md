@@ -538,6 +538,14 @@ coordination remain separate delivery requirements.
 
 ## 13. Storage and Observability
 
+Provide read-only task lease/recovery metadata through CLI `task leases`, SDK
+`InspectTaskLeases`, and authenticated `GET /v1/tasks/{id}/leases`. Validate one
+bounded coherent snapshot, distinguish unavailable legacy feature groups from
+measured zero, omit execution capabilities and content, and never interpret
+expiry/counts as process-death or retry authority. The implemented diagnostic
+covers task-owned aggregate counts; general per-scope holder discovery and
+persistent operator attention remain required. See [task lease inspection](docs/task-lease-inspection.md).
+
 SQLite operates in WAL mode with serialized, versioned migrations. Event appends and corresponding state projections are transactional. Startup verifies database integrity and migration compatibility before readiness.
 
 Core stored entities include configurations, policy snapshots, tasks, sessions, events, attempts, routes, provider health, model fitness, evaluation evidence, work leases, memory, skill versions, approvals, and audit records.

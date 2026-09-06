@@ -5,6 +5,10 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Read-only task lease and recovery counts through CLI, SDK and authenticated
+  HTTP, with explicit legacy availability and no execution capabilities or
+  conversation content. See [task lease inspection](task-lease-inspection.md).
+
 - Verified orphan-worker failure recovery when its execution child is already
   terminal and effect-resolved or has a provably model-only interruption.
   Atomic child/worker failure, reader release and receipt, followed

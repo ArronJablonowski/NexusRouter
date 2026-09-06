@@ -210,6 +210,14 @@ Inspecting readiness never repairs or resumes a task.
 The CLI exits zero for a successful inspection even when `history_eligible` is
 false; scripts must inspect that field, not treat command success as permission.
 
+Task-owned lease and recovery counts are available through
+`darwin task leases --db path --task TASK_ID`, SDK `InspectTaskLeases`, and
+authenticated `GET /v1/tasks/{task}/leases`. These metadata-only observations
+exclude lease tokens, owner/scope names and conversation content. Unexpired
+leases are not proof of living owners; counts do not authorize release or retry.
+See [task lease inspection](docs/task-lease-inspection.md) for limits and schema
+availability.
+
 ## Configuration
 
 ```sh

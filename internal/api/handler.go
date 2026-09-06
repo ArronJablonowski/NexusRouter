@@ -26,6 +26,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
 type Services struct {
@@ -58,6 +59,7 @@ type Services struct {
 	Cancel                 func(context.Context, string) (runtime.CancellationStatus, error)
 	Cancellation           func(context.Context, string) (runtime.CancellationStatus, error)
 	TaskContinuation       func(context.Context, string) (sessions.ContinuationStatus, error)
+	TaskLeases             func(context.Context, string) (workers.TaskLeaseStatus, error)
 	Events                 func(context.Context, string, int64, int) (sessions.EventPage, error)
 	RunStream              func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	RunTextStream          func(context.Context, app.Request, func(string) error) (app.Result, error)
@@ -167,6 +169,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveCancellation(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/continuation"):
 		h.serveTaskContinuation(w, r.WithContext(ctx))
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/leases"):
+		h.serveTaskLeases(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:
 		h.serveTaskStream(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/summaries" || strings.HasPrefix(r.URL.Path, "/v1/summaries/"):
