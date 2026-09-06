@@ -547,6 +547,11 @@ The Go `sessions.Summarizer` component generates bounded proposals, and the appl
 
 The selected model needs configured `context_tokens` and `estimated_cost`; local models also need `ram_bytes`. The default zero cost ceiling permits only a configured zero-cost estimate. The sample local configuration needs this operator-supplied metadata before summary generation. Summarization may use the source model because it is not an independent quality audit; `evaluation.judge` does not disable explicitly requested summaries.
 
+The exact signed-in Sol `codex_app_server` model can also draft summaries of
+cloud-eligible sources using the same command. See [native session-summary
+drafts](docs/codex-session-summaries.md). Native compacted/approved-summary
+continuation is still unsupported; generating a draft does not apply it.
+
 Generation makes one auxiliary call without tools or retries. Application admission enforces deployment mode, source privacy, resource reservation and cost metadata, then persists a `started` attempt before dispatch. Configured credentials are redacted from input and draft content. Success atomically stores the proposal with `drafted` status; failure stores a generic code. Cancellation cleanup is bounded independently. A crash or unavailable store can leave `started` indeterminate—it is not proof that a summarizer is still running. Inspection opens storage read-only and supports up to 100 records per page, with optional task filtering and an exclusive `--after` ID cursor.
 
 Drafting never modifies the source, starts a continuation or affects fitness. Inspect the full proposal and verify its accuracy before recording an operator review:

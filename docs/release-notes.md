@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Signed-in Sol session-summary drafting with durable-before-launch execution,
+  schema-bound generation and unchanged source provenance. One synthetic live
+  check passed; native compacted-history import and automatic application remain
+  open. See [session-summary drafting](codex-session-summaries.md).
+
 - Opt-in local existing-file replacement after exact old/new approval, with
   checked preimages, shared writer leases and private recovery copies. No
   delegated or unattended writes, external-writer fencing or extended-metadata

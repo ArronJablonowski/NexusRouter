@@ -1,5 +1,53 @@
 # Implementation evidence
 
+Native session-summary checkpoint: previous turn made verified progress with
+reviewed file replacement and backup 84ebec4; the worktree was clean at entry.
+SummarizeTask now uses the shared inert auxiliary adapter for the exact signed-in
+Sol codex_app_server provider. Mode/source privacy/cost checks precede a durable
+started attempt and schema-inclusive context admission; only then does the CLI
+launch. The one-minute summarizer deadline includes startup and streaming, with
+owned cleanup, no tools, no retries and no automatic application/fitness update.
+Source provenance remains derived from unchanged durable history.
+
+Following the official OpenAI app-server per-turn outputSchema contract, native
+summarization requests a fresh closed version-1/six-array schema. The host parser
+remains authoritative and rejects empty abstention, invalid/oversized output,
+unknown/duplicate fields and tools. HTTP keeps schema-off default and accepts
+omitted categories; the shared prompt now requests empty arrays where needed.
+Native source redaction strictly validates original argument JSON before
+decoding structured tool output/arguments, retaining numeric precision and
+denying ambiguous duplicate keys. Current-secret guards before launch and after
+startup deny changes to admitted input; output redaction refreshes after stream.
+Independent review prompted a post-stream metadata check before draft publication;
+already persisted started/source identities are not retroactively rewritten.
+
+Three agents contributed schema/ownership tests, application failure/rotation
+fixtures and an opt-in live qualification. Focused sessions schema race tests
+passed three times 1.519s; native summary application tests three times 6.735s;
+combined summary/estimator tests passed sessions 1.280s and app 5.744s. Strict native
+source tests passed three times 1.480s, and focused vet passed. Tests cover durable
+start before launch, estimator/BeginSummary denial, privacy/mode/config gates,
+malformed output, tool proposals, cancellation, unavailable launcher, cleanup,
+source immutability and rotated input/output credentials.
+
+Explicit live TestLiveCodexSummaryDraft passed 6.77s (race package 8.233s), launches=1,
+streams=1, closes=1, done=true, response=490 bytes. Real signed-in Sol produced one
+durable inactive draft from a synthetic cloud-eligible loopback source. The
+source events and host provenance were unchanged and owned directory removed.
+No raw prompts/drafts were logged. This is not actual Ollama generation, semantic
+summary validation, summary import or live crash-recovery qualification. Final
+metadata hardening followed that live run and has separate fixture coverage;
+all native summary tests including identity rotation passed race tests three
+times (8.274s).
+Final make check passed formatting/LOC enforcement, vet, full native race tests
+and production build: app 138.484s, telemetry 102.434s, CLI 30.412s, API 9.993s and
+SDK 18.521s (unchanged packages cached). Native make build and CGO-free Linux
+amd64 production/application-test cross-compilation passed; Linux execution is
+not claimed. Native Linear remained locked;
+no issue mutation or user configuration change is claimed. Native compacted
+history import, automatic semantic validation/application, mid-task compaction,
+summary-attempt crash reconciliation and full PRD/Linear acceptance remain open.
+
 Reviewed replacement checkpoint: opt-in local replace_file adds full-content
 editing of existing UTF-8 regular files, bounded to 64 KiB per preimage/new body.
 Exact per-call old/new review is consumed under the shared workspace writer

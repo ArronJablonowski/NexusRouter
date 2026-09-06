@@ -5,12 +5,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -19,7 +18,7 @@ import (
 // generated text still needs accuracy validation before automatic application.
 func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep int, maxCost float64) (sessions.SummaryAttempt, error) {
 	bad := func() (sessions.SummaryAttempt, error) { return sessions.SummaryAttempt{}, ErrAdmission }
-	if task == "" || len(task) > 128 || keep < 1 || keep > 100000 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
+	if s == nil || ctx == nil || ctx.Err() != nil || task == "" || len(task) > 128 || keep < 1 || keep > 100000 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
 		return bad()
 	}
 	read, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
@@ -70,7 +69,14 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		return bad()
 	}
 	input := history
-	input.Messages, err = redactSummaryMessages(history.Messages, secrets)
+	if provider.Kind == "codex_app_server" {
+		input.Messages, err = nativeSummaryMessages(history.Messages, secrets)
+		if !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable}, secrets) {
+			return bad()
+		}
+	} else {
+		input.Messages, err = redactSummaryMessages(history.Messages, secrets)
+	}
 	if err != nil {
 		return bad()
 	}
@@ -84,14 +90,22 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		}
 		defer release()
 	}
-	transport, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{provider.Endpoint})
+	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, provider, model, history.Privacy, key)
 	if err != nil {
 		return bad()
 	}
-	defer transport.CloseIdleConnections()
-	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: transport})
-	if err != nil {
-		return bad()
+	defer closeProvider()
+	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
+		// A changed credential must not silently alter the request after context
+		// estimation. Recheck the original source before launch and after startup.
+		native.beforeStream = func() error {
+			secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+			clean, err := nativeSummaryMessages(history.Messages, secrets)
+			if err != nil || !reflect.DeepEqual(clean, input.Messages) || !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable}, secrets) {
+				return ErrAdmission
+			}
+			return nil
+		}
 	}
 	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
@@ -114,7 +128,7 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		}
 		return attempt, cause
 	}
-	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost, StructuredOutput: provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, input, keep)
 	if err != nil {
 		code := "summary_failed"
@@ -122,6 +136,12 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 			code = "canceled"
 		}
 		return fail(code, errors.New("summary draft failed"))
+	}
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	if provider.Kind == "codex_app_server" && !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable, attempt.ID, attempt.SourceDigest}, secrets) {
+		// Keep the immutable started identity for lifecycle reconciliation, but
+		// do not publish a draft with newly classified credential metadata.
+		return fail("summary_failed", errors.New("summary metadata unavailable"))
 	}
 	draft.Request.Summary = redactSummary(draft.Request.Summary, secrets)
 	_, checkpoint, err := sessions.PrepareContinuation(history, draft.Request)

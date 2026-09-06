@@ -451,6 +451,12 @@ Prompt input is assembled in three tiers:
 
 Compaction occurs only at safe boundaries and never separates a tool call from its result. It retains recent messages and creates a structured summary of decisions, requirements, failures, open work, referenced artifacts, and cumulative file/tool activity. The compaction record includes the first retained event and token estimates before and after compaction.
 
+Current implementation also supports explicit summary drafting through the
+signed-in Sol Codex provider: schema-inclusive context admission, durable start
+before launch, decoded-secret redaction and host-derived provenance. Drafts do
+not activate themselves. Native compacted-history import and automatic semantic
+validation/application remain required work; see [native summary drafting](docs/codex-session-summaries.md).
+
 ### 10.4 Memory
 
 Memory stores durable facts rather than procedures. Records include provenance, confidence, creation time, last-use time, optional expiry, and privacy classification. Users can inspect, export, correct, or delete records. Local-only policy prevents external memory providers and keeps stored memory on the host.
