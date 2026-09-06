@@ -301,7 +301,7 @@ values are rejected. Type-invalid lower-precedence files or environment values
 are rejected even if a later layer overrides them. Genuine floating-point
 settings, such as estimated cost and routing weights, remain supported.
 
-Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. The display redacts endpoints and database paths. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode; this is not an operating-system sandbox for arbitrary future tools.
+Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. The display redacts endpoints and database paths. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. This is not an operating-system sandbox for arbitrary future tools.
 
 ## Run an explicit-model task
 

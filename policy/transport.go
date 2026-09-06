@@ -17,6 +17,7 @@ var ErrEgress = errors.New("network destination denied by policy")
 
 // Transport owns its connection pool. LocalOnly permits literal loopback IPs
 // and localhost (pinned to 127.0.0.1), never DNS, LAN addresses or proxies.
+// Recognized loopback destinations are pinned in every deployment mode.
 // This protects runtime HTTP traffic, not arbitrary code running in-process.
 type Transport struct {
 	inner     *http.Transport
@@ -56,16 +57,25 @@ func NewTransport(localOnly bool, endpoints []string) (*Transport, error) {
 		if err != nil {
 			return nil, ErrEgress
 		}
-		if localOnly {
-			ip, ok := localAddress(host)
-			if !ok {
-				return nil, ErrEgress
-			}
-			address = net.JoinHostPort(ip, port)
+		address, err = transportDialAddress(localOnly, host, port)
+		if err != nil {
+			return nil, err
 		}
 		return dialer.DialContext(ctx, network, address)
 	}
 	return t, nil
+}
+
+// Local endpoint authority must not depend on the host resolver even when
+// remote HTTPS providers are also enabled. Preserve DNS only for remote hosts.
+func transportDialAddress(localOnly bool, host, port string) (string, error) {
+	if ip, ok := localAddress(host); ok {
+		return net.JoinHostPort(ip, port), nil
+	}
+	if localOnly {
+		return "", ErrEgress
+	}
+	return net.JoinHostPort(host, port), nil
 }
 
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {

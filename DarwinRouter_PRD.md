@@ -712,6 +712,7 @@ the reserved runtime `opentelemetry_enabled` flag is not yet supported.
 ## 14. Security and Privacy
 
 - Fully local mode denies unauthorized outbound connections at the DarwinRouter transport boundary.
+- Recognized loopback provider destinations, including case-insensitive `localhost`, remain pinned to loopback in every deployment mode; enabling cloud routes must not delegate local endpoint resolution to DNS.
 - Provider credentials are read from environment variables or secret-store adapters and are never serialized into configuration snapshots.
 - Logs, events, errors, traces, and route explanations pass through structured redaction before persistence or export.
 - Tool schemas and model output are untrusted input.

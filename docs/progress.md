@@ -1,5 +1,43 @@
 # Implementation evidence
 
+Shared transport pinning checkpoint: the previous goal turn made verified progress
+and was committed/pushed as 87c80be; this turn started clean. Following the metrics
+export finding, inspection showed the shared provider transport still delegated
+localhost resolution to the host resolver when localOnly=false. Local-model
+application routes already pass localOnly=true, but trusted SDK callers and
+hybrid/cloud routes using local proxy endpoints can use false.
+
+The shared dial path now converts recognized loopback hosts to literal loopback
+addresses in every mode, preserving the existing localhost-to-127.0.0.1 mapping.
+Nonlocal hosts remain denied in local-only mode; explicitly authorized remote
+HTTPS hosts retain normal DNS in hybrid/cloud mode. Endpoint allowlisting, TLS
+verification, proxy denial and provider redirect handling are unchanged. This is
+transport hardening, not an OS-wide egress sandbox or an arbitrary-host SSRF policy.
+
+Pure dial-target tests cover both modes, case-insensitive localhost, IPv4,
+IPv6, IPv4-mapped IPv6, local-only remote denial and remote DNS preservation.
+Focused policy race tests passed three times (1.424s) before independent provider
+integration qualification. Full verification follows below. Native Linear was
+checked but the Mac was locked and automatic unlock failed; no issue status
+update is claimed. The broader PRD remains incomplete.
+
+Independent provider integration uses NewTransport(false), the real Ollama
+adapter and an owned HTTP server with a synthetic bearer. HTTP trace hooks prove
+zero DNS lookups and exactly one connection to literal 127.0.0.1 for localhost,
+mixed-case localhost, IPv4 and IPv4-mapped IPv6. Configured proxy fixtures receive
+zero requests. These tests passed race detection three times (1.391s); final
+review found no blocker. Native IPv6 listeners and TLS were not newly qualified.
+Compatibility: localhost consistently means IPv4; IPv6-only services must use
+explicit [::1]. Previously local-only routes already had that behavior.
+
+Final make check passed formatting/LOC, vet, all native race tests and build
+(app197.843s, telemetry134.842s, CLI36.990s, API11.919s, SDK23.587s,
+policy1.880s). Native and Linux amd64 CLI builds passed. The complete policy suite
+also executed successfully as a CGO-free Linux arm64 binary in existing Alpine3.22
+with no external network, read-only root and an unprivileged UID. Linux tests were
+not race-instrumented. No live model, user configuration, credentials or database
+was changed. Broader egress isolation and full MVP qualification remain open.
+
 Explicit telemetry-export checkpoint: previous turn made verified progress,
 committed/pushed d4337c9; this turn started clean. The PRD's optional observability
 delivery now has a real one-shot CLI/SDK OTLP/HTTP JSON path for the existing
