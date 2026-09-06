@@ -40,7 +40,8 @@ The daemon can now reclaim a narrow subset: terminal readers with fully resolved
 journals and a retained, verified unlocked process guard. See
 [terminal reader recovery](terminal-reader-recovery.md). A separate
 [orphan-worker recovery](orphan-worker-recovery.md) can fail an interrupted
-supervisor with an already-terminal child. Running children, writers, unknown
+supervisor with a terminal or safely interrupted model-only child. Tool-aware
+interrupted children, writers, unknown
 ownership and unresolved effects remain blockers.
 
 ## Built-in filesystem scope and upgrades

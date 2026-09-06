@@ -256,7 +256,7 @@ func TestOrphanWorkerRecoveryAfterSIGKILL(t *testing.T) {
 }
 
 func TestOrphanWorkerRecoveryRejectsUnsafeCandidates(t *testing.T) {
-	for _, mode := range []string{"writer", "active", "pending", "uncertain", "confirmed", "interrupted", "legacy", "missing", "missing_origin", "wrong_origin", "wrong_owner", "extra_owner", "corrupt_head"} {
+	for _, mode := range []string{"writer", "pending", "uncertain", "confirmed", "interrupted", "legacy", "missing", "missing_origin", "wrong_origin", "wrong_owner", "extra_owner", "corrupt_head"} {
 		t.Run(mode, func(t *testing.T) {
 			s, _, token, kill := startOrphanWorkerOwner(t, mode)
 			kill()

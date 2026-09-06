@@ -34,6 +34,9 @@ type leaseRecoveryReceipt struct {
 	Digest          string    `json:"digest"`
 	CandidateDigest string    `json:"candidate_digest"`
 	EventID         string    `json:"event_id,omitempty"`
+	ChildTaskID     string    `json:"child_task_id,omitempty"`
+	ChildSequence   int64     `json:"child_sequence,omitempty"`
+	ChildEventID    string    `json:"child_event_id,omitempty"`
 }
 type recoveryQuery interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
@@ -120,7 +123,7 @@ func existingLeaseRecovery(ctx context.Context, q recoveryQuery, c recoveryLease
 	}
 	switch r.Reason {
 	case "terminal_reader_owner_unlocked":
-		if r.EventID != "" {
+		if r.EventID != "" || r.ChildTaskID != "" || r.ChildSequence != 0 || r.ChildEventID != "" {
 			return false, ErrLeaseRecovery
 		}
 	case "orphan_worker_owner_unlocked":
@@ -131,6 +134,9 @@ func existingLeaseRecovery(ctx context.Context, q recoveryQuery, c recoveryLease
 		var terminal runtime.Event
 		if q.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(body AS BLOB)) BETWEEN 1 AND 8388608 THEN body END FROM events WHERE task_id=? AND sequence=? AND id=?`, c.Task, seq, r.EventID).Scan(&encoded) != nil || json.Unmarshal(encoded, &terminal) != nil || terminal.Validate() != nil || terminal.TaskID != c.Task || terminal.ID != r.EventID || terminal.Sequence != seq || terminal.WorkerID != c.Owner || terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "worker_owner_interrupted" || !terminal.Time.Equal(r.Time) {
 			return false, ErrLeaseRecovery
+		}
+		if err := validateOrphanChildReceipt(ctx, q, r); err != nil {
+			return false, err
 		}
 	default:
 		return false, ErrLeaseRecovery

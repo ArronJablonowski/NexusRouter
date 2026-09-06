@@ -15,7 +15,7 @@ import (
 )
 
 // RecoverOrphanWorker records failure, never acceptance, for a stopped local
-// worker whose execution child is already durably terminal and effect-resolved.
+// worker whose execution child is terminal or a provably model-only interruption.
 // Ownership proof, event, projection, reader release and receipt share one commit.
 func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.Time) (bool, error) {
 	now = now.UTC()
@@ -74,10 +74,11 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	if err != nil {
 		return false, ErrLeaseRecovery
 	}
-	plan, err := sessions.PlanInterruptedWorker(histories, now)
+	tree, err := sessions.PlanInterruptedWorkerTree(histories, now)
 	if errors.Is(err, sessions.ErrHistory) {
 		return false, nil
 	}
+	plan := tree.Worker
 	if err != nil || len(plan.Events) != 1 || plan.ParentTaskID != c.Task || histories[0][0].WorkerID != c.Owner {
 		return false, ErrLeaseRecovery
 	}
@@ -95,22 +96,25 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	if tx.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT token FROM resource_leases WHERE task_id=? LIMIT 2)`, c.Task).Scan(&count) != nil || count != 1 {
 		return false, ErrLeaseRecovery
 	}
-	body, err := event.Encode()
-	if err != nil {
-		return false, ErrLeaseRecovery
+	if tree.Child != nil {
+		// A model-only child has no current tool dispatch. A separate resource
+		// holder is contradictory ownership, not another lease to reclaim.
+		var held bool
+		if tree.Child.ParentTaskID != histories[1][0].TaskID || len(tree.Child.Events) != 1 || tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
+			return false, ErrLeaseRecovery
+		}
+		if appendOrphanFailure(ctx, tx, *tree.Child) != nil {
+			return false, ErrLeaseRecovery
+		}
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, body); err != nil {
-		return false, ErrLeaseRecovery
-	}
-	result, err := tx.ExecContext(ctx, `UPDATE task_heads SET sequence=?,state='failed' WHERE task_id=? AND session_id=? AND sequence=? AND state='running'`, event.Sequence, c.Task, event.SessionID, plan.ExpectedSequence)
-	if err != nil {
-		return false, ErrLeaseRecovery
-	}
-	if n, err := result.RowsAffected(); err != nil || n != 1 {
+	if appendOrphanFailure(ctx, tx, plan) != nil {
 		return false, ErrLeaseRecovery
 	}
 	h := sha256.Sum256([]byte(token))
 	r := leaseRecoveryReceipt{Version: 1, Task: c.Task, Sequence: event.Sequence, State: "failed", Time: now, Process: c.Process, Reason: "orphan_worker_owner_unlocked", Digest: hex.EncodeToString(h[:]), CandidateDigest: recoveryDigest(c, event.Sequence, "failed"), EventID: event.ID}
+	if tree.Child != nil {
+		r.ChildTaskID, r.ChildSequence, r.ChildEventID = tree.Child.ParentTaskID, tree.Child.Events[0].Sequence, tree.Child.Events[0].ID
+	}
 	receipt, _ := json.Marshal(r)
 	if _, err = tx.ExecContext(ctx, `INSERT INTO lease_recoveries(lease_token,digest,body) VALUES(?,?,?)`, token, r.Digest, receipt); err != nil || releaseFinishedWorker(ctx, tx, event, token, c.Owner) != nil {
 		return false, ErrLeaseRecovery
@@ -118,8 +122,14 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	// Replay after all writes catches budget overflow and trigger-time journal
 	// drift. The canonical source prefix and execution child must remain equal.
 	finalHistories, err := orphanWorkerHistories(ctx, tx, c.Task)
-	if err != nil || !orphanHistoriesMatch(histories, finalHistories, event) {
+	if err != nil || !orphanHistoriesMatch(histories, finalHistories, event, tree.Child) {
 		return false, ErrLeaseRecovery
+	}
+	if tree.Child != nil {
+		var held bool
+		if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
+			return false, ErrLeaseRecovery
+		}
 	}
 	finalParent, err := orphanWorkerParent(ctx, tx, histories[0][0], now)
 	a, _ := json.Marshal(parent)
@@ -140,6 +150,31 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 		return false, ErrLeaseRecovery
 	}
 	return true, nil
+}
+
+func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.InterruptionRecovery) error {
+	if len(plan.Events) != 1 {
+		return ErrLeaseRecovery
+	}
+	event := plan.Events[0]
+	if event.Kind != runtime.TaskFailed || event.TaskID != plan.ParentTaskID || event.Sequence != plan.ExpectedSequence+1 {
+		return ErrLeaseRecovery
+	}
+	body, err := event.Encode()
+	if err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, body); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE task_heads SET sequence=?,state='failed' WHERE task_id=? AND session_id=? AND sequence=? AND state='running'`, event.Sequence, event.TaskID, event.SessionID, plan.ExpectedSequence)
+	if err != nil {
+		return err
+	}
+	if n, err := result.RowsAffected(); err != nil || n != 1 {
+		return ErrLeaseRecovery
+	}
+	return nil
 }
 
 // Bind the worker's origin to the parent's actual dispatched delegation. This
@@ -174,11 +209,14 @@ func orphanWorkerParent(ctx context.Context, tx *sql.Tx, start runtime.Event, no
 	return history, nil
 }
 
-func orphanHistoriesMatch(before, after [][]runtime.Event, event runtime.Event) bool {
+func orphanHistoriesMatch(before, after [][]runtime.Event, event runtime.Event, child *sessions.InterruptionRecovery) bool {
 	if len(before) != 2 || len(after) != 2 || len(after[0]) != len(before[0])+1 {
 		return false
 	}
 	want := [][]runtime.Event{append(append([]runtime.Event(nil), before[0]...), event), before[1]}
+	if child != nil {
+		want[1] = append(append([]runtime.Event(nil), before[1]...), child.Events...)
+	}
 	a, _ := json.Marshal(want)
 	b, _ := json.Marshal(after)
 	return string(a) == string(b)

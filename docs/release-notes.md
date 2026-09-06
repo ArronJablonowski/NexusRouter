@@ -6,7 +6,8 @@ production release, release tag or complete PRD acceptance is claimed.
 ## Available for supervised testing
 
 - Verified orphan-worker failure recovery when its execution child is already
-  terminal and effect-resolved. Atomic failure/reader release/receipt, followed
+  terminal and effect-resolved or has a provably model-only interruption.
+  Atomic child/worker failure, reader release and receipt, followed
   by independently validated parent reconciliation; no output acceptance or
   model retry. See [orphan worker recovery](orphan-worker-recovery.md).
 

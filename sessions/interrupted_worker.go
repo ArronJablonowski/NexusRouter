@@ -12,7 +12,7 @@ import (
 )
 
 // PlanInterruptedWorker plans failure, never acceptance, of an unfinished
-// supervisor journal with one fully resolved execution child. The caller must
+// supervisor journal with one resolved or provably interrupted-model child. The caller must
 // independently prove and retain original process ownership loss transactionally.
 func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (InterruptionRecovery, error) {
 	bad := func() (InterruptionRecovery, error) { return InterruptionRecovery{}, ErrHistory }
@@ -66,7 +66,8 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 		}
 	}
 	childState, err := Replay(context.Background(), terminalReader(child), execution.TaskID)
-	if err != nil || childState.InterruptedTurn || childState.UncertainEffects || len(childState.Pending) != 0 {
+	interrupted := child[len(child)-1].Data.Code == "interrupted_model"
+	if err != nil || (childState.InterruptedTurn && !interrupted) || (interrupted && !isInterruptedModelTerminal(child)) || childState.UncertainEffects || len(childState.Pending) != 0 {
 		return bad()
 	}
 	childValidation := append([]runtime.Event(nil), child...)
@@ -87,6 +88,9 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 		return bad()
 	}
 	for i, e := range work {
+		if interrupted && (e.Kind == runtime.EvaluationRecorded || e.Kind == runtime.WorkerCompleted) {
+			return bad()
+		}
 		if e.Data.Effect != "" || len(e.Data.Messages) != 0 || e.Data.Compaction != nil || (i > 0 && (e.Data.ParentTaskID != "" || e.Data.SubmissionID != "" || e.Data.DelegationOrigin != nil || e.Data.RetryOfTaskID != "")) {
 			return bad()
 		}
@@ -122,4 +126,68 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 		return bad()
 	}
 	return InterruptionRecovery{ParentTaskID: start.TaskID, ExpectedSequence: state.Sequence, Events: []runtime.Event{end}}, nil
+}
+
+// InterruptedWorkerTreeRecovery is an atomic failure plan. Child, when present,
+// must commit with Worker; neither plan authorizes dispatch or output acceptance.
+type InterruptedWorkerTreeRecovery struct {
+	Worker InterruptionRecovery
+	Child  *InterruptionRecovery
+}
+
+// PlanInterruptedWorkerTree also handles a running, model-only execution child.
+// Ownership loss must be independently proven for the entire tree by the caller.
+func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (InterruptedWorkerTreeRecovery, error) {
+	bad := func() (InterruptedWorkerTreeRecovery, error) { return InterruptedWorkerTreeRecovery{}, ErrHistory }
+	now = now.UTC()
+	if len(histories) != 2 {
+		return bad()
+	}
+	childIndex := -1
+	for i, h := range histories {
+		if len(h) == 0 {
+			return bad()
+		}
+		if h[0].WorkerID == "" {
+			if childIndex != -1 {
+				return bad()
+			}
+			childIndex = i
+		}
+	}
+	if childIndex == -1 {
+		return bad()
+	}
+	child := histories[childIndex]
+	var childPlan *InterruptionRecovery
+	validation := histories
+	last := child[len(child)-1].Kind
+	if last != runtime.TaskCompleted && last != runtime.TaskFailed && last != runtime.TaskCanceled {
+		planned, err := PlanInterruptedModel([][]runtime.Event{child}, now, false)
+		if err != nil {
+			return bad()
+		}
+		childPlan = &planned
+		validation = append([][]runtime.Event(nil), histories...)
+		validation[childIndex] = append(append([]runtime.Event(nil), child...), planned.Events...)
+	}
+	worker, err := PlanInterruptedWorker(validation, now)
+	if err != nil {
+		return bad()
+	}
+	return InterruptedWorkerTreeRecovery{Worker: worker, Child: childPlan}, nil
+}
+
+// Recognize only the exact deterministic terminal derived from a model-only
+// prefix. A matching failure code alone is not proof of safe interruption.
+func isInterruptedModelTerminal(history []runtime.Event) bool {
+	if len(history) < 2 {
+		return false
+	}
+	end := history[len(history)-1]
+	if end.Kind != runtime.TaskFailed || end.Data.Code != "interrupted_model" {
+		return false
+	}
+	plan, err := PlanInterruptedModel([][]runtime.Event{history[:len(history)-1]}, end.Time, false)
+	return err == nil && len(plan.Events) == 1 && reflect.DeepEqual(plan.Events[0], end)
 }

@@ -10,7 +10,9 @@ claim. The bounded journal must replay consistently and contain no current tool
 proposals, effects, approvals, workers, retries, or evaluation/error records.
 Complete historical tool pairs in the initial context are not current tool
 execution. A continuation parent must match the original submission intake.
-Multiple task trees and unfinished delegated children remain ineligible.
+Multiple task trees remain ineligible for this single-task submission path.
+The separate [orphan-worker path](orphan-worker-recovery.md) now supports a
+model-only interrupted child under retained worker process-ownership proof.
 
 One SQLite writer transaction appends a terminal `TaskFailed` event with code
 `interrupted_model`, updates the task head and submission, invalidates the old
@@ -31,11 +33,12 @@ invalid histories, size limits, rollback, concurrent recovery and stale-owner
 fencing. Application tests kill an owned subprocess with SIGKILL after a model
 delta is persisted, expire its fixture lease, and run the dispatcher recovery
 path. They assert prefix preservation, one terminal event and receipt, an empty
-result, no redispatch, and idempotent repeated recovery. The existing running-child
-crash test still requires refusal.
+result, no redispatch, and idempotent repeated recovery. The running-child crash
+test first proves this parent-only path refuses; the full daemon then uses the
+separate worker-tree proof to record failure without replaying inference.
 
 ```sh
-go test -race ./internal/app -run 'Test(InterruptedModelRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRemainsUnresolved)$' -count=1
+go test -race ./internal/app -run 'Test(InterruptedModelRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRecoversFailure)$' -count=1
 ```
 
 These tests use loopback provider fixtures, not live Codex or Ollama generation.

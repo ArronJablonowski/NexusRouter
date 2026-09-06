@@ -1,8 +1,8 @@
 # Interrupted worker recovery
 
 The daemon can now fail a verified orphaned in-process worker whose execution
-child finished before the worker's terminal commit. This closes the crash gap
-between preliminary worker acceptance and durable finalization. It does not
+child finished before the worker's terminal commit, or whose model-only child
+was interrupted. This closes both the finalization and model-stream crash gaps. It does not
 accept the output, rerun inference, resume a task, or reassign work.
 
 ## Required evidence
@@ -15,8 +15,10 @@ accept the output, rerun inference, resume a task, or reassign work.
 - The running worker journal follows the supported supervisor lifecycle. Its
   preliminary validation/output records remain source facts, not success.
 - Exactly one direct, non-worker execution child has a valid terminal projection,
-  with no pending tool, interrupted turn, uncertain or confirmed effect. Nested,
-  missing, ambiguous and still-running children are unsupported.
+  or a running model-only history with no current tools or acceptance records.
+  Pending tools, uncertain/confirmed effects, nested, missing and ambiguous
+  children remain unsupported. A running child must have no independently held
+  resource lease; worker ownership cannot authorize releasing another holder.
 - Parent history binds the worker's delegation origin to the actual dispatched
   pending call, including turn, attempt, tool, session, submission and batch index.
   The child may use its own session; submission identities must match. Empty
@@ -35,6 +37,16 @@ lease metadata, terminal sequence/state and event ID. It contains no model
 output, raw lease token or guard path in its body; its private key references the
 lease token. No schema migration is needed beyond schema 23.
 
+For a running model-only child, the same transaction first appends
+`task.failed` / `interrupted_model` to the child and updates its head. Both child
+and worker failure, the reader release and the receipt commit or roll back
+together. The receipt additionally binds the child task, terminal sequence and
+event ID. The model-interruption terminal must match the exact deterministic
+plan derived from its source prefix; a matching error string alone is not proof.
+Partial deltas and the replayed `InterruptedTurn` flag remain intact. No
+`turn.completed`, output, evaluation or success is invented. Worker preliminary
+acceptance is inconsistent with an interrupted child and is rejected.
+
 The transaction revalidates ownership, source event content, child and parent
 history before commit. Any failure rolls back all changes. Repeating recovery
 does not append another event or rewrite the receipt. Repeat receipt validation
@@ -50,7 +62,7 @@ Parent submission reconciliation remains restricted by configuration and expired
 submission claim. Non-submitted parent journal reconciliation is not added here.
 
 Each page has a five-second cooperative deadline. Worker plus child history is
-bounded to 10,000 stored events and 8 MiB, including the new terminal. The parent
+bounded to 10,000 stored events and 8 MiB, including all new terminals. The parent
 is independently bounded to 10,000 events and 8 MiB. Bounds limit returned
 candidates and payloads, not total database scan cost or filesystem-call latency.
 Unsupported histories remain untouched; corruption/operational errors degrade
@@ -64,6 +76,13 @@ preserves the child and source prefixes, releases both verified readers, and
 allows new writers on both scopes. Fixture coordinator and worker call counts
 remain one each. Repeated sweeps preserve journal and receipt bytes.
 
+The model-stream SIGKILL test waits for actual child request dispatch, kills and
+reaps the owned helper, and verifies request disconnection before recovery. The
+real daemon then fails the interrupted child, worker and parent without another
+provider request. Model-stream prefixes remain unchanged and interrupted;
+the repaired parent contains bounded failure evidence, not a partial answer.
+Provider disconnection does not attest remote generation or billing cessation.
+
 Storage tests additionally cover held guards, writers, unknown ownership,
 unresolved child effects, parent-origin mismatch, duplicate owners, concurrent
 recovery, and rollback after event/receipt/release failures, cancellation, guard
@@ -72,11 +91,11 @@ ordering, invalid metadata, independent sessions and non-submitted work.
 
 ```sh
 go test -race ./sessions -run PlanInterruptedWorker -count=3
-go test -race ./internal/telemetry -run '^TestOrphanWorker' -count=3
-go test -race ./internal/app -run '^TestWorkerFinalizationProcessDeathRecoveryBoundary$' -count=3
+go test -race ./internal/telemetry -run '^TestOrphan(Worker|Child)' -count=3
+go test -race ./internal/app -run '^Test(WorkerFinalizationProcessDeathRecoveryBoundary|UnfinishedDelegationAfterSIGKILLRecoversFailure)$' -count=3
 ```
 
-Still required: interrupted child recovery, missing outcomes, writer and
+Still required: interrupted tool-aware child recovery, missing outcomes, writer and
 uncertain-effect resolution, persistent operator attention, idempotent
 reassignment, automatic continuation, stronger isolation and durable guard
 retention. This is not full worker recovery or complete PRD acceptance. Native

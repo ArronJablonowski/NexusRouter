@@ -84,7 +84,8 @@ forced in-process termination remain unfinished. Schema-22 leases bind to a priv
 [local execution-image guard](process-lifetime-ownership.md), preventing active
 mutation by an unrelated process with a copied lease token. Internal guard
 observation now enables terminal-reader reclamation and the bounded orphan-worker
-case described above. Running children, unknown ownership and unresolved effects
+case described above, including model-only interrupted children. Tool-aware
+interrupted children, unknown ownership and unresolved effects
 still block availability. Broader lifecycle ownership and reconciliation remain
 required by the PRD. See [interrupted delegation recovery](interrupted-delegation-recovery.md)
 and [reader/writer execution](reader-writer-execution.md).

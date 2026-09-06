@@ -85,6 +85,9 @@ func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error
 	}
 	var child TerminalOutcome
 	if len(execution) > 0 {
+		if execution[len(execution)-1].Data.Code == "interrupted_model" && !isInterruptedModelTerminal(execution) {
+			return nil, ErrHistory
+		}
 		snapshot, replayErr := Replay(context.Background(), terminalReader(execution), execution[0].TaskID)
 		if replayErr != nil || snapshot.UncertainEffects || len(snapshot.Pending) != 0 {
 			return nil, ErrHistory
@@ -110,7 +113,7 @@ func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error
 			return recoveryFailureEvidence{}, ErrHistory
 		}
 		switch e.Data.Code {
-		case "worker_failed", "worker_owner_interrupted", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "execution_lease_lost":
+		case "worker_failed", "worker_owner_interrupted", "interrupted_model", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "execution_lease_lost":
 		default:
 			return recoveryFailureEvidence{}, ErrHistory
 		}

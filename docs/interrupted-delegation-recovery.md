@@ -97,10 +97,12 @@ inference call.
 
 A complementary subprocess test kills the owner while the child's HTTP request
 is still in progress. After the connection closes, the parent, work and execution
-journals remain running. Repeated recovery leaves those journals and the expired
+journals remain running. Repeated parent-only recovery leaves those journals and the expired
 submission unresolved, produces no receipt or redispatch, and denies continuation
-of the unfinished history. This verifies a safe refusal, not automatic recovery
-of running children.
+of the unfinished history. The test then starts the full daemon: retained process
+proof and a model-only child prefix permit atomic child/worker failure, followed
+by parent failure reconciliation and separate parent-reader reclamation. It
+preserves interrupted-turn evidence and never repeats either model request.
 
 [Worker-finalization crash qualification](worker-finalization.md) additionally
 kills the application inside the worker terminal/release transaction and after
@@ -112,14 +114,15 @@ The daemon now follows journal recovery with a separate
 [terminal-reader reclamation page](terminal-reader-recovery.md), which requires
 verified unlocked ownership and effect-resolved terminal replay. A preceding
 [orphan-worker sweep](orphan-worker-recovery.md) can now fail an interrupted
-supervisor when its one execution child is already terminal and effect-resolved.
-Running children, uncertain effects, legacy/missing guards and writers remain
+supervisor when its one execution child is terminal and effect-resolved or has a
+provably model-only interruption. Interrupted tool-aware children, uncertain
+effects, legacy/missing guards and writers remain
 unresolved.
 
 Run the process-boundary tests with:
 
 ```sh
-go test -race ./internal/app -run 'Test(InterruptedDelegationRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRemainsUnresolved)$' -count=5
+go test -race ./internal/app -run 'Test(InterruptedDelegationRecoveredAfterAbruptProcessDeath|UnfinishedDelegationAfterSIGKILLRecoversFailure)$' -count=5
 ```
 
 These SIGKILL tests target macOS and Linux; local execution evidence is macOS.
@@ -129,6 +132,6 @@ They do not establish power-loss durability, automatic daemon restart, recovery
 from arbitrary transaction instructions, or stopping remote generation/billing.
 Separate [model-only interruption recovery](interrupted-model-recovery.md) can
 close eligible single-task inference journals as failed or canceled, without
-resuming inference. Running children, missing batch slots, uncertain
+resuming inference. Tool-aware interrupted children, missing batch slots, uncertain
 effects, automatic continuation and broader crash qualification remain required
 follow-up work.

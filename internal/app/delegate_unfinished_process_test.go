@@ -23,9 +23,10 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
-// Unlike terminal-worker recovery, an interrupted provider request supplies no
-// proof of completion. Killing the owner must not authorize redispatch.
-func TestUnfinishedDelegationAfterSIGKILLRemainsUnresolved(t *testing.T) {
+// An interrupted provider request supplies no proof of completion. Manual
+// journal repair cannot change it; verified process-ownership proof permits
+// failure only, never redispatch or invented completed inference.
+func TestUnfinishedDelegationAfterSIGKILLRecoversFailure(t *testing.T) {
 	if stdRuntime.GOOS != "darwin" && stdRuntime.GOOS != "linux" {
 		t.Skip("SIGKILL qualification requires Unix")
 	}
@@ -50,6 +51,7 @@ func TestUnfinishedDelegationAfterSIGKILLRemainsUnresolved(t *testing.T) {
 			select {
 			case <-r.Context().Done():
 			case <-ctx.Done():
+				return
 			}
 			select {
 			case disconnected <- struct{}{}:
@@ -180,5 +182,9 @@ func TestUnfinishedDelegationAfterSIGKILLRemainsUnresolved(t *testing.T) {
 	}
 	if _, err := loadContinuation(ctx, db, Request{ContinueTaskID: parent}, nil); !errors.Is(err, ErrAdmission) {
 		t.Fatal("unfinished delegation admitted as restored history", err)
+	}
+	qualifyOrphanChildSweep(t, ctx, svc, db, before.ID, parent, journals)
+	if calls.Load() != 2 {
+		t.Fatal("orphan child recovery redispatched provider", calls.Load())
 	}
 }
