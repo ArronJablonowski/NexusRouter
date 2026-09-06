@@ -1,5 +1,60 @@
 # Implementation evidence
 
+Skill outcome comparison checkpoint: resumed from GitHub-backed 2cfd61e and the
+in-progress comparator/batch work. The preceding user-facing turn confirmed the
+authenticated Codex CLI but did not itself advance implementation. PRD9.4 now
+has a bounded explicit-task-set diagnostic over two fresh skill versions, with
+configured scope/model binding and current independent quality evidence.
+
+One read-only SQLite transaction spans every selected journal and current
+evaluation chain; aggregate event/evidence metadata limits are checked before
+loading bodies. A real WAL barrier test commits two feedback revisions while a
+reader is pinned: the first batch retains both old outcomes and the next sees
+both revisions. Missing/corrupt tasks and budget overflow return no partial data.
+There is no migration, catalog access, inference, fitness update or rollback.
+
+The pure comparator excludes all repeated selected sessions, task lineage,
+nonfinal work, unknown/ambiguous fresh attribution, wrong execution profiles and
+missing/other quality sources. It preserves explicit rejection. User feedback
+qualifies for every domain; deterministic/tool-result quality only qualifies for
+the enumerated objective domains. Model judging and mechanical syntax/nonempty
+checks cannot qualify. Conflicting version content digests fail even when the
+conflicting tasks would otherwise be excluded. Reports recompute count partitions,
+rates, Wilson bounds and status during validation, with a canonical evidence
+digest and no raw prompt/output/skill/evidence-reference payloads.
+
+Application, SDK, `darwin skills compare --config path` (strict JSON stdin), and
+authenticated POST `/v1/skills/comparison` expose the read-only operation.
+Configured secrets are checked before I/O and again against complete observations
+and the report. HTTP shares bounded control capacity with a five-second deadline.
+Review found and fixed lossy surrogate escape decoding and missing configured
+model-ID response binding; tests explicitly reject both conditions. Current user
+corrections change accepted counts/digests without adding samples or changing
+the journal. Unknown legacy records stay unknown rather than fabricating exposure.
+
+The statistical result is explicitly advisory: per-cohort approximate Wilson95
+interval separation is not joint confidence, a causal experiment, proof of
+equivalence, or repeated-testing protection. Automatic cohort selection/indexing,
+confounder controls, repeated monitoring policy, qualified production validators
+and durable activation-bound outcome rollback remain unfinished. See
+[comparison usage and limitations](skill-outcome-comparison.md).
+
+Focused native race tests passed three repetitions for the comparator, batch
+storage, app, SDK, CLI and API, including actual HTTP/app/SQLite integration.
+The first full check caught a stale compiled CLI fixture that serialized an
+unset estimated cost as YAML null. Configuration rejection was correct; the
+fixture was fixed to explicit zero before freeze. The frozen full CLI race suite
+passed35.488s. Final make check passed formatting/LOC, vet, the complete native
+race suite and production build, including app162.455s, telemetry114.011s,
+CLI37.321s, API13.202s, SDK21.944s and skills17.516s.
+Native and Linux amd64 builds passed. Comparison tests executed successfully as
+CGO-free Linux arm64 binaries in the existing Alpine3.22 image (no network,
+read-only root, unprivileged UID, bounded memory/processes/tmpfs), including the
+actual WAL and HTTP integration tests. Linux tests are not race-instrumented.
+Native Linear was rechecked: the Mac remains locked and automatic
+unlock failed; no issue state/comment update is claimed. No user database or
+configuration was changed, and no live model inference was performed.
+
 Skill outcome attribution checkpoint: the prior turn made verified progress and
 was pushed as6439059; this turn started clean. PRD9.4 outcome-driven regression
 needs reliable skill exposure and independent outcome evidence, not skill names

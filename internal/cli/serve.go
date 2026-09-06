@@ -161,13 +161,14 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
 			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
 		},
-		RunStream:        service.RunStream,
-		RunTextStream:    service.RunTextStream,
-		Events:           db.ReadEventPage,
-		Run:              service.Run,
-		Inspect:          db.TaskSnapshot,
-		TaskContinuation: db.TaskContinuation,
-		SkillTaskOutcome: service.SkillTaskOutcome,
+		RunStream:            service.RunStream,
+		RunTextStream:        service.RunTextStream,
+		Events:               db.ReadEventPage,
+		Run:                  service.Run,
+		Inspect:              db.TaskSnapshot,
+		TaskContinuation:     db.TaskContinuation,
+		SkillTaskOutcome:     service.SkillTaskOutcome,
+		CompareSkillOutcomes: service.CompareSkillOutcomes,
 		TaskLeases: func(ctx context.Context, task string) (workers.TaskLeaseStatus, error) {
 			return app.InspectTaskLeases(ctx, s.Telemetry.Database, task)
 		},

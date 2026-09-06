@@ -66,6 +66,12 @@ quality evidence separate from nonempty-text/Go-syntax checks. The same report i
 available through the SDK and authenticated HTTP API; see
 [skill outcome attribution](docs/skill-outcome-attribution.md).
 
+`darwin skills compare --config config.yaml` accepts a bounded JSON task-set
+request on stdin and compares two recorded skill versions using current quality
+evidence. Reports are advisory; creative tasks require user feedback and no model
+judge can qualify. See [outcome comparison](docs/skill-outcome-comparison.md) for
+the SDK/HTTP interfaces, sample requirements and statistical limitations.
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

@@ -92,7 +92,11 @@ performs no inference or mutation. An actual WAL concurrency test pins a reader,
 commits a feedback revision from another connection, and confirms that the first
 report retains the old evidence while the next sees the new revision.
 
-An indexed cross-task/version observation store, sufficiently sampled comparable
+An explicit bounded [cross-task comparison](skill-outcome-comparison.md) now
+provides advisory version statistics from one coherent snapshot. It conservatively
+excludes ambiguous exposure and requires independent quality evidence.
+
+An indexed cross-task/version observation store, automatically selected comparable
 cohorts, treatment of multiple simultaneous skills and inherited history,
 statistical regression policy, and qualified production skill validators remain
 necessary before automatic outcome-based rollback can be enabled.

@@ -36,6 +36,17 @@ func (s *Store) SkillTaskOutcome(ctx context.Context, task string) (out skills.T
 		return out, err
 	}
 	defer tx.Rollback()
+	out, err = skillTaskOutcome(ctx, tx, task)
+	if err != nil {
+		return out, err
+	}
+	if err = tx.Commit(); err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+func skillTaskOutcome(ctx context.Context, tx *sql.Tx, task string) (out skills.TaskOutcome, err error) {
 	var events []runtime.Event
 	snapshot, err := taskSnapshotWithEvents(ctx, tx, task, &events)
 	if err != nil {
@@ -109,9 +120,6 @@ func (s *Store) SkillTaskOutcome(ctx context.Context, task string) (out skills.T
 	}
 	if out.Validate() != nil {
 		return out, skills.ErrInvalid
-	}
-	if err = tx.Commit(); err != nil {
-		return out, err
 	}
 	return out, nil
 }

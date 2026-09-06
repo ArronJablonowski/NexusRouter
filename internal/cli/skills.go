@@ -14,7 +14,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
-const skillsUsage = "usage: darwin skills list|show|history|state|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--expected-revision sha256] [--limit 100]\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable."
+const skillsUsage = "usage: darwin skills list|show|history|state|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--expected-revision sha256] [--limit 100]\n       darwin skills compare --config path < request.json\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable. Comparison is advisory and cannot activate or roll back skills."
 
 var skillIdentifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
@@ -35,6 +35,9 @@ func runSkills(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return skillsError(stderr, skillsUsage, 2)
 	}
 	command := args[0]
+	if command == "compare" {
+		return runSkillComparison(args[1:], stdin, stdout, stderr)
+	}
 	if command == "learning" {
 		return runSkillLearning(args[1:], stdout, stderr)
 	}

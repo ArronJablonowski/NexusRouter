@@ -61,6 +61,7 @@ type Services struct {
 	Cancellation           func(context.Context, string) (runtime.CancellationStatus, error)
 	TaskContinuation       func(context.Context, string) (sessions.ContinuationStatus, error)
 	SkillTaskOutcome       func(context.Context, string) (skills.TaskOutcome, error)
+	CompareSkillOutcomes   func(context.Context, skills.ComparisonRequest) (skills.ComparisonReport, error)
 	TaskLeases             func(context.Context, string) (workers.TaskLeaseStatus, error)
 	ScopeLeases            func(context.Context, string) (workers.ScopeLeaseStatus, error)
 	LeaseAttention         func(context.Context, workers.LeaseAttentionOptions) (workers.LeaseAttentionPage, error)
@@ -150,6 +151,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/skills/comparison":
+		h.serveSkillComparison(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/resources/attention":
 		h.serveLeaseAttention(w, r.WithContext(ctx))
 	case attentionHistoryRoute(r.URL.Path):
