@@ -1,5 +1,57 @@
 # Implementation evidence
 
+Outcome-policy rollback checkpoint: started from clean, verified/pushed 44458e2.
+PRD9.4 now has a default-off trusted-Go-host action that binds automatic exposure
+selection to an exact first activation and its validated undo predecessor. The
+application obtains evidence from the configured SQLite selector; matching
+immutable catalog digests and activation revision are checked before commit.
+The observational regression signal remains a policy heuristic, not fabricated
+deterministic validation or proof that the skill caused the decline.
+
+Schema6 catalog receipts atomically record one committed adjudication per skill
+activation revision: a signal restores the predecessor with a distinct outcome
+marker, while empty, insufficient and no-signal reports commit no_action without
+changing activation state. Exact retries return the historical receipt without
+reading newer SQLite evidence, including after later activation or unavailable
+telemetry. Failed/interrupted callbacks can repeat before commit; this is neither
+exactly-once callback execution nor a strict bound on statistical looks. Catalog
+and SQLite are not one distributed transaction. Reports capture a historical
+snapshot, and CheckedAt is catalog decision time.
+
+Configuration, application and Go SDK expose the separate outcome_rollback
+permission, preserving default settings JSON/fingerprints when false. Every
+action/retry checks current policy, model mapping, cumulative secret redaction,
+kill switches and per-call catalog/database bindings. Independent review caught
+a historical retry policy-change gap; new tests reproduce and cover its fix.
+Inspection remains available with rollback disabled. Receipt caps, cooperative
+deadlines, immutable metadata ownership and schema/marker consistency checks fail
+closed. Ordinary catalog reads do structural receipt validation; requested receipt
+lookups additionally verify the historical activation prefix and cohort digests.
+
+Focused race tests passed repeated core, config, application and SDK scenarios,
+including concurrent conflicting decisions, no-action consumption, digest and
+predecessor rejection, restored-version rejection, callback panic/cancellation,
+secret and policy rotation, and mutation-free historical retry. An owned child
+process was killed after catalog commit but before wrapper acknowledgement;
+reopening and retrying returned the same receipt without another selector call
+or rollback. This does not qualify kill-during-fsync or physical power loss.
+
+Final make check passed formatting/LOC enforcement, vet, all native race tests
+and production build (app173.267s, telemetry117.821s, CLI38.243s, API11.968s,
+SDK21.078s). Native and Linux amd64 binaries built. New core, application, SDK
+and configuration tests also executed successfully as CGO-free Linux arm64
+binaries in the existing Alpine3.22 image with network disabled, read-only root,
+unprivileged UID and bounded resources. Linux execution was not race-instrumented.
+
+No unattended daemon loop or CLI/HTTP mutation endpoint is introduced. Durable
+preselection intent, current-activation exposure attribution, repeated-monitoring
+policy, production validators and confounder handling remain unfinished. No live
+model inference, user database migration or user configuration change occurred.
+Native Linear remained inaccessible because the Mac was locked; no issue status
+was changed. Codex CLI 0.153.4 was rechecked as installed and logged in using
+ChatGPT; the existing exact-Sol app-server integration remains experimental.
+See [outcome-policy rollback](skill-outcome-rollback.md) for the contract and limits.
+
 Automatic comparison-window checkpoint: previous turn made verified progress,
 committed/pushed e77573a, and this turn started clean. PRD9.4 now has automatic
 outcome-independent exposure selection instead of requiring individual task IDs.

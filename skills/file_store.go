@@ -22,12 +22,13 @@ const maxFile = 8 << 20
 // One manifest replacement commits visibility; orphan draft files are harmless.
 // Cross-process locking serializes mutations and is released on process exit.
 type FileStore struct {
-	root      *os.Root
-	lock      *os.File
-	mu        sync.Mutex
-	automatic atomic.Bool
-	scopes    map[string]bool
-	readOnly  bool
+	root            *os.Root
+	lock            *os.File
+	mu              sync.Mutex
+	automatic       atomic.Bool
+	outcomeRollback atomic.Bool
+	scopes          map[string]bool
+	readOnly        bool
 }
 
 type catalog struct {
@@ -37,6 +38,7 @@ type catalog struct {
 	RegressionOperations    map[string]RegressionOperation    `json:"regression_operations,omitempty"`
 	RegressionMonitors      map[string]RegressionMonitorState `json:"regression_monitors,omitempty"`
 	RegressionMonitorChecks map[string]RegressionMonitorCheck `json:"regression_monitor_checks,omitempty"`
+	OutcomeOperations       map[string]OutcomeRollbackReceipt `json:"outcome_operations,omitempty"`
 }
 type entry struct {
 	Key         Key                 `json:"key"`
@@ -49,14 +51,15 @@ type entry struct {
 // ActivationRecord records one durable transition. Regression, when present,
 // attributes an automatic rollback to a failed deterministic validator.
 type ActivationRecord struct {
-	From           string    `json:"from"`
-	To             string    `json:"to"`
-	At             time.Time `json:"at"`
-	Rollback       bool      `json:"rollback"`
-	Regression     *Evidence `json:"regression,omitempty"`
-	OperationID    string    `json:"operation_id,omitempty"`
-	BeforeRevision string    `json:"before_revision,omitempty"`
-	Evidence       *Evidence `json:"evidence,omitempty"`
+	From               string    `json:"from"`
+	To                 string    `json:"to"`
+	At                 time.Time `json:"at"`
+	Rollback           bool      `json:"rollback"`
+	Regression         *Evidence `json:"regression,omitempty"`
+	OperationID        string    `json:"operation_id,omitempty"`
+	BeforeRevision     string    `json:"before_revision,omitempty"`
+	Evidence           *Evidence `json:"evidence,omitempty"`
+	OutcomeOperationID string    `json:"outcome_operation_id,omitempty"`
 }
 
 type activation = ActivationRecord
@@ -167,7 +170,7 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := s.read("catalog.json", &c); err != nil && (s.readOnly || !os.IsNotExist(err)) {
 		return err
 	}
-	if (c.Schema < 1 || c.Schema > 5) || c.Skills == nil || len(c.Skills) > 1000 {
+	if (c.Schema < 1 || c.Schema > 6) || c.Skills == nil || len(c.Skills) > 1000 {
 		return ErrInvalid
 	}
 	for index, e := range c.Skills {
@@ -205,6 +208,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 		return err
 	}
 	if err := validateRegressionMonitors(&c); err != nil {
+		return err
+	}
+	if err := validateOutcomeOperations(&c); err != nil {
 		return err
 	}
 	if err := fn(&c); err != nil {

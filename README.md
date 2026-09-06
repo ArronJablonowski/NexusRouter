@@ -77,6 +77,11 @@ latest exposure windows before examining outcomes. See [selection rules and
 schema27 migration](docs/skill-comparison-selection.md). This remains diagnostic;
 it cannot automatically roll back a skill.
 
+Trusted Go hosts can separately opt into operation-bound
+[outcome-policy rollback](docs/skill-outcome-rollback.md). It is disabled by default,
+requires an exact first-activation/predecessor binding, and preserves a durable
+receipt for rollback or no-action decisions. No daemon loop starts automatically.
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

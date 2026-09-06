@@ -94,4 +94,7 @@ session exclusions reduce specific ambiguities; they do not prove independence.
 This operation does not activate or roll back skills, change routing fitness,
 run validation commands or dispatch models. Qualified production validators,
 durable repeated-monitoring policy, confounder handling, and activation-bound
-outcome rollback remain required for fully automatic outcome-based learning.
+outcome rollback supervision remain required for fully automatic outcome-based
+learning. A separate [trusted-host, opt-in outcome action](skill-outcome-rollback.md)
+now binds one committed decision to a first candidate activation and its validated
+predecessor. Read-only selection itself grants no mutation authority.

@@ -91,6 +91,7 @@ type Skills struct {
 	AutoDraft        bool             `yaml:"auto_draft" json:"auto_draft"`
 	AutoActivate     bool             `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
 	Rollback         bool             `yaml:"rollback_on_regression" json:"rollback_on_regression"`
+	OutcomeRollback  bool             `yaml:"outcome_rollback" json:"outcome_rollback,omitempty"`
 	Root             string           `yaml:"root" json:"root"`
 	Scope            string           `yaml:"scope" json:"scope"`
 	LocalOnly        bool             `yaml:"local_only" json:"local_only"`
@@ -276,6 +277,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Skills.MaxSkills < 1 || s.Skills.MaxSkills > 16 || s.Skills.MaxBytes < 256 || s.Skills.MaxBytes > 65536 || (s.Skills.Root == "") != (s.Skills.Scope == "") {
 		return errors.New("invalid skills context settings")
+	}
+	if s.Skills.OutcomeRollback && (!s.Skills.Enabled || !s.Skills.Rollback || s.Skills.Root == "" || s.Skills.Scope == "") {
+		return errors.New("outcome rollback requires enabled skills, rollback policy, and configured root and scope")
 	}
 	if err := s.Skills.GenerationBudget.Validate(); err != nil {
 		return err

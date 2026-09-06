@@ -103,7 +103,9 @@ func (s *FileStore) PrepareRegressionMonitor(ctx context.Context, scope, name, v
 			c.RegressionMonitorChecks[check.OperationID] = check
 		}
 		c.RegressionMonitors[index] = state
-		c.Schema = 5
+		if c.Schema < 5 {
+			c.Schema = 5
+		}
 		return nil
 	}, true)
 	if err != nil {

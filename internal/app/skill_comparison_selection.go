@@ -17,17 +17,11 @@ func (s *Service) SelectSkillComparison(ctx context.Context, request skills.Comp
 			out, err = skills.ComparisonSelectionReport{}, ErrInspection
 		}
 	}()
-	if s == nil || ctx == nil || ctx.Err() != nil || request.Validate() != nil || s.settings.Validate() != nil || !skillGenerationIdentifier.MatchString(s.settings.Skills.Scope) {
+	if ctx == nil || ctx.Err() != nil {
 		return out, ErrAdmission
 	}
-	policy := skills.ComparisonSelectionPolicy{Version: 1, Privacy: request.Privacy, TasksPerVersion: request.TasksPerVersion, Comparison: skills.ComparisonPolicy{Key: skills.Key{Scope: s.settings.Skills.Scope, Name: request.Name}, BaselineVersion: request.BaselineVersion, CandidateVersion: request.CandidateVersion, Source: request.Source, MinSamples: request.MinSamples, MinDrop: request.MinDrop}}
-	for _, model := range s.settings.Models {
-		if model.ID == request.ModelID {
-			policy.Comparison.Execution = routing.Key{Model: model.Model, Provider: model.Provider, Domain: request.Domain, Profile: request.Profile}
-			break
-		}
-	}
-	if policy.Validate() != nil {
+	policy, err := s.skillComparisonSelectionPolicy(request)
+	if err != nil {
 		return out, ErrAdmission
 	}
 	secrets := memorySecrets(s.settings, s.secret)
@@ -68,4 +62,21 @@ func (s *Service) SelectSkillComparison(ctx context.Context, request skills.Comp
 		return skills.ComparisonSelectionReport{}, ErrInspection
 	}
 	return out, nil
+}
+
+func (s *Service) skillComparisonSelectionPolicy(request skills.ComparisonSelectionRequest) (skills.ComparisonSelectionPolicy, error) {
+	if s == nil || request.Validate() != nil || s.settings.Validate() != nil || !skillGenerationIdentifier.MatchString(s.settings.Skills.Scope) {
+		return skills.ComparisonSelectionPolicy{}, ErrAdmission
+	}
+	policy := skills.ComparisonSelectionPolicy{Version: 1, Privacy: request.Privacy, TasksPerVersion: request.TasksPerVersion, Comparison: skills.ComparisonPolicy{Key: skills.Key{Scope: s.settings.Skills.Scope, Name: request.Name}, BaselineVersion: request.BaselineVersion, CandidateVersion: request.CandidateVersion, Source: request.Source, MinSamples: request.MinSamples, MinDrop: request.MinDrop}}
+	for _, model := range s.settings.Models {
+		if model.ID == request.ModelID {
+			policy.Comparison.Execution = routing.Key{Model: model.Model, Provider: model.Provider, Domain: request.Domain, Profile: request.Profile}
+			break
+		}
+	}
+	if policy.Validate() != nil {
+		return skills.ComparisonSelectionPolicy{}, ErrAdmission
+	}
+	return policy, nil
 }

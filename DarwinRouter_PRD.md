@@ -438,11 +438,16 @@ comparison now reads all observations in one SQLite snapshot and reports advisor
 Wilson-interval separation, using independent quality evidence and conservative
 exclusions. Indexed automatic latest-window selection now fixes privacy and
 selects recorded exposures before examining outcomes, with snapshot-wide session
-exclusions. Confounder controls, repeated
-monitoring policy and automated outcome-driven rollback remain required.
+exclusions. Trusted Go hosts can now explicitly opt into one committed
+outcome-policy adjudication per first candidate activation, with a receipt and
+rollback atomically bound to its validated predecessor. The report remains
+observational, never fabricated deterministic evidence. Reactivation attribution,
+confounder controls, durable preselection/repeated-monitoring policy and unattended
+daemon supervision remain required.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).
 See [outcome comparison and limitations](docs/skill-outcome-comparison.md).
 See [automatic window selection](docs/skill-comparison-selection.md).
+See [opt-in outcome-policy rollback](docs/skill-outcome-rollback.md).
 
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
 

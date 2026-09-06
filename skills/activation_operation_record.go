@@ -26,6 +26,9 @@ type OperationStore interface {
 var _ OperationStore = (*FileStore)(nil)
 
 func validActivationOperationFields(a ActivationRecord) bool {
+	if a.OutcomeOperationID != "" && (!identifier.MatchString(a.OutcomeOperationID) || !a.Rollback || a.Regression != nil || a.Evidence != nil || a.OperationID != "" || a.BeforeRevision != "") {
+		return false
+	}
 	if a.OperationID == "" {
 		return a.BeforeRevision == "" && a.Evidence == nil
 	}
