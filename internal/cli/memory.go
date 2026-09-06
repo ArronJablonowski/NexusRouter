@@ -15,14 +15,14 @@ import (
 
 func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin memory list|show|put|delete (--config path | --db path --scope scope) [--id id] [--expected revision]")
+		fmt.Fprintln(stderr, "usage: darwin memory list|show|put|delete (--config path | --db path --scope scope) [--id id] [--expected revision]; darwin memory export --config path")
 		return 2
 	}
 	if len(args) == 0 {
 		return usage()
 	}
 	action := args[0]
-	if action != "list" && action != "show" && action != "put" && action != "delete" {
+	if action != "list" && action != "show" && action != "put" && action != "delete" && action != "export" {
 		return usage()
 	}
 	fs := flag.NewFlagSet("memory", flag.ContinueOnError)
@@ -47,6 +47,9 @@ func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return usage()
 		}
 		return runConfiguredMemory(options, stdin, stdout, stderr)
+	}
+	if action == "export" {
+		return usage()
 	}
 	if *path == "" || !memory.ValidKey(*scope) || ((action == "show" || action == "delete") && !memory.ValidKey(*id)) || (action == "delete" && *expected < 1) {
 		return usage()

@@ -50,6 +50,8 @@ func (o configuredMemoryOptions) validFlags(visited map[string]bool) bool {
 	}
 	allowed := map[string]bool{"config": true}
 	switch o.action {
+	case "export":
+		// Export is the complete configured scope, not a filtered live page.
 	case "list":
 		for _, name := range []string{"limit", "after", "contains", "include-expired"} {
 			allowed[name] = true
@@ -110,6 +112,8 @@ func runConfiguredMemory(o configuredMemoryOptions, stdin io.Reader, stdout, std
 	defer cancel()
 	var output any
 	switch o.action {
+	case "export":
+		output, err = service.ExportMemory(ctx)
 	case "list":
 		output, err = service.Memories(ctx, o.after, o.contains, o.limit, o.includeExpired)
 	case "show":
@@ -124,9 +128,27 @@ func runConfiguredMemory(o configuredMemoryOptions, stdin io.Reader, stdout, std
 	if err != nil {
 		return fail()
 	}
+	if o.action == "export" {
+		return writeMemoryExport(stdout, output, fail)
+	}
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
 	if encoder.Encode(output) != nil {
+		return 1
+	}
+	return 0
+}
+
+// The complete compact envelope is buffered before publishing any bytes. A
+// failed stdout write can still leave a partial external copy; never retry it.
+func writeMemoryExport(stdout io.Writer, output any, fail func() int) int {
+	body, err := json.Marshal(output)
+	if err != nil || len(body) > memory.ExportMaxBytes {
+		return fail()
+	}
+	body = append(body, '\n')
+	n, err := stdout.Write(body)
+	if err != nil || n != len(body) {
 		return 1
 	}
 	return 0

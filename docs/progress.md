@@ -1,5 +1,47 @@
 # Implementation evidence
 
+Consistent memory-export checkpoint: the previous dispatched-read recovery turn
+made verified progress and was pushed as9fa4788; this turn started from a clean
+worktree. PRD10.4 requires operator export, while existing live pages could mix
+concurrent revisions. New configured CLI `memory export --config` and SDK
+`ExportMemory` use an optional memory.Exporter contract. SQLite returns all
+current scoped facts, including expired/private facts, from one read transaction.
+Retired IDs and deleted content are excluded. Canonical metadata-bound records,
+SQL-side materialization limits, at most1,000 facts and an exact8MiB encoded
+envelope prevent silent truncation or partial returned snapshots. Capture time is
+observation metadata, not a database revision or exact snapshot-pin time.
+
+Application management retains the existing scope, disabled-retrieval access,
+existing-store-only policy and cooperative five-second deadline. It validates
+custom output, copies its slice, redacts admission plus post-read credentials,
+rejects secret identities and rechecks the expanded envelope. Custom exporters
+must guarantee isolation/completeness; absent support fails without a live-page
+fallback. CLI accepts only explicit configured export, never reads stdin, and
+buffers compact JSON before stdout. A write error can still leave a partial
+external copy; it returns nonzero. No inference, last-use update, migration,
+import, secure erasure or database-backup guarantee is introduced.
+
+Agents implemented storage and CLI with independent review. Storage race tests
+passed three runs7.910s, including an actual paused SQLite read and concurrent
+atomic WAL writer: the paused export sees both old records and the next export
+both new records. Initial concurrency fixture setup failed because its connection
+predated scalar-function registration; a fresh read-only connection and explicit
+early-error/join handling fixed the test. CLI configured/export/process race tests
+passed three runs19.883s, including a real owned CLI subprocess. Root app tests
+passed three runs2.150s including rotated-secret ownership and expanded-envelope
+denial; SDK tests passed three runs1.759s and contract tests1.559s. Full make check
+passed (format/LOC, vet, native race suite and production build), including
+app150.112s, telemetry110.960s, CLI37.513s and SDK20.526s. Native make build and
+Linux amd64 production cross-build passed. The new telemetry, app and CLI tests
+also executed successfully as Linux arm64 binaries in the existing Alpine3.22
+image with unprivileged user, read-only root and no external network. This
+includes the concurrent WAL writer and actual CLI subprocess; CGO-free Linux
+tests were not race-instrumented. Independent review found no outstanding issue.
+No user database/configuration, credentials or live model inference was used.
+Larger exports,
+HTTP export, automatic memory learning and complete PRD acceptance remain open.
+Native Linear is still locked; no issue update or completion is claimed.
+
 Pending dispatched read-only recovery checkpoint:
 the orphan-worker planner now resolves 1–32 already-dispatched, explicitly
 read-only pending child calls as fixed host failures, then fails child and worker

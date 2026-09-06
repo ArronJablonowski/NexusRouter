@@ -1031,7 +1031,7 @@ under changed configuration.
 
 Automatic execution permits one fallback after a provider-declared retryable first-turn failure with no text/tool proposals and a successfully persisted failure. It rechecks the preselected alternative's eligibility and remaining estimated cost budget. Partial output, validation failure, tool activity, cancellation and persistence failure do not authorize retries. Local-task privacy remains local on fallback. Each attempt has its own durable task ID with retry lineage; CLI/native task responses include previous attempt IDs. Returned text/usage belong to the final attempt, not aggregate billing. Explicit model requests do not auto-fallback. Broader recovery, validation-driven fallback and adaptive retry policies remain unfinished.
 
-`darwin memory list|show|put|delete --config path` inspects and maintains factual
+`darwin memory list|show|export|put|delete --config path` inspects and maintains factual
 memory through the configured scope and credential-redaction boundary. Put reads
 a complete fact as strict JSON from stdin and requires `--expected 0` for creation
 or the current revision for correction. Delete requires `--id` and `--expected`.
@@ -1039,8 +1039,13 @@ Storage must already exist. The explicit `--db path --scope scope` form remains
 legacy raw-storage access without configured credential redaction; never mix it
 with `--config`. Deletion is logical, not secure erasure of WAL or backups.
 
-The CLI, daemon and Go SDK provide configured-scope memory inspection, paginated
-export, creation/correction and revision-checked deletion. These operations remain
+The CLI, daemon and Go SDK provide configured-scope memory inspection,
+creation/correction and revision-checked deletion. CLI `memory export --config`
+and SDK `ExportMemory` also return one consistent scoped snapshot of all current
+facts, including expired/private facts, with configured-secret redaction. The
+bounded snapshot supports at most 1,000 facts and an 8 MiB encoded envelope;
+overflow fails instead of silently truncating or collecting inconsistent pages.
+It is not a database backup or restore operation. These operations remain
 available when prompt retrieval is disabled and do not invoke models. See
 [operator memory management](docs/memory-management.md) for the authenticated
 HTTP contract, redaction, storage requirements and uncertain-write handling.

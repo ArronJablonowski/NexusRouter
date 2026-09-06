@@ -21,6 +21,7 @@ credential redaction and existing-store-only controls as the application service
 darwin memory list --config config.yaml --limit 20
 darwin memory list --config config.yaml --after language --include-expired
 darwin memory show --config config.yaml --id language
+darwin memory export --config config.yaml
 darwin memory put --config config.yaml --expected 0 < fact.json
 darwin memory delete --config config.yaml --id language --expected 1
 ```
@@ -41,12 +42,40 @@ model, daemon startup, database initialization/migration or automatic retry occu
 Reads work with retrieval disabled and never touch `last_use`.
 
 List emits a JSON array, show a complete fact, and writes a small ID/revision or
-deletion acknowledgement. Page limits are 1–100; page through ordered immutable
-IDs for export. Output is machine-readable JSON, not a consistent multi-page
-snapshot. An output failure returns nonzero but may follow a committed mutation;
+deletion acknowledgement. Page limits are 1–100. List pages are live observations,
+not a consistent multi-page snapshot; use the explicit export command below for
+a bounded consistent snapshot. An output failure returns nonzero but may follow a committed mutation;
 inspect current state before deciding whether to write again. Errors omit raw
 configuration/backend details. The explicit legacy `--db ... --scope ...` form
 remains direct storage access without these configured redaction controls.
+
+### Consistent export
+
+`darwin memory export --config config.yaml` emits one compact JSON object with
+`version: 1`, configured `scope`, `captured_at`, and an ordered `facts` array.
+It includes all current facts in that scope, including private and expired facts;
+it excludes deleted/expired-away facts, retired-ID tombstones and historical
+payloads. An empty scope produces `facts: []`. No filter, pagination, ID, revision,
+raw database or scope override flags are accepted. Export never reads stdin.
+
+SQLite reads the complete result from one read transaction, so concurrent WAL
+writers cannot mix revisions within an export. The timestamp is the operation's
+observation time, not a database revision or a claim that the snapshot was pinned
+at that precise instant. Fact revisions and last-use values are preserved; export
+does not mutate, initialize or migrate storage. Current and newly observed
+configured credentials are redacted before output; sensitive identifiers fail
+instead of being rewritten. Other personal data remains sensitive.
+
+The complete encoded envelope must fit 8 MiB and contain at most 1,000 facts.
+Exceeding either limit or encountering invalid storage fails the whole export:
+there is no silent truncation or fallback to live pages. CLI adds one newline
+outside that envelope limit and buffers validation before writing stdout. A
+failed output write can still leave a partial external copy and returns nonzero.
+No output file is created by Darwin; secure any redirected copy yourself.
+
+This is a factual-memory export, not a database backup, restore format or secure
+erasure mechanism. Larger snapshot exports and an HTTP export endpoint remain
+future work. Exported facts do not authorize import or reuse of retired IDs.
 
 ## HTTP contract
 
@@ -109,11 +138,19 @@ fact, err := client.Memory(ctx, "language")
 facts, err := client.Memories(ctx, "", "Go", 20, false)
 err = client.PutMemory(ctx, fact, expectedRevision)
 err = client.DeleteMemory(ctx, "language", expectedRevision)
+snapshot, err := client.ExportMemory(ctx)
 ```
 
 `sdk.MemoryFact` aliases `memory.Fact`; `sdk.ErrMemoryConflict` permits conflict
 detection with `errors.Is`. Each operation uses the client's configured scope
 and store. SDK calls do not send HTTP requests to a daemon.
+
+`sdk.MemoryExport` aliases `memory.ExportSnapshot`. Custom memory stores must
+implement the optional `memory.Exporter` / `sdk.MemoryExporter` interface to
+support export, guaranteeing one complete consistent observation and cooperative
+cancellation. Unsupported stores fail rather than approximating a snapshot with
+`QueryMemory` pages. The service validates and copies custom output before
+redaction; it cannot prove a custom backend's isolation or completeness.
 
 ## Mutation, privacy, and recovery boundaries
 
@@ -158,4 +195,4 @@ adapter cannot make a custom store's delete/recreate lifecycle safe on its behal
 
 Deletion removes the active fact, not historical task prompts, WAL pages, backups
 or filesystem copies. It cannot recall context already dispatched to a provider.
-Secure erasure and coordinated multi-page export snapshots are not provided.
+Secure erasure and exports exceeding the bounded single-snapshot limit are not provided.
