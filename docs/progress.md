@@ -1,5 +1,64 @@
 # Implementation evidence
 
+Skill outcome attribution checkpoint: the prior turn made verified progress and
+was pushed as6439059; this turn started clean. PRD9.4 outcome-driven regression
+needs reliable skill exposure and independent outcome evidence, not skill names
+mined from arbitrary prompt/history JSON. New application TaskStarted records
+carry bounded host-owned SkillContextUse metadata for fresh admitted skills,
+including scope/name/version/digest. Capture occurs after tool/byte selection and
+whole-tier context planning; persistence precedes model dispatch. Records mean
+fresh context admission, not actual workflow execution, successful dispatch or
+causal responsibility for an outcome. Legacy absence and unavailable/redacted
+attribution are distinct from a known empty fresh tier. History and user/model
+text never fabricate new references. Identity secret collisions withhold the
+entire attribution record while preserving existing redacted context behavior.
+
+Runtime and replay validate at most16 unique references and own their copies.
+Review caught that adding a nil Snapshot field would change saved source-digest
+inputs. Explicit omitempty plus a literal legacy JSON golden preserves the old
+snapshot bytes; nonnil records remain visible. No old task or receipt is rewritten,
+and this additive event field requires no database migration.
+
+New SkillTaskOutcome returns one bounded coherent SQLite observation of task
+state, fresh attribution, lineage, latest attempt key, current quality evidence
+ID/digest and separately verified mechanical output checks. Rejected, canceled,
+failed, running and unevaluated work stays visible. Nonempty text/Go syntax never
+becomes quality acceptance; current user revisions supersede earlier subjective
+judgments without creating additional samples. Strict opaque evidence-reference
+grammar and fresh configured-secret checks protect the metadata-only boundary.
+Referenced scopes must match configuration; unreferenced tasks need no skill
+configuration. Inspection opens no catalog and initializes no storage.
+
+The operation is exposed by the configured application and SDK, CLI
+`task skill-outcome --config --task`, and authenticated GET
+`/v1/tasks/{id}/skill-outcome`. HTTP rejects body/query/browser origins, shares
+bounded control capacity and uses a five-second deadline. Malformed, foreign or
+secret-bearing metadata returns no partial report. Neither inspection nor
+attribution updates fitness, dispatches a model or triggers rollback.
+
+Focused race tests passed three runs across runtime, sessions, skills, storage,
+app, CLI, SDK and API. Actual application fixtures verify selected/omitted tiers,
+tool/byte exclusion, forged JSON, historical context, identity redaction and
+disabled/default-config inspection. Actual HTTP/app/SQLite tests preserve current
+negative/corrected feedback with no prompt/output/skill body, mutation or inference.
+A test-only SQLite view barrier pins the reader before a real concurrent feedback
+revision commits; the first result retains the old evidence, the next sees the
+revision. The WAL test passed three race runs1.832s without production hooks.
+
+Native and Linux amd64 builds passed. New telemetry, app, API, CLI and SDK tests
+also executed successfully as CGO-free Linux arm64 binaries in the existing
+Alpine3.22 image, with no external network, read-only root, unprivileged UID and
+bounded temporary storage/resources. Linux tests were not race-instrumented.
+The final make check after compatibility/default-scope adjustments passed
+(format/LOC, vet, complete native race suite and production build), including
+app158.145s, telemetry111.935s, CLI37.732s, SDK20.662s and sessions13.496s.
+Independent final review found no blocker.
+No new live model inference or user database/configuration changes were performed.
+Native Linear was rechecked and remains locked; no issue update/completion is
+claimed. Statistical comparable-cohort analysis, indexed cross-task observations,
+automatic outcome-driven rollback, production skill validators and complete PRD
+acceptance remain open. See docs/skill-outcome-attribution.md.
+
 Configured learning lifecycle checkpoint: this turn started clean from verified
 GitHub backup845302d. Optional learning.validator_id, regression_name and
 regression_interval select a bounded immutable registry of trusted Go validators;

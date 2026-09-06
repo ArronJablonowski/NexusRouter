@@ -426,6 +426,17 @@ must pass read-only preflight before either configured controller starts; shared
 cancellation joins both on shutdown. New model-generated drafts carry their
 verified source domain for progressive discovery without rewriting prior receipts.
 
+Outcome-based regression requires trustworthy exposure evidence. The host now
+records fresh skill-tier references (scope/name/version/digest) on TaskStarted
+before dispatch, after context admission. Unknown legacy or redacted attribution
+is not an unexposed sample. Do not infer use from model/user text or inherited
+history, and do not equate context inclusion with semantic execution or causality.
+Read-only task outcome inspection through CLI, SDK and HTTP captures one coherent
+journal/current-evaluation snapshot, retaining negative and missing evidence and
+keeping mechanical validity separate from quality. Statistical comparable-cohort
+analysis and automated outcome-driven rollback remain required.
+See [skill outcome attribution](docs/skill-outcome-attribution.md).
+
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
 
 The signed-in Sol coordinator may also perform bounded skill drafting through

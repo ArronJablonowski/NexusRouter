@@ -60,6 +60,12 @@ start learning plus durable regression monitoring through the shared
 [configured lifecycle](docs/configured-learning-supervision.md). The stock binary
 ships no qualified domain validator and fails closed on unknown selections.
 
+`darwin task skill-outcome --config config.yaml --task TASK_ID` inspects recorded
+fresh skill versions and current task feedback without running anything. It keeps
+quality evidence separate from nonempty-text/Go-syntax checks. The same report is
+available through the SDK and authenticated HTTP API; see
+[skill outcome attribution](docs/skill-outcome-attribution.md).
+
 ### Managed local model residency
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,

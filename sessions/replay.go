@@ -23,6 +23,7 @@ type Pending struct {
 	ToolBehavior runtime.ToolBehavior
 }
 type Snapshot struct {
+	SkillContext             *runtime.SkillContextUse `json:"SkillContext,omitempty"`
 	Compaction               *runtime.ContextCompaction
 	RetryOfTaskID            string
 	ParentTaskID, Privacy    string
@@ -77,6 +78,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.RetryOfTaskID = e.Data.RetryOfTaskID
 				s.Privacy = e.Data.Privacy
 				s.Compaction = e.Data.Compaction
+				s.SkillContext = e.Data.SkillContext.Clone()
 				s.Messages = e.Data.Messages
 				s.MessageSequences = make([]int64, len(s.Messages))
 				for i := range s.MessageSequences {

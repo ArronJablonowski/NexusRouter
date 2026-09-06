@@ -62,6 +62,7 @@ type Event struct {
 }
 
 type Data struct {
+	SkillContext     *SkillContextUse     `json:"skill_context,omitempty"`
 	SteeringID       string               `json:"steering_id,omitempty"`
 	SubmissionID     string               `json:"submission_id,omitempty"`
 	Compaction       *ContextCompaction   `json:"compaction,omitempty"`
@@ -93,6 +94,9 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if e.Data.SkillContext != nil && (e.Kind != TaskStarted || e.Data.SkillContext.Validate() != nil) {
+		return errors.New("invalid skill context attribution placement")
+	}
 	if e.Data.ToolBehavior != "" && (!e.Data.ToolBehavior.Valid() || (e.Kind != ToolStarted && e.Kind != ToolCompleted)) {
 		return errors.New("invalid tool behavior declaration")
 	}

@@ -167,6 +167,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		Run:              service.Run,
 		Inspect:          db.TaskSnapshot,
 		TaskContinuation: db.TaskContinuation,
+		SkillTaskOutcome: service.SkillTaskOutcome,
 		TaskLeases: func(ctx context.Context, task string) (workers.TaskLeaseStatus, error) {
 			return app.InspectTaskLeases(ctx, s.Telemetry.Database, task)
 		},

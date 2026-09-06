@@ -60,6 +60,7 @@ type Services struct {
 	Cancel                 func(context.Context, string) (runtime.CancellationStatus, error)
 	Cancellation           func(context.Context, string) (runtime.CancellationStatus, error)
 	TaskContinuation       func(context.Context, string) (sessions.ContinuationStatus, error)
+	SkillTaskOutcome       func(context.Context, string) (skills.TaskOutcome, error)
 	TaskLeases             func(context.Context, string) (workers.TaskLeaseStatus, error)
 	ScopeLeases            func(context.Context, string) (workers.ScopeLeaseStatus, error)
 	LeaseAttention         func(context.Context, workers.LeaseAttentionOptions) (workers.LeaseAttentionPage, error)
@@ -179,6 +180,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveCancellation(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/continuation"):
 		h.serveTaskContinuation(w, r.WithContext(ctx))
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/skill-outcome"):
+		h.serveSkillTaskOutcome(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/leases"):
 		h.serveTaskLeases(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:

@@ -12,6 +12,9 @@ import (
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "skill-outcome" {
+		return runSkillTaskOutcome(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "leases" {
 		return runTaskLeases(args[1:], stdout, stderr)
 	}

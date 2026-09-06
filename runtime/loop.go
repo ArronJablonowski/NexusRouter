@@ -53,6 +53,7 @@ type ToolResult struct {
 	Recoverable bool
 }
 type RunRequest struct {
+	SkillContext  *SkillContextUse
 	SubmissionID  string
 	Compaction    *ContextCompaction
 	Validation    string
@@ -104,6 +105,10 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr error) {
+	if r.SkillContext.Validate() != nil {
+		return Result{}, ErrInvalidRun
+	}
+	skillContext := r.SkillContext.Clone()
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
 	}
@@ -163,7 +168,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}
