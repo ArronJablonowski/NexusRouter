@@ -197,7 +197,7 @@ func TestLearningActivationIntentMigrationPreservesState(t *testing.T) {
 		t.Fatal(err)
 	}
 	attempt, _ := s.SkillGenerationAttempt(ctx, i.SelectionID)
-	if _, err := s.db.Exec(`DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; PRAGMA user_version=25`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; PRAGMA user_version=25`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.initialize(ctx); err != nil {
@@ -212,7 +212,7 @@ func TestLearningActivationIntentMigrationPreservesState(t *testing.T) {
 		t.Fatal("migration changed draft", err)
 	}
 	var version, count int
-	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 28 || s.db.QueryRow(`SELECT count(*) FROM learning_activation_intents`).Scan(&count) != nil || count != 0 {
+	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 29 || s.db.QueryRow(`SELECT count(*) FROM learning_activation_intents`).Scan(&count) != nil || count != 0 {
 		t.Fatal(version, count)
 	}
 	if _, err := s.db.Exec(`INSERT INTO learning_activation_intents VALUES('missing','missing','selection','{}')`); err == nil {
@@ -221,7 +221,7 @@ func TestLearningActivationIntentMigrationPreservesState(t *testing.T) {
 }
 
 func TestLearningActivationIntentSchemaAndIgnoredInsert(t *testing.T) {
-	for _, version := range []int{25, 29} {
+	for _, version := range []int{25, 30} {
 		s, _, i := activationIntentFixture(t)
 		if _, err := s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", version)); err != nil {
 			t.Fatal(err)

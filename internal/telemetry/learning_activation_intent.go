@@ -52,7 +52,7 @@ func (s *Store) LearningActivationIntent(ctx context.Context, scope, name, selec
 	if err := tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&schema); err != nil {
 		return skills.LearningActivationIntent{}, learningError(ctx, err)
 	}
-	if schema < 26 || schema > 28 {
+	if schema < 26 || schema > 29 {
 		return skills.LearningActivationIntent{}, ErrLearningUnavailable
 	}
 	out, err := decodeActivationIntent(tx.QueryRowContext(ctx, `SELECT `+activationIntentBody+` FROM learning_activation_intents WHERE scope=? AND name=? AND selection_id=?`, scope, name, selectionID), scope, name, selectionID)
@@ -89,7 +89,7 @@ func (s *Store) PutLearningActivationIntent(ctx context.Context, intent skills.L
 	if err = tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&schema); err != nil {
 		return learningError(ctx, err)
 	}
-	if schema < 26 || schema > 28 {
+	if schema < 26 || schema > 29 {
 		return ErrLearningUnavailable
 	}
 	state, err := decodeLearning(tx.QueryRowContext(ctx, `SELECT `+learningColumns+` FROM learning_states WHERE scope=? AND name=?`, intent.Scope, intent.Name))

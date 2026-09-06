@@ -192,6 +192,9 @@ func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.Interrup
 		if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, e.ID, e.TaskID, e.Sequence, body); err != nil {
 			return err
 		}
+		if err = appendTaskTiming(ctx, tx, e); err != nil {
+			return err
+		}
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE task_heads SET sequence=?,state='failed' WHERE task_id=? AND session_id=? AND sequence=? AND state='running'`, event.Sequence, event.TaskID, event.SessionID, plan.ExpectedSequence)
 	if err != nil {

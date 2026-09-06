@@ -156,7 +156,7 @@ func TestAuditMigrationAndMissingCompletedTurn(t *testing.T) {
 	if err := s.RecordAudit(ctx, storedAudit()); !errors.Is(err, evaluation.ErrAudit) {
 		t.Fatal("audit without completed output accepted", err)
 	}
-	if _, err := s.db.ExecContext(ctx, "DROP INDEX events_submission_start; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; DROP TABLE summary_review_heads; DROP TABLE summary_reviews; DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; PRAGMA user_version=4;"); err != nil {
+	if _, err := s.db.ExecContext(ctx, "DROP INDEX events_submission_start; DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE task_cancellations; DROP TABLE summary_review_heads; DROP TABLE summary_reviews; DROP TABLE summary_attempts; DROP INDEX events_model_start; DROP TABLE review_attempts; DROP TABLE evaluation_revisions; DROP TABLE evaluation_heads; DROP TABLE audit_records; PRAGMA user_version=4;"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -168,7 +168,7 @@ func TestAuditMigrationAndMissingCompletedTurn(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 28 {
+	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 29 {
 		t.Fatal(version, err)
 	}
 	if audits, err := s.Audits(ctx, "task", "", 100); err != nil || len(audits) != 0 {

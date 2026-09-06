@@ -90,13 +90,15 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Only the existing closed-vocabulary snapshot is exported: tasks, submissions,
+The closed-vocabulary lifecycle snapshot contains tasks, submissions,
 reviews, evaluations, audits and recoveries. Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
 current durable state, not cumulative activity counters, latency histograms or
 quality judgments. Counts and nanosecond timestamps use decimal strings without
-floating-point precision loss.
+floating-point precision loss. Schema29 additionally supplies a cumulative
+[task-duration histogram](task-duration-metrics.md) and unavailable timing gauges;
+its floating-point sum is in seconds. Legacy schemas omit that instrumentation.
 
 The resource is fixed `service.name=DarwinRouter` and the instrumentation scope
 is `darwinrouter.metrics`, version1. No task/session/model identifiers, prompts,
@@ -142,4 +144,4 @@ no storage mutation, cancellation, response bounds, partial rejection and redire
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable export
-delivery, traces, histogram coverage or the full PRD telemetry scope.
+delivery, traces, full histogram coverage or the full PRD telemetry scope.

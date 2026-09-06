@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"encoding/json"
-	"math"
 	"strconv"
 )
 
@@ -15,13 +14,11 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 	if snapshot.Validate() != nil {
 		return nil, ErrInvalid
 	}
-	seconds, nanos := snapshot.ObservedAt.Unix(), uint64(snapshot.ObservedAt.Nanosecond())
-	// UnixNano returns an int64 and silently overflows for otherwise legal OTLP
-	// fixed64 timestamps. Check unsigned epoch arithmetic before multiplying.
-	if seconds < 0 || uint64(seconds) > (math.MaxUint64-nanos)/1_000_000_000 {
+	nanos, err := epochNanos(snapshot.ObservedAt)
+	if err != nil {
 		return nil, ErrInvalid
 	}
-	at := strconv.FormatUint(uint64(seconds)*1_000_000_000+nanos, 10)
+	at := strconv.FormatUint(nanos, 10)
 	items := make([]otlpMetric, 0, len(snapshot.Groups))
 	for _, group := range snapshot.Groups {
 		if !group.Available {
@@ -34,7 +31,10 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 				TimeUnixNano: at, AsInt: strconv.FormatInt(count.Value, 10),
 			})
 		}
-		items = append(items, otlpMetric{Name: "darwinrouter." + group.Name, Unit: "{record}", Gauge: otlpGauge{DataPoints: points}})
+		items = append(items, otlpMetric{Name: "darwinrouter." + group.Name, Unit: "{record}", Gauge: &otlpGauge{DataPoints: points}})
+	}
+	if snapshot.TaskDuration != nil {
+		items = append(items, otlpTaskDuration(snapshot.TaskDuration, at)...)
 	}
 	request := otlpRequest{ResourceMetrics: []otlpResourceMetrics{{
 		Resource:     otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}},
@@ -66,9 +66,10 @@ type otlpScope struct {
 	Version string `json:"version"`
 }
 type otlpMetric struct {
-	Name  string    `json:"name"`
-	Unit  string    `json:"unit"`
-	Gauge otlpGauge `json:"gauge"`
+	Name      string         `json:"name"`
+	Unit      string         `json:"unit"`
+	Gauge     *otlpGauge     `json:"gauge,omitempty"`
+	Histogram *otlpHistogram `json:"histogram,omitempty"`
 }
 type otlpGauge struct {
 	DataPoints []otlpPoint `json:"dataPoints"`

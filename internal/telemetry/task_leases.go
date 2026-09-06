@@ -27,7 +27,7 @@ func (s *Store) TaskLeaseStatus(ctx context.Context, task string, now time.Time)
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version < 1 || version > 28 {
+	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version < 1 || version > 29 {
 		return zero, workers.ErrTaskLeaseStatus
 	}
 	var exists int

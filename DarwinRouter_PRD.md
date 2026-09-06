@@ -708,8 +708,14 @@ network access. See [metric export](docs/metrics-export.md) for delivery semanti
 credential handling and bounds. Opt-in daemon scheduling and an owned SDK
 exporter now send fresh snapshots sequentially and report supplemental health,
 without blocking task readiness on collector failure. Runtime traces,
-histograms and the complete instrumentation list above still require implementation;
+provider/tool-specific histograms and the complete instrumentation list above still require implementation;
 the reserved runtime `opentelemetry_enabled` flag is not yet supported.
+
+Schema29 now records task start-to-terminal event wall time transactionally,
+including recovery terminals, and exports cumulative fixed-bucket histograms
+with explicit missing/invalid timing counts. This is not inference latency or
+quality evidence. Historical tasks are not retrospectively sampled; see
+[task-duration metrics](docs/task-duration-metrics.md) for coverage and reset limits.
 
 ## 14. Security and Privacy
 

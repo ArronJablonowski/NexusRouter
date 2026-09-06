@@ -1,5 +1,60 @@
 # Implementation evidence
 
+Task-duration instrumentation checkpoint: the previous goal turn made verified
+progress and was committed/pushed596ee7f; this turn started clean. PRD13 task
+latency observability now includes a durable timing projection, public metrics
+and cumulative OTLP histogram rather than deriving a recent-window approximation
+and labeling it cumulative. Schema29 captures an instrumentation epoch plus one
+metadata row per newly observed task, updated transactionally in all three event
+insert paths: ordinary append, orphan recovery and submission recovery.
+
+Recorded duration is TaskStarted-to-terminal event wall time, including tool/
+approval waits and recovery downtime, excluding pre-start admission/queue time.
+Backwards/overflow intervals are invalid_time, never zero. Tasks without a captured
+start—including pre-migration history—are missing_start. Migration adds tables
+without rewriting journal bodies or retrospectively fabricating samples.
+The exact terminal event/sequence binding and head update share the transaction;
+failure rolls back timing and journal state together, and acknowledgement retry
+does not duplicate a sample. The epoch remains stable across ordinary reopening.
+
+Metrics read canonical bounded projection fields and head/event metadata in the
+same read transaction as lifecycle counts, not private journal bodies. Fixed
+completed/failed/canceled groups expose upper-inclusive buckets, floating-point
+sum seconds and explicit unavailable reasons; observed+unavailable counts must
+equal terminal lifecycle counts. OTLP emits a cumulative task-duration histogram
+and unavailable gauges with only fixed state/reason labels. Schema1..28 keep
+legacy metrics without a timing field. All feature-specific schema ceilings now
+accept29; future-schema denial fixtures use30. Earlier historical fixtures retain
+their original versions and supported feature boundaries.
+
+Focused tests qualify all bucket edges and one-nanosecond-above boundaries,
+zero/backward/overflow timing, exact counter reconciliation, projection/epoch
+corruption, large unusable private journal content, migration rollback and no
+backfill, and atomic terminal/recovery paths. Root read tests passed race three
+times4.885s; timing/migration/index/metrics focused tests passed10.101s. Public
+contract/codec race tests passed three times1.372s, including impossible sum
+rejection with conservative floating tolerance. Cross-surface SQLite→app/API
+and SDK→OTLP integration passed three times1.920s: completed1.5s and missing_start1
+survive inspection/export without private identities or database mutation.
+
+See docs/task-duration-metrics.md for coverage, migration, clock semantics and
+cumulative-stream limits. Multiple exporters need coordination; copying/restoring
+or manually altering stores is not an automatic metric reset protocol. Native
+Linear remains inaccessible because the Mac is locked; no issue update is claimed.
+No user configuration/store was changed or live inference dispatched. Full PRD
+completion, traces, provider/tool latency and cost histograms, production
+collectors and large-store read/write performance remain open.
+
+Final make check passed formatting/LOC, vet, all native race tests and build
+(app218.655s, telemetry145.967s, CLI41.162s, API12.694s, SDK25.931s,
+metrics2.177s). Native and Linux amd64 CLI builds passed. Full metrics package,
+focused timing/projection/migration/legacy/read tests and the cross-surface
+SQLite→API/SDK→OTLP integration executed successfully as CGO-free Linux arm64
+binaries in existing Alpine3.22 with no external network, read-only root and
+an unprivileged UID. Linux execution was not race-instrumented. Independent
+final review found no concrete blocker. Back up operational stores and stop
+older writers before upgrading; this checkpoint did not migrate user stores.
+
 Periodic metrics delivery checkpoint: the previous goal turn made verified
 progress, committed/pushed bc615a6; this turn started clean. PRD13 optional
 observability now has opt-in daemon scheduling and a caller-owned Go SDK exporter,

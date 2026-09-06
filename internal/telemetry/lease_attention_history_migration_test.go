@@ -17,7 +17,7 @@ func TestLeaseAttentionHistoryMigrationPreservesBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; INSERT INTO lease_attention(id,lease_token,task_id,state,body) VALUES(?,?,?,'open',?); PRAGMA user_version=24`, record.ID, "baseline-token", req.TaskID, body); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; INSERT INTO lease_attention(id,lease_token,task_id,state,body) VALUES(?,?,?,'open',?); PRAGMA user_version=24`, record.ID, "baseline-token", req.TaskID, body); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.initialize(context.Background()); err != nil {
@@ -37,7 +37,7 @@ func TestLeaseAttentionHistoryMigrationPreservesBaseline(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count, version int
-	if s.db.QueryRow(`SELECT count(*) FROM lease_attention_history`).Scan(&count) != nil || count != 1 || s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 28 {
+	if s.db.QueryRow(`SELECT count(*) FROM lease_attention_history`).Scan(&count) != nil || count != 1 || s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 29 {
 		t.Fatal("duplicate migration", count, version)
 	}
 	for _, statement := range []string{`INSERT INTO lease_attention_history VALUES('baseline-attention',0,'observed','{}')`, `INSERT INTO lease_attention_history VALUES('baseline-attention',2,'unknown','{}')`, `INSERT INTO lease_attention_history VALUES('missing',1,'baseline','{}')`, `INSERT INTO lease_attention_history VALUES('baseline-attention',1,'observed','{}')`} {

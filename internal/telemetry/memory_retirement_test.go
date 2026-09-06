@@ -181,7 +181,7 @@ func TestMemoryRetirementMigrationPreservesPayload(t *testing.T) {
 	if err = s.db.QueryRow("SELECT body FROM memory_facts").Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec("DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; PRAGMA user_version=19"); err != nil {
+	if _, err = s.db.Exec("DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; PRAGMA user_version=19"); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.Close(); err != nil {
@@ -201,7 +201,7 @@ func TestMemoryRetirementMigrationPreservesPayload(t *testing.T) {
 	if err = s.db.QueryRow("SELECT body FROM memory_facts").Scan(&after); err != nil || !bytes.Equal(before, after) {
 		t.Fatal("migration changed payload", err)
 	}
-	if err = s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 28 {
+	if err = s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 29 {
 		t.Fatal(version, err)
 	}
 	if err = s.db.QueryRow("SELECT count(*) FROM memory_retired_ids").Scan(&count); err != nil || count != 0 {

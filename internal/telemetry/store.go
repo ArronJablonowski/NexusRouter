@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 28 {
+	if version > 29 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -327,6 +327,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 29 {
+		if err = migrateTaskTiming(ctx, conn); err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -466,6 +471,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		return fmt.Errorf("append event: %w", err)
 	}
 	if err = appendSkillExposures(ctx, tx, e); err != nil {
+		return err
+	}
+	if err = appendTaskTiming(ctx, tx, e); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=?, state=? WHERE task_id=?", e.Sequence, state, e.TaskID); err != nil {

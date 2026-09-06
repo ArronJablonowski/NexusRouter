@@ -42,7 +42,7 @@ func openExistingControl(ctx context.Context, path string, unavailable error) (*
 	}
 	var version int
 	var mode, check string
-	if db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || (version < 26 || version > 28) || db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode) != nil || mode != "wal" || db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check) != nil || check != "ok" {
+	if db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || (version < 26 || version > 29) || db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode) != nil || mode != "wal" || db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&check) != nil || check != "ok" {
 		return nil, unavailable
 	}
 	ok = true

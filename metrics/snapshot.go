@@ -22,10 +22,11 @@ type Group struct {
 }
 
 type Snapshot struct {
-	Version       int       `json:"version"`
-	ObservedAt    time.Time `json:"observed_at"`
-	StorageSchema int       `json:"storage_schema"`
-	Groups        []Group   `json:"groups"`
+	Version       int           `json:"version"`
+	ObservedAt    time.Time     `json:"observed_at"`
+	StorageSchema int           `json:"storage_schema"`
+	Groups        []Group       `json:"groups"`
+	TaskDuration  *TaskDuration `json:"task_duration,omitempty"`
 }
 
 type definition struct {
@@ -58,6 +59,9 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 		}
 		s.Groups = append(s.Groups, g)
 	}
+	if schema >= 29 {
+		s.TaskDuration = newTaskDuration(at)
+	}
 	return s
 }
 
@@ -65,7 +69,7 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 // leak model names, task IDs, secret-bearing errors or arbitrary label values.
 // Canonical order also makes snapshots deterministic apart from observation time.
 func (s Snapshot) Validate() error {
-	if s.Version != 1 || s.StorageSchema < 1 || s.StorageSchema > 28 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
+	if s.Version != 1 || s.StorageSchema < 1 || s.StorageSchema > 29 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
 		return ErrInvalid
 	}
 	if _, err := s.ObservedAt.MarshalJSON(); err != nil {
@@ -93,5 +97,11 @@ func (s Snapshot) Validate() error {
 			total += c.Value
 		}
 	}
-	return nil
+	if s.StorageSchema < 29 {
+		if s.TaskDuration != nil {
+			return ErrInvalid
+		}
+		return nil
+	}
+	return s.validateTaskDuration()
 }

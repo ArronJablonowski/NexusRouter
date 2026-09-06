@@ -70,6 +70,11 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 			return metrics.Snapshot{}, errMetrics
 		}
 	}
+	if schema >= 29 {
+		if err := readTaskDuration(ctx, tx, &snapshot); err != nil {
+			return metrics.Snapshot{}, errMetrics
+		}
+	}
 	if snapshot.Validate() != nil {
 		return metrics.Snapshot{}, errMetrics
 	}
