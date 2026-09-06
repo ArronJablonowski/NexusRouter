@@ -75,8 +75,48 @@ restoring, deleting or manually editing a store is not an automatic cumulative
 reset protocol. Coordinate a new collector stream/resource identity when replacing
 or restoring a database. No task-history retention/deletion operation is added.
 
-Tests cover exact bucket edges, missing/invalid timing, atomic normal and recovery
-writes, migration rollback, corruption handling, restart persistence, private-body
-isolation and public/OTLP propagation. Production collector integration, large-store
-read/write throughput, routing/provider/tool-specific latency histograms, costs,
-traces and the broader PRD instrumentation remain open.
+## Scale and concurrent-read qualification
+
+`BenchmarkMetricsCompletedTasks` measures the actual read-only `Store.Metrics`
+path against disposable schema-29 databases. Each task has two valid journal
+events, a matching terminal head and timing projection, a unique canonical start
+timestamp, and a 100ms duration. One prepared transaction seeds the fixture
+outside timing; the writer is closed and a read-only store opened. The complete
+count, sum, bucket population and snapshot contract are checked before timing.
+
+On September 6, 2026, Go1.27.1 on this Apple M4 Max (macOS ARM64), three runs of
+five warm reads per size measured:
+
+| Completed tasks | Mean read time across runs | Allocated bytes/read | Database bytes |
+| --- | --- | --- | --- |
+| 1,000 | 2.79–2.86ms | 116,792–129,147 | 1,740,800 |
+| 10,000 | 30.09–30.24ms | 981,390–984,400 | 13,496,320 |
+| 100,000 | 363.52–365.74ms | 9,624,952–9,626,452 | 132,038,656–132,329,472 |
+
+Reproduce with:
+
+```sh
+go test ./internal/telemetry -run '^$' -bench '^BenchmarkMetricsCompletedTasks$' -benchtime=5x -count=3 -benchmem
+```
+
+These are per-run means, not percentiles, cold-cache latency, write throughput,
+production load or a cross-platform SLA. Payloads and other lifecycle tables are
+small/empty, so these fixtures do not represent a fully populated agent workload.
+The growing read cost and allocations remain relevant to retention and export
+cadence; this checkpoint does not add sampling or weaken integrity checks.
+
+Separate race-enabled tests schedule real append transactions for 20 completed
+and 20 pending tasks concurrently with read-only snapshots, checking lifecycle/
+timing coherence; the scheduler need not overlap any particular read/write phase.
+A deterministic WAL test pins the read snapshot before a writer commits a terminal
+event: the old transaction retains the old lifecycle and histogram while a new
+connection observes the atomic terminal update, with the same instrumentation
+epoch. Canceled duration reads are rejected. This is correctness evidence, not
+concurrent-load performance measurement or exhaustive interleaving coverage.
+
+Tests also cover exact bucket edges, missing/invalid timing, atomic normal and
+recovery writes, migration rollback, corruption handling, restart persistence,
+private-body isolation and public/OTLP propagation. Production collectors,
+mixed-workload read/write throughput, larger retained histories, routing/provider/
+tool-specific latency histograms, costs, traces and broader PRD instrumentation
+remain open.

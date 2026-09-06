@@ -1,5 +1,35 @@
 # Implementation evidence
 
+Task-duration scale/concurrency checkpoint: the preceding response revalidated
+Codex authentication but did not advance implementation. This turn resumed the
+two pending agent-authored test files on base 5af6061. No production behavior or
+schema was changed. The actual read-only metrics benchmark now qualifies canonical
+unique-timestamp histories with 1k/10k/100k completed tasks, valid paired events,
+terminal heads and 100ms projections, seeded transactionally outside timing.
+Three runs of five warm reads measured means of 2.79–2.86ms, 30.09–30.24ms and
+363.52–365.74ms respectively on this M4 Max/macOS ARM64/Go1.27.1. At 100k,
+reads allocated about 9.625MB and 400,370 allocations. All full-population count,
+sum, bucket and snapshot checks passed; the complete benchmark exited zero (39.840s).
+This is not cold-cache, p99, production mixed-workload, write-contention or SLA
+evidence. Existing integrity validation was retained without optimization based
+on these limited fixtures. See docs/task-duration-metrics.md for reproduction.
+
+New concurrency tests use actual append transactions and independent read-only
+metrics access, plus a deterministic pinned WAL snapshot across a terminal commit.
+They require coherent lifecycle/histogram totals, stable epoch, fresh-read visibility
+and cancellation rejection. No operational store or user configuration was touched,
+and no inference was dispatched. Native Linear was checked again but the Mac is
+locked and automatic unlock failed; no issue update is claimed. Mixed-workload
+performance, instrumentation breadth and complete PRD/Linear acceptance remain open.
+Final make check passed formatting/LOC, vet, the full native race suite and build
+(app 215.020s, telemetry 143.897s, CLI 40.535s, API 12.794s, SDK 24.927s;
+unchanged packages cached). Focused concurrency tests passed three race-enabled
+native repetitions in 2.673s and three CGO-free Linux ARM64 repetitions in an
+owned read-only, network-disabled, unprivileged container. This does not claim
+Linux race execution or Linux performance. Independent review found no blocker
+and clarified that the stress test does not force scheduling overlap; only the
+separate pinned-transaction test establishes the deterministic commit boundary.
+
 Task-duration instrumentation checkpoint: the previous goal turn made verified
 progress and was committed/pushed596ee7f; this turn started clean. PRD13 task
 latency observability now includes a durable timing projection, public metrics
