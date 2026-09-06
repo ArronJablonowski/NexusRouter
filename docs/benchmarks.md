@@ -1,4 +1,81 @@
-# Routing benchmark checkpoint
+# Routing performance evidence
+
+## Current latency distributions
+
+Measured September 6, 2026 on Apple M4 Max, darwin/arm64, Go 1.27.1,
+with 100 serial completed tasks per case and three separate runs. No race
+instrumentation or concurrent project benchmark/test suite was running for these
+recorded measurements. Other host workloads, CPU scheduling and thermal state
+were not controlled. An earlier overlapping exploratory run was discarded.
+
+```sh
+go test ./internal/app -run '^TestTaskLatencyNearestRank$' -bench '^BenchmarkAutomaticTaskOverhead$' -benchtime=100x -count=3
+```
+
+The benchmark now reports empirical nearest-rank `p50-ms`, `p95-ms`, `p99-ms`,
+`max-ms`, and `samples` in addition to Go's mean and allocations. Every successful
+timed task contributes one sample; sample allocation and sorting occur outside
+the timer. Clock reads and result checks add small measurement overhead. At 100
+samples p99 is the second-largest observation, not a confidence bound or a
+reliable estimate of rare production tails. The following ranges retain the
+minimum and maximum of each metric across the three runs; they are **not pooled
+percentiles or averages of percentiles**.
+
+| Pool | Seed → final tasks per run | Mean ms | p50 ms | p95 ms | p99 ms | Largest observed ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 0 → 101 | 11.71–12.04 | 11.49–12.12 | 18.72–19.53 | 19.41–20.28 | 21.25 |
+| 2 | 100 → 201 | 22.35–22.63 | 23.04–23.86 | 26.99–27.42 | 27.70–27.96 | 28.33 |
+| 2 | 1,000 → 1,101 | 36.76–37.18 | 36.54–37.16 | 39.46–39.94 | 39.95–41.36 | 42.09 |
+| 8 | 0 → 101 | 16.70–17.32 | 16.28–17.12 | 27.33–28.36 | 28.33–35.82 | 43.21 |
+| 8 | 100 → 201 | 29.14–29.24 | 29.07–30.31 | 38.90–40.04 | 39.67–40.84 | 41.80 |
+| 8 | 1,000 → 1,101 | 111.97–113.83 | 112.4–113.2 | 118.1–123.0 | 122.1–131.7 | 141.4 |
+
+These are whole `Service.Run` tasks, including routing, persistence, loopback
+provider execution and completion—not isolated deterministic routing latency.
+The corpus grows during each run, so the distribution spans changing history
+sizes. Discovery is initially warmed; its normal five-second TTL may expire
+during longer cases. Refreshes are not suppressed or separately counted.
+Fixtures use deterministic nonempty checks, not representative human feedback,
+audits, code outputs or broad domain/profile distributions. There is one provider,
+no request concurrency, mocked resource sensors and no real inference. These
+measurements do not establish either PRD latency SLA or performance equivalence
+with the older three-operation results below.
+
+## Isolated routing core
+
+```sh
+go test ./routing -run '^$' -bench '^BenchmarkSelect' -benchmem -count=3
+```
+
+Separate non-overlapping runs on the same host measured only `routing.Select`.
+Fixtures build real domain-keyed quality, compliance, reliability, latency, cost,
+recency, advisory and validity evidence. Before timing they require a successful
+primary, expected eligible/excluded/fallback counts, the intended exploration
+state and a first fallback in a different failure domain. This prevents an
+accidental all-rejected fast path from appearing as successful routing.
+
+| Case | Mean ns/op across runs | Bytes/op | Allocations/op |
+| --- | ---: | ---: | ---: |
+| 2 eligible models | 368.1–370.0 | 656 | 7 |
+| 8 eligible models | 1,429–1,434 | 3,824 | 12 |
+| 64 eligible models | 15,204–15,314 | 42,808 | 27 |
+| 64 candidates, 8 eligible and 56 constraint exclusions | 7,259–7,526 | 23,416 | 94 |
+| 8 models, cold-start exploration | 1,199–1,235 | 3,824 | 12 |
+
+The constrained case exercises mode/privacy, health, permission, capacity,
+context, cost and capability denials while retaining viable diverse fallbacks.
+The exploration case leaves half the pool without measured history. Time and
+random draw are fixed inputs; these cases do not model stochastic workload
+variation. They exclude configuration, classification, evidence retrieval,
+hardware profiling, reservation, database I/O and inference. Results are Go
+benchmark means, not latency percentiles.
+
+The large gap between pure selection and the full task fixture motivates profiling
+evidence reads/admission/persistence next; it does not attribute the entire gap
+to a particular query. Neither benchmark qualifies auxiliary model classification
+or concurrent production latency. No timing threshold is enforced in CI.
+
+## Historical three-operation checkpoint
 
 Local measurements on Apple M4 Max, darwin/arm64, Go 1.27.1. Each displayed
 measurement is the mean of three timed operations in one benchmark run, not a

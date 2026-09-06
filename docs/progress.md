@@ -1,5 +1,44 @@
 # Implementation evidence
 
+Routing-performance evidence checkpoint: previous turn made verified progress,
+committed/pushed72a18bd, and this turn started clean. PRD16 / historical DAR-44
+performance evidence now measures complete automatic-task latency distributions
+instead of only three-operation means. Each case records100 serial operations,
+empirical nearest-rank p50/p95/p99/max and sample count; allocation of samples and
+sorting occur outside the timer. A unit test verifies percentile ranks, including
+small samples and non-round counts. Three independent runs preserve metric
+ranges without pooling or averaging percentiles. The corpus grows from seed
+count to seed+101, and normal discovery-cache expiry remains possible.
+
+New separately measured pure routing benchmarks qualify successful evidence-based
+selection, expected exclusions/fallbacks, diverse failure domains and exploration
+before timing. Two/eight/64-model means were approximately0.37/1.43/15.3µs.
+The full eight-model/1,000-seed loopback task fixture averaged111.97–113.83ms,
+with run p99 values122.1–131.7ms and maximum141.4ms. These boundaries differ:
+the latter includes SQLite/admission/execution/completion and growing history;
+the former excludes them. This motivates targeted admission/evidence/persistence
+profiling, not an unproven ranking optimization or a claim that all overhead is
+one query. See docs/benchmarks.md for the complete matrix and commands.
+
+Independent review confirmed rank calculations and measurement boundaries.
+An initial overlapping exploratory run was discarded; recorded app/core runs
+did not overlap each other or full project tests. Other host load and thermal
+state were uncontrolled. No live inference, user configuration/database changes,
+or production runtime behavior changes were made. Larger histories/outputs,
+sparse profiles, meaningful feedback populations, multiple providers, concurrency,
+actual sensors, auxiliary classification and both production latency SLAs remain
+unqualified. Native Linear was checked but the Mac remained locked; no issue
+update or completion is claimed.
+
+Full make check passed formatting/LOC, vet, native race tests and build
+(app193.197s, telemetry118.764s, CLI38.206s, API11.843s, SDK23.562s,
+routing1.510s). Linux amd64 production cross-build passed. The percentile unit
+test and every new/modified benchmark fixture executed successfully as CGO-free
+Linux arm64 binaries in existing Alpine3.22, no network, read-only root and
+unprivileged UID. Those one-operation fixture checks are not Linux performance
+measurements or race qualification. Recorded macOS application and core benchmark
+runs passed separately in79.299s and19.922s respectively.
+
 Fixed-source freshness checkpoint: the previous turn made verified progress,
 committed and pushed a6da473; this turn started clean. The opt-in application/SDK
 outcome action now invalidates an unfinished selection when its original evidence

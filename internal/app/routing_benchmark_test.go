@@ -28,7 +28,7 @@ import (
 // Model pools of two and eight candidates expose pool-size routing overhead.
 // Reproduce with:
 //
-//	go test ./internal/app -run '^$' -bench BenchmarkAutomaticTaskOverhead -benchtime=3x -count=1
+//	go test ./internal/app -run '^$' -bench BenchmarkAutomaticTaskOverhead -benchtime=100x -count=1
 func BenchmarkAutomaticTaskOverhead(b *testing.B) {
 	for _, poolSize := range []int{2, 8} {
 		b.Run(fmt.Sprintf("pool_%d", poolSize), func(b *testing.B) {
@@ -100,14 +100,18 @@ func BenchmarkAutomaticTaskOverhead(b *testing.B) {
 					if out, err := svc.Run(ctx, req); err != nil || out.Text != "answer" || out.TaskID == "" {
 						b.Fatalf("warmup task: result=%+v error=%v", out, err)
 					}
+					latencies := make([]time.Duration, b.N)
 					b.ReportAllocs()
 					b.ResetTimer()
 					for i := 0; i < b.N; i++ {
+						started := time.Now()
 						if out, err := svc.Run(ctx, req); err != nil || out.Text != "answer" || out.TaskID == "" {
 							b.Fatalf("automatic task: result=%+v error=%v", out, err)
 						}
+						latencies[i] = time.Since(started)
 					}
 					b.StopTimer()
+					reportTaskLatencies(b, latencies)
 					b.ReportMetric(float64(seedTasks+1+b.N), "finaltasks")
 				})
 			}
