@@ -30,8 +30,8 @@ func (p *auditLifecycleProvider) Close() error {
 	return nil
 }
 
-func auditLifecycleAdapter(launch codexLaunch) *codexAuditProvider {
-	return &codexAuditProvider{settings: config.Settings{Mode: "hybrid"}, provider: config.Provider{Kind: "codex_app_server", Executable: "/fixture/codex"}, model: config.Model{Model: "gpt-5.6-sol", Locality: "cloud"}, privacy: "cloud_allowed", launch: launch}
+func auditLifecycleAdapter(launch codexLaunch) *codexAuxiliaryProvider {
+	return &codexAuxiliaryProvider{settings: config.Settings{Mode: "hybrid"}, provider: config.Provider{Kind: "codex_app_server", Executable: "/fixture/codex"}, model: config.Model{Model: "gpt-5.6-sol", Locality: "cloud"}, privacy: "cloud_allowed", launch: launch}
 }
 func auditLifecycleRequest() providers.Request {
 	return providers.Request{Model: "gpt-5.6-sol", Messages: []providers.Message{{Role: "system", Content: "audit rules"}, {Role: "user", Content: "untrusted evidence"}}}

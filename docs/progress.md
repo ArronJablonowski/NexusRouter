@@ -1,5 +1,47 @@
 # Implementation evidence
 
+Native skill-generation checkpoint: previous goal turn made verified progress
+with periodic deterministic regression monitoring and backup f268d17. Worktree
+was clean at entry; native Linear remains locked and no issue mutation is claimed.
+The exact gpt-5.6-sol signed-in Codex provider now supports explicit and selected
+skill drafting, and is accepted by the enabled learning model gate. Auxiliary
+launch is inert until a durable generation/budget claim and schema-inclusive
+context admission. The request has trusted system instructions, untrusted
+source data, no tools and a closed eight-field schema; host parsing/provenance
+remain authoritative. Empty schema-compatible abstention is rejected, rather
+than forcing invented workflows. HTTP generation keeps its schema opt-in default.
+Native input digests include executable/schema mode; full-config selections
+reject executable changes. Originals are decoded before escaped-secret redaction;
+case aliases/duplicate keys fail. Credential changes after estimation or startup
+reject changed admitted input before streaming. No user learning config changed.
+
+Three agents contributed structured schemas, protocol/application tests and
+independent lifecycle/binding review; root integrated providers/configuration,
+credential refresh guards and docs. Focused generation/learning tests passed
+app 26.937s, config 1.738s and skills 1.779s. Later focused schema-abstention tests
+passed three repetitions 1.700s; native generation tests 11.236s, rotation guards
+3.451s, strict escaped-source tests 1.630s and protocol tests 1.513s, all with race
+detection. Skills/app vet passed. A private-source test setup initially failed
+its own task admission; it now constructs a valid local-private source before
+asserting that mixed-privacy generation cannot launch Codex.
+
+Explicit live qualification passed: TestLiveCodexSkillDraft 12.51s (race package
+14.070s), launches=1, streams=1, done=true, response bytes=1106. Exact signed-in Sol
+generated a durable inactive proposal from two synthetic accepted Square/Cube
+Go-code outputs served by a loopback fixture. Host provenance and source snapshots
+were unchanged, the owned working directory was removed, and no skill catalog
+was created. No raw prompt/output was logged. This used one real cloud call, not
+actual local-model inference or production learning validation. The ordinary
+suite skips it. Standalone validator-engine
+configuration, statistical regression detection and full PRD acceptance remain open.
+
+Final `make check` passed formatting/LOC, vet, full native race tests and build:
+app 138.343s, telemetry 105.575s, CLI 30.998s, API 10.533s, config 3.310s,
+SDK 21.254s and skills 14.902s. Native build and CGO-free Linux amd64 production
+build/app-test compilation passed; Linux binaries were not executed. Fetch
+confirmed HEAD/origin-main 0/0 before commit. Only source, tests and documentation
+are included; no credentials, generated binaries or live task databases.
+
 Regression-monitor checkpoint: the previous goal turn made verified progress
 with opt-in validated learning and backup 00b5327. This turn confirmed a clean
 worktree; native Linear is still locked and no issue status was changed.

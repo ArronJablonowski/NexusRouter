@@ -36,11 +36,11 @@ skills:
     scan_limit: 20
 ```
 
-`model_id` refers to a configured Ollama or OpenAI-compatible HTTP model with
-context and cost metadata, plus a RAM estimate for local execution. Native
-Codex coordinator authentication remains supported for tasks and audits, but
-native Codex skill generation is not implemented; enabling that combination
-is rejected in configuration. Local-only policy applies to generation transport
+`model_id` refers to a configured Ollama, OpenAI-compatible HTTP, or experimental
+Codex app-server model with context and cost metadata, plus a RAM estimate for
+local execution. [Signed-in Sol skill drafting](codex-skill-generation.md) requires
+cloud-eligible sources, a cloud-sharing skill scope and hybrid/cloud-only mode.
+Local-only policy applies to generation transport
 and source material. Cost numbers must use the same units as model estimates;
 they are reservations, not measured provider invoices.
 

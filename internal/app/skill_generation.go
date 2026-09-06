@@ -14,8 +14,6 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
@@ -85,11 +83,13 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		}
 	}
 	localRequired := s.settings.Skills.LocalOnly
+	rawSteps := make([][]string, len(sources))
 	examples := make([]skills.WorkflowExample, 0, len(sources))
 	var sourceSessions, sourceEvidence []string
 	seenTasks := make(map[string]bool, len(ids))
 	for i := range sources {
 		source := &sources[i]
+		rawSteps[i] = slices.Clone(source.Example.Steps)
 		if !slices.Contains(ids, source.Example.TaskID) || seenTasks[source.Example.TaskID] {
 			return bad()
 		}
@@ -160,7 +160,7 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 	}
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	metadataClean := func() bool {
-		return selectionValueClean([]any{identities, workflowSelectionCandidates(sources), sourceSessions, sourceEvidence, model.ID, model.Model, provider.ID}, secrets) && (selection == nil || selectionValueClean(selection, secrets))
+		return selectionValueClean([]any{identities, workflowSelectionCandidates(sources), sourceSessions, sourceEvidence, model.ID, model.Model, provider.ID, provider.Executable}, secrets) && (selection == nil || selectionValueClean(selection, secrets))
 	}
 	if !metadataClean() {
 		return bad()
@@ -175,28 +175,53 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		}
 		defer release()
 	}
-	transport, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{provider.Endpoint})
-	if err != nil {
-		return bad()
-	}
-	defer transport.CloseIdleConnections()
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if !metadataClean() {
 		return bad()
 	}
-	adapter, err := providers.Build(ctx, s.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: apiKey, Transport: transport})
+	privacy := "cloud_allowed"
+	if localRequired {
+		privacy = "local_only"
+	}
+	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, provider, model, privacy, apiKey)
 	if err != nil {
 		return bad()
 	}
+	defer closeProvider()
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if !metadataClean() {
 		return bad()
 	}
 	for i := range sources {
-		for j := range sources[i].Example.Steps {
-			sources[i].Example.Steps[j] = redact(sources[i].Example.Steps[j], secrets)
+		if provider.Kind == "codex_app_server" {
+			// Decode the original host-serialized messages before redaction;
+			// literal replacement first can damage JSON or hide escaped secrets.
+			clean, err := redactCodexWorkflowSteps(rawSteps[i], secrets)
+			if err != nil {
+				return bad()
+			}
+			sources[i].Example.Steps = clean
+		} else {
+			for j := range sources[i].Example.Steps {
+				sources[i].Example.Steps[j] = redact(sources[i].Example.Steps[j], secrets)
+			}
 		}
 		examples[i] = sources[i].Example
+	}
+	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
+		native.beforeStream = func() error {
+			secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+			if !metadataClean() {
+				return ErrAdmission
+			}
+			for i := range sources {
+				clean, err := redactCodexWorkflowSteps(rawSteps[i], secrets)
+				if err != nil || !slices.Equal(clean, sources[i].Example.Steps) {
+					return ErrAdmission
+				}
+			}
+			return nil
+		}
 	}
 	body, err := json.Marshal(struct {
 		Version                                  int
@@ -208,7 +233,9 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		ContextTokens                            int
 		Timeout                                  time.Duration
 		MaxCost                                  float64
-	}{1, key, sources, model, provider.ID, provider.Kind, provider.Endpoint, s.settings.Mode, localRequired, model.ContextTokens, 30 * time.Second, maxCost})
+		Executable                               string `json:",omitempty"`
+		StructuredOutput                         bool   `json:",omitempty"`
+	}{1, key, sources, model, provider.ID, provider.Kind, provider.Endpoint, s.settings.Mode, localRequired, model.ContextTokens, 30 * time.Second, maxCost, provider.Executable, provider.Kind == "codex_app_server"})
 	if err != nil || len(body) > 512<<10 {
 		return bad()
 	}
@@ -255,6 +282,7 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		return finish(a, errors.New("skill generation failed"))
 	}
 	g := skills.ModelGenerator{Provider: adapter, ContextEstimator: s.contextEstimator, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: 30 * time.Second, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	g.StructuredOutput = provider.Kind == "codex_app_server"
 	result, err := g.GenerateDetailed(ctx, key, examples)
 	if err != nil {
 		code := "generation_failed"

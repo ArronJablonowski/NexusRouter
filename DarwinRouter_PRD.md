@@ -395,6 +395,13 @@ See [activation operations](docs/skill-activation-operations.md).
 
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
 
+The signed-in Sol coordinator may also perform bounded skill drafting through
+the Codex app-server provider. This remains cloud inference: all source and scope
+privacy constraints apply. Commit the generation reservation before CLI launch,
+include the closed output schema in context admission, and expose no task tools.
+Generated provenance is never accepted; the host derives it from recorded work.
+See [Codex skill drafting](docs/codex-skill-generation.md).
+
 The initial deterministic grouping rule, `observed_tools_v1`, recognizes repeated successful tool execution sequences within the same domain and execution profile. Derive the sequence from actual durable dispatch/completion events, preserving order and repetitions; never infer execution from supplied conversation history. Failed or uncertain tool trajectories do not qualify. Require at least two distinct sessions. Identical tool names are a drafting heuristic, not proof of equivalent arguments, tool implementations, or semantics. Text-only workflows need a separate validated grouping rule. Recheck the actual execution sequence alongside source extraction before planning and generation; a conversation snapshot digest alone does not cover all execution evidence.
 
 Discovery must persist each observed page atomically with its scan checkpoint. Retries of the same revision and parameters return the original saved page, even when feedback changes afterward. Each epoch freezes membership using a durable insertion-sequence fence, not merely a maximum task ID; new tasks cannot indefinitely extend an active epoch. The next epoch starts from the beginning to revisit late feedback and lower-sorting arrivals. Page boundaries freeze neither source evidence across the epoch nor permission to generate. Corrupt history must stop advancement visibly rather than silently skip work.

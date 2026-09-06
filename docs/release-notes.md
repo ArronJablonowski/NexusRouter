@@ -5,6 +5,12 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Signed-in Sol skill drafting through the native Codex app-server adapter,
+  with schema-inclusive context admission, durable-before-launch execution,
+  scoped privacy gates and inactive proposals. One bounded live synthetic check
+  passed; this does not enable user learning or validate generated workflows.
+  See [Codex skill drafting](codex-skill-generation.md).
+
 - Opt-in periodic skill regression monitoring for trusted Go hosts: paginated
   active-state inspection, revision-fenced deterministic rollback, failure
   isolation, sticky health and joined cancellation. No daemon validator or

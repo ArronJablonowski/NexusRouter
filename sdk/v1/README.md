@@ -402,6 +402,12 @@ dispatch/persistence; exports can still contain other sensitive task content.
 No automatic selection of source tasks, publication, activation or background
 scheduling occurs. This does not mutate an injected SkillStore.
 
+The configured generator may be the experimental signed-in `codex_app_server`
+model `gpt-5.6-sol`, without a separate API key. It requires all sources and the
+skill scope to permit cloud sharing. CLI startup occurs only after the durable
+attempt and schema-inclusive context admission. See
+[Codex skill drafting](../../docs/codex-skill-generation.md).
+
 `Client.ListSkillGenerations(ctx, scope, after, limit)` returns metadata-only
 summaries without generated content or source identifiers; limit is1–100 and
 after is an exclusive lexical ID cursor. Pages are live observations, not a

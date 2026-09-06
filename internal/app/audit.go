@@ -194,7 +194,7 @@ func (s *Service) AuditTask(ctx context.Context, task, reviewerID string, maxCos
 		}
 		defer release()
 	}
-	adapter, closeProvider, err := s.openAuditProvider(ctx, provider, model, history.Privacy, key)
+	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, provider, model, history.Privacy, key)
 	if err != nil {
 		return bad()
 	}

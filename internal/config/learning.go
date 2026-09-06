@@ -37,11 +37,11 @@ func (s Settings) validateLearning() error {
 			return errors.New("learning model unavailable within configured limits")
 		}
 		for _, provider := range s.Providers {
-			if provider.ID == m.Provider && (provider.Kind == "ollama" || provider.Kind == "openai_compatible") {
+			if provider.ID == m.Provider && (provider.Kind == "ollama" || provider.Kind == "openai_compatible" || provider.Kind == "codex_app_server") {
 				return nil
 			}
 		}
-		return errors.New("learning requires an HTTP generation provider")
+		return errors.New("learning requires a supported generation provider")
 	}
 	return errors.New("learning model unavailable within configured limits")
 }

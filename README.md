@@ -1074,8 +1074,11 @@ system prompt material, and requires distinct sessions and a common domain.
 Newer negative user feedback disqualifies an earlier positive example. Generation
 honors skill scope/auto-draft settings, deployment mode, source privacy, context,
 resource and cost limits. Inputs and output are redacted before dispatch/storage;
-the returned record is a durable proposal, never an active skill. Background
-learning scheduling remains open.
+the returned record is a durable proposal, never an active skill. Explicitly
+enabled background learning can drive selection and generation. The experimental
+signed-in `codex_app_server` path now supports exact Sol skill drafting with a
+closed output schema, lazy launch after durable admission and no tools. See
+[Codex skill drafting](docs/codex-skill-generation.md) for privacy and test limits.
 
 Go hosts can now call `DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` to
 find current accepted examples without supplying task IDs first. It scans 1–20
