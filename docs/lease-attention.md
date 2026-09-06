@@ -16,6 +16,20 @@ SDK options are explicit. Both surfaces open existing storage read-only, without
 migration, execution, profiling or ownership probes. Missing databases are not
 created. SQLite may create ordinary WAL/SHM coordination sidecars.
 
+Authenticated daemon clients can use `GET /v1/resources/attention`, with optional
+`state`, `after` and `limit` query parameters and the same defaults as the CLI.
+URL-encode cursor values. No request body is accepted. Unknown, duplicate, empty,
+malformed or out-of-range parameters are rejected before storage access; limits
+must use canonical decimal notation. The response is JSON with `Cache-Control:
+no-store`. Normal daemon authentication and browser-origin denial apply.
+
+HTTP inspection shares two bounded control slots and a cooperative five-second
+deadline. Capacity exhaustion returns 503 with `Retry-After: 1`; unavailable
+storage returns a generic 503 without private errors. Invalid backend metadata
+or records outside the requested filter/cursor range fail closed. The endpoint
+does not acknowledge, resolve or create attention records; only the daemon's
+separate observation sweep maintains them.
+
 Each versioned record contains an opaque attention ID, task ID, writer flag,
 first-observed and last-change times, observed lease expiry, state and reason:
 
@@ -47,6 +61,10 @@ successful page and wraps at the end. Pages use a five-second cooperative
 deadline and commit atomically. This bounds returned rows, not database scan
 cost or total delay with a large retained population.
 
+Each observation transaction reserves the SQLite writer before its first schema
+read, preventing stale-snapshot write upgrades under concurrent daemon activity.
+The reservation changes no rows; the schema-24 guard still precedes observation.
+
 Records validate bounded canonical metadata. Task/writer identity drift,
 malformed records, clock regression before the previous update or other page
 errors roll back the whole page and degrade supervisor health. The cursor is
@@ -67,7 +85,12 @@ nonmutation. A real dispatcher test creates an expired synthetic writer, records
 attention while staying healthy, and preserves its lease/journal without model
 calls; the same record survives shutdown and read-only reopening.
 
-HTTP endpoints, acknowledgment/assignment, notifications, immutable attention
+HTTP tests cover authentication, query/body rejection, response validation,
+control capacity, read-only SQLite access and actual daemon wiring. A
+two-connection regression reproduces the former stale-snapshot failure and
+checks writer reservation, schema rejection and lock release.
+
+Acknowledgment/assignment, notifications, immutable attention
 transition history, retention/garbage collection, corruption-tolerant page
 advancement and broader stall reasons remain follow-up work. This feature neither
 resolves uncertain tool effects nor implements idempotent reassignment.

@@ -6,7 +6,7 @@ production release, release tag or complete PRD acceptance is claimed.
 ## Available for supervised testing
 
 - Schema-24 durable attention for expired unreleased leases, maintained by the
-  daemon and inspectable through CLI/SDK without granting release authority.
+  daemon and inspectable through CLI/SDK/authenticated HTTP without granting release authority.
   Back up databases and stop old writers before migration. See
   [lease attention](lease-attention.md).
 

@@ -549,9 +549,10 @@ authenticated `GET /v1/resources/leases?scope=...`, using the admission overlap
 policy. It reveals requested scope and holder task IDs, not private lease
 capabilities. Schema 24 adds durable attention for expired unreleased leases,
 maintained by bounded daemon sweeps and inspectable through CLI `resources
-attention` and SDK `ListLeaseAttention`. Renewal/release resolves observations;
+attention`, SDK `ListLeaseAttention`, and authenticated `GET
+/v1/resources/attention`. Renewal/release resolves observations;
 expiry recurrence reopens the same record. These are diagnostic snapshots, not
-execution or recovery authority. HTTP attention, operator acknowledgment,
+execution or recovery authority. Operator acknowledgment,
 notifications, transition history, retention and broader stall reasons remain
 required. See [lease attention](docs/lease-attention.md).
 See [task lease inspection](docs/task-lease-inspection.md) and

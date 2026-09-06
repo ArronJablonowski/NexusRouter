@@ -37,11 +37,7 @@ func (s *Store) ObserveLeaseAttentionPage(ctx context.Context, after string, now
 		return bad()
 	}
 	defer tx.Rollback()
-	var schema int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema != 24 {
-		return bad()
-	}
-	if _, err = tx.ExecContext(ctx, `UPDATE lease_attention SET state=state WHERE 0`); err != nil {
+	if err = reserveLeaseAttention(ctx, tx); err != nil {
 		return bad()
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT l.rowid,
@@ -130,4 +126,22 @@ FROM resource_leases l WHERE l.rowid>? AND ((l.released=0 AND l.expires<=?) OR E
 		return bad()
 	}
 	return next, changed, nil
+}
+
+// Reserve the writer before the first snapshot read. Reading user_version first
+// permits a concurrent WAL commit to make this transaction's later write upgrade
+// fail with SQLITE_BUSY_SNAPSHOT; a busy timeout cannot repair that old snapshot.
+// WHERE 0 changes no rows, and unsupported/missing tables still fail closed.
+func reserveLeaseAttention(ctx context.Context, tx *sql.Tx) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE lease_attention SET state=state WHERE 0`); err != nil {
+		return err
+	}
+	var schema int
+	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil {
+		return err
+	}
+	if schema != 24 {
+		return workers.ErrLeaseAttention
+	}
+	return nil
 }

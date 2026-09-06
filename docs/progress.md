@@ -1,5 +1,40 @@
 # Implementation evidence
 
+HTTP attention checkpoint: the previous turn made verified schema24 durable
+attention implementation and backup progress (0550c75). This turn rechecked a
+clean worktree; native Linear remains locked and no issue update is claimed.
+Authenticated GET /v1/resources/attention exposes the same read-only records as
+CLI/SDK with default open/25, strict state/after/limit queries, body rejection,
+bounded control admission, cooperative five-second deadlines and generic errors.
+Returned pages are validated against requested filter, cursor and size as well
+as public metadata contracts. Neither the route nor its app adapter writes
+records, probes guards or dispatches models/tools. Two agents supplied HTTP
+contract and actual-SQLite tests; a third verifies actual serve-process wiring.
+Final aggregate evidence follows below. Broader attention actions, retention,
+notifications, uncertain effects and full PRD qualification remain unfinished.
+
+HTTP checkpoint qualification exposed an existing attention-observer transaction
+race: the initial full suite failed two dispatcher shutdown assertions, and
+isolated repeated tests reproduced it. A two-connection storage regression
+reproduces SQLITE_BUSY_SNAPSHOT (517) when a schema read precedes writer
+reservation. The observer now reserves the writer with a zero-row update before
+reading the schema, preventing that stale-snapshot upgrade without changing
+lease ownership or dispatching work. The exact schema guard remains mandatory;
+unsupported schemas roll back. Final post-fix verification is recorded below.
+
+HTTP attention final verification: post-fix make check passed formatting/LOC,
+vet, full native race suite and build (app109.602s, telemetry96.644s,
+CLI29.128s, API9.160s, SDK17.460s). The two formerly failing app tests passed
+all ten isolated repetitions58.294s; deterministic reservation and schema23/25
+rejection tests passed three repetitions2.145s. Final schema-test additions were
+also checked separately because the aggregate run had already started. Native
+make build and CGO-free Linux amd64 production/API test-binary compilation passed;
+Linux execution was not tested. Actual HTTP daemon and SQLite tests prove no task
+dispatch or inspection-time record writes. Independent review found no safety
+blocker in the reservation fix. No user database, configuration or live model was
+used. This delivers HTTP inspection plus the observer contention fix, not full
+MVP acceptance; native Linear remains locked and no issue update is claimed.
+
 Lease-attention final verification: make check passed format/LOC, vet, full
 native race suite and build, including app108.731s, telemetry95.869s,
 CLI29.238s, SDK18.078s and API9.007s. Additional ignored-insert/update fault

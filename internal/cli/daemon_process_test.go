@@ -3,9 +3,12 @@ package cli
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/daemon"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
 func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
@@ -70,6 +74,37 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	status, err := run("status")
 	if err != nil || status.InstanceID != first.InstanceID {
 		t.Fatal("status identity", status, err)
+	}
+	// Exercise the real serve.go service binding in the already-running child.
+	// This is inspection only: the database must remain without task execution.
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/v1/resources/attention", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	transport := &http.Transport{Proxy: nil}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal("attention endpoint request failed", err)
+	}
+	var attention workers.LeaseAttentionPage
+	decodeErr := json.NewDecoder(response.Body).Decode(&attention)
+	closeErr := response.Body.Close()
+	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 24 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
+		t.Fatal("real daemon attention inspection failed", response.StatusCode, decodeErr, closeErr)
+	}
+	databaseURL := url.URL{Scheme: "file", Path: filepath.Join(dir, "tasks.db"), RawQuery: "mode=ro"}
+	database, err := sql.Open("sqlite", databaseURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var taskCount int
+	queryErr := database.QueryRowContext(ctx, `SELECT count(*) FROM task_heads`).Scan(&taskCount)
+	closeErr = database.Close()
+	if queryErr != nil || closeErr != nil || taskCount != 0 {
+		t.Fatal("attention inspection created execution", queryErr, closeErr, taskCount)
 	}
 	if _, err := run("start"); err == nil {
 		t.Fatal("duplicate start accepted")

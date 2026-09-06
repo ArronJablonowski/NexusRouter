@@ -161,6 +161,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		ScopeLeases: func(ctx context.Context, scope string) (workers.ScopeLeaseStatus, error) {
 			return app.InspectScopeLeases(ctx, s.Telemetry.Database, scope)
 		},
+		LeaseAttention: func(ctx context.Context, options workers.LeaseAttentionOptions) (workers.LeaseAttentionPage, error) {
+			return app.InspectLeaseAttention(ctx, s.Telemetry.Database, options)
+		},
 		Health: func(ctx context.Context) error {
 			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !learningReady(learner) {
 				return errors.New("supervisor unavailable")
