@@ -15,7 +15,7 @@ import (
 
 func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin memory list|show|put|delete --db path --scope scope [--id id] [--expected revision]")
+		fmt.Fprintln(stderr, "usage: darwin memory list|show|put|delete (--config path | --db path --scope scope) [--id id] [--expected revision]")
 		return 2
 	}
 	if len(args) == 0 {
@@ -27,6 +27,7 @@ func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fs := flag.NewFlagSet("memory", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
+	configPath := fs.String("config", "", "configured scoped memory management")
 	path := fs.String("db", "", "memory database")
 	scope := fs.String("scope", "", "exact scope")
 	id := fs.String("id", "", "fact ID")
@@ -35,7 +36,19 @@ func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	after := fs.String("after", "", "exclusive ID cursor")
 	contains := fs.String("contains", "", "literal content filter")
 	expired := fs.Bool("include-expired", false, "include expired facts")
-	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || !memory.ValidKey(*scope) || ((action == "show" || action == "delete") && !memory.ValidKey(*id)) || (action == "delete" && *expected < 1) {
+	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 {
+		return usage()
+	}
+	visited := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+	if visited["config"] {
+		options := configuredMemoryOptions{action: action, config: *configPath, id: *id, expected: *expected, limit: *limit, after: *after, contains: *contains, includeExpired: *expired}
+		if !options.validFlags(visited) || !configuredMemoryUniqueFlags(fs, args[1:]) {
+			return usage()
+		}
+		return runConfiguredMemory(options, stdin, stdout, stderr)
+	}
+	if *path == "" || !memory.ValidKey(*scope) || ((action == "show" || action == "delete") && !memory.ValidKey(*id)) || (action == "delete" && *expected < 1) {
 		return usage()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

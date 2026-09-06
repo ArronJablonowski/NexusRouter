@@ -1,6 +1,6 @@
 # Operator memory management
 
-The authenticated daemon API and Go SDK inspect and maintain factual memory
+The configured CLI, authenticated daemon API and Go SDK maintain factual memory
 through the same application service. They never invoke a model, modify routing
 fitness, or enable prompt retrieval. Configure `memory.scope`; this is the only
 scope these operations may access. Management remains available when
@@ -11,6 +11,42 @@ connection. Writes require existing current-schema WAL storage and never create
 or migrate it; normal daemon initialization owns schema setup. An SDK-injected
 `MemoryStore` is used instead, and its lifetime remains the embedding host's
 responsibility.
+
+## Configured CLI
+
+Use an explicit project configuration to apply the same configured scope,
+credential redaction and existing-store-only controls as the application service:
+
+```sh
+darwin memory list --config config.yaml --limit 20
+darwin memory list --config config.yaml --after language --include-expired
+darwin memory show --config config.yaml --id language
+darwin memory put --config config.yaml --expected 0 < fact.json
+darwin memory delete --config config.yaml --id language --expected 1
+```
+
+Use the complete fact shown below for creation. A correction supplies the next
+fact revision and its current revision in `--expected`; optional `--id` must match
+the input. Put requires explicit `--expected`, including zero for creation. The
+fact's scope must match configuration. `--scope` and `--db` cannot accompany
+`--config`, even as empty flags. Only list accepts `--after`, `--contains`,
+`--limit` and `--include-expired`; duplicate or unrelated flags are rejected instead of
+silently ignored. Configuration uses normal environment-over-project precedence.
+
+Put reads at most 128 KiB of UTF-8 JSON from stdin, with all required fact fields,
+no duplicates, unknown/case-alias keys, null fields, extra JSON values or unpaired
+Unicode surrogate escapes. This bounds bytes, not how long an input pipe may wait.
+Once admitted, service operations have a cooperative five-second deadline. No
+model, daemon startup, database initialization/migration or automatic retry occurs.
+Reads work with retrieval disabled and never touch `last_use`.
+
+List emits a JSON array, show a complete fact, and writes a small ID/revision or
+deletion acknowledgement. Page limits are 1–100; page through ordered immutable
+IDs for export. Output is machine-readable JSON, not a consistent multi-page
+snapshot. An output failure returns nonzero but may follow a committed mutation;
+inspect current state before deciding whether to write again. Errors omit raw
+configuration/backend details. The explicit legacy `--db ... --scope ...` form
+remains direct storage access without these configured redaction controls.
 
 ## HTTP contract
 
@@ -101,8 +137,11 @@ upgrading: an already-open connection from an older binary cannot enforce the
 new lifecycle rule. A custom store must provide equivalent
 identity-lifecycle protection if it permits operator mutations.
 
-Current configured credentials are redacted from content and provenance before
-write and before output. Credentials in IDs, scopes, cursors or filters cause
+Observed configured credentials are redacted from content and provenance before
+write and before output. Reads retain admission credentials and recheck after
+backend access, so credentials rotated during a read are also redacted. This
+does not erase old stored payloads or promise observation of future rotations.
+Credentials in IDs, scopes, cursors or filters cause
 rejection instead of identity rewriting, preserving pagination and revision
 semantics. Other personal data is not automatically removed; exports remain
 sensitive. Stronger identifier validation now rejects invalid UTF-8, control

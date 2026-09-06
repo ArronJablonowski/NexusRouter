@@ -43,7 +43,8 @@ Usage:
   darwin approval-decision --config path < decision.json
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin daemon start|status|stop --config path  Control an authenticated local daemon
-  darwin memory list|show|put|delete --db path --scope scope
+  darwin memory list|show|put|delete --config path
+  darwin memory list|show|put|delete --db path --scope scope (raw storage)
   darwin skills list|show|history|state|draft|rollback --root path --scope scope
   darwin skill-generations list --db path --scope id [--after id --limit 25]
   darwin skill-generations show --db path --scope id --id generation-id

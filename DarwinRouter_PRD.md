@@ -189,6 +189,13 @@ The `darwin` CLI supports:
 - Memory and skill inspection, export, correction, deletion, activation, and rollback.
 - Approval review for model disabling, pruning suggestions, policy changes, and destructive tools.
 
+Configured memory commands must use the same scoped, credential-redacted
+application service as SDK/HTTP management. Explicit raw database access must
+remain distinguishable and cannot be combined with configured scope. Input
+framing must reject ambiguous fact JSON; revisions remain required for correction
+and deletion. Reads must not initialize storage or update last-use metadata.
+See [operator memory management](docs/memory-management.md).
+
 Interactive chat must deliver provisional assistant text while providers are
 streaming, alongside ordered committed lifecycle metadata. Known credentials
 must remain redacted across fragments, terminal controls must not cross chunk

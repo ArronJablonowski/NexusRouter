@@ -1,5 +1,45 @@
 # Implementation evidence
 
+Configured CLI memory checkpoint: the previous turn made verified durable-monitor
+progress and backed up cdc68e7; this turn began from a clean worktree. Requirement
+audit found that raw CLI memory commands bypassed the configured-scope/redaction
+service already used by SDK/HTTP. New `darwin memory ... --config path` commands
+now use that same service for list/show/put/delete, including with retrieval off.
+Explicit legacy `--db/--scope` access remains distinguishable and cannot be mixed
+with configuration, even through empty flags. Creation requires explicit expected
+revision zero; correction/deletion retain CAS, privacy and retired-ID protection.
+
+The configured path rejects duplicate or irrelevant flags and strict fact JSON
+with unknown/duplicate/case-alias keys, nulls, missing required fields, invalid
+UTF-8, unpaired surrogate escapes, extra values or more than128KiB. Read limits
+remain100 facts and the application encoded-page bound. Errors omit raw details;
+storage must already exist and is not migrated. Read inspection never touches
+last-use. Application reads now preserve admission secrets and recheck credentials
+after backend calls, suppressing newly sensitive identities/filters and redacting
+both old and newly observed text credentials without rewriting stored facts.
+
+Three agents contributed the gap audit/CLI implementation, end-to-end fixtures,
+and independent review. Review caught last-wins repeated flags, now rejected.
+Configured CLI race tests passed three runs4.361s; application memory race tests
+passed three runs2.429s. Owned subprocess tests use the actual RunWithInput command
+entry with synthetic-only environment and isolated YAML/SQLite; they prove redacted
+storage/output, stale revision rejection and joined command completion. Final
+deletion/retirement assertions additionally inspect storage, not just a failed show.
+
+Full make check passed (format/LOC, vet, native race suite and production build):
+app150.245s, CLI30.797s, telemetry104.134s and SDK19.596s. Native make build and
+Linux amd64 production cross-build passed. After adding final owned-process
+deletion/retirement assertions, the complete CLI race suite passed33.709s and
+format/LOC plus app/CLI vet passed. Core memory-management and configured CLI tests,
+including actual child processes, executed successfully as CGO-free Linux arm64
+binaries in an existing Alpine container: no network, read-only root, unprivileged
+user, only owned test binaries mounted. Linux execution was not race-instrumented.
+No live inference, user database migration
+or configuration change was performed. Native Linear remains locked; no issue
+status changed. Consistent multi-page export, semantic/background factual learning,
+secure erasure, daemon validator configuration and full PRD qualification remain
+open. See docs/memory-management.md for the implemented operator boundary.
+
 Durable named monitor checkpoint: starting from
 ce65bdc, added catalog-schema5 scheduling state and check intents before trusted
 validation, exact pending restart, persisted cadence and lexical fairness. A

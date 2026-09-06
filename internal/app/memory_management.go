@@ -61,7 +61,7 @@ func memoryManagementKey(value string, secrets []string) bool {
 	return memory.ValidKey(value) && utf8.ValidString(value) && redact(value, secrets) == value
 }
 func memoryManagementFact(f memory.Fact, scope string, secrets []string) (memory.Fact, error) {
-	if f.Validate() != nil || f.Scope != scope || !memoryManagementKey(f.ID, secrets) || !utf8.ValidString(f.Content) || !utf8.ValidString(f.Provenance) {
+	if f.Validate() != nil || f.Scope != scope || !memoryManagementKey(scope, secrets) || !memoryManagementKey(f.ID, secrets) || !utf8.ValidString(f.Content) || !utf8.ValidString(f.Provenance) {
 		return memory.Fact{}, ErrAdmission
 	}
 	f.Content, f.Provenance = redact(f.Content, secrets), redact(f.Provenance, secrets)
@@ -87,6 +87,9 @@ func (s *Service) Memory(ctx context.Context, id string) (memory.Fact, error) {
 		if f.ID != id {
 			return ErrAdmission
 		}
+		// A trusted backend may outlive credential rotation. Retain the admission
+		// credentials as well as fresh observations before releasing its result.
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 		out, err = memoryManagementFact(f, scope, secrets)
 		return err
 	})
@@ -112,6 +115,10 @@ func (s *Service) Memories(ctx context.Context, after, contains string, limit in
 		}
 		facts, err := store.QueryMemory(ctx, q)
 		if err != nil || len(facts) > limit {
+			return ErrAdmission
+		}
+		secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+		if !memoryManagementKey(scope, secrets) || (after != "" && !memoryManagementKey(after, secrets)) || redact(contains, secrets) != contains {
 			return ErrAdmission
 		}
 		last := after
