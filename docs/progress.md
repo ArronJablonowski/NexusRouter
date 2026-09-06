@@ -1,5 +1,54 @@
 # Implementation evidence
 
+Linux thermal-admission checkpoint: the previous turn made verified progress
+with the public SDK summary workflow and backup 3be5f51. This turn began from a
+clean worktree. PRD12 thermal-pressure sampling had an unimplemented Linux path:
+mandatory proc/cgroup memory and CPU data were present, but thermal pressure was
+always unknown. The host profile now shares its three-second deadline with a
+read-only survey of fixed kernel thermal sysfs paths. This uses published
+millidegree passive/hot/critical trip points, not invented temperature limits or
+fan activity. No OS settings, cooling controls or model processes are changed.
+
+Any valid reached positive threshold denies new local reservations through the
+existing budget. False requires complete bounded discovery, a usable passive
+trip in every visible zone and no reached recognized threshold; otherwise the
+reading stays unknown. Unknown zones cannot erase separately observed positive
+pressure. Zero/negative/invalid thresholds, absent sensors, unsupported types,
+incomplete pairs and overflow cannot establish absence of pressure. Linux does
+not receive a fabricated macOS thermal_state label. Mandatory memory/CPU facts
+remain intact on optional sensor failure; cancellation fails the whole profile.
+
+A research/test agent checked official kernel ABI and driver documentation,
+implemented filesystem fixtures, and independently reviewed the sampler. Review
+found no further concrete defect after fixing a double-suffix index alias and
+checking directory type before opening. Root integration tests prove cgroup
+preservation, threshold-driven reservation denial, shared deadlines, caller
+cancellation and host-only fallback. An initial host-only fixture used malformed
+empty cgroup data and correctly failed; it was corrected to valid non-memory
+legacy membership without weakening production parsing. Final focused thermal
+race tests passed three runs (6.516s).
+
+CGO-free Linux/arm64 thermal tests executed successfully in an existing Alpine
+image with no network, an unprivileged UID, read-only root/binary mount, dropped
+capabilities and temporary fixture storage. Its actual rebuilt resources command
+observed two CPUs and a512MiB cgroup capacity with thermal pressure null because
+no usable sensors were exposed. No images were installed, no user sessions or
+local model inference were involved, and only owned disposable containers were
+removed after completion. This qualifies Linux execution/absence handling, not
+physical hot-sensor behavior, atomic sysfs sampling, cooling hysteresis or
+active-inference preemption. See docs/linux-thermal-profiling.md.
+
+Native Linear was rechecked and remains inaccessible while the Mac is locked.
+No issue status was changed. Full PRD/Linear acceptance remains open.
+
+Verification: make check passed formatting/LOC, vet, the native race suite and
+production build (app141.910s, telemetry104.671s, CLI30.045s, API9.496s,
+SDK19.490s, resources7.240s). The later suffix-alias regression test passed in
+the final focused native race run and rebuilt Linux/arm64 test execution. Native
+make build, CGO-free Linux/amd64 production build and resource test-binary
+compilation also passed; amd64 tests were not executed. No paid/live inference,
+physical sensor stress or complete PRD qualification is claimed.
+
 SDK summary-workflow checkpoint: the preceding CLI-access turn verified installed
 authentication but did not advance implementation. This turn resumed the pending
 SDK/app changes against the actual worktree. The versioned embedded client now

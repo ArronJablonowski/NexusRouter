@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Linux thermal trip-point observations now gate new local reservations,
+  preserving unknown readings and existing cgroup limits. Fixture tests ran on
+  Linux/arm64; physical hot-sensor qualification remains open. See
+  [Linux thermal profiling](linux-thermal-profiling.md).
+
 - Embedded Go SDK summary drafting, read-only proposal inspection/pagination,
   operator review/history and explicit approved-summary continuation. Operator
   authentication belongs to the host; automatic approval remains disabled. See

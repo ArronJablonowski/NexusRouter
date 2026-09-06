@@ -51,6 +51,7 @@ signal. This was a read-only observation, not a physical throttling test.
 Injected-probe tests exercise all states through the actual budget reservation
 method, malformed and failed probes, preservation of memory data, fixed command
 arguments and cancellation. Custom-profiler tests reject unknown labels and
-inconsistent pressure. Linux thermal measurement, physical hot-state
+inconsistent pressure. [Linux thermal measurement](linux-thermal-profiling.md)
+now samples published trip points separately. Physical hot-state
 qualification, progressive fair-state throttling, active-inference preemption
 and cross-platform thermal parity remain unfinished.

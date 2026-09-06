@@ -43,7 +43,9 @@ func Profile(ctx context.Context) (Snapshot, error) {
 	case "darwin":
 		return profileDarwin(ctx, runProbe)
 	case "linux":
-		return profileLinux(ctx, readLinuxProfileFile)
+		return profileLinuxHost(ctx, readLinuxProfileFile, func(ctx context.Context) *bool {
+			return probeLinuxThermal(ctx, "/sys/class/thermal")
+		})
 	default:
 		return s, ErrProfile
 	}

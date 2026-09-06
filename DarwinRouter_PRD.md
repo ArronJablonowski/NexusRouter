@@ -519,6 +519,12 @@ The resource profiler samples:
 - Loaded local models and estimated memory requirements.
 - Current provider and worker concurrency.
 
+Linux thermal sampling uses kernel-exported passive/hot/critical thresholds,
+not fixed temperature guesses. Missing or incomplete measurements remain
+unknown; pressure must flow into existing local admission without modifying OS
+cooling policy. The current bounded implementation and physical-qualification
+limits are recorded in [Linux thermal profiling](docs/linux-thermal-profiling.md).
+
 Default allocation policy (GiB means 2^30 bytes):
 
 - Below 16 GiB usable unified memory/VRAM: one local execution; unload before incompatible model switches.

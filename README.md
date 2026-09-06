@@ -289,6 +289,13 @@ remain null rather than being called cool. The optional `thermal_state` label
 distinguishes nominal, fair, serious and critical reports. See
 [thermal profiling](docs/macos-thermal-profiling.md) for API caveats and limits.
 
+On Linux, read-only thermal sysfs observations compare published passive, hot
+and critical trip points with sampled temperatures. Reached thresholds deny new
+local reservations; incomplete measurements remain unknown. No guessed Celsius
+limits, fan-state inference or cooling-setting changes are used. See
+[Linux thermal profiling](docs/linux-thermal-profiling.md) for bounds and the
+distinction between threshold evidence and actual kernel throttling.
+
 On Linux, cgroup-v2 measurements cap host RAM by every visible ancestor's
 `memory.max` and `memory.high`, and cap available RAM by the corresponding
 `limit - memory.current` headroom (saturated at zero). Treating `memory.high`
