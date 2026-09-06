@@ -33,8 +33,11 @@ func validateOrphanChildReceipt(ctx context.Context, q recoveryQuery, r leaseRec
 			return ErrLeaseRecovery
 		}
 	}
-	if start.Kind != runtime.TaskStarted || start.Data.ParentTaskID != r.Task || terminal.ID != r.ChildEventID || terminal.Kind != runtime.TaskFailed || (terminal.Data.Code != "interrupted_model" && terminal.Data.Code != "interrupted_read_only_model") || !terminal.Time.Equal(r.Time) || terminal.SessionID != start.SessionID {
+	if start.Kind != runtime.TaskStarted || start.Data.ParentTaskID != r.Task || terminal.ID != r.ChildEventID || terminal.Kind != runtime.TaskFailed || (terminal.Data.Code != "interrupted_model" && terminal.Data.Code != "interrupted_read_only_model" && terminal.Data.Code != "interrupted_read_only_tool") || !terminal.Time.Equal(r.Time) || terminal.SessionID != start.SessionID {
 		return ErrLeaseRecovery
+	}
+	if terminal.Data.Code == "interrupted_read_only_tool" {
+		return validateOrphanToolReceipt(ctx, q, r, terminal)
 	}
 	return nil
 }

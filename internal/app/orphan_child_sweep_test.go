@@ -13,6 +13,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 // The fixture's actual process has exited by SIGKILL and its in-flight child
@@ -24,6 +25,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 	if len(expectedCode) == 1 {
 		childCode = expectedCode[0]
 	}
+	pendingRead := childCode == "interrupted_read_only_tool"
 	parentLeases, err := db.InspectLeases(ctx, "delegation")
 	if err != nil || len(parentLeases) != 1 || parentLeases[0].TaskID != parent {
 		t.Fatal("missing interrupted parent reader", err)
@@ -43,8 +45,20 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		t.Fatal("missing interrupted child journal")
 	}
 	initial, err := db.TaskSnapshot(ctx, child)
-	if err != nil || !initial.InterruptedTurn || len(initial.Pending) != 0 || initial.UncertainEffects {
+	if err != nil || (!pendingRead && (!initial.InterruptedTurn || len(initial.Pending) != 0 || initial.UncertainEffects)) || (pendingRead && (initial.InterruptedTurn || len(initial.Pending) == 0 || !initial.UncertainEffects)) {
 		t.Fatal("fixture did not interrupt a provider turn with no pending effects", err)
+	}
+	var childLeases []telemetry.Lease
+	if pendingRead {
+		childLeases, err = db.InspectLeases(ctx, "workspace")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, lease := range childLeases {
+			if lease.TaskID != child || lease.Writer {
+				t.Fatal("unexpected pending-read owner")
+			}
+		}
 	}
 	dispatcher, err := StartDispatcher(ctx, svc)
 	if err != nil {
@@ -61,7 +75,15 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		if pe != nil || we != nil {
 			t.Fatal("inspect recovering readers", pe, we)
 		}
-		if len(p) == 0 && len(w) == 0 {
+		childHeld := false
+		if pendingRead {
+			readers, err := db.InspectLeases(wait, "workspace")
+			if err != nil {
+				t.Fatal(err)
+			}
+			childHeld = len(readers) > 0
+		}
+		if len(p) == 0 && len(w) == 0 && !childHeld {
 			break
 		}
 		if len(p) > 1 || len(w) > 1 || len(p) == 1 && p[0].Token != parentLeases[0].Token || len(w) == 1 && w[0].Token != workerLeases[0].Token {
@@ -91,6 +113,20 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		suffix := page.Events[len(before):]
 		switch task {
 		case child, worker:
+			if pendingRead {
+				plan, err := sessions.PlanInterruptedWorkerTree([][]runtime.Event{journals[worker], journals[child]}, page.Events[len(page.Events)-1].Time)
+				if err != nil || plan.Child == nil {
+					t.Fatal("cannot derive interrupted tool recovery", err)
+				}
+				want := plan.Worker.Events
+				if task == child {
+					want = plan.Child.Events
+				}
+				if !reflect.DeepEqual(suffix, want) {
+					t.Fatal("noncanonical interrupted tool recovery suffix")
+				}
+				break
+			}
 			code := "worker_owner_interrupted"
 			if task == child {
 				code = childCode
@@ -115,7 +151,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		repaired[task] = page.Events
 	}
 	snapshot, err := db.TaskSnapshot(ctx, child)
-	if err != nil || snapshot.State != "failed" || !snapshot.InterruptedTurn || len(snapshot.Pending) != 0 || snapshot.UncertainEffects {
+	if err != nil || snapshot.State != "failed" || snapshot.InterruptedTurn != initial.InterruptedTurn || len(snapshot.Pending) != 0 || snapshot.UncertainEffects {
 		t.Fatal("recovery invented completed model turn", err)
 	}
 	raw, err := sql.Open("sqlite", svc.settings.Telemetry.Database)
@@ -124,7 +160,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 	}
 	defer raw.Close()
 	receipts := map[string][]byte{}
-	for _, lease := range []telemetry.Lease{parentLeases[0], workerLeases[0]} {
+	for _, lease := range append([]telemetry.Lease{parentLeases[0], workerLeases[0]}, childLeases...) {
 		var body []byte
 		if err := raw.QueryRowContext(ctx, `SELECT body FROM lease_recoveries WHERE lease_token=?`, lease.Token).Scan(&body); err != nil {
 			t.Fatal("missing reader recovery receipt", err)
@@ -184,7 +220,7 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 		}
 	}
 	var count int
-	if err := raw.QueryRowContext(ctx, `SELECT count(*) FROM lease_recoveries`).Scan(&count); err != nil || count != 2 {
+	if err := raw.QueryRowContext(ctx, `SELECT count(*) FROM lease_recoveries`).Scan(&count); err != nil || count != 2+len(childLeases) {
 		t.Fatal("unexpected recovery receipt count", err, count)
 	}
 	afterHistory, err := db.RecoveryHistory(ctx, submission)
@@ -197,7 +233,11 @@ func qualifyOrphanChildSweep(t *testing.T, ctx context.Context, svc *Service, db
 	if err := db.Append(ctx, 0, start); err != nil {
 		t.Fatal(err)
 	}
-	for _, scope := range []string{"delegation", "delegation-" + parent} {
+	scopes := []string{"delegation", "delegation-" + parent}
+	if pendingRead {
+		scopes = append(scopes, "workspace")
+	}
+	for _, scope := range scopes {
 		writer, err := db.AcquireLease(ctx, start.TaskID, "child-recovery-probe-writer", scope, true, time.Now(), time.Second)
 		if err != nil {
 			t.Fatal("recovered tree still blocks new writer", scope, err)

@@ -246,7 +246,12 @@ child was recorded, including death after acquiring its reader but before
 output, and atomically releases the exact worker reader with a distinct receipt.
 The parent requires separate reconciliation and ownership proof. See
 [interrupted worker recovery](docs/orphan-worker-recovery.md) for eligibility,
-actual SIGKILL qualification and unsupported pending-tool/write cases.
+actual SIGKILL qualification and unsupported cases. Interrupted execution children
+can also resolve 1–32 already-dispatched, explicitly read-only calls as fixed
+host failures, then fail the child and worker without repeating tools or inference.
+Up to 64 held child readers must match the worker's exact stopped execution image;
+they remain held until separately proven terminal-reader recovery. Undispatched
+proposals, writes, legacy behavior and uncertain effects remain unsupported.
 
 ```sh
 ./bin/darwin config validate --config examples/local.yaml

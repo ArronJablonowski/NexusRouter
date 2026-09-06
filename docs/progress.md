@@ -1,5 +1,46 @@
 # Implementation evidence
 
+Pending dispatched read-only recovery checkpoint:
+the orphan-worker planner now resolves 1–32 already-dispatched, explicitly
+read-only pending child calls as fixed host failures, then fails child and worker
+atomically. It does not infer actual output or success, invent dispatch, repeat
+tools/inference, change fitness, or grant retry/reassignment authority. All past
+completed tools must be read-only/no-effect; undispatched proposals, legacy or
+write behavior, delegation tools, acceptance/evaluation/error records and
+unresolved effects remain outside this path. Synthetic completions use
+`tool_failed`, effect `none`, and `{"error":"read_only_tool_interrupted"}`;
+the child terminal is `interrupted_read_only_tool`.
+
+The worker retains its exact unlocked execution-image guard through the reserved
+SQLite transaction. Up to 64 held child readers are allowed only with matching
+full process identity/reference and unchanged before/after metadata snapshots.
+The worker transaction leaves child readers untouched; separate terminal-reader
+recovery verifies and releases them after failure resolves the pending calls.
+Canonical bounded receipt history re-derives the entire synthetic suffix from
+the original last-event marker. Existing model-only, resolved-read-only and
+pre-child recovery semantics remain unchanged. No schema migration is added;
+older recovery binaries do not understand the new child terminal contract.
+
+Agents contributed session planning, telemetry integration/tests and independent
+review. Actual application SIGKILL fixtures cover the built-in read handler
+after return but before result INSERT (reader released), and before workspace
+reader release (reader held), not interruption inside a callback. Real dispatcher
+recovery preserves source prefixes, records failed unavailable results, fails
+child/worker/parent, separately reclaims readers and keeps repeat receipts stable.
+Provider counts remain one coordinator and one child request, with no repeated
+tool execution and no recovered private file contents. App race tests passed
+three runs4.106s; focused session/telemetry tests passed. Linux amd64 production
+cross-build passed. New session, telemetry and both actual app SIGKILL cases
+passed as CGO-free Linux arm64 binaries in existing Alpine 3.22 containers with
+an unprivileged user, read-only root and no network; Linux was not race-instrumented.
+Full native make check passed (format/LOC, vet, full race suite and production
+build), including app153.870s, telemetry112.532s, CLI36.847s, SDK24.266s and
+sessions13.336s. Native make build passed; final focused session tests passed
+three runs17.517s. Read-only CLI checks
+reported Codex0.153.4 and ChatGPT login, with no credential reading or live
+inference. General pending/write/uncertain-effect recovery and full PRD acceptance
+remain open; no Linear completion is claimed.
+
 Pre-child worker recovery checkpoint: previous turn made verified configured
 memory CLI progress and backed up a523604; this turn began from a clean worktree.
 Inspection confirmed model-stream and resolved-read-only-tool child recovery were

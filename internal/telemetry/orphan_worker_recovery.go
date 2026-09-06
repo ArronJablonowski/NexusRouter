@@ -97,12 +97,22 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	if tx.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT token FROM resource_leases WHERE task_id=? LIMIT 2)`, c.Task).Scan(&count) != nil || count != 1 {
 		return false, ErrLeaseRecovery
 	}
+	var childReaders []recoveryLease
+	toolRecovery := tree.Child != nil && len(tree.Child.Events) > 1 && tree.Child.Events[len(tree.Child.Events)-1].Data.Code == "interrupted_read_only_tool"
 	if tree.Child != nil {
-		// An eligible child has no pending tool dispatch; any earlier read-only
-		// tool leases must already be released. A separate holder is contradictory
-		// ownership, not another lease this worker proof can reclaim.
+		// Pending explicitly read-only dispatches may retain bounded readers from
+		// this exact stopped process image. Other child plans still require no
+		// held tool leases. This transaction never releases child readers.
 		var held bool
-		if tree.Child.ParentTaskID != histories[1][0].TaskID || len(tree.Child.Events) != 1 || tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
+		if tree.Child.ParentTaskID != histories[1][0].TaskID || len(tree.Child.Events) < 1 || (!toolRecovery && len(tree.Child.Events) != 1) {
+			return false, ErrLeaseRecovery
+		}
+		if toolRecovery {
+			childReaders, err = orphanToolReaders(ctx, tx, tree.Child.ParentTaskID, c)
+			if err != nil {
+				return false, ErrLeaseRecovery
+			}
+		} else if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
 			return false, ErrLeaseRecovery
 		}
 		if appendOrphanFailure(ctx, tx, *tree.Child) != nil {
@@ -118,7 +128,8 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 		r.Reason = "orphan_worker_without_child_unlocked"
 	}
 	if tree.Child != nil {
-		r.ChildTaskID, r.ChildSequence, r.ChildEventID = tree.Child.ParentTaskID, tree.Child.Events[0].Sequence, tree.Child.Events[0].ID
+		last := tree.Child.Events[len(tree.Child.Events)-1]
+		r.ChildTaskID, r.ChildSequence, r.ChildEventID = tree.Child.ParentTaskID, last.Sequence, last.ID
 	}
 	receipt, _ := json.Marshal(r)
 	if _, err = tx.ExecContext(ctx, `INSERT INTO lease_recoveries(lease_token,digest,body) VALUES(?,?,?)`, token, r.Digest, receipt); err != nil || releaseFinishedWorker(ctx, tx, event, token, c.Owner) != nil {
@@ -132,7 +143,12 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 	}
 	if tree.Child != nil {
 		var held bool
-		if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
+		if toolRecovery {
+			finalReaders, readErr := orphanToolReaders(ctx, tx, tree.Child.ParentTaskID, c)
+			if readErr != nil || !sameOrphanToolReaders(childReaders, finalReaders) {
+				return false, ErrLeaseRecovery
+			}
+		} else if tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_leases WHERE task_id=? AND released=0)`, tree.Child.ParentTaskID).Scan(&held) != nil || held {
 			return false, ErrLeaseRecovery
 		}
 	}
@@ -158,19 +174,24 @@ func (s *Store) RecoverOrphanWorker(ctx context.Context, token string, now time.
 }
 
 func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.InterruptionRecovery) error {
-	if len(plan.Events) != 1 {
+	if len(plan.Events) < 1 || len(plan.Events) > 33 {
 		return ErrLeaseRecovery
 	}
-	event := plan.Events[0]
-	if event.Kind != runtime.TaskFailed || event.TaskID != plan.ParentTaskID || event.Sequence != plan.ExpectedSequence+1 {
+	event := plan.Events[len(plan.Events)-1]
+	if event.Kind != runtime.TaskFailed || event.TaskID != plan.ParentTaskID || event.Sequence != plan.ExpectedSequence+int64(len(plan.Events)) {
 		return ErrLeaseRecovery
 	}
-	body, err := event.Encode()
-	if err != nil {
-		return err
-	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, body); err != nil {
-		return err
+	for i, e := range plan.Events {
+		if e.TaskID != event.TaskID || e.SessionID != event.SessionID || e.Sequence != plan.ExpectedSequence+int64(i)+1 || i < len(plan.Events)-1 && e.Kind != runtime.ToolCompleted {
+			return ErrLeaseRecovery
+		}
+		body, err := e.Encode()
+		if err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, e.ID, e.TaskID, e.Sequence, body); err != nil {
+			return err
+		}
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE task_heads SET sequence=?,state='failed' WHERE task_id=? AND session_id=? AND sequence=? AND state='running'`, event.Sequence, event.TaskID, event.SessionID, plan.ExpectedSequence)
 	if err != nil {

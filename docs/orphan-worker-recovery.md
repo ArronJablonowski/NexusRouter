@@ -3,7 +3,9 @@
 The daemon can now fail a verified orphaned in-process worker before an execution
 child was recorded, whose child finished before the worker's terminal commit, whose model-only child was
 interrupted, or whose child finished explicitly read-only tools before its
-interruption. This covers these finalization and model-stream crash boundaries. It does not
+interruption, or whose explicitly read-only calls were dispatched without durable
+results. This covers the qualified finalization, model-stream and pending-read
+boundaries below. It does not
 accept the output, rerun inference, resume a task, or reassign work.
 
 ## Required evidence
@@ -18,10 +20,12 @@ accept the output, rerun inference, resume a task, or reassign work.
 - Exactly one direct, non-worker execution child has a valid terminal projection,
   or an eligible running history with no pending tools or acceptance records.
   Alternatively, the strict pre-child lifecycle described below has no linked
-  child record at all. Pending tools, uncertain/confirmed effects, nested and ambiguous
-  children remain unsupported. A running child must have no independently held
+  child record at all. The pending-read-only exception below permits a bounded
+  set of dispatched calls and same-image child readers. Other pending tools,
+  uncertain/confirmed effects, nested and ambiguous children remain unsupported.
+  Model-only and resolved-read-only children must have no independently held
   resource lease; worker ownership cannot authorize releasing another holder.
-- A tool-aware running child must have at least one completed current-journal
+- The resolved-tool/model-interruption path requires at least one completed current-journal
   tool pair. Every dispatch and result must explicitly declare `read_only`, and
   every result must record `none` effects. A dispatch's initial `uncertain`
   marker is permitted only when its matching result resolves it. Legacy behavior,
@@ -74,6 +78,41 @@ unlinked corrupt history, prove remote generation stopped, or authorize retries.
 
 ## Atomic failure and supervision
 
+### Dispatched read-only calls without recorded results
+
+The pending-tool path requires 1–32 current-journal pending calls, each already
+dispatched and explicitly declared `read_only`. All previous tool dispatches and
+results must also be read-only, with completed results recording `none` effects.
+Undispatched proposals, legacy behavior, delegation tools, writes, acceptance,
+evaluation/error records and unresolved effects are excluded. A trusted read-only
+declaration is a contract, not evidence that the tool returned a result or that
+remote work stopped.
+
+Recovery appends one deterministic `tool.completed` failure per pending call,
+with code `tool_failed`, effect `none`, and the fixed JSON body
+`{"error":"read_only_tool_interrupted"}`. It then appends child `task.failed` /
+`interrupted_read_only_tool` and worker failure in the same transaction. These
+records report unavailable results; no actual output, successful execution, new
+dispatch or acceptance is invented. Tool identities and ordering remain paired.
+The child terminal's causation identifies the original last event, and receipt
+inspection re-derives every synthetic completion and terminal from canonical,
+bounded original-prefix bytes.
+
+This path alone permits 0–64 unreleased child leases, all readers with the
+worker's exact process identity and full retained guard reference. Their ordered
+metadata snapshots must remain identical before and after recovery writes.
+Foreign/unknown owners, writers, excess readers or lease drift abort recovery.
+The worker transaction releases only its own reader, never child readers. The
+terminal-reader sweep subsequently proves ownership loss and reclaims each
+eligible child reader independently. This grants no retry, reassignment, remote
+cancellation or general uncertain-effect recovery authority.
+
+The new child terminal uses existing schema-23 receipt storage without migration.
+Older recovery binaries do not recognize it and must not be used to recover
+these histories after upgrading.
+
+### Existing terminal and model-interruption paths
+
 One transaction appends `task.failed` with code `worker_owner_interrupted`,
 updates the worker head, releases its exact reader and stores a private schema-23
 lease receipt with reason `orphan_worker_owner_unlocked`. The receipt binds the
@@ -101,10 +140,11 @@ lease; the completed tool's lease must already have been released normally.
 
 The transaction revalidates ownership, source event content, child and parent
 history before commit. Any failure rolls back all changes. Repeating recovery
-does not append another event or rewrite the receipt. Existing child-recovery
+does not append another event or rewrite the receipt. Existing model/resolved-read
 receipt validation checks its binding and terminal metadata; it is not a full
-historical corruption audit. The new pre-child receipt additionally validates
-its strict worker prefix as described above. Source events and learning evidence
+historical corruption audit. Pre-child receipts validate their strict worker
+prefix; pending-read receipts validate their full original prefix and synthetic
+suffix as described above. Source events and learning evidence
 are never rewritten.
 
 At startup and each tick, the dispatcher visits at most 32 running worker-reader
@@ -116,13 +156,33 @@ Parent submission reconciliation remains restricted by configuration and expired
 submission claim. Non-submitted parent journal reconciliation is not added here.
 
 Each page has a five-second cooperative deadline. Worker plus child history is
-bounded to 10,000 stored events and 8 MiB, including all new terminals. The parent
+bounded to 10,000 stored events and 8 MiB, including all new failure events. The parent
 is independently bounded to 10,000 events and 8 MiB. Bounds limit returned
 candidates and payloads, not total database scan cost or filesystem-call latency.
 Unsupported histories remain untouched; corruption/operational errors degrade
 supervisor health. The public API does not expose private recovery capabilities.
 
 ## Qualification and remaining work
+
+New actual application SIGKILL fixtures run built-in `read_file` and pause after
+its handler returned, either before `tool.completed` INSERT (reader already
+released) or before workspace-reader release (reader held). They kill and join
+only the owned subprocess, then run the real dispatcher. Recovery records fixed
+failed results and fails child, worker and parent without another tool execution
+or provider request. Counts remain one fixture coordinator and one child request;
+discarded file contents never become recovered output. The held-reader case
+verifies separate terminal-reader reclamation. Source prefixes, repeat receipts
+and writer admission on recovered scopes are checked. These are test-only SQLite
+pause points, not interruption inside a running callback, production-model
+inference, remote termination or power-loss qualification.
+
+The new app cases passed native race tests three times (4.106s); focused session
+and telemetry tests passed. Linux amd64 production cross-build passed. The new
+session, telemetry and both actual app SIGKILL cases also passed as CGO-free Linux
+arm64 binaries in existing Alpine 3.22 containers, with an unprivileged user,
+read-only root and no network; Linux tests were not race-instrumented. Full native
+`make check` (format/LOC, vet, full race suite and production build) and `make build`
+passed. Final focused session tests passed three runs (17.517s).
 
 Actual application SIGKILL tests pause inside the first execution-child INSERT
 and separately inside `worker.started` INSERT after reader acquisition. They kill
@@ -168,7 +228,7 @@ source pairs and no additional read lease establish that recovery did not rerun
 the read tool. This qualifies synthetic loopback execution, not live model
 behavior or remote-generation cessation.
 
-Still required: pending tool-aware child recovery, ambiguous/malformed missing
+Still required: undispatched or mixed/unsupported pending-tool child recovery, ambiguous/malformed missing
 outcomes, writer and
 uncertain-effect resolution, persistent operator attention, idempotent
 reassignment, automatic continuation, stronger isolation and guard garbage

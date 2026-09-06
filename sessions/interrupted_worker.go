@@ -34,7 +34,8 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 			}
 			budget -= len(body)
 			count++
-			readOnlyStart := history[len(history)-1].Data.Code == "interrupted_read_only_model" && e.Kind == runtime.ToolStarted && e.Data.ToolBehavior == runtime.BehaviorReadOnly && e.Data.Effect == runtime.UncertainEffect
+			readOnlyCode := history[len(history)-1].Data.Code
+			readOnlyStart := (readOnlyCode == "interrupted_read_only_model" || readOnlyCode == "interrupted_read_only_tool") && e.Kind == runtime.ToolStarted && e.Data.ToolBehavior == runtime.BehaviorReadOnly && e.Data.Effect == runtime.UncertainEffect
 			if e.Data.Effect != "" && e.Data.Effect != runtime.NoEffect && !readOnlyStart {
 				return bad()
 			}
@@ -177,6 +178,9 @@ func PlanInterruptedWorkerTree(histories [][]runtime.Event, now time.Time) (Inte
 			planned, err = PlanInterruptedReadOnlyModel([][]runtime.Event{child}, now)
 		}
 		if err != nil {
+			planned, err = PlanInterruptedReadOnlyTools([][]runtime.Event{child}, now)
+		}
+		if err != nil {
 			return bad()
 		}
 		childPlan = &planned
@@ -197,6 +201,9 @@ func isInterruptedModelTerminal(history []runtime.Event) bool {
 		return false
 	}
 	end := history[len(history)-1]
+	if end.Data.Code == "interrupted_read_only_tool" {
+		return isInterruptedReadOnlyToolsTerminal(history)
+	}
 	if end.Kind != runtime.TaskFailed || !interruptedModelCode(end.Data.Code) {
 		return false
 	}
@@ -208,5 +215,5 @@ func isInterruptedModelTerminal(history []runtime.Event) bool {
 }
 
 func interruptedModelCode(code string) bool {
-	return code == "interrupted_model" || code == "interrupted_read_only_model"
+	return code == "interrupted_model" || code == "interrupted_read_only_model" || code == "interrupted_read_only_tool"
 }

@@ -93,6 +93,24 @@ func TestOrphanWorkerOwnerHelper(t *testing.T) {
 	}
 	appendEvent("child", runtime.TaskStarted, runtime.Data{ParentTaskID: "work"})
 	appendEvent("child", runtime.TurnStarted, runtime.Data{})
+	if strings.HasPrefix(mode, "readtool_pending") {
+		appendEvent("child", runtime.TurnCompleted, runtime.Data{FinishReason: "tool_calls", ToolCalls: []providers.ToolCall{{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{}`)}}})
+		appendEvent("child", runtime.ToolStarted, runtime.Data{ToolCallID: "read", ToolName: "read_file", ToolBehavior: runtime.BehaviorReadOnly, Effect: runtime.UncertainEffect})
+		if mode != "readtool_pending" {
+			reader, err := s.AcquireLease(ctx, "child", "read-owner", "child-scope", mode == "readtool_pending_writer", time.Now(), time.Minute)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "readtool_pending_released" {
+				if err = s.ReleaseLease(ctx, reader.Token, reader.Owner); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		fmt.Println("orphan-worker-ready")
+		<-ctx.Done()
+		t.Fatal("parent did not kill helper")
+	}
 	readOnly := mode == "readonly_active" || mode == "readonly_complete"
 	if readOnly {
 		appendEvent("child", runtime.TurnCompleted, runtime.Data{FinishReason: "tool_calls", ToolCalls: []providers.ToolCall{{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{}`)}}})

@@ -150,7 +150,9 @@ func TestOrphanReadOnlyRecoveryRejectsAmbiguousToolsAndLease(t *testing.T) {
 			case "missing_terminal":
 				_, err = s.db.Exec(`DELETE FROM events WHERE task_id='child' AND sequence>=5`)
 				if err == nil {
-					_, err = s.db.Exec(`UPDATE task_heads SET sequence=4 WHERE task_id='child'`)
+					// Missing completion is now eligible only with an explicit
+					// read-only dispatch. Legacy declarations remain unsafe.
+					_, err = s.db.Exec(`UPDATE task_heads SET sequence=4 WHERE task_id='child'; UPDATE events SET body=json_remove(body,'$.data.tool_behavior') WHERE task_id='child' AND sequence=4`)
 				}
 			}
 			if err != nil {
