@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Verified orphan-worker failure recovery when its execution child is already
+  terminal and effect-resolved. Atomic failure/reader release/receipt, followed
+  by independently validated parent reconciliation; no output acceptance or
+  model retry. See [orphan worker recovery](orphan-worker-recovery.md).
+
 - Declared read-only/idempotent-write/non-idempotent-write tool behavior, with
   durable event/approval binding and no added retry authority. Both writer
   classes retain approvals and writer leases; see [tool behavior](tool-behavior.md).

@@ -110,8 +110,11 @@ parent journal repair without releasing a separate orphaned parent reader lease.
 Journal repair and safe resource-holder reconciliation remain distinct concerns.
 The daemon now follows journal recovery with a separate
 [terminal-reader reclamation page](terminal-reader-recovery.md), which requires
-verified unlocked ownership and effect-resolved terminal replay. Running,
-uncertain, legacy, missing-guard and writer cases still remain unresolved.
+verified unlocked ownership and effect-resolved terminal replay. A preceding
+[orphan-worker sweep](orphan-worker-recovery.md) can now fail an interrupted
+supervisor when its one execution child is already terminal and effect-resolved.
+Running children, uncertain effects, legacy/missing guards and writers remain
+unresolved.
 
 Run the process-boundary tests with:
 

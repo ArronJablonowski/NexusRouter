@@ -229,6 +229,7 @@ func TestWorkerFinalizationProcessDeathRecoveryBoundary(t *testing.T) {
 				if _, reclaimed, err := db.RecoverTerminalReadersPage(ctx, "", 32, time.Now().UTC()); err != nil || reclaimed != 0 {
 					t.Fatal("running worker reader was reclaimed", err, reclaimed)
 				}
+				qualifyOrphanWorkerSweep(t, ctx, svc, db, raw, id, parentLeases[0], workerLeases[0], journals)
 			}
 			if parents.Load() != 1 || children.Load() != 1 {
 				t.Fatal("reader sweep dispatched inference")

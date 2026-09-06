@@ -47,7 +47,10 @@ loopback providers and cover two distinct boundaries:
    preliminary worker acceptance have completed, but the worker terminal rolls
    back. The parent stays at its pending tool call. Reconciliation leaves the
    running work unresolved, produces no recovery receipt or model call, and
-   refuses continuation. Expired unreleased readers continue to exclude writers.
+   refuses continuation. A separate [orphan-worker sweep](orphan-worker-recovery.md)
+   now verifies the stopped owner and terminal child, atomically fails the worker
+   and releases its reader, then permits parent failure reconciliation and the
+   parent's separately proven reader reclamation. No model call is repeated.
 2. **After worker finalization, inside enclosing tool-reader release:** the worker
    terminal and its lease release survive, while the parent reader remains held.
    Existing interrupted-delegation recovery reconstructs the parent tool result
@@ -76,14 +79,12 @@ automatic daemon restart, or all failed/canceled terminal process boundaries.
 
 ## Remaining recovery work
 
-No general process-death proof, orphan release, idempotent reassignment, automatic
-continuation or forced in-process termination is provided by this change.
-New schema-22 leases additionally bind to a private
+General process-death proof, idempotent reassignment, automatic continuation and
+forced in-process termination remain unfinished. Schema-22 leases bind to a private
 [local execution-image guard](process-lifetime-ownership.md), preventing active
 mutation by an unrelated process with a copied lease token. Internal guard
-observation now enables terminal-reader reclamation, but not running-worker recovery.
-Unresolved readers can still block availability. Even when the test knows its
-child died, production recovery has no such trusted observation and does not
-release those leases. Stronger lifecycle ownership and safe reconciliation are
-still required by the PRD. See [interrupted delegation recovery](interrupted-delegation-recovery.md)
+observation now enables terminal-reader reclamation and the bounded orphan-worker
+case described above. Running children, unknown ownership and unresolved effects
+still block availability. Broader lifecycle ownership and reconciliation remain
+required by the PRD. See [interrupted delegation recovery](interrupted-delegation-recovery.md)
 and [reader/writer execution](reader-writer-execution.md).

@@ -3,7 +3,8 @@
 New resource leases are bound to private local execution-image ownership, in
 addition to their task, owner and token. This is a prerequisite for safe orphan
 reconciliation. Schema 23 now uses it for narrowly scoped
-[terminal reader reclamation](terminal-reader-recovery.md), not general recovery.
+[terminal reader reclamation](terminal-reader-recovery.md) and
+[orphan-worker failure recovery](orphan-worker-recovery.md), not general recovery.
 
 ## Ownership protocol
 
@@ -84,8 +85,8 @@ Storage tests cover Store.Close/reopen, migration preservation, atomic
 registration rollback, corrupt metadata and foreign-process mutation/approval
 denial. All resources and tokens in those tests are synthetic, not user records.
 
-General holder discovery, authoritative reconciliation of running workers,
-release of nonterminal or unknown readers and orphaned writer leases, idempotent reassignment, persistent
+General holder discovery, reconciliation of workers with unfinished children,
+release of unknown readers and orphaned writer leases, idempotent reassignment, persistent
 operator attention and automatic continuation remain required PRD work. No
 expiry-based release, model retry, tool retry, model disabling or approval policy
 change is introduced by the ownership protocol. Terminal-reader reclamation has

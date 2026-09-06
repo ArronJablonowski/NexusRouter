@@ -12,9 +12,21 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	defer ticker.Stop()
 	after := ""
 	readerAfter := ""
+	workerAfter := ""
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
+		nextWorker, _, workerErr := d.db.RecoverOrphanWorkersPage(query, workerAfter, 32, time.Now().UTC())
+		cancel()
+		workerAfter = nextWorker
+		d.supervisorHeartbeat(-1)
+		if workerErr != nil && ctx.Err() == nil {
+			d.recordError()
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		query, cancel = context.WithTimeout(ctx, 5*time.Second)
 		next, err := d.recoverPage(query, configDigest, after)
 		cancel()
 		d.supervisorHeartbeat(-1)

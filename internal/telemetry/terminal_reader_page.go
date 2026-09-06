@@ -11,6 +11,16 @@ import (
 // unverifiable owners are visited and skipped, so they cannot starve later rows.
 // Each candidate gets bounded replay; the page shares a five-second deadline.
 func (s *Store) RecoverTerminalReadersPage(ctx context.Context, after string, limit int, now time.Time) (next string, recovered int, err error) {
+	return s.recoverReadersPage(ctx, after, limit, now, false)
+}
+
+// RecoverOrphanWorkersPage visits running worker readers independently from
+// terminal readers. Eligibility is revalidated by the recovery transaction.
+func (s *Store) RecoverOrphanWorkersPage(ctx context.Context, after string, limit int, now time.Time) (next string, recovered int, err error) {
+	return s.recoverReadersPage(ctx, after, limit, now, true)
+}
+
+func (s *Store) recoverReadersPage(ctx context.Context, after string, limit int, now time.Time, workers bool) (next string, recovered int, err error) {
 	now = now.UTC()
 	var cursor int64
 	if len(after) > 19 {
@@ -29,7 +39,11 @@ func (s *Store) RecoverTerminalReadersPage(ctx context.Context, after string, li
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	next = after
-	rows, err := s.db.QueryContext(ctx, `SELECT l.rowid,CASE WHEN typeof(l.token)='text' AND length(CAST(l.token AS BLOB)) BETWEEN 1 AND 512 THEN l.token END FROM resource_leases l JOIN task_heads h ON h.task_id=l.task_id WHERE l.rowid>? AND l.writer=0 AND l.released=0 AND l.process_id IS NOT NULL AND h.state IN ('completed','failed','canceled') ORDER BY l.rowid LIMIT ?`, cursor, limit)
+	predicate := `h.state IN ('completed','failed','canceled')`
+	if workers {
+		predicate = `h.state='running' AND EXISTS(SELECT 1 FROM events e WHERE e.task_id=l.task_id AND e.sequence=1 AND json_extract(e.body,'$.kind')='task.started' AND json_extract(e.body,'$.worker_id')=l.owner)`
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT l.rowid,CASE WHEN typeof(l.token)='text' AND length(CAST(l.token AS BLOB)) BETWEEN 1 AND 512 THEN l.token END FROM resource_leases l JOIN task_heads h ON h.task_id=l.task_id WHERE l.rowid>? AND l.writer=0 AND l.released=0 AND l.process_id IS NOT NULL AND `+predicate+` ORDER BY l.rowid LIMIT ?`, cursor, limit)
 	if err != nil {
 		return after, 0, ErrLeaseRecovery
 	}
@@ -54,7 +68,11 @@ func (s *Store) RecoverTerminalReadersPage(ctx context.Context, after string, li
 		if !leaseObservationIdentity(token.token) {
 			return next, recovered, ErrLeaseRecovery
 		}
-		changed, e := s.RecoverTerminalReader(ctx, token.token.String, now)
+		recover := s.RecoverTerminalReader
+		if workers {
+			recover = s.RecoverOrphanWorker
+		}
+		changed, e := recover(ctx, token.token.String, now)
 		if e != nil {
 			return next, recovered, e
 		}

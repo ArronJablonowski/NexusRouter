@@ -83,7 +83,11 @@ cooperative in-process lease contract. Missing guard files after temporary-folde
 cleanup, copied databases or reboot remain unknown; they are never recreated as
 proof. Supported local-filesystem and retention limits still apply.
 
-Running-worker recovery, missing child outcomes, writer/uncertain-effect
+The separate [orphan-worker sweep](orphan-worker-recovery.md) can now fail an
+interrupted supervisor with one already-terminal child and verified ownership.
+This does not broaden terminal-reader reclamation authority.
+
+Running-child recovery, missing child outcomes, writer/uncertain-effect
 resolution, idempotent reassignment, automatic continuation, public holder and
 receipt inspection, persistent operator attention and robust guard retention are
 still outstanding. This checkpoint is not general orphan recovery or complete

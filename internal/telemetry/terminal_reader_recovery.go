@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -32,6 +33,7 @@ type leaseRecoveryReceipt struct {
 	Reason          string    `json:"reason"`
 	Digest          string    `json:"digest"`
 	CandidateDigest string    `json:"candidate_digest"`
+	EventID         string    `json:"event_id,omitempty"`
 }
 type recoveryQuery interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
@@ -113,7 +115,24 @@ func existingLeaseRecovery(ctx context.Context, q recoveryQuery, c recoveryLease
 	if seq < 1 || seq > 10000 || (state.String != "completed" && state.String != "failed" && state.String != "canceled") || offset != 0 || c.Process == "" {
 		return false, ErrLeaseRecovery
 	}
-	if !bytes.Equal(body, canonical) || r.Version != 1 || r.Task != c.Task || r.Process != c.Process || r.Sequence != seq || r.State != state.String || r.Time.Year() < 1970 || r.Time.Year() >= 2261 || r.Reason != "terminal_reader_owner_unlocked" || !digest.Valid || digest.String != wantDigest || r.Digest != wantDigest || r.CandidateDigest != recoveryDigest(c, seq, state.String) || c.Released != 1 || c.Writer != 0 {
+	if !bytes.Equal(body, canonical) || r.Version != 1 || r.Task != c.Task || r.Process != c.Process || r.Sequence != seq || r.State != state.String || r.Time.Year() < 1970 || r.Time.Year() >= 2261 || !digest.Valid || digest.String != wantDigest || r.Digest != wantDigest || r.CandidateDigest != recoveryDigest(c, seq, state.String) || c.Released != 1 || c.Writer != 0 {
+		return false, ErrLeaseRecovery
+	}
+	switch r.Reason {
+	case "terminal_reader_owner_unlocked":
+		if r.EventID != "" {
+			return false, ErrLeaseRecovery
+		}
+	case "orphan_worker_owner_unlocked":
+		if !sessions.ValidEventPageID(r.EventID) || state.String != "failed" {
+			return false, ErrLeaseRecovery
+		}
+		var encoded []byte
+		var terminal runtime.Event
+		if q.QueryRowContext(ctx, `SELECT CASE WHEN length(CAST(body AS BLOB)) BETWEEN 1 AND 8388608 THEN body END FROM events WHERE task_id=? AND sequence=? AND id=?`, c.Task, seq, r.EventID).Scan(&encoded) != nil || json.Unmarshal(encoded, &terminal) != nil || terminal.Validate() != nil || terminal.TaskID != c.Task || terminal.ID != r.EventID || terminal.Sequence != seq || terminal.WorkerID != c.Owner || terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "worker_owner_interrupted" || !terminal.Time.Equal(r.Time) {
+			return false, ErrLeaseRecovery
+		}
+	default:
 		return false, ErrLeaseRecovery
 	}
 	return true, nil
@@ -183,7 +202,7 @@ func (s *Store) RecoverTerminalReader(ctx context.Context, token string, now tim
 		return false, nil
 	}
 	h := sha256.Sum256([]byte(c.Token))
-	r := leaseRecoveryReceipt{1, c.Task, snapshot.Sequence, snapshot.State, now.UTC(), c.Process, "terminal_reader_owner_unlocked", hex.EncodeToString(h[:]), recoveryDigest(c, snapshot.Sequence, snapshot.State)}
+	r := leaseRecoveryReceipt{Version: 1, Task: c.Task, Sequence: snapshot.Sequence, State: snapshot.State, Time: now.UTC(), Process: c.Process, Reason: "terminal_reader_owner_unlocked", Digest: hex.EncodeToString(h[:]), CandidateDigest: recoveryDigest(c, snapshot.Sequence, snapshot.State)}
 	body, _ := json.Marshal(r)
 	if _, err = tx.ExecContext(ctx, `INSERT INTO lease_recoveries(lease_token,digest,body) VALUES(?,?,?)`, token, r.Digest, body); err != nil {
 		return false, ErrLeaseRecovery
