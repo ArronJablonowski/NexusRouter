@@ -488,8 +488,9 @@ tasks retain those records for inspection; they are not automatically resumed.
 New guidance for a terminal task is rejected, but duplicate-key receipts remain
 retrievable. Use completed-session continuation for a new follow-up task.
 
-Storage migrates transactionally to schema14. Back up operational databases
-before upgrades; older binaries cannot open this schema. The new runtime turn
+Steering storage was introduced in schema14; current storage migrates
+transactionally to [schema28](docs/event-kind-index.md). Back up operational databases
+before upgrades; older binaries cannot open schema28. The runtime turn
 configuration changes durable submission fingerprints, so older queued requests
 require explicit configuration-mismatch handling. A full-screen interactive editor
 and general interrupted-session recovery remain unfinished.

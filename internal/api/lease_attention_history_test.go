@@ -150,7 +150,7 @@ func TestAttentionHistoryHTTPBackendBinding(t *testing.T) {
 				case "version":
 					out.Version = 2
 				case "schema":
-					out.StorageSchema = 28
+					out.StorageSchema = 29
 				case "id":
 					out.AttentionID = "other"
 					out.Items[0].Observation.ID = "other"

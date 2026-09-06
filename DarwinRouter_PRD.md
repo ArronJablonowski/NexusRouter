@@ -690,6 +690,13 @@ See [task lease inspection](docs/task-lease-inspection.md) and
 
 SQLite operates in WAL mode with serialized, versioned migrations. Event appends and corresponding state projections are transactional. Startup verifies database integrity and migration compatibility before readiness.
 
+Schema28 adds a task/kind/sequence index to accelerate journal evidence reads
+without changing eligibility, recent-sample ordering or evidence validation.
+Read-only legacy schemas remain supported at their feature-specific minimums;
+older writers must stop before migration. See [index migration](docs/event-kind-index.md)
+and [bounded performance evidence](docs/benchmarks.md). Large-history migration
+cost, concurrent workloads and the complete latency SLAs remain to be qualified.
+
 Core stored entities include configurations, policy snapshots, tasks, sessions, events, attempts, routes, provider health, model fitness, evaluation evidence, work leases, memory, skill versions, approvals, and audit records.
 
 Metrics and traces follow OpenTelemetry conventions and cover task latency, route decisions, provider calls, tool calls, worker leases, retries, fallbacks, compactions, fitness updates, skill changes, queue pressure, and resource pressure. Export is optional and disabled by default; local metrics remain available.

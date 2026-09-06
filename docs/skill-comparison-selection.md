@@ -76,7 +76,7 @@ Append failures roll back the event, task head and index together; exact retries
 do not duplicate exposure. The index accelerates lookup; it is not independent
 proof that a workflow was executed or that an output was correct.
 
-Selection inspection requires schema27 but never creates or migrates storage.
+Selection inspection accepts schema27 or28 but never creates or migrates storage.
 Normal write-capable daemon/store startup performs the migration. Older supported
 read-only features remain available on their compatible schemas. No live user
 database is migrated merely by running the test suite.

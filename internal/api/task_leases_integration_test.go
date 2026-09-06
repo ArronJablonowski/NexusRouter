@@ -86,7 +86,7 @@ func TestTaskLeasesHTTPReadOnlySQLite(t *testing.T) {
 		}
 		var status workers.TaskLeaseStatus
 		want := workers.TaskLeaseCounts{LiveReaders: 1, ExpiredReaders: 1, ReleasedWriters: 1}
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &status) != nil || status.Validate() != nil || status.TaskID != "task" || status.TaskState != "running" || status.Sequence != 1 || status.StorageSchema != 27 || status.Leases == nil || *status.Leases != want || status.Recoveries == nil || *status.Recoveries != (workers.TaskRecoveryCounts{}) {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &status) != nil || status.Validate() != nil || status.TaskID != "task" || status.TaskState != "running" || status.Sequence != 1 || status.StorageSchema != 28 || status.Leases == nil || *status.Leases != want || status.Recoveries == nil || *status.Recoveries != (workers.TaskRecoveryCounts{}) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 	}

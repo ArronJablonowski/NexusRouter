@@ -106,7 +106,7 @@ func TestScopeLeaseStatusCorruption(t *testing.T) {
 		"owner": `UPDATE resource_leases SET owner=char(10)`, "token": `UPDATE resource_leases SET token=''`,
 		"expiry": `UPDATE resource_leases SET expires=9223372036854775807`, "writer": `PRAGMA ignore_check_constraints=ON; UPDATE resource_leases SET writer=2`,
 		"head": `UPDATE task_heads SET state='invalid'`, "session": `UPDATE task_heads SET session_id=''`, "sequence": `UPDATE task_heads SET sequence=0`,
-		"missing-head": `PRAGMA foreign_keys=OFF; DELETE FROM task_heads`, "schema": `PRAGMA user_version=28`,
+		"missing-head": `PRAGMA foreign_keys=OFF; DELETE FROM task_heads`, "schema": `PRAGMA user_version=29`,
 		"duplicate-writer": `UPDATE resource_leases SET writer=1; INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires) SELECT 'second',task_id,owner,scope,1,expires FROM resource_leases`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestScopeLeaseStatusLegacyAndInputs(t *testing.T) {
 		t.Run(fmt.Sprint(schema), func(t *testing.T) {
 			s, path, req := approvalFixture(t)
 			if schema < 23 {
-				if _, err := s.db.Exec(`DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries`); err != nil {
+				if _, err := s.db.Exec(`DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries`); err != nil {
 					t.Fatal(err)
 				}
 			}

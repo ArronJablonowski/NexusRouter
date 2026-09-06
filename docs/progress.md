@@ -1,5 +1,57 @@
 # Implementation evidence
 
+Indexed evidence-read checkpoint: the previous turn made verified progress,
+committed/pushed70785d9; this turn started clean. A CPU profile of the actual
+eight-model/1,000-seed automatic-task fixture attributed74.46% cumulative sampled
+CPU to OutputValidity. An attempted combined-count JSON query increased
+allocations and measured115.17–115.71ms, so it was discarded. Query-plan inspection
+confirmed existing task/sequence seeks rather than guessing a bad join index.
+An owned-database experiment then demonstrated that an additional task/kind/
+sequence expression index cuts repeated JSON-kind scans.
+
+Schema28 now creates events_task_kind transactionally during normal migration,
+without changing any journal/evaluation body or evidence predicate. The preliminary
+model-start count stops at201 because only zero/≤200/>200 distinguish query plans.
+The selected latest100 window, domain/profile/validator filtering, source-body
+validation, duplicate counts and malformed-evidence rejection remain intact.
+Read-only supported schemas extend through28, while comparison/source checks
+continue accepting27. Metrics/lease metadata validators and legacy migration
+fixtures reflect the new maximum; future-schema tests reject29. The skill file
+catalog is unchanged. See docs/event-kind-index.md for upgrade constraints.
+
+Recorded isolated full application benchmarks passed three100-task runs per case
+in45.083s. Eight-model/1,000-seed mean improved from111.97–113.83ms to49.76–49.86ms;
+run p99 values were55.48–56.60ms, maximum57.72ms. Every case still includes normal
+task writes/index maintenance. These are local fixture results, not production
+SLAs or inference speedups. An overlapping exploratory run was discarded. Other
+host workloads were uncontrolled. Separate read probes on synthetic1,000-task
+corpora showed gains for text and4KiB Go-source checks; production migration
+duration, disk footprint and standalone write throughput remain unqualified.
+
+Migration tests verify legacy27 read-only nonmigration, body/result preservation,
+append maintenance, stable reopening and failed migration/recovery after an index
+name conflict. Density regressions cover199/200/201/350 model starts, newer
+off-domain/profile distractions, reversed lexical IDs/timestamps, empty/unfinished
+evidence, old excluded corruption and selected foreign-attempt rejection.
+Focused migration/validity race tests passed three times54.540s and separate
+density/unfinished tests passed three times36.062s. Existing migration and public
+adapter-focused suites also passed. Independent final review found no blocker.
+
+Full make check passed formatting/LOC, vet, all native race tests and build
+(app196.575s, telemetry133.735s, CLI38.148s, API12.383s, SDK24.292s).
+Native and Linux amd64 CLI builds passed. Migration/validity/density suites and
+application blank-answer/Go-validation routing tests executed successfully as
+CGO-free Linux arm64 binaries in existing Alpine3.22 with no network, read-only
+root and unprivileged UID. Linux execution was not race-instrumented; no Linux
+latency or production migration throughput claim follows from these tests.
+
+Native Linear was checked but the Mac remained locked; no issue status update or
+completion is claimed. Tests used owned temporary stores and loopback providers;
+no live inference, user configuration changes or user database migration occurred.
+Back up operational stores and stop old writers before normal startup upgrades
+them. Large-history migration, power-loss boundaries, concurrency and both full
+latency SLAs remain open, along with the broader PRD acceptance requirements.
+
 Routing-performance evidence checkpoint: previous turn made verified progress,
 committed/pushed72a18bd, and this turn started clean. PRD16 / historical DAR-44
 performance evidence now measures complete automatic-task latency distributions

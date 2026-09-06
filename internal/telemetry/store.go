@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 27 {
+	if version > 28 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -316,6 +316,14 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 27 {
 		if err = migrateSkillExposures(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 28 {
+		// Exact-kind seeks avoid repeatedly decoding unrelated event bodies.
+		// This is an accelerator only; readers still validate journal evidence.
+		if _, err = conn.ExecContext(ctx, `CREATE INDEX events_task_kind ON events(task_id,json_extract(body,'$.kind'),sequence);
+		 PRAGMA user_version=28;`); err != nil {
 			return err
 		}
 	}

@@ -179,9 +179,10 @@ selection checkpoint promotes it to schema8. Existing schema6/7 receipts remain
 readable without invented historical intent or checkpoint records.
 Schemas1–7 remain readable; subsequent activation, publication and deterministic
 monitor writes do not downgrade it. Stop older writers before adopting schema8.
-This operation does not migrate SQLite, whose selector requires schema27.
+This operation does not migrate SQLite, whose selector accepts schema27 or28.
 Source membership is an additive optional report field; catalog schema8 and
-SQLite schema27 are unchanged. Completed historical receipts, including those
+the source-record format are unchanged. SQLite schema28 adds only an unrelated
+query index; schema27 remains readable. Completed historical receipts, including those
 without sources, remain acknowledgeable without reopening the evidence database.
 Outcome records reserve at most 1,000 distinct activation revision slots across
 intents and legacy receipts, with at most one selection checkpoint per intent,

@@ -93,7 +93,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	var attention workers.LeaseAttentionPage
 	decodeErr := json.NewDecoder(response.Body).Decode(&attention)
 	closeErr := response.Body.Close()
-	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 27 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
+	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 28 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
 		t.Fatal("real daemon attention inspection failed", response.StatusCode, decodeErr, closeErr)
 	}
 	databaseURL := url.URL{Scheme: "file", Path: filepath.Join(dir, "tasks.db"), RawQuery: "mode=ro"}
@@ -169,7 +169,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	}
 	res, body = readHistory()
 	var history workers.LeaseAttentionHistoryPage
-	if res.StatusCode != http.StatusOK || json.Unmarshal(body, &history) != nil || history.Version != 1 || history.StorageSchema != 27 || !history.Available || history.AttentionID != "daemon-history" || len(history.Items) != 1 || history.Items[0].Sequence != 1 || history.Items[0].Kind != "baseline" || history.Items[0].Observation != observation {
+	if res.StatusCode != http.StatusOK || json.Unmarshal(body, &history) != nil || history.Version != 1 || history.StorageSchema != 28 || !history.Available || history.AttentionID != "daemon-history" || len(history.Items) != 1 || history.Items[0].Sequence != 1 || history.Items[0].Kind != "baseline" || history.Items[0].Observation != observation {
 		t.Fatal("positive history route not wired", res.StatusCode, string(body))
 	}
 	for _, private := range []string{token, "private-history-token", "private-owner", "private-scope"} {

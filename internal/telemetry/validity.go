@@ -32,9 +32,9 @@ func (s *Store) OutputValidity(ctx context.Context, key routing.Key, requested .
 	// candidates the query materializes a bounded recent set before fetching
 	// output bodies or performing the expensive evidence consistency checks.
 	var modelStarts int
-	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM events
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM events
 	 WHERE json_extract(body,'$.kind')='turn.started'
-	 AND json_extract(body,'$.data.model_id')=? AND json_extract(body,'$.data.provider_id')=?`, key.Model, key.Provider).Scan(&modelStarts); err != nil {
+	 AND json_extract(body,'$.data.model_id')=? AND json_extract(body,'$.data.provider_id')=? LIMIT 201)`, key.Model, key.Provider).Scan(&modelStarts); err != nil {
 		return out, err
 	}
 	if modelStarts == 0 {

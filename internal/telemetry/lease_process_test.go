@@ -93,7 +93,7 @@ func TestLeaseProcessCorruptMetadataFencesMutations(t *testing.T) {
 func TestLeaseProcessMigrationPreservesLegacyUnknown(t *testing.T) {
 	s, path := leaseStore(t)
 	ctx := context.Background()
-	if _, err := s.db.Exec(`DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; PRAGMA user_version=21`); err != nil {
+	if _, err := s.db.Exec(`DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; PRAGMA user_version=21`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.db.Exec(`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires) VALUES('legacy','task','owner','scope',0,?)`, time.Now().Add(time.Minute).UnixNano()); err != nil {
@@ -115,7 +115,7 @@ func TestLeaseProcessMigrationPreservesLegacyUnknown(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT count(*) FROM lease_processes`).Scan(&count); err != nil || count != 0 {
 		t.Fatal(count, err)
 	}
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 27 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 28 {
 		t.Fatal(version, err)
 	}
 	if err = s.RenewLease(ctx, "legacy", "owner", time.Now(), time.Minute); err != nil {

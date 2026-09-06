@@ -42,7 +42,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.StorageSchema != 27 || snapshot.Validate() != nil {
+	if snapshot.StorageSchema != 28 || snapshot.Validate() != nil {
 		t.Fatal(snapshot)
 	}
 	for _, group := range snapshot.Groups {
@@ -61,7 +61,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 
 func TestMetricsLegacyAbsentTables(t *testing.T) {
 	db, path := submissionStore(t)
-	if _, err := db.db.Exec(`DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; PRAGMA user_version=1`); err != nil {
+	if _, err := db.db.Exec(`DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; PRAGMA user_version=1`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(context.Background(), path)

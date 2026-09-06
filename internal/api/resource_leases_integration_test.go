@@ -86,7 +86,7 @@ func TestResourceLeasesHTTPReadOnlySQLite(t *testing.T) {
 			}
 		}
 		var out workers.ScopeLeaseStatus
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &out) != nil || out.Validate() != nil || out.Scope != scope || !out.Available || out.StorageSchema != 27 {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &out) != nil || out.Validate() != nil || out.Scope != scope || !out.Available || out.StorageSchema != 28 {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		want := []workers.ScopeLeaseHolder{}

@@ -1,6 +1,45 @@
 # Routing performance evidence
 
-## Current latency distributions
+## Schema28 indexed evidence reads
+
+The task/kind/sequence index described in [migration notes](event-kind-index.md)
+accelerates repeated per-task evidence queries without changing eligibility or
+validation. The same six application fixtures were rerun with100 serial tasks
+and three independent runs on the same host. These recorded runs did not overlap
+other project tests/benchmarks; other host workloads remained uncontrolled.
+An exploratory overlapping run was discarded.
+
+| Pool | Seed → final tasks per run | Mean ms | p50 ms | p95 ms | p99 ms | Largest observed ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 0 → 101 | 7.15–7.36 | 6.83–7.26 | 10.34–10.45 | 10.67–10.88 | 10.96 |
+| 2 | 100 → 201 | 11.61–12.10 | 11.74–12.30 | 13.83–14.39 | 14.02–14.61 | 15.11 |
+| 2 | 1,000 → 1,101 | 22.66–22.80 | 22.45–22.82 | 24.25–24.92 | 24.79–25.40 | 27.73 |
+| 8 | 0 → 101 | 9.56–9.77 | 9.61–9.93 | 14.21–14.41 | 14.53–14.88 | 15.21 |
+| 8 | 100 → 201 | 15.59–15.76 | 15.21–15.47 | 19.79–19.96 | 20.14–20.49 | 20.67 |
+| 8 | 1,000 → 1,101 | 49.76–49.86 | 49.24–49.41 | 53.20–55.59 | 55.48–56.60 | 57.72 |
+
+Values are ranges of each per-run metric, not pooled percentiles. The eight-model,
+1,000-seed mean is approximately56% lower than the schema27 fixture below.
+New timed tasks still incur normal index-maintenance writes, but these measurements
+do not separately qualify write throughput, index disk size, large migrations or
+concurrent requests. All original measurement limitations below still apply.
+
+A CPU profile of the schema27 fixture (13.11s profile duration,12.02s sampled CPU)
+attributed8.95s/74.46% cumulative CPU to `OutputValidity`; it includes setup/seeding
+as well as measured tasks and is not a latency decomposition. Reproduce on the
+reviewed source revision with a caller-owned output directory:
+
+```sh
+go test ./internal/app -run '^$' -bench '^BenchmarkAutomaticTaskOverhead/pool_8/seed_1000$' -benchtime=100x -count=1 -cpuprofile /absolute/owned/cpu.pprof -o /absolute/owned/app.test
+go tool pprof -top -cum /absolute/owned/app.test /absolute/owned/cpu.pprof
+```
+
+An attempted combined-count JSON query measured115.17–115.71ms and increased
+allocations; it was discarded before this checkpoint. The accepted change adds
+the index and bounds the planning population count at201; it does not replace
+fresh evidence validation with a cache or drop malformed observations.
+
+## Schema27 latency distributions
 
 Measured September 6, 2026 on Apple M4 Max, darwin/arm64, Go 1.27.1,
 with 100 serial completed tasks per case and three separate runs. No race

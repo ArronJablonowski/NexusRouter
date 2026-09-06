@@ -111,7 +111,7 @@ func TestCanceledAppendAndFutureMigration(t *testing.T) {
 	if err != nil || len(items) != 0 {
 		t.Fatal("cancellation persisted state")
 	}
-	if _, err = s.db.Exec("PRAGMA user_version=28"); err != nil {
+	if _, err = s.db.Exec("PRAGMA user_version=29"); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
