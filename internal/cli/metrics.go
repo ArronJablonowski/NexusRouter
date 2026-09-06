@@ -11,6 +11,9 @@ import (
 )
 
 func runMetrics(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "export" {
+		return runMetricsExport(args[1:], stdout, stderr)
+	}
 	fs := flag.NewFlagSet("metrics", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := ""

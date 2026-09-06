@@ -701,6 +701,14 @@ Core stored entities include configurations, policy snapshots, tasks, sessions, 
 
 Metrics and traces follow OpenTelemetry conventions and cover task latency, route decisions, provider calls, tool calls, worker leases, retries, fallbacks, compactions, fitness updates, skill changes, queue pressure, and resource pressure. Export is optional and disabled by default; local metrics remain available.
 
+An explicit one-shot CLI/SDK OTLP/HTTP JSON export now delivers the existing
+content-free lifecycle gauges through the configured deployment-mode network
+policy. It reads existing storage only and introduces no implicit background
+network access. See [metric export](docs/metrics-export.md) for delivery semantics,
+credential handling and bounds. Periodic exporter lifecycle, runtime traces,
+histograms and the complete instrumentation list above still require implementation;
+the reserved runtime `opentelemetry_enabled` flag is not yet supported.
+
 ## 14. Security and Privacy
 
 - Fully local mode denies unauthorized outbound connections at the DarwinRouter transport boundary.

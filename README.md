@@ -1394,7 +1394,10 @@ The storage query has a three-second context limit, the application a four-secon
 limit, and the HTTP route a five-second limit. Count queries and database integrity
 checks scale with stored data and may time out on large or pressured databases;
 only response size and label cardinality are fixed. Reads neither migrate storage
-nor dispatch inference. OpenTelemetry export, latency/cost histograms, retention
+nor dispatch inference. An explicit CLI/SDK [OTLP metrics export](docs/metrics-export.md)
+can now send one aggregate snapshot through the network policy. It does not enable
+the reserved runtime export flag or start background work. Periodic OpenTelemetry
+export, traces, latency/cost histograms, retention
 and production-scale metrics qualification remain unfinished.
 
 ## Next sprints

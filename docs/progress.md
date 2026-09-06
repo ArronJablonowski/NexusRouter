@@ -1,5 +1,59 @@
 # Implementation evidence
 
+Explicit telemetry-export checkpoint: previous turn made verified progress,
+committed/pushed d4337c9; this turn started clean. The PRD's optional observability
+delivery now has a real one-shot CLI/SDK OTLP/HTTP JSON path for the existing
+content-free lifecycle gauges. Pure metrics.MarshalOTLP validates the closed
+snapshot vocabulary, omits unavailable groups and preserves int64 counts/uint64
+nanosecond timestamps as decimal strings. Fixed resource/scope/state attributes
+do not include prompts, task/model IDs, paths, endpoints or credentials.
+
+ExportMetrics reads existing SQLite only, resolves an optional named credential,
+and sends through an owned deployment-mode transport. Loopback HTTP is allowed;
+non-loopback HTTP, remote destinations in local-only mode, proxies and redirects
+are denied. The operation is bounded to ten cooperative seconds and64KiB request/
+decoded response bodies, with one POST and no automatic retries. HTTP200 JSON
+must acknowledge all data; partial rejection/malformed response fails generically.
+Zero-rejection warnings and unknown future fields are accepted without exposing
+diagnostics. Collector acknowledgement is not downstream persistence; an error
+after dispatch/acceptance is not proof of zero delivery. No delivery ledger or
+exactly-once guarantee is claimed.
+
+CLI strict export flags and SDK options preserve the existing local metrics
+command. No configuration or startup defaults changed; the reserved runtime
+opentelemetry_enabled flag remains unsupported, and no daemon-loop/HTTP mutation
+endpoint was added. Periodic export, traces, latency/cost histograms, deployment
+qualification and full instrumentation remain required. Multiple database streams
+need collector-side identity separation; fixed per-database gauges are not global
+aggregates. See docs/metrics-export.md and its primary OTLP/schema references.
+
+Owned SQLite/collector tests cover real queued counts, no sensitive payload or
+source mutation, no creation on missing storage, method/path/media/bearer handling,
+strict input, cancellation, redirects, response bounds/partial errors and no retry.
+Independent review found a final credential callback could change policy after
+the initial check; a second authority check now rejects mode/database/flag/key
+rotation or callback panic before dispatch. Combined focused race tests passed
+three times (metrics1.303s, app7.092s, CLI2.187s, SDK2.464s). Full verification
+follows below. Tests contacted only owned loopback fixtures, not any user collector
+or model. Native Linear was checked but the Mac remained locked; no issue update
+or completion is claimed. The full PRD remains incomplete.
+
+Final independent review found localhost resolution was not pinned in hybrid/
+cloud transport mode. Export now forces loopback pinning for all permitted HTTP
+destinations and case-insensitive localhost in every mode. A policy matrix and
+real hybrid localhost collector regression cover the fix; review found no further
+blocker. Codex CLI was rechecked: version 0.153.4, logged in using ChatGPT. The
+existing coordinator remains exact gpt-5.6-sol; no credentials were read or
+changed, and no new live inference was dispatched during this checkpoint.
+
+Final make check passed formatting/LOC, vet, all native race tests and build
+(app197.637s, telemetry135.639s, CLI37.559s, API11.861s, SDK23.476s).
+Native and Linux amd64 CLI builds passed. Focused metrics, application, CLI and
+SDK export suites executed successfully as CGO-free Linux arm64 binaries in
+existing Alpine3.22 with no external network, read-only root and unprivileged UID;
+the application binary was rebuilt and rerun after the final pinning fix.
+Linux tests were not race-instrumented. No production collector was contacted.
+
 Indexed evidence-read checkpoint: the previous turn made verified progress,
 committed/pushed70785d9; this turn started clean. A CPU profile of the actual
 eight-model/1,000-seed automatic-task fixture attributed74.46% cumulative sampled

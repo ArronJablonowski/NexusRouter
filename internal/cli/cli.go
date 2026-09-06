@@ -30,6 +30,7 @@ Usage:
   darwin models deprecation --config path --model id [--domain general --profile default --window 50 --minimum-samples 20 --failure-threshold 0.35]
     Read-only recommendation; never disables or removes a model
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
+  darwin metrics export --config path --endpoint URL [--api-key-env ENV_NAME]
   darwin task show --db path --task id  Inspect durable conversation state
   darwin task continuation --db path --task id  Inspect continuation readiness
   darwin task leases --db path --task id        Inspect lease and recovery counts
