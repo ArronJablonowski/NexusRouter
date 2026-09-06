@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Schema-24 durable attention for expired unreleased leases, maintained by the
+  daemon and inspectable through CLI/SDK without granting release authority.
+  Back up databases and stop old writers before migration. See
+  [lease attention](lease-attention.md).
+
 - Failure-only orphan recovery after a worker child's completed read-only tools,
   preserving paired results and later interrupted inference without tool/model
   retries. Explicit behavior, no-effect results and retained ownership proof are

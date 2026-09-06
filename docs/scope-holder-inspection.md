@@ -26,7 +26,7 @@ tool arguments and outputs are not returned.
 
 Scopes must be valid UTF-8, 1–512 bytes, exactly trimmed and free of Unicode
 control characters. Schemas 1–2 return `available: false` and an empty holders
-array; supported schemas 3–23 return an available observation. Unknown schemas,
+array; supported schemas 3–24 return an available observation. Unknown schemas,
 invalid metadata and more than 1,000 overlapping unreleased lease rows fail the
 whole read, without partial results or pagination. Task-head metadata is checked;
 this is not full history replay or acceptance validation.

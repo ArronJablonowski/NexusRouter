@@ -547,7 +547,13 @@ covers task-owned aggregate counts. Bounded per-scope holder discovery is also
 implemented through CLI `resources leases`, SDK `InspectScopeLeases`, and
 authenticated `GET /v1/resources/leases?scope=...`, using the admission overlap
 policy. It reveals requested scope and holder task IDs, not private lease
-capabilities. Global discovery and persistent operator attention remain required.
+capabilities. Schema 24 adds durable attention for expired unreleased leases,
+maintained by bounded daemon sweeps and inspectable through CLI `resources
+attention` and SDK `ListLeaseAttention`. Renewal/release resolves observations;
+expiry recurrence reopens the same record. These are diagnostic snapshots, not
+execution or recovery authority. HTTP attention, operator acknowledgment,
+notifications, transition history, retention and broader stall reasons remain
+required. See [lease attention](docs/lease-attention.md).
 See [task lease inspection](docs/task-lease-inspection.md) and
 [scope holder inspection](docs/scope-holder-inspection.md).
 

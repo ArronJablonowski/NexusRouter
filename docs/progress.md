@@ -1,5 +1,40 @@
 # Implementation evidence
 
+Lease-attention final verification: make check passed format/LOC, vet, full
+native race suite and build, including app108.731s, telemetry95.869s,
+CLI29.238s, SDK18.078s and API9.007s. Additional ignored-insert/update fault
+tests passed three repetitions2.005s, proving an ignored write cannot report
+successful observation. Real dispatcher persistence passed three runs1.830s;
+storage lifecycle/corruption/privacy tests passed three runs5.038s; SDK/CLI
+focused race tests passed three runs2.413s/1.709s. Native make build and
+CGO-free Linux amd64 production plus application/telemetry test-binary builds
+passed; Linux execution was not tested. Independent review found no unauthorized
+probe/release path and confirmed the documented corrupt-page limitation.
+No user database/configuration or live model was used. Git fetch found no
+divergence. This is durable expired-lease attention, not full PRD completion.
+
+Durable attention checkpoint: the previous goal turn delivered verified
+read-only-child recovery and GitHub backup (94367cd). This turn rechecked a clean
+worktree; native Linear remains locked, with no issue mutation claimed. Schema24
+adds private lease-linked attention records. The daemon observes expired
+unreleased readers/writers, including legacy or unverifiable owners, after its
+recovery passes. Renewal/release resolves a record; recurrence reopens the same
+ID. Unchanged observations preserve bytes and timestamps. Observation never
+probes guards, releases leases, changes task journals or dispatches work. Public
+CLI/SDK metadata omits tokens, owners, scopes, guard references and content.
+
+Three agents supplied schema/contracts, SDK/CLI adapters, storage qualification
+and real dispatcher integration. Focused race tests passed migration/contract,
+storage lifecycle/corruption/rollback, repeated SDK/CLI and daemon-persistence
+cases. Schema max checks and future-version rejection fixtures advance to24/25;
+feature introductions remain unchanged. Only synthetic databases were migrated.
+The observer intentionally fails an entire corrupt page and retains its cursor,
+so corruption can block later attention pages and degrade health. Record writer
+and task identity drift is rejected, not updated. These are latest-state
+observations, not immutable transition history or execution authority. HTTP,
+acknowledgment, notifications, retention, broader stall reasons and full PRD
+acceptance remain open. Final verification follows; see docs/lease-attention.md.
+
 Read-only-child final verification: make check passed format/LOC, vet, full
 native race suite and build, including app106.793s, telemetry91.878s, CLI29.032s
 and SDK16.616s. Full sessions race4.279s covers exact 10,000-event/8MiB limits,

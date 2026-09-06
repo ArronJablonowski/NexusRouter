@@ -226,6 +226,11 @@ read-only list grants no execution or recovery authority. See
 
 ## Configuration
 
+The daemon durably flags expired unreleased leases. Inspect them with
+`darwin resources attention --db path` or SDK `ListLeaseAttention`; an alert
+never grants release or retry authority. See [lease attention](docs/lease-attention.md)
+for schema-24 upgrade guidance and observation limits.
+
 Process-ownership guards default to private `DarwinRouter/process-owners`
 storage beneath the OS user configuration directory. Set
 `DARWIN_PROCESS_OWNER_DIR` before startup to override it with an absolute private

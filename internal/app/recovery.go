@@ -13,6 +13,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	after := ""
 	readerAfter := ""
 	workerAfter := ""
+	attentionAfter := ""
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -47,6 +48,19 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			d.supervisorHeartbeat(-1)
 			if readerErr != nil && ctx.Err() == nil {
 				d.recordError()
+			}
+		}
+		if ctx.Err() == nil {
+			query, cancel := context.WithTimeout(ctx, 5*time.Second)
+			nextAttention, _, attentionErr := d.db.ObserveLeaseAttentionPage(query, attentionAfter, time.Now().UTC(), 32)
+			cancel()
+			d.supervisorHeartbeat(-1)
+			if attentionErr != nil {
+				if ctx.Err() == nil {
+					d.recordError()
+				}
+			} else {
+				attentionAfter = nextAttention
 			}
 		}
 		select {

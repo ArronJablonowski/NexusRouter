@@ -691,6 +691,13 @@ is counted on the worker lease's receipt. Inspection never probes guard files,
 reclaims ownership, retries work or returns prompts, tokens, owner/scope names or
 receipt bodies. See [task lease inspection](../../docs/task-lease-inspection.md).
 
+`ListLeaseAttention(ctx, LeaseAttentionOptions{State: "open", Limit: 25})`
+reads durable schema-24 lease alerts. Use state `open`, `resolved` or `all`, limit
+1–100, and `After: page.NextCursor` to continue. Older schemas report unavailable
+without migration. Opaque IDs and first-observed times remain stable across
+renewal/reopening; results are stored observations, not admission authority.
+See [lease attention](../../docs/lease-attention.md).
+
 `InspectScopeLeases(ctx, scope)` returns `ScopeLeaseStatus` with sorted
 `ScopeLeaseHolder` task IDs and live/expired reader/writer counts. It uses the
 admission overlap policy and includes expired unreleased holders. The requested

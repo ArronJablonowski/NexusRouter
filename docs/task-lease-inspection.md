@@ -61,7 +61,7 @@ lease or receipt records. Missing stores are never created.
 
 Schemas 1–2 return `leases: null`; schemas 1–22 return `recoveries: null`.
 Null means the feature is unavailable, not a measured zero. Available groups
-always contain explicit zero counts. The current reader supports schemas 1–23
+always contain explicit zero counts. The current reader supports schemas 1–24
 and refuses unknown future schemas. This feature adds no migration.
 
 ## Verification and limits
