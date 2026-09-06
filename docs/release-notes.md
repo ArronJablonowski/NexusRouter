@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Opt-in validated learning for trusted Go hosts, with a named validator,
+  schema-26 activation intents and restart-safe operation reconciliation.
+  The standard daemon remains draft-only. See
+  [background learning](background-learning.md).
+
 - Operation-keyed skill activation for trusted Go hosts, with atomic receipts,
   retry recognition after restart/rollback and deterministic validation gates.
   This upgrades the file skill catalog to schema 3; it does not enable background

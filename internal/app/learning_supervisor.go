@@ -22,6 +22,20 @@ type Learner struct {
 }
 
 func StartLearning(ctx context.Context, s *Service) (*Learner, error) {
+	return startLearning(ctx, s, nil)
+}
+
+// StartLearningWithValidation is an opt-in trusted-host supervisor, not a remote
+// proof-submission interface. Validators are cooperative, read-only host code.
+func StartLearningWithValidation(ctx context.Context, s *Service, validatorID string, validator skills.Validator) (*Learner, error) {
+	validation, err := s.learningValidator(validatorID, validator)
+	if err != nil {
+		return nil, err
+	}
+	return startLearning(ctx, s, validation)
+}
+
+func startLearning(ctx context.Context, s *Service, validation *learningValidation) (*Learner, error) {
 	if ctx == nil || ctx.Err() != nil || s == nil {
 		return nil, ErrLearningAttention
 	}
@@ -57,7 +71,7 @@ func StartLearning(ctx context.Context, s *Service) (*Learner, error) {
 			l.mu.Lock()
 			l.stepStarted = time.Now()
 			l.mu.Unlock()
-			_, err := s.LearningStep(ctx)
+			_, err := s.learningStep(ctx, validation)
 			if ctx.Err() != nil {
 				return
 			}

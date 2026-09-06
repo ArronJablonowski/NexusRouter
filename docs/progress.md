@@ -1,5 +1,33 @@
 # Implementation evidence
 
+Validated-learning checkpoint: the previous goal turn delivered operation-keyed
+activation and backup7a729aa. This turn confirmed a clean worktree; native Linear
+remains locked. A new opt-in Go-host learning path binds validator identity into
+policy, persists an immutable schema26 intent before validation, and uses the
+existing catalog operation receipt before acknowledging the learning cursor.
+The SDK offers single-step and explicitly started, caller-owned supervisors plus
+read-only intent inspection. The ordinary daemon remains draft-only. Three agents
+implemented schema/contracts, SDK integration and workflow/supervisor tests while
+root integrated the durable phase progression and receipt reconciliation.
+No default success validator, remote proof endpoint or user learner was enabled.
+Standalone daemon validation configuration, intent resolution, regression
+monitoring and full PRD qualification remain open.
+
+Final `make check` passed: formatting/LOC, vet, full race suite and build;
+app 127.629s, telemetry 101.820s, CLI 29.754s, API 9.924s and SDK 18.308s.
+A test-only Service mutex copy was caught by vet and replaced with a fresh
+constructor before the final run. Focused missing-generation regression passed
+three race runs (3.413s): a durable activation intent prevents redispatch when
+its generation row is missing, preserving cursor/intent and callback counts.
+The real background-supervisor fixture also traversed discovery through
+validated activation without manual ticks. Native build and CGO-free Linux
+amd64 production build/app-test compilation passed; Linux binaries were not run.
+All new learning evidence uses synthetic databases/catalogs and loopback fixtures;
+no user data was migrated, no live inference was run, and no learner was enabled.
+Read-only CLI verification reported codex-cli 0.153.4 and ChatGPT login; the existing
+smoke configuration still selects exact gpt-5.6-sol. Fetch showed HEAD/origin-main
+0/0 before the checkpoint commit. Native Linear remains unavailable while locked.
+
 Activation-operation checkpoint: the previous goal turn made verified sweep
 progress and backupe902eff. This turn confirmed a clean worktree and found a
 durable-retry prerequisite for automatic skill activation. File catalog schema3

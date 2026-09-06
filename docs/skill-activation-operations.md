@@ -63,6 +63,7 @@ atomic replacement and durability boundary. Tests cover restart/retry, rollback,
 concurrent callers, ABA changes, corruption, policy and secret rotation. Power-loss
 qualification remains separate.
 
-This supplies durable retry recognition for future learning controllers. It does
-not yet connect background learning to a configured validation engine or schedule
-automatic activation/regression checks. Those PRD requirements remain open.
+The opt-in Go-host learning controller now uses these receipts with a durable
+activation intent and a named trusted validator; see
+[background learning](background-learning.md). Standalone daemon validator
+configuration and automatic regression monitoring remain open.

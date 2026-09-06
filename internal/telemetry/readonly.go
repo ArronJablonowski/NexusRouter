@@ -43,7 +43,7 @@ func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
 	if err := db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return nil, err
 	}
-	if version < 1 || version > 25 {
+	if version < 1 || version > 26 {
 		return nil, errors.New("unsupported database version")
 	}
 	var check string

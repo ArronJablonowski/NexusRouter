@@ -19,6 +19,10 @@ var ErrLearningAttention = errors.New("skill learning requires operator attentio
 // reservations remain in the existing immutable generation ledger, not this
 // scheduling cursor. It never creates validation evidence or activates a skill.
 func (s *Service) LearningStep(ctx context.Context) (out skills.LearningState, err error) {
+	return s.learningStep(ctx, nil)
+}
+
+func (s *Service) learningStep(ctx context.Context, validation *learningValidation) (out skills.LearningState, err error) {
 	defer func() {
 		if recover() != nil {
 			out = skills.LearningState{}
@@ -36,7 +40,7 @@ func (s *Service) LearningStep(ctx context.Context) (out skills.LearningState, e
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	policy, err := s.learningPolicy()
+	policy, err := s.learningPolicyForValidation(validation)
 	if err != nil {
 		return out, ErrLearningAttention
 	}
@@ -89,7 +93,7 @@ func (s *Service) LearningStep(ctx context.Context) (out skills.LearningState, e
 		}
 	case "generate":
 		if current.PendingSelectionID != "" {
-			completed, e := s.learningGeneration(ctx, db, current)
+			completed, e := s.learningGeneration(ctx, db, current, validation)
 			if e != nil {
 				return current, e
 			}
@@ -167,9 +171,16 @@ func (s *Service) SkillLearningState(ctx context.Context) (skills.LearningState,
 	return state, nil
 }
 
-func (s *Service) learningGeneration(ctx context.Context, db *telemetry.Store, state skills.LearningState) (bool, error) {
+func (s *Service) learningGeneration(ctx context.Context, db *telemetry.Store, state skills.LearningState, validation *learningValidation) (bool, error) {
 	attempt, err := db.SkillGenerationAttempt(ctx, state.PendingSelectionID)
 	if errors.Is(err, sql.ErrNoRows) {
+		// A durable intent proves this selection already reached the
+		// drafted phase. Missing generation evidence is corruption, not
+		// permission to dispatch that selection again, in either mode.
+		_, intentErr := db.LearningActivationIntent(ctx, state.Scope, state.Name, state.PendingSelectionID)
+		if !errors.Is(intentErr, sql.ErrNoRows) {
+			return false, ErrLearningAttention
+		}
 		// The pinned selection survives a restart. Never recompute a different
 		// attempt identity after a possibly dispatched generation.
 		_, err = s.GenerateSkillSelection(ctx, state.PendingSelectionID, s.settings.Skills.Learning.MaxCost)
@@ -185,8 +196,12 @@ func (s *Service) learningGeneration(ctx context.Context, db *telemetry.Store, s
 	if err != nil || attempt.Validate() != nil || attempt.Key.Scope != state.Scope || attempt.Key.Name != state.PendingBucketID || attempt.ID != state.PendingSelectionID || attempt.Status != "drafted" {
 		return false, ErrLearningAttention
 	}
-	if _, err = s.PublishSkillGeneration(ctx, state.PendingSelectionID); err != nil {
+	version, err := s.PublishSkillGeneration(ctx, state.PendingSelectionID)
+	if err != nil {
 		return false, ErrLearningAttention
+	}
+	if validation != nil {
+		return s.learningActivate(ctx, db, state, version, validation)
 	}
 	return true, nil
 }

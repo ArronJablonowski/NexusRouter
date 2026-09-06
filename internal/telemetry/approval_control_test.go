@@ -58,10 +58,10 @@ func TestApprovalControlRejectsWithoutCreationOrMigration(t *testing.T) {
 				}
 				version := "14"
 				if kind == "future" {
-					version = "26"
+					version = "27"
 				}
 				if kind == "rollback" {
-					version = "25"
+					version = "26"
 				}
 				if _, err := db.Exec(`CREATE TABLE preserved(value TEXT); INSERT INTO preserved VALUES('unchanged'); PRAGMA user_version=` + version); err != nil {
 					t.Fatal(err)

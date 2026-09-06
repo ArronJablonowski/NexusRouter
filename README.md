@@ -230,7 +230,7 @@ The daemon durably flags expired unreleased leases. Inspect them with
 `darwin resources attention --db path`, SDK `ListLeaseAttention`, or authenticated
 `GET /v1/resources/attention?state=open&limit=25`; an alert
 never grants release or retry authority. See [lease attention](docs/lease-attention.md)
-for schema-25 upgrade guidance and observation limits. Inspect recorded transitions
+for schema-26 upgrade guidance and observation limits. Inspect recorded transitions
 with `darwin resources attention-history --db path --id ATTENTION_ID`.
 
 Process-ownership guards default to private `DarwinRouter/process-owners`
@@ -1210,6 +1210,12 @@ acknowledgement. A matching receipt never reactivates a version after rollback.
 Inspect it with `SkillActivationOperation`; validation and policy gates still
 apply. See [activation operations](docs/skill-activation-operations.md) for the
 file-catalog schema-3 upgrade and remaining controller work.
+
+Trusted Go hosts may explicitly start `StartLearningWithValidation` with a named
+deterministic validator. A SQLite activation intent is saved before validation;
+operation receipts make restart acknowledgement safe after activation or rollback.
+The ordinary daemon remains draft-only. See
+[validated learning](docs/background-learning.md#opt-in-validated-learning-for-go-hosts).
 
 `RevalidateSkillVersion` completes the host-driven recovery path: with
 `skills.rollback_on_regression` enabled, a trusted deterministic failing check

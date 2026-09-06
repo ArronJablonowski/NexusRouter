@@ -20,7 +20,7 @@ func TestLeaseAttentionHistoryValidation(t *testing.T) {
 		t.Fatal("valid history rejected")
 	}
 	for name, mutate := range map[string]func(*LeaseAttentionHistoryPage){
-		"version": func(p *LeaseAttentionHistoryPage) { p.Version = 2 }, "future": func(p *LeaseAttentionHistoryPage) { p.StorageSchema = 26 }, "available": func(p *LeaseAttentionHistoryPage) { p.Available = false },
+		"version": func(p *LeaseAttentionHistoryPage) { p.Version = 2 }, "future": func(p *LeaseAttentionHistoryPage) { p.StorageSchema = 27 }, "available": func(p *LeaseAttentionHistoryPage) { p.Available = false },
 		"id": func(p *LeaseAttentionHistoryPage) { p.AttentionID = "wrong" }, "nil": func(p *LeaseAttentionHistoryPage) { p.Items = nil }, "legacy": func(p *LeaseAttentionHistoryPage) { p.StorageSchema = 24; p.Available = false },
 		"gap": func(p *LeaseAttentionHistoryPage) { p.Items[1].Sequence = 3 }, "duplicate": func(p *LeaseAttentionHistoryPage) { p.Items[1].Sequence = 1 }, "baseline": func(p *LeaseAttentionHistoryPage) { p.Items[1].Kind = "baseline" },
 		"kind": func(p *LeaseAttentionHistoryPage) { p.Items[0].Kind = "invented" }, "record-version": func(p *LeaseAttentionHistoryPage) { p.Items[0].Version = 2 }, "sequence": func(p *LeaseAttentionHistoryPage) { p.Items[0].Sequence = 0 },
@@ -39,7 +39,7 @@ func TestLeaseAttentionHistoryValidation(t *testing.T) {
 			}
 		})
 	}
-	for schema := 1; schema <= 25; schema++ {
+	for schema := 1; schema <= 26; schema++ {
 		p := historyFixture()
 		p.StorageSchema = schema
 		p.Available = schema >= 25
