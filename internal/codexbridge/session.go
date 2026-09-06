@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -30,7 +31,8 @@ type Options struct{ Model, CWD string }
 // across the entire runtime loop, including while a proposed tool is executing.
 // Initial history is imported as typed items into a new ephemeral thread, not
 // flattened into a user prompt or resumed from a foreign Codex thread ID.
-// Steering and compaction of an active exchange remain unsupported.
+// Durable steering is admitted only between segments, never during Stream.
+// Compaction of an active exchange remains unsupported.
 type Session struct {
 	w                          Wire
 	options                    Options
@@ -52,6 +54,9 @@ type Session struct {
 	launchFeatures             []string
 	launchRequestID            int
 	allowDisabledStatus        bool
+	completedRequest           *providers.Request
+	controlSequence, steered   int
+	turnIDs                    map[string]bool
 }
 
 func NewSession(ctx context.Context, w Wire, options Options) (*Session, error) {
@@ -102,7 +107,7 @@ func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(p
 			_ = s.Close()
 		}
 	}()
-	if ctx == nil || ctx.Err() != nil || emit == nil || s.closed.Load() || s.finished ||
+	if ctx == nil || ctx.Err() != nil || emit == nil || s.closed.Load() ||
 		!validRequest(req) || providers.ValidateMessages(req.Messages) != nil || req.Model != s.options.Model {
 		return failure(s.emitted)
 	}
@@ -126,19 +131,31 @@ func (s *Session) Stream(ctx context.Context, req providers.Request, emit func(p
 			return err
 		}
 		s.started = true
+	} else if s.finished {
+		if err = s.continueCompleted(ctx, req); err != nil {
+			return err
+		}
 	} else {
 		if s.pending == nil {
 			return failure(s.emitted)
 		}
-		response, resumeErr := s.pending.Resume(req)
+		response, guidance, resumeErr := s.pending.ResumeSteered(req)
 		if resumeErr != nil {
+			return failure(s.emitted)
+		}
+		if len(guidance) > 0 {
+			if err = s.steer(ctx, guidance); err != nil {
+				return err
+			}
+		}
+		if ctx.Err() != nil || s.closed.Load() {
 			return failure(s.emitted)
 		}
 		if err = s.w.Write(codexrpc.Envelope{ID: bytes.Clone(s.pendingID), Result: response}); err != nil {
 			return failure(s.emitted)
 		}
 		s.items[s.pendingCall].responded = true
-		s.items[s.pendingCall].responseSuccess = !req.Messages[len(req.Messages)-1].ToolFailed
+		s.items[s.pendingCall].responseSuccess = !req.Messages[len(req.Messages)-len(guidance)-1].ToolFailed
 		s.pending, s.pendingID, s.pendingCall = nil, nil, ""
 	}
 	return s.segment(ctx, req, emit)
@@ -227,6 +244,7 @@ func (s *Session) begin(req providers.Request) error {
 		return failure(false)
 	}
 	s.turn = turn.Turn.ID
+	s.turnIDs = map[string]bool{s.turn: true}
 	return nil
 }
 
@@ -250,7 +268,10 @@ func (s *Session) receive() (codexrpc.Envelope, error) {
 }
 
 func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
-	if s.w.Write(codexrpc.Envelope{ID: json.RawMessage(id), Method: method, Params: marshal(params)}) != nil {
+	request := codexrpc.Envelope{ID: json.RawMessage(id), Method: method, Params: marshal(params)}
+	// Validate the complete frame before any wire can observe it, including
+	// custom host wires. Guidance is never silently split or truncated.
+	if codexrpc.NewEncoder(io.Discard, codexrpc.DefaultMaxFrame).Write(request) != nil || s.closed.Load() || s.w.Write(request) != nil {
 		return nil, failure(s.emitted)
 	}
 	for {
@@ -260,6 +281,12 @@ func (s *Session) call(id, method string, params any) (json.RawMessage, error) {
 		}
 		kind, _ := e.Kind()
 		if s.allowDisabledStatus && kind == codexrpc.Notification && e.Method == "remoteControl/status/changed" && disabledRemoteControl(e.Params) {
+			continue
+		}
+		if method == "turn/steer" && kind == codexrpc.Notification {
+			if !s.steeringNotice(e) {
+				return nil, failure(s.emitted)
+			}
 			continue
 		}
 		if method == "thread/inject_items" && kind == codexrpc.Notification && s.compatibilityNotice(e) {

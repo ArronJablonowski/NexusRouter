@@ -1,5 +1,58 @@
 # Implementation evidence
 
+Codex boundary-steering checkpoint: the preceding goal turn made verified
+progress and was backed up as 84b44d6; this turn started clean. Inspection found
+that line-oriented chat already supports interactive guidance, while the PRD's
+claim that an interactive steering CLI was missing was stale. The actual gap
+was native coordinator continuation after durable guidance. The PRD now reflects
+existing chat and the newly implemented native adapter behavior.
+
+Pending tool continuations admit only exact prior history/catalog/schema/model,
+the emitted assistant proposal, its paired result, then bounded plain user
+guidance. A matching turn/steer acknowledgement is required before releasing the
+native tool response once. Completed native segments instead require the exact
+prior conversation and assistant answer before starting a new turn in the same
+thread. Neither path recreates the process/thread, reinjects history, executes
+tools or changes runtime authority/budgets. Lifetime wire/item limits and
+cumulative usage are retained; 32 total guidance messages and a 1MiB complete
+control-frame bound fail closed without truncation or automatic retry.
+
+The OpenAI Docs skill guided use of official app-server steering semantics;
+installed CLI 0.153.4 generated types independently confirmed expectedTurnId and
+the turnId acknowledgement. Pre-acknowledgement notices are restricted to checked
+compatibility/status, same-turn user-item lifecycle and monotonic usage. Failures
+close the session and leave already completed tool work in the durable journal.
+Independent review prompted pre-ack usage coverage; further tests cover strict
+history and identity bindings, failed tool results, limits and malformed notices.
+
+Real signed-in gpt-5.6-sol smoke tests passed both paths on first attempt:
+one-thread/two-turn completed-boundary guidance and one-thread/one-turn paused
+synthetic-tool guidance, with exactly one steer and one tool reply in the latter.
+Both returned the revised marker with no extra proposal. Total test duration was
+15.60s (package 16.951s), not a latency benchmark. No real tool or local worker was
+executed and no private task history or project files were sent. Application
+fixtures separately use actual SQLite and owned local HTTP work to prove durable
+tool/result/steering ordering, one local invocation and cancellation/failure
+behavior. See docs/codex-steering.md for reproduction and remaining qualification.
+
+Native Linear remains inaccessible because the Mac is locked; no issue update
+is claimed. Actual interactive Sol/Ollama steering, stream interruption, automatic
+restart/resume, stronger isolation and complete PRD/Linear acceptance remain open.
+
+Steering verification: make check passed formatting/LOC, vet, full native race
+suite and build (app 219.103s, telemetry 147.809s, CLI 40.189s, API 12.534s,
+Codex bridge 3.730s, SDK 25.111s; unchanged packages cached). The final stricter
+application receipt/sequence/exact-terminal assertions separately passed race
+three times in 3.755s. Bridge fixture tests passed three race repetitions and
+vet; final independent review found no concrete blocker. Native CLI build and
+Linux amd64 cross-build passed. Focused bridge and application tests also passed
+three CGO-free Linux ARM64 repetitions in isolated unprivileged, network-disabled
+containers. The first application container omitted a writable process-owner
+directory, so delegation never reached the worker; setting the documented
+DARWIN_PROCESS_OWNER_DIR inside disposable /tmp made the unchanged binary pass.
+This is not Linux race or live Linux Codex qualification. Generated schemas,
+test binaries and inference diagnostics were kept outside the repository.
+
 Task-duration scale/concurrency checkpoint: the preceding response revalidated
 Codex authentication but did not advance implementation. This turn resumed the
 two pending agent-authored test files on base 5af6061. No production behavior or

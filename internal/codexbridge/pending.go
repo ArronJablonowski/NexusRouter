@@ -111,21 +111,43 @@ func (p *Pending) Proposal() providers.ToolCall {
 // they must not silently mutate a paused Codex turn. A successful call is
 // single-use even if delivery of the returned RPC response later fails.
 func (p *Pending) Resume(next providers.Request) (json.RawMessage, error) {
+	response, _, err := p.resume(next, false)
+	return response, err
+}
+
+// ResumeSteered additionally admits bounded plain user guidance after the exact
+// tool pair. Guidance is returned separately, never embedded in tool output.
+// This validates correspondence only; the host owns authorization and delivery.
+func (p *Pending) ResumeSteered(next providers.Request) (json.RawMessage, []providers.Message, error) {
+	return p.resume(next, true)
+}
+
+func (p *Pending) resume(next providers.Request, steering bool) (json.RawMessage, []providers.Message, error) {
+	if p == nil {
+		return nil, nil, ErrContinuation
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.resolved || len(next.Messages) != len(p.request.Messages)+2 || !validRequest(next) || providers.ValidateMessages(next.Messages) != nil {
-		return nil, ErrContinuation
+	extra := len(next.Messages) - len(p.request.Messages) - 2
+	if p.resolved || extra < 0 || extra > 32 || (!steering && extra != 0) || !validRequest(next) || providers.ValidateMessages(next.Messages) != nil {
+		return nil, nil, ErrContinuation
+	}
+	for _, message := range next.Messages[len(p.request.Messages)+2:] {
+		if !validSteeringMessage(message) {
+			return nil, nil, ErrContinuation
+		}
 	}
 	b, err := json.Marshal(next)
 	if err != nil || len(b) > maxExchangeBytes {
-		return nil, ErrContinuation
+		return nil, nil, ErrContinuation
 	}
 	var owned providers.Request
 	if json.Unmarshal(b, &owned) != nil {
-		return nil, ErrContinuation
+		return nil, nil, ErrContinuation
 	}
 	n := len(p.request.Messages)
 	assistant, result := owned.Messages[n], owned.Messages[n+1]
+	guidance := append([]providers.Message{}, owned.Messages[n+2:]...)
 	owned.Messages = owned.Messages[:n]
 	want := providers.Message{Role: "assistant", Content: p.text, ToolCalls: []providers.ToolCall{p.call}}
 	// Compare the same canonical JSON representation used for the snapshot:
@@ -135,15 +157,15 @@ func (p *Pending) Resume(next providers.Request) (json.RawMessage, error) {
 	gotBytes, _ := json.Marshal(assistant)
 	if !reflect.DeepEqual(owned, p.request) || !bytes.Equal(wantBytes, gotBytes) ||
 		result.Role != "tool" || result.ToolCallID != p.call.ID || len(result.ToolCalls) != 0 {
-		return nil, ErrContinuation
+		return nil, nil, ErrContinuation
 	}
 	response, err := json.Marshal(struct {
 		ContentItems []map[string]string `json:"contentItems"`
 		Success      bool                `json:"success"`
 	}{[]map[string]string{{"type": "inputText", "text": result.Content}}, !result.ToolFailed})
 	if err != nil {
-		return nil, ErrContinuation
+		return nil, nil, ErrContinuation
 	}
 	p.resolved = true
-	return response, nil
+	return response, guidance, nil
 }

@@ -17,6 +17,8 @@ terminal may visually wrap a long model line.
 Wait for completion before entering the next ordinary prompt. During generation,
 `/status`, `/steer TEXT` and `/cancel` remain available. Steering is queued for
 safe runtime boundaries; it cannot alter an already-dispatched tool call.
+The experimental [Codex coordinator](codex-steering.md) now supports these
+boundaries as well, without interrupting an active inference stream.
 Ctrl-C requests cancellation during work and exits when idle. `/quit` and SIGTERM
 cancel and join active execution. EOF waits for the active task. A normal chat
 session exits zero even after an individual failed task, as before; use headless

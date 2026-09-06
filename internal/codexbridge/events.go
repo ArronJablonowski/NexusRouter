@@ -207,6 +207,9 @@ func (s *Session) segment(ctx context.Context, req providers.Request, emit func(
 				}
 			}
 			s.finished = true
+			completed := req
+			completed.Messages = append(append([]providers.Message(nil), req.Messages...), providers.Message{Role: "assistant", Content: text.String()})
+			s.completedRequest = &completed
 			return done("stop")
 		case "thread/tokenUsage/updated":
 			if n.ThreadID != s.thread || n.TurnID != s.turn || s.recordUsage(e.Params) != nil {

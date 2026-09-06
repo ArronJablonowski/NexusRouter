@@ -501,8 +501,13 @@ cannot disappear behind a successful terminal transition. Guidance never resets
 iteration, output, context, privacy or tool limits, and pending guidance must not
 be discarded by automatic fallback. `runtime.max_turns` bounds all task turns
 (default8, allowed1–32), also capped by tool limits when tools are enabled.
-Failed/canceled tasks may retain inspectable pending guidance; general interrupted
-task recovery and an interactive steering CLI remain required delivery work.
+Failed/canceled tasks may retain inspectable pending guidance. Line-oriented
+`darwin chat` supports `/steer` during work, with committed application evidence.
+The experimental Codex coordinator admits this guidance at completed model/tool
+boundaries through checked native steering or a new turn in the same thread;
+it does not interrupt an active model stream or replay tool execution. See
+[Codex steering](docs/codex-steering.md) for limits and qualification.
+General interrupted-task recovery and full-screen editing remain delivery work.
 
 ### 10.2 Context Assembly
 

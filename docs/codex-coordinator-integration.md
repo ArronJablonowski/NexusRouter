@@ -6,6 +6,8 @@ Use `examples/sol-codex-local-smoke.yaml` with `--model coordinator` for fresh,
 supervised, non-sensitive tasks or [explicit history continuation](codex-history-continuation.md).
 Live continuation from the earlier completed Sol/local-worker task has also
 passed; automatic resume and compaction remain unfinished.
+Durable [boundary steering](codex-steering.md) is now supported, with live
+CLI 0.153.4 checks for both a completed native turn and a paused synthetic tool.
 Historical sections below record earlier
 implementation stages; they do not imply production qualification.
 
