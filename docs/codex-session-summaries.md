@@ -65,13 +65,13 @@ activation occurs.
 
 Inspect the complete draft against the source before using the existing
 `summary-review` operation. Approval is an operator decision, not an LLM judge.
-Approved drafts can be used by existing compatible continuation providers.
-**The native Codex task path still rejects compacted/reviewed-summary
-continuations**; this checkpoint adds drafting, not that import qualification.
-Uncompacted explicit Codex history continuation remains a separate capability.
+Approved drafts can be used by compatible continuation providers, including
+explicit [native compacted continuation](codex-compacted-continuation.md).
+The native path preserves source/checkpoint binding and the transactional
+approval boundary; draft generation itself still does not approve or apply it.
 
-Automatic summary validation/application, mid-task compaction, native compacted
-history import, summary-attempt crash reconciliation and full PRD acceptance
+Automatic summary validation/application, mid-task compaction,
+summary-attempt crash reconciliation and full PRD acceptance
 remain open. The native launch profile is experimental, not a host/process
 isolation certification.
 

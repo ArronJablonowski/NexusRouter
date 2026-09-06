@@ -36,9 +36,11 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 		return p, tr.CloseIdleConnections, nil
 	}
 	// Explicit continuation imports only validated, completed conversation items.
-	// Fresh tasks still cannot acquire extra memory/skill roles implicitly;
-	// compaction and reviewed-summary imports await separate qualification.
-	if ctx.Err() != nil || privacy != "cloud_allowed" || model.Locality != "cloud" || r.LocalRequired || s.Mode == "local_only" || r.Compaction != nil || r.SummaryAttemptID != "" || codexbridge.ValidateInitialMessages(messages) != nil || (r.ContinueTaskID == "" && (len(messages) != 1 || messages[0].Role != "user")) {
+	// Compaction must come from the resolved canonical continuation path, not
+	// merely from request flags. Stored-summary approval is checked again when
+	// the runtime commits TaskStarted, before the provider imports any items.
+	// Fresh tasks still cannot acquire extra memory/skill roles implicitly.
+	if ctx == nil || ctx.Err() != nil || privacy != "cloud_allowed" || model.Locality != "cloud" || r.LocalRequired || s.Mode == "local_only" || !codexCompactionReady(r) || codexbridge.ValidateInitialMessages(messages) != nil || (r.ContinueTaskID == "" && (len(messages) != 1 || messages[0].Role != "user")) {
 		return nil, nil, ErrAdmission
 	}
 	return openOwnedCodexProvider(ctx, s, provider, model, privacy, r.codexLauncher)

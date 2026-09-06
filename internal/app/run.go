@@ -229,6 +229,15 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			privacy = "local_only"
 		}
 		sessionID = history.SessionID
+		if provider.Kind == "codex_app_server" && history.Compaction != nil {
+			// Inspect original retained tool arguments before any context engine
+			// or ordinary map-based redaction could collapse duplicate keys.
+			// The returned projection is discarded; assembly still owns its
+			// single redaction pass and the journal keeps canonical provenance.
+			if _, err := nativeSummaryMessages(history.Messages, secrets); err != nil {
+				return result, ErrAdmission
+			}
+		}
 	}
 	if !r.memoryPrepared && (model.Locality == "local" || !s.Memory.LocalOnly) {
 		r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), s.Memory, model.Locality == "local", secrets, memoryTaskQuery(r))

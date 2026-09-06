@@ -6,6 +6,9 @@ The source may be a completed task or an exact recovered-delegation checkpoint.
 This starts a new Darwin task and a new ephemeral Codex thread; it does not
 resume a stored Codex thread by ID or automatically restart interrupted work.
 
+Completed sources also support explicit [reviewed compacted continuation](codex-compacted-continuation.md).
+Recovered failed sources remain eligible only for ordinary uncompacted continuation.
+
 ## Protocol and trust boundary
 
 The [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
@@ -98,7 +101,7 @@ completed sequence 6; the source remains completed at sequence 73. Delegation
 was disabled for the new task. This was not a new Ollama generation, execution
 of that Go code, or a live recovered-crash continuation.
 
-Automatic restart/resume, in-flight steering, compacted/summary continuation requests,
+Automatic restart/resume, in-flight steering,
 broad model/version compatibility,
 full host/process containment, and crash recovery during import remain open.
 Live tests are skipped by default. The pinned profile and limits are still
@@ -106,4 +109,5 @@ experimental, not a production or privacy-isolation certification.
 Bounded [output audits through the Codex provider](codex-output-audits.md) are
 now supported separately, as are [skill drafting](codex-skill-generation.md) and
 [session-summary drafting](codex-session-summaries.md). Those capabilities do
-not imply native compacted-history import or automatic application.
+not imply automatic application; explicit reviewed compacted-history import is
+qualified separately in the linked compacted-continuation guide.

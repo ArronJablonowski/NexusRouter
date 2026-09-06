@@ -1,5 +1,54 @@
 # Implementation evidence
 
+Native compacted-continuation checkpoint: the previous turn made verified
+progress with signed-in Sol summary drafting and backup e57a7c8; the worktree was
+clean at entry. The exact Sol native task path now accepts explicit manual
+compaction and currently approved stored summaries. A private resolved-checkpoint
+binding gate replaces the blanket denial; request flags alone cannot supply
+source/approval authority. Existing loadContinuation reconstructs canonical
+source context and compares reviewed proposal bytes. The TaskStarted transaction
+still rechecks the exact current review before committing input/checkpoint.
+
+Official OpenAI documentation confirms thread/inject_items adds history without
+starting generation. The existing typed bridge now receives canonical compacted
+messages: original system roles, fixed host reference-data warning, summary JSON
+in a user role, and the complete recent suffix including paired historical tools.
+Only the final new prompt enters turn/start after a checked import acknowledgement.
+No native automatic compaction, historical tool redispatch, automatic approval,
+automatic retry, source rewrite or weaker privacy mode is introduced. Completed
+cloud-eligible sources only; failed recovered sources retain ordinary uncompacted
+continuation, not compaction. Existing context and full-frame bounds remain.
+
+Three agents qualified the application/SQLite path, typed projection/protocol
+and an explicitly gated live probe. Application race tests passed three times
+5.377s, bridge compaction tests three times 1.883s; combined final-shape tests
+passed app 2.934s/bridge 1.816s. Independent review found no new binding/privacy
+bypass. An initially overbroad revocation test was corrected against runtime
+ordering: context estimation happens after durable TaskStarted. Rejection before
+that start prevents import; rejection afterward blocks future direct reuse but
+does not cancel the admitted task. Fixtures verify both sides, not a new policy.
+
+The live TestLiveCodexCompactedContinuation passed 4.89s (race package 6.351s), one
+launch/stream/close, done=true, recalled=true, checkpoint_exact=true and unchanged
+source. A synthetic loopback source/draft plus explicit trusted-host review
+fixture supplied a marker only through the approved summary; actual signed-in
+Sol recalled it. The observer did not count import RPCs. No user session/files,
+actual local-model delegation or live crash recovery was involved.
+
+Final fidelity hardening validates retained original tool JSON before a custom
+context engine or map-based redaction can collapse duplicate keys. Duplicate,
+escaped/nested duplicate and excessive-depth cases reject before launch with
+unchanged source in both built-in and custom-engine paths. All native compaction
+race tests then passed three times 7.840s. This validation followed the live run
+and is separately fixture-covered. Final make check passed formatting/LOC, vet,
+native race tests and build: app 141.429s, telemetry 102.548s, CLI 30.619s, API
+9.665s and SDK 18.652s, with unchanged packages cached. Native make build and
+CGO-free Linux amd64 production, application-test and bridge-test compilation
+passed; Linux execution is not claimed.
+Native Linear remained locked; no issue mutation is claimed. Automatic semantic
+compaction/validation, in-flight native steering, broader crash/isolation/release
+qualification and full PRD/Linear acceptance remain open.
+
 Native session-summary checkpoint: previous turn made verified progress with
 reviewed file replacement and backup 84ebec4; the worktree was clean at entry.
 SummarizeTask now uses the shared inert auxiliary adapter for the exact signed-in

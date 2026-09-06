@@ -5,10 +5,15 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Explicit Sol continuation with manual or approved stored compaction, preserving
+  canonical checkpoints, historical tool pairs and the durable-start approval
+  boundary. One synthetic live recall check passed. See
+  [native compacted continuation](codex-compacted-continuation.md).
+
 - Signed-in Sol session-summary drafting with durable-before-launch execution,
   schema-bound generation and unchanged source provenance. One synthetic live
-  check passed; native compacted-history import and automatic application remain
-  open. See [session-summary drafting](codex-session-summaries.md).
+  check passed; automatic application remains open. See
+  [session-summary drafting](codex-session-summaries.md).
 
 - Opt-in local existing-file replacement after exact old/new approval, with
   checked preimages, shared writer leases and private recovery copies. No

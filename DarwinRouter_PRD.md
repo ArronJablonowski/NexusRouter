@@ -454,8 +454,11 @@ Compaction occurs only at safe boundaries and never separates a tool call from i
 Current implementation also supports explicit summary drafting through the
 signed-in Sol Codex provider: schema-inclusive context admission, durable start
 before launch, decoded-secret redaction and host-derived provenance. Drafts do
-not activate themselves. Native compacted-history import and automatic semantic
-validation/application remain required work; see [native summary drafting](docs/codex-session-summaries.md).
+not activate themselves. Explicit native compacted-history import supports
+operator-supplied summaries and approved stored drafts with canonical provenance
+and transactional review checks. Automatic semantic validation/application
+remains required work; see [native summary drafting](docs/codex-session-summaries.md)
+and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory
 

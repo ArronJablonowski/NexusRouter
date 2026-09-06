@@ -549,8 +549,9 @@ The selected model needs configured `context_tokens` and `estimated_cost`; local
 
 The exact signed-in Sol `codex_app_server` model can also draft summaries of
 cloud-eligible sources using the same command. See [native session-summary
-drafts](docs/codex-session-summaries.md). Native compacted/approved-summary
-continuation is still unsupported; generating a draft does not apply it.
+drafts](docs/codex-session-summaries.md). Explicit [native compacted continuation](docs/codex-compacted-continuation.md)
+can use an operator-supplied summary or approved stored draft; generating a
+draft does not approve or apply it.
 
 Generation makes one auxiliary call without tools or retries. Application admission enforces deployment mode, source privacy, resource reservation and cost metadata, then persists a `started` attempt before dispatch. Configured credentials are redacted from input and draft content. Success atomically stores the proposal with `drafted` status; failure stores a generic code. Cancellation cleanup is bounded independently. A crash or unavailable store can leave `started` indeterminate—it is not proof that a summarizer is still running. Inspection opens storage read-only and supports up to 100 records per page, with optional task filtering and an exclusive `--after` ID cursor.
 

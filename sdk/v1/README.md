@@ -257,6 +257,12 @@ process health. Readers remain blockers for writers even when expired.
 
 ### Replaceable task context estimates
 
+For an explicitly selected signed-in Sol model, `Request.Compaction` or
+`Request.SummaryAttemptID` with `ContinueTaskID` now uses the native compacted
+history path. Stored drafts require current operator review; source/checkpoint
+and review checks are shared with the CLI and task API. This is not automatic
+approval or resume. See [native compacted continuation](../../docs/codex-compacted-continuation.md).
+
 `ConfigOptions.ContextEstimator` implements the public `providers.ContextEstimator`
 interface (also `sdk.ContextEstimator`). `Estimate(ctx, providers.Request)` sees
 an isolated model request including messages, tool schemas and output schema.
