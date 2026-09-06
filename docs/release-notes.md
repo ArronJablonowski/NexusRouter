@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Operation-keyed deterministic skill checks with durable pass receipts,
+  atomic failure/rollback receipts and historical retry recognition. Explicit
+  Go-host control only; daemon validation and durable monitor scheduling remain
+  open. See [regression operations](skill-regression-operations.md).
+
 - Linux thermal trip-point observations now gate new local reservations,
   preserving unknown readings and existing cgroup limits. Fixture tests ran on
   Linux/arm64; physical hot-sensor qualification remains open. See

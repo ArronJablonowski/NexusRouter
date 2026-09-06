@@ -74,7 +74,7 @@ func validateActivationOperations(c *catalog) error {
 			if a.OperationID == "" {
 				continue
 			}
-			if c.Schema != 3 || seen[a.OperationID] {
+			if c.Schema < 3 || seen[a.OperationID] {
 				return ErrInvalid
 			}
 			if !validActivationOperationFields(a) {

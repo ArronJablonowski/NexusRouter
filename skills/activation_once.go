@@ -93,7 +93,9 @@ func (s *FileStore) ActivateOnce(ctx context.Context, operationID string, expect
 		e.Activations = append(e.Activations, activation{From: expected.Active, To: id, At: time.Now().UTC(), OperationID: operationID, BeforeRevision: expected.Revision, Evidence: &proof})
 		e.Active = id
 		c.Skills[expected.Key.index()] = e
-		c.Schema = 3
+		if c.Schema < 3 {
+			c.Schema = 3
+		}
 		return nil
 	}, true)
 }

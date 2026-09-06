@@ -1239,7 +1239,7 @@ operation receipts make restart acknowledgement safe after activation or rollbac
 The ordinary daemon remains draft-only. See
 [validated learning](docs/background-learning.md#opt-in-validated-learning-for-go-hosts).
 
-`RevalidateSkillVersion` completes the host-driven recovery path: with
+`RevalidateSkillVersion` provides host-driven deterministic recovery: with
 `skills.rollback_on_regression` enabled, a trusted deterministic failing check
 can restore the validated predecessor of the observed active version. Passing
 checks are non-mutating; callback errors or model opinions do not cause rollback.
@@ -1251,6 +1251,14 @@ failures advance to later keys while health stays degraded. The monitor does not
 infer statistical regressions from task outcomes or run generated test commands.
 See [regression monitoring](docs/skill-regression-monitor.md) for policy, restart,
 admission-failure and cooperative-shutdown limits.
+
+For a durable check receipt, Go hosts can use `RevalidateSkillVersionOnce` with
+an operation ID, stable validator identity and exact expected activation. Passes
+retain an audit receipt without changing activation revisions; failure receipts
+and rollback commit together. Exact retries do not rerun validation or rollback.
+This schema-4 catalog extension does not yet change the periodic monitor. See
+[regression operations](docs/skill-regression-operations.md) for compatibility,
+inspection and limits.
 
 `darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 

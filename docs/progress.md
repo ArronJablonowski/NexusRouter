@@ -1,5 +1,68 @@
 # Implementation evidence
 
+Durable regression-operation checkpoint: the previous turn made verified progress
+with Linux thermal admission and backup 3da51ce; this turn began from a clean
+worktree. Inspection of the skill-learning path found that explicit passing
+regression checks had no durable audit receipt and controller retries could not
+recognize a completed check. The new FileStore RevalidateAndRollbackOnce and
+application/SDK RevalidateSkillVersionOnce bind an operation ID, trusted validator
+identity and exact expected activation to a historical receipt. Passing checks
+record evidence without changing activation revision; deterministic failure and
+rollback commit with their receipt in one existing atomic catalog replacement.
+
+Catalog schema4 introduces a separate bounded map of at most1000 regression
+operations. Schema1–3 remains readable; publication and activation receipts are
+preserved and later ActivateOnce cannot downgrade the schema. Regression IDs use
+a namespace separate from activation-operation IDs. Lookup validates the exact
+historical prefix and any rollback's evidence, timestamp and following revision.
+Exact retries acknowledge that history without callback or another rollback,
+including after later activation changes. Capacity exhaustion rejects new checks
+before a callback; receipts are not silently evicted. Read-only inspection creates
+or migrates nothing. SQLite schema26 is unchanged.
+
+Three agents contributed core implementation/tests, app/SDK fixtures and an
+independent review. No blocking correctness/security defect was found. Review
+identified an intentionally qualified preflight race: a matching concurrent commit
+can make the application return a generic conflict before its next exact retry
+recognizes the receipt. The core serializes commit, not callback execution;
+concurrent read-only validators may both run. Current policy and cumulative secret
+checks remain on callbacks, inspection and receipt acknowledgement. No default
+success validator, generated command, model-judgment authority or daemon engine
+was enabled. Existing periodic monitoring retains its legacy in-memory cursor.
+
+Focused race tests passed three runs: core7.041s, app11.757s, SDK2.131s. Test coverage
+includes reopened pass/failure receipts, changed later activations, stale/rebound
+identities, proof/operation/validator credential collisions and rotation, canceled
+contexts, kill switches, ABA changes, unavailable predecessors, malformed receipt
+bindings, full capacity and schema compatibility. A corrected test assertion now
+uses ActivationCount as the pre-operation history length, not the post-rollback
+length. CGO-free Linux/arm64 core and app lifecycle/credential fixtures plus SDK
+regression tests also executed successfully in a network-disabled, read-only,
+unprivileged Alpine container using only temporary fixture storage. Native build
+and Linux/amd64 production cross-build passed. Final full gates and subprocess
+qualification are recorded below.
+
+Full make check passed formatting/LOC, vet, native race tests and build
+(app149.560s, telemetry105.535s, CLI32.137s, API11.129s, SDK23.699s,
+skills18.881s). A subsequently added owned-subprocess test passed three race runs
+1.792s: the child commits a deterministic failed check and rollback, signals only
+a test boundary before wrapper response, and is then SIGKILLed and joined. Reopen
+recovers the exact receipt, source version remains unchanged, history gains only
+one rollback, and exact retry invokes zero callbacks or writes. No production
+hook was added. The final complete skills race suite passed15.854s with this test;
+format/LOC and skills vet also passed. The rebuilt CGO-free Linux/arm64 crash test
+executed successfully in the isolated container, and Linux/amd64 skills test
+compilation passed. This is process death after completed commit, not interruption
+during rename/fsync or power loss. No live model or user data was involved.
+
+Native Linear was rechecked and remains blocked by the locked Mac; no issue
+status was changed. The repository backup is made only after these verified gates.
+
+Standalone daemon validation-engine configuration, persistent monitor scheduling
+identities, statistical regression baselines/user-feedback attribution, receipt
+retention and full crash/power-loss qualification remain required. This is not
+full PRD/Linear acceptance, and no user learner or monitor was started.
+
 Linux thermal-admission checkpoint: the previous turn made verified progress
 with the public SDK summary workflow and backup 3be5f51. This turn began from a
 clean worktree. PRD12 thermal-pressure sampling had an unimplemented Linux path:

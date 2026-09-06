@@ -399,6 +399,13 @@ validation-engine configuration and statistical outcome-based regression
 monitoring remain required. See [regression monitoring](docs/skill-regression-monitor.md).
 See [activation operations](docs/skill-activation-operations.md).
 
+Explicit regression operations must likewise retain deterministic passing-check
+evidence and commit failed-check receipts atomically with rollback. Bind retries
+to the exact activation revision and trusted validator identity without repeating
+rollback or changing activation revisions merely to record a pass. Current Go
+host APIs are described in [regression operations](docs/skill-regression-operations.md).
+Durable scheduling of these operations remains separate required work.
+
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
 
 The signed-in Sol coordinator may also perform bounded skill drafting through

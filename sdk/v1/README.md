@@ -499,6 +499,14 @@ credential, trusted-callback and cooperative-deadline rules apply as activation.
 An initial version has no predecessor to restore. This method does not schedule
 continuous checks or infer statistical regressions from task outcomes.
 
+For durable check audit and lost-acknowledgement recognition, use
+`RevalidateSkillVersionOnce(ctx, operationID, validatorID, expected, validator)`
+and inspect `SkillRegressionOperation(ctx, key, operationID)`. Passing checks
+persist a receipt but leave activation revisions unchanged; failure receipts and
+rollback commit together. Exact retries acknowledge history without callbacks
+or further rollback. See [regression operations](../../docs/skill-regression-operations.md)
+for schema-4 compatibility, bounds, policy and concurrent-callback limitations.
+
 For periodic checks, explicitly call
 `Client.StartSkillRegression(ctx, interval, validator)`. The caller owns the
 returned `SkillRegressionMonitor` and must call `Close()`; `Health()` reports
