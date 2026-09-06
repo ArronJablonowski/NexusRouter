@@ -22,9 +22,33 @@ recoverers cannot both commit; any failed write rolls the transaction back.
 
 The original event prefix remains unchanged. Recovery invents no completed turn,
 returns no partial text as an answer, grants no success evidence, and dispatches
-no model or tool. Existing incomplete-turn markers remain intact. The ordinary
-failed history does not become eligible for continuation. Existing submission
-inspection and recovery-history surfaces expose the terminal state and receipt.
+no model or tool. Existing incomplete-turn markers remain intact. Existing
+submission inspection and recovery-history surfaces expose the terminal state
+and receipt. Ordinary failures remain ineligible for continuation.
+
+## Explicit continuation after recovery
+
+An operator may now reuse the saved conversation after an exact model-only
+recovery, using `--continue-task TASK_ID` or interactive `/resume TASK_ID` followed
+by a new prompt. Readiness inspection reports `history_eligible: true` with
+reason `recovered_model`. The shared assessment captures a bounded history
+(10,000 events / 8 MiB including the recovery terminal), replays that same owned
+history, and recomputes the deterministic recovery plan. The stored terminal
+must match the plan exactly; its code alone is not sufficient evidence.
+
+Only initial context and completed messages are imported. Partial model deltas
+remain in the original journal but are never supplied as an answer or context.
+The raw snapshot still reports `failed` and retains `InterruptedTurn` when
+appropriate. Continuation creates a fresh parent-linked task; it neither changes
+the failed source/submission nor grants success evidence or automatic retry.
+Privacy, provider, context, resource and tool-policy admission still apply.
+
+Canceled or ordinary failed tasks, current tool proposals/effects, read-only
+tool-recovery paths and unverifiable terminals remain ineligible for this path.
+Historical paired tools in initial context remain reference data, not dispatch
+authority. Compaction and stored-summary options remain unavailable for failed
+sources. General interrupted-task resumption and automatic retries are still
+separate unfinished requirements.
 
 ## Verification and limits
 

@@ -63,8 +63,8 @@ func startResumeChat(t *testing.T, base app.Request, hooks chatHooks) (chan chat
 }
 
 func TestChatResumeEligibleSelectionDefersExecutionAndClearsCompaction(t *testing.T) {
-	for _, recovered := range []bool{false, true} {
-		t.Run(map[bool]string{false: "completed", true: "recovered"}[recovered], func(t *testing.T) {
+	for _, reason := range []string{"completed", "recovered_delegation", "recovered_model"} {
+		t.Run(reason, func(t *testing.T) {
 			requests := make(chan app.Request, 1)
 			var inspections atomic.Int64
 			hooks := chatHooks{Continuation: func(ctx context.Context, id string) (sessions.ContinuationStatus, error) {
@@ -74,8 +74,8 @@ func TestChatResumeEligibleSelectionDefersExecutionAndClearsCompaction(t *testin
 					t.Error("unbounded or foreign inspection")
 				}
 				status := chatResumeStatus(id)
-				if recovered {
-					status.State, status.Reason = "failed", "recovered_delegation"
+				if reason != "completed" {
+					status.State, status.Reason = "failed", reason
 				}
 				return status, nil
 			}, Run: func(_ context.Context, r app.Request, _ func(runtime.Event) error) (app.Result, error) {

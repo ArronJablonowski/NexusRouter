@@ -1,5 +1,55 @@
 # Implementation evidence
 
+Recovered model-only continuation checkpoint: the previous goal turn made
+verified progress and was backed up as 99637d1. Current Linear DAR-14 requires
+queued steering/follow-up, cancellation and safe resumption from durable state;
+it has been moved from Todo to In Progress, not marked complete. This checkpoint
+allows explicit conversation continuation after an exact model-only interruption
+recovery. It does not rerun the old task or broaden uncertain-effect recovery.
+
+The shared sessions.ReplayContinuation captures one owned, bounded journal
+(10,000 events / 8 MiB including the recovery terminal). It preserves ordinary
+completed/recovered-delegation assessment and admits failed `recovered_model`
+history only when recomputing PlanInterruptedModel reproduces the exact stored
+terminal. Partial deltas are not imported; raw failed state and InterruptedTurn
+remain unchanged. Current tools/effects, canceled tasks, ordinary failures and
+read-only tool-recovery protocols do not qualify under this model-only path.
+Historical paired tools remain context, never current execution authority.
+
+Application admission and metadata inspection now use the same SQLite read
+transaction with raw payload-size checks before loading bodies. A review of
+the initial integration found app admission still used the unbounded raw event
+reader; ContinuationSnapshot now replaces that path. All continued tasks still
+pass normal privacy, provider, context, resource and tool-policy admission.
+Failed sources reject compaction and stored-summary options. No database schema
+or recovery writer protocol changes; no automatic inference or skill update.
+
+Tests cover exact inclusive event/aggregate-byte limits and one-over rejection,
+replay-valid forged recovery terminals, source ownership, cancellation, current
+tool rejection, pre-dispatch/partial/completed-turn boundaries and historical
+tool context. The real application fixture commits a model-only journal into
+an owned submission, expires its fixture claim, executes the existing recovery
+transaction and creates a fresh explicit continuation through loopback HTTP.
+It proves no inference during recovery/inspection or privacy/compaction denial,
+exact complete-message import without partial output, new parent/session/privacy
+binding, unchanged failed source events and unchanged failed submission state.
+Storage tests retain raw InterruptedTurn even when readiness is true. HTTP
+metadata and chat selection tests accept the new reason without granting retry
+authority. These are fixtures, not a new live Codex/Ollama recovery run, general
+automatic resume, semantic output acceptance or complete PRD qualification.
+
+Final verification: make check passed format/LOC, vet, the full native race
+suite and build after the shared transaction refinement (app 227.288s,
+telemetry 152.197s, CLI 41.166s, API 12.804s, SDK 26.136s, sessions 16.610s;
+unchanged packages cached). make build passed. Final focused app/storage race
+tests passed three repetitions in 3.502s/7.951s; strengthened sessions tests
+passed three race repetitions in 10.818s, chat resume in 2.462s, and HTTP
+metadata in 1.757s. Final app continuation and sessions boundary tests also ran
+three times as CGO-free Linux ARM64 tests in an unprivileged, read-only,
+network-disabled container. No Linux race or live-provider result is claimed.
+Independent final review found no concrete blocker. Source files remain below
+1,000 LOC; GitHub backup and a native Linear evidence comment follow this gate.
+
 Interactive saved-context selection checkpoint: the preceding goal turn
 confirmed authentication without advancing implementation. Work resumed from
 clean GitHub-backed c968c8b. Chat now accepts `/resume TASK_ID` while idle,

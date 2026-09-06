@@ -84,6 +84,14 @@ func TestInterruptedModelRecoveryAtomicAndFenced(t *testing.T) {
 			if err != nil || len(receipts) != 1 || receipts[0].Reason != "interrupted_model" || receipts[0].Action != want {
 				t.Fatal(receipts, err)
 			}
+			continuation, err := db.TaskContinuation(ctx, "model-task")
+			if err != nil || continuation.Validate() != nil || continuation.HistoryEligible != (want == "failed") || (want == "failed" && continuation.Reason != "recovered_model") {
+				t.Fatal("recovered continuation eligibility", continuation, err)
+			}
+			snapshot, err := db.TaskSnapshot(ctx, "model-task")
+			if err != nil || !snapshot.InterruptedTurn || snapshot.State != want || len(snapshot.Messages) != 1 {
+				t.Fatal("eligibility rewrote interruption or imported partial text", snapshot, err)
+			}
 			body, _ := json.Marshal([]any{status.Result, receipts, page.Events[3]})
 			if strings.Contains(string(body), "PRIVATE_") {
 				t.Fatal("recovery copied private source payload")

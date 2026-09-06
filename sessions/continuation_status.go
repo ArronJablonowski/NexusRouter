@@ -24,7 +24,7 @@ func (s ContinuationStatus) Validate() error {
 		return ErrHistory
 	}
 	if s.HistoryEligible {
-		if (s.Reason == "completed" && s.State == "completed") || (s.Reason == "recovered_delegation" && s.State == "failed") {
+		if (s.Reason == "completed" && s.State == "completed") || ((s.Reason == "recovered_delegation" || s.Reason == "recovered_model") && s.State == "failed") {
 			return nil
 		}
 		return ErrHistory

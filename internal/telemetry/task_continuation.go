@@ -12,30 +12,38 @@ import (
 // replay-validated read transaction. It neither repairs a task nor appends a
 // continuation, and returns no partially decoded status on any failure.
 func (s *Store) TaskContinuation(ctx context.Context, task string) (sessions.ContinuationStatus, error) {
+	_, status, err := s.ContinuationSnapshot(ctx, task)
+	return status, err
+}
+
+// ContinuationSnapshot shares the same coherent, raw-size-preflighted history
+// between execution admission and metadata inspection. It grants no execution
+// authority and does not rewrite interruption flags in the returned snapshot.
+func (s *Store) ContinuationSnapshot(ctx context.Context, task string) (sessions.Snapshot, sessions.ContinuationStatus, error) {
+	noSnapshot := sessions.Snapshot{}
 	zero := sessions.ContinuationStatus{}
 	if ctx == nil || !sessions.ValidEventPageID(task) {
-		return zero, sessions.ErrHistory
+		return noSnapshot, zero, sessions.ErrHistory
 	}
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return zero, err
+		return noSnapshot, zero, err
 	}
 	defer tx.Rollback()
 	var events []runtime.Event
-	snapshot, err := taskSnapshotWithEvents(ctx, tx, task, &events)
+	_, err = taskSnapshotWithEvents(ctx, tx, task, &events)
 	if err != nil {
-		return zero, err
+		return noSnapshot, zero, err
 	}
-	tail := events
-	if len(tail) > 2 {
-		tail = tail[len(tail)-2:]
+	snapshot, out, err := sessions.ReplayContinuation(ctx, snapshotEvents(events), task)
+	if err != nil {
+		return noSnapshot, zero, err
 	}
-	out := sessions.AssessContinuation(snapshot, tail)
 	if out.Validate() != nil {
-		return zero, sessions.ErrHistory
+		return noSnapshot, zero, sessions.ErrHistory
 	}
 	if err := tx.Commit(); err != nil {
-		return zero, err
+		return noSnapshot, zero, err
 	}
-	return out, nil
+	return snapshot, out, nil
 }

@@ -29,43 +29,49 @@ func continuationRequest(method, path, body string) *http.Request {
 }
 
 func TestTaskContinuationMetadataOnly(t *testing.T) {
-	s := services()
-	calls := 0
-	s.Run = func(context.Context, app.Request) (app.Result, error) {
-		t.Fatal("inspection executed task")
-		return app.Result{}, nil
-	}
-	s.Inspect = func(context.Context, string) (sessions.Snapshot, error) {
-		t.Fatal("inspection loaded public snapshot")
-		return sessions.Snapshot{}, nil
-	}
-	s.TaskContinuation = func(ctx context.Context, task string) (sessions.ContinuationStatus, error) {
-		calls++
-		if task != "task" {
-			t.Fatal(task)
-		}
-		deadline, ok := ctx.Deadline()
-		if !ok || time.Until(deadline) > 5*time.Second || time.Until(deadline) <= 0 {
-			t.Fatal("missing bounded deadline")
-		}
-		return continuationFixture(), nil
-	}
-	h, err := New(token, 1, s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, continuationRequest("GET", "/v1/tasks/task/continuation", ""))
-	var got sessions.ContinuationStatus
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &got) != nil || got != continuationFixture() || calls != 1 {
-		t.Fatal(w.Code, w.Body.String(), calls)
-	}
-	var fields map[string]any
-	if json.Unmarshal(w.Body.Bytes(), &fields) != nil || len(fields) != 6 {
-		t.Fatal(w.Body.String())
-	}
-	if w.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("cacheable diagnostic")
+	for _, reason := range []string{"recovered_delegation", "recovered_model"} {
+		t.Run(reason, func(t *testing.T) {
+			want := continuationFixture()
+			want.Reason = reason
+			s := services()
+			calls := 0
+			s.Run = func(context.Context, app.Request) (app.Result, error) {
+				t.Fatal("inspection executed task")
+				return app.Result{}, nil
+			}
+			s.Inspect = func(context.Context, string) (sessions.Snapshot, error) {
+				t.Fatal("inspection loaded public snapshot")
+				return sessions.Snapshot{}, nil
+			}
+			s.TaskContinuation = func(ctx context.Context, task string) (sessions.ContinuationStatus, error) {
+				calls++
+				if task != "task" {
+					t.Fatal(task)
+				}
+				deadline, ok := ctx.Deadline()
+				if !ok || time.Until(deadline) > 5*time.Second || time.Until(deadline) <= 0 {
+					t.Fatal("missing bounded deadline")
+				}
+				return want, nil
+			}
+			h, err := New(token, 1, s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, continuationRequest("GET", "/v1/tasks/task/continuation", ""))
+			var got sessions.ContinuationStatus
+			if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &got) != nil || got != want || calls != 1 {
+				t.Fatal(w.Code, w.Body.String(), calls)
+			}
+			var fields map[string]any
+			if json.Unmarshal(w.Body.Bytes(), &fields) != nil || len(fields) != 6 {
+				t.Fatal(w.Body.String())
+			}
+			if w.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("cacheable diagnostic")
+			}
+		})
 	}
 }
 

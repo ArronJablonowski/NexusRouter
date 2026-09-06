@@ -229,16 +229,10 @@ func TestRecoveredContinuationRequiresExactCheckpoint(t *testing.T) {
 		case "canceled":
 			end.Kind = runtime.TaskCanceled
 		}
-		reader := recoveredCheckpointReader{tool, end}
-		ok := recoveredDelegationContinuation(context.Background(), reader, sessions.Snapshot{TaskID: "task", SessionID: "session", State: "failed", Sequence: 9})
+		status := sessions.AssessContinuation(sessions.Snapshot{TaskID: "task", SessionID: "session", State: "failed", Sequence: 9}, []runtime.Event{tool, end})
+		ok := status.HistoryEligible && status.Reason == "recovered_delegation"
 		if ok != (mode == "valid") {
 			t.Fatal("checkpoint admission", mode, ok)
 		}
 	}
-}
-
-type recoveredCheckpointReader []runtime.Event
-
-func (r recoveredCheckpointReader) Read(_ context.Context, task string, after int64, limit int) ([]runtime.Event, error) {
-	return r, nil
 }

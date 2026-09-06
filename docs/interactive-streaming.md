@@ -28,7 +28,8 @@ When idle, `/resume TASK_ID` selects eligible saved history from the configured
 database. Selection is read-only and does not launch inference or rerun tools.
 Enter your next prompt to create a new task linked to that source; all normal
 privacy, provider, context-budget and permission checks still run at submission.
-Completed histories and validated recovered-delegation histories are eligible;
+Completed histories, validated recovered-delegation histories and exact
+[recovered model-only histories](interrupted-model-recovery.md) are eligible;
 ordinary failed, canceled, running or uncertain-effect histories are not.
 This is context continuation, not automatic restart of an interrupted task.
 

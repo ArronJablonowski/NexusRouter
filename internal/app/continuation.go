@@ -16,13 +16,17 @@ type continuationContext struct {
 	Compaction         *runtime.ContextCompaction
 }
 
-func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secrets []string) (*continuationContext, error) {
-	history, err := sessions.Replay(ctx, db, r.ContinueTaskID)
-	if err != nil || history.InterruptedTurn || history.UncertainEffects || len(history.Pending) > 0 {
+type continuationReader interface {
+	ContinuationSnapshot(context.Context, string) (sessions.Snapshot, sessions.ContinuationStatus, error)
+}
+
+func loadContinuation(ctx context.Context, db continuationReader, r Request, secrets []string) (*continuationContext, error) {
+	history, status, err := db.ContinuationSnapshot(ctx, r.ContinueTaskID)
+	if err != nil || !status.HistoryEligible {
 		return nil, ErrAdmission
 	}
 	if history.State != "completed" {
-		if history.State != "failed" || r.Compaction != nil || r.SummaryAttemptID != "" || !recoveredDelegationContinuation(ctx, db, history) {
+		if history.State != "failed" || r.Compaction != nil || r.SummaryAttemptID != "" {
 			return nil, ErrAdmission
 		}
 	}
@@ -72,21 +76,6 @@ func loadContinuation(ctx context.Context, db sessions.Reader, r Request, secret
 		result.Compaction.SummaryAttemptID, result.Compaction.SummaryReviewID = attempt.ID, review.ID
 	}
 	return result, nil
-}
-
-// Recovery closes the old task without claiming a final answer. An explicit
-// user continuation may consume the restored tool pair, never re-dispatch it.
-// Ordinary failures, cancellation and uncertain tool effects remain ineligible.
-func recoveredDelegationContinuation(ctx context.Context, db sessions.Reader, history sessions.Snapshot) bool {
-	if history.Sequence < 2 {
-		return false
-	}
-	events, err := db.Read(ctx, history.TaskID, history.Sequence-2, 2)
-	if err != nil || len(events) != 2 {
-		return false
-	}
-	status := sessions.AssessContinuation(history, events)
-	return status.HistoryEligible && status.Reason == "recovered_delegation"
 }
 
 func redactSummary(summary sessions.Summary, secrets []string) sessions.Summary {
