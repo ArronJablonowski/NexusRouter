@@ -257,6 +257,12 @@ process health. Readers remain blockers for writers even when expired.
 
 ### Replaceable task context estimates
 
+The SDK also exposes `SummarizeTask`, `InspectSummaryAttempt`,
+`ListSummaryAttempts`, `ReviewSummary` and `SummaryReviewHistory` for the explicit
+draft/review workflow. See [SDK session summaries](../../docs/sdk-session-summaries.md)
+for operator responsibilities, pagination, errors and an example. Generation
+does not approve or apply a proposal automatically.
+
 For an explicitly selected signed-in Sol model, `Request.Compaction` or
 `Request.SummaryAttemptID` with `ContinueTaskID` now uses the native compacted
 history path. Stored drafts require current operator review; source/checkpoint
@@ -728,8 +734,10 @@ This is not model readiness or execution authorization. Normal provider,
 privacy, resource, budget and tool policy checks still apply; no method silently
 replays old tool calls. Codex CLI now supports explicit `Request.ContinueTaskID`
 through typed history import into a new ephemeral thread, subject to its 1 MiB
-injection-frame limit. Compaction/summary requests and in-flight steering remain
-unsupported for that provider; see [the continuation guide](../../docs/codex-history-continuation.md).
+injection-frame limit. Explicit manual or currently approved stored compaction
+is supported; in-flight steering remains unsupported for that provider. See
+[the continuation guide](../../docs/codex-history-continuation.md) and
+[native compacted continuation](../../docs/codex-compacted-continuation.md).
 
 `InspectTaskLeases(ctx, taskID)` returns `TaskLeaseStatus`: task/head metadata,
 live/expired/released reader/writer counts, and validated recovery counts. The

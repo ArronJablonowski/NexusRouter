@@ -40,10 +40,22 @@ func (s *Service) ReviewSummary(ctx context.Context, attemptID, expectedID, deci
 }
 
 func SummaryReviewHistory(ctx context.Context, path, attemptID string) ([]sessions.SummaryReview, error) {
-	db, err := telemetry.OpenReadOnly(ctx, path)
-	if err != nil {
+	if ctx == nil || path == "" || !summaryInspectionID(attemptID, false) {
 		return nil, ErrAdmission
 	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	db, err := telemetry.OpenReadOnly(ctx, path)
+	if err != nil {
+		return nil, summaryInspectionError(ctx)
+	}
 	defer db.Close()
-	return db.SummaryReviews(ctx, attemptID)
+	result, err := db.SummaryReviews(ctx, attemptID)
+	if err != nil || ctx.Err() != nil {
+		return nil, summaryInspectionError(ctx)
+	}
+	if result == nil {
+		result = []sessions.SummaryReview{}
+	}
+	return result, nil
 }

@@ -157,6 +157,12 @@ The versioned SDK exposes stable interfaces for:
 
 Interfaces accept `context.Context`; implementations must honor cancellation. Public records include schema versions and reject unknown incompatible major versions.
 
+The SDK must expose explicit session-summary drafting, bounded inspection and
+listing, operator review/history, and approved-summary continuation through the
+same application service as the CLI/API. Current implementation and limits are
+documented in [SDK session summaries](docs/sdk-session-summaries.md); this does
+not fulfill automatic compaction or semantic validation requirements.
+
 ### 6.2 HTTP API
 
 DarwinRouter exposes:

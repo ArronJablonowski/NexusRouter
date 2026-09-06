@@ -5,6 +5,11 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Embedded Go SDK summary drafting, read-only proposal inspection/pagination,
+  operator review/history and explicit approved-summary continuation. Operator
+  authentication belongs to the host; automatic approval remains disabled. See
+  [SDK session summaries](sdk-session-summaries.md).
+
 - Explicit Sol continuation with manual or approved stored compaction, preserving
   canonical checkpoints, historical tool pairs and the durable-start approval
   boundary. One synthetic live recall check passed. See

@@ -567,6 +567,11 @@ Drafting never modifies the source, starts a continuation or affects fitness. In
 
 Review is a local operator attestation, not automated proof of accuracy, and does not itself run a model. Rejection blocks subsequent direct admissions of that stored draft; it does not cancel already-started work or erase summary copies in existing sessions. Newly configured redaction that changes an approved summary requires a fresh draft and review. The manual summary-file route remains available for explicitly operator-supplied summaries.
 
+Embedded Go applications can generate, inspect, list and review these same
+proposals through the [SDK session-summary workflow](docs/sdk-session-summaries.md).
+The host must authenticate the reviewing operator; calling the SDK does not
+grant a model authority to approve its own draft.
+
 Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation and mid-task compaction remain unfinished.
 
 ### Model-callable bounded workers

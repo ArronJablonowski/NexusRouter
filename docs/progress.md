@@ -1,5 +1,51 @@
 # Implementation evidence
 
+SDK summary-workflow checkpoint: the preceding CLI-access turn verified installed
+authentication but did not advance implementation. This turn resumed the pending
+SDK/app changes against the actual worktree. The versioned embedded client now
+exposes explicit SummarizeTask, InspectSummaryAttempt, ListSummaryAttempts,
+ReviewSummary and SummaryReviewHistory, with public session-record aliases.
+They use the existing application generation, approval and continuation policy;
+there is no automatic approval, compaction, replay or new model dispatch path.
+
+New shared read facades use existing read-only storage, strict IDs and 1–100-row
+lexical pages, ten-second cooperative deadlines, sanitized errors and no partial
+results on malformed rows. Review-history reads now share those bounds. Empty
+history alone does not establish attempt existence. Pre-canceled SDK calls retain
+context errors; mid-flight generation/review retain existing write-path error
+normalization and may leave durable state. Inspection returns sensitive complete
+proposals, not a metadata-only feed. Source journals remain immutable.
+
+Independent read-only review found no blocking defect and clarified cancellation
+and unknown-attempt history semantics in the documentation. Public SDK fixtures
+exercise drafting, reopened-client inspection, owned result copies, explicit
+review, exact checkpoint provenance, stale review rejection, future-use revocation,
+separate explicit attempts and read-only pagination. App fixtures cover malformed
+pages, missing-storage noncreation and unchanged source/database contents.
+An additional external SDK fixture proves malformed auxiliary output leaves one
+inspectable failed attempt, cannot be approved or continued, does not retry and
+leaves source state unchanged. Unknown-attempt history/detail semantics are also
+asserted. That focused race test passed three runs (2.204s).
+
+Initial full make check passed formatting/LOC, vet, native race tests and build
+(app 142.846s, telemetry 103.353s, CLI 30.199s, API 9.957s, SDK 18.824s). Native
+make build and CGO-free Linux amd64 production build plus app/SDK test-binary
+compilation passed. Linux binaries were not executed. The added failure test is
+included in the final gate recorded below; no new live model inference was run
+for this SDK facade work. Fixtures use temporary loopback providers and storage,
+not actual local models, user files or production operator authentication.
+
+Final make check including the new failure fixture passed formatting/LOC, vet,
+the native race suite and build (app 144.157s, telemetry 104.499s, CLI 30.541s,
+API 9.566s, SDK 18.382s; unchanged packages cached). Final SDK Linux test-binary
+compilation also passed. No automatic-compaction or full MVP claim is made.
+
+Linear access was rechecked: the native app is blocked by the locked Mac. The
+connected plugin reports Cyber Operations Harness, not DarwinRouter. No changes
+were made to that unrelated workspace or to Linear issue status. The user must
+unlock native Linear or reconnect the connector to DarwinRouter for issue sync.
+Local progress remains possible; full PRD/Linear acceptance is not claimed.
+
 Native compacted-continuation checkpoint: the previous turn made verified
 progress with signed-in Sol summary drafting and backup e57a7c8; the worktree was
 clean at entry. The exact Sol native task path now accepts explicit manual
