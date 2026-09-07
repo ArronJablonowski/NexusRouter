@@ -1,5 +1,21 @@
 # Implementation evidence
 
+DAR-46 release preparation advanced but is not completion-ready. Release
+qualification now depends on the deterministic DAR-45 MVP gate, so packaging
+cannot qualify while the current runtime acceptance slice is failing. The
+composed `make qualify-release` passed from clean GitHub-backed commit
+18947cb12d55d7de75de565a9ba797215c243bb7: the race-enabled MVP matrix passed in
+9.374s, then eight clean-snapshot builds completed in 24.94s with byte-identical
+unsigned artifacts, all four executable formats checked, package/sign/verify
+commands exercised, matching disposable-key signatures, native version output
+and rejected tampering. No artifacts, test keys or tags were retained or
+published. DAR-46 still requires operator selection of a distribution license
+and notices, a dedicated release-signing identity and independently distributed
+public-key trust record, supported-platform native/hosted evidence, approved
+version notes and explicit publication authority. The repository SSH key is
+intentionally excluded from signing authority. Native Linear remains unavailable
+because the Mac is locked, so no DAR-46 state/comment change is claimed.
+
 DAR-45 is completion-ready pending native Linear reconciliation. The new
 `make qualify-mvp` gate passed under the race detector in 9.352s and provides a
 single repeatable acceptance matrix for local-only, cloud-only and hybrid
