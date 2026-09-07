@@ -1,5 +1,27 @@
 # Implementation evidence
 
+PRD queue-pressure-metrics checkpoint: snapshot schema version 5 adds a fixed
+`queue_age` group for the current durable submission population. Each queued
+record is classified exactly once into less-than-1s/10s/1m/5m/30m/1h,
+at-least-1h or `invalid_time`; validation requires the bucket total to equal the
+existing queued submission count. Future or malformed timestamps cannot become
+negative ages, and a corrupt queue larger than the configured 128-record bound
+fails closed. The reader selects only bounded creation timestamps inside the
+same SQLite read transaction and releases no submission IDs, exact timestamps,
+requests or results. This measures current wait pressure, not arrival/service
+rates or historical wait latency. Focused metrics/telemetry tests cover all
+buckets, invalid time, reconciliation, the corrupt overbound population and
+payload isolation. `make qualify-performance` passed: three 100,000-task/
+200,000-event metrics snapshots took 1.579–1.591s with approximately 9.63–9.65
+MiB and 400,482–400,509 allocations; automatic-routing p50 was 53.98–54.68ms
+and p95 58.70–60.36ms. Final `make check` passed formatting/LOC enforcement,
+vet, every native race-enabled package and production build; application took
+219.854s, telemetry 147.304s, CLI 42.471s, metrics 2.195s and SDK 25.289s. These
+are isolated Apple M4 Max results, not contended or cross-platform guarantees.
+No live model, user database or collector was used. Native Linear remains
+inaccessible because the Mac is locked, so no issue update is claimed. The full
+PRD remains incomplete.
+
 PRD live-resource-metrics checkpoint: application-backed metrics snapshot
 schema version 4 adds a fixed observation for CPU threads, RAM, swap, aggregate
 VRAM, thermal pressure and unified-memory status. Every value has an explicit

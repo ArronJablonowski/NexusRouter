@@ -45,6 +45,7 @@ func TestSnapshotRejectsInvalidOrUnboundedLabels(t *testing.T) {
 		"missing count":        func(s *Snapshot) { s.Groups[0].Counts = s.Groups[0].Counts[1:] },
 		"negative":             func(s *Snapshot) { s.Groups[0].Counts[0].Value = -1 },
 		"overflow":             func(s *Snapshot) { s.Groups[0].Counts[0].Value = math.MaxInt64; s.Groups[0].Counts[1].Value = 1 },
+		"queue mismatch":       func(s *Snapshot) { s.Groups[3].Counts[0].Value = 1 },
 		"duplicate":            func(s *Snapshot) { s.Groups[0].Counts[1].State = "running" },
 		"null unavailable":     func(s *Snapshot) { *s = NewSnapshot(1, s.ObservedAt); s.Groups[1].Counts = nil },
 		"invented unavailable": func(s *Snapshot) { *s = NewSnapshot(1, s.ObservedAt); s.Groups[1].Counts = []Count{{State: "queued"}} },

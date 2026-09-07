@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
@@ -46,6 +49,16 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 		t.Fatal(snapshot)
 	}
 	for _, group := range snapshot.Groups {
+		if group.Name == "queue_age" {
+			var total int64
+			for _, count := range group.Counts {
+				total += count.Value
+			}
+			if total != 1 {
+				t.Fatal(group)
+			}
+			continue
+		}
 		for _, count := range group.Counts {
 			expected := int64(1)
 			if group.Name == "runtime_events" || group.Name == "runtime_operations" {
@@ -59,6 +72,84 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || strings.Contains(string(body), "token") {
 		t.Fatal("payload leaked")
+	}
+}
+
+func TestMetricsQueueAgeDistributionAndInvalidTime(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	created := []time.Time{
+		now.Add(-2 * time.Hour), now.Add(-45 * time.Minute), now.Add(-10 * time.Minute),
+		now.Add(-2 * time.Minute), now.Add(-30 * time.Second), now.Add(-5 * time.Second),
+		now.Add(time.Hour), now,
+	}
+	for i, at := range created {
+		job := queuedSubmission(t, db, fmt.Sprintf("queue-age-%d", i))
+		if i == len(created)-1 {
+			at = time.Now().UTC()
+		}
+		value := at.Format(time.RFC3339Nano)
+		if _, err := db.db.Exec(`UPDATE submissions SET created_at=? WHERE id=?`, value, job.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	corrupt := queuedSubmission(t, db, "queue-age-corrupt")
+	if _, err := db.db.Exec(`UPDATE submissions SET created_at='not-a-time' WHERE id=?`, corrupt.ID); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := db.Metrics(ctx)
+	if err != nil || snapshot.Validate() != nil {
+		t.Fatal(snapshot, err)
+	}
+	for _, group := range snapshot.Groups {
+		if group.Name != "queue_age" {
+			continue
+		}
+		for _, count := range group.Counts {
+			want := int64(1)
+			if count.State == "invalid_time" {
+				want = 2
+			}
+			if count.Value != want {
+				t.Fatal(group)
+			}
+		}
+		body, _ := json.Marshal(group)
+		if strings.Contains(string(body), "queue-age") {
+			t.Fatal("queue identity leaked", string(body))
+		}
+		return
+	}
+	t.Fatal("queue age group missing")
+}
+
+func TestMetricsQueueAgeRejectsPopulationBeyondAdmissionBound(t *testing.T) {
+	db, _ := submissionStore(t)
+	tx, err := db.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	statement, err := tx.Prepare(`INSERT INTO submissions(id,key_digest,request_digest,config_digest,request,state,created_at,updated_at) VALUES(?,?,?,?,?,'queued',?,?)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for i := 0; i <= submissions.MaxQueued; i++ {
+		id := fmt.Sprintf("overbound-%03d", i)
+		if _, err := statement.Exec(id, submitDigest("key-"+id), submitDigest("{}"), submitDigest("config"), []byte("{}"), now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := statement.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Metrics(context.Background()); err == nil {
+		t.Fatal("overbound queue accepted")
 	}
 }
 
@@ -174,7 +265,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 		if err != nil || snapshot.StorageSchema != schema {
 			t.Fatal(snapshot, err)
 		}
-		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
+		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "queue_age": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
 		for _, group := range snapshot.Groups {
 			if group.Available != (schema >= since[group.Name]) {
 				t.Fatal(group)

@@ -93,8 +93,18 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 4 adds an optional live host-resource observation to
-the version 3 runtime-event and derived-operation activity. The application,
+Snapshot schema version 5 adds a fixed `queue_age` population gauge to version
+4's optional live host-resource observation and version 3's runtime activity.
+For schema-12-and-newer databases, every queued submission is classified once
+as less than 1 second, 10 seconds, 1 minute, 5 minutes, 30 minutes, or 1 hour;
+at least 1 hour; or invalid time. The fixed buckets are derived inside the same
+read transaction as submission state counts and must reconcile exactly with the
+queued count. Future or malformed timestamps become `invalid_time` rather than
+negative age. Classification reads at most the configured 128-item durable
+queue and fails closed if a corrupt store exceeds that bound. The gauges expose
+neither submission identity nor exact arrival time.
+
+The application,
 daemon, HTTP API and SDK attach fixed CPU-thread, RAM, swap, aggregate VRAM,
 thermal-pressure and unified-memory measurements. Each value has an explicit
 availability bit: an unsupported or failed probe is unavailable, never an
@@ -119,7 +129,9 @@ events, errors and steering without exporting an envelope or payload field.
 The `runtime_operations` group counts fallback-linked task starts, compacted
 continuations, skill-context uses, explored routes, and capacity, budget,
 privacy, or health exclusions. Exclusion counts are per excluded candidate;
-they are not inferred hardware samples or queue depth.
+they are not inferred hardware samples. The submission and queue-age groups are
+current durable population gauges, not arrival/service rates or wait-time
+histories.
 Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
@@ -174,5 +186,5 @@ no storage mutation, cancellation, response bounds, partial rejection and redire
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable
-export delivery, physical thermal-sensor accuracy, queue pressure, traces, full
+export delivery, physical thermal-sensor accuracy, queue arrival/service rates, traces, full
 histogram coverage or the full PRD telemetry scope.

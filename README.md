@@ -1398,13 +1398,20 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 4 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 5 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
 count stored records. Counts come from one SQLite read transaction and survive
 service restarts. Older schemas explicitly mark unsupported groups unavailable.
 No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
+
+The `queue_age` group classifies every currently queued submission into one of
+seven fixed age buckets from less than one second through at least one hour, or
+`invalid_time`. Its total must equal the durable queued-submission count. This
+distinguishes a fresh queue from sustained wait pressure without exposing exact
+arrival times or submission identity; it is not an arrival rate, service rate,
+historical wait distribution or execution-duration measurement.
 
 Application-backed snapshots also contain a fixed live resource block for CPU
 threads, RAM, swap, aggregate VRAM, thermal pressure and unified-memory status.
@@ -1438,7 +1445,7 @@ supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export; it does not enable tracing.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
-queue and per-device pressure, provider/tool latency and cost histograms, retention
+queue arrival/service rates, per-device pressure, provider/tool latency and cost histograms, retention
 and production-scale metrics qualification remain unfinished.
 
 ## Next sprints

@@ -10,7 +10,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 4
+const SnapshotVersion = 5
 
 type Count struct {
 	State string `json:"state"`
@@ -43,6 +43,7 @@ var definitions = []definition{
 	{"runtime_events", 1, []string{"task.started", "task.completed", "task.failed", "task.canceled", "turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed", "worker.started", "worker.heartbeat", "worker.completed", "route.selected", "evaluation.recorded", "error.recorded", "steering.applied"}},
 	{"runtime_operations", 1, []string{"fallback", "compaction", "skill_context", "exploration", "capacity_exclusion", "budget_exclusion", "privacy_exclusion", "health_exclusion"}},
 	{"submissions", 12, []string{"queued", "running", "succeeded", "failed", "canceled"}},
+	{"queue_age", 12, []string{"lt_1s", "lt_10s", "lt_1m", "lt_5m", "lt_30m", "lt_1h", "gte_1h", "invalid_time"}},
 	{"reviews", 7, []string{"started", "completed", "failed"}},
 	{"evaluations", 2, []string{"stored"}},
 	{"audits", 5, []string{"stored"}},
@@ -100,6 +101,25 @@ func (s Snapshot) Validate() error {
 				return ErrInvalid
 			}
 			total += c.Value
+		}
+	}
+	if s.StorageSchema >= 12 {
+		var queued, classified int64
+		for _, group := range s.Groups {
+			switch group.Name {
+			case "submissions":
+				queued = group.Counts[0].Value
+			case "queue_age":
+				for _, count := range group.Counts {
+					if classified > math.MaxInt64-count.Value {
+						return ErrInvalid
+					}
+					classified += count.Value
+				}
+			}
+		}
+		if queued != classified {
+			return ErrInvalid
 		}
 	}
 	if s.StorageSchema < 29 {

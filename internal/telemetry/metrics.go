@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 var errMetrics = errors.New("metrics unavailable")
@@ -59,6 +60,11 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 			) GROUP BY operation`
 		case "submissions":
 			query = `SELECT CASE state WHEN 'queued' THEN 0 WHEN 'running' THEN 1 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 3 WHEN 'canceled' THEN 4 ELSE -1 END,count(*) FROM submissions GROUP BY 1`
+		case "queue_age":
+			if err := readQueueAge(ctx, tx, snapshot.ObservedAt, group); err != nil {
+				return metrics.Snapshot{}, errMetrics
+			}
+			continue
 		case "reviews":
 			query = `SELECT CASE status WHEN 'started' THEN 0 WHEN 'completed' THEN 1 WHEN 'failed' THEN 2 ELSE -1 END,count(*) FROM review_attempts GROUP BY 1`
 		case "evaluations":
@@ -101,4 +107,49 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 		return metrics.Snapshot{}, errMetrics
 	}
 	return snapshot, nil
+}
+
+func readQueueAge(ctx context.Context, tx *sql.Tx, observedAt time.Time, group *metrics.Group) error {
+	rows, err := tx.QueryContext(ctx, "SELECT created_at FROM submissions WHERE state='queued' ORDER BY rowid LIMIT ?", submissions.MaxQueued+1)
+	if err != nil {
+		return errMetrics
+	}
+	defer rows.Close()
+	count := 0
+	for rows.Next() {
+		count++
+		if count > submissions.MaxQueued {
+			return errMetrics
+		}
+		var encoded string
+		if rows.Scan(&encoded) != nil || len(encoded) > 64 {
+			return errMetrics
+		}
+		created, parseErr := time.Parse(time.RFC3339Nano, encoded)
+		index := 7
+		if parseErr == nil && !created.After(observedAt) {
+			age := observedAt.Sub(created)
+			switch {
+			case age < time.Second:
+				index = 0
+			case age < 10*time.Second:
+				index = 1
+			case age < time.Minute:
+				index = 2
+			case age < 5*time.Minute:
+				index = 3
+			case age < 30*time.Minute:
+				index = 4
+			case age < time.Hour:
+				index = 5
+			default:
+				index = 6
+			}
+		}
+		group.Counts[index].Value++
+	}
+	if rows.Err() != nil {
+		return errMetrics
+	}
+	return nil
 }
