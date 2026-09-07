@@ -5,6 +5,12 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Content-free durable task discovery through `darwin task list`, interactive
+  `/tasks`, Go SDK `ListTasks`, and authenticated `GET /v1/tasks`. Newest-first
+  opaque pages freeze their insertion boundary while reporting live state; a
+  listed ID still requires an explicit continuation-readiness check before
+  `/resume`. See [task discovery](task-discovery.md).
+
 - Metadata-only automatic-route inspection through `darwin task route`, the Go
   SDK's `InspectRouteExplanation`, and authenticated
   `GET /v1/tasks/{id}/route`. The reader reconstructs only the fixed initial

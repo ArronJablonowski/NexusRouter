@@ -758,6 +758,14 @@ no route decision and returns an inspection error. Historical health and
 capacity fields describe admission time only and do not authorize a retry.
 See [route explanation inspection](../../docs/route-explanation.md).
 
+`ListTasks(ctx, TaskListOptions)` discovers newest-first durable task metadata
+without loading conversation or tool content. Each item contains only task and
+session IDs, current state, head sequence and start time. Opaque cursors freeze
+the insertion boundary, not later state changes. Listing never performs
+inference, repairs a journal or establishes continuation eligibility; call
+`InspectTaskContinuation` for the selected task. See
+[task discovery](../../docs/task-discovery.md).
+
 This is not model readiness or execution authorization. Normal provider,
 privacy, resource, budget and tool policy checks still apply; no method silently
 replays old tool calls. Codex CLI now supports explicit `Request.ContinueTaskID`

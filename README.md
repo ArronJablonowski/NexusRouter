@@ -297,6 +297,9 @@ DARWIN__MODE=local_only ./bin/darwin config validate
 # Inspect one automatic task's metadata-only durable routing decision.
 ./bin/darwin task route --db ./data/darwin.db --task TASK_ID
 
+# Discover newest durable task IDs without loading conversation content.
+./bin/darwin task list --db ./data/darwin.db --limit 25
+
 # Query the authenticated health report of the running daemon.
 DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
@@ -350,6 +353,13 @@ memory include GPU allocations in RAM and leave `vram_bytes` zero. Then run:
 The prompt is read from stdin (maximum1MiB, nonblank UTF-8, with a30-second input allowance). Canonical terminals and pipes support cancellation and retain their original descriptor ownership/flags; regular-file kernel reads and custom readers remain cooperative. The completed answer goes to stdout; the durable task ID goes to stderr. This command requires an explicit project config, optionally accepts `--user-config` and repeated `--set` scalar overrides, and uses environment overrides. Unlike `config`, it does not discover user/project configuration paths yet. Execution has a separate five-minute timeout and configured runtime turn limits; file tools require explicit opt-in. Known configured provider keys are redacted from persisted content and the returned answer. Partial token text is not persisted. Other sensitive-content redaction policies remain unfinished. No paid/live-provider qualification has been performed.
 
 `task show` opens an existing database read-only and prints reconstructed conversation state as JSON, including pending tools and uncertain outcomes. It never creates a database or resumes work. Its output includes session content; treat exports as sensitive. `resources` reports host measurements with unavailable sensors represented as null.
+
+`task list` opens an existing database read-only and returns newest-first task ID,
+session ID, state, head sequence and start time only. Pages use an opaque
+insertion-fenced cursor; state filters remain live observations between pages.
+Listing does not inspect continuation eligibility, dispatch inference or repair
+history. The raw database command has no configured credential resolver, so
+treat its metadata as sensitive. See [task discovery](docs/task-discovery.md).
 
 On macOS, the profiler also reads Foundation's reported thermal state. Serious
 or critical readings block new local reservations; failed or unknown readings
@@ -550,6 +560,9 @@ Enter one prompt per line; wait for its final answer before entering the next
 prompt. Each successful task becomes the next task's persisted conversation
 context. Failed or canceled tasks never silently become continuation sources.
 Use `/status`, `/cancel`, `/steer TEXT`, `/new`, `/help`, or `/quit`.
+Use `/tasks` to discover the newest saved IDs and `/tasks CURSOR` for another
+page; listing alone never selects history or starts work. `/resume TASK_ID`
+retains only a source that passes the separate continuation-readiness check.
 `/new` clears the continuation pointer only when idle; it does not delete history.
 While a task runs, ordinary lines are rejected explicitly; `/steer TEXT` queues
 guidance once a task ID is available. Guidance applies at safe runtime boundaries,
@@ -751,6 +764,7 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /v1/resources/attention/{id}/history`: append-only observation history;
   optional `after_sequence` and `limit`, with defaults `0` and `25`.
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, `turns`, and the optional `route_estimated_cost` described under automatic routing.
+- `GET /v1/tasks?state=completed&limit=25`: newest-first, content-free task discovery with an optional opaque `after` cursor. The insertion boundary is frozen across pages, while state membership may change. Listing performs no inference or continuation check; configured credential collisions fail closed. See [task discovery](docs/task-discovery.md).
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, and exploration flag. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
 - `POST /v1/tasks/{id}/cancel`: send JSON `{}` to durably request cancellation. HTTP202 means the request was recorded while the task was running, not that execution has already stopped; HTTP200 reports an already-terminal task. Repeating the request is naturally idempotent for that task and retains the original request ID/time. `GET /v1/tasks/{id}/cancellation` reports durable request status and the current task state. Two independent control slots keep these operations available when execution capacity is full. Current runners observe requests through SQLite, including requests from another service instance/process. Database transaction order resolves cancellation versus completion: a cancellation recorded first prevents later normal events and completion, while a terminal event recorded first remains terminal. Already-started tool effects may finish and must be recorded; cancellation does not roll them back. A stopped/orphaned runner can retain a pending request until recovery is implemented. Post-completion auxiliary audits have their own lifecycle and are not canceled through this task endpoint.

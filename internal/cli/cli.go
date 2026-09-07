@@ -36,6 +36,7 @@ Usage:
   darwin metrics export --config path --endpoint URL [--api-key-env ENV_NAME]
   darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]
   darwin task show --db path --task id  Inspect durable conversation state
+  darwin task list --db path [--state state --after cursor --limit 25]
   darwin task continuation --db path --task id  Inspect continuation readiness
   darwin task route --db path --task id         Inspect metadata-only route decision
   darwin task leases --db path --task id        Inspect lease and recovery counts

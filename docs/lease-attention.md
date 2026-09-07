@@ -125,7 +125,7 @@ that explicitly need it; the daemon uses the isolated sweep instead.
 Read-only access to schemas 1–23 reports `available: false` and an empty array,
 distinct from an observed empty attention table. History inspection on schemas
 1–24 reports unavailable without migration. Stop older writers and back up
-the database before normal opening migrates it to the current schema (28). Older binaries
+the database before normal opening migrates it to the current schema (29). Older binaries
 cannot open the new schema; no downgrade or mixed-version writing is supported.
 The migration preserves existing tasks, leases and recovery receipts.
 

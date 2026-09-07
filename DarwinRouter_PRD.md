@@ -171,6 +171,8 @@ DarwinRouter exposes:
 - An authenticated OpenAI-shaped configured-model catalog that performs no
   provider discovery or inference and exposes no endpoint or credential data.
 - Native task submission, cancellation, status, and Server-Sent Events endpoints.
+- Bounded metadata-only task discovery for SDK, CLI, interactive resume, and
+  authenticated HTTP clients without loading conversation content.
 - Route-explanation and model-health endpoints.
 - Metadata-only route inspection through CLI, Go SDK, and authenticated HTTP,
   validated from the immutable initial `route.selected` boundary.
@@ -516,6 +518,11 @@ scheduling is disabled, metadata-only health and cancellation/join on shutdown.
 State transitions are appended durably before acknowledgement. Events carry task, session, turn, attempt, worker, route, and causation identifiers. Replay must reproduce externally visible state without repeating uncertain effects.
 
 Sessions support cancellation, retries, resumable branches, steering messages, follow-ups, checkpoints, and idempotency keys.
+
+Operators can discover durable task IDs through newest-first, insertion-fenced
+metadata pages. Listing exposes only task/session identity, state, sequence and
+start time, performs no inference or repair, and never substitutes for the exact
+continuation-eligibility check on a selected task.
 
 Active-task steering is durable user guidance, not a policy or permission change.
 The initial HTTP surface accepts up to32 messages per task, each up to64KiB UTF-8,

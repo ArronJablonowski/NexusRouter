@@ -116,6 +116,17 @@ func TestChatResumeRealCLIContinuation(t *testing.T) {
 			}
 		}
 	}()
+	if _, err := io.WriteString(writer, "/tasks\n"); err != nil {
+		t.Fatal(err)
+	}
+	out.wait(t, source.TaskID+"  completed")
+	if calls.Load() != 1 {
+		t.Fatal("task discovery performed inference")
+	}
+	counts, err := db.Metrics(ctx)
+	if err != nil || counts.Groups[0].Counts[0].Value != 0 || counts.Groups[0].Counts[1].Value != 1 {
+		t.Fatal("task discovery created task")
+	}
 	if _, err := io.WriteString(writer, "/resume "+source.TaskID+"\n"); err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +134,7 @@ func TestChatResumeRealCLIContinuation(t *testing.T) {
 	if calls.Load() != 1 {
 		t.Fatal("selection performed inference")
 	}
-	counts, err := db.Metrics(ctx)
+	counts, err = db.Metrics(ctx)
 	if err != nil || counts.Groups[0].Counts[0].Value != 0 || counts.Groups[0].Counts[1].Value != 1 {
 		t.Fatal("selection created task")
 	}

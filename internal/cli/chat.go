@@ -17,6 +17,7 @@ import (
 
 type chatHooks struct {
 	Continuation    func(context.Context, string) (sessions.ContinuationStatus, error)
+	ListTasks       func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)
 	Run             taskStreamRunner
 	RunLive         func(context.Context, app.Request, func(runtime.Event) error, func(string) error) (app.Result, error)
 	Approvals       <-chan chatApprovalRequest
@@ -71,7 +72,8 @@ func runChat(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Continuation: func(ctx context.Context, task string) (sessions.ContinuationStatus, error) {
 			return app.InspectTaskContinuation(ctx, settings.Telemetry.Database, task)
 		},
-		RunLive: service.RunLiveStream, Steer: service.SteerTask,
+		ListTasks: service.ListTasks,
+		RunLive:   service.RunLiveStream, Steer: service.SteerTask,
 		Approvals: approvalRequests,
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, settings.Telemetry.Database, task, accepted, cost)

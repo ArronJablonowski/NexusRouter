@@ -285,7 +285,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					}
 					continue
 				}
-				if command != "/steer" && command != "/resume" && argument != "" {
+				if command != "/steer" && command != "/resume" && command != "/tasks" && argument != "" {
 					if !write("Command takes no arguments.\n") {
 						join()
 						return 1
@@ -293,6 +293,10 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 					continue
 				}
 				switch command {
+				case "/tasks":
+					inspectCtx, stop := context.WithTimeout(ctx, 5*time.Second)
+					write(runChatTasks(inspectCtx, argument, hooks))
+					stop()
 				case "/resume":
 					if cancel != nil {
 						write("Cannot select saved context while a task is active.\n")
@@ -315,7 +319,7 @@ func runChatSession(ctx context.Context, base app.Request, hooks chatHooks, line
 						}
 					}
 				case "/help":
-					write("Enter text to start a task. /status /new /resume TASK_ID /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
+					write("Enter text to start a task. /status /new /tasks [CURSOR] /resume TASK_ID /cancel /steer TEXT /quit. Use // for a literal slash.\n/feedback accepted|rejected COST, /feedback-show, /feedback-revise EXPECTED_ID accepted|rejected target the latest successful answer before starting another task.\n")
 					if hooks.Approvals != nil {
 						write("File creation requires review: /approve REQUEST_ID or /deny REQUEST_ID. No blanket approvals.\n")
 					}

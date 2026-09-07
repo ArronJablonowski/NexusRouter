@@ -62,6 +62,7 @@ type Services struct {
 	Cancellation           func(context.Context, string) (runtime.CancellationStatus, error)
 	TaskContinuation       func(context.Context, string) (sessions.ContinuationStatus, error)
 	RouteExplanation       func(context.Context, string) (sessions.RouteExplanation, error)
+	Tasks                  func(context.Context, sessions.TaskListOptions) (sessions.TaskPage, error)
 	SkillTaskOutcome       func(context.Context, string) (skills.TaskOutcome, error)
 	CompareSkillOutcomes   func(context.Context, skills.ComparisonRequest) (skills.ComparisonReport, error)
 	SelectSkillComparison  func(context.Context, skills.ComparisonSelectionRequest) (skills.ComparisonSelectionReport, error)
@@ -141,7 +142,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.URL.Path == "/v1/resources/leases" || r.URL.Path == "/v1/resources/attention" || attentionHistoryRoute(r.URL.Path) || r.Method == http.MethodGet && (r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
+	if r.URL.RawQuery != "" && !(r.URL.Path == "/v1/resources/leases" || r.URL.Path == "/v1/resources/attention" || attentionHistoryRoute(r.URL.Path) || r.Method == http.MethodGet && (r.URL.Path == "/v1/tasks" || r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -215,6 +216,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"status": "ok", "providers_checked": false})
+	case r.URL.Path == "/v1/tasks" && r.Method == http.MethodGet:
+		h.serveTaskList(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks" && r.Method == http.MethodPost:
 		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || media != "application/json" {
