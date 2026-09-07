@@ -1,8 +1,8 @@
 # Implementation evidence
 
-DAR-21 is verified and ready for its Linear completion update. Native Linear
-moved the issue to In Progress under state activity
-`6f3c8af7-5c68-47bd-be10-b1b3a55527a3`. Delegation constructs an isolated child
+DAR-21 is Done in native Linear under state activity
+`cea67412-b2cc-4f11-9d3a-ea36f4ee7388` with completion evidence comment
+`52aacd0e`. Delegation constructs an isolated child
 request from only the explicit prompt, validation target, parent/work lineage,
 privacy constraint and optional inherited read-only capability. Parent deny
 rules remain authoritative; children cannot delegate recursively or gain write
@@ -18,9 +18,10 @@ validation, capacity, batch-budget, cancellation, rejection and finalization
 race tests passed three repetitions (3.368s and 14.826s). The immediately
 preceding full `make check` on the same production tree passed format/LOC, vet,
 the complete native race suite and build. Current push/fetch verification at
-`096968f` showed matching local and remote heads, zero divergence and a clean
-worktree. GitHub/Linear completion evidence follows after synchronization. The
-full PRD remains incomplete.
+`c4d575d` showed matching local and remote heads, zero divergence and a clean
+worktree before the Linear comment and Done state were read back. Linear
+released DAR-45 from this dependency; other dependencies may remain. The full
+PRD remains incomplete.
 
 DAR-13 is Done in native Linear with its completion evidence comment submitted
 and read back; the native accessibility response truncated both activity URLs,
