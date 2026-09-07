@@ -93,8 +93,26 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 5 adds a fixed `queue_age` population gauge to version
-4's optional live host-resource observation and version 3's runtime activity.
+Snapshot schema version 6 adds provider-turn and tool-call duration histograms
+to version 5's queue-age gauge, version 4's live host observation, and version
+3's runtime activity. Schema-28-and-newer databases pair `turn.started` with
+`turn.completed` and `tool.started` with `tool.completed` by their durable
+task/turn/attempt/call identities. Only the fixed `provider` and `tool` operation
+labels are released. Missing starts, missing ends, malformed/noncanonical times,
+future times and backward clocks have explicit unavailable counts. Every
+observed/unavailable sample reconciles independently with the canonical start
+and completion event totals. This detects interrupted calls without presenting
+them as zero latency.
+
+The operation histogram uses the task-duration bucket boundaries and measures
+wall time between durable lifecycle facts. Tool time can include approval waits;
+provider time includes streaming until the completion event. It is a cumulative
+view of retained events beginning at the earliest valid retained operation time,
+not provider-reported server latency, an in-flight timer, or a breakdown by
+model/provider/tool identity.
+
+Version 5 added a fixed `queue_age` population gauge to version 4's optional
+live host-resource observation and version 3's runtime activity.
 For schema-12-and-newer databases, every queued submission is classified once
 as less than 1 second, 10 seconds, 1 minute, 5 minutes, 30 minutes, or 1 hour;
 at least 1 hour; or invalid time. The fixed buckets are derived inside the same
@@ -135,8 +153,8 @@ histories.
 Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
-current durable state, not cumulative activity counters, latency histograms or
-quality judgments. Counts and nanosecond timestamps use decimal strings without
+current durable state, not cumulative activity counters or quality judgments.
+Counts and nanosecond timestamps use decimal strings without
 floating-point precision loss. Schema29 additionally supplies a cumulative
 [task-duration histogram](task-duration-metrics.md) and unavailable timing gauges;
 its floating-point sum is in seconds. Legacy schemas omit that instrumentation.
@@ -186,5 +204,6 @@ no storage mutation, cancellation, response bounds, partial rejection and redire
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable
-export delivery, physical thermal-sensor accuracy, queue arrival/service rates, traces, full
+export delivery, physical thermal-sensor accuracy, queue arrival/service rates,
+operation-specific cardinality, traces, full
 histogram coverage or the full PRD telemetry scope.

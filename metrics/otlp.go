@@ -36,6 +36,9 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 	if snapshot.TaskDuration != nil {
 		items = append(items, otlpTaskDuration(snapshot.TaskDuration, at)...)
 	}
+	if snapshot.OperationDuration != nil {
+		items = append(items, otlpOperationDuration(snapshot.OperationDuration, at)...)
+	}
 	if snapshot.Resources != nil {
 		items = append(items, otlpResources(snapshot.Resources, at)...)
 	}

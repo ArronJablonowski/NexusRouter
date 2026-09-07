@@ -10,7 +10,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 5
+const SnapshotVersion = 6
 
 type Count struct {
 	State string `json:"state"`
@@ -24,12 +24,13 @@ type Group struct {
 }
 
 type Snapshot struct {
-	Version       int           `json:"version"`
-	ObservedAt    time.Time     `json:"observed_at"`
-	StorageSchema int           `json:"storage_schema"`
-	Groups        []Group       `json:"groups"`
-	TaskDuration  *TaskDuration `json:"task_duration,omitempty"`
-	Resources     *Resources    `json:"resources,omitempty"`
+	Version           int                `json:"version"`
+	ObservedAt        time.Time          `json:"observed_at"`
+	StorageSchema     int                `json:"storage_schema"`
+	Groups            []Group            `json:"groups"`
+	TaskDuration      *TaskDuration      `json:"task_duration,omitempty"`
+	OperationDuration *OperationDuration `json:"operation_duration,omitempty"`
+	Resources         *Resources         `json:"resources,omitempty"`
 }
 
 type definition struct {
@@ -67,6 +68,9 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 	}
 	if schema >= 29 {
 		s.TaskDuration = newTaskDuration(at)
+	}
+	if schema >= 28 {
+		s.OperationDuration = newOperationDuration(at)
 	}
 	return s
 }
@@ -127,6 +131,13 @@ func (s Snapshot) Validate() error {
 			return ErrInvalid
 		}
 	} else if s.validateTaskDuration() != nil {
+		return ErrInvalid
+	}
+	if s.StorageSchema < 28 {
+		if s.OperationDuration != nil {
+			return ErrInvalid
+		}
+	} else if s.validateOperationDuration() != nil {
 		return ErrInvalid
 	}
 	if s.Resources != nil && s.validateResources() != nil {

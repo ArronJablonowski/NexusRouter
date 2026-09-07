@@ -1,5 +1,31 @@
 # Implementation evidence
 
+PRD operation-duration-metrics checkpoint: snapshot schema version 6 derives
+fixed provider-turn and tool-call duration histograms for schema-28-and-newer
+stores by pairing durable start/completion events within each ordered task
+journal. Successful pairs use the existing fixed task-duration buckets;
+missing-start, missing-end and invalid-time observations are explicit, and both
+start-side and completion-side totals must reconcile with canonical event
+counts. Legacy identity-free event fixtures become unavailable samples rather
+than suppressing the lifecycle snapshot. Pairing state is bounded to one task
+and 10,000 relevant events. The public snapshot and OTLP labels contain only
+`provider`/`tool` plus fixed reasons—never provider, model, tool, task, turn,
+attempt or call identity. This is retained lifecycle wall time; tool timing can
+include approval waits and provider timing includes streaming. It is not
+provider-reported server latency or an in-flight timer. Focused tests cover
+observed pairs, interrupted/orphan/invalid pairs, legacy records, histogram
+wire shape, reconciliation and public API/CLI/SDK compatibility. Full
+`make check` passed formatting/LOC enforcement, vet, every native race-enabled
+package and the production build; application took 223.712s, telemetry
+147.800s, CLI 42.581s, metrics 1.878s and SDK 26.292s. Performance
+qualification (`make qualify-performance`) passed:
+three 100,000-task/200,000-event metrics snapshots took 1.753–1.759s with
+approximately 9.63–9.65 MiB and 400,526–400,545 allocations; automatic-routing
+p50 was 53.90–54.35ms and p95 59.23–59.71ms. These are isolated Apple M4 Max
+results, not contended or cross-platform guarantees. No live model, user
+database or collector was used. Native Linear remains inaccessible because the
+Mac is locked, so no issue update is claimed. The full PRD remains incomplete.
+
 PRD queue-pressure-metrics checkpoint: snapshot schema version 5 adds a fixed
 `queue_age` group for the current durable submission population. Each queued
 record is classified exactly once into less-than-1s/10s/1m/5m/30m/1h,

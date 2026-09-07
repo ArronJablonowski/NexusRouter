@@ -75,7 +75,7 @@ func TestTaskDurationOwnedThresholdsAndWire(t *testing.T) {
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
 	histogramIndex := len(s.Groups)
-	if len(items) != histogramIndex+2 || items[histogramIndex].Gauge != nil || items[histogramIndex].Histogram == nil || items[histogramIndex].Histogram.AggregationTemporality != 2 || items[histogramIndex].Unit != "s" {
+	if len(items) != histogramIndex+4 || items[histogramIndex].Gauge != nil || items[histogramIndex].Histogram == nil || items[histogramIndex].Histogram.AggregationTemporality != 2 || items[histogramIndex].Unit != "s" {
 		t.Fatal("invalid histogram")
 	}
 	p := items[histogramIndex].Histogram.DataPoints[0]
@@ -95,7 +95,7 @@ func TestTaskDurationOwnedThresholdsAndWire(t *testing.T) {
 	oldBody, _ := MarshalOTLP(legacy)
 	var old otlpRequest
 	_ = json.Unmarshal(oldBody, &old)
-	if !reflect.DeepEqual(items[:histogramIndex], old.ResourceMetrics[0].ScopeMetrics[0].Metrics) {
+	if !reflect.DeepEqual(items[:histogramIndex], old.ResourceMetrics[0].ScopeMetrics[0].Metrics[:histogramIndex]) {
 		t.Fatal("existing gauges changed")
 	}
 	after, _ := json.Marshal(s)

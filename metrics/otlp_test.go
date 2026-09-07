@@ -33,10 +33,10 @@ func TestMarshalOTLPWireShapePrecisionAndOwnership(t *testing.T) {
 		t.Fatal(scope)
 	}
 	metrics := scope["metrics"].([]any)
-	if len(metrics) != len(s.Groups) {
+	if len(metrics) != len(s.Groups)+2 {
 		t.Fatal(metrics)
 	}
-	for i, item := range metrics {
+	for i, item := range metrics[:len(s.Groups)] {
 		metric := item.(map[string]any)
 		if len(metric) != 3 || metric["name"] != "darwinrouter."+s.Groups[i].Name || metric["unit"] != "{record}" {
 			t.Fatal(metric)
@@ -56,6 +56,11 @@ func TestMarshalOTLPWireShapePrecisionAndOwnership(t *testing.T) {
 				t.Fatal(attributes)
 			}
 		}
+	}
+	operation := metrics[len(s.Groups)].(map[string]any)
+	unavailable := metrics[len(s.Groups)+1].(map[string]any)
+	if operation["name"] != "darwinrouter.operation.duration" || unavailable["name"] != "darwinrouter.operation.duration.unavailable" {
+		t.Fatal(metrics[len(s.Groups):])
 	}
 	after, _ := json.Marshal(s)
 	if !bytes.Equal(before, after) {

@@ -1398,7 +1398,7 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 5 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 6 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
@@ -1412,6 +1412,15 @@ seven fixed age buckets from less than one second through at least one hour, or
 distinguishes a fresh queue from sustained wait pressure without exposing exact
 arrival times or submission identity; it is not an arrival rate, service rate,
 historical wait distribution or execution-duration measurement.
+
+Schema-28-and-newer stores also expose cumulative provider-turn and tool-call
+duration histograms derived from paired durable events. Missing starts, missing
+ends, invalid/future timestamps, and backward clocks remain explicit unavailable
+samples and reconcile with the canonical event counts. Labels are limited to
+`provider` and `tool`; model, provider, tool, task, turn, attempt and call
+identities remain private. These durations are lifecycle wall time—tool timing
+can include approval waits—not provider-reported server latency or live in-flight
+measurements.
 
 Application-backed snapshots also contain a fixed live resource block for CPU
 threads, RAM, swap, aggregate VRAM, thermal pressure and unified-memory status.
@@ -1445,7 +1454,7 @@ supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export; it does not enable tracing.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
-queue arrival/service rates, per-device pressure, provider/tool latency and cost histograms, retention
+queue arrival/service rates, per-device pressure, operation-specific latency/cardinality, cost histograms, retention
 and production-scale metrics qualification remain unfinished.
 
 ## Next sprints

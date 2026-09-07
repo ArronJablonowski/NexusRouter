@@ -723,7 +723,12 @@ count every canonical durable runtime-event kind, providing content-free task,
 provider-turn, tool, worker, route, evaluation, error and steering activity.
 Derived gauges count fallback-linked tasks, compactions, skill-context use,
 exploration and capacity/budget/privacy/health route exclusions. Snapshot schema
-version 5 also classifies the bounded durable queued population into fixed age
+version 6 also derives fixed provider-turn and tool-call duration histograms
+from paired durable events. Observed, missing-start, missing-end and invalid-time
+samples reconcile with canonical start/completion totals without exporting any
+provider, model, tool, task, turn, attempt or call identity. These are retained
+lifecycle wall times, not provider-reported server latency. Version 5 classifies
+the bounded durable queued population into fixed age
 buckets, reconciled exactly with queued submission state, so sustained waiting
 is observable without exporting submission IDs or exact arrival timestamps.
 Direct thermal
@@ -733,7 +738,8 @@ values are limited to fixed CPU-thread, RAM, swap, aggregate VRAM,
 thermal-pressure and unified-memory gauges; device inventory, profiler
 provenance and host identity remain private. Cloud-only, disabled or failed
 profilers report unavailable rather than fabricated zero, while storage-only
-inspection omits the live block. Queue arrival/service rates, per-device capacity, model
+inspection omits the live block. Queue arrival/service rates, operation-specific
+cardinality, per-device capacity, model
 residency and reservation telemetry remain separate work.
 
 Schema29 now records task start-to-terminal event wall time transactionally,
