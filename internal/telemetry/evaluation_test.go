@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,5 +106,65 @@ func TestFitnessFailureRollsBackEvidence(t *testing.T) {
 	var n int
 	if err := s.db.QueryRow("SELECT count(*) FROM evaluations").Scan(&n); err != nil || n != 0 {
 		t.Fatal("partial commit", n, err)
+	}
+}
+
+func TestConcurrentEvaluationCreatesOneImmutableSample(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "concurrent-evaluation.db")
+	first, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	for i, kind := range []runtime.Kind{runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted} {
+		e := event(string(kind), int64(i+1), kind)
+		e.TurnID, e.AttemptID = "turn", "attempt"
+		e.Data = runtime.Data{ModelID: "model", ProviderID: "provider"}
+		if err := first.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	second, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	base := evaluation.Record{Version: 1, TaskID: "task", AttemptID: "attempt", Key: routing.Key{Model: "model", Provider: "provider", Domain: "code", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "tests", Passed: true}}, ExecutionSucceeded: true, Latency: time.Second, Cost: .1, Time: time.Unix(100, 0)}
+	stores := []*Store{first, second}
+	errs := make(chan error, len(stores))
+	var wg sync.WaitGroup
+	for i := range stores {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			r := base
+			r.ID = []string{"evaluation-a", "evaluation-b"}[i]
+			errs <- stores[i].RecordEvaluation(ctx, r)
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	wins, conflicts := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			wins++
+		case errors.Is(err, ErrConflict):
+			conflicts++
+		default:
+			t.Fatal(err)
+		}
+	}
+	if wins != 1 || conflicts != 1 {
+		t.Fatal("unexpected concurrent results", wins, conflicts)
+	}
+	fitness, err := first.Fitness(ctx, base.Key)
+	if err != nil || fitness.Samples != 1 || fitness.Quality != 1 || fitness.Reliability != 1 || fitness.Latency != base.Latency || fitness.Cost != base.Cost {
+		t.Fatal("attempt contributed more than once", fitness, err)
+	}
+	history, err := first.EvaluationHistory(ctx, base.TaskID, base.AttemptID)
+	if err != nil || len(history) != 1 {
+		t.Fatal("immutable evidence history mismatch", history, err)
 	}
 }
