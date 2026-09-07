@@ -124,6 +124,32 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 	}
 	var result Result
 	var err error
+	result, err = s.runRouteChain(ctx, r)
+	if recovered, ok := s.providerOverflowCompaction(ctx, r, result, err); ok {
+		next, nextErr := s.runRouteChain(ctx, recovered)
+		if next.TaskID != "" {
+			previous := append([]string(nil), result.PreviousTaskIDs...)
+			previous = append(previous, result.TaskID)
+			next.PreviousTaskIDs = append(previous, next.PreviousTaskIDs...)
+			next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
+			next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
+			result, err = next, nextErr
+		}
+	}
+	if err == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
+		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
+		result.AuditStatus = "failed"
+		if auditErr == nil {
+			result.AuditID = audit.ID
+			result.AuditStatus = "recorded"
+		}
+	}
+	return result, err
+}
+
+func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) {
+	var result Result
+	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 	} else {
@@ -166,14 +192,6 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 					break
 				}
 			}
-		}
-	}
-	if err == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
-		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
-		result.AuditStatus = "failed"
-		if auditErr == nil {
-			result.AuditID = audit.ID
-			result.AuditStatus = "recorded"
 		}
 	}
 	return result, err

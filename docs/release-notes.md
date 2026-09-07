@@ -45,7 +45,15 @@ production release, release tag or complete PRD acceptance is claimed.
 - The same policy now covers explicit-model initial admission. It measures the
   frozen history, memory, skill and tool-schema assembly before resource or
   residency mutation, selects an approved checkpoint only when it fits, and
-  leaves custom-estimator, provider-overflow and mid-task decisions fail closed.
+  leaves custom-estimator and mid-task decisions fail closed.
+
+- Provider-reported first-turn context overflow can use that policy to start
+  one separately linked same-model task with an approved summary. Durable
+  replay must prove zero output, tool activity and effects; partial streams and
+  ambiguous state remain terminal. Ordered retry lineage, the route-attempt
+  ceiling and aggregate configured cost are preserved across an earlier safe
+  fallback and the compacted recovery. This does not guarantee that the failed
+  provider attempt was unbilled.
 
 - Explicit Sol continuation with manual or approved stored compaction, preserving
   canonical checkpoints, historical tool pairs and the durable-start approval

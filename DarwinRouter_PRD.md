@@ -557,6 +557,15 @@ explicitly selected model cannot fit its fully assembled initial request. It
 rebuilds the continuation from the approved draft and reruns ordinary admission
 exactly once before task creation or inference dispatch.
 The default is off, and the policy never generates or approves a summary.
+When an admitted provider instead reports `context_overflow`, the opt-in policy
+may start one separately linked task using the same model and newest currently
+approved summary. Recovery requires durable replay proof that the failed first
+turn emitted no output, invoked no tool and created no confirmed or uncertain
+effect. It preserves ordered retry lineage and aggregate route cost, observes
+the terminal-tree attempt cap, and reruns all admission plus the transactional
+approval check. It never replays the failed provider call. Partial streams,
+delegated work, cancellation, ambiguous model identity and absent or stale
+approval remain terminal.
 Automatic semantic validation and mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
@@ -816,7 +825,10 @@ Provider-reported context overflow is a non-retryable execution outcome. HTTP
 413 and an exact recognized structured provider code normalize to the closed
 `context_overflow` classification; arbitrary response prose is never parsed for
 retry authority. The task records that terminal code and automatic fallback
-does not resend the same oversized context to another route.
+does not resend the same oversized context to another route. The separately
+linked, approved-summary recovery described in Section 10.3 is the sole current
+exception: it uses a smaller, frozen context on the same model only after exact
+effect-free failure verification, and remains disabled by default.
 
 Local preflight uses the same durable overflow code when a trusted estimator's
 finite count exceeds the configured model window. Estimator errors and panics
