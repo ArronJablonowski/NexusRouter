@@ -1,5 +1,28 @@
 # Implementation evidence
 
+DAR-30 is Done in native Linear under state activity
+`b64c57cb-07f4-4e97-8e3f-7db94ec1c7a8` with completion evidence comment
+`339be631`. `RecordEvaluation` resolves immutable evidence, verifies durable
+model-attempt attribution, and inserts the evidence record, current head and
+domain/profile fitness update in one SQLite transaction. Exact retries are
+idempotent and alternate identities for one attempt conflict. Subjective
+corrections append immutable revision records, compare-and-swap the head and
+adjust only the existing quality contribution; objective evidence, attribution,
+schema result, reliability, latency and cost cannot be revised. Existing tests
+prove restart reconstruction, revision idempotency, stale-writer rejection,
+injected-failure rollback, bounded history and coherent WAL snapshots. New
+two-connection race coverage proves concurrent first evaluations produce one
+winner, one conflict, one history record and exactly one aggregate sample with
+the original quality, reliability, latency and cost. Focused evaluation and
+telemetry race tests passed three repetitions. Final `make check` passed
+format/LOC, vet, the complete native race suite and build; application tests
+took 223.090s, telemetry 148.931s, CLI 42.341s, SDK 25.175s, tool-gate 19.588s
+and workers 3.570s. The checkpoint is backed up at `33d7a8b`; push/fetch
+verification showed matching local and remote heads and zero divergence before
+the Linear comment and Done state were read back. Linear released DAR-35,
+DAR-43 and DAR-45 from this dependency; other dependencies may remain. The full
+PRD remains incomplete.
+
 DAR-29 is Done in native Linear under state activity
 `b03454b9-baee-4f10-82b3-1c71484d91a6` with completion evidence comment
 `611e186d`. User feedback is persisted as immutable, idempotent evaluation
