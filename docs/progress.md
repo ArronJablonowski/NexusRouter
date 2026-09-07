@@ -4230,3 +4230,20 @@ race run, vet, sample validation and shell syntax checks passed. A full
 `make check` also passed the complete race-enabled suite and build on the
 implementation tree; a final post-documentation gate is still required before
 the checkpoint is pushed.
+
+Corrected version-bound collateral qualification: clean GitHub-backed commit
+`495b36a6359cb8b27faddb6bf49ba6785bdd3682` passed
+`make qualify-release` as `1.0.0-rc.2` on darwin/arm64. The first integrated
+rehearsal correctly revealed that its caller had supplied the repository as the
+disposable installation root; the generated `installation/` and `private/`
+trees were moved to Trash and the caller was changed to a private
+`testing.T.TempDir`. A focused regression test and the full race-enabled
+`make check` passed before that correction was committed and pushed. The
+corrected qualification then passed all nine MVP scenarios, reproduced every
+byte across two builds of four six-member archives, verified executable formats
+and authenticated schema-2 collateral, matched library and CLI disposable-key
+signatures, ran the native version and isolated install/schema-28-to-29
+migration/backup/rollback rehearsal, rejected tampering, and left the checkout
+clean. This remains local darwin/arm64 evidence; hosted jobs, other native
+targets, historical published-binary rehearsal, legal notice approval,
+production signing and publication are still open.
