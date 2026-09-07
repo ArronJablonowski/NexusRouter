@@ -61,7 +61,6 @@ type Request struct {
 type Result struct {
 	PreviousTaskIDs      []string
 	retryable            bool
-	retryLocalOnly       bool
 	fallbackModelID      string
 	reservedCost         float64
 	AuditID, AuditStatus string

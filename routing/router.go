@@ -256,16 +256,25 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		out.Explored = true
 	}
 	out.Primary = out.Ranked[selected]
-	// Prefer fallbacks with a known, different infrastructure failure domain.
-	for _, different := range []bool{true, false} {
-		for i, c := range out.Ranked {
-			if i == selected {
-				continue
-			}
-			diverse := c.FailureDomain != "" && out.Primary.FailureDomain != "" && c.FailureDomain != out.Primary.FailureDomain
-			if diverse == different {
-				out.Fallbacks = append(out.Fallbacks, c)
-			}
+	// Prefer the best route from every additional known failure domain before
+	// repeating a domain or using an unknown one. This keeps the fallback chain
+	// diverse, rather than comparing every fallback only with the primary.
+	usedDomains := map[string]bool{}
+	if out.Primary.FailureDomain != "" {
+		usedDomains[out.Primary.FailureDomain] = true
+	}
+	added := make([]bool, len(out.Ranked))
+	for i, c := range out.Ranked {
+		if i == selected || c.FailureDomain == "" || usedDomains[c.FailureDomain] {
+			continue
+		}
+		out.Fallbacks = append(out.Fallbacks, c)
+		added[i] = true
+		usedDomains[c.FailureDomain] = true
+	}
+	for i, c := range out.Ranked {
+		if i != selected && !added[i] {
+			out.Fallbacks = append(out.Fallbacks, c)
 		}
 	}
 	return out, nil

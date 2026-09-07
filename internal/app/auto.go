@@ -132,7 +132,6 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 			first := result
 			r.onlyModelID = first.fallbackModelID
 			r.retryOfTaskID = first.TaskID
-			r.LocalRequired = r.LocalRequired || first.retryLocalOnly
 			r.MaxCost -= first.reservedCost
 			if r.MaxCost >= 0 {
 				next, nextErr := s.runWithPressure(ctx, r, s.runAuto)
@@ -501,12 +500,11 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	for _, m := range cfg.Models {
 		if m.ID == r.ModelID && m.EstimatedCost != nil {
 			result.reservedCost = *m.EstimatedCost
-			result.retryLocalOnly = m.Locality == "local"
 		}
 	}
 	for _, fallback := range selected.Fallbacks {
 		for _, m := range cfg.Models {
-			if m.Model == fallback.Model && m.Provider == fallback.Provider && (!result.retryLocalOnly || m.Locality == "local") {
+			if m.Model == fallback.Model && m.Provider == fallback.Provider {
 				result.fallbackModelID = m.ID
 				break
 			}

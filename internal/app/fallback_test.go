@@ -87,3 +87,47 @@ func TestAutomaticSafeFallbackPreservesFailedHistory(t *testing.T) {
 		})
 	}
 }
+
+func TestHybridFallbackMayCrossLocalityOnlyWhenPolicyAllows(t *testing.T) {
+	for _, localRequired := range []bool{false, true} {
+		t.Run(fmt.Sprint("local-required-", localRequired), func(t *testing.T) {
+			svc, _ := autoFixture(t)
+			svc.settings.Mode = "hybrid"
+			svc.settings.Models[0].FailureDomain = "local-host"
+			svc.settings.Models[1].Locality = "cloud"
+			svc.settings.Models[1].FailureDomain = "cloud-provider"
+			calls := []string{}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/tags" {
+					fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"z"}]}`)
+					return
+				}
+				var request struct {
+					Model string `json:"model"`
+				}
+				if json.NewDecoder(r.Body).Decode(&request) != nil {
+					t.Fatal("invalid provider request")
+				}
+				calls = append(calls, request.Model)
+				if request.Model == "a" {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+				fmt.Fprintln(w, `{"message":{"content":"cloud fallback"},"done":true,"done_reason":"stop"}`)
+			}))
+			defer server.Close()
+			svc.settings.Providers[0].Endpoint = server.URL
+
+			out, err := svc.Run(context.Background(), Request{Prompt: "hello", LocalRequired: localRequired})
+			if localRequired {
+				if err == nil || len(calls) != 1 || calls[0] != "a" || len(out.PreviousTaskIDs) != 0 {
+					t.Fatalf("private task crossed locality: %+v %v calls=%v", out, err, calls)
+				}
+				return
+			}
+			if err != nil || out.Text != "cloud fallback" || len(calls) != 2 || calls[0] != "a" || calls[1] != "z" || len(out.PreviousTaskIDs) != 1 {
+				t.Fatalf("hybrid failover unavailable: %+v %v calls=%v", out, err, calls)
+			}
+		})
+	}
+}

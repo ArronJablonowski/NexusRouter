@@ -129,12 +129,30 @@ func TestExplorationCannotSelectFilteredCandidate(t *testing.T) {
 
 func TestFallbackFailureDomains(t *testing.T) {
 	r, c, now := fixture()
-	third := c[0]
-	third.Model = "second-local"
-	c = append(c, third)
-	e := map[Key]Evidence{{"local", "ollama", "code", "default"}: {Samples: 100, Quality: 1, Compliance: 1, Reliability: 1, Updated: now}, {"second-local", "ollama", "code", "default"}: {Samples: 100, Quality: .9, Compliance: 1, Reliability: 1, Updated: now}}
+	same := c[0]
+	same.Model = "second-local"
+	secondCloud := c[1]
+	secondCloud.Model = "second-cloud-a"
+	otherCloud := c[1]
+	otherCloud.Model, otherCloud.FailureDomain = "cloud-b", "cloud-b"
+	unknown := c[1]
+	unknown.Model, unknown.FailureDomain = "unknown", ""
+	c = append(c, same, secondCloud, otherCloud, unknown)
+	e := map[Key]Evidence{
+		{"local", "ollama", "code", "default"}:          {Samples: 100, Quality: 1, Compliance: 1, Reliability: 1, Updated: now},
+		{"second-local", "ollama", "code", "default"}:   {Samples: 100, Quality: .96, Compliance: 1, Reliability: 1, Updated: now},
+		{"cloud", "remote", "code", "default"}:          {Samples: 100, Quality: .95, Compliance: 1, Reliability: 1, Updated: now},
+		{"second-cloud-a", "remote", "code", "default"}: {Samples: 100, Quality: .94, Compliance: 1, Reliability: 1, Updated: now},
+		{"cloud-b", "remote", "code", "default"}:        {Samples: 100, Quality: .93, Compliance: 1, Reliability: 1, Updated: now},
+		{"unknown", "remote", "code", "default"}:        {Samples: 100, Quality: .92, Compliance: 1, Reliability: 1, Updated: now},
+	}
 	out, err := Select(r, Defaults(), c, e, now, .9)
-	if err != nil || out.Primary.Model != "local" || out.Fallbacks[0].Model != "cloud" {
+	want := []string{"cloud", "cloud-b", "second-local", "second-cloud-a", "unknown"}
+	got := make([]string, len(out.Fallbacks))
+	for i := range out.Fallbacks {
+		got[i] = out.Fallbacks[i].Model
+	}
+	if err != nil || out.Primary.Model != "local" || !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v %v", out, err)
 	}
 }

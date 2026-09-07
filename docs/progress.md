@@ -1,5 +1,27 @@
 # Implementation evidence
 
+DAR-26 is in progress in native Linear. Its audit found fallback diversity was
+measured only against the primary route, allowing repeated infrastructure
+domains to precede another available domain. The router now selects the
+highest-ranked candidate from each additional known failure domain before
+repeating a domain or using an unknown domain. A second gap incorrectly forced
+a fresh hybrid task to remain local merely because its first selected route was
+local. Fallback now retains the request's actual privacy constraint: a
+policy-permitted hybrid task can fail over from local to cloud, while
+`LocalRequired` still makes cloud unreachable. Automatic fallback remains
+limited to a retryable provider failure with no text, tool calls, partial
+output, steering or side-effect evidence. Existing SDK/tool-gate integration
+tests prove confirmed and uncertain writes execute once with zero fallback
+calls for both idempotent and non-idempotent declarations. New tests prove the
+complete diverse-domain ordering and both sides of hybrid locality policy.
+Focused race suites passed five routing repetitions and three repetitions each
+for application fallback, SDK writer behavior and tool-gate single-use safety.
+Final `make check` passed format/LOC, vet, the complete native race suite and
+build; application tests took 221.933s, telemetry 147.368s, CLI 41.887s, SDK
+24.721s, tool-gate 20.317s, routing 1.823s and workers 4.390s. The checkpoint
+still needs to be committed, pushed, fetch-verified and recorded in Linear. The
+full PRD remains incomplete.
+
 DAR-25 is Done in native Linear with completion evidence comment `8ca1e122`.
 Its bounded-exploration audit found
 that a draw inside the exploration window could select the ordinary top-ranked
