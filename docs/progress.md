@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-17 is completion-ready pending native Linear reconciliation. Tool policy is
+resolved from immutable, bounded scope snapshots with exact tool/resource
+matching; child workers inherit every parent denial and can only become more
+restrictive. Deny never dispatches, Allow grants only configured read-only
+behavior directly, and Ask creates a durable exact-bound approval request after
+`tool.started` but before handler invocation. Side-effecting tools require Ask
+even when a broader rule says Allow. Approval identity binds task, turn,
+attempt, call, tool, resource, arguments, schema and policy digests; decisions
+are operator-attributed, revision-safe, expiring, revocable and single-use.
+Application, authenticated HTTP, CLI and Go SDK surfaces support bounded
+inspection and exact allow/deny decisions without exposing arguments or lease
+capabilities. Credential-bearing identities/actors are rejected, previews are
+isolated and digest-checked, and persisted/output content passes the configured
+redaction boundary. Confirmed or uncertain effects never gain retry/fallback
+authority. The focused schema, policy, inherited-denial, approval, redaction,
+reviewed-create and bounded-replace matrix passed three race-enabled
+repetitions: tools 1.575s, approvals 1.346s, tool-gate 2.039s, application
+68.071s, API 4.523s, CLI 14.500s and SDK 15.536s. The immediately preceding
+full `make check` passed format/LOC, vet, the complete native race suite and
+build. Custom trusted callbacks remain in-process cooperative code and general
+patch editing stays outside this issue's authority. Native Linear remains
+unavailable because the Mac is locked, so no DAR-17 state/comment change is
+claimed. The full PRD remains incomplete.
+
 DAR-27 is completion-ready pending native Linear reconciliation. Resource
 pressure has three explicit outcomes. `reject` returns a capacity-classified
 admission failure before creating a task or contacting a provider. `wait`
