@@ -38,6 +38,7 @@ type Candidate struct {
 	Capabilities                              []string
 	ContextTokens                             int
 	Healthy, PolicyAllowed, CapacityAvailable bool
+	CredentialRequired, CredentialAvailable   bool
 	EstimatedCost                             float64
 }
 type Request struct {
@@ -127,6 +128,9 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		}
 		if !c.PolicyAllowed {
 			reasons = append(reasons, "policy")
+		}
+		if c.CredentialRequired && !c.CredentialAvailable {
+			reasons = append(reasons, "credential")
 		}
 		if !c.CapacityAvailable {
 			reasons = append(reasons, "capacity")

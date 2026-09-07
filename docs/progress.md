@@ -1,5 +1,40 @@
 # Implementation evidence
 
+Provider-contract and eligibility continuation: DAR-8 is now Done in native
+Linear with evidence comment `7bed654b`; its state activity remains
+`d8def7c5-8d7e-42d4-a7be-56d9bef19b58` because Linear consolidated the Todo to
+Done history. Linear released DAR-9, DAR-10, DAR-16 and DAR-19 automatically.
+The exact tested checkpoint is GitHub-backed `9518561` with matching local and
+remote heads and zero divergence.
+
+DAR-10 then moved through In Progress to Done under state activity
+`62dd15d7-faa7-43de-9141-b8718c6878ca`; its completion comment was posted and
+read back. The provider-neutral contracts carry streaming text, structured JSON
+schema requests, typed tool-call proposals, usage and finish data. Context
+cancellation propagates, bounded model discovery is the provider/model health
+probe used by application health, and normalized failures retain safe code,
+partial-output and retryability facts without raw adapter errors. The full
+provider race suite passed; explicit/automatic/child execution and health-factory
+integration passed three race repetitions in 2.915s. Linear released DAR-11,
+DAR-12, DAR-13, DAR-23, DAR-29 and DAR-31.
+
+DAR-23 is now In Progress under state activity
+`b12799c3-3f42-41d4-95c6-374b1223bb35`. Review confirmed hard filtering for
+mode, privacy, health, policy, capacity, context, cost budget and capabilities,
+but found required credentials were being collapsed into the generic `policy`
+route explanation. Candidate contracts now carry only credential-required and
+credential-available booleans. A missing required credential excludes the model
+with reason `credential`; the environment-variable name and value are not stored.
+The application no longer mislabels this condition as a policy denial and never
+constructs the unavailable provider. Routing tests include the new hard filter;
+an application/SQLite fixture proves a healthy credential-free route is selected,
+the secured route is excluded explicitly, and its credential configuration is
+absent from the durable route event. Focused routing and application race tests
+passed. Final `make check` passed format/LOC enforcement, vet, the complete native
+race suite and build; application tests took 222.050s, telemetry 147.660s, CLI
+43.102s, SDK 26.395s, tool-gate 19.666s and runtime 9.897s. Backup and Linear
+completion evidence follow; the full PRD remains incomplete.
+
 Resource and canonical-event acceptance checkpoint: native Linear DAR-22 is Done
 after review of both acceptance criteria. Its state activity is
 `4f25bcae-ed47-46b3-8ce3-4403714c3d82` and evidence comment `355ad15a` was

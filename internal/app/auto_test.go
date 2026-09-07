@@ -104,6 +104,54 @@ func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 	}
 }
 
+func TestAutomaticRouteExplainsMissingCredentialWithoutPersistingIt(t *testing.T) {
+	ctx := context.Background()
+	svc, cfg := autoFixture(t)
+	secured := cfg.Providers[0]
+	secured.ID, secured.APIKeyEnv = "secured", "DARWIN_TEST_MISSING_PROVIDER_KEY"
+	svc.settings.Providers = append(svc.settings.Providers, secured)
+	for i := range svc.settings.Models {
+		if svc.settings.Models[i].ID == "z" {
+			svc.settings.Models[i].Provider = secured.ID
+		}
+	}
+
+	result, err := svc.Run(ctx, Request{Prompt: "credential route", Domain: "general"})
+	if err != nil || result.Text != "a" {
+		t.Fatalf("healthy credential-free route not selected: %+v %v", result, err)
+	}
+	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	events, err := db.Read(ctx, result.TaskID, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range events {
+		if event.Kind != runtime.RouteSelected {
+			continue
+		}
+		for _, exclusion := range event.Data.Route.Excluded {
+			if exclusion.Model != "z" || exclusion.Provider != secured.ID {
+				continue
+			}
+			credential, policy := false, false
+			for _, reason := range exclusion.Reasons {
+				credential = credential || reason == "credential"
+				policy = policy || reason == "policy"
+			}
+			body, _ := event.Encode()
+			if !credential || policy || strings.Contains(string(body), secured.APIKeyEnv) {
+				t.Fatalf("credential exclusion was ambiguous or disclosed configuration: %s", body)
+			}
+			return
+		}
+	}
+	t.Fatal("missing credential exclusion not persisted")
+}
+
 func TestAutoUnknownMetadataAndSharedReservations(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := autoFixture(t)

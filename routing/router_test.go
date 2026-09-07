@@ -13,7 +13,7 @@ func fixture() (Request, []Candidate, time.Time) {
 }
 
 func TestHardConstraintsBeforeExploration(t *testing.T) {
-	for _, name := range []string{"privacy", "mode", "health", "policy", "capacity", "context", "budget", "capability"} {
+	for _, name := range []string{"privacy", "mode", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
 		t.Run(name, func(t *testing.T) {
 			r, c, now := fixture()
 			switch name {
@@ -25,6 +25,8 @@ func TestHardConstraintsBeforeExploration(t *testing.T) {
 				c[1].Healthy = false
 			case "policy":
 				c[1].PolicyAllowed = false
+			case "credential":
+				c[1].CredentialRequired = true
 			case "capacity":
 				c[1].CapacityAvailable = false
 			case "context":

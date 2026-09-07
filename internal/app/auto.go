@@ -343,11 +343,12 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 					continue
 				}
 				key := ""
+				c.CredentialRequired = pr.APIKeyEnv != ""
 				if pr.APIKeyEnv != "" && s.secret != nil {
 					key = s.secret(pr.APIKeyEnv)
 				}
+				c.CredentialAvailable = key != ""
 				if pr.APIKeyEnv != "" && key == "" {
-					c.PolicyAllowed = false
 					break
 				}
 				tr, e := policy.NewTransport(cfg.Mode == "local_only" || c.Local, []string{pr.Endpoint})
