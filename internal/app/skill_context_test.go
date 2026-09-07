@@ -134,6 +134,31 @@ func TestSkillContextWholeWorkflowBudgetAndVersion(t *testing.T) {
 	}
 }
 
+func TestSkillContextLoadsOnlyBoundedDiscoverySubset(t *testing.T) {
+	s, settings := contextSkillStore(t)
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		seedContextSkill(t, s, "project", name, "code", "body-"+name, nil, true)
+	}
+	settings.MaxSkills = 2
+	c, err := loadSkillContext(context.Background(), settings, "code", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readContextSkills(t, c)
+	if len(got) != 2 || got[0].Key.Name != "a" || got[1].Key.Name != "b" || got[0].Steps[0] != "body-a" || got[1].Steps[0] != "body-b" || len(c.Use.References) != 2 {
+		t.Fatal("full catalog or wrong discovery subset injected", got, c.Use)
+	}
+	encoded, err := json.Marshal(c.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, excluded := range []string{"body-c", "body-d", "body-e"} {
+		if strings.Contains(string(encoded), excluded) {
+			t.Fatal("undiscovered body injected", excluded)
+		}
+	}
+}
+
 func TestSkillContextRedactsStringsBeforeJSONEncoding(t *testing.T) {
 	s, settings := contextSkillStore(t)
 	v := seedContextSkill(t, s, "project", "credential", "general", "quoted \"token\" and newline\nsecret", []string{"read_file"}, true)
