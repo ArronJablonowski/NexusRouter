@@ -32,11 +32,12 @@ func TestProviderEngineUsedForExplicitAutomaticAndChildExecution(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			fixture, cfg := autoFixture(t)
 			cfg.Workers.DelegateModel = "z"
+			cfg.Providers[0].Endpoint = ""
 			cfg.Providers[0].RequestTimeout = "750ms"
 			var builds, discoveries atomic.Int32
 			factory := applicationProviderFactory(func(_ context.Context, c providers.Connection) (providers.Provider, error) {
 				builds.Add(1)
-				if c.Version != 1 || c.ID != "local" || c.Endpoint != cfg.Providers[0].Endpoint || c.Kind != "ollama" || c.Timeout != 750*time.Millisecond || c.APIKey != "" || c.Transport == nil {
+				if c.Version != 1 || c.ID != "local" || c.Endpoint != "http://127.0.0.1:11434" || c.Kind != "ollama" || c.Timeout != 750*time.Millisecond || c.APIKey != "" || c.Transport == nil {
 					t.Error("incorrect provider connection")
 				}
 				return applicationProvider{&discoveries}, nil

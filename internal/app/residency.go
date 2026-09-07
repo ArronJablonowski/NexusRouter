@@ -85,12 +85,13 @@ func (s *Service) reserveManagedResidency(ctx context.Context, provider config.P
 		if provider.APIKeyEnv != "" && key == "" {
 			return nil, ErrAdmission
 		}
-		transport, err := policy.NewTransport(true, []string{provider.Endpoint})
+		resolvedEndpoint := provider.ResolvedEndpoint()
+		transport, err := policy.NewTransport(true, []string{resolvedEndpoint})
 		if err != nil {
 			return nil, ErrAdmission
 		}
 		defer transport.CloseIdleConnections()
-		adapter, err := providers.NewHTTP(provider.Endpoint, provider.Kind, key, transport)
+		adapter, err := providers.NewHTTPWithTimeout(resolvedEndpoint, provider.Kind, key, transport, httpProviderTimeout(provider))
 		if err != nil {
 			return nil, ErrAdmission
 		}

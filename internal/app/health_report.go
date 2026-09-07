@@ -133,7 +133,7 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 		if enabled[i] {
 			for _, p := range s.settings.Providers {
 				if p.ID == m.Provider {
-					transport, policyErr := policy.NewTransport(m.Locality == "local" || s.settings.Mode == "local_only", []string{p.Endpoint})
+					transport, policyErr := policy.NewTransport(m.Locality == "local" || s.settings.Mode == "local_only", []string{p.ResolvedEndpoint()})
 					if policyErr != nil {
 						policyBlocked[i] = true
 					} else {
@@ -188,10 +188,11 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 			for i := range jobs {
 				p := s.settings.Providers[i]
 				query, stop := context.WithTimeout(ctx, 2*time.Second)
-				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{p.Endpoint})
+				endpoint := p.ResolvedEndpoint()
+				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{endpoint})
 				if err == nil {
 					var adapter providers.Provider
-					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.Endpoint, Kind: p.Kind, Timeout: httpProviderTimeout(p), APIKey: probes[i].key, Transport: transport})
+					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: endpoint, Kind: p.Kind, Timeout: httpProviderTimeout(p), APIKey: probes[i].key, Transport: transport})
 					if err == nil {
 						probes[i].names, err = adapter.Models(query)
 					}

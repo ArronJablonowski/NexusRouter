@@ -17,13 +17,14 @@ func (s Settings) validateResidency() error {
 		if !p.ManageResidency {
 			continue
 		}
-		u, err := url.Parse(p.Endpoint)
-		port, local := residencyEndpoint(p.Endpoint)
+		endpoint := p.ResolvedEndpoint()
+		u, err := url.Parse(endpoint)
+		port, local := residencyEndpoint(endpoint)
 		if err != nil || !local || p.Kind != "ollama" || u.User != nil || u.ForceQuery || u.RawQuery != "" || u.Fragment != "" || u.RawFragment != "" || u.RawPath != "" || (u.Path != "" && u.Path != "/") {
 			return errors.New("managed residency requires a dedicated loopback Ollama root endpoint")
 		}
 		for j, other := range s.Providers {
-			otherPort, otherLocal := residencyEndpoint(other.Endpoint)
+			otherPort, otherLocal := residencyEndpoint(other.ResolvedEndpoint())
 			if i != j && otherLocal && port == otherPort {
 				return errors.New("managed residency endpoint cannot be shared by provider entries")
 			}

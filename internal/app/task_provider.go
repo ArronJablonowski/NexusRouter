@@ -25,11 +25,12 @@ type codexLaunch func(context.Context, codexbridge.LaunchSpec) (taskProvider, er
 // has explicit task lifetime ownership instead of masquerading as HTTP.
 func openTaskProvider(ctx context.Context, s config.Settings, provider config.Provider, model config.Model, r Request, messages []providers.Message, privacy, key string) (providers.Provider, func(), error) {
 	if provider.Kind != "codex_app_server" {
-		tr, err := policy.NewTransport(s.Mode == "local_only" || model.Locality == "local", []string{provider.Endpoint})
+		endpoint := provider.ResolvedEndpoint()
+		tr, err := policy.NewTransport(s.Mode == "local_only" || model.Locality == "local", []string{endpoint})
 		if err != nil {
 			return nil, nil, ErrAdmission
 		}
-		p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, Timeout: httpProviderTimeout(provider), APIKey: key, Transport: tr})
+		p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: endpoint, Kind: provider.Kind, Timeout: httpProviderTimeout(provider), APIKey: key, Transport: tr})
 		if err != nil {
 			tr.CloseIdleConnections()
 			return nil, nil, ErrAdmission

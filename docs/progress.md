@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-12 is verified in the repository and ready for native Linear
+reconciliation. Ollama configuration may now omit `endpoint`; DarwinRouter
+deterministically resolves only the standard pinned loopback endpoint
+`http://127.0.0.1:11434`. This is bounded local discovery, not DNS, port
+scanning or remote endpoint selection. OpenAI-compatible providers still
+require an explicit endpoint and the owned Codex provider still requires its
+explicit executable. The resolved endpoint is used consistently for policy
+transport admission, provider construction, model listing/health, automatic
+route cache identity, skill-generation policy binding and managed-residency
+inspection. Omitted and explicitly configured aliases remain conservatively
+the same residency server by port. Existing `/api/tags` model discovery is the
+health and catalog source; routing resource/context metadata remains explicit
+operator configuration rather than trusting incomplete provider estimates.
+The provider conformance matrix now also proves both Ollama NDJSON and
+OpenAI-compatible SSE streams propagate mid-stream cancellation to the owned
+transport after exactly one partial chunk; it passed five race-enabled
+repetitions (1.479s). Focused endpoint, provider-engine, residency and
+cancellation tests passed three repetitions (providers 1.448s, configuration
+1.380s and application 3.030s). Final `make check` passed format/LOC, vet, the
+complete native race suite and build; application tests took 219.488s,
+telemetry 145.858s, CLI 42.096s, SDK 25.194s, tool-gate 20.586s, providers
+3.045s and workers 4.775s. No live user Ollama service was contacted or
+modified. Native Linear remains unavailable because the Mac is locked, so no
+DAR-12 state/comment change is claimed. The full PRD remains incomplete.
+
 DAR-11's remaining configurable-timeout gap is implemented and verified, ready
 for native Linear reconciliation. Each HTTP provider may now configure a total
 `request_timeout` from 100 milliseconds through five minutes; omission retains

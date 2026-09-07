@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // TestHTTPAdaptersPreserveCanonicalToolHandoffs exercises the provider-neutral
@@ -85,6 +86,43 @@ func TestHTTPAdaptersPreserveCanonicalToolHandoffs(t *testing.T) {
 				return nil
 			}); err != nil || text != "accepted" || usage == nil || *usage != (Usage{InputTokens: 7, OutputTokens: 1}) || !secondDone {
 				t.Fatalf("second adapter rejected handoff: text=%q usage=%+v done=%v err=%v", text, usage, secondDone, err)
+			}
+		})
+	}
+}
+
+func TestHTTPAdapterCancellationConformance(t *testing.T) {
+	for _, kind := range []string{"openai_compatible", "ollama"} {
+		t.Run(kind, func(t *testing.T) {
+			started := make(chan struct{})
+			provider := fixtureProvider(t, kind, func(w http.ResponseWriter, r *http.Request) {
+				if kind == "ollama" {
+					fmt.Fprintln(w, `{"message":{"content":"partial"},"done":false}`)
+				} else {
+					fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial\"}}]}\n\n")
+				}
+				w.(http.Flusher).Flush()
+				close(started)
+				select {
+				case <-r.Context().Done():
+				case <-time.After(time.Second):
+					t.Error("adapter cancellation did not reach transport")
+				}
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			chunks := 0
+			err := provider.Stream(ctx, request(), func(chunk Chunk) error {
+				if chunk.Text != "partial" || chunk.Done || chunk.ToolCall != nil {
+					t.Fatalf("unexpected pre-cancel chunk: %+v", chunk)
+				}
+				chunks++
+				cancel()
+				return nil
+			})
+			<-started
+			if err != context.Canceled || chunks != 1 {
+				t.Fatalf("cancellation result chunks=%d err=%v", chunks, err)
 			}
 		})
 	}

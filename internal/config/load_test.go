@@ -129,3 +129,17 @@ func TestProviderRequestTimeoutValidation(t *testing.T) {
 		t.Fatal("HTTP timeout accepted for subprocess provider")
 	}
 }
+
+func TestOllamaEndpointDefaultsToPinnedLoopback(t *testing.T) {
+	body := "providers:\n  - id: local\n    kind: ollama\n"
+	settings, err := Load(Options{ProjectFile: file(t, body)})
+	if err != nil || len(settings.Providers) != 1 || settings.Providers[0].Endpoint != "" || settings.Providers[0].ResolvedEndpoint() != DefaultOllamaEndpoint {
+		t.Fatalf("default Ollama endpoint unavailable: %+v %v", settings.Providers, err)
+	}
+	for _, kind := range []string{"openai_compatible", "codex_app_server"} {
+		body = "providers:\n  - id: provider\n    kind: " + kind + "\n"
+		if _, err := Load(Options{ProjectFile: file(t, body)}); err == nil {
+			t.Fatalf("missing endpoint/executable accepted for %s", kind)
+		}
+	}
+}

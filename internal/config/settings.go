@@ -148,6 +148,17 @@ var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 var skillScope = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
+const DefaultOllamaEndpoint = "http://127.0.0.1:11434"
+
+// ResolvedEndpoint returns the standard loopback Ollama endpoint when it was
+// omitted. It never probes the network or discovers a remote destination.
+func (p Provider) ResolvedEndpoint() string {
+	if p.Kind == "ollama" && p.Endpoint == "" {
+		return DefaultOllamaEndpoint
+	}
+	return p.Endpoint
+}
+
 // Duration accepts Go duration syntax plus positive integer days (e.g. 30d).
 func Duration(value string) (time.Duration, error) {
 	if len(value) > 1 && value[len(value)-1] == 'd' {
@@ -357,7 +368,7 @@ func (s Settings) Validate() error {
 			if p.Executable != "" {
 				return errors.New("HTTP providers cannot configure an executable")
 			}
-			u, err := url.Parse(p.Endpoint)
+			u, err := url.Parse(p.ResolvedEndpoint())
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 				return errors.New("invalid provider endpoint; credentials and query strings are prohibited")
 			}
