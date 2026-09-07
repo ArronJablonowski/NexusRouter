@@ -339,7 +339,16 @@ Fitness is maintained by model, provider, domain, and relevant execution profile
 
 ### 8.4 Fallbacks
 
-The router preselects a fallback from a different failure domain when possible. A retry is allowed only when policy, remaining budget, and effect evidence make it safe. A tool or model attempt with confirmed or uncertain external side effects is never automatically replayed.
+The router preselects an ordered fallback chain, preferring a different failure
+domain before repeating one. Automatic execution may traverse at most 32 route
+attempts. Every candidate is freshly checked for policy, health, resources and
+remaining budget before dispatch; a candidate that becomes ineligible without
+starting work may be skipped. Every executed predecessor must be a durably
+failed, provider-declared retryable first turn with no output, steering or tool
+proposal, and each successor records immediate retry lineage. Partial output,
+validation failure, cancellation, persistence ambiguity, or any confirmed or
+uncertain external side effect stops the chain. Explicit-model requests never
+auto-fallback.
 
 ### 8.5 Route Explanations
 

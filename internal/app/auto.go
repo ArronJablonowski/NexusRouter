@@ -128,16 +128,40 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 	} else {
 		result, err = s.runWithPressure(ctx, r, s.runAuto)
-		if err != nil && result.retryable && result.fallbackModelID != "" && ctx.Err() == nil {
-			first := result
-			r.onlyModelID = first.fallbackModelID
-			r.retryOfTaskID = first.TaskID
-			r.MaxCost -= first.reservedCost
-			if r.MaxCost >= 0 {
+		if err != nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {
+			fallbacks := append([]string(nil), result.fallbackModelIDs...)
+			if len(fallbacks) >= sessions.MaxTerminalRouteAttempts {
+				fallbacks = fallbacks[:sessions.MaxTerminalRouteAttempts-1]
+			}
+			previous := []string{result.TaskID}
+			remaining := r.MaxCost - result.reservedCost
+			for _, modelID := range fallbacks {
+				if !result.retryable || ctx.Err() != nil || remaining < 0 {
+					break
+				}
+				r.onlyModelID = modelID
+				r.retryOfTaskID = previous[len(previous)-1]
+				r.MaxCost = remaining
 				next, nextErr := s.runWithPressure(ctx, r, s.runAuto)
-				if next.TaskID != "" {
-					next.PreviousTaskIDs = []string{first.TaskID}
-					result, err = next, nextErr
+				if next.TaskID == "" {
+					// This candidate became ineligible before dispatch. No durable
+					// attempt or effect exists, so the original ordered chain may
+					// continue to a different failure domain.
+					if nextErr == nil {
+						nextErr = ErrAdmission
+					}
+					if !errors.Is(nextErr, ErrAdmission) || ctx.Err() != nil {
+						err = nextErr
+						break
+					}
+					continue
+				}
+				next.PreviousTaskIDs = append([]string(nil), previous...)
+				previous = append(previous, next.TaskID)
+				remaining -= next.reservedCost
+				result, err = next, nextErr
+				if nextErr == nil {
+					break
 				}
 			}
 		}
@@ -503,15 +527,14 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			result.reservedCost = *m.EstimatedCost
 		}
 	}
+	seenFallbacks := map[string]bool{}
 	for _, fallback := range selected.Fallbacks {
 		for _, m := range cfg.Models {
-			if m.Model == fallback.Model && m.Provider == fallback.Provider {
-				result.fallbackModelID = m.ID
+			if m.Model == fallback.Model && m.Provider == fallback.Provider && !seenFallbacks[m.ID] {
+				result.fallbackModelIDs = append(result.fallbackModelIDs, m.ID)
+				seenFallbacks[m.ID] = true
 				break
 			}
-		}
-		if result.fallbackModelID != "" {
-			break
 		}
 	}
 	return result, runErr

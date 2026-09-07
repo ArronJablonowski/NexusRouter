@@ -132,7 +132,8 @@ production release, release tag or complete PRD acceptance is claimed.
   privacy-safe live host-resource availability, and paired provider/tool
   lifecycle histograms in metrics snapshot v7. Audit verdicts remain advisory
   and do not replace objective evidence or user feedback.
-- Adaptive eligibility/ranking, provider fallback, local resource admission,
+- Adaptive eligibility/ranking, a maximum32-attempt safe provider fallback
+  chain with crash-recoverable immediate lineage, local resource admission,
   bounded delegation, validation evidence and advisory output audits.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
   → local Ollama → Sol round trip, historical continuation and a separate Sol

@@ -201,3 +201,51 @@ func TestRunStreamFallbackEventOrdering(t *testing.T) {
 		t.Fatal(events)
 	}
 }
+
+func TestRunStreamFallbackChainRemainsSequential(t *testing.T) {
+	svc, _ := autoFixture(t)
+	middle := svc.settings.Models[0]
+	middle.ID, middle.Model, middle.FailureDomain = "m", "m", "middle-domain"
+	svc.settings.Models = append(svc.settings.Models, middle)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"m"},{"name":"z"}]}`)
+			return
+		}
+		var request struct{ Model string }
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if request.Model != "z" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprintln(w, `{"message":{"content":"fallback answer"},"done":true,"done_reason":"stop"}`)
+	}))
+	defer server.Close()
+	svc.settings.Providers[0].Endpoint = server.URL
+	var events []runtime.Event
+	out, err := svc.RunStream(context.Background(), Request{Prompt: "hello"}, func(e runtime.Event) error {
+		events = append(events, e)
+		return nil
+	})
+	if err != nil || len(out.PreviousTaskIDs) != 2 || out.Text != "fallback answer" {
+		t.Fatal(out, err)
+	}
+	chain := append(append([]string(nil), out.PreviousTaskIDs...), out.TaskID)
+	index, sequence := 0, int64(0)
+	for i, event := range events {
+		if event.TaskID != chain[index] {
+			if index+1 >= len(chain) || event.TaskID != chain[index+1] || i == 0 || events[i-1].Kind != runtime.TaskFailed || event.Kind != runtime.TaskStarted || event.Data.RetryOfTaskID != chain[index] {
+				t.Fatal("fallback events interleaved", events)
+			}
+			index++
+			sequence = 0
+		}
+		if event.Sequence != sequence+1 {
+			t.Fatal("fallback sequence gap", events)
+		}
+		sequence = event.Sequence
+	}
+	if index != len(chain)-1 || events[len(events)-1].Kind != runtime.TaskCompleted {
+		t.Fatal(events)
+	}
+}

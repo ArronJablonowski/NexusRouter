@@ -39,6 +39,27 @@ func terminalTreeFixture(t *testing.T) [][]runtime.Event {
 	return [][]runtime.Event{root, work, child}
 }
 
+func retryableRootFixture(t *testing.T, task, retry string) []runtime.Event {
+	t.Helper()
+	failed := terminalHistory(t, "failed")
+	out := []runtime.Event{}
+	for _, event := range failed {
+		if event.Kind != runtime.TaskStarted && event.Kind != runtime.TurnStarted && event.Kind != runtime.TaskFailed {
+			continue
+		}
+		event.TaskID, event.SessionID, event.CorrelationID = task, task, task
+		if event.Kind == runtime.TaskStarted {
+			event.Data.RetryOfTaskID = retry
+		}
+		if event.Kind == runtime.TaskFailed {
+			event.Data.Code = "provider_retryable_no_output"
+		}
+		out = append(out, event)
+	}
+	treeLimitRenumber(out)
+	return out
+}
+
 func TestProjectTerminalTreeReturnsOnlyRoot(t *testing.T) {
 	histories := terminalTreeFixture(t)
 	for _, ordered := range [][][]runtime.Event{histories, {histories[2], histories[0], histories[1]}} {
@@ -137,6 +158,86 @@ func TestProjectTerminalTreeFallbackPreviousIDsExcludeDelegates(t *testing.T) {
 	h[0][0].Data.RetryOfTaskID = "first"
 	out, err := ProjectTerminalTree(append([][]runtime.Event{first}, h...))
 	if err != nil || out.Result == nil || out.Result.TaskID != "task" || len(out.Result.PreviousTaskIDs) != 1 || out.Result.PreviousTaskIDs[0] != "first" {
+		t.Fatal(out, err)
+	}
+}
+
+func TestProjectTerminalTreeSupportsContiguousFallbackChain(t *testing.T) {
+	for _, retries := range []int{3, MaxTerminalRouteAttempts - 1} {
+		t.Run(fmt.Sprint(retries), func(t *testing.T) {
+			histories := [][]runtime.Event{}
+			previous := ""
+			for i := 0; i < retries; i++ {
+				id := fmt.Sprintf("retry-%d", i)
+				histories = append(histories, retryableRootFixture(t, id, previous))
+				previous = id
+			}
+			final := terminalHistory(t, "success")
+			for i := range final {
+				final[i].TaskID, final[i].SessionID, final[i].CorrelationID = "final", "final", "final"
+			}
+			final[0].Data.RetryOfTaskID = previous
+			treeLimitRenumber(final)
+			histories = append(histories, final)
+			out, err := ProjectTerminalTree(histories)
+			if err != nil || out.State != "succeeded" || out.Result == nil || out.Result.TaskID != "final" || len(out.Result.PreviousTaskIDs) != retries || out.Result.PreviousTaskIDs[0] != "retry-0" || out.Result.PreviousTaskIDs[retries-1] != fmt.Sprintf("retry-%d", retries-1) {
+				t.Fatal(out, err)
+			}
+		})
+	}
+}
+
+func TestProjectTerminalTreeRejectsUnsafeFallbackChain(t *testing.T) {
+	for _, mode := range []string{"broken-lineage", "intermediate-output", "too-many-roots"} {
+		t.Run(mode, func(t *testing.T) {
+			count := 3
+			if mode == "too-many-roots" {
+				count = MaxTerminalRouteAttempts + 1
+			}
+			histories := [][]runtime.Event{}
+			previous := ""
+			for i := 0; i < count; i++ {
+				id := fmt.Sprintf("retry-%d", i)
+				history := retryableRootFixture(t, id, previous)
+				histories = append(histories, history)
+				previous = id
+			}
+			if mode == "broken-lineage" {
+				histories[2][0].Data.RetryOfTaskID = "retry-0"
+			}
+			if mode == "intermediate-output" {
+				delta := histories[1][1]
+				delta.Kind, delta.Data = runtime.ModelDelta, runtime.Data{Text: "untrusted partial"}
+				histories[1] = append(histories[1][:2], append([]runtime.Event{delta}, histories[1][2:]...)...)
+				treeLimitRenumber(histories[1])
+			}
+			final := terminalHistory(t, "success")
+			for i := range final {
+				final[i].TaskID, final[i].SessionID, final[i].CorrelationID = "final", "final", "final"
+			}
+			final[0].Data.RetryOfTaskID = previous
+			treeLimitRenumber(final)
+			histories = append(histories, final)
+			if out, err := ProjectTerminalTree(histories); err == nil || out.Result != nil {
+				t.Fatal("unsafe fallback chain accepted", out, err)
+			}
+		})
+	}
+}
+
+func TestProjectTerminalTreeRouteLimitAllowsFinalDelegation(t *testing.T) {
+	histories := [][]runtime.Event{}
+	previous := ""
+	for i := 0; i < MaxTerminalRouteAttempts-1; i++ {
+		id := fmt.Sprintf("retry-%d", i)
+		histories = append(histories, retryableRootFixture(t, id, previous))
+		previous = id
+	}
+	delegated := terminalTreeFixture(t)
+	delegated[0][0].Data.RetryOfTaskID = previous
+	histories = append(histories, delegated...)
+	out, err := ProjectTerminalTree(histories)
+	if err != nil || out.State != "succeeded" || out.Result == nil || out.Result.TaskID != "task" || len(out.Result.PreviousTaskIDs) != MaxTerminalRouteAttempts-1 {
 		t.Fatal(out, err)
 	}
 }

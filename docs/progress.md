@@ -1,5 +1,35 @@
 # Implementation evidence
 
+PRD bounded-fallback-chain checkpoint: automatic routing now traverses the
+router's ordered failure-domain-aware fallback list instead of stopping after
+one alternate. One shared recovery contract caps execution at32 route attempts.
+Each candidate is freshly re-admitted against health, policy, resource and
+remaining-cost constraints; a candidate that becomes ineligible before task
+creation can be skipped, while unrelated admission/storage failures are not
+masked. Every executed predecessor must retain a durable provider-declared
+retryable first-turn/no-output failure. Partial output, steering, tool activity,
+validation failure, cancellation and persistence ambiguity continue to stop
+fallback. Each new task references its immediate predecessor, and public results
+preserve all prior task IDs in execution order.
+
+Terminal submission projection now validates the same contiguous chain up to
+the exact32-root boundary. That leaves room inside the existing66-history
+envelope for the final task plus16 worker/inference pairs, preventing live
+execution from creating an otherwise valid but unrecoverable tree. Projection
+rejects broken lineage, intermediate output, unsafe terminals and excess roots;
+it executes no provider, tool, evaluation or audit. Focused tests cover three-
+route success, skipped newly ineligible candidates, intermediate partial-output
+stoppage, the32-attempt hard bound, sequential stream delivery, exact/max root
+projection, unsafe chains and durable multi-hop lost-acknowledgement recovery.
+Final `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and the production build; application took 231.459s,
+telemetry 148.064s, CLI 41.924s, SDK 25.524s, sessions 15.681s and tool gate
+20.958s. No live model, user database or external service was used. Validation-
+driven fallback, adaptive retry policy, whole-request
+cost/usage accounting, production cross-provider qualification and the complete
+PRD remain unfinished. Native Linear remains inaccessible because macOS is
+locked, so no issue update is claimed.
+
 PRD audit-outcome-metrics checkpoint: metrics snapshot schema version 7 adds a
 fixed `audit_outcomes` group with accept, reject and abstain gauges derived from
 durable validated audit records. The SQLite query releases only the three

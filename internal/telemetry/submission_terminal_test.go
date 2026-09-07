@@ -58,14 +58,14 @@ func terminalFixture(t *testing.T, db *Store, claim submissions.Claim, task, ret
 }
 
 func TestTerminalSubmissionRecovery(t *testing.T) {
-	for _, mode := range []string{"success", "failed", "canceled", "fallback", "cancel"} {
+	for _, mode := range []string{"success", "failed", "canceled", "fallback", "fallback_chain", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
 			job := queuedSubmission(t, db, "job")
 			claim := claimSubmission(t, db)
 			fixture := mode
-			if mode == "fallback" {
+			if mode == "fallback" || mode == "fallback_chain" {
 				fixture = "failed"
 			}
 			if mode == "cancel" {
@@ -74,6 +74,10 @@ func TestTerminalSubmissionRecovery(t *testing.T) {
 			terminalFixture(t, db, claim, "task", "", fixture)
 			if mode == "fallback" {
 				terminalFixture(t, db, claim, "second", "task", "success")
+			}
+			if mode == "fallback_chain" {
+				terminalFixture(t, db, claim, "second", "task", "failed")
+				terminalFixture(t, db, claim, "third", "second", "success")
 			}
 			if mode == "cancel" {
 				if _, err := db.CancelSubmission(ctx, job.ID); err != nil {
@@ -90,7 +94,7 @@ func TestTerminalSubmissionRecovery(t *testing.T) {
 				t.Fatal(err)
 			}
 			expected := mode
-			if mode == "success" || mode == "fallback" {
+			if mode == "success" || mode == "fallback" || mode == "fallback_chain" {
 				expected = "succeeded"
 			}
 			if mode == "cancel" {
@@ -108,6 +112,9 @@ func TestTerminalSubmissionRecovery(t *testing.T) {
 				}
 			}
 			if mode == "fallback" && (status.Result.TaskID != "second" || len(status.Result.PreviousTaskIDs) != 1 || status.Result.PreviousTaskIDs[0] != "task") {
+				t.Fatal(status.Result)
+			}
+			if mode == "fallback_chain" && (status.Result.TaskID != "third" || fmt.Sprint(status.Result.PreviousTaskIDs) != "[task second]") {
 				t.Fatal(status.Result)
 			}
 			if ok, err = db.RecoverTerminalSubmission(ctx, job.ID, submitDigest("config"), now); ok || err != nil {

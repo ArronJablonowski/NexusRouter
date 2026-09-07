@@ -61,7 +61,7 @@ type Request struct {
 type Result struct {
 	PreviousTaskIDs      []string
 	retryable            bool
-	fallbackModelID      string
+	fallbackModelIDs     []string
 	reservedCost         float64
 	AuditID, AuditStatus string
 	TaskID, Text         string

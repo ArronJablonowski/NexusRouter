@@ -927,20 +927,22 @@ not implemented.
 If execution reached a durable terminal event but the process died before saving
 the submission result, the same supervisor can restore that result from history.
 It requires an expired claim, matching configuration and complete validated
-journals for all linked tasks. Recovery supports one parent, an optional prior
-no-output fallback attempt, and depth-one worker/inference children, including
-parallel batches. The entire tree is bounded to66 tasks,10,000 events and8MiB.
+journals for all linked tasks. Recovery supports one final parent, up to31
+contiguous prior no-output fallback attempts, and depth-one worker/inference
+children, including parallel batches. The entire tree is bounded to66 tasks,
+10,000 events and8MiB.
 Unsupported or corrupt
 histories remain inspection-required; they are not replayed or declared successful.
 
 Successful reconstruction checks final output, paired tool events, model and
 provider identity, nonempty-output evidence, and requested Go-syntax evidence.
-Fallback lineage must identify a preceding retryable no-output failure. The
+Fallback lineage must form an immediate chain of preceding retryable no-output failures. The
 worker lifecycle must contain durable validation before acceptance, and accepted
 text must match its sole successful inference child. Child privacy cannot exceed
 the parent's policy. Missing or nonterminal nodes prevent reconstruction.
 The result retains the original parent task ID, final text and finish reason;
-PreviousTaskIDs contains only a preceding fallback attempt, never child tasks.
+PreviousTaskIDs contains only preceding fallback attempts in execution order,
+never child tasks.
 All child IDs remain inspectable through submission status. Usage is
 summed only when every turn has complete, nonnegative, nonoverflowing usage;
 otherwise it remains unknown. Failed/canceled outcomes never expose partial text.
@@ -1084,7 +1086,19 @@ Inspect pending submissions when upgrading: work pinned to an older fingerprint
 must be explicitly canceled/resubmitted under a new key rather than silently run
 under changed configuration.
 
-Automatic execution permits one fallback after a provider-declared retryable first-turn failure with no text/tool proposals and a successfully persisted failure. It rechecks the preselected alternative's eligibility and remaining estimated cost budget. Partial output, validation failure, tool activity, cancellation and persistence failure do not authorize retries. Local-task privacy remains local on fallback. Each attempt has its own durable task ID with retry lineage; CLI/native task responses include previous attempt IDs. Returned text/usage belong to the final attempt, not aggregate billing. Explicit model requests do not auto-fallback. Broader recovery, validation-driven fallback and adaptive retry policies remain unfinished.
+Automatic execution may traverse an ordered chain of at most32 route attempts
+after provider-declared retryable first-turn failures with no text, steering or
+tool proposals and a successfully persisted failure. Alternatives prefer new
+failure domains and are rechecked for current eligibility, resources and
+remaining estimated-cost budget before dispatch. An alternative that becomes
+ineligible without starting a task can be skipped; partial output, validation
+failure, tool activity, cancellation, persistence ambiguity and confirmed or
+uncertain effects stop the chain. Local-task privacy remains local on every
+fallback. Each executed attempt has its own durable task ID and references its
+immediate predecessor; CLI/native results list all previous attempts in order.
+Returned text/usage belong to the final attempt, not aggregate billing. Explicit
+model requests do not auto-fallback. Validation-driven fallback and adaptive
+retry policies remain unfinished.
 
 `darwin memory list|show|export|put|delete --config path` inspects and maintains factual
 memory through the configured scope and credential-redaction boundary. Put reads

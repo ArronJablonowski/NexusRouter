@@ -2,6 +2,10 @@ package sessions
 
 import "github.com/ArronJablonowski/DarwinRouter/runtime"
 
+// MaxTerminalRouteAttempts leaves room in the 66-history recovery envelope for
+// a final root plus 16 worker/inference pairs.
+const MaxTerminalRouteAttempts = 32
+
 // ProjectTerminalTree reconstructs a bounded, fully terminal submission tree.
 // History order is durable task-start order, not child completion order. It
 // projects the parent answer only; it never executes or resumes any node.
@@ -78,7 +82,7 @@ func ProjectTerminalTree(histories [][]runtime.Event) (TerminalOutcome, error) {
 			roots = append(roots, id)
 		}
 	}
-	if len(roots) < 1 || len(roots) > 2 {
+	if len(roots) < 1 || len(roots) > MaxTerminalRouteAttempts {
 		return bad()
 	}
 	rootSet := make(map[string]bool)
@@ -117,18 +121,24 @@ func ProjectTerminalTree(histories [][]runtime.Event) (TerminalOutcome, error) {
 			return bad()
 		}
 	}
-	first := nodes[roots[0]]
-	if first.history[0].Data.RetryOfTaskID != "" {
-		return bad()
-	}
-	if len(roots) == 2 {
-		second := nodes[roots[1]]
-		last := first.history[len(first.history)-1]
-		if second.history[0].Data.RetryOfTaskID != roots[0] || last.Kind != runtime.TaskFailed || last.Data.Code != "provider_retryable_no_output" || len(first.children) != 0 {
+	for i, id := range roots {
+		n := nodes[id]
+		if i == 0 {
+			if n.history[0].Data.RetryOfTaskID != "" {
+				return bad()
+			}
+		} else if n.history[0].Data.RetryOfTaskID != roots[i-1] {
+			return bad()
+		}
+		if i == len(roots)-1 {
+			continue
+		}
+		last := n.history[len(n.history)-1]
+		if last.Kind != runtime.TaskFailed || last.Data.Code != "provider_retryable_no_output" || len(n.children) != 0 {
 			return bad()
 		}
 		turns := 0
-		for _, event := range first.history {
+		for _, event := range n.history {
 			if event.Kind == runtime.TurnStarted {
 				turns++
 			}
