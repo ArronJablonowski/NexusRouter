@@ -6,6 +6,7 @@ providers:
   - id: local-primary
     kind: ollama
     endpoint: http://127.0.0.1:11434
+    request_timeout: 5m  # 100ms-5m; bounds the complete provider operation.
 models:
   - id: local-fast
     provider: local-primary

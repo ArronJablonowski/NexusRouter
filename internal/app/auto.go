@@ -356,7 +356,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 					break
 				}
 				check, cancel := context.WithTimeout(ctx, 2*time.Second)
-				adapter, e := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: pr.ID, Endpoint: pr.Endpoint, Kind: pr.Kind, APIKey: key, Transport: tr})
+				adapter, e := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: pr.ID, Endpoint: pr.Endpoint, Kind: pr.Kind, Timeout: httpProviderTimeout(pr), APIKey: key, Transport: tr})
 				if e == nil {
 					identity, _ := json.Marshal([]string{pr.ID, pr.Kind, pr.Endpoint, key, strconv.FormatBool(cfg.Mode == "local_only" || c.Local)})
 					digest := sha256.Sum256(identity)

@@ -219,6 +219,53 @@ func TestFactoryCooperativeConstructionCancellationDiscardsResult(t *testing.T) 
 	}
 }
 
+func TestFactoryAppliesConfiguredOperationTimeout(t *testing.T) {
+	for _, operation := range []string{"stream", "models"} {
+		t.Run(operation, func(t *testing.T) {
+			connection := factoryConnection()
+			connection.Timeout = 100 * time.Millisecond
+			provider, err := Build(context.Background(), testFactory(func(context.Context, Connection) (Provider, error) {
+				wait := func(ctx context.Context) error {
+					deadline, ok := ctx.Deadline()
+					remaining := time.Until(deadline)
+					if !ok || remaining <= 0 || remaining > connection.Timeout {
+						t.Errorf("operation received invalid deadline")
+					}
+					<-ctx.Done()
+					return ctx.Err()
+				}
+				return &factoryTestProvider{
+					stream: func(ctx context.Context, _ Request, _ func(Chunk) error) error { return wait(ctx) },
+					models: func(ctx context.Context) ([]string, error) { return nil, wait(ctx) },
+				}, nil
+			}), connection)
+			if err != nil {
+				t.Fatal(err)
+			}
+			started := time.Now()
+			if operation == "stream" {
+				err = provider.Stream(context.Background(), request(), func(Chunk) error { return nil })
+			} else {
+				_, err = provider.Models(context.Background())
+			}
+			elapsed := time.Since(started)
+			if !errors.Is(err, context.DeadlineExceeded) || elapsed < 50*time.Millisecond || elapsed > time.Second {
+				t.Fatalf("timeout result err=%v elapsed=%v", err, elapsed)
+			}
+		})
+	}
+}
+
+func TestFactoryRejectsInvalidOperationTimeout(t *testing.T) {
+	for _, timeout := range []time.Duration{-1, time.Nanosecond, 99 * time.Millisecond, 5*time.Minute + time.Nanosecond} {
+		connection := factoryConnection()
+		connection.Timeout = timeout
+		if provider, err := Build(context.Background(), nil, connection); err == nil || provider != nil {
+			t.Fatalf("accepted timeout %v", timeout)
+		}
+	}
+}
+
 func TestFactoryModelsBoundaryAndOwnership(t *testing.T) {
 	names := make([]string, 4096)
 	for i := range names {

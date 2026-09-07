@@ -19,9 +19,17 @@ type HTTP struct {
 	client *http.Client
 }
 
+const defaultRequestTimeout = 5 * time.Minute
+
 // NewHTTP accepts an owned transport so the application can enforce egress.
 // Redirects are rejected to avoid forwarding prompts or credentials elsewhere.
 func NewHTTP(base, kind, key string, transport http.RoundTripper) (*HTTP, error) {
+	return NewHTTPWithTimeout(base, kind, key, transport, defaultRequestTimeout)
+}
+
+// NewHTTPWithTimeout constructs an adapter with a bounded total request
+// lifetime. Callers may still supply a shorter context deadline.
+func NewHTTPWithTimeout(base, kind, key string, transport http.RoundTripper, timeout time.Duration) (*HTTP, error) {
 	u, err := url.Parse(base)
 	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return nil, errors.New("invalid provider endpoint")
@@ -32,7 +40,10 @@ func NewHTTP(base, kind, key string, transport http.RoundTripper) (*HTTP, error)
 	if transport == nil {
 		return nil, errors.New("explicit provider transport required")
 	}
-	return &HTTP{strings.TrimRight(base, "/"), kind, key, &http.Client{Transport: transport, Timeout: 5 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	if timeout < 100*time.Millisecond || timeout > defaultRequestTimeout {
+		return nil, errors.New("invalid provider request timeout")
+	}
+	return &HTTP{strings.TrimRight(base, "/"), kind, key, &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.Response, error) {

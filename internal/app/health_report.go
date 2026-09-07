@@ -191,7 +191,7 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{p.Endpoint})
 				if err == nil {
 					var adapter providers.Provider
-					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.Endpoint, Kind: p.Kind, APIKey: probes[i].key, Transport: transport})
+					adapter, err = providers.Build(query, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.Endpoint, Kind: p.Kind, Timeout: httpProviderTimeout(p), APIKey: probes[i].key, Transport: transport})
 					if err == nil {
 						probes[i].names, err = adapter.Models(query)
 					}

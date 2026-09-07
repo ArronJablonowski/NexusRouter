@@ -62,6 +62,7 @@ type Provider struct {
 	ID              string `yaml:"id" json:"id"`
 	Kind            string `yaml:"kind" json:"kind"`
 	Endpoint        string `yaml:"endpoint" json:"endpoint"`
+	RequestTimeout  string `yaml:"request_timeout,omitempty" json:"request_timeout,omitempty"`
 	APIKeyEnv       string `yaml:"api_key_env" json:"api_key_env,omitempty"`
 	Executable      string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
@@ -341,6 +342,12 @@ func (s Settings) Validate() error {
 		}
 		if p.Kind != "ollama" && p.Kind != "openai_compatible" && p.Kind != "codex_app_server" {
 			return errors.New("unsupported provider kind")
+		}
+		if p.RequestTimeout != "" {
+			timeout, err := Duration(p.RequestTimeout)
+			if err != nil || timeout < 100*time.Millisecond || timeout > 5*time.Minute || p.Kind == "codex_app_server" {
+				return errors.New("invalid provider request timeout")
+			}
 		}
 		if p.Kind == "codex_app_server" {
 			if !filepath.IsAbs(p.Executable) || len(p.Executable) > 4096 || !utf8.ValidString(p.Executable) || strings.ContainsRune(p.Executable, 0) || p.Endpoint != "" || p.APIKeyEnv != "" {

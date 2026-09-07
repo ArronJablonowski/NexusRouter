@@ -1,5 +1,28 @@
 # Implementation evidence
 
+DAR-11's remaining configurable-timeout gap is implemented and verified, ready
+for native Linear reconciliation. Each HTTP provider may now configure a total
+`request_timeout` from 100 milliseconds through five minutes; omission retains
+the existing five-minute default and any shorter caller deadline remains
+authoritative. Configuration rejects invalid bounds and rejects this HTTP-only
+setting for the owned Codex subprocess provider. The value is propagated through
+explicit, automatic, delegated, auxiliary and health/discovery construction.
+Built-in HTTP clients enforce it across response streaming, while custom
+provider engines receive a derived cooperative deadline for both `Stream` and
+`Models`; construction remains separately bounded. Timeouts normalize without
+provider text or credentials, and the existing retry-safe boundary still
+permits retry only when no partial output or tool proposal escaped. The sample
+configuration and README document the field and bounds. Focused provider,
+configuration and application race tests passed three repetitions (2.867s,
+1.702s and 2.396s). Final `make check` passed format/LOC, vet, the complete
+native race suite and build; application tests took 223.457s, telemetry
+153.330s, CLI 42.677s, SDK 29.719s, tool-gate 24.124s, skills 24.467s, runtime
+11.935s, providers 3.284s and workers 6.366s. Live hosted-provider
+qualification remains an operational release check, not evidence claimed by
+these deterministic fixtures. Native Linear remains unavailable because the
+Mac is locked, so no DAR-11 status/comment change is claimed. The full PRD
+remains incomplete.
+
 DAR-15 is verified in the repository and ready for native Linear reconciliation.
 The provider conformance matrix now performs real HTTP handoffs in both
 directions between the OpenAI-compatible and Ollama adapters. A canonical tool

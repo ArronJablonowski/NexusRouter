@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func fixtureProvider(t *testing.T, kind string, handler http.HandlerFunc) *HTTP {
@@ -147,6 +148,26 @@ func TestCallbackAndCancellation(t *testing.T) {
 	defer cancel()
 	if err := p.Stream(ctx, request(), func(Chunk) error { cancel(); return nil }); !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
+	}
+}
+
+func TestHTTPConfiguredTimeoutBoundsUnresponsiveProvider(t *testing.T) {
+	started := make(chan struct{})
+	fixture := fixtureProvider(t, "openai_compatible", func(_ http.ResponseWriter, _ *http.Request) {
+		close(started)
+		time.Sleep(300 * time.Millisecond)
+	})
+	p, err := NewHTTPWithTimeout(fixture.base, "openai_compatible", "", fixture.client.Transport, 100*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	begin := time.Now()
+	err = p.Stream(context.Background(), request(), func(Chunk) error { return nil })
+	<-started
+	var failure *Failure
+	elapsed := time.Since(begin)
+	if !errors.As(err, &failure) || failure.Code != "transport" || !failure.Retryable || elapsed < 50*time.Millisecond || elapsed > time.Second {
+		t.Fatalf("timeout result err=%v elapsed=%v", err, elapsed)
 	}
 }
 

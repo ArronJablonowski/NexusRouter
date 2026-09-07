@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
@@ -28,7 +29,7 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 		if err != nil {
 			return nil, nil, ErrAdmission
 		}
-		p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, APIKey: key, Transport: tr})
+		p, err := providers.Build(ctx, r.providerFactory, providers.Connection{Version: 1, ID: provider.ID, Endpoint: provider.Endpoint, Kind: provider.Kind, Timeout: httpProviderTimeout(provider), APIKey: key, Transport: tr})
 		if err != nil {
 			tr.CloseIdleConnections()
 			return nil, nil, ErrAdmission
@@ -44,6 +45,14 @@ func openTaskProvider(ctx context.Context, s config.Settings, provider config.Pr
 		return nil, nil, ErrAdmission
 	}
 	return openOwnedCodexProvider(ctx, s, provider, model, privacy, r.codexLauncher)
+}
+
+func httpProviderTimeout(provider config.Provider) time.Duration {
+	if provider.RequestTimeout == "" {
+		return 5 * time.Minute
+	}
+	timeout, _ := config.Duration(provider.RequestTimeout)
+	return timeout
 }
 
 // The caller admits its own request shape and privacy before this shared

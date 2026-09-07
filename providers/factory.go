@@ -18,6 +18,7 @@ import (
 type Connection struct {
 	Version            int
 	ID, Endpoint, Kind string
+	Timeout            time.Duration
 	APIKey             string            `json:"-"`
 	Transport          http.RoundTripper `json:"-"`
 }
@@ -44,7 +45,11 @@ func Build(ctx context.Context, factory Factory, connection Connection) (out Pro
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	builtin, err := NewHTTP(connection.Endpoint, connection.Kind, connection.APIKey, connection.Transport)
+	timeout := connection.Timeout
+	if timeout == 0 {
+		timeout = defaultRequestTimeout
+	}
+	builtin, err := NewHTTPWithTimeout(connection.Endpoint, connection.Kind, connection.APIKey, connection.Transport, timeout)
 	if err != nil {
 		return nil, adapterFailure(false)
 	}
@@ -60,7 +65,7 @@ func Build(ctx context.Context, factory Factory, connection Connection) (out Pro
 	if err != nil || nilProvider(p) {
 		return nil, adapterFailure(false)
 	}
-	return guardedProvider{p}, nil
+	return guardedProvider{provider: p, timeout: timeout}, nil
 }
 
 func nilProvider(p Provider) bool {
@@ -75,7 +80,10 @@ func nilProvider(p Provider) bool {
 	return false
 }
 
-type guardedProvider struct{ provider Provider }
+type guardedProvider struct {
+	provider Provider
+	timeout  time.Duration
+}
 
 func (p guardedProvider) Models(ctx context.Context) (out []string, err error) {
 	defer func() {
@@ -89,6 +97,8 @@ func (p guardedProvider) Models(ctx context.Context) (out []string, err error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
 	names, err := p.provider.Models(ctx)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -126,6 +136,8 @@ func (p guardedProvider) Stream(ctx context.Context, input Request, emit func(Ch
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
 	if ValidateMessages(input.Messages) != nil || !factoryLabel(input.Model) {
 		return adapterFailure(false)
 	}
