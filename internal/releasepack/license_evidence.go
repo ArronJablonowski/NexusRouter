@@ -134,43 +134,54 @@ func FreezeLicenseEvidence(ctx context.Context, options LicenseEvidenceOptions) 
 // VerifyLicenseEvidence binds the exact external record digest and re-derives
 // every field from its immutable commit in the supplied clean checkout.
 func VerifyLicenseEvidence(ctx context.Context, recordPath, expectedSHA256, source string) error {
+	_, err := verifyLicenseEvidenceRecord(ctx, recordPath, expectedSHA256, source)
+	return err
+}
+
+// verifyLicenseEvidenceRecord returns the exact canonical record only after it
+// has been independently digest-bound and fully re-derived from the clean
+// source. Approval-bound release paths use the returned public metadata to
+// relate the evidence to candidate and artifact identities.
+func verifyLicenseEvidenceRecord(ctx context.Context, recordPath, expectedSHA256, source string) (LicenseEvidence, error) {
 	if ctx == nil || !trustFingerprint(expectedSHA256) || source == "" {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
 	body, record, err := readLicenseEvidence(recordPath)
 	if err != nil || licenseEvidenceDigest(body) != expectedSHA256 {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
 	root, err := filepath.Abs(source)
 	if err != nil {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
 	root, err = filepath.EvalSymlinks(root)
 	if err != nil {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
-	env := environment()
+	// Verification is an offline operation. Required modules must already be in
+	// the trusted local cache; never let a missing input trigger network fetches.
+	env := append(environment(), "GOPROXY=off", "GOSUMDB=off")
 	top, err := command(ctx, root, env, "git", "rev-parse", "--show-toplevel")
 	if err != nil || top != root || verifyCandidateCheckout(ctx, root, record.SourceCommit, env) != nil {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
 	snapshotDir, err := os.MkdirTemp("", ".darwin-license-verify-")
 	if err != nil {
-		return err
+		return LicenseEvidence{}, err
 	}
 	defer os.RemoveAll(snapshotDir)
 	if err = snapshot(ctx, root, record.SourceCommit, snapshotDir, env); err != nil {
-		return err
+		return LicenseEvidence{}, err
 	}
 	expected, err := deriveLicenseEvidence(ctx, snapshotDir, record.SourceCommit, env)
 	if err != nil {
-		return err
+		return LicenseEvidence{}, err
 	}
 	expectedBody, err := marshalLicenseEvidence(expected)
 	if err != nil || !bytes.Equal(body, expectedBody) || verifyCandidateCheckout(ctx, root, record.SourceCommit, env) != nil {
-		return ErrInvalid
+		return LicenseEvidence{}, ErrInvalid
 	}
-	return nil
+	return record, nil
 }
 
 func deriveLicenseEvidence(ctx context.Context, source, commit string, env []string) (LicenseEvidence, error) {

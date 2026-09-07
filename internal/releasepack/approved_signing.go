@@ -62,7 +62,9 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
 		return ErrSignature
 	}
-	if VerifyLicenseEvidence(ctx, options.LicenseEvidenceFile, options.ExpectedLicenseEvidenceSHA256, options.Source) != nil {
+	licenseEvidence, err := verifyLicenseEvidenceRecord(ctx, options.LicenseEvidenceFile,
+		options.ExpectedLicenseEvidenceSHA256, options.Source)
+	if err != nil || licenseEvidence.SourceCommit != candidate.SourceCommit {
 		return ErrSignature
 	}
 	source, err := filepath.Abs(options.Source)
@@ -91,7 +93,8 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 	if err != nil {
 		return ErrSignature
 	}
-	if prefixedDigest(sums) != options.ExpectedSumsSHA256 || approvedArtifactIdentity(root, candidate) != nil {
+	if prefixedDigest(sums) != options.ExpectedSumsSHA256 ||
+		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence) != nil {
 		root.Close()
 		return ErrSignature
 	}
@@ -134,36 +137,57 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 }
 
 func approvedArtifactIdentity(root *os.Root, candidate CandidateRecord) error {
+	_, err := approvedArtifactManifest(root, candidate)
+	return err
+}
+
+func approvedArtifactLicenseIdentity(root *os.Root, candidate CandidateRecord, evidence LicenseEvidence) error {
+	manifest, err := approvedArtifactManifest(root, candidate)
+	if err != nil || evidence.SourceCommit != candidate.SourceCommit ||
+		manifest.Toolchain != evidence.Toolchain.GOVERSION || len(evidence.Targets) != len(manifest.Artifacts) {
+		return ErrSignature
+	}
+	for i, target := range evidence.Targets {
+		artifact := manifest.Artifacts[i]
+		if target.OS != artifact.OS || target.Arch != artifact.Arch || len(artifact.Entries) <= 3 ||
+			artifact.Entries[3].Name != noticeName || target.NoticeSHA256 != "sha256:"+artifact.Entries[3].SHA256 {
+			return ErrSignature
+		}
+	}
+	return nil
+}
+
+func approvedArtifactManifest(root *os.Root, candidate CandidateRecord) (Manifest, error) {
 	body, err := readReleaseFile(root, "manifest.json", 64<<10)
 	if err != nil {
-		return ErrSignature
+		return Manifest{}, ErrSignature
 	}
 	var manifest Manifest
 	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != candidate.ReleaseManifestSchema ||
 		manifest.Version != candidate.ReleaseVersion || manifest.Commit != candidate.SourceCommit ||
 		len(manifest.Artifacts) != len(candidate.Targets) {
-		return ErrSignature
+		return Manifest{}, ErrSignature
 	}
 	canonical, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil || !bytes.Equal(body, append(canonical, '\n')) {
-		return ErrSignature
+		return Manifest{}, ErrSignature
 	}
 	for i, target := range candidate.Targets {
 		artifact := manifest.Artifacts[i]
 		if artifact.OS != target.OS || artifact.Arch != target.Arch || len(artifact.Entries) != len(candidate.ArchiveEntries) {
-			return ErrSignature
+			return Manifest{}, ErrSignature
 		}
 	}
 	indexes := [...]int{0, 1, 2, 4}
 	if len(candidate.SourceCollateral) != len(indexes) {
-		return ErrSignature
+		return Manifest{}, ErrSignature
 	}
 	for i, index := range indexes {
 		if manifest.Artifacts[0].Entries[index].SHA256 != candidate.SourceCollateral[i].SHA256 {
-			return ErrSignature
+			return Manifest{}, ErrSignature
 		}
 	}
-	return nil
+	return manifest, nil
 }
 
 func prefixedDigest(body []byte) string {

@@ -101,6 +101,16 @@ func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
 	}
 }
 
+func TestApprovedVerificationRejectsSignedArtifactNoticeOutsideLicenseEvidence(t *testing.T) {
+	signing, _ := approvedSigningFixtureWithNoticeMismatch(t)
+	if err := signUncheckedForTest(signing.Dir, signing.KeyFile); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := VerifyApproved(context.Background(), verificationOptions(signing)); err == nil || result != (ApprovedVerificationResult{}) {
+		t.Fatal("signed artifact notice outside license evidence verified", result, err)
+	}
+}
+
 func verificationOptions(signing ApprovedSigningOptions) ApprovedVerificationOptions {
 	return ApprovedVerificationOptions{
 		Dir: signing.Dir, CandidateRecordFile: signing.CandidateRecordFile,

@@ -58,7 +58,9 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
 		return result, ErrSignature
 	}
-	if VerifyLicenseEvidence(ctx, options.LicenseEvidenceFile, options.ExpectedLicenseEvidenceSHA256, options.Source) != nil {
+	licenseEvidence, err := verifyLicenseEvidenceRecord(ctx, options.LicenseEvidenceFile,
+		options.ExpectedLicenseEvidenceSHA256, options.Source)
+	if err != nil || licenseEvidence.SourceCommit != candidate.SourceCommit {
 		return result, ErrSignature
 	}
 	source, err := filepath.Abs(options.Source)
@@ -88,7 +90,8 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 		return result, ErrSignature
 	}
 	defer root.Close()
-	if prefixedDigest(sums) != options.ExpectedSumsSHA256 || approvedArtifactIdentity(root, candidate) != nil {
+	if prefixedDigest(sums) != options.ExpectedSumsSHA256 ||
+		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence) != nil {
 		return result, ErrSignature
 	}
 	encodedSignature, err := readReleaseFile(root, signatureName, 129)

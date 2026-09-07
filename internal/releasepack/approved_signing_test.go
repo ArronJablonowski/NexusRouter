@@ -158,6 +158,59 @@ func TestApprovedSigningReadsPrivateKeyOnceAfterPreflight(t *testing.T) {
 	}
 }
 
+func TestApprovedSigningRejectsArtifactNoticeOutsideLicenseEvidenceBeforeKey(t *testing.T) {
+	options, _ := approvedSigningFixtureWithNoticeMismatch(t)
+	calls := 0
+	reader := func(string) ([]byte, error) {
+		calls++
+		return make([]byte, ed25519.SeedSize), nil
+	}
+	if err := signApproved(context.Background(), options, reader); err != ErrSignature {
+		t.Fatal("artifact notice outside license evidence accepted", err)
+	}
+	if calls != 0 {
+		t.Fatal("artifact/evidence mismatch reached private-key reader")
+	}
+}
+
+func TestApprovedArtifactLicenseIdentityRejectsRelationalMismatch(t *testing.T) {
+	options, _ := approvedSigningFixture(t)
+	_, evidence, err := readLicenseEvidence(options.LicenseEvidenceFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, _, err := checkedRelease(options.Dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	for name, mutate := range map[string]func(*LicenseEvidence){
+		"source_commit": func(record *LicenseEvidence) { record.SourceCommit = strings.Repeat("a", 40) },
+		"toolchain":     func(record *LicenseEvidence) { record.Toolchain.GOVERSION = "go1.99.0" },
+		"notice_digest": func(record *LicenseEvidence) { record.Targets[0].NoticeSHA256 = invalidPublicDigest() },
+		"target_swap": func(record *LicenseEvidence) {
+			record.Targets[0], record.Targets[1] = record.Targets[1], record.Targets[0]
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := cloneLicenseEvidence(evidence)
+			mutate(&changed)
+			if approvedArtifactLicenseIdentity(root, candidateFixtureFromFile(t, options.CandidateRecordFile), changed) == nil {
+				t.Fatal("artifact accepted with mismatched license evidence")
+			}
+		})
+	}
+}
+
+func candidateFixtureFromFile(t *testing.T, path string) CandidateRecord {
+	t.Helper()
+	_, candidate, err := readCandidateRecord(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return candidate
+}
+
 func readAuthorizationFixture(t *testing.T, path string) ([]byte, SigningAuthorization) {
 	t.Helper()
 	body, err := os.ReadFile(path)
@@ -181,6 +234,14 @@ func canonicalAuthorizationFixture(t *testing.T, authorization SigningAuthorizat
 }
 
 func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithOptions(t, false)
+}
+
+func approvedSigningFixtureWithNoticeMismatch(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithOptions(t, true)
+}
+
+func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice bool) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
 	source := collateralSourceFixture(t)
@@ -214,6 +275,10 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, licenseEvidence, err := readLicenseEvidence(licenseEvidenceFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 	candidateFile := filepath.Join(t.TempDir(), "candidate.json")
 	if err = FreezeCandidate(ctx, Options{Version: "1.0.0", Commit: commit, Out: candidateFile, Source: source}); err != nil {
 		t.Fatal(err)
@@ -227,11 +292,18 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 		t.Fatal(err)
 	}
 	releaseDir := t.TempDir()
-	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: commit, Toolchain: "go1.27.1"}
+	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: commit, Toolchain: licenseEvidence.Toolchain.GOVERSION}
 	var sums strings.Builder
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
-		entries, metadata, entryErr := releaseEntries(shared, signingNoticeFixture(target[0], target[1]), signingBinaryFixture(t, target[0], target[1]))
+		notice, entryErr := thirdPartyNotices(ctx, source, target[0], target[1], environment())
+		if entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		if mismatchNotice && target[0] == "darwin" && target[1] == "amd64" {
+			notice = signingNoticeFixture(target[0], target[1])
+		}
+		entries, metadata, entryErr := releaseEntries(shared, notice, signingBinaryFixture(t, target[0], target[1]))
 		if entryErr != nil {
 			t.Fatal(entryErr)
 		}

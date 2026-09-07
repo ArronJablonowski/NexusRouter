@@ -4415,3 +4415,21 @@ migration/backup/rollback rehearsal, rejected tampering, and left the checkout
 clean. This remains local darwin/arm64 evidence; hosted jobs, other native
 targets, historical published-binary rehearsal, legal notice approval,
 production signing and publication are still open.
+
+DAR-46 publication-control decomposition: the release epic now has fifteen
+short child sprints. DAR-58 and DAR-59 split publication authorization and a
+mockable create-only GitHub publisher out of DAR-56; DAR-60 and DAR-61 split
+independent remote-byte verification and first-release rollback readiness out
+of DAR-57. DAR-58 and DAR-59 are In Progress. The new canonical publication
+authorization is externally authored and binds the exact repository, tag,
+commit, approved release metadata and seven-asset signed set. Its offline
+preflight re-runs approval-bound verification and has no credential, signing,
+tagging, upload or publication capability. The separate GitHub publisher is an
+injected, mock-tested draft-first state machine with create-only/no-overwrite
+semantics and fail-closed uncertain-state evidence; it has no production CLI or
+credential handling. Approval-bound signing and verification also now prove
+that candidate source commit, Go toolchain and every target notice digest match
+the supplied license evidence. Focused integrated race tests and the full
+`make check` passed. Production approval, credentials, signing, publication,
+post-publication verification and rollback-policy evidence remain operator
+gates.
