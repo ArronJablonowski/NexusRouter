@@ -1,7 +1,8 @@
 # Implementation evidence
 
-DAR-26 is in progress in native Linear. Its audit found fallback diversity was
-measured only against the primary route, allowing repeated infrastructure
+DAR-26 is Done in native Linear with completion evidence comment `f5f6cf04`.
+Its audit found fallback diversity was measured only against the primary route,
+allowing repeated infrastructure
 domains to precede another available domain. The router now selects the
 highest-ranked candidate from each additional known failure domain before
 repeating a domain or using an unknown domain. A second gap incorrectly forced
@@ -19,8 +20,10 @@ for application fallback, SDK writer behavior and tool-gate single-use safety.
 Final `make check` passed format/LOC, vet, the complete native race suite and
 build; application tests took 221.933s, telemetry 147.368s, CLI 41.887s, SDK
 24.721s, tool-gate 20.317s, routing 1.823s and workers 4.390s. The checkpoint
-still needs to be committed, pushed, fetch-verified and recorded in Linear. The
-full PRD remains incomplete.
+is backed up at `d4afd47`; push/fetch verification showed matching local and
+remote heads, zero divergence and a clean worktree before the Linear state and
+comment were read back. Linear released DAR-45 from this dependency, though
+other qualification dependencies may remain. The full PRD remains incomplete.
 
 DAR-25 is Done in native Linear with completion evidence comment `8ca1e122`.
 Its bounded-exploration audit found
