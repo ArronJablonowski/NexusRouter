@@ -1,5 +1,27 @@
 # Implementation evidence
 
+DAR-33 is Done in native Linear under state activity
+`fee38c5c-9f0e-45d4-a94f-ad9918f8e436` with completion evidence comment
+`7371afab`. Discovery returns only active validated metadata filtered by exact
+configured scope and task domain. Each selected immutable body is then loaded
+by pinned version and revalidated against its metadata digest, key, tags,
+parent, timestamp, structure and bounds. Workflows needing unavailable tools
+are skipped; listed tools grant no permission and skill content is explicitly
+untrusted. Selection is name-stable, bounded to at most 16 skills and 64 KiB,
+and admits only complete workflows. Local-only skill context constrains hybrid
+routing, while explicitly shareable context remains subject to policy. Exact
+selected version/digest references are persisted before dispatch and cannot be
+forged by model/user output or changed by later activation. A new five-skill
+acceptance test sets `max_skills=2` and proves only two discovered bodies and
+references enter context; all remaining matching catalog bodies are absent.
+Focused skills/runtime/application race tests passed three repetitions. Final
+`make check` passed format/LOC, vet, the complete native race suite and build;
+application tests took 222.228s, telemetry 150.177s, CLI 42.687s, SDK 25.420s
+and tool-gate 19.544s. The checkpoint is backed up at `2b10827`; push/fetch
+verification showed matching local and remote heads and zero divergence before
+the Linear comment and Done state were read back. Linear released DAR-34. The
+full PRD remains incomplete.
+
 DAR-32 is Done in native Linear under state activity
 `61d7f726-0572-443b-82b5-60c2daa3035a` with completion evidence comment
 `a76b18da`. Versioned facts persist content, provenance, confidence, privacy,
