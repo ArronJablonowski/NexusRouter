@@ -1,8 +1,9 @@
 # Implementation evidence
 
-DAR-13 is verified and ready for its Linear completion update. Native Linear
-moved the issue to In Progress. The provider-neutral loop persists typed task,
-route, turn, model-delta, tool,
+DAR-13 is Done in native Linear with its completion evidence comment submitted
+and read back; the native accessibility response truncated both activity URLs,
+so their opaque IDs are not claimed here. The provider-neutral loop persists
+typed task, route, turn, model-delta, tool,
 evaluation and terminal events before exposing the corresponding transition.
 Tool execution begins only after a durable `tool.started` intent and uses the
 scoped executor when available; call/result pairs remain ordered in subsequent
@@ -16,9 +17,11 @@ model repair turn within the existing budget. Focused runtime and application
 loop, budget, scoped-tool and cancellation race tests passed three repetitions
 (11.956s and 2.408s). The immediately preceding full `make check` on the same
 production tree passed format/LOC, vet, the complete native race suite and
-build. Current push/fetch verification at `6c34714` showed matching local and
-remote heads, zero divergence and a clean worktree. GitHub/Linear completion
-evidence follows after synchronization. The full PRD remains incomplete.
+build. The checkpoint is backed up at `2c76772`; push/fetch verification showed
+matching local and remote heads, zero divergence and a clean worktree before
+the Linear comment and Done state were read back. Linear released DAR-14,
+DAR-15, DAR-21, DAR-38 and DAR-39 from this dependency; other dependencies may
+remain. The full PRD remains incomplete.
 
 DAR-20 is Done in native Linear under state activity
 `12eee5b4-4afd-4135-b076-2f84329950fd` with completion evidence comment
