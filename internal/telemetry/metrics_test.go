@@ -48,7 +48,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	for _, group := range snapshot.Groups {
 		for _, count := range group.Counts {
 			expected := int64(1)
-			if group.Name == "runtime_events" {
+			if group.Name == "runtime_events" || group.Name == "runtime_operations" {
 				expected = 0
 			}
 			if count.Value != expected {
@@ -75,7 +75,21 @@ func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
 		"evaluation.recorded", "error.recorded", "steering.applied",
 	}
 	for i, kind := range kinds {
-		body, err := json.Marshal(map[string]any{"kind": kind, "data": map[string]string{"text": "private-payload"}})
+		data := map[string]any{"text": "private-payload"}
+		if kind == "task.started" {
+			data["retry_of_task_id"] = "private-prior-task"
+			data["compaction"] = map[string]any{"summary": "private-summary"}
+			data["skill_context"] = map[string]any{"references": []string{"private-skill"}}
+		}
+		if kind == "route.selected" {
+			data["route"] = map[string]any{"Explored": true, "Excluded": []map[string]any{
+				{"Model": "private-capacity", "Reasons": []string{"capacity"}},
+				{"Model": "private-budget", "Reasons": []string{"budget"}},
+				{"Model": "private-privacy", "Reasons": []string{"privacy"}},
+				{"Model": "private-health", "Reasons": []string{"health"}},
+			}}
+		}
+		body, err := json.Marshal(map[string]any{"kind": kind, "data": data})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,6 +119,19 @@ func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
 	if !found {
 		t.Fatal("runtime event group missing")
 	}
+	for _, group := range snapshot.Groups {
+		if group.Name != "runtime_operations" {
+			continue
+		}
+		if len(group.Counts) != 8 {
+			t.Fatal(group)
+		}
+		for _, count := range group.Counts {
+			if count.Value != 1 {
+				t.Fatal("derived operation missing", count)
+			}
+		}
+	}
 	body, err := json.Marshal(snapshot)
 	if err != nil || strings.Contains(string(body), "private") {
 		t.Fatal("runtime event metric leaked payload", err)
@@ -126,7 +153,7 @@ func TestMetricsLegacyAbsentTables(t *testing.T) {
 		t.Fatal(snapshot, err)
 	}
 	for _, group := range snapshot.Groups {
-		if group.Name != "tasks" && group.Name != "runtime_events" && (group.Available || len(group.Counts) != 0) {
+		if group.Name != "tasks" && group.Name != "runtime_events" && group.Name != "runtime_operations" && (group.Available || len(group.Counts) != 0) {
 			t.Fatal(group)
 		}
 	}
@@ -147,7 +174,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 		if err != nil || snapshot.StorageSchema != schema {
 			t.Fatal(snapshot, err)
 		}
-		since := map[string]int{"tasks": 1, "runtime_events": 1, "submissions": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
+		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
 		for _, group := range snapshot.Groups {
 			if group.Available != (schema >= since[group.Name]) {
 				t.Fatal(group)

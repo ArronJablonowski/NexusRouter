@@ -46,6 +46,17 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 			 WHEN 'worker.started' THEN 9 WHEN 'worker.heartbeat' THEN 10 WHEN 'worker.completed' THEN 11
 			 WHEN 'route.selected' THEN 12 WHEN 'evaluation.recorded' THEN 13 WHEN 'error.recorded' THEN 14
 			 WHEN 'steering.applied' THEN 15 ELSE -1 END,count(*) FROM events GROUP BY 1`
+		case "runtime_operations":
+			query = `SELECT operation,count(*) FROM (
+			 SELECT 0 AS operation FROM events WHERE json_extract(body,'$.kind')='task.started' AND coalesce(json_extract(body,'$.data.retry_of_task_id'),'')<>''
+			 UNION ALL SELECT 1 FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_type(body,'$.data.compaction')='object'
+			 UNION ALL SELECT 2 FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_type(body,'$.data.skill_context')='object'
+			 UNION ALL SELECT 3 FROM events WHERE json_extract(body,'$.kind')='route.selected' AND json_extract(body,'$.data.route.Explored')=1
+			 UNION ALL SELECT 4 FROM events AS e,json_each(json_extract(e.body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r WHERE json_extract(e.body,'$.kind')='route.selected' AND r.value='capacity'
+			 UNION ALL SELECT 5 FROM events AS e,json_each(json_extract(e.body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r WHERE json_extract(e.body,'$.kind')='route.selected' AND r.value='budget'
+			 UNION ALL SELECT 6 FROM events AS e,json_each(json_extract(e.body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r WHERE json_extract(e.body,'$.kind')='route.selected' AND r.value='privacy'
+			 UNION ALL SELECT 7 FROM events AS e,json_each(json_extract(e.body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r WHERE json_extract(e.body,'$.kind')='route.selected' AND r.value='health'
+			) GROUP BY operation`
 		case "submissions":
 			query = `SELECT CASE state WHEN 'queued' THEN 0 WHEN 'running' THEN 1 WHEN 'succeeded' THEN 2 WHEN 'failed' THEN 3 WHEN 'canceled' THEN 4 ELSE -1 END,count(*) FROM submissions GROUP BY 1`
 		case "reviews":

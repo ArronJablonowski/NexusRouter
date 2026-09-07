@@ -721,7 +721,9 @@ provider/tool-specific histograms and the complete instrumentation list above
 still require implementation. The exported closed-vocabulary gauges now also
 count every canonical durable runtime-event kind, providing content-free task,
 provider-turn, tool, worker, route, evaluation, error and steering activity.
-Derived fallback, compaction and pressure metrics remain separate work.
+Derived gauges count fallback-linked tasks, compactions, skill-context use,
+exploration and capacity/budget/privacy/health route exclusions. Direct thermal
+and queue-pressure measurements remain separate work.
 
 Schema29 now records task start-to-terminal event wall time transactionally,
 including recovery terminals, and exports cumulative fixed-bucket histograms

@@ -93,12 +93,16 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 2 adds runtime-event activity to the version 1 lifecycle
-groups. The closed-vocabulary lifecycle snapshot contains tasks, submissions,
+Snapshot schema version 3 includes runtime-event and derived-operation activity
+in addition to the version 1 lifecycle groups. The closed-vocabulary lifecycle snapshot contains tasks, submissions,
 reviews, evaluations, audits, recoveries and durable runtime-event counts. The
 `runtime_events` group reports the sixteen canonical event kinds, covering task
 terminals, provider turns, model deltas, tool calls, workers, routes, evaluation
 events, errors and steering without exporting an envelope or payload field.
+The `runtime_operations` group counts fallback-linked task starts, compacted
+continuations, skill-context uses, explored routes, and capacity, budget,
+privacy, or health exclusions. Exclusion counts are per excluded candidate;
+they are not inferred hardware samples or queue depth.
 Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
@@ -153,5 +157,5 @@ no storage mutation, cancellation, response bounds, partial rejection and redire
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable
-export delivery, derived fallback/compaction/pressure counters, traces, full
+export delivery, direct thermal/queue-pressure counters, traces, full
 histogram coverage or the full PRD telemetry scope.

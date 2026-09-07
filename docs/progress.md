@@ -1,5 +1,26 @@
 # Implementation evidence
 
+PRD derived-runtime-metrics checkpoint: metrics snapshot schema version 3 adds
+a closed `runtime_operations` gauge derived from durable event facts. It counts
+fallback-linked task starts, compacted continuations, skill-context uses,
+explored routes, and per-candidate capacity, budget, privacy and health route
+exclusions. SQL returns only fixed numeric indices and aggregate counts; model,
+provider, task/session, skill and summary identities remain inside SQLite.
+Malformed unknown event kinds still fail the companion canonical-event group,
+while unrecognized route reasons cannot create labels. Tests populate every
+operation from encoded journal shapes, require one fixed count each, prove
+private payload isolation, and cover snapshot/OTLP/API/CLI/SDK validation. A
+100,000-task/200,000-event local benchmark completed one full snapshot in
+1.604s on this Apple M4 Max, within the existing three-second storage deadline;
+this is local evidence, not a cross-platform or contended-store SLA. Final
+`make check` passed formatting/LOC enforcement, vet, every native race-enabled
+package and production build; application took 222.319s, telemetry 147.010s,
+CLI 41.976s, metrics 2.172s and SDK 25.088s. Direct thermal readings, queue depth,
+provider/tool latency histograms, trace spans and production collector scale
+remain open. No live model, user database or external collector was used. Native
+Linear remains unavailable because the Mac is locked, so no issue update is
+claimed. The full PRD remains incomplete.
+
 PRD runtime-metrics checkpoint: metrics snapshot schema version 2 adds a fixed
 `runtime_events` gauge with all sixteen canonical durable event kinds. It now
 reports content-free counts for task lifecycle, provider turns, model deltas,

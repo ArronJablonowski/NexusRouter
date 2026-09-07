@@ -1398,7 +1398,7 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 2 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 3 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
@@ -1408,6 +1408,8 @@ No prompts, output, task/model/provider IDs, paths or arbitrary labels are inclu
 
 Runtime-event counts cover provider turns, tool calls, worker lifecycle, routes,
 steering and errors without exporting event envelopes or payloads. These are
+joined by fixed operation counts for fallbacks, compactions, skill-context use,
+exploration and capacity/budget/privacy/health route exclusions. These are
 current stored-population **gauges**, not monotonic counters, validated
 success rates or proof that a `running` task/`started` review is alive. A completed
 task is not necessarily semantically correct. Evaluation revisions are not
