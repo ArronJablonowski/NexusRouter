@@ -6,8 +6,9 @@ native Linear; its completion comment was posted and read back with checkpoint
 DAR-31, DAR-40 and DAR-43. GitHub push/fetch verified matching heads and zero
 divergence before the next issue began.
 
-DAR-24 is In Progress under native Linear state activity
-`4b78fce4-31bb-45d4-b4b2-6ccca02d66fa`. Its normalized ranking already isolates
+DAR-24 is Done under native Linear state activity
+`4b78fce4-31bb-45d4-b4b2-6ccca02d66fa`; its completion comment linking
+`11a6e2e` was posted and read back. Its normalized ranking isolates
 evidence by model/provider/domain/profile, applies configurable unit-sum weights,
 shrinks sparse samples toward neutral priors, decays evidence by half-life, and
 normalizes latency/cost against fixed scales so unrelated pool membership cannot
@@ -21,8 +22,9 @@ and domain isolation. The routing race suite passed three repetitions in 1.363s;
 application route persistence passed three focused race repetitions in 2.840s.
 Final `make check` passed format/LOC, vet, the complete native race suite and
 build; application tests took 219.250s, telemetry 147.052s, CLI 42.206s, SDK
-25.924s and tool-gate 20.039s. Backup and Linear completion evidence follow;
-the full PRD remains incomplete.
+25.924s and tool-gate 20.039s. GitHub push/fetch verified matching `11a6e2e`
+heads and zero divergence. Linear released DAR-25, DAR-26, DAR-30 and DAR-44.
+The full PRD remains incomplete.
 
 Storage dependency-chain checkpoint: native Linear DAR-23 is Done with evidence
 comment `43827442`; its consolidated state activity is
