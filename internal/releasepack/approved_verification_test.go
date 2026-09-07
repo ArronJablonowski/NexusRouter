@@ -1,0 +1,109 @@
+package releasepack
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestApprovedVerificationRoundTrip(t *testing.T) {
+	signing, _ := approvedSigningFixture(t)
+	if err := SignApproved(context.Background(), signing); err != nil {
+		t.Fatal(err)
+	}
+	options := verificationOptions(signing)
+	result, err := VerifyApproved(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature, err := os.ReadFile(filepath.Join(signing.Dir, signatureName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CandidateRecordSHA256 != signing.ExpectedCandidateSHA256 ||
+		result.SHA256SUMSSHA256 != signing.ExpectedSumsSHA256 ||
+		result.TrustRecordSHA256 != signing.ExpectedTrustRecordSHA256 ||
+		result.AuthorizationRecordSHA256 != signing.ExpectedAuthorizationSHA256 ||
+		result.KeyID != signing.ExpectedKeyID || result.KeyFingerprint != signing.ExpectedKeyFingerprint ||
+		result.SignatureFileSHA256 != prefixedDigest(signature) {
+		t.Fatal("incorrect verification evidence", result)
+	}
+}
+
+func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
+	for _, scenario := range []string{"candidate", "sums", "trust", "authorization", "key_id", "fingerprint", "policy", "unsigned", "artifact", "signature", "dirty_source", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			signing, _ := approvedSigningFixture(t)
+			if scenario != "unsigned" {
+				if err := SignApproved(context.Background(), signing); err != nil {
+					t.Fatal(err)
+				}
+			}
+			options := verificationOptions(signing)
+			ctx := context.Background()
+			switch scenario {
+			case "candidate":
+				options.ExpectedCandidateSHA256 = invalidPublicDigest()
+			case "sums":
+				options.ExpectedSumsSHA256 = invalidPublicDigest()
+			case "trust":
+				options.ExpectedTrustRecordSHA256 = invalidPublicDigest()
+			case "authorization":
+				options.ExpectedAuthorizationSHA256 = invalidPublicDigest()
+			case "key_id":
+				options.ExpectedKeyID = "other-key"
+			case "fingerprint":
+				options.ExpectedKeyFingerprint = invalidPublicDigest()
+			case "policy":
+				_, authorization := readAuthorizationFixture(t, signing.AuthorizationRecordFile)
+				authorization.ReleasePolicyURL = "https://example.invalid/other-policy"
+				body := canonicalAuthorizationFixture(t, authorization)
+				if err := os.WriteFile(signing.AuthorizationRecordFile, body, 0644); err != nil {
+					t.Fatal(err)
+				}
+				options.ExpectedAuthorizationSHA256 = prefixedDigest(body)
+			case "artifact":
+				if err := os.WriteFile(filepath.Join(signing.Dir, "manifest.json"), []byte("{}\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			case "signature":
+				path := filepath.Join(signing.Dir, signatureName)
+				body, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				body[0] ^= 1
+				if err = os.WriteFile(path, body, 0644); err != nil {
+					t.Fatal(err)
+				}
+			case "dirty_source":
+				if err := os.WriteFile(filepath.Join(signing.Source, "dirty"), []byte("dirty\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			if result, err := VerifyApproved(ctx, options); err == nil || result != (ApprovedVerificationResult{}) {
+				t.Fatal("unsafe release verified", result, err)
+			}
+		})
+	}
+}
+
+func verificationOptions(signing ApprovedSigningOptions) ApprovedVerificationOptions {
+	return ApprovedVerificationOptions{
+		Dir: signing.Dir, CandidateRecordFile: signing.CandidateRecordFile,
+		ExpectedCandidateSHA256: signing.ExpectedCandidateSHA256, Source: signing.Source,
+		ExpectedSumsSHA256: signing.ExpectedSumsSHA256, TrustRecordFile: signing.TrustRecordFile,
+		ExpectedTrustRecordSHA256: signing.ExpectedTrustRecordSHA256, ExpectedKeyID: signing.ExpectedKeyID,
+		ExpectedKeyFingerprint: signing.ExpectedKeyFingerprint, AuthorizationRecordFile: signing.AuthorizationRecordFile,
+		ExpectedAuthorizationSHA256: signing.ExpectedAuthorizationSHA256,
+	}
+}
+
+func invalidPublicDigest() string {
+	return "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}

@@ -65,26 +65,32 @@ valid archival data but cannot verify a release.
    a channel separate from release artifacts and record where each came from.
 5. Conduct a disposable candidate signing rehearsal. The signer receives an
    already approved, quiescent artifact directory; it does not build or publish.
-6. A different operator verifies with the independently retrieved record and an
-   expected key ID, key fingerprint and SHA-256 digest of the exact canonical
-   trust-record bytes supplied separately:
+6. A different operator verifies the full approval-bound release with the
+   independently retrieved candidate, authorization and trust records, every
+   exact expected digest, and an independently trusted clean source checkout:
 
    ```sh
-   go run ./cmd/verify-release \
+   go run ./cmd/verify-approved-release \
      --dir /ABSOLUTE/QUIESCENT/RELEASE_DIRECTORY \
+     --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
+     --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+     --candidate-record-sha256 sha256:REPLACE_WITH_CANDIDATE_SHA256 \
+     --expected-sums-sha256 sha256:REPLACE_WITH_SHA256SUMS_SHA256 \
      --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
      --trust-record-sha256 sha256:REPLACE_WITH_RECORD_SHA256 \
      --key-id release-YYYY-NN \
-     --key-fingerprint sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS
+     --key-fingerprint sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS \
+     --authorization-record /ABSOLUTE/INDEPENDENT/SIGNING_AUTHORIZATION.json \
+     --authorization-record-sha256 sha256:REPLACE_WITH_AUTHORIZATION_SHA256
    ```
 
 7. Record only public identifiers, fingerprints, URLs, UTC times, operator names
    and results in `docs/release-checklist.md`.
 
-Raw `--public-key` verification remains available for qualification and emergency
-diagnosis. Production approval should use the canonical trust record plus explicit
-record digest, key ID and key fingerprint obtained independently, so verification
-evidence binds the exact reviewed identity, status and policy links.
+Raw `verify-release --public-key` verification remains available for qualification
+and emergency diagnosis. Production verification should use the approval-bound
+command above so its machine-readable result binds the exact candidate, checksum,
+authorization, trust identity, status, policy and signature-file digest.
 
 ## Signing ceremony
 

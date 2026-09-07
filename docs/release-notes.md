@@ -12,6 +12,12 @@ decision or publication approval is claimed.
   never substitutes a third build. Signing and publication remain separate
   operator-controlled gates.
 
+- The independent `verify-approved-release` command now checks a production
+  signature through one pinned release root while binding the exact candidate,
+  checksum set, signing authorization, active trust record, release-policy URL,
+  key identity and clean source commit. Its canonical JSON result contains only
+  public digests and identifiers for the operator evidence record.
+
 ## Available for supervised testing
 
 - Versioned configured routing metadata through `darwin models list`, Go SDK

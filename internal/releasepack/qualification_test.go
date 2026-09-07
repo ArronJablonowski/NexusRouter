@@ -158,6 +158,24 @@ func TestReleaseQualification(t *testing.T) {
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", second, "--public-key", publicFile); err != nil {
 		t.Fatal("verification CLI", err)
 	}
+	verificationOutput, err := command(ctx, source, environment(), "go", "run", "./cmd/verify-approved-release",
+		"--dir", second, "--source", source, "--candidate-record", candidateFile,
+		"--candidate-record-sha256", prefixedDigest(candidateBody), "--expected-sums-sha256", prefixedDigest(sumsBody),
+		"--trust-record", trustFile, "--trust-record-sha256", prefixedDigest(trustBody),
+		"--key-id", trustRecord.KeyID, "--key-fingerprint", keyFingerprint,
+		"--authorization-record", authorizationFile, "--authorization-record-sha256", prefixedDigest(authorizationBody))
+	if err != nil {
+		t.Fatal("approved verification CLI", err)
+	}
+	var verificationResult ApprovedVerificationResult
+	if json.Unmarshal([]byte(verificationOutput), &verificationResult) != nil ||
+		verificationResult.CandidateRecordSHA256 != prefixedDigest(candidateBody) ||
+		verificationResult.SHA256SUMSSHA256 != prefixedDigest(sumsBody) ||
+		verificationResult.TrustRecordSHA256 != prefixedDigest(trustBody) ||
+		verificationResult.AuthorizationRecordSHA256 != prefixedDigest(authorizationBody) ||
+		verificationResult.KeyID != trustRecord.KeyID || verificationResult.KeyFingerprint != keyFingerprint {
+		t.Fatal("approved verification evidence")
+	}
 	firstSignature, err := os.ReadFile(filepath.Join(first, signatureName))
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +248,7 @@ func TestReleaseQualification(t *testing.T) {
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", first, "--public-key", publicFile); err == nil {
 		t.Fatal("verification CLI accepted tampering")
 	}
-	t.Log("approved build CLI retained one of eight compared target builds: every unsigned byte including signed collateral and target-specific dependency notices matched; four executable formats checked; sign/verify CLIs exercised; ephemeral signatures matched; native install/migration/rollback rehearsal passed; tampering rejected")
+	t.Log("approved build CLI retained one of eight compared target builds: every unsigned byte including signed collateral and target-specific dependency notices matched; four executable formats checked; sign/raw and approval-bound verify CLIs exercised; ephemeral signatures matched; native install/migration/rollback rehearsal passed; tampering rejected")
 }
 
 func copyQualificationRelease(source, destination string) error {

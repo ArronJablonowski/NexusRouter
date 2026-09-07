@@ -163,8 +163,33 @@ go run ./cmd/verify-release \
 For production verification, prefer the canonical independently published
 trust record plus an expected key ID and fingerprint obtained separately from
 the release artifacts. Follow [release-signing identity and trust
-policy](release-signing-trust.md). Raw public-key mode remains useful for
-disposable qualification and emergency diagnosis.
+policy](release-signing-trust.md). The independent production verifier also
+binds the candidate, checksum set and signing authorization rather than checking
+the public key alone:
+
+```sh
+go run ./cmd/verify-approved-release \
+  --dir /ABSOLUTE/RELEASE_DIRECTORY \
+  --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
+  --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+  --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
+  --expected-sums-sha256 sha256:EXPECTED_EXACT_SHA256SUMS_SHA256 \
+  --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
+  --trust-record-sha256 sha256:EXPECTED_EXACT_TRUST_RECORD_SHA256 \
+  --key-id EXPECTED_RELEASE_KEY_ID \
+  --key-fingerprint sha256:EXPECTED_RELEASE_PUBLIC_KEY_SHA256 \
+  --authorization-record /ABSOLUTE/INDEPENDENT/SIGNING_AUTHORIZATION.json \
+  --authorization-record-sha256 sha256:EXPECTED_EXACT_AUTHORIZATION_SHA256
+```
+
+Its one-line JSON result records the exact public inputs and signature-file
+digest observed by that verification. Retain it with the independent operator,
+host and UTC time. The verifier validates the clean source/candidate binding,
+authorization/trust policy agreement, active key identity, exact checksum set,
+Ed25519 signature and every declared artifact twice through one pinned release
+root. It remains a point-in-time local observation, not remote attestation or
+publication approval. Raw public-key mode remains useful for disposable
+qualification and emergency diagnosis.
 
 Exit 0 means the signature, manifest and every declared file verified. Exit 1
 means verification failed; exit 2 denotes invalid command arguments. The

@@ -133,6 +133,7 @@ be omitted.
 - `manifest.json` SHA-256:
 - `SHA256SUMS` SHA-256:
 - `SHA256SUMS.sig` SHA-256:
+- `verify-approved-release` JSON result location and digest:
 - Independent verification operator, host, time and result:
 - [ ] Manifest version and commit equal the recorded candidate identity.
 - [ ] `build-approved-release` performed two isolated builds and the retained
@@ -143,7 +144,8 @@ be omitted.
   present; no unexpected files are included.
 - [ ] Native staged binary reports the approved release version.
 - [ ] A second operator retrieved the trust record through the independent
-  channel and verified the production-signed directory successfully.
+  channel and successfully ran the approval-bound verifier with independently
+  supplied candidate, checksum, authorization, trust and key identities.
 
 ## Publication authorization
 
