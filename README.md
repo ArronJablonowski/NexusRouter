@@ -1451,11 +1451,15 @@ nor dispatch inference. An explicit CLI/SDK [OTLP metrics export](docs/metrics-e
 can now send one aggregate snapshot through the network policy. Opt-in daemon
 configuration and an owned SDK exporter also support periodic fresh snapshots,
 supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
-now aliases configured periodic metrics export; it does not enable tracing.
+now aliases configured periodic metrics export. A separate explicit CLI/SDK
+[OTLP trace export](docs/traces-export.md) sends up to 32 recent terminal task
+roots with paired provider/tool children, using fresh non-durable wire IDs and
+no session content or durable identities. It has no periodic controller yet.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
-queue arrival/service rates, per-device pressure, operation-specific latency/cardinality, cost histograms, retention
-and production-scale metrics qualification remain unfinished.
+outside this initial task/provider/tool slice, queue arrival/service rates,
+per-device pressure, cost histograms, retention and production-scale
+observability qualification remain unfinished.
 
 ## Next sprints
 

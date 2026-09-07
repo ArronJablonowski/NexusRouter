@@ -1,0 +1,158 @@
+package telemetry
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"sort"
+	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/traces"
+)
+
+var errTraces = errors.New("traces unavailable")
+
+type traceTask struct {
+	id, state string
+}
+
+type tracePairKey struct {
+	kind, turn, attempt, call string
+}
+
+type traceStart struct {
+	at       time.Time
+	toolName string
+}
+
+// Traces reconstructs a bounded recent terminal-task view inside one SQLite
+// read snapshot. Only pairing fields are selected; event bodies, durable IDs,
+// model/provider/tool names and session content never enter the returned value.
+func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) {
+	if limit < 1 || limit > traces.MaxTraces {
+		return traces.Snapshot{}, errTraces
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return traces.Snapshot{}, errTraces
+	}
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(ctx, `SELECT task_id,state FROM task_heads WHERE state IN ('completed','failed','canceled') ORDER BY rowid DESC LIMIT ?`, limit)
+	if err != nil {
+		return traces.Snapshot{}, errTraces
+	}
+	tasks := make([]traceTask, 0, limit)
+	for rows.Next() {
+		var task traceTask
+		if rows.Scan(&task.id, &task.state) != nil || len(task.id) == 0 || len(task.id) > 128 {
+			rows.Close()
+			return traces.Snapshot{}, errTraces
+		}
+		tasks = append(tasks, task)
+	}
+	if rows.Err() != nil || rows.Close() != nil {
+		return traces.Snapshot{}, errTraces
+	}
+	out := traces.Snapshot{Version: traces.SnapshotVersion, ObservedAt: time.Now().UTC(), Traces: make([]traces.Trace, 0, len(tasks))}
+	spanCount := 0
+	for _, task := range tasks {
+		trace, readErr := readTaskTrace(ctx, tx, task, out.ObservedAt)
+		if readErr != nil || len(trace.Spans) > traces.MaxSpans-spanCount {
+			return traces.Snapshot{}, errTraces
+		}
+		spanCount += len(trace.Spans)
+		out.Traces = append(out.Traces, trace)
+	}
+	if out.Validate() != nil || tx.Commit() != nil {
+		return traces.Snapshot{}, errTraces
+	}
+	return out, nil
+}
+
+func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt time.Time) (traces.Trace, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT sequence,json_extract(body,'$.kind'),
+	 CASE WHEN json_type(body,'$.turn_id')='text' AND length(CAST(json_extract(body,'$.turn_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.turn_id') ELSE '' END,
+	 CASE WHEN json_type(body,'$.attempt_id') IS NULL THEN '' WHEN json_type(body,'$.attempt_id')='text' AND length(CAST(json_extract(body,'$.attempt_id') AS BLOB))<=256 THEN json_extract(body,'$.attempt_id') ELSE '' END,
+	 CASE WHEN json_type(body,'$.data.tool_call_id') IS NULL THEN '' WHEN json_type(body,'$.data.tool_call_id')='text' AND length(CAST(json_extract(body,'$.data.tool_call_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.data.tool_call_id') ELSE '' END,
+	 CASE WHEN json_type(body,'$.data.tool_name') IS NULL THEN '' WHEN json_type(body,'$.data.tool_name')='text' AND length(CAST(json_extract(body,'$.data.tool_name') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.data.tool_name') ELSE '' END,
+	 CASE WHEN json_type(body,'$.time')='text' AND length(CAST(json_extract(body,'$.time') AS BLOB)) BETWEEN 1 AND 40 THEN json_extract(body,'$.time') ELSE '' END
+	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
+	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed')
+	 ORDER BY sequence LIMIT 514`, task.id)
+	if err != nil {
+		return traces.Trace{}, errTraces
+	}
+	defer rows.Close()
+	pending := map[tracePairKey]traceStart{}
+	children := make([]traces.Span, 0)
+	var rootStart, rootEnd time.Time
+	count := 0
+	for rows.Next() {
+		count++
+		if count > 513 {
+			return traces.Trace{}, errTraces
+		}
+		var sequence int64
+		var kind, turn, attempt, call, toolName, encodedTime string
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &encodedTime) != nil || sequence < 1 {
+			return traces.Trace{}, errTraces
+		}
+		at, valid := operationMetricTime(encodedTime, observedAt)
+		if !valid {
+			return traces.Trace{}, errTraces
+		}
+		switch kind {
+		case "task.started":
+			if !rootStart.IsZero() {
+				return traces.Trace{}, errTraces
+			}
+			rootStart = at
+		case "task.completed", "task.failed", "task.canceled":
+			if !rootEnd.IsZero() || kind != "task."+task.state {
+				return traces.Trace{}, errTraces
+			}
+			rootEnd = at
+		case "turn.started", "turn.completed", "tool.started", "tool.completed":
+			group := "provider"
+			start := kind == "turn.started" || kind == "tool.started"
+			pairable := turn != ""
+			if kind == "tool.started" || kind == "tool.completed" {
+				group, pairable = "tool", pairable && call != "" && toolName != ""
+			} else {
+				pairable = pairable && call == "" && toolName == ""
+			}
+			if !pairable {
+				continue
+			}
+			key := tracePairKey{kind: group, turn: turn, attempt: attempt, call: call}
+			if start {
+				if _, exists := pending[key]; exists {
+					return traces.Trace{}, errTraces
+				}
+				pending[key] = traceStart{at: at, toolName: toolName}
+				continue
+			}
+			started, exists := pending[key]
+			if !exists {
+				continue
+			}
+			delete(pending, key)
+			if started.toolName != toolName || at.Before(started.at) {
+				return traces.Trace{}, errTraces
+			}
+			children = append(children, traces.Span{Name: group, Outcome: "completed", Parent: 0, StartedAt: started.at, EndedAt: at})
+		default:
+			return traces.Trace{}, errTraces
+		}
+	}
+	if rows.Err() != nil || count > 512 || rootStart.IsZero() || rootEnd.IsZero() || rootEnd.Before(rootStart) {
+		return traces.Trace{}, errTraces
+	}
+	sort.SliceStable(children, func(i, j int) bool { return children[i].StartedAt.Before(children[j].StartedAt) })
+	spans := make([]traces.Span, 1, len(children)+1)
+	spans[0] = traces.Span{Name: "task", Outcome: task.state, Parent: -1, StartedAt: rootStart, EndedAt: rootEnd}
+	spans = append(spans, children...)
+	return traces.Trace{Spans: spans}, nil
+}

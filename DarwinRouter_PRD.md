@@ -716,9 +716,13 @@ exporter now send fresh snapshots sequentially and report supplemental health,
 without blocking task readiness on collector failure. The legacy
 `opentelemetry_enabled` switch is supported as an alias for enabling the
 configured periodic metrics exporter; it requires the same explicit destination
-and policy checks and does not disable task or learning execution. Runtime traces,
-provider/tool-specific histograms and the complete instrumentation list above
-still require implementation. The exported closed-vocabulary gauges now also
+and policy checks and does not disable task or learning execution. Explicit
+CLI/SDK trace export now reconstructs bounded recent terminal-task roots with
+successfully paired provider-turn and tool-call children. Public snapshots have
+no content or durable identity, and each serialization uses fresh random OTLP
+trace/span IDs. Periodic trace scheduling, broader span families, stable
+correlation and the complete instrumentation list above remain unfinished. See
+[trace export](docs/traces-export.md). The exported closed-vocabulary gauges now also
 count every canonical durable runtime-event kind, providing content-free task,
 provider-turn, tool, worker, route, evaluation, error and steering activity.
 Derived gauges count fallback-linked tasks, compactions, skill-context use,

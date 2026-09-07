@@ -33,6 +33,13 @@ share an in-memory hardware budget. Construction does not start a daemon or hold
 an open task database; no `Close` is needed. Calls open bounded-lived storage as
 required. Callers own cancellation and should set appropriate deadlines.
 
+`Client.TraceSnapshot(ctx, limit)` reads a content-free recent terminal-task
+view, and `Client.ExportTraces(ctx, TraceExportOptions{...})` explicitly sends
+it as OTLP/HTTP JSON. The limit is 1–32; export defaults to 16. Wire trace/span
+IDs are fresh for every serialization and do not expose or stably represent
+DarwinRouter identities. This starts no background exporter. See
+[trace export](../../docs/traces-export.md).
+
 Configuration is explicit: defaults → `UserFile` → `ProjectFile` → `Environment`
 → `Overrides`. Maps contain scalar YAML paths such as `mode` or
 `workers.max_in_process`, not raw operating-system environment variable names.

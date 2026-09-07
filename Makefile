@@ -13,7 +13,7 @@ test:
 	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race ./...
 
 fmt:
-	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources memory skills health metrics submissions approvals contextengine sdk examples scripts/qualify-cgroup
+	gofmt -w cmd internal runtime providers tools routing policy evaluation sessions workers resources memory skills health metrics traces submissions approvals contextengine sdk examples scripts/qualify-cgroup
 
 qualify-linux-cgroup:
 	sh scripts/qualify-linux-cgroup.sh

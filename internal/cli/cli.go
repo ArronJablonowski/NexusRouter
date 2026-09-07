@@ -34,6 +34,7 @@ Usage:
     Read-only recommendation; never disables or removes a model
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin metrics export --config path --endpoint URL [--api-key-env ENV_NAME]
+  darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]
   darwin task show --db path --task id  Inspect durable conversation state
   darwin task continuation --db path --task id  Inspect continuation readiness
   darwin task leases --db path --task id        Inspect lease and recovery counts
@@ -112,6 +113,9 @@ func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, vers
 	}
 	if len(args) > 0 && args[0] == "metrics" {
 		return runMetrics(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "traces" {
+		return runTraces(args[1:], stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "submit" {
 		return runSubmit(args[1:], stdin, stdout, stderr)

@@ -1,5 +1,33 @@
 # Implementation evidence
 
+PRD initial-runtime-traces checkpoint: a new content-free trace snapshot and
+explicit one-shot OTLP/HTTP JSON exporter reconstruct at most 32 recent
+terminal tasks (16 by default), each as a task root with successfully paired
+provider-turn and tool-call children. The SQLite reader uses one read
+transaction, a three-second deadline, at most 512 relevant events per task and
+512 spans total. It fails closed on contradictory terminal state/time,
+duplicate starts, mismatched tool pairs or exceeded bounds; incomplete legacy
+children are omitted while the separate metrics snapshot retains their
+unavailable counts. Public structs and wire attributes use a closed vocabulary
+and never contain prompt/output, messages, arguments/results, error details,
+model/provider/tool names or durable task/session/event/route/worker/turn/
+attempt/call identity. Every serialization generates fresh random OTLP trace
+and span IDs, intentionally preventing correlation between exports. CLI
+`darwin traces export`, Go SDK snapshot/export methods, deployment-mode network
+policy, explicit credential-name lookup, rotation fencing, redirect denial and
+bounded collector acknowledgement are implemented. Focused race tests passed:
+traces 1.337s, telemetry 147.194s, application 219.986s, SDK 23.835s and CLI
+42.601s. Final `make check` passed formatting/LOC enforcement, vet, every
+native race-enabled package and the production build; application took
+222.541s, telemetry 147.869s, CLI 43.525s, SDK 25.851s, trace 1.337s in the
+focused run, runtime 9.601s and tool gate 19.045s. Periodic scheduling, running
+tasks, routes, workers, evaluations, retries/fallbacks, compactions, fitness,
+skills, stable correlation, retention and production-scale trace qualification
+remain open. No live model, user database or external collector was used. The
+collector tests use owned loopback fixtures. Native Linear remains inaccessible
+because the Mac is locked, so no issue update is claimed. The full PRD remains
+incomplete.
+
 PRD operation-duration-metrics checkpoint: snapshot schema version 6 derives
 fixed provider-turn and tool-call duration histograms for schema-28-and-newer
 stores by pairing durable start/completion events within each ordered task
