@@ -1,5 +1,27 @@
 # Implementation evidence
 
+DAR-42 is completion-ready pending native Linear reconciliation. In addition to
+provider keys, the daemon API token and the optional metrics-export credential,
+operators can now configure up to 64 validated environment-variable names under
+`security.redact_env`. Only names enter YAML; resolved values join the existing
+longest-first exact-literal redaction set used for model context, completed
+output, durable events, streaming surfaces, route-adjacent context, auxiliary
+audits/summaries/skills/memory and inspection adapters. Configuration display
+continues to hide endpoint, executable, database and tool-root paths; provider
+catalog diagnostics omit endpoint and credential-reference names. Runtime and
+HTTP failures remain generic, and the daemon discards the standard HTTP server
+error log. A real provider round trip proves a custom configured value is absent
+from dispatched input, returned output and reopened events. Configuration and
+application focused tests passed three race-enabled repetitions in 1.342s and
+2.050s; the broader redaction audit matrix passed application, API, SDK,
+provider and CLI packages in 38.958s, 3.025s, 2.568s, 1.295s and 3.149s. The
+final full `make check` passed format/LOC, vet, every native race package and
+build, including application at 222.438s, telemetry at 147.844s and CLI at
+41.985s. This is exact literal redaction, not semantic DLP, secure erasure of
+historical/WAL/backups, or protection against encoded and obfuscated variants.
+Native Linear is unavailable because the Mac is locked, so no DAR-42
+state/comment change is claimed. The full PRD remains incomplete.
+
 DAR-41 is completion-ready pending native Linear reconciliation. All production
 HTTP clients are constructed over DarwinRouter-owned, endpoint-allowlisted
 transports: built-in provider execution/discovery/health/residency, explicit and

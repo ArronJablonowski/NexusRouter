@@ -113,8 +113,9 @@ type Evaluation struct {
 	Precedence        []string `yaml:"evidence_precedence" json:"evidence_precedence"`
 }
 type Security struct {
-	Egress     string `yaml:"local_only_egress" json:"local_only_egress"`
-	ToolPolicy string `yaml:"default_tool_policy" json:"default_tool_policy"`
+	Egress     string   `yaml:"local_only_egress" json:"local_only_egress"`
+	ToolPolicy string   `yaml:"default_tool_policy" json:"default_tool_policy"`
+	RedactEnv  []string `yaml:"redact_env,omitempty" json:"redact_env,omitempty"`
 }
 type Telemetry struct {
 	Database      string         `yaml:"database" json:"database"`
@@ -141,7 +142,7 @@ func Defaults() Settings {
 		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{"deny", "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
+		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -263,6 +264,16 @@ func (s Settings) Validate() error {
 	}
 	if s.Security.ToolPolicy != "ask" && s.Security.ToolPolicy != "deny" && s.Security.ToolPolicy != "allow" {
 		return errors.New("invalid default tool policy")
+	}
+	if len(s.Security.RedactEnv) > 64 {
+		return errors.New("too many sensitive environment references")
+	}
+	redactEnv := map[string]bool{}
+	for _, name := range s.Security.RedactEnv {
+		if !envName.MatchString(name) || redactEnv[name] {
+			return errors.New("invalid sensitive environment reference")
+		}
+		redactEnv[name] = true
 	}
 	if s.Tools.MaxTurns < 2 || s.Tools.MaxTurns > 32 {
 		return errors.New("tool max turns must be between 2 and 32")

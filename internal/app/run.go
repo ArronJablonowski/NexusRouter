@@ -198,6 +198,13 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			}
 		}
 	}
+	for _, name := range s.Security.RedactEnv {
+		if secret != nil {
+			if value := secret(name); value != "" {
+				secrets = append(secrets, value)
+			}
+		}
+	}
 	if provider.APIKeyEnv != "" && key == "" {
 		return result, ErrAdmission
 	}

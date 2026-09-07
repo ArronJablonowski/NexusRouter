@@ -295,6 +295,7 @@ evaluation:
 security:
   local_only_egress: deny
   default_tool_policy: ask
+  redact_env: [DARWIN_PROJECT_SECRET]
 
 telemetry:
   database: "${DARWIN_DATA_DIR}/darwin.db"

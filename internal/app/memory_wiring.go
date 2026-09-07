@@ -17,6 +17,9 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 			secrets = append(secrets, secret(p.APIKeyEnv))
 		}
 	}
+	for _, name := range cfg.Security.RedactEnv {
+		secrets = append(secrets, secret(name))
+	}
 	if value := metricsExportSecret(cfg, secret); value != "" {
 		secrets = append(secrets, value)
 	}

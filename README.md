@@ -315,6 +315,14 @@ settings, such as estimated cost and routing weights, remain supported.
 
 Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; DarwinRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
 
+Add up to 64 environment-variable names under `security.redact_env` when
+project-specific sensitive values beyond provider/API credentials must be
+removed from runtime input, output, durable events, route-related context and
+inspection surfaces. Store only the variable names in YAML and place their
+values in the process environment; literal secret values do not belong in
+configuration. This is exact literal redaction, not semantic data-loss
+prevention or protection against encoded/obfuscated variants.
+
 ## Run an explicit-model task
 
 Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model
