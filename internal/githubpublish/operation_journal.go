@@ -19,11 +19,12 @@ const (
 	maxOperationJournal    = 1 << 20
 	maxOperationEvents     = 128
 
-	ReconciliationAbsent       = "absent"
-	ReconciliationPartialExact = "partial_exact"
-	ReconciliationExactDraft   = "exact_draft"
-	ReconciliationConfirmed    = "confirmed"
-	ReconciliationConflict     = "conflict"
+	ReconciliationAbsent         = "absent"
+	ReconciliationPartialExact   = "partial_exact"
+	ReconciliationExactDraft     = "exact_draft"
+	ReconciliationExactPublished = "exact_published"
+	ReconciliationConfirmed      = "confirmed"
+	ReconciliationConflict       = "conflict"
 )
 
 // OperationIdentity is the independently authorized key for one publication
@@ -39,30 +40,45 @@ type OperationIdentity struct {
 type ExpectedDraftState struct {
 	Identity           OperationIdentity `json:"identity"`
 	Commit             string            `json:"commit"`
+	TagMessage         string            `json:"tag_message"`
+	Tagger             Tagger            `json:"tagger"`
 	ReleaseTitle       string            `json:"release_title"`
 	ReleaseNotesSHA256 string            `json:"release_notes_sha256"`
 	Prerelease         bool              `json:"prerelease"`
+	MakeLatest         bool              `json:"make_latest"`
 	Assets             []ExpectedAsset   `json:"assets"`
 }
 
 // ExpectedAsset binds one authorized asset's public name, byte count, and
 // content digest without storing its body.
 type ExpectedAsset struct {
-	Name   string `json:"name"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	Name        string `json:"name"`
+	Size        int64  `json:"size"`
+	SHA256      string `json:"sha256"`
+	ContentType string `json:"content_type"`
 }
 
 // RemoteObservation is supplied by a read-only remote observer. Absence must
 // be explicit; an observer error is never converted into an absence claim.
 type RemoteObservation struct {
-	Tag     *ObservedTag     `json:"tag,omitempty"`
-	Release *ObservedRelease `json:"release,omitempty"`
-	Assets  []ObservedAsset  `json:"assets"`
+	Tag     *ObservedTag           `json:"tag,omitempty"`
+	Release *ObservedRelease       `json:"release,omitempty"`
+	Latest  *ObservedLatestRelease `json:"latest,omitempty"`
+	Assets  []ObservedAsset        `json:"assets"`
 }
 
 type ObservedTag struct {
-	Commit string `json:"commit"`
+	Commit     string `json:"commit"`
+	ObjectSHA  string `json:"object_sha"`
+	ObjectType string `json:"object_type"`
+	Message    string `json:"message"`
+	Tagger     Tagger `json:"tagger"`
+}
+
+type ObservedLatestRelease struct {
+	Exists bool   `json:"exists"`
+	ID     int64  `json:"id,omitempty"`
+	Tag    string `json:"tag,omitempty"`
 }
 
 // ObservedRelease is the exact release metadata returned by a read-only
@@ -75,14 +91,16 @@ type ObservedRelease struct {
 	ReleaseNotesSHA256 string `json:"release_notes_sha256"`
 	Draft              bool   `json:"draft"`
 	Prerelease         bool   `json:"prerelease"`
+	Immutable          bool   `json:"immutable"`
 }
 
 // ObservedAsset is independently read-back remote asset metadata.
 type ObservedAsset struct {
-	ID     int64  `json:"id"`
-	Name   string `json:"name"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Size        int64  `json:"size"`
+	SHA256      string `json:"sha256"`
+	ContentType string `json:"content_type"`
 }
 
 // RemoteObserver reads current remote state for exactly one operation key.
@@ -118,15 +136,19 @@ type journalEvent struct {
 	Phase         string            `json:"phase"`
 	Asset         string            `json:"asset,omitempty"`
 	Outcome       string            `json:"outcome,omitempty"`
+	ObjectSHA     string            `json:"object_sha,omitempty"`
 }
 
 type journalSnapshot struct {
-	header    journalHeader
-	events    []journalEvent
-	torn      bool
-	pending   *journalEvent
-	uncertain bool
-	confirmed bool
+	header         journalHeader
+	events         []journalEvent
+	torn           bool
+	pending        *journalEvent
+	uncertain      bool
+	confirmed      bool
+	publishAttempt bool
+	tagObjectSHA   string
+	step           int
 }
 
 // OperationJournal is a single-process append capability. Reopening a journal
@@ -136,7 +158,8 @@ type OperationJournal struct {
 	file     *os.File
 	name     string
 	identity OperationIdentity
-	assets   map[string]struct{}
+	assets   []string
+	step     int
 	next     int
 	pending  *journalEvent
 	terminal bool
@@ -180,15 +203,15 @@ func CreateOperationJournal(path string, expected ExpectedDraftState) (*Operatio
 		root.Close()
 		return nil, ErrOperationJournal
 	}
-	assets := make(map[string]struct{}, len(expected.Assets))
-	for _, asset := range expected.Assets {
-		assets[asset.Name] = struct{}{}
+	assets := make([]string, len(expected.Assets))
+	for i, asset := range expected.Assets {
+		assets[i] = asset.Name
 	}
 	return &OperationJournal{root: root, file: file, name: name, identity: expected.Identity, assets: assets, next: 1}, nil
 }
 
 func (j *OperationJournal) RecordIntent(phase, asset string) error {
-	if j == nil || j.closed || j.terminal || j.pending != nil || !j.validMutation(phase, asset) {
+	if j == nil || j.closed || j.terminal || j.pending != nil || !matchesPublicationStep(j.step, j.assets, phase, asset) {
 		return ErrOperationJournal
 	}
 	event := journalEvent{SchemaVersion: operationJournalSchema, Scope: operationJournalScope,
@@ -201,26 +224,37 @@ func (j *OperationJournal) RecordIntent(phase, asset string) error {
 	return nil
 }
 
-func (j *OperationJournal) RecordResult(phase, asset, outcome string) error {
+func (j *OperationJournal) RecordResult(phase, asset, outcome string, objectSHA ...string) error {
+	sha := ""
+	if len(objectSHA) == 1 {
+		sha = objectSHA[0]
+	} else if len(objectSHA) > 1 {
+		return ErrOperationJournal
+	}
 	if j == nil || j.closed || j.terminal || j.pending == nil ||
-		j.pending.Phase != phase || j.pending.Asset != asset || (outcome != "confirmed" && outcome != "uncertain") {
+		j.pending.Phase != phase || j.pending.Asset != asset || (outcome != "confirmed" && outcome != "uncertain") ||
+		(phase == "create_tag_object" && outcome == "confirmed" && !commitRE.MatchString(sha)) ||
+		(phase != "create_tag_object" && sha != "") || (outcome == "uncertain" && sha != "") {
 		return ErrOperationJournal
 	}
 	event := journalEvent{SchemaVersion: operationJournalSchema, Scope: operationJournalScope,
-		Type: "result", Sequence: j.next, Identity: j.identity, Phase: phase, Asset: asset, Outcome: outcome}
+		Type: "result", Sequence: j.next, Identity: j.identity, Phase: phase, Asset: asset, Outcome: outcome, ObjectSHA: sha}
 	if j.append(event) != nil {
 		return ErrOperationJournal
 	}
 	j.next++
 	j.pending = nil
 	j.terminal = outcome == "uncertain"
+	if outcome == "confirmed" {
+		j.step++
+	}
 	return nil
 }
 
 // RecordConfirmation follows a complete read-back of the exact remote draft.
 // Reconciliation still re-observes remote state and never trusts this alone.
 func (j *OperationJournal) RecordConfirmation() error {
-	if j == nil || j.closed || j.terminal || j.pending != nil || j.next == 1 {
+	if j == nil || j.closed || j.terminal || j.pending != nil || j.step != publicationStepCount(len(j.assets)) {
 		return ErrOperationJournal
 	}
 	event := journalEvent{SchemaVersion: operationJournalSchema, Scope: operationJournalScope,
@@ -275,20 +309,22 @@ func ReconcileOperation(ctx context.Context, path string, expected ExpectedDraft
 	if err != nil || ctx.Err() != nil {
 		return result, ErrOperationJournal
 	}
-	classification, releaseID, observedAssets := classifyRemote(expected, observed)
+	classification, releaseID, observedAssets := classifyRemote(expected, observed, snapshot.tagObjectSHA)
 	result.Classification, result.ReleaseID, result.ObservedAssets = classification, releaseID, observedAssets
 	result.RetryAllowed = classification == ReconciliationAbsent && len(snapshot.events) == 0 && !snapshot.torn
-	if classification == ReconciliationExactDraft && snapshot.confirmed && !snapshot.torn {
+	if classification == ReconciliationExactPublished && snapshot.publishAttempt && !snapshot.torn {
 		result.Classification = ReconciliationConfirmed
 	}
 	return result, nil
 }
 
-func classifyRemote(expected ExpectedDraftState, observed RemoteObservation) (string, int64, int) {
+func classifyRemote(expected ExpectedDraftState, observed RemoteObservation, journalTagObjectSHA string) (string, int64, int) {
 	if observed.Tag == nil && observed.Release == nil && len(observed.Assets) == 0 {
 		return ReconciliationAbsent, 0, 0
 	}
-	if observed.Tag == nil || observed.Tag.Commit != expected.Commit {
+	if observed.Tag == nil || observed.Tag.Commit != expected.Commit || observed.Tag.ObjectType != "tag" ||
+		!commitRE.MatchString(observed.Tag.ObjectSHA) || journalTagObjectSHA != "" && observed.Tag.ObjectSHA != journalTagObjectSHA ||
+		observed.Tag.Message != expected.TagMessage || observed.Tag.Tagger != expected.Tagger {
 		return ReconciliationConflict, releaseID(observed.Release), len(observed.Assets)
 	}
 	if observed.Release == nil {
@@ -300,7 +336,7 @@ func classifyRemote(expected ExpectedDraftState, observed RemoteObservation) (st
 	release := observed.Release
 	if release.ID < 1 || release.Tag != expected.Identity.Tag || release.Commit != expected.Commit ||
 		release.Title != expected.ReleaseTitle || release.ReleaseNotesSHA256 != expected.ReleaseNotesSHA256 ||
-		!release.Draft || release.Prerelease != expected.Prerelease {
+		release.Prerelease != expected.Prerelease || (release.Draft && release.Immutable) || (!release.Draft && !release.Immutable) {
 		return ReconciliationConflict, release.ID, len(observed.Assets)
 	}
 	want := make(map[string]ExpectedAsset, len(expected.Assets))
@@ -311,7 +347,8 @@ func classifyRemote(expected ExpectedDraftState, observed RemoteObservation) (st
 	seenNames := make(map[string]bool, len(observed.Assets))
 	for _, asset := range observed.Assets {
 		expectedAsset, ok := want[asset.Name]
-		if !ok || asset.ID < 1 || seenIDs[asset.ID] || seenNames[asset.Name] || asset.Size != expectedAsset.Size || asset.SHA256 != expectedAsset.SHA256 {
+		if !ok || asset.ID < 1 || seenIDs[asset.ID] || seenNames[asset.Name] || asset.Size != expectedAsset.Size ||
+			asset.SHA256 != expectedAsset.SHA256 || asset.ContentType != expectedAsset.ContentType {
 			return ReconciliationConflict, release.ID, len(observed.Assets)
 		}
 		seenIDs[asset.ID], seenNames[asset.Name] = true, true
@@ -319,7 +356,24 @@ func classifyRemote(expected ExpectedDraftState, observed RemoteObservation) (st
 	if len(observed.Assets) < len(expected.Assets) {
 		return ReconciliationPartialExact, release.ID, len(observed.Assets)
 	}
+	if !release.Draft {
+		if !validLatestObservation(observed.Latest) || expected.MakeLatest && (!observed.Latest.Exists || observed.Latest.ID != release.ID || observed.Latest.Tag != expected.Identity.Tag) ||
+			!expected.MakeLatest && observed.Latest.Exists && (observed.Latest.ID == release.ID || observed.Latest.Tag == expected.Identity.Tag) {
+			return ReconciliationConflict, release.ID, len(observed.Assets)
+		}
+		return ReconciliationExactPublished, release.ID, len(observed.Assets)
+	}
 	return ReconciliationExactDraft, release.ID, len(observed.Assets)
+}
+
+func validLatestObservation(latest *ObservedLatestRelease) bool {
+	if latest == nil {
+		return false
+	}
+	if !latest.Exists {
+		return latest.ID == 0 && latest.Tag == ""
+	}
+	return latest.ID > 0 && validTag(latest.Tag)
 }
 
 func releaseID(release *ObservedRelease) int64 {
@@ -335,6 +389,7 @@ func canonicalExpectedState(expected ExpectedDraftState) ([]byte, error) {
 		!nameRE.MatchString(parts[0]) || !nameRE.MatchString(parts[1]) || !validTag(expected.Identity.Tag) ||
 		!commitRE.MatchString(expected.Commit) || expected.ReleaseTitle != "DarwinRouter "+expected.Identity.Tag ||
 		!digestRE.MatchString(expected.ReleaseNotesSHA256) || expected.Prerelease != strings.Contains(expected.Identity.Tag, "-") ||
+		!validTagger(expected.Tagger) || expected.TagMessage != "DarwinRouter release "+expected.Identity.Tag || (expected.Prerelease && expected.MakeLatest) ||
 		len(expected.Assets) == 0 || len(expected.Assets) > maxAssets {
 		return nil, ErrOperationJournal
 	}
@@ -342,7 +397,7 @@ func canonicalExpectedState(expected ExpectedDraftState) ([]byte, error) {
 	var total int64
 	for _, asset := range expected.Assets {
 		if !assetNameRE.MatchString(asset.Name) || asset.Name <= previous || asset.Size < 1 ||
-			asset.Size > maxAssetBytes || total > int64(maxTotalBytes)-asset.Size || !digestRE.MatchString(asset.SHA256) {
+			asset.Size > maxAssetBytes || total > int64(maxTotalBytes)-asset.Size || !digestRE.MatchString(asset.SHA256) || !mediaRE.MatchString(asset.ContentType) {
 			return nil, ErrOperationJournal
 		}
 		total += asset.Size
@@ -355,26 +410,23 @@ func canonicalExpectedState(expected ExpectedDraftState) ([]byte, error) {
 	return body, nil
 }
 
-func validMutation(phase, asset string) bool {
-	switch phase {
-	case "create_tag", "create_draft":
-		return asset == ""
-	case "upload_asset":
-		return assetNameRE.MatchString(asset)
+func publicationStepCount(assetCount int) int { return 4 + assetCount }
+
+func matchesPublicationStep(step int, assets []string, phase, asset string) bool {
+	switch {
+	case step == 0:
+		return phase == "create_tag_object" && asset == ""
+	case step == 1:
+		return phase == "create_tag_ref" && asset == ""
+	case step == 2:
+		return phase == "create_draft" && asset == ""
+	case step >= 3 && step < 3+len(assets):
+		return phase == "upload_asset" && asset == assets[step-3]
+	case step == 3+len(assets):
+		return phase == "publish_release" && asset == ""
 	default:
 		return false
 	}
-}
-
-func (j *OperationJournal) validMutation(phase, asset string) bool {
-	if !validMutation(phase, asset) {
-		return false
-	}
-	if phase != "upload_asset" {
-		return true
-	}
-	_, ok := j.assets[asset]
-	return ok
 }
 
 func writeJournalLine(file *os.File, value any) error {
@@ -406,9 +458,9 @@ func syncRoot(root *os.Root) error {
 func readOperationJournal(path string, expected ExpectedDraftState, expectedSHA string) (journalSnapshot, error) {
 	var snapshot journalSnapshot
 	identity := expected.Identity
-	assets := make(map[string]struct{}, len(expected.Assets))
-	for _, asset := range expected.Assets {
-		assets[asset.Name] = struct{}{}
+	assets := make([]string, len(expected.Assets))
+	for i, asset := range expected.Assets {
+		assets[i] = asset.Name
 	}
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > maxOperationJournal {
@@ -455,25 +507,35 @@ func readOperationJournal(path string, expected ExpectedDraftState, expectedSHA 
 	return snapshot, nil
 }
 
-func applyJournalEvent(snapshot *journalSnapshot, event journalEvent, assets map[string]struct{}) error {
+func applyJournalEvent(snapshot *journalSnapshot, event journalEvent, assets []string) error {
 	switch event.Type {
 	case "intent":
-		_, expectedAsset := assets[event.Asset]
-		if snapshot.pending != nil || snapshot.uncertain || snapshot.confirmed || event.Outcome != "" ||
-			!validMutation(event.Phase, event.Asset) || (event.Phase == "upload_asset" && !expectedAsset) {
+		if snapshot.pending != nil || snapshot.uncertain || snapshot.confirmed || event.Outcome != "" || event.ObjectSHA != "" ||
+			!matchesPublicationStep(snapshot.step, assets, event.Phase, event.Asset) {
 			return ErrOperationJournal
 		}
 		copy := event
 		snapshot.pending = &copy
+		if event.Phase == "publish_release" {
+			snapshot.publishAttempt = true
+		}
 	case "result":
 		if snapshot.pending == nil || snapshot.uncertain || snapshot.confirmed || event.Phase != snapshot.pending.Phase ||
-			event.Asset != snapshot.pending.Asset || (event.Outcome != "confirmed" && event.Outcome != "uncertain") {
+			event.Asset != snapshot.pending.Asset || (event.Outcome != "confirmed" && event.Outcome != "uncertain") ||
+			(event.Phase == "create_tag_object" && event.Outcome == "confirmed" && !commitRE.MatchString(event.ObjectSHA)) ||
+			(event.Phase != "create_tag_object" && event.ObjectSHA != "") || (event.Outcome == "uncertain" && event.ObjectSHA != "") {
 			return ErrOperationJournal
 		}
 		snapshot.pending = nil
 		snapshot.uncertain = event.Outcome == "uncertain"
+		if event.Outcome == "confirmed" {
+			snapshot.step++
+			if event.Phase == "create_tag_object" {
+				snapshot.tagObjectSHA = event.ObjectSHA
+			}
+		}
 	case "confirmation":
-		if snapshot.pending != nil || snapshot.uncertain || snapshot.confirmed || event.Phase != "complete" || event.Asset != "" || event.Outcome != "confirmed" {
+		if snapshot.pending != nil || snapshot.uncertain || snapshot.confirmed || snapshot.step != publicationStepCount(len(assets)) || event.Phase != "complete" || event.Asset != "" || event.Outcome != "confirmed" || event.ObjectSHA != "" {
 			return ErrOperationJournal
 		}
 		snapshot.confirmed = true

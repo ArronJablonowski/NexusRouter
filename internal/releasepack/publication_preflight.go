@@ -26,6 +26,8 @@ type PublicationPreflightResult struct {
 	SourceCommit                   string             `json:"source_commit"`
 	Tag                            string             `json:"tag"`
 	ReleaseTitle                   string             `json:"release_title"`
+	TagMessage                     string             `json:"tag_message"`
+	Tagger                         PublicationTagger  `json:"tagger"`
 	Prerelease                     bool               `json:"prerelease"`
 	MakeLatest                     bool               `json:"make_latest"`
 	ReleaseNotesSHA256             string             `json:"release_notes_sha256"`
@@ -86,6 +88,7 @@ func VerifyPublicationPreflight(ctx context.Context, options PublicationPrefligh
 		PublicationAuthorizationSHA256: options.ExpectedPublicationAuthorizationSHA256,
 		Repository:                     authorization.Repository, ReleaseVersion: authorization.ReleaseVersion,
 		SourceCommit: authorization.SourceCommit, Tag: authorization.Tag, ReleaseTitle: authorization.ReleaseTitle,
+		TagMessage: authorization.TagMessage, Tagger: authorization.Tagger,
 		Prerelease: authorization.Prerelease, MakeLatest: authorization.MakeLatest,
 		ReleaseNotesSHA256: notesSHA, Assets: assets,
 	}, nil
@@ -107,6 +110,7 @@ func publicationAssets(dir string) ([]PublicationAsset, error) {
 		return nil, ErrPublicationAuthorization
 	}
 	assets := make([]PublicationAsset, 0, len(entries))
+	var total int64
 	for _, entry := range entries {
 		if !entry.Type().IsRegular() || !signingBasename(entry.Name()) {
 			return nil, ErrPublicationAuthorization
@@ -117,13 +121,14 @@ func publicationAssets(dir string) ([]PublicationAsset, error) {
 		}
 		info, statErr := file.Stat()
 		hash := sha256.New()
-		n, copyErr := io.Copy(hash, io.LimitReader(file, (4<<30)+1))
+		n, copyErr := io.Copy(hash, io.LimitReader(file, (256<<20)+1))
 		final, finalErr := file.Stat()
 		fileCloseErr := file.Close()
 		if statErr != nil || finalErr != nil || fileCloseErr != nil || !os.SameFile(info, final) ||
-			n < 1 || n > 4<<30 || info.Size() != n || final.Size() != n || copyErr != nil {
+			n < 1 || n > 256<<20 || total > (512<<20)-n || info.Size() != n || final.Size() != n || copyErr != nil {
 			return nil, ErrPublicationAuthorization
 		}
+		total += n
 		assets = append(assets, PublicationAsset{Name: entry.Name(), Size: n, SHA256: "sha256:" + hex.EncodeToString(hash.Sum(nil))})
 	}
 	sort.Slice(assets, func(i, j int) bool { return assets[i].Name < assets[j].Name })

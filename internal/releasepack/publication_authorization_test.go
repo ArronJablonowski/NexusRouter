@@ -83,6 +83,8 @@ func publicationAuthorizationFixture() PublicationAuthorization {
 		SchemaVersion: publicationAuthorizationSchema, Project: "DarwinRouter", Scope: publicationAuthorizationScope,
 		GitHubHost: "github.com", Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0",
 		SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseTitle: "DarwinRouter v1.0.0",
+		TagMessage: "DarwinRouter release v1.0.0",
+		Tagger:     PublicationTagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
 		Prerelease: false, MakeLatest: true,
 		ReleaseNotesSHA256: digest, CandidateRecordSHA256: digest, LicenseEvidenceSHA256: digest,
 		SHA256SUMSSHA256: digest, SignatureFileSHA256: digest, TrustRecordSHA256: digest,

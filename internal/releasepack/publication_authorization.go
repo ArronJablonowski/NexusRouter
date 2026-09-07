@@ -36,6 +36,8 @@ type PublicationAuthorization struct {
 	SourceCommit               string                         `json:"source_commit"`
 	Tag                        string                         `json:"tag"`
 	ReleaseTitle               string                         `json:"release_title"`
+	TagMessage                 string                         `json:"tag_message"`
+	Tagger                     PublicationTagger              `json:"tagger"`
 	Prerelease                 bool                           `json:"prerelease"`
 	MakeLatest                 bool                           `json:"make_latest"`
 	ReleaseNotesSHA256         string                         `json:"release_notes_sha256"`
@@ -51,6 +53,12 @@ type PublicationAuthorization struct {
 	ApproverID                 string                         `json:"approver_id"`
 	PublicationPolicyURL       string                         `json:"publication_policy_url"`
 	ApprovedAt                 string                         `json:"approved_at"`
+}
+
+type PublicationTagger struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Date  string `json:"date"`
 }
 
 type PublicationAsset struct {
@@ -129,6 +137,7 @@ func validatePublicationAuthorization(record PublicationAuthorization) error {
 		record.Scope != publicationAuthorizationScope || record.GitHubHost != "github.com" ||
 		!githubRepository.MatchString(record.Repository) || validate(Options{Version: record.ReleaseVersion, Commit: record.SourceCommit, Out: "release"}) != nil ||
 		record.Tag != "v"+record.ReleaseVersion || record.ReleaseTitle != "DarwinRouter "+record.Tag ||
+		record.TagMessage != "DarwinRouter release "+record.Tag || !validPublicationTagger(record.Tagger) ||
 		record.Prerelease != strings.Contains(record.ReleaseVersion, "-") || (record.Prerelease && record.MakeLatest) ||
 		!trustFingerprint(record.ReleaseNotesSHA256) || !trustFingerprint(record.CandidateRecordSHA256) ||
 		!trustFingerprint(record.LicenseEvidenceSHA256) || !trustFingerprint(record.SHA256SUMSSHA256) ||
@@ -140,11 +149,14 @@ func validatePublicationAuthorization(record PublicationAuthorization) error {
 		return ErrPublicationAuthorization
 	}
 	previous := ""
+	var total int64
 	names := publicationAssetNames(record.ReleaseVersion)
 	for i, asset := range record.Assets {
-		if asset.Name != names[i] || !signingBasename(asset.Name) || asset.Name <= previous || asset.Size < 1 || asset.Size > 4<<30 || !trustFingerprint(asset.SHA256) {
+		if asset.Name != names[i] || !signingBasename(asset.Name) || asset.Name <= previous || asset.Size < 1 || asset.Size > 256<<20 ||
+			total > (512<<20)-asset.Size || !trustFingerprint(asset.SHA256) {
 			return ErrPublicationAuthorization
 		}
+		total += asset.Size
 		previous = asset.Name
 	}
 	for i := range publicationAuthorizationGates {
@@ -157,6 +169,13 @@ func validatePublicationAuthorization(record PublicationAuthorization) error {
 		return ErrPublicationAuthorization
 	}
 	return nil
+}
+
+func validPublicationTagger(tagger PublicationTagger) bool {
+	when, err := time.Parse("2006-01-02T15:04:05Z", tagger.Date)
+	return err == nil && when.Format("2006-01-02T15:04:05Z") == tagger.Date &&
+		len(tagger.Name) > 0 && len(tagger.Name) <= 200 && len(tagger.Email) >= 3 && len(tagger.Email) <= 254 &&
+		strings.Contains(tagger.Email, "@") && !strings.ContainsAny(tagger.Name+tagger.Email, "\r\n\x00")
 }
 
 func publicationAssetNames(version string) []string {

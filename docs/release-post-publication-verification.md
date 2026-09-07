@@ -9,7 +9,9 @@ operator-supplied authorization record and the original signed set. It then:
 
 1. Reads the release, annotated-tag reference, and annotated tag object through
    GitHub's GET APIs. The tag object must point directly to the exact authorized
-   commit; lightweight tags, nested tags, and mismatched targets are rejected.
+   commit and reproduce the authorization-bound tag message, tagger name,
+   email, and whole-second UTC date; lightweight tags, nested tags, and
+   mismatched targets are rejected. The receipt retains the tag-object SHA.
 2. Requires an immutable, non-draft release with the exact authorized tag,
    commit, title, notes, prerelease decision, and seven-asset set.
 3. Creates a new private download directory outside both the source checkout

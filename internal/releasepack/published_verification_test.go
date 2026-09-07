@@ -2,8 +2,10 @@ package releasepack
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/githubverify"
@@ -41,6 +43,25 @@ func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
 func TestPostPublicationReceiptRejectsNonGitHubEvidenceURL(t *testing.T) {
 	if validGitHubReleaseURL("https://evil.example/acme/router/releases/tag/v1.0.0", "acme/router", "v1.0.0") {
 		t.Fatal("non-GitHub receipt URL accepted")
+	}
+}
+
+func TestPostPublicationReceiptRejectsCrossAuthorityAssetURL(t *testing.T) {
+	preflight, signedDir := publishedFixture(t)
+	receipt, err := VerifyPublishedRelease(context.Background(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
+		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt.Assets[0].DownloadURL = "https://github.com/other/repository/releases/download/" + receipt.Tag + "/" + receipt.Assets[0].Name
+	body, err := json.MarshalIndent(receipt, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = append(body, '\n')
+	if _, err = ParsePostPublicationReceipt(body); err == nil {
+		t.Fatal("cross-repository asset URL accepted by canonical receipt parser")
 	}
 }
 
@@ -117,7 +138,8 @@ func (f *fixtureReleaseReader) Verify(_ context.Context, plan githubverify.Plan)
 	}
 	return githubverify.Observation{
 		Repository: plan.Repository, ReleaseID: 7, ReleaseURL: "https://github.com/" + plan.Repository + "/releases/tag/" + plan.Tag,
-		Tag: plan.Tag, Commit: plan.Commit, Title: plan.Title, BodySHA256: publicationDigest(plan.Body),
+		Tag: plan.Tag, Commit: plan.Commit, TagObjectSHA: strings.Repeat("c", 40), TagMessage: plan.TagMessage, Tagger: plan.Tagger,
+		Title: plan.Title, BodySHA256: publicationDigest(plan.Body),
 		Prerelease: plan.Prerelease, Immutable: true, PublishedAt: "2026-09-07T01:00:00Z",
 		ObservedAt: "2026-09-07T01:01:00Z", Assets: assets, DownloadDir: plan.DownloadDir,
 	}, nil

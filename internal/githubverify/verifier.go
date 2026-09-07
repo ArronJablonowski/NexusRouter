@@ -52,6 +52,8 @@ type Plan struct {
 	Repository     string
 	Tag            string
 	Commit         string
+	TagMessage     string
+	Tagger         Tagger
 	Title          string
 	Body           []byte
 	Prerelease     bool
@@ -60,20 +62,29 @@ type Plan struct {
 	ForbiddenRoots []string
 }
 
+type Tagger struct {
+	Name  string
+	Email string
+	Date  string
+}
+
 type Observation struct {
-	Repository  string
-	ReleaseID   int64
-	ReleaseURL  string
-	Tag         string
-	Commit      string
-	Title       string
-	BodySHA256  string
-	Prerelease  bool
-	Immutable   bool
-	PublishedAt string
-	ObservedAt  string
-	Assets      []ObservedAsset
-	DownloadDir string
+	Repository   string
+	ReleaseID    int64
+	ReleaseURL   string
+	Tag          string
+	Commit       string
+	TagObjectSHA string
+	TagMessage   string
+	Tagger       Tagger
+	Title        string
+	BodySHA256   string
+	Prerelease   bool
+	Immutable    bool
+	PublishedAt  string
+	ObservedAt   string
+	Assets       []ObservedAsset
+	DownloadDir  string
 }
 
 type ObservedAsset struct {
@@ -147,7 +158,7 @@ func (v *Verifier) Verify(ctx context.Context, input Plan) (Observation, error) 
 		!exactAnnotatedTag(annotated, ref.Object.SHA, plan) {
 		return empty, ErrVerify
 	}
-	remote, err := exactAssets(release.Assets, plan.Assets)
+	remote, err := exactAssets(release.Assets, plan.Assets, plan.Repository, plan.Tag)
 	if err != nil {
 		return empty, err
 	}
@@ -174,7 +185,8 @@ func (v *Verifier) Verify(ctx context.Context, input Plan) (Observation, error) 
 	}
 	return Observation{
 		Repository: plan.Repository, ReleaseID: release.ID, ReleaseURL: release.HTMLURL,
-		Tag: plan.Tag, Commit: plan.Commit, Title: plan.Title, BodySHA256: digest(plan.Body),
+		Tag: plan.Tag, Commit: plan.Commit, TagObjectSHA: annotated.SHA, TagMessage: annotated.Message, Tagger: annotated.Tagger,
+		Title: plan.Title, BodySHA256: digest(plan.Body),
 		Prerelease: plan.Prerelease, Immutable: true, PublishedAt: release.PublishedAt,
 		ObservedAt: v.now().UTC().Format("2006-01-02T15:04:05Z"), Assets: observed, DownloadDir: plan.DownloadDir,
 	}, nil
@@ -183,7 +195,8 @@ func (v *Verifier) Verify(ctx context.Context, input Plan) (Observation, error) 
 func validatePlan(input Plan) (Plan, error) {
 	owner, repository, ok := strings.Cut(input.Repository, "/")
 	if !ok || !nameRE.MatchString(owner) || !nameRE.MatchString(repository) || !nameRE.MatchString(input.Tag) ||
-		!commitRE.MatchString(input.Commit) || input.Title == "" || len(input.Title) > 256 || len(input.Body) == 0 || len(input.Body) > 1<<20 ||
+		!commitRE.MatchString(input.Commit) || input.TagMessage == "" || len(input.TagMessage) > 4096 || !validTagger(input.Tagger) ||
+		input.Title == "" || len(input.Title) > 256 || len(input.Body) == 0 || len(input.Body) > 1<<20 ||
 		len(input.Assets) != 7 || input.DownloadDir == "" {
 		return Plan{}, ErrVerify
 	}
@@ -236,9 +249,11 @@ type refResponse struct {
 }
 
 type annotatedTagResponse struct {
-	Tag    string `json:"tag"`
-	SHA    string `json:"sha"`
-	Object struct {
+	Tag     string `json:"tag"`
+	SHA     string `json:"sha"`
+	Message string `json:"message"`
+	Tagger  Tagger `json:"tagger"`
+	Object  struct {
 		Type string `json:"type"`
 		SHA  string `json:"sha"`
 	} `json:"object"`
@@ -249,13 +264,21 @@ func exactAnnotatedRef(got refResponse, plan Plan) bool {
 }
 
 func exactAnnotatedTag(got annotatedTagResponse, tagObjectSHA string, plan Plan) bool {
-	return got.Tag == plan.Tag && got.SHA == tagObjectSHA && got.Object.Type == "commit" && got.Object.SHA == plan.Commit
+	return got.Tag == plan.Tag && got.SHA == tagObjectSHA && got.Message == plan.TagMessage && got.Tagger == plan.Tagger &&
+		got.Object.Type == "commit" && got.Object.SHA == plan.Commit
+}
+
+func validTagger(tagger Tagger) bool {
+	when, err := time.Parse("2006-01-02T15:04:05Z", tagger.Date)
+	return err == nil && when.Format("2006-01-02T15:04:05Z") == tagger.Date && len(tagger.Name) > 0 && len(tagger.Name) <= 200 &&
+		len(tagger.Email) >= 3 && len(tagger.Email) <= 254 && strings.Contains(tagger.Email, "@") &&
+		!strings.ContainsAny(tagger.Name+tagger.Email, "\r\n\x00")
 }
 
 func exactRelease(got releaseResponse, want Plan) bool {
 	when, err := time.Parse("2006-01-02T15:04:05Z", got.PublishedAt)
 	return err == nil && when.Format("2006-01-02T15:04:05Z") == got.PublishedAt && got.ID > 0 && got.Immutable &&
-		!got.Draft && got.TagName == want.Tag && got.TargetCommitish == want.Commit && got.Name == want.Title &&
+		!got.Draft && got.TagName == want.Tag && got.Name == want.Title &&
 		got.Body == string(want.Body) && got.Prerelease == want.Prerelease && len(got.Assets) == len(want.Assets) && validReleaseURL(got.HTMLURL, want)
 }
 
@@ -271,7 +294,7 @@ func validReleaseURL(raw string, plan Plan) bool {
 		u.EscapedPath() == "/"+plan.Repository+"/releases/tag/"+url.PathEscape(plan.Tag)
 }
 
-func exactAssets(got []assetResponse, want []ExpectedAsset) ([]assetResponse, error) {
+func exactAssets(got []assetResponse, want []ExpectedAsset, repository, tag string) ([]assetResponse, error) {
 	if len(got) != len(want) {
 		return nil, ErrVerify
 	}
@@ -282,7 +305,7 @@ func exactAssets(got []assetResponse, want []ExpectedAsset) ([]assetResponse, er
 		asset := ordered[i]
 		if asset.ID <= 0 || ids[asset.ID] || asset.Name != want[i].Name || asset.State != "uploaded" || asset.Size != want[i].Size ||
 			asset.Digest != want[i].SHA256 || asset.ContentType != want[i].ContentType ||
-			!validInitialDownloadURL(asset.BrowserDownloadURL, asset.Name) {
+			!validInitialDownloadURL(asset.BrowserDownloadURL, repository, tag, asset.Name) {
 			return nil, ErrVerify
 		}
 		ids[asset.ID] = true
@@ -294,9 +317,10 @@ func validContentType(value string) bool {
 	return value == "application/gzip" || value == "application/octet-stream"
 }
 
-func validInitialDownloadURL(raw, name string) bool {
+func validInitialDownloadURL(raw, repository, tag, name string) bool {
 	u, err := url.Parse(raw)
-	if err != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" || filepath.Base(u.Path) != name {
+	wantPath := "/" + repository + "/releases/download/" + url.PathEscape(tag) + "/" + url.PathEscape(name)
+	if err != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.EscapedPath() != wantPath {
 		return false
 	}
 	host := u.Hostname()

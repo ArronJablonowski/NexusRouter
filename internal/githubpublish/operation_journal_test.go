@@ -26,12 +26,14 @@ func operationFixture() ExpectedDraftState {
 			Tag:                 "v1.0.0-rc.1",
 		},
 		Commit:             strings.Repeat("b", 40),
+		TagMessage:         "DarwinRouter release v1.0.0-rc.1",
+		Tagger:             Tagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
 		ReleaseTitle:       "DarwinRouter v1.0.0-rc.1",
 		ReleaseNotesSHA256: "sha256:" + strings.Repeat("c", 64),
 		Prerelease:         true,
 		Assets: []ExpectedAsset{
-			{Name: "darwinrouter_checksums.txt", Size: 200, SHA256: "sha256:" + strings.Repeat("d", 64)},
-			{Name: "darwinrouter_macos.tar.gz", Size: 400, SHA256: "sha256:" + strings.Repeat("e", 64)},
+			{Name: "darwinrouter_checksums.txt", Size: 200, SHA256: "sha256:" + strings.Repeat("d", 64), ContentType: "application/octet-stream"},
+			{Name: "darwinrouter_macos.tar.gz", Size: 400, SHA256: "sha256:" + strings.Repeat("e", 64), ContentType: "application/gzip"},
 		},
 	}
 }
@@ -39,16 +41,16 @@ func operationFixture() ExpectedDraftState {
 func exactObservation(expected ExpectedDraftState) RemoteObservation {
 	assets := make([]ObservedAsset, len(expected.Assets))
 	for i, asset := range expected.Assets {
-		assets[i] = ObservedAsset{ID: int64(i + 10), Name: asset.Name, Size: asset.Size, SHA256: asset.SHA256}
+		assets[i] = ObservedAsset{ID: int64(i + 10), Name: asset.Name, Size: asset.Size, SHA256: asset.SHA256, ContentType: asset.ContentType}
 	}
 	return RemoteObservation{
-		Tag: &ObservedTag{Commit: expected.Commit},
+		Tag: &ObservedTag{Commit: expected.Commit, ObjectSHA: strings.Repeat("a", 40), ObjectType: "tag", Message: expected.TagMessage, Tagger: expected.Tagger},
 		Release: &ObservedRelease{
 			ID: 41, Tag: expected.Identity.Tag, Commit: expected.Commit,
 			Title: expected.ReleaseTitle, ReleaseNotesSHA256: expected.ReleaseNotesSHA256,
 			Draft: true, Prerelease: expected.Prerelease,
 		},
-		Assets: assets,
+		Latest: &ObservedLatestRelease{}, Assets: assets,
 	}
 }
 
@@ -78,7 +80,7 @@ func TestOperationJournalPersistsTransitionsAndReconciles(t *testing.T) {
 		t.Fatalf("duplicate create error = %v", err)
 	}
 
-	mutations := [][2]string{{"create_tag", ""}, {"create_draft", ""}}
+	mutations := [][2]string{{"create_tag_object", ""}, {"create_tag_ref", ""}, {"create_draft", ""}}
 	for _, asset := range expected.Assets {
 		mutations = append(mutations, [2]string{"upload_asset", asset.Name})
 	}
@@ -86,10 +88,23 @@ func TestOperationJournalPersistsTransitionsAndReconciles(t *testing.T) {
 		if err := journal.RecordIntent(mutation[0], mutation[1]); err != nil {
 			t.Fatalf("RecordIntent(%v): %v", mutation, err)
 		}
-		if err := journal.RecordResult(mutation[0], mutation[1], "confirmed"); err != nil {
+		var err error
+		if mutation[0] == "create_tag_object" {
+			err = journal.RecordResult(mutation[0], mutation[1], "confirmed", strings.Repeat("a", 40))
+		} else {
+			err = journal.RecordResult(mutation[0], mutation[1], "confirmed")
+		}
+		if err != nil {
 			t.Fatalf("RecordResult(%v): %v", mutation, err)
 		}
 	}
+	if err := journal.RecordIntent("publish_release", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordResult("publish_release", "", "confirmed"); err != nil {
+		t.Fatal(err)
+	}
+	mutations = append(mutations, [2]string{"publish_release", ""})
 	if err := journal.RecordConfirmation(); err != nil {
 		t.Fatalf("RecordConfirmation: %v", err)
 	}
@@ -97,13 +112,52 @@ func TestOperationJournalPersistsTransitionsAndReconciles(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	result, err := ReconcileOperation(context.Background(), path, expected, fixedObserver(exactObservation(expected)))
+	remote := exactObservation(expected)
+	remote.Release.Draft, remote.Release.Immutable = false, true
+	result, err := ReconcileOperation(context.Background(), path, expected, fixedObserver(remote))
 	if err != nil {
 		t.Fatalf("ReconcileOperation: %v", err)
 	}
 	if result.Classification != ReconciliationConfirmed || result.RetryAllowed || result.JournalTorn ||
 		result.Events != len(mutations)*2+1 || result.ReleaseID != 41 || result.ObservedAssets != len(expected.Assets) {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestReconcileConfirmsPublishedStateAfterLostPatchResponse(t *testing.T) {
+	expected := operationFixture()
+	path, journal := createJournal(t, expected)
+	for _, mutation := range [][2]string{{"create_tag_object", ""}, {"create_tag_ref", ""}, {"create_draft", ""}} {
+		if err := journal.RecordIntent(mutation[0], mutation[1]); err != nil {
+			t.Fatal(err)
+		}
+		if mutation[0] == "create_tag_object" {
+			if err := journal.RecordResult(mutation[0], mutation[1], "confirmed", strings.Repeat("a", 40)); err != nil {
+				t.Fatal(err)
+			}
+		} else if err := journal.RecordResult(mutation[0], mutation[1], "confirmed"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, asset := range expected.Assets {
+		if err := journal.RecordIntent("upload_asset", asset.Name); err != nil {
+			t.Fatal(err)
+		}
+		if err := journal.RecordResult("upload_asset", asset.Name, "confirmed"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := journal.RecordIntent("publish_release", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	remote := exactObservation(expected)
+	remote.Release.Draft, remote.Release.Immutable = false, true
+	result, err := ReconcileOperation(context.Background(), path, expected, fixedObserver(remote))
+	if err != nil || result.Classification != ReconciliationConfirmed || result.RetryAllowed {
+		t.Fatal("published state was not reconciled", result, err)
 	}
 }
 
@@ -118,7 +172,7 @@ func TestReconciliationClassifiesRemoteState(t *testing.T) {
 	releaseWithoutTag.Tag = nil
 	partialAssets := exactObservation(expected)
 	partialAssets.Assets = partialAssets.Assets[:1]
-	tagOnly := RemoteObservation{Tag: &ObservedTag{Commit: expected.Commit}, Assets: []ObservedAsset{}}
+	tagOnly := RemoteObservation{Tag: exact.Tag, Assets: []ObservedAsset{}}
 
 	tests := []struct {
 		name      string
@@ -159,11 +213,11 @@ func TestOperationJournalUncertainAndPendingAttemptsAreNotRetryable(t *testing.T
 		t.Run(outcome, func(t *testing.T) {
 			expected := operationFixture()
 			path, journal := createJournal(t, expected)
-			if err := journal.RecordIntent("create_tag", ""); err != nil {
+			if err := journal.RecordIntent("create_tag_object", ""); err != nil {
 				t.Fatal(err)
 			}
 			if outcome == "uncertain" {
-				if err := journal.RecordResult("create_tag", "", "uncertain"); err != nil {
+				if err := journal.RecordResult("create_tag_object", "", "uncertain"); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -178,10 +232,97 @@ func TestOperationJournalUncertainAndPendingAttemptsAreNotRetryable(t *testing.T
 	}
 }
 
+func TestReconcileLostCreateDraftResponseDoesNotRetry(t *testing.T) {
+	expected := operationFixture()
+	path, journal := createJournal(t, expected)
+	if err := journal.RecordIntent("create_tag_object", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordResult("create_tag_object", "", "confirmed", strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordIntent("create_tag_ref", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordResult("create_tag_ref", "", "confirmed"); err != nil {
+		t.Fatal(err)
+	}
+	// The create request reached GitHub, but its response was lost before a
+	// result event could be made durable.
+	if err := journal.RecordIntent("create_draft", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := ReconcileOperation(t.Context(), path, expected, fixedObserver(exactObservation(expected)))
+	if err != nil || result.Classification != ReconciliationExactDraft || result.RetryAllowed {
+		t.Fatal("lost create-draft response was not safely reconciled", result, err)
+	}
+}
+
+func TestJournalEnforcesCompleteOrderedPublication(t *testing.T) {
+	expected := operationFixture()
+	_, journal := createJournal(t, expected)
+	defer journal.Close()
+	if err := journal.RecordIntent("create_tag_ref", ""); !errors.Is(err, ErrOperationJournal) {
+		t.Fatal("out-of-order tag ref accepted", err)
+	}
+	if err := journal.RecordIntent("create_tag_object", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordResult("create_tag_object", "", "confirmed", strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.RecordIntent("create_draft", ""); !errors.Is(err, ErrOperationJournal) {
+		t.Fatal("draft accepted before tag ref", err)
+	}
+	if err := journal.RecordConfirmation(); !errors.Is(err, ErrOperationJournal) {
+		t.Fatal("partial operation accepted confirmation", err)
+	}
+}
+
+func TestRemoteClassificationBindsAnnotatedTagAndLatestPolicy(t *testing.T) {
+	expected := operationFixture()
+	base := exactObservation(expected)
+	base.Release.Draft, base.Release.Immutable = false, true
+	for name, mutate := range map[string]func(*RemoteObservation){
+		"tag_object":     func(o *RemoteObservation) { o.Tag.ObjectSHA = strings.Repeat("f", 40) },
+		"tag_type":       func(o *RemoteObservation) { o.Tag.ObjectType = "commit" },
+		"tag_message":    func(o *RemoteObservation) { o.Tag.Message = "different" },
+		"tagger":         func(o *RemoteObservation) { o.Tag.Tagger.Email = "other@example.invalid" },
+		"latest_missing": func(o *RemoteObservation) { o.Latest = nil },
+		"unexpected_latest": func(o *RemoteObservation) {
+			o.Latest = &ObservedLatestRelease{Exists: true, ID: o.Release.ID, Tag: expected.Identity.Tag}
+		},
+		"contradictory_latest_absence": func(o *RemoteObservation) {
+			o.Latest = &ObservedLatestRelease{ID: 99, Tag: "v0.9.0"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			observed := base
+			tag := *base.Tag
+			release := *base.Release
+			latest := *base.Latest
+			observed.Tag, observed.Release, observed.Latest = &tag, &release, &latest
+			mutate(&observed)
+			classification, _, _ := classifyRemote(expected, observed, strings.Repeat("a", 40))
+			if classification != ReconciliationConflict {
+				t.Fatal("inexact public state accepted", classification)
+			}
+		})
+	}
+	expected.MakeLatest = true
+	base.Latest = &ObservedLatestRelease{Exists: true, ID: base.Release.ID, Tag: expected.Identity.Tag}
+	if classification, _, _ := classifyRemote(expected, base, strings.Repeat("a", 40)); classification != ReconciliationExactPublished {
+		t.Fatal("exact latest release rejected", classification)
+	}
+}
+
 func TestOperationJournalRejectsInvalidTransitionAndReplacement(t *testing.T) {
 	expected := operationFixture()
 	path, journal := createJournal(t, expected)
-	if err := journal.RecordResult("create_tag", "", "confirmed"); !errors.Is(err, ErrOperationJournal) {
+	if err := journal.RecordResult("create_tag_object", "", "confirmed", strings.Repeat("a", 40)); !errors.Is(err, ErrOperationJournal) {
 		t.Fatalf("result without intent error = %v", err)
 	}
 	if err := journal.RecordConfirmation(); !errors.Is(err, ErrOperationJournal) {
@@ -205,7 +346,7 @@ func TestOperationJournalRejectsInvalidTransitionAndReplacement(t *testing.T) {
 	if err := replacement.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := journal.RecordIntent("create_tag", ""); !errors.Is(err, ErrOperationJournal) {
+	if err := journal.RecordIntent("create_tag_object", ""); !errors.Is(err, ErrOperationJournal) {
 		t.Fatalf("replacement error = %v", err)
 	}
 	if err := journal.Close(); err != nil {
@@ -305,11 +446,11 @@ func TestOperationJournalCrashIntentIsDurable(t *testing.T) {
 	if os.Getenv("DARWIN_OPERATION_JOURNAL_HELPER") == "1" {
 		expected := operationFixture()
 		journal, err := CreateOperationJournal(os.Getenv("DARWIN_OPERATION_JOURNAL_PATH"), expected)
-		if err != nil || journal.RecordIntent("create_tag", "") != nil {
+		if err != nil || journal.RecordIntent("create_tag_object", "") != nil {
 			os.Exit(2)
 		}
 		if os.Getenv("DARWIN_OPERATION_JOURNAL_STAGE") == "result" &&
-			journal.RecordResult("create_tag", "", "confirmed") != nil {
+			journal.RecordResult("create_tag_object", "", "confirmed", strings.Repeat("a", 40)) != nil {
 			os.Exit(3)
 		}
 		_, _ = os.Stdout.WriteString("ready\n")

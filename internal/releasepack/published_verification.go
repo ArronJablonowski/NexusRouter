@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,6 +32,9 @@ type PostPublicationReceipt struct {
 	ReleaseURL                     string                     `json:"release_url"`
 	Tag                            string                     `json:"tag"`
 	SourceCommit                   string                     `json:"source_commit"`
+	TagObjectSHA                   string                     `json:"tag_object_sha"`
+	TagMessage                     string                     `json:"tag_message"`
+	Tagger                         PublicationTagger          `json:"tagger"`
 	ReleaseTitle                   string                     `json:"release_title"`
 	ReleaseNotesSHA256             string                     `json:"release_notes_sha256"`
 	Prerelease                     bool                       `json:"prerelease"`
@@ -77,12 +79,16 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 	}
 	observation, err := remote.Verify(ctx, githubverify.Plan{
 		Repository: preflight.Repository, Tag: preflight.Tag, Commit: preflight.SourceCommit,
-		Title: preflight.ReleaseTitle, Body: body, Prerelease: preflight.Prerelease,
+		TagMessage: preflight.TagMessage,
+		Tagger:     githubverify.Tagger{Name: preflight.Tagger.Name, Email: preflight.Tagger.Email, Date: preflight.Tagger.Date},
+		Title:      preflight.ReleaseTitle, Body: body, Prerelease: preflight.Prerelease,
 		Assets: expectedAssets, DownloadDir: options.DownloadDir,
 		ForbiddenRoots: []string{options.Preflight.Verification.Source, options.Preflight.Verification.Dir},
 	})
 	if err != nil || !observation.Immutable || observation.Repository != preflight.Repository ||
 		observation.Tag != preflight.Tag || observation.Commit != preflight.SourceCommit ||
+		!commitPattern.MatchString(observation.TagObjectSHA) || observation.TagMessage != preflight.TagMessage ||
+		observation.Tagger != (githubverify.Tagger{Name: preflight.Tagger.Name, Email: preflight.Tagger.Email, Date: preflight.Tagger.Date}) ||
 		observation.Title != preflight.ReleaseTitle || observation.BodySHA256 != preflight.ReleaseNotesSHA256 ||
 		observation.Prerelease != preflight.Prerelease || len(observation.Assets) != len(preflight.Assets) {
 		return empty, ErrPublicationAuthorization
@@ -112,6 +118,7 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 		Repository:                     preflight.Repository, ReleaseVersion: preflight.ReleaseVersion,
 		ReleaseID: observation.ReleaseID, ReleaseURL: observation.ReleaseURL,
 		Tag: preflight.Tag, SourceCommit: preflight.SourceCommit, ReleaseTitle: preflight.ReleaseTitle,
+		TagObjectSHA: observation.TagObjectSHA, TagMessage: observation.TagMessage, Tagger: preflight.Tagger,
 		ReleaseNotesSHA256: preflight.ReleaseNotesSHA256, Prerelease: preflight.Prerelease,
 		AuthorizedMakeLatest: preflight.MakeLatest, Immutable: true,
 		PublishedAt: observation.PublishedAt, ObservedAt: observation.ObservedAt,
@@ -134,6 +141,7 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		!trustFingerprint(receipt.PublicationAuthorizationSHA256) || !githubRepository.MatchString(receipt.Repository) ||
 		receipt.ReleaseID < 1 || validate(Options{Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit, Out: "release"}) != nil ||
 		receipt.Tag != "v"+receipt.ReleaseVersion || !validGitHubReleaseURL(receipt.ReleaseURL, receipt.Repository, receipt.Tag) ||
+		!commitPattern.MatchString(receipt.TagObjectSHA) || receipt.TagMessage != "DarwinRouter release "+receipt.Tag || !validPublicationTagger(receipt.Tagger) ||
 		receipt.ReleaseTitle != "DarwinRouter "+receipt.Tag || !trustFingerprint(receipt.ReleaseNotesSHA256) || !receipt.Immutable ||
 		(receipt.Prerelease && receipt.AuthorizedMakeLatest) || receipt.Prerelease != strings.Contains(receipt.ReleaseVersion, "-") ||
 		!wholeSecondUTC(receipt.PublishedAt) || !wholeSecondUTC(receipt.ObservedAt) || len(receipt.Assets) != 7 ||
@@ -147,7 +155,7 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		if asset.ID < 1 || ids[asset.ID] || !signingBasename(asset.Name) || asset.Name <= previous || asset.Size < 1 ||
 			asset.Name != names[i] || asset.ContentType != publicationContentType(asset.Name) ||
 			!trustFingerprint(asset.ServerSHA256) || asset.LocalSHA256 != asset.ServerSHA256 ||
-			!validGitHubAssetURL(asset.DownloadURL, asset.Name) {
+			!validGitHubAssetURL(asset.DownloadURL, receipt.Repository, receipt.Tag, asset.Name) {
 			return nil, ErrPublicationAuthorization
 		}
 		ids[asset.ID], previous = true, asset.Name
@@ -205,14 +213,11 @@ func validGitHubReleaseURL(raw, repository, tag string) bool {
 		u.User == nil && u.RawQuery == "" && u.Fragment == "" && u.EscapedPath() == "/"+repository+"/releases/tag/"+url.PathEscape(tag)
 }
 
-func validGitHubAssetURL(raw, name string) bool {
+func validGitHubAssetURL(raw, repository, tag, name string) bool {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.Port() != "" && u.Port() != "443" || u.User != nil || u.Fragment != "" ||
-		filepath.Base(u.Path) != name || len(u.RawQuery) > 4096 {
-		return false
-	}
-	host := strings.ToLower(u.Hostname())
-	return host == "github.com" || host == "release-assets.githubusercontent.com" || host == "objects.githubusercontent.com"
+	return err == nil && u.Scheme == "https" && strings.EqualFold(u.Hostname(), "github.com") && u.Port() == "" &&
+		u.User == nil && u.RawQuery == "" && u.Fragment == "" &&
+		u.EscapedPath() == "/"+repository+"/releases/download/"+url.PathEscape(tag)+"/"+url.PathEscape(name)
 }
 
 func validReceiptVerification(v ApprovedVerificationResult) bool {

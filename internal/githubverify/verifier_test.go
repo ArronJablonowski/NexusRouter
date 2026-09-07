@@ -27,6 +27,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 	}
 	commit := strings.Repeat("a", 40)
 	tagObjectSHA := strings.Repeat("b", 40)
+	tagger := Tagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"}
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.Header.Get("Authorization") != "" {
@@ -36,7 +37,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 		case "/repos/acme/router/releases/tags/v1.0.0":
 			remote := make([]assetResponse, len(assets))
 			for i, asset := range assets {
-				remote[i] = assetResponse{ID: int64(i + 1), Name: asset.Name, State: "uploaded", Size: asset.Size, Digest: asset.SHA256, ContentType: asset.ContentType, BrowserDownloadURL: server.URL + "/download/" + asset.Name}
+				remote[i] = assetResponse{ID: int64(i + 1), Name: asset.Name, State: "uploaded", Size: asset.Size, Digest: asset.SHA256, ContentType: asset.ContentType, BrowserDownloadURL: server.URL + "/acme/router/releases/download/v1.0.0/" + asset.Name}
 			}
 			writeJSON(t, w, releaseResponse{ID: 41, HTMLURL: "https://github.com/acme/router/releases/tag/v1.0.0", TagName: "v1.0.0", TargetCommitish: commit, Name: "DarwinRouter v1.0.0", Body: "notes\n", Immutable: true, PublishedAt: "2026-09-07T01:00:00Z", Assets: remote})
 		case "/repos/acme/router/git/ref/tags/v1.0.0":
@@ -45,7 +46,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 			writeJSON(t, w, ref)
 		case "/repos/acme/router/git/tags/" + tagObjectSHA:
 			var tag annotatedTagResponse
-			tag.Tag, tag.SHA, tag.Object.Type, tag.Object.SHA = "v1.0.0", tagObjectSHA, "commit", commit
+			tag.Tag, tag.SHA, tag.Message, tag.Tagger, tag.Object.Type, tag.Object.SHA = "v1.0.0", tagObjectSHA, "DarwinRouter release v1.0.0", tagger, "commit", commit
 			writeJSON(t, w, tag)
 		default:
 			name := filepath.Base(r.URL.Path)
@@ -69,7 +70,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "fresh")
-	result, err := verifier.Verify(context.Background(), Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out})
+	result, err := verifier.Verify(context.Background(), Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: tagger, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out})
 	if err != nil || !result.Immutable || result.ObservedAt != "2026-09-07T01:01:00Z" || len(result.Assets) != 7 {
 		t.Fatal("verification failed", result, err)
 	}
@@ -83,7 +84,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 
 func TestVerifierRejectsRemoteDriftAndUnsafeOutput(t *testing.T) {
 	asset := ExpectedAsset{Name: "only", Size: 1, SHA256: digest([]byte("x")), ContentType: "application/octet-stream"}
-	if _, err := validatePlan(Plan{Repository: "a/b", Tag: "v1.0.0", Commit: strings.Repeat("a", 40), Title: "t", Body: []byte("n"), Assets: []ExpectedAsset{asset}, DownloadDir: "out"}); err == nil {
+	if _, err := validatePlan(Plan{Repository: "a/b", Tag: "v1.0.0", Commit: strings.Repeat("a", 40), TagMessage: "message", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}, Title: "t", Body: []byte("n"), Assets: []ExpectedAsset{asset}, DownloadDir: "out"}); err == nil {
 		t.Fatal("wrong asset set accepted")
 	}
 	parent := t.TempDir()
@@ -102,9 +103,9 @@ func TestVerifierRejectsRemoteDriftAndUnsafeOutput(t *testing.T) {
 
 func TestExactAnnotatedTagRejectsLightweightNestedAndMismatchedStates(t *testing.T) {
 	commit, object := strings.Repeat("a", 40), strings.Repeat("b", 40)
-	plan := Plan{Tag: "v1.0.0", Commit: commit}
+	plan := Plan{Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}}
 	var valid annotatedTagResponse
-	valid.Tag, valid.SHA, valid.Object.Type, valid.Object.SHA = plan.Tag, object, "commit", commit
+	valid.Tag, valid.SHA, valid.Message, valid.Tagger, valid.Object.Type, valid.Object.SHA = plan.Tag, object, plan.TagMessage, plan.Tagger, "commit", commit
 	if !exactAnnotatedTag(valid, object, plan) {
 		t.Fatal("valid annotated tag rejected")
 	}
@@ -113,6 +114,8 @@ func TestExactAnnotatedTagRejectsLightweightNestedAndMismatchedStates(t *testing
 		"wrong_object": func(tag *annotatedTagResponse) { tag.SHA = strings.Repeat("c", 40) },
 		"nested_tag":   func(tag *annotatedTagResponse) { tag.Object.Type = "tag" },
 		"wrong_commit": func(tag *annotatedTagResponse) { tag.Object.SHA = strings.Repeat("d", 40) },
+		"message":      func(tag *annotatedTagResponse) { tag.Message = "other" },
+		"tagger":       func(tag *annotatedTagResponse) { tag.Tagger.Email = "other@example.invalid" },
 		"missing":      func(tag *annotatedTagResponse) { tag.Object.SHA = "" },
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -141,8 +144,24 @@ func TestExactAnnotatedTagRejectsLightweightNestedAndMismatchedStates(t *testing
 func TestExactAssetsRejectsContentTypeDrift(t *testing.T) {
 	want := []ExpectedAsset{{Name: "asset", Size: 1, SHA256: digest([]byte("x")), ContentType: "application/octet-stream"}}
 	got := []assetResponse{{ID: 1, Name: "asset", State: "uploaded", Size: 1, Digest: want[0].SHA256, ContentType: "text/plain", BrowserDownloadURL: "https://github.com/a/b/releases/download/v/asset"}}
-	if _, err := exactAssets(got, want); err == nil {
+	if _, err := exactAssets(got, want, "a/b", "v"); err == nil {
 		t.Fatal("remote content-type drift accepted")
+	}
+}
+
+func TestInitialDownloadURLBindsRepositoryTagAndAsset(t *testing.T) {
+	valid := "https://github.com/acme/router/releases/download/v1.0.0/artifact.tar.gz"
+	if !validInitialDownloadURL(valid, "acme/router", "v1.0.0", "artifact.tar.gz") {
+		t.Fatal("exact release asset URL rejected")
+	}
+	for _, candidate := range []string{
+		"https://github.com/other/router/releases/download/v1.0.0/artifact.tar.gz",
+		"https://github.com/acme/router/releases/download/v1.0.1/artifact.tar.gz",
+		"https://github.com/acme/router/releases/download/v1.0.0/other.tar.gz",
+	} {
+		if validInitialDownloadURL(candidate, "acme/router", "v1.0.0", "artifact.tar.gz") {
+			t.Fatal("cross-authority asset URL accepted", candidate)
+		}
 	}
 }
 
@@ -164,7 +183,7 @@ func TestRedirectPolicyRejectsUntrustedHosts(t *testing.T) {
 
 func TestExactReleaseRejectsMetadataDrift(t *testing.T) {
 	commit := strings.Repeat("a", 40)
-	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n")}
+	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n")}
 	valid := releaseResponse{
 		ID: 1, HTMLURL: "https://github.com/acme/router/releases/tag/v1.0.0", TagName: plan.Tag,
 		TargetCommitish: commit, Name: plan.Title, Body: string(plan.Body), Immutable: true,
@@ -174,7 +193,6 @@ func TestExactReleaseRejectsMetadataDrift(t *testing.T) {
 		"mutable":      func(r *releaseResponse) { r.Immutable = false },
 		"draft":        func(r *releaseResponse) { r.Draft = true },
 		"tag":          func(r *releaseResponse) { r.TagName = "v1.0.1" },
-		"commit":       func(r *releaseResponse) { r.TargetCommitish = strings.Repeat("b", 40) },
 		"title":        func(r *releaseResponse) { r.Name += " changed" },
 		"body":         func(r *releaseResponse) { r.Body += "changed\n" },
 		"prerelease":   func(r *releaseResponse) { r.Prerelease = true },

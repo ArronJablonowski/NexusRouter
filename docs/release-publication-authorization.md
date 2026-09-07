@@ -15,7 +15,8 @@ strict parser and offline preflight, but no command that generates this record.
 
 The record binds one `github.com` owner/repository, exact version and full source
 commit, the exact `vVERSION` tag, fixed release title, exact release-notes body
-digest, every public release-control digest, and the seven exact signed release
+digest, the exact annotated-tag message and tagger identity/time, every public
+release-control digest, and the seven exact signed release
 files. Its controls require draft-first, create-only publication into a repository
 with immutable releases enabled. Those fields express approval requirements;
 offline verification cannot prove the GitHub setting or remote state.
@@ -36,6 +37,12 @@ digest is `sha256:` plus 64 lowercase hexadecimal characters.
   "source_commit": "REPLACE_WITH_40_LOWERCASE_HEX_CHARACTERS",
   "tag": "v1.0.0",
   "release_title": "DarwinRouter v1.0.0",
+  "tag_message": "DarwinRouter release v1.0.0",
+  "tagger": {
+    "name": "REPLACE_WITH_APPROVED_TAGGER_NAME",
+    "email": "REPLACE_WITH_APPROVED_TAGGER_EMAIL",
+    "date": "YYYY-MM-DDTHH:MM:SSZ"
+  },
   "prerelease": false,
   "make_latest": true,
   "release_notes_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",

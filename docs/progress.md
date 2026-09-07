@@ -4450,3 +4450,23 @@ retries. Focused integrated race tests passed. DAR-63 still must implement the
 annotated-tag/draft-to-immutable transition and DAR-64 must connect only pinned
 authorization bytes to a secret-safe fixed-origin transport. No production
 credential, tag, upload, release or rollback action was used.
+
+DAR-63/DAR-64 implementation checkpoint: the authorization-derived publication
+adapter now pins and revalidates the source, release, approval, verification and
+seven exact asset files before its sole mutation call. The operation-scoped
+credential lease is restricted to the authorized repository, fixed GitHub HTTPS
+origins, a closed request grammar and the pinned API version; it requires both
+Contents write and Administration read authority and scrubs retained token bytes
+and response request metadata. The publisher creates an approval-bound annotated
+tag object and reference, creates a draft, uploads and rereads the exact assets,
+rechecks the repository immutable-release policy immediately before one publish
+transition, then requires an immutable non-draft reread before confirming its
+durable journal. It also independently observes the authorized latest-release
+outcome. Lost-response recovery remains non-retryable and converges only from a
+complete ordered journal plus exact release, asset, annotated-tag and latest
+remote observations. Independent verification now also binds
+every initial download URL to the exact repository, tag and asset. These are
+mocked local controls only: no production credential, network mutation, tag,
+upload or release was used, and operator authorization, the live repository
+immutable setting, production execution and post-publication receipt remain open
+gates.

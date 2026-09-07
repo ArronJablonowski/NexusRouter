@@ -296,7 +296,7 @@ func (p *Publisher) assetRequest(ctx context.Context, evidence *Evidence, reques
 }
 
 func (p *Publisher) request(ctx context.Context, evidence *Evidence, origin *url.URL, method, requestPath string, query url.Values, body io.Reader) (*http.Request, error) {
-	if ctx.Err() != nil || evidence.Requests >= maxRequests || (method != http.MethodGet && method != http.MethodPost) || requestPath == "" || requestPath[0] != '/' || path.Clean(requestPath) != requestPath {
+	if ctx.Err() != nil || evidence.Requests >= maxRequests || (method != http.MethodGet && method != http.MethodPost && method != http.MethodPatch) || requestPath == "" || requestPath[0] != '/' || path.Clean(requestPath) != requestPath {
 		return nil, ErrPublish
 	}
 	u := *origin
@@ -358,13 +358,15 @@ type createReleaseRequest struct {
 }
 
 type releaseResponse struct {
-	ID         int64  `json:"id"`
-	TagName    string `json:"tag_name"`
-	Name       string `json:"name"`
-	Body       string `json:"body"`
-	Draft      bool   `json:"draft"`
-	Prerelease bool   `json:"prerelease"`
-	UploadURL  string `json:"upload_url"`
+	ID              int64  `json:"id"`
+	TagName         string `json:"tag_name"`
+	TargetCommitish string `json:"target_commitish"`
+	Name            string `json:"name"`
+	Body            string `json:"body"`
+	Draft           bool   `json:"draft"`
+	Prerelease      bool   `json:"prerelease"`
+	Immutable       bool   `json:"immutable"`
+	UploadURL       string `json:"upload_url"`
 }
 
 type assetResponse struct {
