@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	APIVersion       = "2022-11-28"
+	APIVersion       = "2026-03-10"
 	maxAssets        = 16
 	maxAssetBytes    = 256 << 20
 	maxTotalBytes    = 512 << 20

@@ -4433,3 +4433,20 @@ the supplied license evidence. Focused integrated race tests and the full
 `make check` passed. Production approval, credentials, signing, publication,
 post-publication verification and rollback-policy evidence remain operator
 gates.
+
+DAR-60/DAR-61/DAR-62 checkpoint: the release epic is now decomposed into
+eighteen short sprints. Independent post-publication verification requires an
+immutable non-draft GitHub release, an annotated tag object that peels directly
+to the authorized commit, the exact point-in-time title/notes and seven-asset
+set, exact content types, server and local digests, bounded fresh downloads and
+a second approval-bound verification before a canonical receipt is emitted.
+Rollback readiness has a separate canonical, read-only contract for explicit
+first-release or upgrade policy, prior binary and backup evidence when
+applicable, rehearsal evidence, incident ownership, independent verifier roles
+and an approval validity window. A create-only `0600` fsynced publication
+journal now records mutation intent/result boundaries and classifies absent,
+partial, confirmed or conflicting remote state without allowing uncertain
+retries. Focused integrated race tests passed. DAR-63 still must implement the
+annotated-tag/draft-to-immutable transition and DAR-64 must connect only pinned
+authorization bytes to a secret-safe fixed-origin transport. No production
+credential, tag, upload, release or rollback action was used.
