@@ -58,12 +58,16 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		t.Fatal("automatic trigger introduced")
 	}
 	dispatch, ok := workflow.On["workflow_dispatch"]
-	if !ok || len(dispatch.Inputs) != 1 {
+	if !ok || len(dispatch.Inputs) != 2 {
 		t.Fatal("dispatch authority changed")
 	}
 	versionInput, ok := dispatch.Inputs["version"]
 	if !ok || !versionInput.Required || versionInput.Type != "string" || versionInput.Description == "" {
 		t.Fatal("release version input changed")
+	}
+	evidenceInput, ok := dispatch.Inputs["license_evidence_sha256"]
+	if !ok || !evidenceInput.Required || evidenceInput.Type != "string" || evidenceInput.Description == "" {
+		t.Fatal("license evidence authority input changed")
 	}
 	if !reflect.DeepEqual(workflow.Permissions, map[string]string{"contents": "read"}) || len(workflow.Jobs) != 1 {
 		t.Fatal("workflow authority expanded")
@@ -76,7 +80,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		{"linux/arm64", "ubuntu-24.04-arm", "linux", "arm64"},
 	}
 	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 90 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
-		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 7 {
+		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 8 {
 		t.Fatal("unexpected job structure")
 	}
 	for i, expected := range expectedMatrix {
@@ -97,7 +101,14 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if job.Steps[1].Uses != "actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff" || job.Steps[1].With["go-version-file"] != "go.mod" || job.Steps[1].With["cache"] != false {
 		t.Fatal("toolchain/cache contract")
 	}
-	if job.Steps[3].ID != "check" || job.Steps[3].Run != "make check" || job.Steps[4].ID != "qualification" || job.Steps[4].Run != "make qualify-release" {
+	evidence := job.Steps[3]
+	if evidence.ID != "license_evidence" || evidence.Env["EXPECTED_LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" ||
+		!strings.Contains(evidence.Run, `license-evidence freeze --commit "$GITHUB_SHA"`) ||
+		!strings.Contains(evidence.Run, `test "$actual" = "$EXPECTED_LICENSE_EVIDENCE_SHA256"`) ||
+		!strings.Contains(evidence.Run, "make qualify-license-evidence") {
+		t.Fatal("candidate license evidence is not independently bound and re-derived")
+	}
+	if job.Steps[4].ID != "check" || job.Steps[4].Run != "make check" || job.Steps[5].ID != "qualification" || job.Steps[5].Run != "make qualify-release" {
 		t.Fatal("qualification gates bypassed")
 	}
 	if job.Steps[2].Env["RELEASE_VERSION"] != "${{ inputs.version }}" ||
@@ -110,7 +121,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		!strings.Contains(job.Steps[2].Run, `test "$(go env GOHOSTARCH)" = "$EXPECTED_NATIVE_ARCH"`) {
 		t.Fatal("release version is not validated and recorded")
 	}
-	if !reflect.DeepEqual(job.Steps[4].Env, map[string]string{"DARWIN_RELEASE_VERSION": "${{ inputs.version }}", "DARWIN_RELEASE_COMMIT": "${{ github.sha }}"}) {
+	if !reflect.DeepEqual(job.Steps[5].Env, map[string]string{"DARWIN_RELEASE_VERSION": "${{ inputs.version }}", "DARWIN_RELEASE_COMMIT": "${{ github.sha }}"}) {
 		t.Fatal("release identity is not bound to qualification")
 	}
 	for _, step := range job.Steps[2:] {
@@ -118,16 +129,18 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 			t.Fatal("additional external action or unexpected shell")
 		}
 	}
-	for _, index := range []int{2, 5} {
+	for _, index := range []int{2, 6} {
 		if !strings.Contains(job.Steps[index].Run, "git rev-parse HEAD") || !strings.Contains(job.Steps[index].Run, "$GITHUB_SHA") || !strings.Contains(job.Steps[index].Run, "git status --porcelain --untracked-files=all") {
 			t.Fatal("missing source binding")
 		}
 	}
-	report := job.Steps[6]
-	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["QUALIFICATION_OUTCOME"] != "${{ steps.qualification.outcome }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" {
+	report := job.Steps[7]
+	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["QUALIFICATION_OUTCOME"] != "${{ steps.qualification.outcome }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || !strings.Contains(report.Run, "Approved candidate license-evidence digest") {
 		t.Fatal("missing failure-aware evidence")
 	}
 	for _, evidence := range []string{
+		"four target-specific dependency closures and notice digests",
+		"does not grant legal approval",
 		"exact six-member schema-2 collateral",
 		"target-specific dependency notices",
 		"disposable native install",

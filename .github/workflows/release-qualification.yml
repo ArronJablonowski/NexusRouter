@@ -9,6 +9,10 @@ on:
         description: Semantic release version without a leading v or build metadata
         required: true
         type: string
+      license_evidence_sha256:
+        description: Independently reviewed sha256 digest emitted by license-evidence freeze for this exact commit and Go toolchain
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -94,6 +98,19 @@ jobs:
             echo "arch=$(go env GOHOSTARCH)"
             echo "go=$(go env GOVERSION)"
           } >> "$GITHUB_OUTPUT"
+      - name: Re-derive approved candidate license evidence
+        id: license_evidence
+        shell: bash
+        env:
+          EXPECTED_LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/darwinrouter-license-evidence.json"
+          actual=$(go run ./cmd/license-evidence freeze --commit "$GITHUB_SHA" --source . --out "$evidence")
+          test "$actual" = "$EXPECTED_LICENSE_EVIDENCE_SHA256"
+          DARWIN_LICENSE_EVIDENCE_RECORD="$evidence" \
+          DARWIN_LICENSE_EVIDENCE_SHA256="$EXPECTED_LICENSE_EVIDENCE_SHA256" \
+            make qualify-license-evidence
       - name: Run quality gates
         id: check
         shell: bash
@@ -121,7 +138,9 @@ jobs:
           NATIVE_OS: ${{ steps.source.outputs.os }}
           NATIVE_ARCH: ${{ steps.source.outputs.arch }}
           GO_VERSION: ${{ steps.source.outputs.go }}
+          LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
           SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          LICENSE_EVIDENCE_OUTCOME: ${{ steps.license_evidence.outcome }}
           CHECK_OUTCOME: ${{ steps.check.outcome }}
           QUALIFICATION_OUTCOME: ${{ steps.qualification.outcome }}
           UNCHANGED_OUTCOME: ${{ steps.unchanged.outcome }}
@@ -132,12 +151,13 @@ jobs:
             printf '\nDispatched commit: `%s`\n' "$GITHUB_SHA"
             printf '\nVerified checkout: `%s`\n' "${SOURCE_COMMIT:-unavailable}"
             printf '\nObserved native platform: `%s/%s`; Go: `%s`\n' "${NATIVE_OS:-unavailable}" "${NATIVE_ARCH:-unavailable}" "${GO_VERSION:-unavailable}"
+            printf '\nApproved candidate license-evidence digest: `%s`\n' "$LICENSE_EVIDENCE_SHA256"
             printf '\n| Gate | Outcome |\n| --- | --- |\n'
-            printf '| Source binding | %s |\n| make check | %s |\n| make qualify-release | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$CHECK_OUTCOME" "$QUALIFICATION_OUTCOME" "$UNCHANGED_OUTCOME"
+            printf '| Source binding | %s |\n| Candidate license evidence | %s |\n| make check | %s |\n| make qualify-release | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$LICENSE_EVIDENCE_OUTCOME" "$CHECK_OUTCOME" "$QUALIFICATION_OUTCOME" "$UNCHANGED_OUTCOME"
             echo
-            echo 'Only a successful qualification gate establishes the following evidence: deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact six-member schema-2 collateral and target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-28-to-29 migration, backup and rollback rehearsal.'
+            echo 'Only successful license-evidence and qualification gates establish the following evidence: the exact source commit, Go version and module directive, root MIT license digest, four target-specific dependency closures and notice digests; deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact six-member schema-2 collateral and target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-28-to-29 migration, backup and rollback rehearsal.'
             echo
             echo 'This job natively executes only the observed platform above; the other three artifacts are cross-built and inspected. All four successful matrix jobs are required for four-target native evidence. Read the observed platform above; the workflow asserts it against the expected target instead of trusting the runner label alone. Failed/skipped gates do not qualify a release.'
             echo
-            echo 'No live models, production signing key, tag, release, artifact upload, installation outside the disposable runner-local rehearsal, or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
+            echo 'The supplied license-evidence digest is independent dispatch input; this workflow only checks exact derivation and does not grant legal approval. No live models, production signing key, tag, release, artifact upload, installation outside the disposable runner-local rehearsal, or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-release qualify-codex-repair
+.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-release qualify-license-evidence qualify-codex-repair
 
 build:
 	go build -trimpath -o bin/darwin ./cmd/darwin
@@ -41,3 +41,11 @@ qualify-codex-repair:
 # checkout. Uses only disposable test signing keys.
 qualify-release: qualify-mvp
 	DARWIN_RELEASE_QUALIFY=1 go test -count=1 -timeout=45m -run '^TestReleaseQualification$$' -v ./internal/releasepack
+
+# Re-derive an external, canonical license-evidence record from its immutable
+# commit and bind it to an independently supplied digest. The record must be
+# outside the source checkout and the checkout must be exact and clean.
+qualify-license-evidence:
+	test -n "$$DARWIN_LICENSE_EVIDENCE_RECORD"
+	test -n "$$DARWIN_LICENSE_EVIDENCE_SHA256"
+	go run ./cmd/license-evidence verify --record "$$DARWIN_LICENSE_EVIDENCE_RECORD" --record-sha256 "$$DARWIN_LICENSE_EVIDENCE_SHA256" --source .
