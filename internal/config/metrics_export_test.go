@@ -97,3 +97,29 @@ func TestMetricsExportValidation(t *testing.T) {
 		t.Fatal("disabled empty block")
 	}
 }
+
+func TestOpenTelemetryCompatibilitySwitch(t *testing.T) {
+	for _, mode := range []string{"hybrid", "cloud_only", "local_only"} {
+		s := Defaults()
+		s.Mode = mode
+		s.Telemetry.OTEL = true
+		s.Telemetry.MetricsExport = &MetricsExport{Endpoint: "http://127.0.0.1:4318/v1/metrics", Interval: "1s"}
+		if err := s.Validate(); err != nil {
+			t.Fatalf("%s compatibility switch rejected: %v", mode, err)
+		}
+	}
+
+	s := Defaults()
+	s.Telemetry.OTEL = true
+	if s.Validate() == nil {
+		t.Fatal("switch without destination accepted")
+	}
+	s.Telemetry.MetricsExport = &MetricsExport{Endpoint: "https://collector.example/v1/metrics"}
+	if err := s.Validate(); err != nil {
+		t.Fatal("cloud-capable destination rejected", err)
+	}
+	s.Mode = "local_only"
+	if s.Validate() == nil {
+		t.Fatal("local-only switch accepted a remote collector")
+	}
+}

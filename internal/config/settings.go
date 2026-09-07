@@ -319,13 +319,13 @@ func (s Settings) Validate() error {
 			return errors.New("local-only mode requires local skills context")
 		}
 	}
-	if s.Mode == "local_only" && (!s.Memory.LocalOnly || s.Telemetry.OTEL) {
-		return errors.New("local-only mode requires local memory and disabled telemetry export")
+	if s.Mode == "local_only" && !s.Memory.LocalOnly {
+		return errors.New("local-only mode requires local memory")
 	}
 	if s.Telemetry.Database == "" {
 		return errors.New("database path required")
 	}
-	if err := s.Telemetry.MetricsExport.validate(s.Mode); err != nil {
+	if err := s.Telemetry.MetricsExport.validate(s.Mode, s.Telemetry.OTEL); err != nil {
 		return err
 	}
 	want := Defaults().Evaluation.Precedence

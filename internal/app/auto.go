@@ -54,7 +54,7 @@ type Service struct {
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
-	if s.Validate() != nil || s.Telemetry.OTEL || s.Workers.Max > 64 {
+	if s.Validate() != nil || s.Workers.Max > 64 {
 		return nil, ErrAdmission
 	}
 	// Snapshot nested configuration so callers cannot mutate running admissions.

@@ -45,7 +45,7 @@ func (s *Service) SkillWorkflowScan(ctx context.Context, name string) (skills.Wo
 // Scope is destination configuration, not source-project or tenant ownership.
 func (s *Service) AdvanceSkillWorkflowScan(ctx context.Context, name, domain string, expectedRevision int64, scanLimit int) (skills.WorkflowScanPage, error) {
 	bad := func() (skills.WorkflowScanPage, error) { return skills.WorkflowScanPage{}, ErrAdmission }
-	if !s.skillScanAdmission(ctx, name) || !s.settings.Skills.AutoDraft || s.settings.Telemetry.OTEL || !skillGenerationIdentifier.MatchString(domain) || expectedRevision < 0 || expectedRevision >= 1_000_000_000 || scanLimit < 1 || scanLimit > 20 {
+	if !s.skillScanAdmission(ctx, name) || !s.settings.Skills.AutoDraft || !skillGenerationIdentifier.MatchString(domain) || expectedRevision < 0 || expectedRevision >= 1_000_000_000 || scanLimit < 1 || scanLimit > 20 {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

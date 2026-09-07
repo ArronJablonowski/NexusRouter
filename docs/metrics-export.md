@@ -4,8 +4,9 @@ The CLI and Go SDK can send one content-free lifecycle snapshot to an
 OpenTelemetry collector using OTLP/HTTP JSON. This is an explicit operation,
 not a background exporter. Optional periodic export is separately available
 through daemon configuration or an explicitly owned SDK handle below. The
-existing `telemetry.opentelemetry_enabled` flag remains unsupported by runtime
-startup and must stay false; traces and full instrumentation remain unfinished.
+`telemetry.opentelemetry_enabled` switch is a compatibility alias for enabling
+the configured periodic metrics exporter; it does not enable traces, which
+remain unfinished.
 
 ```sh
 darwin metrics export --config config.yaml --endpoint http://127.0.0.1:4318/v1/metrics
@@ -32,15 +33,17 @@ command. No new daemon HTTP endpoint accepts arbitrary export destinations.
 
 ## Periodic daemon and SDK export
 
-Daemon export is off when `telemetry.metrics_export` is absent or disabled. To
-opt in, add the following to the daemon's configuration before starting it:
+Daemon export is off unless either `opentelemetry_enabled` or
+`metrics_export.enabled` is true. In both cases the `metrics_export` block and
+endpoint are required. To opt in, add the following before starting the daemon:
 
 ```yaml
 telemetry:
   database: ./data/darwin.db
-  opentelemetry_enabled: false
+  opentelemetry_enabled: true
   metrics_export:
-    enabled: true
+    # enabled: true is the equivalent newer spelling.
+    enabled: false
     endpoint: http://127.0.0.1:4318/v1/metrics
     interval: 60s
     # api_key_env: OTEL_COLLECTOR_TOKEN

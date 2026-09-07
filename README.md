@@ -1419,8 +1419,9 @@ only response size and label cardinality are fixed. Reads neither migrate storag
 nor dispatch inference. An explicit CLI/SDK [OTLP metrics export](docs/metrics-export.md)
 can now send one aggregate snapshot through the network policy. Opt-in daemon
 configuration and an owned SDK exporter also support periodic fresh snapshots,
-supplemental health and cancellation. Neither enables the reserved legacy export
-flag. Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
+supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
+now aliases configured periodic metrics export; it does not enable tracing.
+Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
 provider/tool latency and cost histograms, retention
 and production-scale metrics qualification remain unfinished.

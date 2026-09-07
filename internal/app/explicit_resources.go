@@ -27,7 +27,7 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 }
 
 func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
-	if s == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || validateInput(r) != nil || ctx.Err() != nil {
+	if s == nil || s.settings.Validate() != nil || validateInput(r) != nil || ctx.Err() != nil {
 		return Result{}, ErrAdmission
 	}
 	r.providerFactory = s.providerFactory

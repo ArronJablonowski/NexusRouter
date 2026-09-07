@@ -33,32 +33,32 @@ func StartMetricsExport(ctx context.Context, s *Service, options metrics.ExportO
 
 // StartConfiguredMetricsExport is the daemon's explicit configuration boundary.
 // An absent or disabled setting returns an inert handle without reading storage
-// or resolving credentials. Enabling it does not enable traces or the reserved
-// legacy opentelemetry_enabled flag.
+// or resolving credentials. telemetry.opentelemetry_enabled is a compatibility
+// alias for enabling this metrics exporter; it does not enable runtime traces.
 func StartConfiguredMetricsExport(ctx context.Context, s *Service) (*MetricsExporter, error) {
-	if ctx == nil || ctx.Err() != nil || s == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL {
+	if ctx == nil || ctx.Err() != nil || s == nil || s.settings.Validate() != nil {
 		return nil, metrics.ErrExport
 	}
 	cfg := s.settings.Telemetry.MetricsExport
-	if cfg == nil || !cfg.Enabled {
+	if cfg == nil || (!cfg.Enabled && !s.settings.Telemetry.OTEL) {
 		m := &MetricsExporter{done: make(chan struct{}), status: "disabled", code: "disabled_by_policy"}
 		close(m.done)
 		return m, nil
 	}
-	expected := *cfg
+	expected, expectedOTEL := *cfg, s.settings.Telemetry.OTEL
 	interval, err := expected.IntervalDuration()
 	if err != nil {
 		return nil, metrics.ErrExport
 	}
 	authorized := func() bool {
 		current := s.settings.Telemetry.MetricsExport
-		return current != nil && *current == expected
+		return current != nil && *current == expected && s.settings.Telemetry.OTEL == expectedOTEL
 	}
 	return startMetricsExport(ctx, s, metrics.ExportOptions{Endpoint: expected.Endpoint, APIKeyEnv: expected.APIKeyEnv}, interval, authorized)
 }
 
 func startMetricsExport(ctx context.Context, s *Service, options metrics.ExportOptions, interval time.Duration, authorized func() bool) (*MetricsExporter, error) {
-	if ctx == nil || ctx.Err() != nil || s == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || options.Validate() != nil || interval < time.Second || interval > 24*time.Hour {
+	if ctx == nil || ctx.Err() != nil || s == nil || s.settings.Validate() != nil || options.Validate() != nil || interval < time.Second || interval > 24*time.Hour {
 		return nil, metrics.ErrExport
 	}
 	// Validate destination authority before starting, without DNS or a connection.

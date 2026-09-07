@@ -1,5 +1,28 @@
 # Implementation evidence
 
+PRD telemetry-gap checkpoint: `telemetry.opentelemetry_enabled` is no longer a
+reserved switch that disables the runtime. It is now a compatibility alias for
+enabling the explicitly configured periodic OTLP/HTTP metrics exporter; the
+newer `telemetry.metrics_export.enabled` spelling remains supported. Either path
+requires the bounded metrics-export block and collector endpoint, applies the
+same destination validation and credential lookup, and allows only a loopback
+collector in local-only mode. Missing configuration and remote local-only
+destinations fail validation before storage or network access. Runtime tasks,
+automatic routing and configured skill-learning operations remain available
+while export is enabled. The daemon exporter snapshots the selected flag/block
+and rejects configuration rotation before delivery, retains sequential
+non-retrying scheduling, and reports its existing bounded health state. Focused
+race tests prove local/hybrid/cloud validation, task execution plus an actual
+loopback OTLP delivery, configured-learning coexistence and rotation fencing.
+Full `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and production build; application took 220.104s,
+telemetry 146.137s, CLI 42.160s and SDK 25.018s. This closes the unusable-switch
+gap for metrics only; runtime trace spans, provider/tool histograms, full
+instrumentation coverage, production collectors and fleet-scale qualification
+remain open. No live model, user database or external collector was used. Native
+Linear remains unavailable because the Mac is locked, so no issue update is
+claimed. The full PRD remains incomplete.
+
 DAR-46 release preparation advanced but is not completion-ready. Release
 qualification now depends on the deterministic DAR-45 MVP gate, so packaging
 cannot qualify while the current runtime acceptance slice is failing. The

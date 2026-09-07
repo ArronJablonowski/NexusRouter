@@ -66,6 +66,12 @@ func TestLearningValidation(t *testing.T) {
 	if err := s.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	s = learningSettings()
+	s.Telemetry.OTEL = true
+	s.Telemetry.MetricsExport = &MetricsExport{Endpoint: "http://127.0.0.1:4318/v1/metrics"}
+	if err := s.Validate(); err != nil {
+		t.Fatal("telemetry export disabled configured learning", err)
+	}
 }
 
 func TestLearningLayering(t *testing.T) {

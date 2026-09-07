@@ -29,7 +29,7 @@ func (s *Service) GenerateSkillDraft(ctx context.Context, attemptID, modelID str
 
 func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID string, key skills.Key, taskIDs []string, maxCost float64, selection *skills.WorkflowSelection, observedSecrets []string) (skills.GenerationAttempt, error) {
 	bad := func() (skills.GenerationAttempt, error) { return skills.GenerationAttempt{}, ErrAdmission }
-	if s == nil || ctx == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(attemptID) || len(taskIDs) < 2 || len(taskIDs) > 20 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
+	if s == nil || ctx == nil || s.settings.Validate() != nil || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(attemptID) || len(taskIDs) < 2 || len(taskIDs) > 20 || maxCost < 0 || math.IsNaN(maxCost) || math.IsInf(maxCost, 0) {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)

@@ -28,7 +28,7 @@ func (s *Service) exportMetrics(ctx context.Context, options metrics.ExportOptio
 			err = metrics.ErrExport
 		}
 	}()
-	if s == nil || ctx == nil || ctx.Err() != nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || options.Validate() != nil {
+	if s == nil || ctx == nil || ctx.Err() != nil || s.settings.Validate() != nil || options.Validate() != nil {
 		return metrics.ErrExport
 	}
 	if authorized != nil && !authorized() {
@@ -64,7 +64,7 @@ func (s *Service) exportMetrics(ctx context.Context, options metrics.ExportOptio
 	if options.APIKeyEnv != "" && s.secret(options.APIKeyEnv) != key {
 		return metrics.ErrExport
 	}
-	if ctx.Err() != nil || s.settings.Mode != mode || s.settings.Telemetry.Database != database || s.settings.Validate() != nil || s.settings.Telemetry.OTEL {
+	if ctx.Err() != nil || s.settings.Mode != mode || s.settings.Telemetry.Database != database || s.settings.Validate() != nil {
 		return metrics.ErrExport
 	}
 	if authorized != nil && !authorized() {

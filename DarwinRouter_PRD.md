@@ -713,9 +713,12 @@ policy. It reads existing storage only and introduces no implicit background
 network access. See [metric export](docs/metrics-export.md) for delivery semantics,
 credential handling and bounds. Opt-in daemon scheduling and an owned SDK
 exporter now send fresh snapshots sequentially and report supplemental health,
-without blocking task readiness on collector failure. Runtime traces,
-provider/tool-specific histograms and the complete instrumentation list above still require implementation;
-the reserved runtime `opentelemetry_enabled` flag is not yet supported.
+without blocking task readiness on collector failure. The legacy
+`opentelemetry_enabled` switch is supported as an alias for enabling the
+configured periodic metrics exporter; it requires the same explicit destination
+and policy checks and does not disable task or learning execution. Runtime traces,
+provider/tool-specific histograms and the complete instrumentation list above
+still require implementation.
 
 Schema29 now records task start-to-terminal event wall time transactionally,
 including recovery terminals, and exports cumulative fixed-bucket histograms

@@ -27,7 +27,7 @@ func (s *Service) PlanWorkflowSelection(ctx context.Context, modelID string, key
 
 func (s *Service) planWorkflowSelection(ctx context.Context, modelID string, key skills.Key, group, algorithm string, taskIDs []string, maxCost float64, binding *skills.WorkflowGroup, observedSecrets []string) (skills.WorkflowSelection, error) {
 	bad := func() (skills.WorkflowSelection, error) { return skills.WorkflowSelection{}, ErrAdmission }
-	if s == nil || ctx == nil || s.settings.Validate() != nil || s.settings.Telemetry.OTEL || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(group) || !skillGenerationIdentifier.MatchString(algorithm) || len(taskIDs) < 2 || len(taskIDs) > 20 {
+	if s == nil || ctx == nil || s.settings.Validate() != nil || !s.settings.Skills.Enabled || !s.settings.Skills.AutoDraft || s.settings.Skills.Root == "" || key.Scope != s.settings.Skills.Scope || !skillGenerationIdentifier.MatchString(key.Name) || !skillGenerationIdentifier.MatchString(group) || !skillGenerationIdentifier.MatchString(algorithm) || len(taskIDs) < 2 || len(taskIDs) > 20 {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

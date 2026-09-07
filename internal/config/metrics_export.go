@@ -29,16 +29,20 @@ func (m MetricsExport) IntervalDuration() (time.Duration, error) {
 	return d, nil
 }
 
-func (m *MetricsExport) validate(mode string) error {
+func (m *MetricsExport) validate(mode string, telemetryEnabled bool) error {
 	if m == nil {
+		if telemetryEnabled {
+			return errors.New("metrics export configuration required")
+		}
 		return nil
 	}
 	if _, err := m.IntervalDuration(); err != nil {
 		return err
 	}
 	endpoint := m.Endpoint
+	enabled := m.Enabled || telemetryEnabled
 	if endpoint == "" {
-		if m.Enabled {
+		if enabled {
 			return errors.New("metrics export endpoint required")
 		}
 		endpoint = "https://collector.invalid/v1/metrics" // Validate only a supplied credential name when disabled.
@@ -46,7 +50,7 @@ func (m *MetricsExport) validate(mode string) error {
 	if (metrics.ExportOptions{Endpoint: endpoint, APIKeyEnv: m.APIKeyEnv}).Validate() != nil {
 		return errors.New("invalid metrics export configuration")
 	}
-	if m.Enabled && mode == "local_only" {
+	if enabled && mode == "local_only" {
 		u, err := url.Parse(endpoint)
 		if err != nil {
 			return errors.New("invalid metrics export configuration")

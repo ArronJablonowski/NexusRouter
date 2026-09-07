@@ -42,7 +42,7 @@ func (s Settings) validateLearning() error {
 	if (l.ValidatorID != "" && !s.Skills.AutoActivate) || (l.RegressionName != "" && !s.Skills.Rollback) {
 		return errors.New("skill learning validator selection requires activation and regression policy")
 	}
-	if !s.Skills.Enabled || !s.Skills.AutoDraft || !s.Skills.GenerationBudget.Enabled || s.Skills.Root == "" || s.Skills.Scope == "" || s.Telemetry.OTEL || l.MaxCost > s.Skills.GenerationBudget.MaxCost {
+	if !s.Skills.Enabled || !s.Skills.AutoDraft || !s.Skills.GenerationBudget.Enabled || s.Skills.Root == "" || s.Skills.Scope == "" || l.MaxCost > s.Skills.GenerationBudget.MaxCost {
 		return errors.New("skill learning requires configured skills and generation budget")
 	}
 	for _, m := range s.Models {

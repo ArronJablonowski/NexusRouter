@@ -15,7 +15,7 @@ import (
 // invokes a provider nor publishes or activates a skill.
 func (s *Service) ConsumeSkillWorkflowScan(ctx context.Context, name string, expectedRevision int64) (skills.WorkflowScanConsumption, error) {
 	bad := func() (skills.WorkflowScanConsumption, error) { return skills.WorkflowScanConsumption{}, ErrAdmission }
-	if !s.skillScanAdmission(ctx, name) || !s.settings.Skills.AutoDraft || s.settings.Telemetry.OTEL || expectedRevision < 0 || expectedRevision >= 1_000_000_000 {
+	if !s.skillScanAdmission(ctx, name) || !s.settings.Skills.AutoDraft || expectedRevision < 0 || expectedRevision >= 1_000_000_000 {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

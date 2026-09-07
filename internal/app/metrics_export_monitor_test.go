@@ -75,6 +75,40 @@ func TestMetricsExporterDisabledAndInvalidStartDoNotDispatch(t *testing.T) {
 	}
 }
 
+func TestOpenTelemetrySwitchRunsTasksAndConfiguredExporter(t *testing.T) {
+	base, cfg := autoFixture(t)
+	var calls atomic.Int64
+	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{}`)
+	}))
+	defer collector.Close()
+	cfg.Telemetry.OTEL = true
+	cfg.Telemetry.MetricsExport = &config.MetricsExport{Endpoint: collector.URL + "/v1/metrics", Interval: "1s"}
+	s, err := NewService(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.profile = base.profile
+	result, err := s.Run(context.Background(), Request{ModelID: "a", Prompt: "runtime remains available"})
+	if err != nil || result.Text != "a" {
+		t.Fatal("telemetry switch disabled task execution", result, err)
+	}
+	exporter, err := StartConfiguredMetricsExport(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer exporter.Close()
+	waitMetricsExportHealth(t, exporter, "healthy")
+	if calls.Load() != 1 {
+		t.Fatal("compatibility switch did not start exporter", calls.Load())
+	}
+	if err := exporter.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMetricsExporterCompletionRelativeCadenceAndClose(t *testing.T) {
 	s := metricsExportFixture(t)
 	entered := make(chan time.Time, 4)
@@ -212,18 +246,24 @@ func TestMetricsExporterCloseCancelsAndJoinsActiveRequest(t *testing.T) {
 }
 
 func TestConfiguredMetricsExporterRechecksSettingsAfterCredentialCallback(t *testing.T) {
-	for _, mutation := range []string{"disabled", "endpoint"} {
+	for _, mutation := range []string{"disabled", "endpoint", "otel"} {
 		t.Run(mutation, func(t *testing.T) {
 			s := metricsExportFixture(t)
 			var calls atomic.Int64
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
 			defer server.Close()
 			s.settings.Telemetry.MetricsExport = &config.MetricsExport{Enabled: true, Endpoint: server.URL + "/v1/metrics", APIKeyEnv: "DARWIN_TEST_TOKEN", Interval: "1s"}
+			if mutation == "otel" {
+				s.settings.Telemetry.MetricsExport.Enabled = false
+				s.settings.Telemetry.OTEL = true
+			}
 			s.secret = func(string) string {
 				if mutation == "disabled" {
 					s.settings.Telemetry.MetricsExport.Enabled = false
-				} else {
+				} else if mutation == "endpoint" {
 					s.settings.Telemetry.MetricsExport.Endpoint = server.URL + "/changed"
+				} else {
+					s.settings.Telemetry.OTEL = false
 				}
 				return "synthetic-monitor-token"
 			}

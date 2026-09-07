@@ -74,7 +74,7 @@ type Result struct {
 // dispatch retains its loopback-only transport even when cloud use is enabled.
 func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
-	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || s.Telemetry.OTEL {
+	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil {
 		return result, ErrAdmission
 	}
 	if r.delegatedParent != "" {
