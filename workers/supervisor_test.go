@@ -156,3 +156,67 @@ func TestLeaseLossCancelsWorker(t *testing.T) {
 		t.Fatal(out, err)
 	}
 }
+
+func TestRunningWorkerPersistsHeartbeatBeforeCompletion(t *testing.T) {
+	s, sup := setup(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	w := work("heartbeat")
+	w.Execute = func(ctx context.Context) (string, error) {
+		close(started)
+		select {
+		case <-release:
+			return "answer", nil
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	type result struct {
+		output string
+		err    error
+	}
+	done := make(chan result, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		output, err := sup.Run(ctx, w)
+		done <- result{output: output, err: err}
+	}()
+	<-started
+
+	heartbeat := false
+	for !heartbeat {
+		events, err := s.Read(ctx, "heartbeat", 0, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, event := range events {
+			if event.Kind == runtime.WorkerHeartbeat {
+				heartbeat = true
+				break
+			}
+		}
+		if heartbeat {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("worker heartbeat was not persisted")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	close(release)
+	got := <-done
+	if got.err != nil || got.output != "answer" {
+		t.Fatal(got.output, got.err)
+	}
+	events, err := s.Read(context.Background(), "heartbeat", 0, 100)
+	if err != nil || events[len(events)-1].Kind != runtime.TaskCompleted {
+		t.Fatal(events, err)
+	}
+	leases, err := s.InspectLeases(context.Background(), "project")
+	if err != nil || len(leases) != 0 {
+		t.Fatal("completed worker retained lease", leases, err)
+	}
+}
