@@ -31,8 +31,9 @@ and publication authority remain operator gates.
 The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands, opt-in local read tools, reviewed new-file creation and bounded existing-file replacement are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. General patch editing, delegated writes and unattended write approvals remain unfinished; reviewed custom Go SDK tools have separate safety requirements. See the implementation evidence for remaining work; passing the testable-MVP gate is not a published or production-qualified release.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
-family used by Hermes Agent. Third-party dependency licenses and notices remain
-separate and are inventoried for release review.
+family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
+Third-party dependency licenses and notices remain separate and are inventoried
+for release review.
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent or explicitly identified same-model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 

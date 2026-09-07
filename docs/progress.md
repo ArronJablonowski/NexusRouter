@@ -1,5 +1,17 @@
 # Implementation evidence
 
+Licensing-policy verification checkpoint: the project owner selected the same
+license family as the publicly available Hermes Agent. The authoritative Hermes
+repository currently declares MIT and carries the standard MIT grant with
+`Copyright (c) 2025 Nous Research`. DarwinRouter correctly carries the same MIT
+terms with its own `Copyright (c) 2026 Arron Jablonowski`; architectural
+inspiration does not transfer ownership. The PRD now records that substantial
+copied or adapted Hermes material would retain its applicable upstream notice,
+the README links the authoritative upstream license, and the Go SDK links the
+project license. Release archives already authenticate and install DarwinRouter's
+license. Candidate-bound dependency and toolchain notices plus human approval
+remain separate open DAR-48 gates; this checkpoint is not legal approval.
+
 DAR-55 approval-bound verification checkpoint: a separate production verifier
 now requires independently supplied exact candidate, `SHA256SUMS`, trust-record,
 authorization-record, key-ID and key-fingerprint identities plus an independently

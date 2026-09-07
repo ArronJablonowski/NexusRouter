@@ -47,6 +47,22 @@ DarwinRouter 1.0 is successful when it can:
 - Built-in subprocess, Git-worktree, container, SSH, or remote worker backends; these are post-MVP adapters.
 - A production web dashboard.
 
+### 2.4 Licensing and Attribution
+
+DarwinRouter is distributed under the MIT License, matching Hermes Agent's
+public license family while retaining DarwinRouter's own copyright ownership.
+Architectural ideas and independently implemented behavior do not transfer an
+upstream copyright. If DarwinRouter later copies or substantially adapts Hermes
+Agent code or documentation, the applicable Nous Research copyright and MIT
+permission notice must be preserved with those portions.
+
+Every binary distribution must include DarwinRouter's root `LICENSE` and a
+candidate-bound third-party notice bundle for the exact dependencies, toolchain,
+targets, and build inputs being shipped. Mechanical notice generation and
+verification do not replace human review. Production signing and publication
+remain blocked until an operator records approval of both the project license
+and all applicable third-party license, notice, patent, and attribution terms.
+
 ## 3. Research Basis
 
 DarwinRouter adapts proven ideas from three open-source agent systems while retaining routing as its core product identity.
@@ -57,7 +73,7 @@ Hermes distinguishes durable factual memory from reusable procedural skills, loa
 
 Automatic skill changes are allowed only within an explicit scope. Every activated version must retain provenance, validation evidence, its predecessor, and a rollback path. Messaging gateways, voice, and broad assistant features are deferred.
 
-Sources: [Hermes documentation](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/index.mdx), [configuration and context engine](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md), and [prompt assembly](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/prompt-assembly.md).
+Sources: [Hermes MIT license](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE), [Hermes documentation](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/index.mdx), [configuration and context engine](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/configuration.md), and [prompt assembly](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/prompt-assembly.md).
 
 ### 3.2 Pi Agent
 

@@ -1,5 +1,7 @@
 # Embedded Go client
 
+This SDK is distributed under DarwinRouter's root [MIT License](../../LICENSE).
+
 `Client.SkillLearningState(ctx)` inspects the configured learner's persisted
 phase, scan cursor and pending generation identity without starting background
 work. Inspection remains available when learning is disabled. The daemon owns
