@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-14 is verified and ready for its Linear completion update. Durable steering
+already queues bounded guidance during a running task, commits application before
+the next model turn, and never separates tool calls from results. Explicit
+continuation already reconstructs only replay-validated completed or narrowly
+recovered history, preserving session, parent, privacy and compaction evidence.
+The remaining post-terminal race is now closed: when a dispatcher claims a
+follow-up whose referenced source is still running, it retains the bounded
+worker slot and renewable durable submission claim while polling the source's
+coherent replay-derived continuation status. It performs no inference, repair
+or history import until the source is terminal; normal continuation admission
+then accepts or rejects that immutable result. Cancellation and lease loss still
+cancel the wait through the existing claim heartbeat. This avoids premature
+failure, requeue spin and duplicate dispatch without adding schema or retry
+authority. A real two-worker HTTP/SQLite test proves the follow-up is durably
+running before its source completes, makes no early provider call, then receives
+the exact persisted user/assistant history and succeeds after source release; it
+passed five race-enabled repetitions (5.117s). Focused dispatcher, continuation,
+recovery, steering, telemetry and session tests passed three repetitions
+(42.607s, 12.538s and 10.673s). Final `make check` passed format/LOC, vet, the
+complete native race suite and build; application tests took 222.137s,
+telemetry 150.510s, CLI 42.148s, SDK 24.872s, tool-gate 20.206s and workers
+4.545s. The implementation checkpoint is backed up at `105e9bc`; push/fetch
+verification showed matching local and remote heads, zero divergence and a
+clean worktree. The full PRD remains incomplete.
+
 DAR-21 is Done in native Linear under state activity
 `cea67412-b2cc-4f11-9d3a-ea36f4ee7388` with completion evidence comment
 `52aacd0e`. Delegation constructs an isolated child
