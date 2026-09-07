@@ -23,6 +23,9 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 	if value := metricsExportSecret(cfg, secret); value != "" {
 		secrets = append(secrets, value)
 	}
+	if value := traceExportSecret(cfg, secret); value != "" {
+		secrets = append(secrets, value)
+	}
 	return secrets
 }
 
@@ -33,6 +36,13 @@ func metricsExportSecret(cfg config.Settings, secret func(string) string) string
 		return ""
 	}
 	return secret(cfg.Telemetry.MetricsExport.APIKeyEnv)
+}
+
+func traceExportSecret(cfg config.Settings, secret func(string) string) string {
+	if secret == nil || cfg.Telemetry.TraceExport == nil || cfg.Telemetry.TraceExport.APIKeyEnv == "" {
+		return ""
+	}
+	return secret(cfg.Telemetry.TraceExport.APIKeyEnv)
 }
 
 func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string {

@@ -101,6 +101,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var dispatcher *app.Dispatcher
 	var learner *app.ConfiguredLearning
 	var exporter *app.MetricsExporter
+	var traceExporter *app.TraceExporter
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
@@ -110,7 +111,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || metricsExportDegraded(exporter.Health())) {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health())) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -202,7 +203,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if err != nil {
 				return health.Report{}, err
 			}
-			return withMetricsExportHealth(report, exporter.Health())
+			report, err = withMetricsExportHealth(report, exporter.Health())
+			if err != nil {
+				return health.Report{}, err
+			}
+			return withTraceExportHealth(report, traceExporter.Health())
 		},
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
@@ -230,12 +235,22 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer exporter.Close()
+	traceExporter, err = app.StartConfiguredTraceExport(ctx, service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start trace exporter")
+		return 1
+	}
+	defer traceExporter.Close()
 	if err := serveHTTP(ctx, listener, handler, stdout); err != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
 		return 1
 	}
 	if err := exporter.Close(); err != nil {
 		fmt.Fprintln(stderr, "metrics exporter requires inspection")
+		return 1
+	}
+	if err := traceExporter.Close(); err != nil {
+		fmt.Fprintln(stderr, "trace exporter requires inspection")
 		return 1
 	}
 	if err := learner.Close(); err != nil {

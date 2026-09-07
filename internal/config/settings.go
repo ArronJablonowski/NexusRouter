@@ -121,6 +121,7 @@ type Telemetry struct {
 	Database      string         `yaml:"database" json:"database"`
 	OTEL          bool           `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
 	MetricsExport *MetricsExport `yaml:"metrics_export,omitempty" json:"metrics_export,omitempty"`
+	TraceExport   *TraceExport   `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
 	CreateEnabled  bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
@@ -328,6 +329,9 @@ func (s Settings) Validate() error {
 	if err := s.Telemetry.MetricsExport.validate(s.Mode, s.Telemetry.OTEL); err != nil {
 		return err
 	}
+	if err := s.Telemetry.TraceExport.validate(s.Mode); err != nil {
+		return err
+	}
 	want := Defaults().Evaluation.Precedence
 	if s.Evaluation.AutoReviewMaxCost < 0 || math.IsNaN(s.Evaluation.AutoReviewMaxCost) || math.IsInf(s.Evaluation.AutoReviewMaxCost, 0) {
 		return errors.New("invalid audit cost ceiling")
@@ -446,6 +450,13 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 			copy.Endpoint = "[REDACTED]"
 		}
 		s.Telemetry.MetricsExport = &copy
+	}
+	if s.Telemetry.TraceExport != nil {
+		copy := *s.Telemetry.TraceExport
+		if copy.Endpoint != "" {
+			copy.Endpoint = "[REDACTED]"
+		}
+		s.Telemetry.TraceExport = &copy
 	}
 	s.Tools.ReadRoot = "[REDACTED]"
 	if s.Tools.CreateRoot != "" {

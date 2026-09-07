@@ -39,11 +39,13 @@ func strictIntegers(n *yaml.Node, target reflect.Type) error {
 			}
 		}
 		for i := 0; i < len(n.Content); i += 2 {
-			if target == reflect.TypeOf(MetricsExport{}) {
+			if target == reflect.TypeOf(MetricsExport{}) || target == reflect.TypeOf(TraceExport{}) {
 				value := n.Content[i+1]
 				want := "!!str"
 				if n.Content[i].Value == "enabled" {
 					want = "!!bool"
+				} else if n.Content[i].Value == "limit" {
+					want = "!!int"
 				}
 				if value.Kind != yaml.ScalarNode || value.Tag != want {
 					return errors.New("invalid metrics export scalar type")

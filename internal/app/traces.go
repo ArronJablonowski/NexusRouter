@@ -40,12 +40,19 @@ func (s *Service) TraceSnapshot(ctx context.Context, limit int) (traces.Snapshot
 // starts no scheduler, follows no redirect, retries nothing and mutates no
 // DarwinRouter state. Collector acknowledgement can still be lost.
 func (s *Service) ExportTraces(ctx context.Context, options traces.ExportOptions) (err error) {
+	return s.exportTraces(ctx, options, nil)
+}
+
+func (s *Service) exportTraces(ctx context.Context, options traces.ExportOptions, authorized func() bool) (err error) {
 	defer func() {
 		if recover() != nil || err != nil {
 			err = traces.ErrExport
 		}
 	}()
 	if s == nil || ctx == nil || ctx.Err() != nil || s.settings.Validate() != nil || options.Validate() != nil {
+		return traces.ErrExport
+	}
+	if authorized != nil && !authorized() {
 		return traces.ErrExport
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -78,6 +85,9 @@ func (s *Service) ExportTraces(ctx context.Context, options traces.ExportOptions
 		return traces.ErrExport
 	}
 	if ctx.Err() != nil || s.settings.Mode != mode || s.settings.Telemetry.Database != database || s.settings.Validate() != nil {
+		return traces.ErrExport
+	}
+	if authorized != nil && !authorized() {
 		return traces.ErrExport
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, options.Endpoint, bytes.NewReader(body))

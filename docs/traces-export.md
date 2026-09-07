@@ -10,8 +10,30 @@ darwin traces export --config config.yaml \
 
 The equivalent Go SDK calls are `Client.TraceSnapshot(ctx, limit)` and
 `Client.ExportTraces(ctx, options)`. Export is a one-shot operator action. It
-does not enable periodic delivery, start a daemon controller, retry a request,
-dispatch inference, create storage or migrate a database.
+does not itself enable periodic delivery, start a daemon controller, retry a
+request, dispatch inference, create storage or migrate a database.
+
+Periodic export is independently opt-in:
+
+```yaml
+telemetry:
+  trace_export:
+    enabled: true
+    endpoint: http://127.0.0.1:4318/v1/traces
+    api_key_env: OTEL_TRACE_TOKEN
+    interval: 1m
+    limit: 16
+```
+
+The daemon starts immediately, waits the configured interval after each
+completed attempt, and never overlaps attempts within its owned handle. SDK
+hosts may explicitly call `Client.StartTraceExport`. Scheduling is ephemeral:
+restart begins a fresh cadence and failures are not durably queued or retried.
+Health is reported as the supplemental `trace_export` component. Collector
+failure degrades overall status but does not make an otherwise usable daemon
+unready. Configuration rotation fences an in-flight delivery; callers must
+restart the owned exporter to apply new settings. The legacy
+`opentelemetry_enabled` switch continues to control only the metrics exporter.
 
 ## Scope and privacy
 
@@ -40,8 +62,8 @@ retains explicit missing-start and missing-end counts.
 This first trace slice does not include running tasks, model deltas, routes,
 workers, evaluations, retries, fallbacks, compactions, fitness or skill
 changes. It is retained lifecycle wall time, not provider server latency.
-Periodic trace scheduling, durable delivery, sampling policy, stable
-correlation, retention controls and broader span families remain unfinished.
+Durable delivery, sampling policy, stable correlation, retention controls and
+broader span families remain unfinished.
 
 ## Network and credentials
 

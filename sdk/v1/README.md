@@ -37,7 +37,9 @@ required. Callers own cancellation and should set appropriate deadlines.
 view, and `Client.ExportTraces(ctx, TraceExportOptions{...})` explicitly sends
 it as OTLP/HTTP JSON. The limit is 1–32; export defaults to 16. Wire trace/span
 IDs are fresh for every serialization and do not expose or stably represent
-DarwinRouter identities. This starts no background exporter. See
+DarwinRouter identities. `Client.StartTraceExport` returns an owned periodic
+exporter whose `Health` is inspectable and whose `Close` cancels and joins it;
+attempts are sequential, non-durable and non-retrying. See
 [trace export](../../docs/traces-export.md).
 
 Configuration is explicit: defaults → `UserFile` → `ProjectFile` → `Environment`

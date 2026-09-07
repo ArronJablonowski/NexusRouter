@@ -1,5 +1,28 @@
 # Implementation evidence
 
+PRD periodic-trace-export checkpoint: `telemetry.trace_export` now provides an
+independent opt-in daemon controller with endpoint, credential-name, interval
+and 1–32 task limit fields. Configuration layering preserves explicit false,
+strictly rejects coerced scalar/integer types, redacts the endpoint, validates
+the destination before storage/network access and requires loopback in fully
+local mode. The legacy `opentelemetry_enabled` alias remains metrics-only. Each
+owned daemon or SDK exporter attempts immediately, schedules relative to the
+previous completion, never overlaps or retries within the handle, fences
+configuration/credential rotation before delivery and cancels/joins on Close.
+Scheduling, cadence and failed payloads are deliberately non-durable. The new
+fixed `trace_export` health component is supplemental: startup/error/stall/stop
+degrades overall status without making an otherwise usable daemon unready.
+Configured trace credentials now participate in context redaction and queued
+submission secret rejection even while export is disabled. Focused native tests
+passed for health, configuration, application, SDK and CLI/daemon wiring. Final
+`make check` passed formatting/LOC enforcement, vet, every native race-enabled
+package and the production build; application took 223.775s, telemetry
+147.403s, CLI 42.900s, SDK 25.469s and tool gate 19.659s. No live model, user
+database or external collector was used; delivery tests use owned loopback
+fixtures. Native Linear remains inaccessible because the Mac is locked, so no
+issue update is claimed. Broader trace span families, durable delivery,
+retention and the full PRD remain incomplete.
+
 PRD initial-runtime-traces checkpoint: a new content-free trace snapshot and
 explicit one-shot OTLP/HTTP JSON exporter reconstruct at most 32 recent
 terminal tasks (16 by default), each as a task root with successfully paired

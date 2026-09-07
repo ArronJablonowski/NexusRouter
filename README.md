@@ -1454,7 +1454,10 @@ supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export. A separate explicit CLI/SDK
 [OTLP trace export](docs/traces-export.md) sends up to 32 recent terminal task
 roots with paired provider/tool children, using fresh non-durable wire IDs and
-no session content or durable identities. It has no periodic controller yet.
+no session content or durable identities. `telemetry.trace_export` enables an
+independent sequential daemon exporter, while SDK hosts can own one explicitly;
+health is supplemental and delivery remains best effort. The legacy
+`opentelemetry_enabled` alias remains metrics-only.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
 outside this initial task/provider/tool slice, queue arrival/service rates,

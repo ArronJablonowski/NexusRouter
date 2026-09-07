@@ -30,7 +30,7 @@ type Report struct {
 
 func (c Check) Validate() error {
 	switch c.Component {
-	case "daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "resources", "provider", "model":
+	case "daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "trace_export", "resources", "provider", "model":
 	default:
 		return ErrInvalid
 	}
@@ -40,7 +40,7 @@ func (c Check) Validate() error {
 	if (c.Component == "provider" || c.Component == "model") && c.ID == "" {
 		return ErrInvalid
 	}
-	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "learning" || c.Component == "skill_regression" || c.Component == "metrics_export") && c.ID != "" {
+	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "learning" || c.Component == "skill_regression" || c.Component == "metrics_export" || c.Component == "trace_export") && c.ID != "" {
 		return ErrInvalid
 	}
 	switch c.Status {
@@ -85,7 +85,8 @@ func (c Check) Validate() error {
 // report but do not assert that an otherwise usable model is unavailable.
 // Included learning and regression supervisors must be healthy or disabled;
 // older reports without this optional component retain their prior semantics.
-// Metrics export is supplemental: failure degrades status, not serving readiness.
+// Metrics and trace export are supplemental: failure degrades status, not
+// serving readiness.
 func Outcome(checks []Check) (string, bool) {
 	core := map[string]bool{}
 	model, all, learningReady := false, true, true

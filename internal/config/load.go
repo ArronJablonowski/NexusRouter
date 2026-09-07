@@ -56,6 +56,9 @@ func Load(options Options) (Settings, error) {
 		if err := seedMetricsExportOverrides(root, overrides); err != nil {
 			return Settings{}, err
 		}
+		if err := seedTraceExportOverrides(root, overrides); err != nil {
+			return Settings{}, err
+		}
 		keys := make([]string, 0, len(overrides))
 		for k := range overrides {
 			keys = append(keys, k)

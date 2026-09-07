@@ -7,8 +7,10 @@ production release, release tag or complete PRD acceptance is claimed.
 
 - Explicit one-shot OTLP/HTTP trace export through CLI and Go SDK for bounded
   recent terminal task/provider/tool lifecycles. It uses fresh wire identities,
-  exports no session content or durable IDs, and has no periodic scheduler or
-  broader lifecycle spans yet. See [trace export](traces-export.md).
+  exports no session content or durable IDs, and now has an independently
+  configured sequential daemon/SDK supervisor with supplemental health.
+  Delivery remains ephemeral and broader lifecycle spans are open. See
+  [trace export](traces-export.md).
 
 - Operation-keyed deterministic skill checks with durable pass receipts,
   atomic failure/rollback receipts and historical retry recognition. Explicit
