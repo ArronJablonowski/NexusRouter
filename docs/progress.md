@@ -30,8 +30,11 @@ all review changes: format/LOC enforcement, vet, the full native race suite, and
 production build. App tests took 220.401s, telemetry 146.082s, CLI 41.548s, SDK
 24.885s, and toolgate 19.653s; unchanged packages used cached results. Both exact
 DAR-36 acceptance criteria are now proven for the documented local daemon scope,
-so its native Linear completion follows GitHub publication. The full PRD remains
-incomplete.
+and implementation checkpoint `820f70064393d66cb88e8867ca1c1d5bee61d137`
+is backed up to `origin/main` with matching heads. Native Linear DAR-36 is Done;
+its completion comment was posted and read back with the commit, verification and
+limitations. Linear released its outgoing blocking links without manual relation
+edits. The full PRD remains incomplete.
 
 Process-separated recovery continuation qualification: this turn started clean
 from GitHub-backed 66295c9, a verified implementation checkpoint. The existing
