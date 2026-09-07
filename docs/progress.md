@@ -27,6 +27,22 @@ final-candidate regeneration, complete human dependency/toolchain legal review,
 recorded reviewer/time, and approval of the exact digest. No production key,
 authorization, signature, tag, upload or release was created.
 
+Clean pushed commit `622c27ca5e14c923029891219c437a281580444b` was
+frozen as external RC7 schema-2 license evidence at
+`/Users/aj_lobster/DarwinRouter-release-evidence/1.0.0-rc.7/` with exact record
+SHA-256 `c11f4631b74400b9595dbc7772c3677dc598c435fc75c378542886df3b115204`.
+`make qualify-license-evidence` re-derived and accepted that independently
+supplied digest from the clean checkout. The record observes Go 1.27.1, root
+MIT-license digest `73cf14d1c083cc7fd00c5097e31d880e9d722b33583c8c719f25a54b4fda07b0`,
+14 modules for each Darwin target and 13 for each Linux target including the
+explicit Go toolchain component. Target notice digests are respectively
+`0fa9a66e238d268f7a0b42b7ad5af82c842234703332331e6e9265534b81d7dc`,
+`e37d0189b33ccc4b767f0da9aeb33256a5f3bb60bb1de302e4146cfc01146a03`,
+`5f567ffd740b19ce932ba97ecb839ece9283ad114350756a1f8f9164a09399f5`,
+and `4ec895860c867f7964f9e3924b877dd489f5346db4c36acc4a5bac139f50e13a`
+in canonical target order. This is reproducible mechanical evidence, not the
+required human legal review or production approval.
+
 Licensing-policy verification checkpoint: the project owner selected the same
 license family as the publicly available Hermes Agent. The authoritative Hermes
 repository currently declares MIT and carries the standard MIT grant with
