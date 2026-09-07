@@ -14,6 +14,7 @@ func signingAuthorizationFixture() SigningAuthorization {
 		Project:               "DarwinRouter",
 		Scope:                 signingAuthorizationScope,
 		CandidateRecordSHA256: "sha256:" + strings.Repeat("1", 64),
+		LicenseEvidenceSHA256: "sha256:" + strings.Repeat("5", 64),
 		SHA256SUMSSHA256:      "sha256:" + strings.Repeat("2", 64),
 		TrustRecordSHA256:     "sha256:" + strings.Repeat("3", 64),
 		KeyID:                 "release-2026-01",
@@ -39,6 +40,7 @@ func signingAuthorizationExpected(record SigningAuthorization, body []byte) Sign
 	return SigningAuthorizationExpectations{
 		RecordSHA256:          prefixedSigningAuthorizationDigest(body),
 		CandidateRecordSHA256: record.CandidateRecordSHA256,
+		LicenseEvidenceSHA256: record.LicenseEvidenceSHA256,
 		SHA256SUMSSHA256:      record.SHA256SUMSSHA256,
 		TrustRecordSHA256:     record.TrustRecordSHA256,
 		KeyID:                 record.KeyID,
@@ -50,7 +52,8 @@ func TestParseAndReadSigningAuthorization(t *testing.T) {
 	record := signingAuthorizationFixture()
 	body := signingAuthorizationBody(t, record)
 	parsed, err := ParseSigningAuthorization(body)
-	if err != nil || parsed.ApproverID != record.ApproverID {
+	if err != nil || parsed.ApproverID != record.ApproverID ||
+		parsed.LicenseEvidenceSHA256 != record.LicenseEvidenceSHA256 {
 		t.Fatal("canonical authorization rejected", err)
 	}
 	path := filepath.Join(t.TempDir(), "signing-authorization.json")
@@ -73,6 +76,8 @@ func TestSigningAuthorizationContractFailsClosed(t *testing.T) {
 		{"project", func(r *SigningAuthorization) { r.Project = "Other" }},
 		{"scope", func(r *SigningAuthorization) { r.Scope = "other" }},
 		{"candidate_digest", func(r *SigningAuthorization) { r.CandidateRecordSHA256 = strings.Repeat("1", 64) }},
+		{"license_evidence_digest", func(r *SigningAuthorization) { r.LicenseEvidenceSHA256 = "sha256:bad" }},
+		{"license_evidence_missing", func(r *SigningAuthorization) { r.LicenseEvidenceSHA256 = "" }},
 		{"sums_digest", func(r *SigningAuthorization) { r.SHA256SUMSSHA256 = "sha256:" + strings.Repeat("A", 64) }},
 		{"trust_digest", func(r *SigningAuthorization) { r.TrustRecordSHA256 = "sha256:bad" }},
 		{"key_id", func(r *SigningAuthorization) { r.KeyID = "Release Key" }},
@@ -121,6 +126,19 @@ func TestSigningAuthorizationProjectLicenseGateIsDigestBound(t *testing.T) {
 	}
 }
 
+func TestSigningAuthorizationLicenseEvidenceIsDigestBound(t *testing.T) {
+	record := signingAuthorizationFixture()
+	original := signingAuthorizationBody(t, record)
+	record.LicenseEvidenceSHA256 = "sha256:" + strings.Repeat("6", 64)
+	changed := signingAuthorizationBody(t, record)
+	if prefixedSigningAuthorizationDigest(original) == prefixedSigningAuthorizationDigest(changed) {
+		t.Fatal("license-evidence identity did not change canonical record digest")
+	}
+	if _, err := ParseSigningAuthorization(changed); err != nil {
+		t.Fatal("valid changed license-evidence identity rejected", err)
+	}
+}
+
 func TestSigningAuthorizationRejectsNoncanonicalJSON(t *testing.T) {
 	body := signingAuthorizationBody(t, signingAuthorizationFixture())
 	unknown := append([]byte(nil), body...)
@@ -156,6 +174,10 @@ func TestSigningAuthorizationRequiresIndependentExactInputs(t *testing.T) {
 		{"candidate_digest", func(e *SigningAuthorizationExpectations) {
 			e.CandidateRecordSHA256 = "sha256:" + strings.Repeat("0", 64)
 		}},
+		{"license_evidence_digest", func(e *SigningAuthorizationExpectations) {
+			e.LicenseEvidenceSHA256 = "sha256:" + strings.Repeat("0", 64)
+		}},
+		{"missing_license_evidence_digest", func(e *SigningAuthorizationExpectations) { e.LicenseEvidenceSHA256 = "" }},
 		{"sums_digest", func(e *SigningAuthorizationExpectations) { e.SHA256SUMSSHA256 = "sha256:" + strings.Repeat("0", 64) }},
 		{"trust_digest", func(e *SigningAuthorizationExpectations) { e.TrustRecordSHA256 = "sha256:" + strings.Repeat("0", 64) }},
 		{"key_id", func(e *SigningAuthorizationExpectations) { e.KeyID = "other" }},

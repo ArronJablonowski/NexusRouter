@@ -26,6 +26,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, verify ap
 	flags.StringVar(&options.Source, "source", ".", "clean independently trusted source repository")
 	flags.StringVar(&options.CandidateRecordFile, "candidate-record", "", "canonical external candidate record")
 	flags.StringVar(&options.ExpectedCandidateSHA256, "candidate-record-sha256", "", "independently supplied candidate digest")
+	flags.StringVar(&options.LicenseEvidenceFile, "license-evidence", "", "canonical mechanical candidate license evidence")
+	flags.StringVar(&options.ExpectedLicenseEvidenceSHA256, "license-evidence-sha256", "", "independently supplied license-evidence digest")
 	flags.StringVar(&options.ExpectedSumsSHA256, "expected-sums-sha256", "", "independently supplied SHA256SUMS digest")
 	flags.StringVar(&options.TrustRecordFile, "trust-record", "", "independently retrieved canonical trust record")
 	flags.StringVar(&options.ExpectedTrustRecordSHA256, "trust-record-sha256", "", "independently supplied trust-record digest")
@@ -40,7 +42,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, verify ap
 		return 2
 	}
 	if flags.NArg() != 0 || verify == nil || missing(options) {
-		fmt.Fprintln(stderr, "all release, source, candidate, checksum, trust, key, and authorization inputs are required")
+		fmt.Fprintln(stderr, "all release, source, candidate, license-evidence, checksum, trust, key, and authorization inputs are required")
 		return 2
 	}
 	result, err := verify(ctx, options)
@@ -59,7 +61,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, verify ap
 
 func missing(options releasepack.ApprovedVerificationOptions) bool {
 	return options.Dir == "" || options.Source == "" || options.CandidateRecordFile == "" ||
-		options.ExpectedCandidateSHA256 == "" || options.ExpectedSumsSHA256 == "" ||
+		options.ExpectedCandidateSHA256 == "" || options.LicenseEvidenceFile == "" ||
+		options.ExpectedLicenseEvidenceSHA256 == "" || options.ExpectedSumsSHA256 == "" ||
 		options.TrustRecordFile == "" || options.ExpectedTrustRecordSHA256 == "" ||
 		options.ExpectedKeyID == "" || options.ExpectedKeyFingerprint == "" ||
 		options.AuthorizationRecordFile == "" || options.ExpectedAuthorizationSHA256 == ""

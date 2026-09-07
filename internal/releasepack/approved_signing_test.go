@@ -37,7 +37,8 @@ func TestApprovedSigningRoundTrip(t *testing.T) {
 
 func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 	for _, scenario := range []string{
-		"candidate", "candidate_identity", "authorization", "policy_mismatch", "trust", "sums",
+		"candidate", "candidate_identity", "license_evidence", "license_evidence_missing", "license_evidence_swapped",
+		"authorization", "policy_mismatch", "trust", "sums",
 		"artifact", "existing_signature", "source", "canceled",
 	} {
 		t.Run(scenario, func(t *testing.T) {
@@ -57,6 +58,13 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 					t.Fatal(err)
 				}
 				options.CandidateRecordFile, options.ExpectedCandidateSHA256 = alternate, prefixedDigest(body)
+			case "license_evidence":
+				options.ExpectedLicenseEvidenceSHA256 = "sha256:" + strings.Repeat("0", 64)
+			case "license_evidence_missing":
+				options.LicenseEvidenceFile = filepath.Join(t.TempDir(), "missing-license-evidence.json")
+			case "license_evidence_swapped":
+				options.LicenseEvidenceFile = options.CandidateRecordFile
+				options.ExpectedLicenseEvidenceSHA256 = options.ExpectedCandidateSHA256
 			case "authorization":
 				options.ExpectedAuthorizationSHA256 = "sha256:" + strings.Repeat("0", 64)
 			case "policy_mismatch":
@@ -181,7 +189,16 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte("module example.com/approved\n\ngo 1.27.1\n"), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte("module example.com/approved\n\ngo 1.27.1\n\nrequire github.com/google/uuid v1.6.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte("package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = command(ctx, source, environment(), "go", "mod", "tidy"); err != nil {
 		t.Fatal(err)
 	}
 	for _, step := range [][]string{{"init"}, {"config", "user.email", "approved@example.invalid"}, {"config", "user.name", "Approved Test"}, {"add", "."}, {"commit", "-m", "fixture"}} {
@@ -190,6 +207,13 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 		}
 	}
 	commit := approvedSourceCommit(t, source)
+	licenseEvidenceFile := filepath.Join(t.TempDir(), "license-evidence.json")
+	licenseEvidenceSHA256, err := FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{
+		Commit: commit, Source: source, Out: licenseEvidenceFile,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	candidateFile := filepath.Join(t.TempDir(), "candidate.json")
 	if err = FreezeCandidate(ctx, Options{Version: "1.0.0", Commit: commit, Out: candidateFile, Source: source}); err != nil {
 		t.Fatal(err)
@@ -255,7 +279,8 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 	writeSigningFixture(t, trustFile, trustBody, 0644)
 	authorization := SigningAuthorization{
 		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
-		CandidateRecordSHA256: prefixedDigest(candidateBody), SHA256SUMSSHA256: prefixedDigest(sumsBody),
+		CandidateRecordSHA256: prefixedDigest(candidateBody), LicenseEvidenceSHA256: licenseEvidenceSHA256,
+		SHA256SUMSSHA256:  prefixedDigest(sumsBody),
 		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: record.KeyID, KeyFingerprint: keyFingerprint,
 		Targets:    append([]SigningAuthorizationTarget(nil), authorizedTargets...),
 		Gates:      append([]SigningAuthorizationGate(nil), signingAuthorizationGates...),
@@ -271,7 +296,8 @@ func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.Publi
 	writeSigningFixture(t, authorizationFile, authorizationBody, 0644)
 	return ApprovedSigningOptions{
 		Dir: releaseDir, KeyFile: keyFile, CandidateRecordFile: candidateFile,
-		ExpectedCandidateSHA256: prefixedDigest(candidateBody), Source: source,
+		ExpectedCandidateSHA256: prefixedDigest(candidateBody), LicenseEvidenceFile: licenseEvidenceFile,
+		ExpectedLicenseEvidenceSHA256: licenseEvidenceSHA256, Source: source,
 		ExpectedSumsSHA256: prefixedDigest(sumsBody), TrustRecordFile: trustFile,
 		ExpectedTrustRecordSHA256: prefixedDigest(trustBody), ExpectedKeyID: record.KeyID,
 		ExpectedKeyFingerprint:  keyFingerprint,

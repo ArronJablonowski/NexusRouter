@@ -22,6 +22,7 @@ func TestApprovedVerificationRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.CandidateRecordSHA256 != signing.ExpectedCandidateSHA256 ||
+		result.LicenseEvidenceSHA256 != signing.ExpectedLicenseEvidenceSHA256 ||
 		result.SHA256SUMSSHA256 != signing.ExpectedSumsSHA256 ||
 		result.TrustRecordSHA256 != signing.ExpectedTrustRecordSHA256 ||
 		result.AuthorizationRecordSHA256 != signing.ExpectedAuthorizationSHA256 ||
@@ -32,7 +33,7 @@ func TestApprovedVerificationRoundTrip(t *testing.T) {
 }
 
 func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
-	for _, scenario := range []string{"candidate", "sums", "trust", "authorization", "key_id", "fingerprint", "policy", "unsigned", "artifact", "signature", "dirty_source", "canceled"} {
+	for _, scenario := range []string{"candidate", "license_evidence", "license_evidence_missing", "license_evidence_swapped", "sums", "trust", "authorization", "key_id", "fingerprint", "policy", "unsigned", "artifact", "signature", "dirty_source", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			signing, _ := approvedSigningFixture(t)
 			if scenario != "unsigned" {
@@ -45,6 +46,13 @@ func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
 			switch scenario {
 			case "candidate":
 				options.ExpectedCandidateSHA256 = invalidPublicDigest()
+			case "license_evidence":
+				options.ExpectedLicenseEvidenceSHA256 = invalidPublicDigest()
+			case "license_evidence_missing":
+				options.LicenseEvidenceFile = filepath.Join(t.TempDir(), "missing-license-evidence.json")
+			case "license_evidence_swapped":
+				options.LicenseEvidenceFile = options.CandidateRecordFile
+				options.ExpectedLicenseEvidenceSHA256 = options.ExpectedCandidateSHA256
 			case "sums":
 				options.ExpectedSumsSHA256 = invalidPublicDigest()
 			case "trust":
@@ -97,7 +105,9 @@ func verificationOptions(signing ApprovedSigningOptions) ApprovedVerificationOpt
 	return ApprovedVerificationOptions{
 		Dir: signing.Dir, CandidateRecordFile: signing.CandidateRecordFile,
 		ExpectedCandidateSHA256: signing.ExpectedCandidateSHA256, Source: signing.Source,
-		ExpectedSumsSHA256: signing.ExpectedSumsSHA256, TrustRecordFile: signing.TrustRecordFile,
+		LicenseEvidenceFile:           signing.LicenseEvidenceFile,
+		ExpectedLicenseEvidenceSHA256: signing.ExpectedLicenseEvidenceSHA256,
+		ExpectedSumsSHA256:            signing.ExpectedSumsSHA256, TrustRecordFile: signing.TrustRecordFile,
 		ExpectedTrustRecordSHA256: signing.ExpectedTrustRecordSHA256, ExpectedKeyID: signing.ExpectedKeyID,
 		ExpectedKeyFingerprint: signing.ExpectedKeyFingerprint, AuthorizationRecordFile: signing.AuthorizationRecordFile,
 		ExpectedAuthorizationSHA256: signing.ExpectedAuthorizationSHA256,

@@ -26,6 +26,8 @@ func runWithSigner(ctx context.Context, args []string, stderr io.Writer, sign fu
 	key := f.String("key", "", "release-only Ed25519 seed file (hex, mode 0400 or 0600)")
 	candidate := f.String("candidate-record", "", "independently reviewed canonical candidate record")
 	candidateSHA := f.String("candidate-record-sha256", "", "expected sha256 digest of exact candidate-record bytes")
+	licenseEvidence := f.String("license-evidence", "", "canonical mechanical candidate license evidence")
+	licenseEvidenceSHA := f.String("license-evidence-sha256", "", "expected sha256 digest of exact license-evidence bytes")
 	source := f.String("source", "", "clean source repository at the candidate commit")
 	sumsSHA := f.String("expected-sums-sha256", "", "approved sha256 digest of exact SHA256SUMS bytes")
 	trust := f.String("trust-record", "", "independently trusted canonical public trust record")
@@ -40,14 +42,16 @@ func runWithSigner(ctx context.Context, args []string, stderr io.Writer, sign fu
 		}
 		return 2
 	}
-	if *dir == "" || *key == "" || *candidate == "" || *candidateSHA == "" || *source == "" ||
+	if *dir == "" || *key == "" || *candidate == "" || *candidateSHA == "" || *licenseEvidence == "" ||
+		*licenseEvidenceSHA == "" || *source == "" ||
 		*sumsSHA == "" || *trust == "" || *trustSHA == "" || *keyID == "" || *keyFingerprint == "" ||
 		*authorization == "" || *authorizationSHA == "" || f.NArg() != 0 {
-		fmt.Fprintln(stderr, "required: --dir --key --candidate-record --candidate-record-sha256 --source --expected-sums-sha256 --trust-record --trust-record-sha256 --key-id --key-fingerprint --authorization-record --authorization-record-sha256; no positional arguments")
+		fmt.Fprintln(stderr, "required: --dir --key --candidate-record --candidate-record-sha256 --license-evidence --license-evidence-sha256 --source --expected-sums-sha256 --trust-record --trust-record-sha256 --key-id --key-fingerprint --authorization-record --authorization-record-sha256; no positional arguments")
 		return 2
 	}
 	options := releasepack.ApprovedSigningOptions{
 		Dir: *dir, KeyFile: *key, CandidateRecordFile: *candidate, ExpectedCandidateSHA256: *candidateSHA,
+		LicenseEvidenceFile: *licenseEvidence, ExpectedLicenseEvidenceSHA256: *licenseEvidenceSHA,
 		Source: *source, ExpectedSumsSHA256: *sumsSHA, TrustRecordFile: *trust,
 		ExpectedTrustRecordSHA256: *trustSHA, ExpectedKeyID: *keyID, ExpectedKeyFingerprint: *keyFingerprint,
 		AuthorizationRecordFile: *authorization, ExpectedAuthorizationSHA256: *authorizationSHA,

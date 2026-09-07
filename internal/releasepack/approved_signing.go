@@ -12,21 +12,24 @@ import (
 )
 
 // ApprovedSigningOptions binds the production signing operation to externally
-// reviewed candidate, artifact-set and trust identities. Expected digests use
-// "sha256:" followed by 64 lowercase hexadecimal characters.
+// reviewed candidate, mechanical license evidence, artifact-set and trust
+// identities. Expected digests use "sha256:" followed by 64 lowercase
+// hexadecimal characters. Mechanical evidence is not legal approval.
 type ApprovedSigningOptions struct {
-	Dir                         string
-	KeyFile                     string
-	CandidateRecordFile         string
-	ExpectedCandidateSHA256     string
-	Source                      string
-	ExpectedSumsSHA256          string
-	TrustRecordFile             string
-	ExpectedTrustRecordSHA256   string
-	ExpectedKeyID               string
-	ExpectedKeyFingerprint      string
-	AuthorizationRecordFile     string
-	ExpectedAuthorizationSHA256 string
+	Dir                           string
+	KeyFile                       string
+	CandidateRecordFile           string
+	ExpectedCandidateSHA256       string
+	LicenseEvidenceFile           string
+	ExpectedLicenseEvidenceSHA256 string
+	Source                        string
+	ExpectedSumsSHA256            string
+	TrustRecordFile               string
+	ExpectedTrustRecordSHA256     string
+	ExpectedKeyID                 string
+	ExpectedKeyFingerprint        string
+	AuthorizationRecordFile       string
+	ExpectedAuthorizationSHA256   string
 }
 
 // SignApproved validates every public input before opening the private seed,
@@ -45,8 +48,10 @@ type privateKeyReader func(path string) ([]byte, error)
 
 func signApproved(ctx context.Context, options ApprovedSigningOptions, readPrivateKey privateKeyReader) error {
 	if ctx == nil || options.Dir == "" || options.KeyFile == "" || options.Source == "" ||
-		options.CandidateRecordFile == "" || options.TrustRecordFile == "" || options.AuthorizationRecordFile == "" ||
-		!trustFingerprint(options.ExpectedCandidateSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) || readPrivateKey == nil {
+		options.CandidateRecordFile == "" || options.LicenseEvidenceFile == "" || options.TrustRecordFile == "" ||
+		options.AuthorizationRecordFile == "" || !trustFingerprint(options.ExpectedCandidateSHA256) ||
+		!trustFingerprint(options.ExpectedLicenseEvidenceSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) ||
+		readPrivateKey == nil {
 		return ErrSignature
 	}
 	if err := ctx.Err(); err != nil {
@@ -57,13 +62,17 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
 		return ErrSignature
 	}
+	if VerifyLicenseEvidence(ctx, options.LicenseEvidenceFile, options.ExpectedLicenseEvidenceSHA256, options.Source) != nil {
+		return ErrSignature
+	}
 	source, err := filepath.Abs(options.Source)
 	if err != nil {
 		return ErrSignature
 	}
 	authorization, err := ReadSigningAuthorization(options.AuthorizationRecordFile, SigningAuthorizationExpectations{
 		RecordSHA256: options.ExpectedAuthorizationSHA256, CandidateRecordSHA256: options.ExpectedCandidateSHA256,
-		SHA256SUMSSHA256: options.ExpectedSumsSHA256, TrustRecordSHA256: options.ExpectedTrustRecordSHA256,
+		LicenseEvidenceSHA256: options.ExpectedLicenseEvidenceSHA256,
+		SHA256SUMSSHA256:      options.ExpectedSumsSHA256, TrustRecordSHA256: options.ExpectedTrustRecordSHA256,
 		KeyID: options.ExpectedKeyID, KeyFingerprint: options.ExpectedKeyFingerprint,
 	})
 	if err != nil {
@@ -91,8 +100,8 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		return ErrSignature
 	}
 
-	// No private material is opened until all candidate, source, trust and
-	// artifact identities above have been validated.
+	// No private material is opened until all candidate, license evidence,
+	// source, trust and artifact identities above have been validated.
 	seed, err := readPrivateKey(options.KeyFile)
 	if err != nil || len(seed) != ed25519.SeedSize {
 		clear(seed)

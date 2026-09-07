@@ -8,25 +8,29 @@ import (
 )
 
 // ApprovedVerificationOptions binds independent verification to the exact
-// public inputs used for an authorized production signing operation.
+// public inputs used for an authorized production signing operation. License
+// evidence remains mechanical evidence and does not itself grant approval.
 type ApprovedVerificationOptions struct {
-	Dir                         string
-	CandidateRecordFile         string
-	ExpectedCandidateSHA256     string
-	Source                      string
-	ExpectedSumsSHA256          string
-	TrustRecordFile             string
-	ExpectedTrustRecordSHA256   string
-	ExpectedKeyID               string
-	ExpectedKeyFingerprint      string
-	AuthorizationRecordFile     string
-	ExpectedAuthorizationSHA256 string
+	Dir                           string
+	CandidateRecordFile           string
+	ExpectedCandidateSHA256       string
+	LicenseEvidenceFile           string
+	ExpectedLicenseEvidenceSHA256 string
+	Source                        string
+	ExpectedSumsSHA256            string
+	TrustRecordFile               string
+	ExpectedTrustRecordSHA256     string
+	ExpectedKeyID                 string
+	ExpectedKeyFingerprint        string
+	AuthorizationRecordFile       string
+	ExpectedAuthorizationSHA256   string
 }
 
 // ApprovedVerificationResult contains public exact-byte identities only. It is
 // evidence of local verification, not publication approval or remote attestation.
 type ApprovedVerificationResult struct {
 	CandidateRecordSHA256     string `json:"candidate_record_sha256"`
+	LicenseEvidenceSHA256     string `json:"license_evidence_sha256"`
 	SHA256SUMSSHA256          string `json:"sha256sums_sha256"`
 	TrustRecordSHA256         string `json:"trust_record_sha256"`
 	AuthorizationRecordSHA256 string `json:"authorization_record_sha256"`
@@ -41,8 +45,9 @@ type ApprovedVerificationResult struct {
 func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (ApprovedVerificationResult, error) {
 	var result ApprovedVerificationResult
 	if ctx == nil || options.Dir == "" || options.Source == "" || options.CandidateRecordFile == "" ||
-		options.TrustRecordFile == "" || options.AuthorizationRecordFile == "" ||
-		!trustFingerprint(options.ExpectedCandidateSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) {
+		options.LicenseEvidenceFile == "" || options.TrustRecordFile == "" || options.AuthorizationRecordFile == "" ||
+		!trustFingerprint(options.ExpectedCandidateSHA256) ||
+		!trustFingerprint(options.ExpectedLicenseEvidenceSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) {
 		return result, ErrSignature
 	}
 	if ctx.Err() != nil {
@@ -51,6 +56,9 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 	candidateBody, candidate, err := readCandidateRecord(options.CandidateRecordFile)
 	if err != nil || prefixedDigest(candidateBody) != options.ExpectedCandidateSHA256 ||
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
+		return result, ErrSignature
+	}
+	if VerifyLicenseEvidence(ctx, options.LicenseEvidenceFile, options.ExpectedLicenseEvidenceSHA256, options.Source) != nil {
 		return result, ErrSignature
 	}
 	source, err := filepath.Abs(options.Source)
@@ -63,7 +71,8 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 	}
 	authorization, err := ReadSigningAuthorization(options.AuthorizationRecordFile, SigningAuthorizationExpectations{
 		RecordSHA256: options.ExpectedAuthorizationSHA256, CandidateRecordSHA256: options.ExpectedCandidateSHA256,
-		SHA256SUMSSHA256: options.ExpectedSumsSHA256, TrustRecordSHA256: options.ExpectedTrustRecordSHA256,
+		LicenseEvidenceSHA256: options.ExpectedLicenseEvidenceSHA256,
+		SHA256SUMSSHA256:      options.ExpectedSumsSHA256, TrustRecordSHA256: options.ExpectedTrustRecordSHA256,
 		KeyID: options.ExpectedKeyID, KeyFingerprint: options.ExpectedKeyFingerprint,
 	})
 	if err != nil {
@@ -105,7 +114,8 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 		return result, ErrSignature
 	}
 	result = ApprovedVerificationResult{
-		CandidateRecordSHA256: options.ExpectedCandidateSHA256, SHA256SUMSSHA256: options.ExpectedSumsSHA256,
+		CandidateRecordSHA256: options.ExpectedCandidateSHA256,
+		LicenseEvidenceSHA256: options.ExpectedLicenseEvidenceSHA256, SHA256SUMSSHA256: options.ExpectedSumsSHA256,
 		TrustRecordSHA256: options.ExpectedTrustRecordSHA256, AuthorizationRecordSHA256: options.ExpectedAuthorizationSHA256,
 		KeyID: options.ExpectedKeyID, KeyFingerprint: options.ExpectedKeyFingerprint,
 		SignatureFileSHA256: prefixedDigest(encodedSignature),

@@ -54,6 +54,13 @@ func TestReleaseQualification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	licenseEvidenceFile := filepath.Join(parent, "license-evidence.json")
+	licenseEvidenceSHA256, err := FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{
+		Commit: commit, Source: source, Out: licenseEvidenceFile,
+	})
+	if err != nil {
+		t.Fatal("license evidence", err)
+	}
 	buildOutput, err := command(ctx, source, environment(), "go", "run", "./cmd/build-approved-release",
 		"--out", second, "--source", source, "--candidate-record", candidateFile,
 		"--candidate-record-sha256", prefixedDigest(candidateBody))
@@ -124,7 +131,8 @@ func TestReleaseQualification(t *testing.T) {
 	}
 	authorization := SigningAuthorization{
 		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
-		CandidateRecordSHA256: prefixedDigest(candidateBody), SHA256SUMSSHA256: prefixedDigest(sumsBody),
+		CandidateRecordSHA256: prefixedDigest(candidateBody), LicenseEvidenceSHA256: licenseEvidenceSHA256,
+		SHA256SUMSSHA256:  prefixedDigest(sumsBody),
 		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: trustRecord.KeyID, KeyFingerprint: keyFingerprint,
 		Targets:    append([]SigningAuthorizationTarget(nil), authorizedTargets...),
 		Gates:      append([]SigningAuthorizationGate(nil), signingAuthorizationGates...),
@@ -149,6 +157,7 @@ func TestReleaseQualification(t *testing.T) {
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/sign-release",
 		"--dir", second, "--key", seedFile, "--candidate-record", candidateFile,
 		"--candidate-record-sha256", prefixedDigest(candidateBody), "--source", source,
+		"--license-evidence", licenseEvidenceFile, "--license-evidence-sha256", licenseEvidenceSHA256,
 		"--expected-sums-sha256", prefixedDigest(sumsBody), "--trust-record", trustFile,
 		"--trust-record-sha256", prefixedDigest(trustBody), "--key-id", trustRecord.KeyID,
 		"--key-fingerprint", keyFingerprint, "--authorization-record", authorizationFile,
@@ -161,6 +170,7 @@ func TestReleaseQualification(t *testing.T) {
 	verificationOutput, err := command(ctx, source, environment(), "go", "run", "./cmd/verify-approved-release",
 		"--dir", second, "--source", source, "--candidate-record", candidateFile,
 		"--candidate-record-sha256", prefixedDigest(candidateBody), "--expected-sums-sha256", prefixedDigest(sumsBody),
+		"--license-evidence", licenseEvidenceFile, "--license-evidence-sha256", licenseEvidenceSHA256,
 		"--trust-record", trustFile, "--trust-record-sha256", prefixedDigest(trustBody),
 		"--key-id", trustRecord.KeyID, "--key-fingerprint", keyFingerprint,
 		"--authorization-record", authorizationFile, "--authorization-record-sha256", prefixedDigest(authorizationBody))
@@ -170,6 +180,7 @@ func TestReleaseQualification(t *testing.T) {
 	var verificationResult ApprovedVerificationResult
 	if json.Unmarshal([]byte(verificationOutput), &verificationResult) != nil ||
 		verificationResult.CandidateRecordSHA256 != prefixedDigest(candidateBody) ||
+		verificationResult.LicenseEvidenceSHA256 != licenseEvidenceSHA256 ||
 		verificationResult.SHA256SUMSSHA256 != prefixedDigest(sumsBody) ||
 		verificationResult.TrustRecordSHA256 != prefixedDigest(trustBody) ||
 		verificationResult.AuthorizationRecordSHA256 != prefixedDigest(authorizationBody) ||

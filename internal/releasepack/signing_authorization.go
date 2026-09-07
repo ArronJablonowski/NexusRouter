@@ -23,13 +23,15 @@ const (
 var signingApproverID = regexp.MustCompile(`^[a-z0-9][a-z0-9._:@/-]{1,126}[a-z0-9]$`)
 
 // SigningAuthorization is an operator-authored approval of one exact candidate,
-// checksum manifest and public trust identity. Publication remains unapproved:
-// this record grants only the narrower authority to create a release signature.
+// mechanical license-evidence record, checksum manifest and public trust
+// identity. Publication remains unapproved: this record grants only the
+// narrower authority to create a release signature.
 type SigningAuthorization struct {
 	SchemaVersion         int                          `json:"schema_version"`
 	Project               string                       `json:"project"`
 	Scope                 string                       `json:"scope"`
 	CandidateRecordSHA256 string                       `json:"candidate_record_sha256"`
+	LicenseEvidenceSHA256 string                       `json:"license_evidence_sha256"`
 	SHA256SUMSSHA256      string                       `json:"sha256sums_sha256"`
 	TrustRecordSHA256     string                       `json:"trust_record_sha256"`
 	KeyID                 string                       `json:"key_id"`
@@ -57,6 +59,7 @@ type SigningAuthorizationGate struct {
 type SigningAuthorizationExpectations struct {
 	RecordSHA256          string
 	CandidateRecordSHA256 string
+	LicenseEvidenceSHA256 string
 	SHA256SUMSSHA256      string
 	TrustRecordSHA256     string
 	KeyID                 string
@@ -77,7 +80,7 @@ var signingAuthorizationGates = []SigningAuthorizationGate{
 	{Name: "publication", Status: "unapproved"},
 }
 
-// ParseSigningAuthorization accepts only the canonical schema-1 JSON encoding.
+// ParseSigningAuthorization accepts only the canonical schema-2 JSON encoding.
 // Re-encoding rejects unknown, duplicate, aliased and reordered fields.
 func ParseSigningAuthorization(body []byte) (SigningAuthorization, error) {
 	var record SigningAuthorization
@@ -104,6 +107,7 @@ func ReadSigningAuthorization(path string, expected SigningAuthorizationExpectat
 	}
 	record, err := ParseSigningAuthorization(body)
 	if err != nil || record.CandidateRecordSHA256 != expected.CandidateRecordSHA256 ||
+		record.LicenseEvidenceSHA256 != expected.LicenseEvidenceSHA256 ||
 		record.SHA256SUMSSHA256 != expected.SHA256SUMSSHA256 ||
 		record.TrustRecordSHA256 != expected.TrustRecordSHA256 || record.KeyID != expected.KeyID ||
 		record.KeyFingerprint != expected.KeyFingerprint {
@@ -115,6 +119,7 @@ func ReadSigningAuthorization(path string, expected SigningAuthorizationExpectat
 func validateSigningAuthorization(record SigningAuthorization) error {
 	if record.SchemaVersion != signingAuthorizationSchema || record.Project != "DarwinRouter" ||
 		record.Scope != signingAuthorizationScope || !trustFingerprint(record.CandidateRecordSHA256) ||
+		!trustFingerprint(record.LicenseEvidenceSHA256) ||
 		!trustFingerprint(record.SHA256SUMSSHA256) || !trustFingerprint(record.TrustRecordSHA256) ||
 		!trustKeyID.MatchString(record.KeyID) || !trustFingerprint(record.KeyFingerprint) ||
 		len(record.Targets) != len(authorizedTargets) || len(record.Gates) != len(signingAuthorizationGates) ||
@@ -140,6 +145,7 @@ func validateSigningAuthorization(record SigningAuthorization) error {
 
 func validSigningAuthorizationExpectations(expected SigningAuthorizationExpectations) bool {
 	return trustFingerprint(expected.RecordSHA256) && trustFingerprint(expected.CandidateRecordSHA256) &&
+		trustFingerprint(expected.LicenseEvidenceSHA256) &&
 		trustFingerprint(expected.SHA256SUMSSHA256) && trustFingerprint(expected.TrustRecordSHA256) &&
 		trustKeyID.MatchString(expected.KeyID) && trustFingerprint(expected.KeyFingerprint)
 }
