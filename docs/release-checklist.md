@@ -33,13 +33,26 @@ and sensitive logs out of this record and the repository.
   Hermes Agent; see the repository-root `LICENSE`.
 - Mechanical dependency inventory:
   [distribution dependency license inventory](dependency-license-inventory.md)
+- External canonical license-evidence record location:
+- License-evidence schema, exact source commit and Go version/directive:
+- Independently supplied license-evidence SHA-256 and source:
+- License-evidence verification host/time/result:
+- Distribution scope reviewed (binary/source/channel):
+- Per-target module counts and `THIRD_PARTY_NOTICES.txt` SHA-256 values:
+- Go toolchain `LICENSE`/`PATENTS` hashes:
 - Approved repository license and evidence:
 - Dependency-license review evidence:
 - Approved dependency notices location:
+- Exceptions or additional attribution obligations:
 - Reviewer and decision time (UTC):
 - [ ] The repository license is present and approved for distribution.
-- [ ] Dependency licenses and required notices were reviewed for the shipped
-  dependency graph and included through the approved publication channel.
+- [ ] `license-evidence verify` re-derived the exact external record from this
+  clean candidate and its independently supplied digest.
+- [ ] All four target closures, legal-file hashes and rendered-notice hashes
+  were reviewed for the exact toolchain and distribution scope.
+- [ ] Dependency and toolchain licenses, patent grants and required notices
+  were approved for the shipped graph and included through the approved
+  publication channel.
 
 ## Supported-platform decision
 
@@ -70,6 +83,7 @@ be omitted.
 - GitHub workflow run URL:
 - Workflow-dispatched version:
 - Workflow-dispatched commit:
+- Workflow-dispatched expected license-evidence SHA-256:
 - Ubuntu job native OS/architecture and outcomes:
 - macOS job native OS/architecture and outcomes:
 - [ ] Hosted and local evidence refer to the recorded candidate version and
@@ -115,9 +129,10 @@ be omitted.
 - [ ] The private seed stayed outside the repository, artifacts and logs.
 - [ ] The exact active trust-record bytes, separately supplied record SHA-256,
   key ID and key fingerprint all agree.
-- [ ] The canonical signing authorization binds this exact candidate, checksum
-  set, trust record, key identity, supported targets and notice approval; its
-  publication gate remains unapproved.
+- [ ] The canonical schema-2 signing authorization binds this exact candidate,
+  license-evidence digest, checksum set, trust record, key identity, supported
+  targets, project-license approval and notice approval; its publication gate
+  remains unapproved.
 - [ ] The signing authorization and independently trusted record name the exact
   same reviewed release-policy URL.
 - [ ] A second operator independently confirmed the trust and authorization
@@ -129,6 +144,7 @@ be omitted.
 - `build-approved-release` JSON result and command transcript location:
 - Retained-build host and time (UTC):
 - Independently confirmed candidate-record digest used by the build:
+- Independently confirmed license-evidence digest used by signing:
 - Independently approved exact `SHA256SUMS` SHA-256 source:
 - `manifest.json` SHA-256:
 - `SHA256SUMS` SHA-256:
@@ -145,7 +161,8 @@ be omitted.
 - [ ] Native staged binary reports the approved release version.
 - [ ] A second operator retrieved the trust record through the independent
   channel and successfully ran the approval-bound verifier with independently
-  supplied candidate, checksum, authorization, trust and key identities.
+  supplied candidate, license-evidence, checksum, authorization, trust and key
+  identities.
 
 ## Publication authorization
 

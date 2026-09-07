@@ -72,16 +72,38 @@ owner names and build paths. Packaging has a 30-minute overall deadline;
 individual commands have shorter bounds and bounded output capture.
 
 Reproducibility means identical inputs, dependencies and toolchain produce
-identical artifacts. This is not a hermetic build or independent provenance
-attestation: the installed Git/Go executables, their location on PATH, module
-cache and build host remain trusted. Missing public modules may be downloaded
-through Go's normal module resolution. Packaging is not a model-runtime task
-and is not covered by `mode: local_only` egress controls.
+identical artifacts. Packaging resolves one absolute Go executable, requires it
+to match `GOROOT/bin/go`, and rechecks its file identity and executable mode
+through the four-target build. This is still not a hermetic build or independent
+provenance attestation: the selected Git/Go binary contents, initial PATH,
+module cache and build host remain trusted. Missing public modules may be
+downloaded through Go's normal module resolution. Packaging is not a
+model-runtime task and is not covered by `mode: local_only` egress controls.
 
 `cmd/package-release` remains the lower-level one-pass packaging primitive for
 tests and diagnostics. It accepts explicit version and commit inputs but does
 not prove reproducibility or bind an independently reviewed candidate record;
 do not use it to create the production signable directory.
+
+## Freeze and approve candidate license evidence
+
+Before authorizing production signing, freeze and independently review the
+canonical schema-2 license record described in the
+[dependency license inventory](dependency-license-inventory.md). Its digest
+must be obtained through the release-evidence channel and entered in the
+operator checklist. Re-derive it from the exact clean candidate with:
+
+```sh
+DARWIN_LICENSE_EVIDENCE_RECORD=/ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+DARWIN_LICENSE_EVIDENCE_SHA256=sha256:EXPECTED_EXACT_LICENSE_EVIDENCE_SHA256 \
+  make qualify-license-evidence
+```
+
+This mechanical gate does not decide whether distribution is legally approved.
+An authorized human must review the complete project, dependency and toolchain
+terms for the intended binary/source channels. The external signing
+authorization then binds the exact reviewed evidence digest and separately
+records `project_license: approved` and `third_party_notices: approved`.
 
 ## Sign with a separate release identity
 
@@ -104,6 +126,8 @@ go run ./cmd/sign-release \
   --key /ABSOLUTE/PRIVATE_RELEASE_SEED_FILE \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
+  --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+  --license-evidence-sha256 sha256:EXPECTED_EXACT_LICENSE_EVIDENCE_SHA256 \
   --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
   --expected-sums-sha256 sha256:EXPECTED_EXACT_SHA256SUMS_SHA256 \
   --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
@@ -116,20 +140,25 @@ go run ./cmd/sign-release \
 
 Every digest and identity above is an approval input and must be obtained from
 the recorded independent evidence channel, not calculated ad hoc by the signer
-from whichever paths were supplied. Candidate and trust record digests cover
-their exact canonical bytes, including the `sha256:` prefix in command inputs.
+from whichever paths were supplied. Candidate, license-evidence and trust-record
+digests cover their exact canonical bytes, including the `sha256:` prefix in
+command inputs.
 The external canonical [signing authorization](release-signing-authorization.md)
-must bind those same candidate, checksum, trust and key expectations, explicitly
-approve all four targets, dependency notices and production signing, and leave
-publication unapproved. Its exact digest is supplied independently as well.
+must bind those same candidate, license-evidence, checksum, trust and key
+expectations, explicitly approve the project license, all four targets,
+dependency notices and production signing, and leave publication unapproved.
+Its exact digest is supplied independently as well.
 
 Before opening the private seed, production signing re-verifies the candidate
-record against the clean exact source commit, validates the active trust record
-and signing authorization, checks every payload and the manifest contract, binds
-manifest identity and shared collateral to the candidate, and matches the exact
-approved `SHA256SUMS` digest. The authorization and trust record must name the
-exact same release-policy URL. It then proves the seed-derived public key matches
-the expected trust identity. Signing exclusively creates `SHA256SUMS.sig`: 128
+record and canonical schema-2 license evidence against the clean exact source
+commit, validates the active trust record and signing authorization, checks
+every payload and the manifest contract, binds manifest identity and shared
+collateral to the candidate, and matches the exact approved `SHA256SUMS`
+digest. The license evidence records the exact Go toolchain and directive,
+root MIT license, four target dependency closures, legal-file hashes and
+rendered notice hashes. The authorization and trust record must name the exact
+same release-policy URL. It then proves the seed-derived public key matches the
+expected trust identity. Signing exclusively creates `SHA256SUMS.sig`: 128
 lowercase hex characters containing the Ed25519 signature over the exact
 checksum-file bytes, followed by LF. It syncs the signature and containing
 directory, immediately verifies the complete signed set with the approved public
@@ -164,8 +193,8 @@ For production verification, prefer the canonical independently published
 trust record plus an expected key ID and fingerprint obtained separately from
 the release artifacts. Follow [release-signing identity and trust
 policy](release-signing-trust.md). The independent production verifier also
-binds the candidate, checksum set and signing authorization rather than checking
-the public key alone:
+binds the candidate, license evidence, checksum set and signing authorization
+rather than checking the public key alone:
 
 ```sh
 go run ./cmd/verify-approved-release \
@@ -173,6 +202,8 @@ go run ./cmd/verify-approved-release \
   --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
+  --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+  --license-evidence-sha256 sha256:EXPECTED_EXACT_LICENSE_EVIDENCE_SHA256 \
   --expected-sums-sha256 sha256:EXPECTED_EXACT_SHA256SUMS_SHA256 \
   --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
   --trust-record-sha256 sha256:EXPECTED_EXACT_TRUST_RECORD_SHA256 \
@@ -182,14 +213,15 @@ go run ./cmd/verify-approved-release \
   --authorization-record-sha256 sha256:EXPECTED_EXACT_AUTHORIZATION_SHA256
 ```
 
-Its one-line JSON result records the exact public inputs and signature-file
-digest observed by that verification. Retain it with the independent operator,
-host and UTC time. The verifier validates the clean source/candidate binding,
-authorization/trust policy agreement, active key identity, exact checksum set,
-Ed25519 signature and every declared artifact twice through one pinned release
-root. It remains a point-in-time local observation, not remote attestation or
-publication approval. Raw public-key mode remains useful for disposable
-qualification and emergency diagnosis.
+Its one-line JSON result records the exact candidate, license-evidence,
+authorization, checksum, trust and key inputs plus the signature-file digest
+observed by that verification. Retain it with the independent operator, host
+and UTC time. The verifier re-derives the license evidence, validates the clean
+source/candidate binding, authorization/trust policy agreement, active key
+identity, exact checksum set, Ed25519 signature and every declared artifact
+twice through one pinned release root. It remains a point-in-time local
+observation, not remote attestation or publication approval. Raw public-key
+mode remains useful for disposable qualification and emergency diagnosis.
 
 Exit 0 means the signature, manifest and every declared file verified. Exit 1
 means verification failed; exit 2 denotes invalid command arguments. The

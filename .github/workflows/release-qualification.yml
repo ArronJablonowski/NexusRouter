@@ -151,7 +151,7 @@ jobs:
             printf '\nDispatched commit: `%s`\n' "$GITHUB_SHA"
             printf '\nVerified checkout: `%s`\n' "${SOURCE_COMMIT:-unavailable}"
             printf '\nObserved native platform: `%s/%s`; Go: `%s`\n' "${NATIVE_OS:-unavailable}" "${NATIVE_ARCH:-unavailable}" "${GO_VERSION:-unavailable}"
-            printf '\nApproved candidate license-evidence digest: `%s`\n' "$LICENSE_EVIDENCE_SHA256"
+            printf '\nExpected reviewed candidate license-evidence digest: `%s`\n' "$LICENSE_EVIDENCE_SHA256"
             printf '\n| Gate | Outcome |\n| --- | --- |\n'
             printf '| Source binding | %s |\n| Candidate license evidence | %s |\n| make check | %s |\n| make qualify-release | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$LICENSE_EVIDENCE_OUTCOME" "$CHECK_OUTCOME" "$QUALIFICATION_OUTCOME" "$UNCHANGED_OUTCOME"
             echo

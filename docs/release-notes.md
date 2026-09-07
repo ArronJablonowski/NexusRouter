@@ -14,9 +14,17 @@ decision or publication approval is claimed.
 
 - The independent `verify-approved-release` command now checks a production
   signature through one pinned release root while binding the exact candidate,
-  checksum set, signing authorization, active trust record, release-policy URL,
-  key identity and clean source commit. Its canonical JSON result contains only
-  public digests and identifiers for the operator evidence record.
+  candidate-bound license evidence, checksum set, signing authorization, active
+  trust record, release-policy URL, key identity and clean source commit. Its
+  canonical JSON result contains only public digests and identifiers for the
+  operator evidence record.
+
+- Candidate license evidence now records the root MIT license, exact Go
+  version/directive, all four target dependency/legal-file closures, Go runtime
+  `LICENSE` and `PATENTS`, and target notice hashes. Packaging pins one absolute
+  Go executable for version, module verification, notice discovery and builds.
+  Production authorization separately requires `project_license: approved` and
+  binds the exact evidence digest before signing or independent verification.
 
 ## Available for supervised testing
 
@@ -231,9 +239,10 @@ decision or publication approval is claimed.
 - Local four-target release packaging, checksummed manifests, independently
   bound production signing and offline verification. Each supported target has
   a one-host [native evidence contract](native-target-qualification.md).
-  Production signing requires exact candidate, checksum, trust and external
-  [signing-authorization](release-signing-authorization.md) identities before
-  private-key access; signing authority cannot grant publication. See
+  Production signing requires exact candidate, license-evidence, checksum,
+  trust and external [signing-authorization](release-signing-authorization.md)
+  identities plus explicit project-license approval before private-key access;
+  signing authority cannot grant publication. See
   [packaging instructions](release-packaging.md).
 
 Each item has narrower limits than the eventual PRD. [Implementation evidence](progress.md)

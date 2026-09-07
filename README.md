@@ -19,9 +19,11 @@ publication authority.
 The production build path binds that external candidate record before building,
 compares two isolated four-target outputs byte for byte, and retains one of the
 compared directories as the only signable artifact set.
-Independent production verification binds the resulting signature and every
-artifact back to the exact candidate, checksum set, authorization, active trust
-record, key identity and clean source checkout.
+Candidate-bound license evidence records the root MIT license, exact Go
+toolchain, four target dependency/legal-file closures and notice hashes.
+Production signing and independent verification bind its exact approved digest
+alongside the candidate, checksum set, authorization, active trust record, key
+identity and clean source checkout.
 The deterministic testable-MVP
 gate passes and 41 of 42 MVP issues are complete. DAR-46 remains open: no
 release has been published, and

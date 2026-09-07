@@ -1,5 +1,32 @@
 # Implementation evidence
 
+DAR-48 candidate-bound licensing checkpoint: the canonical schema-2 license
+record now freezes one exact clean commit, Go runtime/directive, root MIT
+license digest, and the four ordered target dependency/legal-file closures.
+Each target explicitly includes the exact Go runtime `LICENSE` and `PATENTS`
+sizes and hashes plus its rendered `THIRD_PARTY_NOTICES.txt` digest. Structured
+evidence and notice bytes derive from the same captured in-memory closure;
+legal files are opened and rechecked through stable descriptors. The external
+freeze/verify CLI and fail-closed Make gate reject missing authority, source or
+toolchain drift, local replacements, symlinks, tampering and noncanonical data.
+The manual four-native-runner workflow requires the independently supplied
+evidence digest and reports its derivation outcome without claiming approval.
+
+Release packaging now pins one absolute, symlink-resolved Go executable and
+revalidates its file identity and executable mode around notice discovery,
+module verification and every target build. Production signing authorization
+schema 2 separately requires `project_license: approved`, binds the exact
+license-evidence digest, and retains publication as unapproved. Both the signer
+and independent verifier require the external evidence file and digest,
+re-derive it against the clean candidate, and reject missing/swapped evidence;
+signing failures occur before private-key access. The verifier's canonical JSON
+also returns the evidence digest. Focused and full releasepack race tests passed
+for the individual implementation slices. Documentation and the operator
+checklist now describe the exact records and approvals. DAR-48 remains open for
+final-candidate regeneration, complete human dependency/toolchain legal review,
+recorded reviewer/time, and approval of the exact digest. No production key,
+authorization, signature, tag, upload or release was created.
+
 Licensing-policy verification checkpoint: the project owner selected the same
 license family as the publicly available Hermes Agent. The authoritative Hermes
 repository currently declares MIT and carries the standard MIT grant with

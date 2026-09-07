@@ -50,8 +50,9 @@ Verification rejects noncanonical JSON, unknown or reordered contract data,
 changed bounds, fabricated approvals, a dirty checkout, a different `HEAD`, or
 source collateral that no longer matches the recorded commit. The record is
 not signed and therefore is not provenance on its own. Retain it with the
-reviewed commit, independently authenticated source, completed checklist, CI
-run links, native target evidence, signatures, and publication evidence.
+reviewed commit, independently authenticated source, completed checklist,
+candidate-bound [license evidence](dependency-license-inventory.md), CI run
+links, native target evidence, signatures, and publication evidence.
 
 The current packager always emits all four targets. An operator decision that
 any target is unsupported blocks the candidate; it does not authorize silently

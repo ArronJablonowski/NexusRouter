@@ -2,16 +2,22 @@
 
 The **Release qualification (no publication)** GitHub Actions workflow is
 manual-only. Select a reviewed branch or tag and enter the intended semantic
-release version when dispatching it. The required version excludes a leading
-`v` and build metadata and is validated before qualification. The workflow
+release version plus the independently reviewed canonical license-evidence
+SHA-256 when dispatching it. The required version excludes a leading `v` and
+build metadata and is validated before qualification. The workflow
 checks out the dispatch event's immutable `github.sha`, verifies HEAD and a clean
 worktree, and runs `make check` followed by a version- and commit-bound
 `make qualify-release`. No separate commit input can redirect the checkout away
 from the dispatched source.
 
-Each Ubuntu/macOS matrix job records the requested version, verified commit,
-actual Go host OS/architecture, Go version and individual gate outcomes in its
-job summary.
+Each Ubuntu/macOS matrix job independently freezes the schema-2 license record,
+requires its digest to equal the dispatch input, re-verifies it against the
+clean checkout, and records the expected digest and gate outcome. The record
+binds the commit, Go version/directive, root MIT license digest, all four target
+module/legal-file closures, exact Go `LICENSE`/`PATENTS` hashes and rendered
+notice hashes. Each job also records the requested version, verified commit,
+actual Go host OS/architecture, Go version and other gate outcomes in its job
+summary.
 The four-job matrix uses explicit standard hosted-runner labels:
 `macos-15-intel` for Darwin/amd64, `macos-15` for Darwin/arm64,
 `ubuntu-24.04` for Linux/amd64 and `ubuntu-24.04-arm` for Linux/arm64. Each job
@@ -56,7 +62,11 @@ workflow is not evidence of a hosted run: record the actual run URL, commit and
 per-job outcomes after an operator dispatches it. Matrix labels may change their
 underlying architecture; do not infer four-platform coverage from two labels.
 
-Successful runs do not choose a distribution license, provision a production
+The expected digest is an independent dispatch input, but the job does not
+authenticate the person or process that approved it and does not retain the
+external canonical record. Preserve that exact record and human review evidence
+in the operator-controlled release evidence channel. Successful runs do not
+choose a distribution license, provision a production
 signing identity, independently distribute a trusted public key, approve a
 release version, or authorize publication. Those remain separate gates in
 [release packaging](release-packaging.md).

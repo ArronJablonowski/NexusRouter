@@ -135,7 +135,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		}
 	}
 	report := job.Steps[7]
-	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["QUALIFICATION_OUTCOME"] != "${{ steps.qualification.outcome }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || !strings.Contains(report.Run, "Approved candidate license-evidence digest") {
+	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["QUALIFICATION_OUTCOME"] != "${{ steps.qualification.outcome }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || !strings.Contains(report.Run, "Expected reviewed candidate license-evidence digest") {
 		t.Fatal("missing failure-aware evidence")
 	}
 	for _, evidence := range []string{

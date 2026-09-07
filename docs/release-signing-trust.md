@@ -75,6 +75,8 @@ valid archival data but cannot verify a release.
      --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
      --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
      --candidate-record-sha256 sha256:REPLACE_WITH_CANDIDATE_SHA256 \
+     --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+     --license-evidence-sha256 sha256:REPLACE_WITH_LICENSE_EVIDENCE_SHA256 \
      --expected-sums-sha256 sha256:REPLACE_WITH_SHA256SUMS_SHA256 \
      --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
      --trust-record-sha256 sha256:REPLACE_WITH_RECORD_SHA256 \
@@ -89,15 +91,16 @@ valid archival data but cannot verify a release.
 
 Raw `verify-release --public-key` verification remains available for qualification
 and emergency diagnosis. Production verification should use the approval-bound
-command above so its machine-readable result binds the exact candidate, checksum,
-authorization, trust identity, status, policy and signature-file digest.
+command above so its machine-readable result binds the exact candidate,
+license evidence, checksum, authorization, trust identity, status, policy and
+signature-file digest.
 
 ## Signing ceremony
 
 The release approver and signer must be distinct roles where staffing permits.
 The signer confirms the version, full commit, independently supplied candidate
-record digest, exact `SHA256SUMS` digest, trust-record identity, completed
-prerequisite gates and the independently digested canonical
+and license-evidence record digests, exact `SHA256SUMS` digest, trust-record
+identity, completed prerequisite gates and the independently digested canonical
 [signing authorization](release-signing-authorization.md) before unlocking the
 seed. Run the full
 production `sign-release` command documented in

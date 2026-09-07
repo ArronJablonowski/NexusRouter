@@ -1,8 +1,8 @@
 # Distribution dependency license inventory
 
-This is a mechanical inventory for release review, not legal advice or approval
-to distribute DarwinRouter. It records the non-standard-library Go modules in
-the `cmd/darwin` dependency closure at commit
+This is a historical mechanical inventory for release review, not legal advice
+or approval to distribute DarwinRouter. It records the non-standard-library Go
+modules in the `cmd/darwin` dependency closure at commit
 `074dd303cb31d6ae875000716937dfc3c3a63cb7`. The release operator must review
 the complete upstream files, decide which texts/notices must accompany each
 distribution channel, and record approval in the [release
@@ -14,7 +14,35 @@ an operating system produced the same module set. The Darwin closure has 13
 modules; Linux has 12 because `github.com/ncruces/go-strftime` is Darwin-only.
 Test-only and build-tool-only modules are intentionally excluded. A final
 release review must repeat the inventory against the exact candidate commit and
-toolchain because dependency or build-tag changes can alter the closure.
+toolchain because dependency or build-tag changes can alter the closure. This
+table is a readable baseline; it is not the final candidate authority.
+
+For a candidate, freeze the canonical schema-2 evidence outside the checkout:
+
+```sh
+go run ./cmd/license-evidence freeze \
+  --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
+  --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
+  --out /ABSOLUTE/OPERATOR_CONTROLLED/LICENSE_EVIDENCE.json
+```
+
+The command prints a `sha256:` digest. Obtain and approve that digest through
+the independent release-evidence channel, then verify the exact record from a
+clean checkout:
+
+```sh
+DARWIN_LICENSE_EVIDENCE_RECORD=/ABSOLUTE/OPERATOR_CONTROLLED/LICENSE_EVIDENCE.json \
+DARWIN_LICENSE_EVIDENCE_SHA256=sha256:EXPECTED_64_LOWERCASE_HEX \
+  make qualify-license-evidence
+```
+
+The record binds the source commit, exact Go runtime version and module
+directive, root MIT license, four ordered target closures, every discovered
+legal-file size/hash, explicit Go toolchain `LICENSE` and `PATENTS`, and each
+rendered `THIRD_PARTY_NOTICES.txt` digest. Evidence and notice bytes derive from
+the same captured closure. Freeze and verification fail closed on a dirty or
+different checkout, noncanonical/tampered evidence, dependency drift, a local
+module replacement, altered legal files, or an incompatible toolchain.
 
 “Observed family” is a convenience classification from the checked module-cache
 text. It is not an SPDX attestation and must not replace review of the complete
@@ -39,13 +67,16 @@ source file identified by the module version and digest.
 ## Required operator follow-up
 
 1. Confirm the repository's adopted MIT text is included in the candidate.
-2. Re-run the four target dependency closures at the final candidate commit.
+2. Freeze and independently verify the candidate-bound schema-2 license record.
 3. Verify each upstream digest from a clean module download using the declared
    Go checksum database/proxy policy.
 4. Review complete upstream license, notice and patent texts and determine the
    required attribution bundle for binary and source distribution.
-5. Produce that reviewed bundle, include or link it through every approved
-   publication channel, and record its digest in the release checklist.
+5. Approve the exact license-evidence digest and bind it into the external
+   signing authorization.
+6. Include the reviewed bundle through every approved publication channel and
+   record its digest, review scope, exceptions, reviewer and UTC decision time
+   in the release checklist.
 
 Until those steps are approved, this inventory is evidence for review only and
 the license/notices release gate remains open.
