@@ -1,7 +1,9 @@
 # Implementation evidence
 
-DAR-35 is verified and ready for its Linear completion update. Skill bodies are
-immutable version files bound to digest-checked catalog metadata and remain
+DAR-35 is Done in native Linear under state activity
+`b88f21bd-3c28-42b8-b011-2fd0b5beaeaa` with completion evidence comment
+`afcfe92b`. Skill bodies are immutable version files bound to digest-checked
+catalog metadata and remain
 inactive until a trusted deterministic validator passes. Activation and
 rollback compare the complete activation revision, so stale observations and
 ABA transitions cannot commit. Automatic mutation is default-off and rechecked
@@ -16,8 +18,11 @@ cannot mutate the catalog. Focused skills and application activation,
 regression, outcome rollback, learning activation and crash-path race tests
 passed three repetitions (26.314s and 139.743s). The immediately preceding full
 `make check` on the same production tree passed format/LOC, vet, the complete
-native race suite and build. GitHub/Linear checkpoint evidence follows after
-synchronization. The full PRD remains incomplete.
+native race suite and build. The checkpoint is backed up at `3978b5a`;
+push/fetch verification showed matching local and remote heads, zero divergence
+and a clean worktree before the Linear comment and Done state were read back.
+Linear released DAR-43 and DAR-45 from this dependency; other dependencies may
+remain. The full PRD remains incomplete.
 
 DAR-34 is Done in native Linear under state activity
 `47622af5-eb33-40b5-8b30-0d37cfd452f7` with completion evidence comment
