@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-15 is verified in the repository and ready for native Linear reconciliation.
+The provider conformance matrix now performs real HTTP handoffs in both
+directions between the OpenAI-compatible and Ollama adapters. A canonical tool
+call emitted by either adapter is paired with a host result and submitted to
+the other adapter; the fixtures verify model/call identity, JSON arguments,
+adapter-specific result correlation, response text, usage and terminal
+ordering without translating provider wire data into durable history. A second
+real-adapter/runtime matrix proves both adapters are invoked exactly once when
+a completed tool result makes the next context exceed its configured window:
+the call/result evidence is durably journaled, the paired history reaches the
+trusted estimator, and the oversized second turn is denied before another
+network request. Existing conformance coverage continues to exercise stream
+ordering, fragmented calls, malformed/truncated output, invalid discovery,
+abort/cancellation, credential-safe failures and tool-batch limits. The new
+handoff and overflow tests passed five race-enabled repetitions (1.484s and
+2.286s), then the complete provider/runtime packages passed three race-enabled
+repetitions (2.781s and 20.415s). Final `make check` passed format/LOC, vet, the
+complete native race suite and build; application tests took 223.890s,
+telemetry 148.886s, CLI 42.602s, SDK 25.278s, tool-gate 19.802s, runtime 8.590s,
+providers 1.704s and workers 3.792s. No live third-party provider was called,
+and production compatibility still depends on provider-specific qualification.
+The local Linear app locked before DAR-14's pending completion evidence could
+be confirmed, so neither that update nor a DAR-15 state change is claimed. The
+full PRD remains incomplete.
+
 DAR-14 is verified and ready for its Linear completion update. Durable steering
 already queues bounded guidance during a running task, commits application before
 the next model turn, and never separates tool calls from results. Explicit
