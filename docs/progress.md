@@ -4,6 +4,10 @@ DAR-47/50/53 release-control checkpoint: a canonical external candidate record
 now freezes an exact clean commit, version, schema-2 six-member archive contract,
 four-target matrix, collateral digests and deliberately unapproved operator
 decisions, then re-derives that record from the immutable source for verification.
+The clean pushed commit `d7b9a636c8624a1a49c0740887966da68250dc9c`
+was frozen as external candidate `1.0.0-rc.3`; re-verification passed and the
+candidate-record SHA-256 was
+`76c2fd1f47fa251c258f4caaa1137d8f49d57023d19775876f03ca27a33e442f`.
 The hosted qualification workflow now pins the local Go toolchain, disables cgo
 and ambient environment/workspace/flags/experiments, fixes architecture baselines
 and reports the complete disposable native install, schema-28-to-29 migration,
@@ -11,8 +15,12 @@ backup and rollback evidence. Release verification can consume a canonical publi
 Ed25519 trust record only when its exact record SHA-256, key ID and public-key
 fingerprint are supplied independently; real CLI tests prove successful signed
 verification plus metadata tamper, revocation and signature-tamper rejection.
-No production key or secret was generated. Focused race tests, vet and diff
-validation passed. DAR-47 remains gated on final candidate decisions and approval;
+No production key or secret was generated. Release qualification passed on
+darwin/arm64: deterministic MVP tests, eight matching builds, four executable
+format checks, disposable signing and tamper rejection, target-specific notices,
+native install, schema-28-to-29 migration, backup and rollback all passed. Focused
+race tests, vet and diff validation also passed. DAR-47 remains gated on final
+candidate decisions and approval;
 DAR-50 remains gated on an authenticated hosted dispatch and recorded Ubuntu/macOS
 evidence; DAR-53 remains gated on operator custody, publication, two-operator
 rehearsal and platform-signing decisions. The full PRD and DAR-46 remain open.
