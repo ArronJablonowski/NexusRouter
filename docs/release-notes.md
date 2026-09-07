@@ -5,6 +5,16 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Versioned configured routing metadata through `darwin models list`, Go SDK
+  `ConfiguredModelCatalog`, and authenticated `GET /v1/routing/models`. The
+  snapshot carries the redacted configuration fingerprint and declared
+  model/provider aliases, capabilities, context, optional cost, resource hints
+  and failure domain without discovery or inference. It excludes endpoints,
+  credential references/values and live health/capacity claims. The CLI now
+  returns a versioned envelope instead of the bare array used by earlier
+  development builds; `/v1/models` retains its minimal OpenAI-compatible shape.
+  See [configured model metadata](configured-model-catalog.md).
+
 - Content-free durable task discovery through `darwin task list`, interactive
   `/tasks`, Go SDK `ListTasks`, and authenticated `GET /v1/tasks`. Newest-first
   opaque pages freeze their insertion boundary while reporting live state; a

@@ -22,6 +22,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
@@ -31,6 +32,7 @@ import (
 
 type Services struct {
 	Models                 func(context.Context) ([]string, error)
+	ConfiguredModels       func(context.Context) (routing.ModelCatalog, error)
 	Memory                 func(context.Context, string) (memory.Fact, error)
 	ExportMemory           func(context.Context) (memory.ExportSnapshot, error)
 	Memories               func(context.Context, string, string, int, bool) ([]memory.Fact, error)
@@ -170,6 +172,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveMemoryManagement(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/models/deprecation":
 		h.serveDeprecation(w, r.WithContext(ctx))
+	case r.URL.Path == "/v1/routing/models":
+		h.serveConfiguredModels(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/models":
 		h.serveModels(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/daemon/status" || r.URL.Path == "/v1/daemon/stop":

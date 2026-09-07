@@ -170,6 +170,9 @@ DarwinRouter exposes:
 - An OpenAI-compatible streaming chat/completion endpoint.
 - An authenticated OpenAI-shaped configured-model catalog that performs no
   provider discovery or inference and exposes no endpoint or credential data.
+- A separate versioned Darwin-native configured-model metadata catalog across
+  CLI, Go SDK and authenticated HTTP. It exposes redacted route declarations,
+  not provider health, discovered availability, current capacity or execution authority.
 - Native task submission, cancellation, status, and Server-Sent Events endpoints.
 - Bounded metadata-only task discovery for SDK, CLI, interactive resume, and
   authenticated HTTP clients without loading conversation content.

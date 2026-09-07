@@ -1,0 +1,51 @@
+package app
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+
+	"github.com/ArronJablonowski/DarwinRouter/routing"
+)
+
+// ConfiguredModelCatalog returns owned declared routing metadata. It performs
+// no provider discovery, inference, health check, reservation, or storage read.
+func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCatalog, error) {
+	zero := routing.ModelCatalog{}
+	if ctx == nil {
+		return zero, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	secrets := memorySecrets(s.settings, s.secret)
+	redacted, err := s.settings.RedactedJSON()
+	if err != nil {
+		return zero, ErrAdmission
+	}
+	digest := sha256.Sum256(redacted)
+	catalog := routing.ModelCatalog{Version: 1, ConfigID: hex.EncodeToString(digest[:]), Models: make([]routing.ConfiguredModel, len(s.settings.Models))}
+	for i, configured := range s.settings.Models {
+		var cost *float64
+		if configured.EstimatedCost != nil {
+			value := *configured.EstimatedCost
+			cost = &value
+		}
+		catalog.Models[i] = routing.ConfiguredModel{
+			Version: 1, ID: configured.ID, Provider: configured.Provider,
+			Model: configured.Model, Locality: configured.Locality,
+			Capabilities:  append([]string(nil), configured.Capabilities...),
+			ContextTokens: configured.ContextTokens, EstimatedCost: cost,
+			RAMBytes: configured.RAMBytes, VRAMBytes: configured.VRAMBytes,
+			GPUDevice: configured.GPUDevice, FailureDomain: configured.FailureDomain,
+		}
+	}
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+	if ctx.Err() != nil || catalog.Validate() != nil || !selectionValueClean(catalog, secrets) {
+		if ctx.Err() != nil {
+			return zero, ctx.Err()
+		}
+		return zero, ErrAdmission
+	}
+	return catalog, nil
+}

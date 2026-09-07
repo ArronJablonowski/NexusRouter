@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/memory"
@@ -396,6 +397,9 @@ func (s Settings) Validate() error {
 	}
 	models := map[string]bool{}
 	routes := map[[2]string]bool{}
+	if len(s.Models) > 256 {
+		return errors.New("too many configured models")
+	}
 	for _, m := range s.Models {
 		route := [2]string{m.Provider, m.Model}
 		if routes[route] {
@@ -405,7 +409,7 @@ func (s Settings) Validate() error {
 		if m.ContextTokens < 0 || (m.EstimatedCost != nil && (!finite(*m.EstimatedCost) || *m.EstimatedCost < 0)) || (m.FailureDomain != "" && !identifier.MatchString(m.FailureDomain)) {
 			return errors.New("invalid model routing metadata")
 		}
-		if !identifier.MatchString(m.ID) || models[m.ID] || m.Model == "" {
+		if !identifier.MatchString(m.ID) || models[m.ID] || m.Model == "" || len(m.Model) > 512 || !utf8.ValidString(m.Model) || strings.TrimSpace(m.Model) != m.Model || strings.ContainsFunc(m.Model, unicode.IsControl) {
 			return errors.New("invalid or duplicate model identity")
 		}
 		models[m.ID] = true
@@ -421,13 +425,15 @@ func (s Settings) Validate() error {
 		if m.GPUDevice != "" && (m.Locality != "local" || m.VRAMBytes == 0 || !resources.ValidGPUDeviceID(m.GPUDevice)) {
 			return errors.New("invalid model GPU binding")
 		}
-		if len(m.Capabilities) == 0 {
+		if len(m.Capabilities) == 0 || len(m.Capabilities) > 128 {
 			return errors.New("model capabilities required")
 		}
+		capabilities := map[string]bool{}
 		for _, c := range m.Capabilities {
-			if !identifier.MatchString(c) {
+			if !identifier.MatchString(c) || capabilities[c] {
 				return errors.New("invalid capability name")
 			}
+			capabilities[c] = true
 		}
 	}
 	return nil

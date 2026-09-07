@@ -305,8 +305,11 @@ DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
 
 The provider and model catalogs only inspect configuration and never perform
-inference or mutate runtime state. Provider output omits endpoints and credential
-environment-variable names. `doctor` validates the daemon's comprehensive
+inference or mutate runtime state. `models list` returns a versioned native
+metadata envelope; this intentionally replaces the bare array emitted by earlier
+development builds. Provider output omits endpoints and credential
+environment-variable names. See [configured model metadata](docs/configured-model-catalog.md).
+`doctor` validates the daemon's comprehensive
 `/v1/health` report and exits nonzero when the daemon is unavailable or not ready.
 
 Precedence: defaults → OS user config directory `/darwinrouter/config.yaml` → working-directory `config.yaml` → `DARWIN__SECTION__FIELD` environment variables → repeated `--set section.field=value` flags. `--user-config` and `--config` select explicit files; missing explicit paths are errors. Nested mappings merge; arrays replace wholesale. Environment and CLI overrides address scalar settings only. Unknown fields, duplicate keys, aliases, nulls, and multi-document YAML are rejected. Configuration files are limited to 1 MiB.
@@ -756,6 +759,7 @@ Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters,
 All endpoints require `Authorization: Bearer <token>`:
 
 - `GET /v1/models`: bounded OpenAI-shaped list of configured Darwin model IDs. It reads the daemon's immutable configuration snapshot without provider discovery or inference and exposes no provider endpoint, credential reference, cost, resource footprint or health assertion. Each item uses `object: "model"`, `owned_by: "darwinrouter"`, `shutdown_date: null`, and `created: 0`; the zero timestamp explicitly means DarwinRouter does not know the upstream model's creation time. Configuration order is preserved. `auto` is routing policy rather than a configured model and is not synthesized into the catalog. The response follows the current [OpenAI list-models envelope](https://developers.openai.com/api/reference/ruby/resources/models/methods/list) while documenting these Darwin-specific metadata semantics.
+- `GET /v1/routing/models`: versioned Darwin-native configured routing metadata, including provider/model aliases, locality, capabilities, context, optional configured cost and resource/failure-domain declarations. It shares the bounded catalog capacity domain with `/v1/models` but performs no discovery, health check, reservation, storage read or inference. Endpoints and credential references/values are omitted. This is not an availability or execution-authority response; see [configured model metadata](docs/configured-model-catalog.md).
 - `GET /health`: lightweight database and live supervisor check. Its legacy response still declares `providers_checked: false`; it performs no provider discovery.
 - `GET /v1/health`: detailed operational report described below, including bounded provider/model discovery.
 - `GET /v1/resources/attention`: read-only paginated lease-attention records;

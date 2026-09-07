@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 )
 
@@ -80,7 +81,17 @@ func runCatalog(kind string, args []string, stdout, stderr io.Writer) int {
 		}
 		return writeSubmissionJSON(ctx, stdout, items)
 	}
-	return writeSubmissionJSON(ctx, stdout, cfg.Models)
+	service, err := app.NewService(cfg, os.Getenv)
+	if err != nil {
+		fmt.Fprintln(stderr, "model catalog unavailable")
+		return 1
+	}
+	catalog, err := service.ConfiguredModelCatalog(ctx)
+	if err != nil {
+		fmt.Fprintln(stderr, "model catalog unavailable")
+		return 1
+	}
+	return writeSubmissionJSON(ctx, stdout, catalog)
 }
 
 func runDoctor(args []string, stdout, stderr io.Writer) int {

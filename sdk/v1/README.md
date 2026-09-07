@@ -10,6 +10,11 @@ using `DeprecationRequest`, `DeprecationPolicy` and `DeprecationReport`. It vali
 inputs/results and never runs inference or creates storage. See the
 [shared CLI/API/SDK contract](../../docs/model-deprecation.md).
 
+`Client.ConfiguredModelCatalog(ctx)` returns an owned, versioned snapshot of
+declared routing metadata and the redacted configuration fingerprint. It does
+no provider discovery, storage read, reservation or inference and makes no live
+health or availability claim. See [configured model metadata](../../docs/configured-model-catalog.md).
+
 Import `github.com/ArronJablonowski/DarwinRouter/sdk/v1` with Go1.27.1 or newer.
 The versioned client is under development; this is not a tagged stable release.
 The snippet below assumes the alias import

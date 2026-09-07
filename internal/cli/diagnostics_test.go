@@ -15,7 +15,12 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
+
+type diagnosticShortWriter struct{}
+
+func (diagnosticShortWriter) Write(body []byte) (int, error) { return len(body) - 1, nil }
 
 func diagnosticFixture(t *testing.T, listen string) string {
 	t.Helper()
@@ -39,6 +44,15 @@ func TestDiagnosticCatalogsAreSafeAndStructured(t *testing.T) {
 				t.Fatalf("%s leaked %q", command, secret)
 			}
 		}
+		if command == "models" {
+			var catalog routing.ModelCatalog
+			if json.Unmarshal(out.Bytes(), &catalog) != nil || catalog.Validate() != nil || len(catalog.Models) != 1 || catalog.Models[0].Model != "fixture:latest" || catalog.Models[0].EstimatedCost != nil {
+				t.Fatal("invalid native model catalog", out.String())
+			}
+		}
+	}
+	if code := RunWithInput([]string{"models", "list", "--config", path}, strings.NewReader(""), diagnosticShortWriter{}, &bytes.Buffer{}, "test"); code != 1 {
+		t.Fatal("short model catalog write accepted", code)
 	}
 	for _, args := range [][]string{{"providers", "list"}, {"models", "list", "--config", path, "--config", path}, {"providers", "bad", "--config", path}} {
 		if code := RunWithInput(args, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, "test"); code != 2 {

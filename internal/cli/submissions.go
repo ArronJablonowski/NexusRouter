@@ -138,8 +138,13 @@ func writeSubmissionJSON(ctx context.Context, output io.Writer, value any) (exit
 			exitCode = 1
 		}
 	}()
-	err = json.NewEncoder(writer).Encode(value)
+	body, err := json.Marshal(value)
 	if err != nil {
+		return 1
+	}
+	body = append(body, '\n')
+	n, err := writer.Write(body)
+	if err != nil || n != len(body) {
 		return 1
 	}
 	return 0

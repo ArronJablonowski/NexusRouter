@@ -116,6 +116,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 			return ids, nil
 		},
+		ConfiguredModels: service.ConfiguredModelCatalog,
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
 		ExportMemory:     service.ExportMemory,
