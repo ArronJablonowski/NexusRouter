@@ -1,5 +1,36 @@
 # Implementation evidence
 
+Foundation acceptance audit: work resumed from clean, GitHub-backed `c040fcc`.
+Native Linear DAR-5 (Initialize Go module and quality gates) and DAR-6 (Define
+versioned configuration schema) are now Done after direct acceptance review; no
+production code or schema changed for these two audits. Their completion evidence
+was posted and read back in the authenticated native Linear app. DAR-5 activity
+is `ca6b995e-5912-4e4c-aff7-c79501419d8b` with evidence comment
+`c03ee863`; DAR-6 activity is `05b1ae1e-a66e-40dc-a97f-65e4c979ac17`,
+with its evidence comment verified immediately after posting. Linear released
+their outgoing dependency links automatically.
+
+DAR-5 evidence: `go.mod` pins the module and Go version; the committed GitHub
+workflow runs the repository checks on macOS and Linux; `make check` runs format
+and 1,000-line enforcement, vet, the complete race-enabled test suite, and a
+production build. Generated code is excluded by the quality checker. The local
+equivalent passed at `c040fcc`; remote GitHub Actions UI execution was not claimed
+because the local GitHub CLI was not authenticated and the repository API did not
+provide a public run listing.
+
+DAR-6 evidence: configuration resolves defaults, user file, project file,
+`DARWIN__` environment values and flags in increasing precedence. Lower layers
+are validated before merge, maps merge recursively, and lists replace. Schema
+version 1 supplies safe defaults and strict validation, including hostile YAML,
+type, bound, identifier, deployment, resource, model, tool, memory, skill,
+evaluation and telemetry cases. Redacted display operates on a copy and removes
+provider endpoints/executables, database/export endpoints and local roots;
+credentials remain environment-variable references and are never loaded into
+settings. Tests cover precedence, explicit zero, list replacement, invalid
+shadowed layers, file/size limits, literal overrides and non-mutating redaction.
+The full PRD and backlog remain incomplete; DAR-22 is the next unblocked
+dependency selected for acceptance review.
+
 Daemon crash/restart qualification: this turn resumed from clean, GitHub-backed
 `a6e38ff`. Native Linear DAR-36 moved from Todo to In Progress. Existing daemon
 implementation already performs configuration, listener, database, provider,
