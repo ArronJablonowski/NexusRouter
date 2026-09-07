@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-43 is completion-ready pending native Linear reconciliation. Its crash,
+replay and lease-recovery acceptance is covered at every named boundary. Real
+owned-process SIGKILL fixtures cover daemon/provider streaming, pre-dispatch
+submission claims, completed-but-unacknowledged tasks, read-only tool calls,
+single and batch delegation trees, pending/no-child workers, worker finalization
+and consumed side-effect approvals both before and after a synced artifact.
+Fresh processes reopen the same WAL store, fence old owners, preserve immutable
+journals and either requeue definitely undispatched work, reconstruct fully
+validated terminal results, close supported interrupted read-only/model work
+without redispatch, or retain uncertain effects and writer ownership for
+inspection. A new restart regression closes the two weaker transactional
+boundaries: injected fitness-projection failure leaves neither evaluation nor
+fitness after reopen, and injected reviewed-compaction task-start failure leaves
+neither task head nor event while preserving the approved source draft/review.
+Those tests passed three race-enabled repetitions in 2.031s. The full `make
+check` passed format/LOC, vet, every native race package and build, including
+application at 222.038s, telemetry at 147.251s and CLI at 42.503s. The new
+crash-recovery matrix documents exact automatic versus inspection-only cases,
+bounds and limitations. This does not claim power-loss/storage-device
+durability, automatic OS service restart, remote-worker recovery, or safe
+automatic repetition of confirmed/uncertain effects. Native Linear remains
+unavailable because the Mac is locked, so no DAR-43 state/comment change is
+claimed. The full PRD remains incomplete.
+
 DAR-42 is completion-ready pending native Linear reconciliation. In addition to
 provider keys, the daemon API token and the optional metrics-export credential,
 operators can now configure up to 64 validated environment-variable names under

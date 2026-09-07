@@ -953,6 +953,8 @@ evaluation or audit calls and does not add fitness evidence. Audit results are
 not reconstructed: `audit_status` is `not_recovered`, and existing audit records
 remain independently inspectable. Partial conversations and uncertain work are
 not resumed by this mechanism.
+See the [crash-recovery qualification matrix](docs/crash-recovery-matrix.md) for
+the tested provider, tool, compaction, fitness and worker transaction boundaries.
 
 ## Automatic routing and local knowledge
 
