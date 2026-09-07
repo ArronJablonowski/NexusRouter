@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-19 is verified and ready for its Linear completion update. Native Linear
+moved the issue to In Progress under state activity
+`fab98207-5c14-4d86-ac7f-dc7e06ad9f13`. The in-process supervisor enforces a
+configured 1-64 worker slot bound and retains each slot until execution and
+validation have joined, including after cancellation or adapter panic. Every
+worker owns a durable child journal and renewable read lease; journal appends
+are lease-fenced and successful terminal persistence atomically releases the
+lease before output becomes visible. Heartbeat or ownership loss cancels the
+worker and cannot release output. Validators run before acceptance, and
+rejected/panicking work records failure without a completion claim. Existing
+process-ownership guards, expiry attention records and conservative orphan
+sweeps detect and recover only proven stopped holders; uncertain effects and
+unproven liveness never authorize retry or release. A new direct supervisor
+test proves a healthy long-running worker persists `worker.heartbeat` before
+completion and releases its lease afterward; it passed five race-enabled
+repetitions. Focused orphan, SIGKILL, lease-restart, finalization and attention
+tests passed three repetitions across telemetry and application (28.066s and
+10.828s). Final `make check` passed format/LOC, vet, the complete native race
+suite and build; application tests took 223.305s, telemetry 148.511s, CLI
+42.078s, SDK 24.809s, tool-gate 19.192s and workers 3.322s. The implementation
+checkpoint is backed up at `7b4d905`; push/fetch verification showed matching
+local and remote heads, zero divergence and a clean worktree. The full PRD
+remains incomplete.
+
 DAR-35 is Done in native Linear under state activity
 `b88f21bd-3c28-42b8-b011-2fd0b5beaeaa` with completion evidence comment
 `afcfe92b`. Skill bodies are immutable version files bound to digest-checked
