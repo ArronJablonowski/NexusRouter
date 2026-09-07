@@ -95,6 +95,53 @@ func (s *Store) CurrentSummaryReview(ctx context.Context, attempt string) (sessi
 	return decodeSummaryReview(body, id, attempt)
 }
 
+// LatestApprovedSummary returns the most recently recorded summary whose
+// current review head is still approved for task. Revoked heads are skipped;
+// malformed durable records fail closed instead of exposing an older draft.
+// The search is deliberately bounded so admission cannot be made to scan an
+// unbounded operator-review history.
+func (s *Store) LatestApprovedSummary(ctx context.Context, task string) (sessions.SummaryAttempt, sessions.SummaryReview, error) {
+	if ctx == nil || !sessions.ValidEventPageID(task) {
+		return sessions.SummaryAttempt{}, sessions.SummaryReview{}, sessions.ErrHistory
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT a.id,
+		CASE WHEN length(CAST(a.body AS BLOB)) BETWEEN 1 AND 1048576 THEN a.body END,
+		r.id,CASE WHEN length(CAST(r.body AS BLOB)) BETWEEN 1 AND 16384 THEN r.body END
+		FROM summary_attempts a
+		JOIN summary_review_heads h ON h.attempt_id=a.id
+		JOIN summary_reviews r ON r.id=h.review_id AND r.attempt_id=a.id
+		WHERE a.task_id=? ORDER BY r.rowid DESC LIMIT 101`, task)
+	if err != nil {
+		return sessions.SummaryAttempt{}, sessions.SummaryReview{}, err
+	}
+	defer rows.Close()
+	for count := 0; rows.Next(); count++ {
+		if count == 100 {
+			return sessions.SummaryAttempt{}, sessions.SummaryReview{}, sessions.ErrHistory
+		}
+		var attemptID, reviewID string
+		var attemptBody, reviewBody []byte
+		if err := rows.Scan(&attemptID, &attemptBody, &reviewID, &reviewBody); err != nil {
+			return sessions.SummaryAttempt{}, sessions.SummaryReview{}, err
+		}
+		a, err := decodeSummaryAttempt(attemptBody, attemptID, task)
+		if err != nil || a.Status != "drafted" || a.Draft == nil {
+			return sessions.SummaryAttempt{}, sessions.SummaryReview{}, sessions.ErrHistory
+		}
+		r, err := decodeSummaryReview(reviewBody, reviewID, attemptID)
+		if err != nil {
+			return sessions.SummaryAttempt{}, sessions.SummaryReview{}, sessions.ErrHistory
+		}
+		if r.Decision == "approved" {
+			return a, r, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return sessions.SummaryAttempt{}, sessions.SummaryReview{}, err
+	}
+	return sessions.SummaryAttempt{}, sessions.SummaryReview{}, sql.ErrNoRows
+}
+
 func (s *Store) SummaryReviews(ctx context.Context, attempt string) ([]sessions.SummaryReview, error) {
 	if attempt == "" || len(attempt) > 128 {
 		return nil, sessions.ErrHistory

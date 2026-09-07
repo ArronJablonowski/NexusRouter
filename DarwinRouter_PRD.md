@@ -548,8 +548,11 @@ signed-in Sol Codex provider: schema-inclusive context admission, durable start
 before launch, decoded-secret redaction and host-derived provenance. Drafts do
 not activate themselves. Explicit native compacted-history import supports
 operator-supplied summaries and approved stored drafts with canonical provenance
-and transactional review checks. Automatic semantic validation/application
-remains required work; see [native summary drafting](docs/codex-session-summaries.md)
+and transactional review checks. Storage can deterministically discover the
+newest currently approved draft for an exact immutable source task, skipping
+revoked heads and failing closed on malformed or excessive review history. This
+is an admission primitive, not implicit activation. Automatic semantic
+validation/application remains required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory

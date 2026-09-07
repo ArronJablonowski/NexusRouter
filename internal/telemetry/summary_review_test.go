@@ -109,6 +109,58 @@ func TestSummaryReviewHistoryAndRevocationGate(t *testing.T) {
 	}
 }
 
+func TestLatestApprovedSummaryUsesCurrentNewestReviewAndFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "reviews.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	first, firstReview := reviewDraftFixture(t, s)
+	if err := s.RecordSummaryReview(ctx, firstReview); err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.ID, second.StartedAt = "summary-b", first.StartedAt.Add(time.Minute)
+	second.Draft = nil
+	second.Status, second.FinishedAt = "started", time.Time{}
+	if err := s.BeginSummary(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	second.Status, second.FinishedAt = "drafted", second.StartedAt.Add(time.Second)
+	second.Draft = first.Draft
+	if err := s.CompleteSummary(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	secondReview := sessions.SummaryReview{Version: 1, ID: "review-b", AttemptID: second.ID, Decision: "approved", Note: "Reviewed newer exact source", Time: time.Unix(400, 0).UTC()}
+	if err := s.RecordSummaryReview(ctx, secondReview); err != nil {
+		t.Fatal(err)
+	}
+	a, r, err := s.LatestApprovedSummary(ctx, first.TaskID)
+	if err != nil || a.ID != second.ID || r.ID != secondReview.ID {
+		t.Fatal(a.ID, r.ID, err)
+	}
+	revoked := secondReview
+	revoked.ID, revoked.PreviousID, revoked.Decision = "review-c", secondReview.ID, "rejected"
+	revoked.Note, revoked.Time = "Revoked after discrepancy", time.Unix(500, 0).UTC()
+	if err := s.RecordSummaryReview(ctx, revoked); err != nil {
+		t.Fatal(err)
+	}
+	a, r, err = s.LatestApprovedSummary(ctx, first.TaskID)
+	if err != nil || a.ID != first.ID || r.ID != firstReview.ID {
+		t.Fatal(a.ID, r.ID, err)
+	}
+	if _, _, err := s.LatestApprovedSummary(ctx, "bad task"); !errors.Is(err, sessions.ErrHistory) {
+		t.Fatal("invalid task admitted", err)
+	}
+	if _, err := s.db.Exec("UPDATE summary_reviews SET body='{}' WHERE id=?", firstReview.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.LatestApprovedSummary(ctx, first.TaskID); !errors.Is(err, sessions.ErrHistory) {
+		t.Fatal("corrupt approved record bypassed", err)
+	}
+}
+
 func TestSummaryReviewRollbackBoundAndMigration(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "reviews.db")
