@@ -747,6 +747,17 @@ used as source context for a new explicit request. Other reasons include
 precedence over uncertain effects, then interrupted turns. Missing, corrupt or
 oversized history returns an error rather than partial metadata.
 
+`InspectRouteExplanation(ctx, taskID)` returns a versioned metadata-only record
+for an automatically routed task. It contains the persisted configuration
+fingerprint, domain/profile, selected model/provider route, bounded candidate
+constraint snapshots, normalized ranking, closed exclusion reason classes,
+fallback order and exploration decision. It never returns conversation,
+provider endpoint, credential value/reference, model output or tool payloads.
+The complete structure is validated before delivery; an explicit-model task has
+no route decision and returns an inspection error. Historical health and
+capacity fields describe admission time only and do not authorize a retry.
+See [route explanation inspection](../../docs/route-explanation.md).
+
 This is not model readiness or execution authorization. Normal provider,
 privacy, resource, budget and tool policy checks still apply; no method silently
 replays old tool calls. Codex CLI now supports explicit `Request.ContinueTaskID`

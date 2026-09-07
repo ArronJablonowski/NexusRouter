@@ -182,6 +182,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		Run:                   service.Run,
 		Inspect:               db.TaskSnapshot,
 		TaskContinuation:      db.TaskContinuation,
+		RouteExplanation:      db.RouteExplanation,
 		SkillTaskOutcome:      service.SkillTaskOutcome,
 		CompareSkillOutcomes:  service.CompareSkillOutcomes,
 		SelectSkillComparison: service.SelectSkillComparison,

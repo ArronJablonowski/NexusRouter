@@ -5,6 +5,15 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Metadata-only automatic-route inspection through `darwin task route`, the Go
+  SDK's `InspectRouteExplanation`, and authenticated
+  `GET /v1/tasks/{id}/route`. The reader reconstructs only the fixed initial
+  route boundary and validates policy weights, candidates, ranking, exclusions,
+  fallbacks and exploration before returning anything. It contains no prompt,
+  model output, endpoint, credential value/reference or tool payload; explicit
+  tasks correctly have no route explanation. See
+  [route explanation inspection](route-explanation.md).
+
 - Authenticated `GET /v1/models` returns an OpenAI-shaped, configuration-only
   catalog of Darwin model aliases. It is independently capacity-bounded, does
   no discovery or inference, and omits endpoints, credential references,

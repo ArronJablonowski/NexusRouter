@@ -21,6 +21,10 @@ import (
 
 func TestSDKInspectionRejectsWithoutCreatingStorage(t *testing.T) {
 	for _, client := range []*sdk.Client{nil, {}} {
+		route, err := client.InspectRouteExplanation(context.Background(), "task")
+		if !errors.Is(err, sdk.ErrAdmission) || route.Version != 1 || route.TaskID != "" {
+			t.Fatal(route, err)
+		}
 		readiness, err := client.InspectTaskContinuation(context.Background(), "task")
 		if !errors.Is(err, sdk.ErrAdmission) || readiness.Version != 1 || readiness.TaskID != "" {
 			t.Fatal(readiness, err)
@@ -38,6 +42,13 @@ func TestSDKInspectionRejectsWithoutCreatingStorage(t *testing.T) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	for _, ctx := range []context.Context{nil, canceled, context.Background()} {
+		route, err := client.InspectRouteExplanation(ctx, "task")
+		if err == nil || route.Version != 1 || route.TaskID != "" {
+			t.Fatal(route, err)
+		}
+		if ctx == canceled && !errors.Is(err, context.Canceled) {
+			t.Fatal("route cancellation identity lost", err)
+		}
 		readiness, err := client.InspectTaskContinuation(ctx, "task")
 		if err == nil || readiness.Version != 1 || readiness.TaskID != "" || readiness.HistoryEligible {
 			t.Fatal(readiness, err)
@@ -62,6 +73,10 @@ func TestSDKInspectionSnapshotsDoNotExecuteOrMutate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			fmt.Fprintln(w, `{"models":[{"name":"fixture"}]}`)
+			return
+		}
 		if _, err := io.Copy(io.Discard, r.Body); err != nil {
 			t.Error(err)
 			return
@@ -117,6 +132,24 @@ models:
 	if err != nil || strings.Contains(string(metadata), "initial prompt") || strings.Contains(string(metadata), "persisted answer") {
 		t.Fatal("continuation inspection leaked conversation")
 	}
+	automatic, err := client.Run(ctx, sdk.Request{Version: 1, ModelID: "auto", Prompt: "automatic private prompt", Domain: "code"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	route, err := client.InspectRouteExplanation(ctx, automatic.TaskID)
+	if err != nil || route.Validate() != nil || route.TaskID != automatic.TaskID || route.Model != "fixture" || route.Provider != "local" {
+		t.Fatal(route, err)
+	}
+	routeBody, err := json.Marshal(route)
+	if err != nil || strings.Contains(string(routeBody), "automatic private prompt") || strings.Contains(string(routeBody), "persisted answer") || strings.Contains(string(routeBody), server.URL) {
+		t.Fatal("route inspection leaked execution content", string(routeBody), err)
+	}
+	route.Candidates[0].Model = "mutated"
+	route.Selection.Ranked[0].Model = "mutated"
+	freshRoute, err := client.InspectRouteExplanation(ctx, automatic.TaskID)
+	if err != nil || freshRoute.Model != "fixture" || freshRoute.Candidates[0].Model != "fixture" || freshRoute.Selection.Ranked[0].Model != "fixture" {
+		t.Fatal("returned route record aliased durable state", freshRoute, err)
+	}
 	snapshot.Messages[0].Content = "mutated prompt"
 	snapshot.Messages[1].Content = "mutated answer"
 	snapshot.MessageSequences[0] = 999
@@ -132,7 +165,7 @@ models:
 	if err != nil || interrupted.Version != 1 || interrupted.State != "canceled" || interrupted.TaskID != failed.TaskID || len(interrupted.Messages) != 1 {
 		t.Fatal(interrupted, err)
 	}
-	if calls.Load() != 1 {
+	if calls.Load() != 2 {
 		t.Fatal("inspection or interrupted run dispatched provider", calls.Load())
 	}
 	missing, err := client.InspectTask(ctx, "unknown-task")

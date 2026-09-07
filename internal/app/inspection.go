@@ -70,3 +70,33 @@ func InspectTaskContinuation(ctx context.Context, path, task string) (sessions.C
 	}
 	return status, nil
 }
+
+// InspectRouteExplanation returns the bounded metadata-only routing decision
+// for an automatic task. Explicit tasks have no route-selection explanation.
+func InspectRouteExplanation(ctx context.Context, path, task string) (sessions.RouteExplanation, error) {
+	zero := sessions.RouteExplanation{}
+	if ctx == nil || path == "" || !sessions.ValidEventPageID(task) {
+		return zero, ErrAdmission
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if ctx.Err() != nil {
+		return zero, ctx.Err()
+	}
+	db, err := telemetry.OpenReadOnly(ctx, path)
+	if err != nil {
+		if ctx.Err() != nil {
+			return zero, ctx.Err()
+		}
+		return zero, ErrInspection
+	}
+	defer db.Close()
+	out, err := db.RouteExplanation(ctx, task)
+	if err != nil || out.Validate() != nil {
+		if ctx.Err() != nil {
+			return zero, ctx.Err()
+		}
+		return zero, ErrInspection
+	}
+	return out, nil
+}

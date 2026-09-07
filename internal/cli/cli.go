@@ -37,6 +37,7 @@ Usage:
   darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]
   darwin task show --db path --task id  Inspect durable conversation state
   darwin task continuation --db path --task id  Inspect continuation readiness
+  darwin task route --db path --task id         Inspect metadata-only route decision
   darwin task leases --db path --task id        Inspect lease and recovery counts
   darwin steer --config path --task id --key idempotency-key < guidance.txt
     Queue guidance for a running task; does not interrupt current tools

@@ -13,6 +13,10 @@ var ErrInspection = app.ErrInspection
 // or permission to retry interrupted effects.
 type ContinuationStatus = sessions.ContinuationStatus
 
+// RouteExplanation is a metadata-only automatic routing decision. It contains
+// no prompt, output, endpoint, credential, or tool payload fields.
+type RouteExplanation = sessions.RouteExplanation
+
 func (c *Client) InspectTaskContinuation(ctx context.Context, task string) (ContinuationStatus, error) {
 	if !c.valid(ctx) {
 		return ContinuationStatus{Version: 1}, ErrAdmission
@@ -38,4 +42,13 @@ func (c *Client) InspectTask(ctx context.Context, task string) (TaskSnapshot, er
 	}
 	snapshot, err := app.InspectTask(ctx, c.database, task)
 	return TaskSnapshot{Version: 1, Snapshot: snapshot}, err
+}
+
+func (c *Client) InspectRouteExplanation(ctx context.Context, task string) (RouteExplanation, error) {
+	if !c.valid(ctx) {
+		return RouteExplanation{Version: 1}, ErrAdmission
+	}
+	out, err := app.InspectRouteExplanation(ctx, c.database, task)
+	out.Version = 1
+	return out, err
 }

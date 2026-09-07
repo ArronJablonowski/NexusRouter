@@ -172,6 +172,8 @@ DarwinRouter exposes:
   provider discovery or inference and exposes no endpoint or credential data.
 - Native task submission, cancellation, status, and Server-Sent Events endpoints.
 - Route-explanation and model-health endpoints.
+- Metadata-only route inspection through CLI, Go SDK, and authenticated HTTP,
+  validated from the immutable initial `route.selected` boundary.
 - Session, branch, and resume endpoints.
 - Feedback and evaluation endpoints.
 - Memory and skill inspection/management endpoints.
