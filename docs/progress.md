@@ -1,5 +1,25 @@
 # Implementation evidence
 
+DAR-41 is completion-ready pending native Linear reconciliation. All production
+HTTP clients are constructed over DarwinRouter-owned, endpoint-allowlisted
+transports: built-in provider execution/discovery/health/residency, explicit and
+periodic metrics export, and daemon control. Local-only mode admits only literal
+loopback or pinned `localhost`, never consults DNS for those destinations,
+disables proxies and redirects, rejects Host overrides and remote endpoints, and
+filters cloud models before provider construction. Codex app-server models are
+cloud-only by configuration and cannot launch in local-only mode. A new
+cross-surface regression proves explicit and automatic tasks, provider health,
+the Sol/Codex subprocess path and metrics export make zero provider-factory,
+subprocess or HTTP calls when denied. It passed three race-enabled repetitions
+in 1.942s; the broader policy/application/configuration matrix passed in 1.417s,
+11.583s and 1.356s respectively. The full `make check` passed format/LOC, vet,
+every native race package and build, including application at 221.408s,
+telemetry at 145.371s and CLI at 41.593s. This establishes the runtime-owned
+egress boundary, not an OS sandbox: trusted in-process extensions and local
+model servers remain responsible for their own networking. Native Linear is
+unavailable because the Mac is locked, so no DAR-41 state/comment change is
+claimed. The full PRD remains incomplete.
+
 DAR-37 is completion-ready pending native Linear reconciliation. The CLI now
 combines the existing layered, strictly validated and redacted `config
 validate/show`, daemon start/status/stop and host-resource inspection commands
