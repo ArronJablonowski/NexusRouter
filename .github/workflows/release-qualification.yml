@@ -1,0 +1,86 @@
+name: Release qualification (no publication)
+
+# Select a reviewed branch/tag in the manual dispatch UI. github.sha is the
+# immutable commit captured by that dispatch, not a moving checkout ref.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify on ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out the dispatched commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install the declared Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify source and record native platform
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit=$(git rev-parse HEAD)
+          test "$commit" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          {
+            echo "commit=$commit"
+            echo "os=$(go env GOHOSTOS)"
+            echo "arch=$(go env GOHOSTARCH)"
+            echo "go=$(go env GOVERSION)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Run quality gates
+        id: check
+        shell: bash
+        run: make check
+      - name: Run deterministic MVP and disposable-key packaging qualification
+        id: qualification
+        shell: bash
+        run: make qualify-release
+      - name: Confirm source remains unchanged
+        id: unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Report evidence and limits
+        if: ${{ always() }}
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          NATIVE_OS: ${{ steps.source.outputs.os }}
+          NATIVE_ARCH: ${{ steps.source.outputs.arch }}
+          GO_VERSION: ${{ steps.source.outputs.go }}
+          SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          QUALIFICATION_OUTCOME: ${{ steps.qualification.outcome }}
+          UNCHANGED_OUTCOME: ${{ steps.unchanged.outcome }}
+        run: |
+          {
+            echo '## Release qualification — no publication'
+            printf '\nDispatched commit: `%s`\n' "$GITHUB_SHA"
+            printf '\nVerified checkout: `%s`\n' "${SOURCE_COMMIT:-unavailable}"
+            printf '\nObserved native platform: `%s/%s`; Go: `%s`\n' "${NATIVE_OS:-unavailable}" "${NATIVE_ARCH:-unavailable}" "${GO_VERSION:-unavailable}"
+            printf '\n| Gate | Outcome |\n| --- | --- |\n'
+            printf '| Source binding | %s |\n| make check | %s |\n| make qualify-release | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$CHECK_OUTCOME" "$QUALIFICATION_OUTCOME" "$UNCHANGED_OUTCOME"
+            echo
+            echo 'Only a successful qualification gate establishes the following evidence: deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; format checks; disposable-key signing/verification; tamper rejection; and execution of the native artifact version command.'
+            echo
+            echo 'The other three target artifacts are cross-built and inspected, not executed by this job. Read the observed native platform above; runner labels alone are not architecture evidence. Failed/skipped gates do not qualify a release.'
+            echo
+            echo 'No live models, production signing key, tag, release, artifact upload, installation or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
+          } >> "$GITHUB_STEP_SUMMARY"

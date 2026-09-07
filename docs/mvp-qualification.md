@@ -20,7 +20,7 @@ conversations, or modify a configured DarwinRouter store.
 | Fallback | A retryable primary failure produces a distinct, linked task on the fallback; partial output, empty output, explicit selection, and exhausted cost budget do not trigger unsafe automatic retries. Hybrid privacy prevents a fallback from crossing locality when local execution is required. |
 | User feedback | Explicit feedback updates the exact model/provider/domain/profile fitness projection once; conflicting repeats are rejected. |
 | Skills | Only the relevant active skill is progressively loaded. Draft and unrelated skills stay out of context, secrets are redacted, and local-only skill policy prevents cloud disclosure. |
-| Recovery | A completed task survives owner-process `SIGKILL` and is reconciled without another provider call. A separate restart fixture preserves a failed read-only step, accepted user feedback, and its eligibility for later workflow learning. |
+| Recovery | A completed task survives owner-process `SIGKILL` and is reconciled without another provider call. A separate restart fixture preserves a failed read-only step and accepted user feedback while excluding the repaired trajectory from successful-workflow learning. |
 
 These fixtures use production application, provider, routing, session, skill,
 evaluation, and SQLite/WAL paths. They are deterministic evidence, not a claim
