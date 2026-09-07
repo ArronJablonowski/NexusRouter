@@ -1,5 +1,36 @@
 # Implementation evidence
 
+Resource and canonical-event acceptance checkpoint: native Linear DAR-22 is Done
+after review of both acceptance criteria. Its state activity is
+`4f25bcae-ed47-46b3-8ce3-4403714c3d82` and evidence comment `355ad15a` was
+posted and read back. Linear automatically released DAR-23, DAR-27, DAR-37 and
+DAR-44. Existing resource implementation profiles CPU, RAM and swap, reports
+Apple unified memory and Foundation thermal state, applies visible Linux cgroup-v2
+CPU/RAM constraints and thermal trip-point observations, and surveys NVIDIA/AMD
+VRAM per device without aggregating distinct accelerators. Injected proc, sysfs,
+command, cgroup and thermal probes provide hardware-independent fixtures.
+`go test -race ./resources` passed, and the read-only CLI on this Mac reported
+16 CPU threads, 48 GiB unified memory, swap usage and nominal/false OS thermal
+pressure. Discrete GPU sources were explicitly unsupported. Null observations
+remain unknown; this live check does not qualify physical temperature, Linux GPU
+hardware, every container hierarchy or OS-enforced isolation.
+
+DAR-23 remained blocked by DAR-10, which remained blocked by DAR-8, so work
+followed the dependency chain instead of bypassing it. DAR-8 is In Progress in
+native Linear under state activity `d8def7c5-8d7e-42d4-a7be-56d9bef19b58`.
+The canonical version-1 runtime protocol already defines immutable typed events
+for task, turn, model delta, tool, worker lifecycle, route selection, evaluation,
+error and steering. Envelope validation requires task/session/correlation/order
+identity and each event family requires its specific identity or outcome fields.
+The focused test now positively constructs, validates, encodes and JSON-round-
+trips every canonical kind, checks that the test table itself has no duplicate
+kinds, and retains the existing malformed-envelope cases. The focused runtime
+race suite and source quality check passed. Final `make check` also passed
+format/LOC enforcement, vet, the complete native race suite and production
+build; application tests took 221.844s, telemetry 148.124s, CLI 42.362s, SDK
+24.967s and tool-gate 19.467s, with unchanged packages cached. GitHub backup and
+the native Linear completion comment follow before DAR-8 is closed.
+
 Foundation acceptance audit: work resumed from clean, GitHub-backed `c040fcc`.
 Native Linear DAR-5 (Initialize Go module and quality gates) and DAR-6 (Define
 versioned configuration schema) are now Done after direct acceptance review; no
