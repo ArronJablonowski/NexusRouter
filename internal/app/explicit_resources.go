@@ -69,6 +69,11 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return Result{}, ErrAdmission
 	}
+	var err error
+	r, err = s.prepareExplicitApprovedCompaction(ctx, r, model)
+	if err != nil {
+		return Result{}, ErrAdmission
+	}
 	// Managed residency is an admission-time maintenance action. Reject known
 	// credential/source failures before any such provider mutation.
 	for _, provider := range s.settings.Providers {

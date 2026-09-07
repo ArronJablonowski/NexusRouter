@@ -17,8 +17,10 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -195,6 +197,10 @@ func TestAutomaticRoutingUsesApprovedSummaryOnlyAfterFullHistoryHasNoRoute(t *te
 	if _, err := svc.Run(ctx, Request{ModelID: "auto", ContinueTaskID: source.TaskID, Prompt: "continue without implicit compaction", Domain: "auto-compaction"}); !errors.Is(err, routing.ErrNoRoute) {
 		t.Fatal("disabled automatic compaction admitted full history", err)
 	}
+	disabled, err := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: source.TaskID, Prompt: "explicit continuation without implicit compaction", Domain: "auto-compaction"})
+	if disabled.TaskID == "" || !errors.Is(err, runtime.ErrContextOverflow) {
+		t.Fatal("disabled explicit compaction did not preserve durable overflow", disabled, err)
+	}
 	svc.settings.Runtime.AutoApprovedCompaction = true
 	out, err := svc.Run(ctx, Request{ModelID: "auto", ContinueTaskID: source.TaskID, Prompt: "continue with approved compact history", Domain: "auto-compaction"})
 	if err != nil || out.TaskID == "" {
@@ -208,6 +214,31 @@ func TestAutomaticRoutingUsesApprovedSummaryOnlyAfterFullHistoryHasNoRoute(t *te
 	replayed, err := sessions.Replay(ctx, db, out.TaskID)
 	if err != nil || replayed.Compaction == nil || replayed.Compaction.SummaryAttemptID != attempt.ID || replayed.Compaction.SummaryReviewID != review.ID || replayed.ParentTaskID != source.TaskID {
 		t.Fatal("automatic compaction attribution missing", replayed, err)
+	}
+	var estimates atomic.Int32
+	svc.contextEstimator = auxiliaryContextEstimator(func(context.Context, providers.Request) (int, error) {
+		estimates.Add(1)
+		return 1, nil
+	})
+	explicit, err := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: source.TaskID, Prompt: "explicit continuation with approved compact history", Domain: "auto-compaction"})
+	if err != nil || explicit.TaskID == "" || estimates.Load() != 1 {
+		t.Fatal(explicit, err, estimates.Load())
+	}
+	explicitReplay, err := sessions.Replay(ctx, db, explicit.TaskID)
+	if err != nil || explicitReplay.Compaction == nil || explicitReplay.Compaction.SummaryAttemptID != attempt.ID || explicitReplay.Compaction.SummaryReviewID != review.ID || explicitReplay.ParentTaskID != source.TaskID {
+		t.Fatal("explicit automatic compaction attribution missing", explicitReplay, err)
+	}
+	svc.contextEstimator = nil
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 1000
+	}
+	tooSmall, err := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: source.TaskID, Prompt: "approved form still cannot fit", Domain: "auto-compaction"})
+	if tooSmall.TaskID == "" || !errors.Is(err, runtime.ErrContextOverflow) {
+		t.Fatal("still-oversized approved form was activated", tooSmall, err)
+	}
+	tooSmallReplay, err := sessions.Replay(ctx, db, tooSmall.TaskID)
+	if err != nil || tooSmallReplay.Compaction != nil {
+		t.Fatal("futile compaction was persisted", tooSmallReplay, err)
 	}
 }
 

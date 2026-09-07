@@ -552,8 +552,10 @@ and transactional review checks. Storage can deterministically discover the
 newest currently approved draft for an exact immutable source task, skipping
 revoked heads and failing closed on malformed or excessive review history. An
 opt-in runtime policy can use that primitive after full-history automatic
-routing finds no route: it rebuilds the continuation from the approved draft
-and reruns ordinary admission exactly once before task creation or inference dispatch.
+routing finds no route, or when the built-in conservative floor proves an
+explicitly selected model cannot fit its fully assembled initial request. It
+rebuilds the continuation from the approved draft and reruns ordinary admission
+exactly once before task creation or inference dispatch.
 The default is off, and the policy never generates or approves a summary.
 Automatic semantic validation and mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).

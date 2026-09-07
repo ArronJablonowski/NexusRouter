@@ -42,6 +42,11 @@ production release, release tag or complete PRD acceptance is claimed.
   are skipped, corrupted records fail closed, and the task-start transaction
   still rechecks the selected approval. It never drafts or approves summaries.
 
+- The same policy now covers explicit-model initial admission. It measures the
+  frozen history, memory, skill and tool-schema assembly before resource or
+  residency mutation, selects an approved checkpoint only when it fits, and
+  leaves custom-estimator, provider-overflow and mid-task decisions fail closed.
+
 - Explicit Sol continuation with manual or approved stored compaction, preserving
   canonical checkpoints, historical tool pairs and the durable-start approval
   boundary. One synthetic live recall check passed. See

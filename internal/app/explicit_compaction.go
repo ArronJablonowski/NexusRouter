@@ -1,0 +1,113 @@
+package app
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+)
+
+// prepareExplicitApprovedCompaction freezes the complete initial context before
+// local resource or managed-residency mutation. It changes the continuation
+// only when the built-in conservative floor proves full history cannot fit and
+// a currently approved replacement does fit. Trusted custom estimators still
+// run once inside the durable runtime and may reject the compacted request.
+func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Request, model config.Model) (Request, error) {
+	if !s.settings.Runtime.AutoApprovedCompaction || r.delegatedParent != "" || r.ContinueTaskID == "" || r.Compaction != nil || r.SummaryAttemptID != "" || model.ContextTokens < 1 {
+		return r, nil
+	}
+	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return r, ErrAdmission
+	}
+	defer db.Close()
+	secrets := memorySecrets(s.settings, s.secret)
+	full, inference, err := s.prepareExplicitInference(ctx, db, r, model, secrets)
+	if err != nil {
+		return r, err
+	}
+	estimate, err := providers.EstimateContext(inference)
+	if err != nil || estimate <= model.ContextTokens {
+		return full, err
+	}
+	attempt, _, err := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return full, nil
+	}
+	if err != nil {
+		return r, ErrAdmission
+	}
+	compact := full
+	compact.SummaryAttemptID = attempt.ID
+	compact.continuation = nil
+	compact.preparedContext = nil
+	compact, inference, err = s.prepareExplicitInference(ctx, db, compact, model, secrets)
+	if err != nil {
+		return r, err
+	}
+	estimate, err = providers.EstimateContext(inference)
+	if err != nil {
+		return r, err
+	}
+	if estimate > model.ContextTokens {
+		return full, nil
+	}
+	return compact, nil
+}
+
+func (s *Service) prepareExplicitInference(ctx context.Context, db *telemetry.Store, r Request, model config.Model, secrets []string) (Request, providers.Request, error) {
+	if r.continuation == nil {
+		var err error
+		r.continuation, err = loadContinuation(ctx, db, r, secrets)
+		if err != nil {
+			return r, providers.Request{}, err
+		}
+	}
+	if r.continuation.Privacy != "cloud_allowed" && model.Locality != "local" {
+		return r, providers.Request{}, ErrAdmission
+	}
+	var err error
+	if !r.memoryPrepared && (model.Locality == "local" || !s.settings.Memory.LocalOnly) {
+		r.memoryContext, err = loadMemoryContext(ctx, selectMemoryStore(r.memoryStore, db), s.settings.Memory, model.Locality == "local", secrets, memoryTaskQuery(r))
+		if err != nil {
+			return r, providers.Request{}, ErrAdmission
+		}
+	}
+	if r.memoryContext != nil && (r.memoryContext.LocalOnly && model.Locality != "local") {
+		return r, providers.Request{}, ErrAdmission
+	}
+	if !r.skillPrepared && (model.Locality == "local" || !s.settings.Skills.LocalOnly) {
+		r.skillContext, err = loadSkillContextFrom(ctx, r.skillStore, s.settings.Skills, r.Domain, contextTools(s.settings, r.toolExtension), secrets)
+		if err != nil {
+			return r, providers.Request{}, ErrAdmission
+		}
+	}
+	if r.skillContext != nil && r.skillContext.LocalOnly && model.Locality != "local" {
+		return r, providers.Request{}, ErrAdmission
+	}
+	messages, err := prepareTaskContext(ctx, &r, secrets)
+	if err != nil {
+		return r, providers.Request{}, ErrAdmission
+	}
+	return r, providers.Request{Model: model.Model, Messages: messages, Tools: initialTaskTools(s.settings, r)}, nil
+}
+
+func initialTaskTools(cfg config.Settings, r Request) []providers.Tool {
+	result := r.toolExtension.Catalog()
+	if cfg.Tools.Enabled {
+		result = append(result, readFileSpec())
+	}
+	if cfg.Tools.CreateEnabled {
+		result = append(result, createFileSpec())
+	}
+	if cfg.Tools.ReplaceEnabled {
+		result = append(result, replaceFileSpec())
+	}
+	if cfg.Workers.DelegateModel != "" {
+		result = append(result, delegateSpec(), delegateBatchSpec())
+	}
+	return result
+}

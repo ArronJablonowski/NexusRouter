@@ -310,20 +310,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	// Byte count is a conservative token estimate, with framing/output reserve.
-	inference := providers.Request{Messages: messages}
-	inference.Tools = r.toolExtension.Catalog()
-	if cfg.Tools.Enabled {
-		inference.Tools = append(inference.Tools, readFileSpec())
-	}
-	if cfg.Tools.CreateEnabled && r.delegatedParent == "" {
-		inference.Tools = append(inference.Tools, createFileSpec())
-	}
-	if cfg.Tools.ReplaceEnabled && r.delegatedParent == "" {
-		inference.Tools = append(inference.Tools, replaceFileSpec())
-	}
-	if cfg.Workers.DelegateModel != "" {
-		inference.Tools = append(inference.Tools, delegateSpec(), delegateBatchSpec())
-	}
+	inference := providers.Request{Messages: messages, Tools: initialTaskTools(cfg, r)}
 	contextTokens, estimateErr := providers.EstimateContext(inference)
 	if estimateErr != nil {
 		return Result{}, ErrAdmission
