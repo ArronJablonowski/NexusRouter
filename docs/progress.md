@@ -1,5 +1,31 @@
 # Implementation evidence
 
+DAR-39 is completion-ready pending native Linear reconciliation. Authenticated
+`POST /v1/chat/completions` accepts the supported OpenAI-compatible text message
+shape, configured model aliases (including automatic routing), strict streaming
+selection and optional `stream_options.include_usage`; unknown, duplicate,
+case-aliased or unsupported fields fail before execution. Nonstreaming replies
+return the durable final answer. Streaming uses live incrementally redacted SSE:
+assistant deltas arrive only after their lifecycle marker commits, tool and
+delegated-child content is withheld, partial secret prefixes are retained until
+safe, and finish/usage/`[DONE]` appear only after successful durable completion.
+Usage is never invented and is explicitly scoped to successful parent task
+model turns. Post-header failures are sanitized SSE errors without a success
+marker; disconnects, write failures and flush failures cancel remaining work
+and never authorize replay. Authentication, browser-origin denial, shared
+capacity, input/output bounds and request deadlines use the daemon's common
+controls. The built-in OpenAI-compatible client round-trips against the endpoint
+with canonical ordering, while the provider matrix separately proves
+OpenAI/Ollama tool-history portability. The focused HTTP compatibility, live
+text, usage, SDK and provider handoff matrix passed three race-enabled
+repetitions: API 4.191s, application 3.425s, SDK 2.366s and providers 2.181s.
+The preceding full `make check` passed format/LOC, vet, all native race tests
+and build. Full OpenAI parameter/tool-call parity and production third-party
+client qualification remain explicit compatibility extensions, not this
+issue's stated endpoint requirement. Native Linear remains unavailable because
+the Mac is locked, so no DAR-39 state/comment change is claimed. The full PRD
+remains incomplete.
+
 DAR-38 is completion-ready pending native Linear reconciliation. `darwin run
 --json` emits versioned committed lifecycle events followed by one terminal
 result, with bounded backpressure, provisional-text redaction, safe broken-pipe
