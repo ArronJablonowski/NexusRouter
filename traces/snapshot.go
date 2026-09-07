@@ -66,6 +66,8 @@ func spanVocabulary(name, outcome string) bool {
 		return outcome == "completed"
 	case "route":
 		return outcome == "selected" || outcome == "explored"
+	case "route_constraint":
+		return routeConstraint(outcome)
 	case "evaluation":
 		return outcome == "accepted" || outcome == "rejected"
 	case "fallback":
@@ -78,6 +80,15 @@ func spanVocabulary(name, outcome string) bool {
 		return outcome == "applied"
 	case "error":
 		return outcome == "recorded"
+	default:
+		return false
+	}
+}
+
+func routeConstraint(value string) bool {
+	switch value {
+	case "mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability":
+		return true
 	default:
 		return false
 	}

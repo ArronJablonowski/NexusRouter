@@ -1456,6 +1456,8 @@ now aliases configured periodic metrics export. A separate explicit CLI/SDK
 roots with paired provider/tool/worker children and fixed route, evaluation,
 fallback, compaction, skill-context, steering and error observations. It uses
 fresh non-durable wire IDs and no session content or durable identities.
+Fixed route-constraint observations expose only mode/privacy/health/policy/
+credential/capacity/context/budget/capability reason classes, never candidates.
 `telemetry.trace_export` enables an
 independent sequential daemon exporter, while SDK hosts can own one explicitly;
 health is supplemental and delivery remains best effort. The legacy

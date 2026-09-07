@@ -27,7 +27,7 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		}
 		if kind == runtime.RouteSelected {
 			e.RouteID, e.Data.ModelID, e.Data.ProviderID = "private-route", "private-model", "private-provider"
-			e.Data.Route = &routing.Selection{Explored: true}
+			e.Data.Route = &routing.Selection{Explored: true, Excluded: []routing.Exclusion{{Model: "private-excluded-model", Provider: "private-excluded-provider", Reasons: []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability", "capacity"}}, {Model: "private-second-model", Provider: "private-second-provider", Reasons: []string{"capacity"}}}}
 		}
 		if kind == runtime.TurnStarted || kind == runtime.TurnCompleted || kind == runtime.ToolStarted || kind == runtime.ToolCompleted {
 			e.TurnID, e.AttemptID = "private-turn", "private-attempt"
@@ -50,19 +50,23 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		}
 	}
 	snapshot, err := db.Traces(ctx, 1)
-	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 10 {
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 19 {
 		t.Fatal(snapshot, err)
 	}
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || snapshot.Traces[0].Spans[0].Outcome != "completed" {
 		t.Fatal(string(body))
 	}
-	want := map[string]string{"fallback": "selected", "compaction": "applied", "skill_context": "loaded", "route": "explored", "provider": "completed", "tool": "completed", "worker": "completed", "evaluation": "accepted", "error": "recorded"}
+	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "worker/completed": true, "evaluation/accepted": true, "error/recorded": true}
+	for _, reason := range []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
+		want["route_constraint/"+reason] = true
+	}
 	for _, span := range snapshot.Traces[0].Spans[1:] {
-		if want[span.Name] != span.Outcome {
+		key := span.Name + "/" + span.Outcome
+		if !want[key] {
 			t.Fatal(span, want)
 		}
-		delete(want, span.Name)
+		delete(want, key)
 	}
 	if len(want) != 0 {
 		t.Fatal("missing spans", want)
@@ -81,5 +85,27 @@ func TestTraceSnapshotRejectsCorruptTerminalTime(t *testing.T) {
 	}
 	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
 		t.Fatal(snapshot, err)
+	}
+}
+
+func TestTraceSnapshotRejectsUnknownRouteConstraint(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Unix(300, 0).UTC()
+	start := event("start-route", 1, runtime.TaskStarted)
+	start.Time = base
+	route := event("route", 2, runtime.RouteSelected)
+	route.Time, route.RouteID = base.Add(time.Second), "route"
+	route.Data.ModelID, route.Data.ProviderID = "model", "provider"
+	route.Data.Route = &routing.Selection{Excluded: []routing.Exclusion{{Model: "model", Provider: "provider", Reasons: []string{"private-new-reason"}}}}
+	done := event("done-route", 3, runtime.TaskCompleted)
+	done.Time = base.Add(2 * time.Second)
+	for i, item := range []runtime.Event{start, route, done} {
+		if err := db.Append(ctx, int64(i), item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("unknown route reason escaped", snapshot, err)
 	}
 }

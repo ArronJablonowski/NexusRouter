@@ -93,6 +93,7 @@ func TestSpanVocabulary(t *testing.T) {
 		"route": {"selected", "explored"}, "evaluation": {"accepted", "rejected"},
 		"fallback": {"selected"}, "compaction": {"applied"}, "skill_context": {"loaded"},
 		"steering": {"applied"}, "error": {"recorded"},
+		"route_constraint": {"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"},
 	}
 	for name, outcomes := range valid {
 		for _, outcome := range outcomes {

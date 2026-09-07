@@ -41,8 +41,12 @@ Each trace contains one terminal task root plus successfully paired
 provider-turn, tool-call and worker child spans. Fixed zero-duration
 observations additionally represent route selection/exploration, evaluation
 acceptance/rejection, fallback lineage, compaction, progressive skill-context
-loading, steering application and recorded errors. Names and outcomes use a
-closed vocabulary. Prompt/output text,
+loading, steering application and recorded errors. Each route also emits one
+fixed `route_constraint` observation per present mode, privacy, health, policy,
+credential, capacity, context, budget or capability exclusion reason. Candidate
+identity and counts are not exported. An unknown exclusion reason fails the
+snapshot rather than opening label cardinality. Names and outcomes use a closed
+vocabulary. Prompt/output text,
 messages, tool arguments/results, error details, model/provider/tool names and
 all durable task, session, event, route, worker, turn, attempt and call IDs are
 never selected into the public snapshot.

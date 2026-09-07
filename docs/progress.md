@@ -1,5 +1,25 @@
 # Implementation evidence
 
+PRD route-constraint-traces checkpoint: every durable route selection now
+projects fixed zero-duration observations for each present canonical exclusion
+class: mode, privacy, health, policy, credential, capacity, context, budget and
+capability. These make resource pressure, provider health and routing-policy
+denials visible alongside the route span without exporting candidate/model/
+provider identity or exclusion multiplicity. SQLite computes a bounded bitset
+inside the existing per-task trace query; duplicate reasons cannot amplify
+spans, while unknown/future/private reasons set an invalid bit and fail closed
+instead of expanding OTLP label cardinality. The public trace validator owns
+the same closed vocabulary. Focused tests cover all nine reasons, duplicate-
+free projection, unknown-reason rejection, public validation and private-field
+absence. This observes routing decisions, not live resource reservations or
+provider reachability. Final `make check` passed formatting/LOC enforcement,
+vet, every native
+race-enabled package and the production build; application took 220.144s,
+telemetry 147.624s, CLI 42.779s, SDK 25.307s, traces 2.488s and tool gate
+20.857s. No live model, user database or collector was used. Native Linear
+remains inaccessible because the Mac is locked, so no issue update is claimed.
+The full PRD remains incomplete.
+
 PRD broader-runtime-traces checkpoint: the bounded terminal-task trace reader
 now pairs durable worker start/completion events in addition to provider turns
 and tool calls. It emits fixed zero-duration task children for route selection

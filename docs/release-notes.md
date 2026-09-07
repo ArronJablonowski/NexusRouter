@@ -11,6 +11,8 @@ production release, release tag or complete PRD acceptance is claimed.
   observations. It uses fresh wire identities, exports no session content or
   durable IDs, and now has an independently
   configured sequential daemon/SDK supervisor with supplemental health.
+  Route constraints expose only nine fixed exclusion reason classes and reject
+  unknown labels.
   Delivery remains ephemeral and broader lifecycle spans are open. See
   [trace export](traces-export.md).
 

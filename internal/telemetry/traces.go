@@ -83,7 +83,9 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	 CASE WHEN json_type(body,'$.data.compaction')='object' THEN 1 ELSE 0 END,
 	 CASE WHEN json_type(body,'$.data.skill_context')='object' THEN 1 ELSE 0 END,
 	 CASE WHEN json_extract(body,'$.data.route.Explored')=1 THEN 1 ELSE 0 END,
-	 CASE WHEN json_type(body,'$.data.accepted')='true' THEN 1 WHEN json_type(body,'$.data.accepted')='false' THEN 0 ELSE -1 END
+	 CASE WHEN json_type(body,'$.data.accepted')='true' THEN 1 WHEN json_type(body,'$.data.accepted')='false' THEN 0 ELSE -1 END,
+	 COALESCE((SELECT sum(DISTINCT CASE r.value WHEN 'mode' THEN 1 WHEN 'privacy' THEN 2 WHEN 'health' THEN 4 WHEN 'policy' THEN 8 WHEN 'credential' THEN 16 WHEN 'capacity' THEN 32 WHEN 'context' THEN 64 WHEN 'budget' THEN 128 WHEN 'capability' THEN 256 ELSE 512 END)
+	  FROM json_each(json_extract(body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r),0)
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
 	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied')
@@ -103,8 +105,8 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		}
 		var sequence int64
 		var kind, turn, attempt, call, toolName, worker, encodedTime string
-		var retry, compaction, skillContext, explored, accepted int
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted) != nil || sequence < 1 {
+		var retry, compaction, skillContext, explored, accepted, routeConstraints int
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -182,11 +184,19 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			}
 			children = append(children, traces.Span{Name: "worker", Outcome: "completed", Parent: 0, StartedAt: started.at, EndedAt: at})
 		case "route.selected":
+			if routeConstraints < 0 || routeConstraints > 511 {
+				return traces.Trace{}, errTraces
+			}
 			outcome := "selected"
 			if explored == 1 {
 				outcome = "explored"
 			}
 			children = append(children, traceInstant("route", outcome, at))
+			for bit, reason := range []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
+				if routeConstraints&(1<<bit) != 0 {
+					children = append(children, traceInstant("route_constraint", reason, at))
+				}
+			}
 		case "evaluation.recorded":
 			if accepted != 0 && accepted != 1 {
 				return traces.Trace{}, errTraces
