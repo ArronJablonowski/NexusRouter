@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-release qualify-codex-repair
+.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-release qualify-codex-repair
 
 build:
 	go build -trimpath -o bin/darwin ./cmd/darwin
@@ -24,6 +24,11 @@ qualify-performance:
 	go test ./internal/telemetry -run '^$$' -bench '^BenchmarkDurableTaskStartAppend$$' -benchmem -benchtime=500x -count=3
 	go test ./resources -run '^$$' -bench '^BenchmarkLocalReservation$$' -benchmem -benchtime=100000x -count=3
 	go test ./internal/app -run '^TestTaskLatencyNearestRank$$' -bench '^BenchmarkAutomaticTaskOverhead/pool_8/seed_1000$$' -benchtime=100x -count=3
+
+# Deterministic DAR-45 release-candidate qualification. Live Sol/Ollama evidence
+# is recorded separately and is intentionally not repeated by this target.
+qualify-mvp:
+	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race ./internal/app -run '^(TestExplicitTaskEndToEnd|TestMVPCloudOnlyOpenAICompatible|TestHybridSolCoordinatorDelegatesToIsolatedOllama|TestAutomaticSafeFallbackPreservesFailedHistory|TestHybridFallbackMayCrossLocalityOnlyWhenPolicyAllows|TestFeedbackUpdatesRoutingExactlyOnce|TestActiveSkillContextIsScopedRedactedAndPrivacyBound|TestRecoverableReadFeedbackAndRestartPreserveFailure|TestCompletedTaskRecoveredAfterOwnerProcessKilled)$$' -count=1 -v
 
 # Explicit supervised signed-in cloud inference with controlled local results.
 # Uses account usage; never included in check/test or ordinary CI.

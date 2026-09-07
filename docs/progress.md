@@ -1,5 +1,31 @@
 # Implementation evidence
 
+DAR-45 is completion-ready pending native Linear reconciliation. The new
+`make qualify-mvp` gate passed under the race detector in 9.352s and provides a
+single repeatable acceptance matrix for local-only, cloud-only and hybrid
+execution without making live model calls. The local fixture runs through the
+Ollama adapter and durable journal; the cloud fixture runs through the
+OpenAI-compatible streaming adapter with secret-resolved authentication and
+proves the credential is absent from persisted events. The hybrid fixture uses
+a Sol-shaped cloud coordinator, an isolated Ollama-shaped local worker,
+deterministic Go validation, untrusted-result return, parent review and durable
+parent/work/execution lineage. Privacy variants prevent cloud dispatch. The
+same gate proves retry lineage for retryable fallback, denial of unsafe fallback
+after partial/empty output, explicit selection or exhausted cost budget,
+cross-locality privacy enforcement, exactly-once user-feedback fitness updates,
+progressive active-skill loading and redaction, persisted failed read-only tool
+evidence across restart, and owner-process SIGKILL reconciliation without a
+second provider call. The earlier supervised real `gpt-5.6-sol` to Ollama round
+trip remains documented separately and was not repeated, avoiding account
+usage. Final `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and production build; application took 220.506s,
+telemetry 146.812s, CLI 42.425s and SDK 25.462s. This qualifies the current
+in-process MVP slice, not every PRD roadmap item, external model quality,
+arbitrary side effects, power loss, remote workers or post-MVP isolation
+backends. Native Linear was unavailable on the last inspection because the Mac
+was locked, so no DAR-45 state/comment change is claimed. The full PRD remains
+incomplete.
+
 DAR-44 is completion-ready pending native Linear reconciliation. The opt-in
 `make qualify-performance` command now reproduces the qualified selector,
 durable-write, resource-reservation and worst-case existing automatic-task

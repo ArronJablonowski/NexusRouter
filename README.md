@@ -1,6 +1,6 @@
 # DarwinRouter
 
-A Go-based, local-first agent runtime with adaptive model routing. The product specification is in [DarwinRouter_PRD.md](DarwinRouter_PRD.md).
+A Go-based, local-first agent runtime with adaptive model routing. The product specification is in [DarwinRouter_PRD.md](DarwinRouter_PRD.md). The repeatable release-candidate gate is documented in [MVP qualification](docs/mvp-qualification.md).
 
 ## Development status
 
