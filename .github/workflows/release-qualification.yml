@@ -17,6 +17,17 @@ jobs:
   qualify:
     name: Qualify on ${{ matrix.os }}
     timeout-minutes: 90
+    env:
+      # Use only the setup-go toolchain and repository module/workspace state.
+      CGO_ENABLED: "0"
+      GODEBUG: ""
+      GOTOOLCHAIN: local
+      GOENV: "off"
+      GOEXPERIMENT: ""
+      GOFLAGS: ""
+      GOWORK: "off"
+      GOAMD64: v1
+      GOARM64: v8.0
     strategy:
       fail-fast: false
       matrix:
@@ -102,9 +113,9 @@ jobs:
             printf '\n| Gate | Outcome |\n| --- | --- |\n'
             printf '| Source binding | %s |\n| make check | %s |\n| make qualify-release | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$CHECK_OUTCOME" "$QUALIFICATION_OUTCOME" "$UNCHANGED_OUTCOME"
             echo
-            echo 'Only a successful qualification gate establishes the following evidence: deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; format checks; disposable-key signing/verification; tamper rejection; and execution of the native artifact version command.'
+            echo 'Only a successful qualification gate establishes the following evidence: deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact six-member schema-2 collateral and target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-28-to-29 migration, backup and rollback rehearsal.'
             echo
             echo 'The other three target artifacts are cross-built and inspected, not executed by this job. Read the observed native platform above; runner labels alone are not architecture evidence. Failed/skipped gates do not qualify a release.'
             echo
-            echo 'No live models, production signing key, tag, release, artifact upload, installation or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
+            echo 'No live models, production signing key, tag, release, artifact upload, installation outside the disposable runner-local rehearsal, or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
           } >> "$GITHUB_STEP_SUMMARY"

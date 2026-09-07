@@ -27,8 +27,9 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		} `yaml:"on"`
 		Permissions map[string]string `yaml:"permissions"`
 		Jobs        map[string]struct {
-			Name     string `yaml:"name"`
-			Timeout  int    `yaml:"timeout-minutes"`
+			Name     string            `yaml:"name"`
+			Timeout  int               `yaml:"timeout-minutes"`
+			Env      map[string]string `yaml:"env"`
 			Strategy struct {
 				FailFast bool                `yaml:"fail-fast"`
 				Matrix   map[string][]string `yaml:"matrix"`
@@ -64,6 +65,12 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if !ok || job.Timeout != 90 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.os }}" || !reflect.DeepEqual(job.Strategy.Matrix["os"], []string{"ubuntu-latest", "macos-latest"}) || len(job.Steps) != 7 {
 		t.Fatal("unexpected job structure")
 	}
+	if !reflect.DeepEqual(job.Env, map[string]string{
+		"CGO_ENABLED": "0", "GODEBUG": "", "GOTOOLCHAIN": "local", "GOENV": "off",
+		"GOEXPERIMENT": "", "GOFLAGS": "", "GOWORK": "off", "GOAMD64": "v1", "GOARM64": "v8.0",
+	}) {
+		t.Fatal("hosted qualification toolchain is not fail-closed")
+	}
 	if job.Steps[0].Uses != "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" || job.Steps[0].With["ref"] != "${{ github.sha }}" || job.Steps[0].With["persist-credentials"] != false {
 		t.Fatal("checkout not immutable or retains credentials")
 	}
@@ -92,6 +99,18 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	report := job.Steps[6]
 	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["QUALIFICATION_OUTCOME"] != "${{ steps.qualification.outcome }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" {
 		t.Fatal("missing failure-aware evidence")
+	}
+	for _, evidence := range []string{
+		"exact six-member schema-2 collateral",
+		"target-specific dependency notices",
+		"disposable native install",
+		"schema-28-to-29 migration",
+		"backup and rollback rehearsal",
+		"installation outside the disposable runner-local rehearsal",
+	} {
+		if !strings.Contains(report.Run, evidence) {
+			t.Fatal("hosted summary omits or misstates qualification evidence", evidence)
+		}
 	}
 	for _, forbidden := range []string{"secrets.", "upload-artifact", "gh release", "git push", "git tag", "continue-on-error", "workflow_run", "pull_request"} {
 		if strings.Contains(string(body), forbidden) {

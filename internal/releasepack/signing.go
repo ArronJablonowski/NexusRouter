@@ -60,6 +60,10 @@ func Verify(dir, publicKeyFile string) error {
 	if err != nil {
 		return ErrSignature
 	}
+	return verifyWithKey(dir, key)
+}
+
+func verifyWithKey(dir string, key ed25519.PublicKey) error {
 	root, err := releaseRoot(dir)
 	if err != nil {
 		return ErrSignature

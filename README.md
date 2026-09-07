@@ -8,7 +8,11 @@ Local release preparation now supports reproducible four-target archives,
 checksummed manifests, explicit Ed25519 signing and offline trusted-key
 verification. See [release packaging](docs/release-packaging.md) and
 the recordable [release checklist](docs/release-checklist.md) for the required
-version- and commit-bound qualification command. The deterministic testable-MVP
+version- and commit-bound qualification command. Proposed release identity and
+the immutable artifact contract can be recorded externally with the
+[candidate contract](docs/release-candidate.md); production verification can
+bind an independently retrieved [signing trust record](docs/release-signing-trust.md).
+The deterministic testable-MVP
 gate passes and 41 of 42 MVP issues are complete. DAR-46 remains open: no
 release has been published, and
 dependency-notice review, supported platforms, production signing trust, release approval

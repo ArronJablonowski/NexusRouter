@@ -110,6 +110,12 @@ go run ./cmd/verify-release \
   --public-key /ABSOLUTE/INDEPENDENTLY_TRUSTED_PUBLIC_KEY
 ```
 
+For production verification, prefer the canonical independently published
+trust record plus an expected key ID and fingerprint obtained separately from
+the release artifacts. Follow [release-signing identity and trust
+policy](release-signing-trust.md). Raw public-key mode remains useful for
+disposable qualification and emergency diagnosis.
+
 Exit 0 means the signature, manifest and every declared file verified. Exit 1
 means verification failed; exit 2 denotes invalid command arguments. The
 verifier does not extract, run or install anything. Checks include safe
@@ -162,7 +168,7 @@ then builds all four targets twice from separate private snapshots, compares
 every unsigned output byte, checks executable platform/architecture, exercises
 the package/sign/verify CLIs, signs/verifies using disposable test keys, compares
 library/CLI signatures, runs the native binary's version command, and proves
-the native install/migration/backup/rollback mechanics, and proves archive
+the native install/migration/backup/rollback mechanics and proves archive
 tampering is rejected. It uses temporary files removed by the test
 framework. It does not sign with an operator identity, publish artifacts, run
 live model inference, or modify user configuration/databases.

@@ -1,5 +1,22 @@
 # Implementation evidence
 
+DAR-47/50/53 release-control checkpoint: a canonical external candidate record
+now freezes an exact clean commit, version, schema-2 six-member archive contract,
+four-target matrix, collateral digests and deliberately unapproved operator
+decisions, then re-derives that record from the immutable source for verification.
+The hosted qualification workflow now pins the local Go toolchain, disables cgo
+and ambient environment/workspace/flags/experiments, fixes architecture baselines
+and reports the complete disposable native install, schema-28-to-29 migration,
+backup and rollback evidence. Release verification can consume a canonical public
+Ed25519 trust record only when its exact record SHA-256, key ID and public-key
+fingerprint are supplied independently; real CLI tests prove successful signed
+verification plus metadata tamper, revocation and signature-tamper rejection.
+No production key or secret was generated. Focused race tests, vet and diff
+validation passed. DAR-47 remains gated on final candidate decisions and approval;
+DAR-50 remains gated on an authenticated hosted dispatch and recorded Ubuntu/macOS
+evidence; DAR-53 remains gated on operator custody, publication, two-operator
+rehearsal and platform-signing decisions. The full PRD and DAR-46 remain open.
+
 PRD bounded-fallback-chain checkpoint: automatic routing now traverses the
 router's ordered failure-domain-aware fallback list instead of stopping after
 one alternate. One shared recovery contract caps execution at32 route attempts.

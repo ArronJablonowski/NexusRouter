@@ -15,8 +15,14 @@ and sensitive logs out of this record and the repository.
 - Release owner/operator:
 - Checklist opened at (UTC):
 - Proposed publication channel and audience:
+- External canonical candidate-record location:
+- Candidate-record SHA-256:
+- Candidate-record verification host/time/result:
 - [ ] The version is approved and has no leading `v` in package-tool inputs.
 - [ ] HEAD equals the recorded commit and the worktree is clean.
+- [ ] `release-candidate verify` re-derived the external candidate record from
+  this exact clean commit; all decisions in the generated record remain
+  intentionally unapproved and are resolved by this checklist.
 - [ ] Release notes identify this exact version, commit, date, supported targets
   and known limitations.
 
@@ -91,6 +97,9 @@ be omitted.
 
 - Signing key identifier (never the private seed):
 - Trusted public-key fingerprint:
+- Independently retrieved canonical trust-record location:
+- Expected exact trust-record SHA-256 source (separate from release artifacts):
+- Expected key ID and fingerprint source (separate from release artifacts):
 - Independent public-key publication URL/channel:
 - Key custodian/authorized signer:
 - Rotation and revocation procedure:
@@ -98,6 +107,8 @@ be omitted.
 - Signing host and time (UTC):
 - [ ] The production key is dedicated to releases and is not a Git/SSH key.
 - [ ] The private seed stayed outside the repository, artifacts and logs.
+- [ ] The exact active trust-record bytes, separately supplied record SHA-256,
+  key ID and key fingerprint all agree.
 - [ ] A second operator obtained the public key through the independent trusted
   channel and verified the candidate directory successfully.
 

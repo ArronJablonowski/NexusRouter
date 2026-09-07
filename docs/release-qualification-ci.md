@@ -23,8 +23,12 @@ summary identifies failures and skipped gates; neither qualifies a release.
 
 The workflow has read-only repository permissions, pins the checkout and Go
 setup actions to reviewed full commit IDs, disables checkout credential
-persistence and Go cache uploads, and has no publication or artifact-upload
-step. Test-generated archives and keys remain disposable runner-local files.
+persistence and Go cache uploads, forces the installed toolchain with
+`GOTOOLCHAIN=local`, disables ambient Go environment/workspace/flag and
+experiment settings, disables cgo, and fixes the documented amd64/arm64
+architecture baselines. It has no publication or artifact-upload step.
+Test-generated archives, installation, database, backup, rollback copy and keys
+remain disposable runner-local files.
 It does not use the repository SSH key, production signing secrets or live model
 accounts. Standard Actions logs and summaries remain subject to repository
 access and retention settings.
