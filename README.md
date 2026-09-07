@@ -740,7 +740,7 @@ All endpoints require `Authorization: Bearer <token>`:
   See [lease attention](docs/lease-attention.md) for observation and upgrade limits.
 - `GET /v1/resources/attention/{id}/history`: append-only observation history;
   optional `after_sequence` and `limit`, with defaults `0` and `25`.
-- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, and `turns`.
+- `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, `turns`, and the optional `route_estimated_cost` described under automatic routing.
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `POST /v1/tasks/{id}/cancel`: send JSON `{}` to durably request cancellation. HTTP202 means the request was recorded while the task was running, not that execution has already stopped; HTTP200 reports an already-terminal task. Repeating the request is naturally idempotent for that task and retains the original request ID/time. `GET /v1/tasks/{id}/cancellation` reports durable request status and the current task state. Two independent control slots keep these operations available when execution capacity is full. Current runners observe requests through SQLite, including requests from another service instance/process. Database transaction order resolves cancellation versus completion: a cancellation recorded first prevents later normal events and completion, while a terminal event recorded first remains terminal. Already-started tool effects may finish and must be recorded; cancellation does not roll them back. A stopped/orphaned runner can retain a pending request until recovery is implemented. Post-completion auxiliary audits have their own lifecycle and are not canceled through this task endpoint.
 - `GET /v1/tasks/{id}/events`: read-only SSE replay of one durable snapshot page, at most100 events and8 MiB of serialized event data. Reconnect with `Last-Event-ID: <task_id>:<last_received_sequence>`; omit the header to start from sequence0. Events use the same IDs and JSON as live streaming. The final `event: checkpoint` contains `from_sequence`, `next_sequence`, `head_sequence`, `state` and `has_more`, without an event ID or task result. When `has_more` is true, fetch another page from `next_sequence`; when false, the reader is caught up to that snapshot only. A running task may subsequently add events. Disconnecting replay never cancels or re-executes the task. Cursor mismatches/malformed headers return400; cursors beyond the durable head return409; unknown tasks return404 and oversized records return413. Honor503 `Retry-After` capacity responses, including immediately after closing a prior replay connection. This is bounded replay, not a continuous follow stream; inspect task history before retrying any mutating submission.
@@ -946,6 +946,8 @@ never child tasks.
 All child IDs remain inspectable through submission status. Usage is
 summed only when every turn has complete, nonnegative, nonoverflowing usage;
 otherwise it remains unknown. Failed/canceled outcomes never expose partial text.
+The optional `route_estimated_cost` is reconstructed from task-start facts and
+summed across top-level fallback roots only.
 A pending submission cancellation overrides delivery without rewriting the
 recorded execution history.
 
@@ -1096,9 +1098,15 @@ failure, tool activity, cancellation, persistence ambiguity and confirmed or
 uncertain effects stop the chain. Local-task privacy remains local on every
 fallback. Each executed attempt has its own durable task ID and references its
 immediate predecessor; CLI/native results list all previous attempts in order.
-Returned text/usage belong to the final attempt, not aggregate billing. Explicit
-model requests do not auto-fallback. Validation-driven fallback and adaptive
-retry policies remain unfinished. Loopback qualification exercises an actual
+Returned text and finish reason belong to the final attempt. Native
+`route_estimated_cost` sums the configured estimates for all admitted
+top-level route attempts; it excludes delegated workers, audits and actual
+provider billing. Token usage is present only when every route attempt has
+complete durable counts, so today's retryable no-output fallback chains report
+usage unavailable rather than exposing final-attempt tokens as a request total.
+Explicit model requests do not auto-fallback. Validation failure intentionally
+stops automatic fallback; bounded coordinator repair remains a separate explicit
+workflow. Adaptive retry policies remain unfinished. Loopback qualification exercises an actual
 Ollama `503` followed by an OpenAI-compatible SSE completion, with distinct
 provider endpoints, exact cumulative estimated-cost admission, durable retry
 lineage and redacted route attribution. The paired local-required case proves

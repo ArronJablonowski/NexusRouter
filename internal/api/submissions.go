@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"math"
 	"mime"
 	"net/http"
 	"strings"
@@ -238,7 +239,7 @@ func validSubmissionStatus(s submissions.Status, expectedID string) bool {
 }
 
 func validSubmissionResult(result *submissions.Result, tasks map[string]bool) bool {
-	if result.TaskID != "" && !tasks[result.TaskID] || result.Turns < 0 || !utf8.ValidString(result.Text) {
+	if result.TaskID != "" && !tasks[result.TaskID] || result.Turns < 0 || !utf8.ValidString(result.Text) || result.RouteEstimatedCost != nil && (math.IsNaN(*result.RouteEstimatedCost) || math.IsInf(*result.RouteEstimatedCost, 0) || *result.RouteEstimatedCost < 0) {
 		return false
 	}
 	for _, prior := range result.PreviousTaskIDs {

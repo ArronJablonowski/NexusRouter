@@ -72,7 +72,7 @@ func TestCrossProviderFallbackQualification(t *testing.T) {
 						t.Error("unexpected OpenAI-compatible request")
 					}
 					w.Header().Set("Content-Type", "text/event-stream")
-					fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cross-provider answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+					fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cross-provider answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":3}}\n\ndata: [DONE]\n\n")
 				default:
 					t.Errorf("unexpected OpenAI-compatible path %q", r.URL.Path)
 					w.WriteHeader(http.StatusNotFound)
@@ -108,12 +108,12 @@ func TestCrossProviderFallbackQualification(t *testing.T) {
 
 			out, runErr := svc.Run(context.Background(), Request{Prompt: prompt, Domain: "qualification", MaxCost: localCost + cloudCost, LocalRequired: localRequired})
 			if localRequired {
-				if runErr == nil || localDiscovery.Load() == 0 || localInference.Load() != 1 || cloudDiscovery.Load() != 0 || cloudInference.Load() != 0 || len(out.PreviousTaskIDs) != 0 {
+				if runErr == nil || localDiscovery.Load() == 0 || localInference.Load() != 1 || cloudDiscovery.Load() != 0 || cloudInference.Load() != 0 || len(out.PreviousTaskIDs) != 0 || out.RouteEstimatedCost == nil || *out.RouteEstimatedCost != localCost || out.Usage != nil {
 					t.Fatalf("local privacy crossed provider boundary: %+v err=%v discoveries=%d/%d inference=%d/%d", out, runErr, localDiscovery.Load(), cloudDiscovery.Load(), localInference.Load(), cloudInference.Load())
 				}
 				return
 			}
-			if runErr != nil || out.Text != "cross-provider answer" || localInference.Load() != 1 || cloudInference.Load() != 1 || len(out.PreviousTaskIDs) != 1 {
+			if runErr != nil || out.Text != "cross-provider answer" || localInference.Load() != 1 || cloudInference.Load() != 1 || len(out.PreviousTaskIDs) != 1 || out.RouteEstimatedCost == nil || *out.RouteEstimatedCost != localCost+cloudCost || out.Usage != nil {
 				t.Fatalf("cross-provider fallback failed: %+v err=%v inference=%d/%d", out, runErr, localInference.Load(), cloudInference.Load())
 			}
 
@@ -131,12 +131,15 @@ func TestCrossProviderFallbackQualification(t *testing.T) {
 				t.Fatalf("cloud retry lineage missing: %+v err=%v", final, err)
 			}
 			firstEvents, err := db.Read(context.Background(), first.TaskID, 0, 100)
-			if err != nil || len(firstEvents) == 0 || firstEvents[len(firstEvents)-1].Kind != runtime.TaskFailed || firstEvents[len(firstEvents)-1].Data.Code != "provider_retryable_no_output" {
+			if err != nil || len(firstEvents) == 0 || firstEvents[0].Data.RouteEstimatedCost == nil || *firstEvents[0].Data.RouteEstimatedCost != localCost || firstEvents[len(firstEvents)-1].Kind != runtime.TaskFailed || firstEvents[len(firstEvents)-1].Data.Code != "provider_retryable_no_output" {
 				t.Fatalf("local failure was not classified safely: events=%v err=%v", firstEvents, err)
 			}
 			finalEvents, err := db.Read(context.Background(), final.TaskID, 0, 100)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if finalEvents[0].Data.RouteEstimatedCost == nil || *finalEvents[0].Data.RouteEstimatedCost != cloudCost {
+				t.Fatal("fallback task did not persist its own route estimate")
 			}
 			attributed := false
 			for _, event := range finalEvents {

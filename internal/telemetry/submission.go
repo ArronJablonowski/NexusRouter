@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -305,7 +306,7 @@ func (s *Store) FinishSubmission(ctx context.Context, id, token, state, errorCod
 	var err error
 	if result != nil {
 		encoded, err = json.Marshal(result)
-		if err != nil || len(encoded) > submissions.MaxRequestBytes || !utf8.ValidString(result.Text) {
+		if err != nil || len(encoded) > submissions.MaxRequestBytes || !utf8.ValidString(result.Text) || result.RouteEstimatedCost != nil && (math.IsNaN(*result.RouteEstimatedCost) || math.IsInf(*result.RouteEstimatedCost, 0) || *result.RouteEstimatedCost < 0) {
 			return submissions.Status{}, submissions.ErrInvalid
 		}
 	}

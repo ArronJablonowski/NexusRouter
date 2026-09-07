@@ -171,7 +171,7 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	if leaseErr != nil || errors.Is(err, runtime.ErrExecutionLeaseLost) {
 		state, code = "failed", "interrupted"
 	}
-	result := &submissions.Result{TaskID: out.TaskID, Text: out.Text, Turns: out.Turns, FinishReason: out.FinishReason, Usage: out.Usage, PreviousTaskIDs: out.PreviousTaskIDs, AuditID: out.AuditID, AuditStatus: out.AuditStatus}
+	result := &submissions.Result{TaskID: out.TaskID, Text: out.Text, Turns: out.Turns, FinishReason: out.FinishReason, Usage: out.Usage, PreviousTaskIDs: out.PreviousTaskIDs, RouteEstimatedCost: out.RouteEstimatedCost, AuditID: out.AuditID, AuditStatus: out.AuditStatus}
 	if state != "succeeded" {
 		result.Text = ""
 	}

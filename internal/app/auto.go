@@ -159,6 +159,8 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 				next.PreviousTaskIDs = append([]string(nil), previous...)
 				previous = append(previous, next.TaskID)
 				remaining -= next.reservedCost
+				next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
+				next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
 				result, err = next, nextErr
 				if nextErr == nil {
 					break
@@ -175,6 +177,27 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 		}
 	}
 	return result, err
+}
+
+func sumRouteEstimatedCost(a, b *float64) *float64 {
+	if a == nil || b == nil || *a > math.MaxFloat64-*b {
+		return nil
+	}
+	total := *a + *b
+	if math.IsInf(total, 0) || math.IsNaN(total) {
+		return nil
+	}
+	return &total
+}
+
+// A partial aggregate is more misleading than unavailable usage. Retryable
+// failed streams have no durable completed-turn usage, so any fallback chain
+// containing one intentionally reports nil rather than only the final route.
+func sumCompleteRouteUsage(a, b *providers.Usage) *providers.Usage {
+	if a == nil || b == nil || a.InputTokens > math.MaxInt64-b.InputTokens || a.OutputTokens > math.MaxInt64-b.OutputTokens {
+		return nil
+	}
+	return &providers.Usage{InputTokens: a.InputTokens + b.InputTokens, OutputTokens: a.OutputTokens + b.OutputTokens}
 }
 
 // RunAuto is a one-shot convenience. Daemons must reuse Service.Run instead.

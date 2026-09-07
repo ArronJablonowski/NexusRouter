@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -180,8 +181,16 @@ func TestSubmissionAppendGateAndTerminalAttribution(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := &submissions.Result{TaskID: "task", Text: "answer", Turns: 1}
+	invalidCost := math.NaN()
+	invalid := *result
+	invalid.RouteEstimatedCost = &invalidCost
+	if _, err := db.FinishSubmission(ctx, claim.Status.ID, claim.Token, "succeeded", "", &invalid); !errors.Is(err, submissions.ErrInvalid) {
+		t.Fatal("invalid route cost persisted", err)
+	}
+	cost := .25
+	result.RouteEstimatedCost = &cost
 	finished, err := db.FinishSubmission(ctx, claim.Status.ID, claim.Token, "succeeded", "", result)
-	if err != nil || finished.State != "succeeded" {
+	if err != nil || finished.State != "succeeded" || finished.Result.RouteEstimatedCost == nil || *finished.Result.RouteEstimatedCost != cost {
 		t.Fatal(finished, err)
 	}
 	again, err := db.FinishSubmission(ctx, claim.Status.ID, claim.Token, "succeeded", "", result)

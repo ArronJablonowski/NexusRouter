@@ -1,6 +1,11 @@
 package sessions
 
-import "github.com/ArronJablonowski/DarwinRouter/runtime"
+import (
+	"math"
+
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
+)
 
 // MaxTerminalRouteAttempts leaves room in the 66-history recovery envelope for
 // a final root plus 16 worker/inference pairs.
@@ -153,6 +158,31 @@ func ProjectTerminalTree(histories [][]runtime.Event) (TerminalOutcome, error) {
 	out := nodes[roots[len(roots)-1]].out
 	if out.Result != nil {
 		out.Result.PreviousTaskIDs = append([]string{}, roots[:len(roots)-1]...)
+		costKnown, usageKnown := true, true
+		cost := 0.0
+		usage := providers.Usage{}
+		for _, id := range roots {
+			result := nodes[id].out.Result
+			if result == nil || result.RouteEstimatedCost == nil || cost > math.MaxFloat64-*result.RouteEstimatedCost {
+				costKnown = false
+			} else if costKnown {
+				cost += *result.RouteEstimatedCost
+			}
+			if result == nil || result.Usage == nil || result.Usage.InputTokens > math.MaxInt64-usage.InputTokens || result.Usage.OutputTokens > math.MaxInt64-usage.OutputTokens {
+				usageKnown = false
+			} else if usageKnown {
+				usage.InputTokens += result.Usage.InputTokens
+				usage.OutputTokens += result.Usage.OutputTokens
+			}
+		}
+		out.Result.RouteEstimatedCost = nil
+		out.Result.Usage = nil
+		if costKnown {
+			out.Result.RouteEstimatedCost = &cost
+		}
+		if usageKnown {
+			out.Result.Usage = &usage
+		}
 	}
 	return out, nil
 }

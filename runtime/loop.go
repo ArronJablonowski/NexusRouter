@@ -53,11 +53,12 @@ type ToolResult struct {
 	Recoverable bool
 }
 type RunRequest struct {
-	SkillContext  *SkillContextUse
-	SubmissionID  string
-	Compaction    *ContextCompaction
-	Validation    string
-	RetryOfTaskID string
+	SkillContext       *SkillContextUse
+	SubmissionID       string
+	Compaction         *ContextCompaction
+	Validation         string
+	RetryOfTaskID      string
+	RouteEstimatedCost *float64
 	// RequireText applies only to a final answer, never an intermediate tool
 	// proposal. Non-text host workflows may leave this false explicitly.
 	RequireText                   bool
@@ -168,7 +169,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		seq++
 		return nil
 	}
-	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	var routeEstimatedCost *float64
+	if r.RouteEstimatedCost != nil {
+		cost := *r.RouteEstimatedCost
+		routeEstimatedCost = &cost
+	}
+	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

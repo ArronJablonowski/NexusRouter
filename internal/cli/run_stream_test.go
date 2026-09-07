@@ -78,6 +78,7 @@ func TestRunTaskJSONEmitsEventsAndSnakeCaseResultOnly(t *testing.T) {
 	events := []runtime.Event{cliStreamEvent(1, runtime.TaskStarted), cliStreamEvent(2, runtime.TaskCompleted)}
 	events[1].Data.Text = "answer\nsecond line"
 	request := app.Request{ModelID: "auto", Prompt: "hello"}
+	routeCost := .75
 	var out, diagnostic bytes.Buffer
 	code := runTaskJSON(context.Background(), request, func(_ context.Context, got app.Request, emit func(runtime.Event) error) (app.Result, error) {
 		if !reflect.DeepEqual(got, request) {
@@ -88,7 +89,7 @@ func TestRunTaskJSONEmitsEventsAndSnakeCaseResultOnly(t *testing.T) {
 				return app.Result{}, err
 			}
 		}
-		return app.Result{TaskID: "task", Text: "answer\nsecond line", Turns: 1, FinishReason: "stop", Usage: &providers.Usage{InputTokens: 3, OutputTokens: 4}, PreviousTaskIDs: []string{"prior"}, AuditID: "audit", AuditStatus: "recorded"}, nil
+		return app.Result{TaskID: "task", Text: "answer\nsecond line", Turns: 1, FinishReason: "stop", Usage: &providers.Usage{InputTokens: 3, OutputTokens: 4}, PreviousTaskIDs: []string{"prior"}, RouteEstimatedCost: &routeCost, AuditID: "audit", AuditStatus: "recorded"}, nil
 	}, &out, &diagnostic)
 	if code != 0 || diagnostic.Len() != 0 {
 		t.Fatal(code, diagnostic.String())
@@ -116,10 +117,11 @@ func TestRunTaskJSONEmitsEventsAndSnakeCaseResultOnly(t *testing.T) {
 			OutputTokens int64 `json:"output_tokens"`
 		} `json:"usage"`
 		Previous    []string `json:"previous_task_ids"`
+		RouteCost   *float64 `json:"route_estimated_cost"`
 		AuditID     string   `json:"audit_id"`
 		AuditStatus string   `json:"audit_status"`
 	}
-	if err := json.Unmarshal(lines[2]["result"], &final); err != nil || final.TaskID != "task" || final.Text != "answer\nsecond line" || final.Turns != 1 || final.FinishReason != "stop" || final.Usage == nil || final.Usage.InputTokens != 3 || final.Usage.OutputTokens != 4 || len(final.Previous) != 1 || final.Previous[0] != "prior" || final.AuditID != "audit" || final.AuditStatus != "recorded" {
+	if err := json.Unmarshal(lines[2]["result"], &final); err != nil || final.TaskID != "task" || final.Text != "answer\nsecond line" || final.Turns != 1 || final.FinishReason != "stop" || final.Usage == nil || final.Usage.InputTokens != 3 || final.Usage.OutputTokens != 4 || len(final.Previous) != 1 || final.Previous[0] != "prior" || final.RouteCost == nil || *final.RouteCost != routeCost || final.AuditID != "audit" || final.AuditStatus != "recorded" {
 		t.Fatal(final, err)
 	}
 	if strings.Contains(string(lines[2]["result"]), `"TaskID"`) {

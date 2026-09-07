@@ -63,6 +63,23 @@ func TestAPIAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeTaskResultIncludesRouteEstimatedCost(t *testing.T) {
+	cost := .75
+	s := services()
+	s.Run = func(context.Context, app.Request) (app.Result, error) {
+		return app.Result{TaskID: "task", Text: "answer", Turns: 1, RouteEstimatedCost: &cost}, nil
+	}
+	h, err := New(token, 1, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, request(http.MethodPost, "/v1/tasks", `{"model_id":"m","prompt":"hello"}`))
+	if w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), `"route_estimated_cost":0.75`) {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
 func TestAuthenticationOriginsAndSafeErrors(t *testing.T) {
 	for _, name := range []string{"unauthorized", "origin", "error", "panic"} {
 		t.Run(name, func(t *testing.T) {

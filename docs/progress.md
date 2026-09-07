@@ -24,9 +24,9 @@ projection, unsafe chains and durable multi-hop lost-acknowledgement recovery.
 Final `make check` passed formatting/LOC enforcement, vet, every native
 race-enabled package and the production build; application took 231.459s,
 telemetry 148.064s, CLI 41.924s, SDK 25.524s, sessions 15.681s and tool gate
-20.958s. No live model, user database or external service was used. Validation-
-driven fallback, adaptive retry policy, whole-request
-cost/usage accounting, production cross-provider qualification and the complete
+20.958s. No live model, user database or external service was used. Validation
+failure intentionally remains a chain stop; explicit bounded repair is separate.
+Adaptive retry policy, delegated/auxiliary cost accounting, live cross-provider qualification and the complete
 PRD remain unfinished. Native Linear remains inaccessible because macOS is
 locked, so no issue update is claimed.
 
@@ -4061,3 +4061,7 @@ Thermal verification: full make check passed (format/LOC, vet, native race suite
 Cross-provider fallback qualification: separate loopback servers now exercise the production Ollama and OpenAI-compatible adapters in one automatic route. The local model is discovered, receives the exact prompt and fails with a retryable HTTP503 before output; only after that failure is durably terminal does the cloud model receive an authenticated SSE request and complete. Reopened storage proves distinct failed/completed task journals, the exact provider_retryable_no_output code, immediate retry lineage and cloud route attribution without prompt, credential or endpoint disclosure. The two model estimates exactly consume the request cost ceiling, covering remaining-budget arithmetic at its boundary. A paired local-required run dispatches the same local attempt but sends neither model discovery nor inference traffic to the cloud endpoint.
 
 This is deterministic loopback protocol evidence, not live Ollama/OpenAI service qualification, remote billing evidence or provider availability testing. The focused qualification test and full make check passed, including format/LOC, vet, the complete native race suite and production build. Linear was not updated because the native app remained unavailable to automation; no issue state change is claimed. Full PRD qualification remains open.
+
+Fallback route-accounting checkpoint: task-start events now durably carry the selected route's optional configured cost estimate. Live application results sum it across every admitted top-level fallback attempt, and terminal-tree recovery derives the same sum from immutable roots. Native synchronous/SSE APIs, JSON/plain CLI, the versioned Go SDK and detached submission results expose `route_estimated_cost`. Values are finite, nonnegative and validated again at submission persistence and inspection boundaries. This number is an operator estimate used for admission, not actual billing; delegated worker and auxiliary audit/summary costs are outside its deliberately named scope.
+
+Usage is no longer silently scoped to only the successful final route after a fallback. It is summed only when every route attempt has complete, nonnegative, nonoverflowing durable counts; otherwise it is nil. Because a safe retryable provider failure occurs before a completed turn, current fallback chains correctly report usage unavailable even if the final provider reports tokens. Single-route behavior is unchanged. Focused tests cover cross-provider cost summation at the exact budget boundary, unknown aggregate usage, per-task journal attribution, restart reconstruction, invalid-cost rejection, native API/CLI delivery and public SDK field parity. Final make check passed format/LOC enforcement, vet, the complete native race suite and production build; application took231.582s, telemetry148.591s, CLI42.843s, SDK25.933s, sessions16.719s and tool gate20.401s. Live-provider billing comparison, delegated/auxiliary accounting and full PRD qualification remain open. Linear is still inaccessible while macOS is locked.

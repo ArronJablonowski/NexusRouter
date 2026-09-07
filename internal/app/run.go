@@ -60,6 +60,7 @@ type Request struct {
 }
 type Result struct {
 	PreviousTaskIDs      []string
+	RouteEstimatedCost   *float64
 	retryable            bool
 	fallbackModelIDs     []string
 	reservedCost         float64
@@ -279,6 +280,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	result.TaskID = rand.Text()
+	if model.EstimatedCost != nil {
+		cost := *model.EstimatedCost
+		result.RouteEstimatedCost = &cost
+		result.reservedCost = cost
+	}
 	ctx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
 	stopWatcher := watchCancellation(ctx, func(query context.Context) (bool, error) {
@@ -336,7 +342,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), SubmissionID: r.submissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), SubmissionID: r.submissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {

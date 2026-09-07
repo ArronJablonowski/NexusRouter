@@ -32,14 +32,15 @@ type Status struct {
 	ErrorCode       string     `json:"error_code,omitempty"`
 }
 type Result struct {
-	TaskID          string           `json:"task_id"`
-	Text            string           `json:"text"`
-	Turns           int              `json:"turns"`
-	FinishReason    string           `json:"finish_reason"`
-	AuditID         string           `json:"audit_id"`
-	AuditStatus     string           `json:"audit_status"`
-	PreviousTaskIDs []string         `json:"previous_task_ids"`
-	Usage           *providers.Usage `json:"usage,omitempty"`
+	TaskID             string           `json:"task_id"`
+	Text               string           `json:"text"`
+	Turns              int              `json:"turns"`
+	FinishReason       string           `json:"finish_reason"`
+	AuditID            string           `json:"audit_id"`
+	AuditStatus        string           `json:"audit_status"`
+	PreviousTaskIDs    []string         `json:"previous_task_ids"`
+	RouteEstimatedCost *float64         `json:"route_estimated_cost,omitempty"`
+	Usage              *providers.Usage `json:"usage,omitempty"`
 }
 type Claim struct {
 	Status  Status          `json:"status"`

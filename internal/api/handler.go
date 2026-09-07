@@ -236,11 +236,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				status = 422
 				code = "admission_denied"
 			}
-			writeJSON(w, status, map[string]any{"error": code, "task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs})
+			writeJSON(w, status, map[string]any{"error": code, "task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost})
 			return
 		}
 		// This synchronous endpoint acknowledges only a completed durable task.
-		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus, "previous_task_ids": result.PreviousTaskIDs})
+		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost})
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/events") && r.URL.Path != "/v1/tasks/events" && r.Method == http.MethodGet:
 		h.serveEventReplay(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && r.Method == http.MethodGet:

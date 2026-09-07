@@ -162,7 +162,7 @@ func main() {
   if e.Kind==runtime.TaskCompleted {terminal=true}
   return nil
  })
- check(err==nil&&result.Version==1&&result.TaskID==task&&terminal&&seq>2,"stream failed")
+ check(err==nil&&result.Version==1&&result.TaskID==task&&terminal&&seq>2&&result.RouteEstimatedCost!=nil&&*result.RouteEstimatedCost==0,"stream failed")
  check(strings.Contains(result.Text,"answer")&&!strings.Contains(result.Text,"fake-sdk-private-marker"),"result secret")
  snapshot,err:=client.InspectTask(ctx,task)
  check(err==nil&&snapshot.Version==1&&snapshot.TaskID==task&&snapshot.State=="completed"&&len(snapshot.Messages)==2,"inspection failed")
@@ -189,7 +189,7 @@ func main() {
  _,err=client.RunStream(ctx,sdk.Request{Version:1,ModelID:"chat",Prompt:"do not dispatch"},func(runtime.Event)error{return errors.New("private callback detail")})
  check(err!=nil&&!strings.Contains(err.Error(),"private callback detail"),"delivery error unsafe")
  result,err=client.Run(ctx,sdk.Request{Version:1,ModelID:"chat",Prompt:"second"})
- check(err==nil&&result.Version==1&&result.TaskID!="","run failed")
+ check(err==nil&&result.Version==1&&result.TaskID!=""&&result.RouteEstimatedCost!=nil&&*result.RouteEstimatedCost==0,"run failed")
  queuedRequest:=sdk.Request{Version:1,ModelID:"chat",Prompt:"queued only; do not execute"}
  queued,err:=client.Submit(ctx,"external-submission-key",queuedRequest)
  check(err==nil&&queued.Version==1&&queued.ID!=""&&queued.State=="queued"&&len(queued.TaskIDs)==0,"submission failed")

@@ -250,6 +250,11 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	if result.RouteEstimatedCost != nil {
+		if _, writeErr := fmt.Fprintln(stderr, "Route estimated cost:", *result.RouteEstimatedCost); writeErr != nil {
+			return 1
+		}
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, "task failed; inspect local task history before retrying")
 		return 1

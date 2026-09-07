@@ -354,6 +354,14 @@ must be durably closed before an OpenAI-compatible fallback begins, and a
 local-required request must make no discovery or inference request to that
 cloud fallback.
 
+Each task start records the selected route's operator-configured cost estimate.
+Public native results expose the sum across admitted top-level fallback
+attempts as `route_estimated_cost`; it is an admission estimate, not provider
+billing, and excludes delegated workers and auxiliary audits. Token usage is
+reported for a fallback chain only when every attempt has complete durable
+usage evidence. Otherwise usage remains unavailable rather than presenting the
+final route's tokens as a whole-request total.
+
 ### 8.5 Route Explanations
 
 Every decision records:

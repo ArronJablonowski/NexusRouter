@@ -110,6 +110,7 @@ type Request struct {
 type Result struct {
 	Version              int
 	PreviousTaskIDs      []string
+	RouteEstimatedCost   *float64
 	AuditID, AuditStatus string
 	TaskID, Text         string
 	Turns                int
@@ -156,7 +157,7 @@ func (r Request) internal() app.Request {
 	return app.Request{SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
 }
 func publicResult(r app.Result) Result {
-	return Result{Version: 1, PreviousTaskIDs: r.PreviousTaskIDs, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
+	return Result{Version: 1, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
 }
 func (c *Client) valid(ctx context.Context) bool { return c != nil && c.service != nil && ctx != nil }
 

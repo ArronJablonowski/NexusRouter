@@ -97,9 +97,9 @@ func (h *Handler) serveTaskStream(w http.ResponseWriter, r *http.Request) {
 		return err
 	}
 	finish := func(result app.Result, code string) {
-		body := map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "finish_reason": result.FinishReason, "usage": result.Usage, "previous_task_ids": result.PreviousTaskIDs, "audit_id": result.AuditID, "audit_status": result.AuditStatus}
+		body := map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "finish_reason": result.FinishReason, "usage": result.Usage, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost, "audit_id": result.AuditID, "audit_status": result.AuditStatus}
 		if code != "" {
-			body = map[string]any{"task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "audit_id": result.AuditID, "error": code}
+			body = map[string]any{"task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost, "audit_id": result.AuditID, "error": code}
 		}
 		encoded, err := json.Marshal(body)
 		if err != nil {

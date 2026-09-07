@@ -137,7 +137,10 @@ production release, release tag or complete PRD acceptance is claimed.
   bounded delegation, validation evidence and advisory output audits. A
   loopback cross-provider fixture qualifies Ollama retryable failure to an
   OpenAI-compatible SSE fallback at the exact cumulative budget boundary and
-  proves local-required requests never contact the cloud fixture.
+  proves local-required requests never contact the cloud fixture. Native task,
+  stream, CLI, SDK and detached-submission results expose the cumulative
+  top-level route estimate. Usage is withheld when any fallback attempt lacks
+  durable counts instead of mislabeling final-attempt tokens as a total.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
   → local Ollama → Sol round trip, historical continuation and a separate Sol
   output audit have been qualified. See [the integration guide](codex-coordinator-integration.md).

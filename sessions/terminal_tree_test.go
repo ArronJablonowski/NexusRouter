@@ -156,8 +156,11 @@ func TestProjectTerminalTreeFallbackPreviousIDsExcludeDelegates(t *testing.T) {
 		first = append(first, event)
 	}
 	h[0][0].Data.RetryOfTaskID = "first"
+	firstCost, finalCost := .25, .5
+	first[0].Data.RouteEstimatedCost = &firstCost
+	h[0][0].Data.RouteEstimatedCost = &finalCost
 	out, err := ProjectTerminalTree(append([][]runtime.Event{first}, h...))
-	if err != nil || out.Result == nil || out.Result.TaskID != "task" || len(out.Result.PreviousTaskIDs) != 1 || out.Result.PreviousTaskIDs[0] != "first" {
+	if err != nil || out.Result == nil || out.Result.TaskID != "task" || len(out.Result.PreviousTaskIDs) != 1 || out.Result.PreviousTaskIDs[0] != "first" || out.Result.RouteEstimatedCost == nil || *out.Result.RouteEstimatedCost != .75 || out.Result.Usage != nil {
 		t.Fatal(out, err)
 	}
 }

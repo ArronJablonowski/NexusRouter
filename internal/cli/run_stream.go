@@ -75,7 +75,7 @@ func runTaskJSON(ctx context.Context, request app.Request, run taskStreamRunner,
 	if result.Usage != nil {
 		usage = map[string]int64{"input_tokens": result.Usage.InputTokens, "output_tokens": result.Usage.OutputTokens}
 	}
-	public := map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "finish_reason": result.FinishReason, "usage": usage, "previous_task_ids": result.PreviousTaskIDs, "audit_id": result.AuditID, "audit_status": result.AuditStatus}
+	public := map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "finish_reason": result.FinishReason, "usage": usage, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost, "audit_id": result.AuditID, "audit_status": result.AuditStatus}
 	if err != nil || broken {
 		code = "task_failed"
 		switch {
@@ -88,7 +88,7 @@ func runTaskJSON(ctx context.Context, request app.Request, run taskStreamRunner,
 		case errors.Is(err, context.DeadlineExceeded):
 			code = "deadline_exceeded"
 		}
-		public = map[string]any{"task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "audit_id": result.AuditID}
+		public = map[string]any{"task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost, "audit_id": result.AuditID}
 	}
 	finalErr := write(struct {
 		Version int            `json:"version"`

@@ -59,6 +59,10 @@ func ProjectTerminalSubmission(events []runtime.Event) (TerminalOutcome, error) 
 	}
 	last := events[len(events)-1]
 	out := TerminalOutcome{Result: &submissions.Result{TaskID: start.TaskID, AuditStatus: "not_recovered"}}
+	if start.Data.RouteEstimatedCost != nil {
+		cost := *start.Data.RouteEstimatedCost
+		out.Result.RouteEstimatedCost = &cost
+	}
 	switch snapshot.State {
 	case "completed":
 		if last.Kind != runtime.TaskCompleted || snapshot.InterruptedTurn || snapshot.UncertainEffects || len(snapshot.Pending) > 0 {
