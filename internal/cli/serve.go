@@ -103,6 +103,19 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
 	handler, err := api.New(token, s.Workers.Max, api.Services{
+		Models: func(ctx context.Context) ([]string, error) {
+			if ctx == nil {
+				return nil, context.Canceled
+			}
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			ids := make([]string, len(s.Models))
+			for i := range s.Models {
+				ids[i] = s.Models[i].ID
+			}
+			return ids, nil
+		},
 		ModelDeprecation: service.ModelDeprecation,
 		Memory:           service.Memory,
 		ExportMemory:     service.ExportMemory,

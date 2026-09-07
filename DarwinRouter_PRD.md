@@ -168,6 +168,8 @@ not fulfill automatic compaction or semantic validation requirements.
 DarwinRouter exposes:
 
 - An OpenAI-compatible streaming chat/completion endpoint.
+- An authenticated OpenAI-shaped configured-model catalog that performs no
+  provider discovery or inference and exposes no endpoint or credential data.
 - Native task submission, cancellation, status, and Server-Sent Events endpoints.
 - Route-explanation and model-health endpoints.
 - Session, branch, and resume endpoints.

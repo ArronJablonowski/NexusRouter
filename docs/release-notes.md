@@ -5,6 +5,14 @@ production release, release tag or complete PRD acceptance is claimed.
 
 ## Available for supervised testing
 
+- Authenticated `GET /v1/models` returns an OpenAI-shaped, configuration-only
+  catalog of Darwin model aliases. It is independently capacity-bounded, does
+  no discovery or inference, and omits endpoints, credential references,
+  routing cost and host resource metadata. Invalid backend catalogs fail closed.
+  The compatibility `created` field is zero because upstream creation time is
+  unknown; `shutdown_date` is null and `owned_by` identifies DarwinRouter's
+  virtual route record rather than ownership of upstream model weights.
+
 - Explicit one-shot OTLP/HTTP trace export through CLI and Go SDK for bounded
   recent terminal task/provider/tool/worker lifecycles plus fixed route,
   evaluation, fallback, compaction, skill-context, steering and error

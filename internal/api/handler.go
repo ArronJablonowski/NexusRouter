@@ -30,6 +30,7 @@ import (
 )
 
 type Services struct {
+	Models                 func(context.Context) ([]string, error)
 	Memory                 func(context.Context, string) (memory.Fact, error)
 	ExportMemory           func(context.Context) (memory.ExportSnapshot, error)
 	Memories               func(context.Context, string, string, int, bool) ([]memory.Fact, error)
@@ -83,6 +84,7 @@ type Services struct {
 	Feedback               func(context.Context, string, bool, float64) error
 }
 type Handler struct {
+	modelSlots       chan struct{}
 	memorySlots      chan struct{}
 	deprecationSlots chan struct{}
 	secret           [32]byte
@@ -100,14 +102,14 @@ func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
+	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	fail := func(status int, code string) {
-		if r.URL.Path != "/v1/chat/completions" {
+		if r.URL.Path != "/v1/chat/completions" && r.URL.Path != "/v1/models" {
 			failure(w, status, code)
 			return
 		}
@@ -166,6 +168,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveMemoryManagement(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/models/deprecation":
 		h.serveDeprecation(w, r.WithContext(ctx))
+	case r.URL.Path == "/v1/models":
+		h.serveModels(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/daemon/status" || r.URL.Path == "/v1/daemon/stop":
 		h.serveDaemonControl(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/skills/workflows":

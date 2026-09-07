@@ -739,6 +739,7 @@ Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters,
 
 All endpoints require `Authorization: Bearer <token>`:
 
+- `GET /v1/models`: bounded OpenAI-shaped list of configured Darwin model IDs. It reads the daemon's immutable configuration snapshot without provider discovery or inference and exposes no provider endpoint, credential reference, cost, resource footprint or health assertion. Each item uses `object: "model"`, `owned_by: "darwinrouter"`, `shutdown_date: null`, and `created: 0`; the zero timestamp explicitly means DarwinRouter does not know the upstream model's creation time. Configuration order is preserved. `auto` is routing policy rather than a configured model and is not synthesized into the catalog. The response follows the current [OpenAI list-models envelope](https://developers.openai.com/api/reference/ruby/resources/models/methods/list) while documenting these Darwin-specific metadata semantics.
 - `GET /health`: lightweight database and live supervisor check. Its legacy response still declares `providers_checked: false`; it performs no provider discovery.
 - `GET /v1/health`: detailed operational report described below, including bounded provider/model discovery.
 - `GET /v1/resources/attention`: read-only paginated lease-attention records;
