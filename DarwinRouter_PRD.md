@@ -718,8 +718,10 @@ without blocking task readiness on collector failure. The legacy
 configured periodic metrics exporter; it requires the same explicit destination
 and policy checks and does not disable task or learning execution. Explicit
 CLI/SDK trace export now reconstructs bounded recent terminal-task roots with
-successfully paired provider-turn and tool-call children. Public snapshots have
-no content or durable identity, and each serialization uses fresh random OTLP
+successfully paired provider-turn, tool-call and worker children plus fixed
+route/exploration, evaluation, fallback, compaction, skill-context, steering
+and error observations. Public snapshots have no content or durable identity,
+and each serialization uses fresh random OTLP
 trace/span IDs. An independently configured daemon/SDK trace supervisor now
 sends fresh bounded snapshots sequentially, fences configuration rotation and
 reports supplemental health; scheduling and delivery are non-durable. Broader

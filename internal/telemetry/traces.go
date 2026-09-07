@@ -77,9 +77,16 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	 CASE WHEN json_type(body,'$.attempt_id') IS NULL THEN '' WHEN json_type(body,'$.attempt_id')='text' AND length(CAST(json_extract(body,'$.attempt_id') AS BLOB))<=256 THEN json_extract(body,'$.attempt_id') ELSE '' END,
 	 CASE WHEN json_type(body,'$.data.tool_call_id') IS NULL THEN '' WHEN json_type(body,'$.data.tool_call_id')='text' AND length(CAST(json_extract(body,'$.data.tool_call_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.data.tool_call_id') ELSE '' END,
 	 CASE WHEN json_type(body,'$.data.tool_name') IS NULL THEN '' WHEN json_type(body,'$.data.tool_name')='text' AND length(CAST(json_extract(body,'$.data.tool_name') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.data.tool_name') ELSE '' END,
-	 CASE WHEN json_type(body,'$.time')='text' AND length(CAST(json_extract(body,'$.time') AS BLOB)) BETWEEN 1 AND 40 THEN json_extract(body,'$.time') ELSE '' END
+	 CASE WHEN json_type(body,'$.worker_id') IS NULL THEN '' WHEN json_type(body,'$.worker_id')='text' AND length(CAST(json_extract(body,'$.worker_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.worker_id') ELSE '' END,
+	 CASE WHEN json_type(body,'$.time')='text' AND length(CAST(json_extract(body,'$.time') AS BLOB)) BETWEEN 1 AND 40 THEN json_extract(body,'$.time') ELSE '' END,
+	 CASE WHEN json_type(body,'$.data.retry_of_task_id')='text' AND length(CAST(json_extract(body,'$.data.retry_of_task_id') AS BLOB)) BETWEEN 1 AND 128 THEN 1 ELSE 0 END,
+	 CASE WHEN json_type(body,'$.data.compaction')='object' THEN 1 ELSE 0 END,
+	 CASE WHEN json_type(body,'$.data.skill_context')='object' THEN 1 ELSE 0 END,
+	 CASE WHEN json_extract(body,'$.data.route.Explored')=1 THEN 1 ELSE 0 END,
+	 CASE WHEN json_type(body,'$.data.accepted')='true' THEN 1 WHEN json_type(body,'$.data.accepted')='false' THEN 0 ELSE -1 END
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
-	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed')
+	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
+	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied')
 	 ORDER BY sequence LIMIT 514`, task.id)
 	if err != nil {
 		return traces.Trace{}, errTraces
@@ -95,8 +102,9 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			return traces.Trace{}, errTraces
 		}
 		var sequence int64
-		var kind, turn, attempt, call, toolName, encodedTime string
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &encodedTime) != nil || sequence < 1 {
+		var kind, turn, attempt, call, toolName, worker, encodedTime string
+		var retry, compaction, skillContext, explored, accepted int
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -109,6 +117,15 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				return traces.Trace{}, errTraces
 			}
 			rootStart = at
+			if retry == 1 {
+				children = append(children, traceInstant("fallback", "selected", at))
+			}
+			if compaction == 1 {
+				children = append(children, traceInstant("compaction", "applied", at))
+			}
+			if skillContext == 1 {
+				children = append(children, traceInstant("skill_context", "loaded", at))
+			}
 		case "task.completed", "task.failed", "task.canceled":
 			if !rootEnd.IsZero() || kind != "task."+task.state {
 				return traces.Trace{}, errTraces
@@ -143,6 +160,46 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				return traces.Trace{}, errTraces
 			}
 			children = append(children, traces.Span{Name: group, Outcome: "completed", Parent: 0, StartedAt: started.at, EndedAt: at})
+		case "worker.started", "worker.completed":
+			if worker == "" {
+				continue
+			}
+			key := tracePairKey{kind: "worker", call: worker}
+			if kind == "worker.started" {
+				if _, exists := pending[key]; exists {
+					return traces.Trace{}, errTraces
+				}
+				pending[key] = traceStart{at: at}
+				continue
+			}
+			started, exists := pending[key]
+			if !exists {
+				continue
+			}
+			delete(pending, key)
+			if at.Before(started.at) {
+				return traces.Trace{}, errTraces
+			}
+			children = append(children, traces.Span{Name: "worker", Outcome: "completed", Parent: 0, StartedAt: started.at, EndedAt: at})
+		case "route.selected":
+			outcome := "selected"
+			if explored == 1 {
+				outcome = "explored"
+			}
+			children = append(children, traceInstant("route", outcome, at))
+		case "evaluation.recorded":
+			if accepted != 0 && accepted != 1 {
+				return traces.Trace{}, errTraces
+			}
+			outcome := "rejected"
+			if accepted == 1 {
+				outcome = "accepted"
+			}
+			children = append(children, traceInstant("evaluation", outcome, at))
+		case "error.recorded":
+			children = append(children, traceInstant("error", "recorded", at))
+		case "steering.applied":
+			children = append(children, traceInstant("steering", "applied", at))
 		default:
 			return traces.Trace{}, errTraces
 		}
@@ -155,4 +212,8 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	spans[0] = traces.Span{Name: "task", Outcome: task.state, Parent: -1, StartedAt: rootStart, EndedAt: rootEnd}
 	spans = append(spans, children...)
 	return traces.Trace{Spans: spans}, nil
+}
+
+func traceInstant(name, outcome string, at time.Time) traces.Span {
+	return traces.Span{Name: name, Outcome: outcome, Parent: 0, StartedAt: at, EndedAt: at}
 }

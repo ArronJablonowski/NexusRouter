@@ -38,9 +38,11 @@ restart the owned exporter to apply new settings. The legacy
 ## Scope and privacy
 
 Each trace contains one terminal task root plus successfully paired
-provider-turn and tool-call child spans. Names and attributes use a closed
-vocabulary: `darwinrouter.task`, `darwinrouter.provider`,
-`darwinrouter.tool`, and their fixed completion outcome. Prompt/output text,
+provider-turn, tool-call and worker child spans. Fixed zero-duration
+observations additionally represent route selection/exploration, evaluation
+acceptance/rejection, fallback lineage, compaction, progressive skill-context
+loading, steering application and recorded errors. Names and outcomes use a
+closed vocabulary. Prompt/output text,
 messages, tool arguments/results, error details, model/provider/tool names and
 all durable task, session, event, route, worker, turn, attempt and call IDs are
 never selected into the public snapshot.
@@ -59,11 +61,14 @@ starts, mismatched tool pairs or any exceeded bound fail the export. Unpaired
 legacy/interrupted child operations are omitted; the separate metrics snapshot
 retains explicit missing-start and missing-end counts.
 
-This first trace slice does not include running tasks, model deltas, routes,
-workers, evaluations, retries, fallbacks, compactions, fitness or skill
-changes. It is retained lifecycle wall time, not provider server latency.
-Durable delivery, sampling policy, stable correlation, retention controls and
-broader span families remain unfinished.
+This trace slice does not include running tasks, model deltas, worker
+heartbeats, resource leases/pressure, provider health, fitness mutations,
+automatic skill draft/activation/rollback operations or queue residency.
+Fallback observations come from canonical safe-retry lineage; they do not
+assert that an arbitrary failed operation was retried. Skill-context loading
+does not prove semantic use. Paired spans measure retained lifecycle wall time,
+not provider server latency. Durable delivery, sampling policy, stable
+correlation, retention controls and the remaining span families are unfinished.
 
 ## Network and credentials
 

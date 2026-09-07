@@ -1,5 +1,27 @@
 # Implementation evidence
 
+PRD broader-runtime-traces checkpoint: the bounded terminal-task trace reader
+now pairs durable worker start/completion events in addition to provider turns
+and tool calls. It emits fixed zero-duration task children for route selection
+or exploration, accepted/rejected evaluation, safe fallback lineage,
+compaction, progressive skill-context loading, steering application and
+recorded errors. Only closed names/outcomes enter public snapshots or OTLP;
+worker/route/model/provider/tool/error/steering identities and all content stay
+inside the bounded SQLite pairing transaction. Fallback is inferred only from
+canonical `retry_of_task_id` lineage, not arbitrary failure, and skill-context
+presence does not claim semantic use. Missing legacy worker pairs are omitted;
+contradictory pairs or invalid times still fail closed. Focused trace and
+telemetry tests cover the complete public vocabulary, expanded wire graph,
+durable pairing, evaluation polarity, exploration and private-field absence.
+Final `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and the production build; application took 221.759s,
+telemetry 147.915s, CLI 42.382s, SDK 25.285s, traces 2.460s and tool gate
+20.844s. Running tasks, model deltas, heartbeats, resource leases/pressure,
+provider health, fitness mutations, skill lifecycle operations, queue
+residency, stable correlation and retention remain open. No live model, user
+database or collector was used. Native Linear remains inaccessible because the
+Mac is locked, so no issue update is claimed. The full PRD remains incomplete.
+
 PRD periodic-trace-export checkpoint: `telemetry.trace_export` now provides an
 independent opt-in daemon controller with endpoint, credential-name, interval
 and 1–32 task limit fields. Configuration layering preserves explicit false,

@@ -49,7 +49,7 @@ func (s Snapshot) Validate() error {
 			return ErrInvalid
 		}
 		for i, span := range trace.Spans[1:] {
-			if span.Parent != 0 || (span.Name != "provider" && span.Name != "tool") || span.Outcome != "completed" || invalidTimes(span, s.ObservedAt) || span.StartedAt.Before(root.StartedAt) || span.EndedAt.After(root.EndedAt) {
+			if span.Parent != 0 || !spanVocabulary(span.Name, span.Outcome) || invalidTimes(span, s.ObservedAt) || span.StartedAt.Before(root.StartedAt) || span.EndedAt.After(root.EndedAt) {
 				return ErrInvalid
 			}
 			if i > 0 && span.StartedAt.Before(trace.Spans[i].StartedAt) {
@@ -58,6 +58,29 @@ func (s Snapshot) Validate() error {
 		}
 	}
 	return nil
+}
+
+func spanVocabulary(name, outcome string) bool {
+	switch name {
+	case "provider", "tool", "worker":
+		return outcome == "completed"
+	case "route":
+		return outcome == "selected" || outcome == "explored"
+	case "evaluation":
+		return outcome == "accepted" || outcome == "rejected"
+	case "fallback":
+		return outcome == "selected"
+	case "compaction":
+		return outcome == "applied"
+	case "skill_context":
+		return outcome == "loaded"
+	case "steering":
+		return outcome == "applied"
+	case "error":
+		return outcome == "recorded"
+	default:
+		return false
+	}
 }
 
 func invalidTimes(span Span, observedAt time.Time) bool {
