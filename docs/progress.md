@@ -4117,3 +4117,17 @@ MVP acceptance reconciliation checkpoint: a fresh `make qualify-mvp` passed all 
 Native Linear acceptance and dependency review moved DAR-11, DAR-12, DAR-14, DAR-15, DAR-17, DAR-27, DAR-37, DAR-38, DAR-39 and DAR-40 to Done. Their issue bodies were re-read in the authenticated DarwinRouter workspace, prerequisite release activity was observed, and each status transition was verified in the issue activity. This is backlog reconciliation against already-tested repository behavior, not a claim that all PRD work is complete. DAR-41 through DAR-45 still require final dependency-ordered reconciliation, and DAR-46 remains In Progress.
 
 Release-qualification CI checkpoint: a new manual-only GitHub Actions workflow binds checkout to the dispatch event's immutable commit, disables credential persistence and cache uploads, runs `make check` and `make qualify-release` on Ubuntu and macOS, verifies the source stays clean, and records the actual host OS/architecture, Go version and gate outcomes. Its summary distinguishes the one natively executed target from inspected cross-builds. Repository permissions are read-only and there are no secrets, artifact uploads, tags, releases or publication commands. A static authority/YAML race test passed three runs, but no hosted workflow run or production-signing evidence is claimed. License choice, supported distribution platforms, production key custody/public trust, release approval and publication authority remain operator gates for DAR-46.
+
+Final MVP backlog reconciliation: the authenticated native Linear board now
+shows 41 of 42 DarwinRouter MVP issues Done, no Todo issues, and only DAR-46 In
+Progress. After re-reading their acceptance criteria and confirming released
+dependencies, DAR-41, DAR-42, DAR-43, DAR-44 and DAR-45 were moved to Done in
+dependency order. DAR-43 also received an independent read-only evidence review
+covering provider, tool, worker, skill, fitness and compaction interruption
+paths; it found no issue-specific blocker while preserving the documented
+power-loss and storage-device limitations. DAR-45's nine-scenario qualification
+and DAR-44's performance qualification had already passed on the exact backed-up
+tree. This establishes the testable MVP gate. DAR-46 remains intentionally open:
+signed v1.0.0 publication still requires operator decisions for license/notices,
+supported platforms, production signing-key custody and public trust, release
+approval and publication authority.
