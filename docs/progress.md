@@ -1,5 +1,28 @@
 # Implementation evidence
 
+DAR-32 is Done in native Linear under state activity
+`61d7f726-0572-443b-82b5-60c2daa3035a` with completion evidence comment
+`a76b18da`. Versioned facts persist content, provenance, confidence, privacy,
+creation/update/last-use times and optional expiry under strict bounds. Scoped
+paged retrieval filters privacy and expiry before deterministic relevance
+ranking, uses only current user input, wraps selected facts as untrusted data,
+redacts secrets, and binds actual use to the exact selected revision. A fact
+changed, deleted, expired or made private between selection and dispatch blocks
+the dispatch. Corrections use revision CAS, preserve creation/last-use, update
+provenance, and cannot weaken local-only privacy. Delete and expiry atomically
+remove payloads and retire IDs, preventing stale resurrection. Complete export
+uses one WAL snapshot, includes current private/expired facts for operator
+inspection, excludes retired payloads, detects corrupt/oversized sources and
+does not touch facts. Configured CLI management is scope-bound, redacted,
+revision-aware, inference-free and cannot create missing storage. Focused
+memory, telemetry, application and CLI race tests passed three repetitions
+(1.329s, 17.616s, 8.454s and 21.127s respectively). The immediately preceding
+full `make check` passed format/LOC, vet, the complete native race suite and
+build. The checkpoint is backed up at `ce9dfae`; push/fetch verification showed
+matching local and remote heads, zero divergence and a clean worktree before
+the Linear comment and Done state were read back. DAR-34 cleared this
+dependency but still depends on DAR-33. The full PRD remains incomplete.
+
 DAR-31 is Done in native Linear under state activity
 `e2029aa1-a884-4d46-8192-11dbafcb9595` with completion evidence comment
 `31ebb037`. `Compact` validates the complete conversation and moves cuts inside
