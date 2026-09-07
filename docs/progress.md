@@ -1,5 +1,25 @@
 # Implementation evidence
 
+DAR-34 is verified and ready for its Linear completion update.
+Automatic learning scans durable completed workflows and groups only repeated
+procedures with the same domain, execution profile and observed successful tool
+sequence. At least two distinct tasks and sessions are required. Source
+eligibility is re-derived from current immutable deterministic, tool-result or
+user-feedback evidence; judge-only evidence, failed trajectories, pending work
+and uncertain effects are excluded. Generation is one bounded, tools-free
+auxiliary model call after privacy, resource, credential, context and cost
+admission. The host replaces any model-supplied provenance with sorted source
+session and evidence references, redacts sensitive content, and records a
+stable started attempt before dispatch so an uncertain restart cannot duplicate
+work. Generated validation cases are proposals, not proof: drafts remain
+inactive until a separate trusted deterministic validator succeeds, and failed
+validation leaves the durable pending selection untouched. Focused grouping,
+generation, provenance and activation race tests passed three repetitions.
+Final `make check` passed format/LOC, vet, the complete native race suite and
+build; application tests took 222.545s, telemetry 148.105s, CLI 42.052s, SDK
+24.745s and tool-gate 19.219s. GitHub/Linear checkpoint evidence follows in
+this entry after synchronization. The full PRD remains incomplete.
+
 DAR-33 is Done in native Linear under state activity
 `fee38c5c-9f0e-45d4-a94f-ad9918f8e436` with completion evidence comment
 `7371afab`. Discovery returns only active validated metadata filtered by exact
