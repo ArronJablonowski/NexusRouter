@@ -722,7 +722,9 @@ successfully paired provider-turn, tool-call and worker children plus fixed
 route/exploration, evaluation, fallback, compaction, skill-context, steering
 and error observations. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
-exact arrival time; retries and delegated children are excluded. Public snapshots have no content or durable identity,
+exact arrival time; retries and delegated children are excluded. Paired tool
+completions expose only their authoritative none/confirmed/uncertain effect
+class, never tool identity or result content. Public snapshots have no content or durable identity,
 and fixed route-constraint observations expose only the nine canonical
 exclusion reason classes—not candidate identities. Unknown reasons fail closed.
 Each serialization uses fresh random OTLP trace/span IDs. An independently

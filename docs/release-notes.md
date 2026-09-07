@@ -16,6 +16,8 @@ production release, release tag or complete PRD acceptance is claimed.
   Linked top-level submissions expose pre-start queue residency through seven
   fixed buckets; submission IDs and exact arrival times remain private, and
   retries/delegated children are excluded.
+  Paired tool completions expose only their fixed none/confirmed/uncertain
+  effect class, without tool identity, result content or retry claims.
   Delivery remains ephemeral and broader lifecycle spans are open. See
   [trace export](traces-export.md).
 

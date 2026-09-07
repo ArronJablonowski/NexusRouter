@@ -51,14 +51,14 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		}
 	}
 	snapshot, err := db.Traces(ctx, 1)
-	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 19 {
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 20 {
 		t.Fatal(snapshot, err)
 	}
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || snapshot.Traces[0].Spans[0].Outcome != "completed" {
 		t.Fatal(string(body))
 	}
-	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "worker/completed": true, "evaluation/accepted": true, "error/recorded": true}
+	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "tool_effect/none": true, "worker/completed": true, "evaluation/accepted": true, "error/recorded": true}
 	for _, reason := range []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
 		want["route_constraint/"+reason] = true
 	}
@@ -128,6 +128,64 @@ func TestQueueResidencyBucketBoundaries(t *testing.T) {
 		if got := queueResidencyBucket(tc.wait); got != tc.want {
 			t.Fatalf("wait %s: got %s want %s", tc.wait, got, tc.want)
 		}
+	}
+}
+
+func TestTraceSnapshotClassifiesToolEffects(t *testing.T) {
+	for _, effect := range []runtime.Effect{runtime.NoEffect, runtime.ConfirmedEffect, runtime.UncertainEffect} {
+		t.Run(string(effect), func(t *testing.T) {
+			db, _ := submissionStore(t)
+			ctx := context.Background()
+			base := time.Now().UTC().Add(-time.Second)
+			start := event("start", 1, runtime.TaskStarted)
+			toolStart := event("tool-start", 2, runtime.ToolStarted)
+			toolDone := event("tool-done", 3, runtime.ToolCompleted)
+			done := event("done", 4, runtime.TaskCompleted)
+			start.Time, toolStart.Time, toolDone.Time, done.Time = base, base.Add(time.Millisecond), base.Add(2*time.Millisecond), base.Add(3*time.Millisecond)
+			for _, item := range []*runtime.Event{&toolStart, &toolDone} {
+				item.TurnID, item.AttemptID = "turn", "attempt"
+				item.Data.ToolCallID, item.Data.ToolName = "private-call", "private-tool"
+			}
+			toolStart.Data.Effect, toolDone.Data.Effect = runtime.UncertainEffect, effect
+			for i, item := range []runtime.Event{start, toolStart, toolDone, done} {
+				if err := db.Append(ctx, int64(i), item); err != nil {
+					t.Fatal(err)
+				}
+			}
+			snapshot, err := db.Traces(ctx, 1)
+			if err != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 3 {
+				t.Fatal(snapshot, err)
+			}
+			if got := snapshot.Traces[0].Spans[2]; got.Name != "tool_effect" || got.Outcome != string(effect) || !got.StartedAt.Equal(toolDone.Time) {
+				t.Fatal(got)
+			}
+		})
+	}
+}
+
+func TestTraceSnapshotRejectsUnknownToolEffect(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	start := event("effect-start", 1, runtime.TaskStarted)
+	toolStart := event("effect-tool-start", 2, runtime.ToolStarted)
+	toolDone := event("effect-tool-done", 3, runtime.ToolCompleted)
+	done := event("effect-done", 4, runtime.TaskCompleted)
+	start.Time, toolStart.Time, toolDone.Time, done.Time = base, base.Add(time.Millisecond), base.Add(2*time.Millisecond), base.Add(3*time.Millisecond)
+	for _, item := range []*runtime.Event{&toolStart, &toolDone} {
+		item.TurnID, item.AttemptID = "turn", "attempt"
+		item.Data.ToolCallID, item.Data.ToolName, item.Data.Effect = "call", "tool", runtime.NoEffect
+	}
+	for i, item := range []runtime.Event{start, toolStart, toolDone, done} {
+		if err := db.Append(ctx, int64(i), item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.db.ExecContext(ctx, "UPDATE events SET body=json_set(body,'$.data.effect','private-effect') WHERE id='effect-tool-done'"); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("unknown tool effect escaped", snapshot, err)
 	}
 }
 

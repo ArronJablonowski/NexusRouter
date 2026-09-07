@@ -1,8 +1,8 @@
 # OTLP trace export
 
 DarwinRouter can explicitly export a bounded, content-free view of recent
-terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 adds the
-fixed queue-residency observation:
+terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
+fixed queue-residency observation; version 3 adds fixed tool-effect evidence:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -42,7 +42,10 @@ Each trace contains one terminal task root plus successfully paired
 provider-turn, tool-call and worker child spans. Fixed zero-duration
 observations additionally represent route selection/exploration, evaluation
 acceptance/rejection, fallback lineage, compaction, progressive skill-context
-loading, steering application and recorded errors. A top-level task created by
+loading, steering application, recorded errors and each paired tool completion's
+authoritative `none`, `confirmed` or `uncertain` effect classification. Tool
+identity and result content remain private, and the effect observation does not
+assert that a failed or uncertain operation is safe to retry. A top-level task created by
 the durable submission queue also receives one `queue_residency` observation at
 task start, classified as `lt_1s`, `lt_10s`, `lt_1m`, `lt_5m`, `lt_30m`,
 `lt_1h` or `gte_1h`. The observation is instantaneous: the bucket describes

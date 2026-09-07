@@ -1,5 +1,24 @@
 # Implementation evidence
 
+PRD tool-effect-traces checkpoint: trace snapshot schema version 3 now attaches
+one instantaneous `tool_effect` child to every successfully paired durable tool
+completion. Outcomes are limited to `none`, `confirmed` and `uncertain`, using
+the runtime's authoritative completion evidence rather than inferring safety
+from tool names, result text or model claims. The existing tool span continues
+to measure retained lifecycle wall time. Public snapshots and OTLP do not expose
+tool/call identity, arguments or results, and the effect observation does not
+authorize retry. Missing or unknown effect labels on a paired completion fail
+closed. Focused tests cover all three outcomes, completion timing, public
+vocabulary, OTLP schema versioning, private-field absence and corrupt-label
+rejection. Final `make check` passed formatting/LOC enforcement, vet, every
+native race-enabled package and the production build; application took
+219.451s, telemetry 146.590s, CLI 42.363s, SDK 25.545s, traces 2.497s and tool
+gate 20.928s. No live model, user database or collector was used. Provider
+health, fitness mutation, skill lifecycle,
+resource-pressure traces, durable delivery, retention and the complete PRD
+remain unfinished. Native Linear remains inaccessible because macOS is locked,
+so no issue update is claimed.
+
 PRD queue-residency-traces checkpoint: each terminal top-level task linked to a
 durable submission now receives one instantaneous `queue_residency` child at
 task start. Trace snapshot schema version 2 owns this addition. Its outcome is

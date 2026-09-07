@@ -96,6 +96,11 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	   AND (SELECT count(*) FROM submissions s WHERE s.id=json_extract(body,'$.data.submission_id'))=1
 	  THEN COALESCE((SELECT CASE WHEN length(CAST(s.created_at AS BLOB)) BETWEEN 1 AND 64 THEN s.created_at END FROM submissions s WHERE s.id=json_extract(body,'$.data.submission_id')),'!invalid!')
 	  ELSE '!invalid!'
+	 END,
+	 CASE
+	  WHEN json_extract(body,'$.kind')<>'tool.completed' THEN ''
+	  WHEN json_extract(body,'$.data.effect') IN ('none','confirmed','uncertain') THEN json_extract(body,'$.data.effect')
+	  ELSE '!invalid!'
 	 END
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
@@ -115,9 +120,9 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			return traces.Trace{}, errTraces
 		}
 		var sequence int64
-		var kind, turn, attempt, call, toolName, worker, encodedTime, queuedAt string
+		var kind, turn, attempt, call, toolName, worker, encodedTime, queuedAt, toolEffect string
 		var retry, compaction, skillContext, explored, accepted, routeConstraints int
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt) != nil || sequence < 1 {
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt, &toolEffect) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -180,6 +185,12 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				return traces.Trace{}, errTraces
 			}
 			children = append(children, traces.Span{Name: group, Outcome: "completed", Parent: 0, StartedAt: started.at, EndedAt: at})
+			if group == "tool" {
+				if toolEffect == "" || toolEffect == "!invalid!" {
+					return traces.Trace{}, errTraces
+				}
+				children = append(children, traceInstant("tool_effect", toolEffect, at))
+			}
 		case "worker.started", "worker.completed":
 			if worker == "" {
 				continue

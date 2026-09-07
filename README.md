@@ -1456,7 +1456,9 @@ now aliases configured periodic metrics export. A separate explicit CLI/SDK
 roots with paired provider/tool/worker children and fixed route, evaluation,
 fallback, compaction, skill-context, steering, error and top-level submission
 queue-residency observations. Queue waits use seven fixed buckets and expose no
-submission identity or exact arrival time. It uses
+submission identity or exact arrival time. Every paired tool completion also
+emits its fixed none/confirmed/uncertain effect class without tool identity or
+result content. It uses
 fresh non-durable wire IDs and no session content or durable identities.
 Fixed route-constraint observations expose only mode/privacy/health/policy/
 credential/capacity/context/budget/capability reason classes, never candidates.
