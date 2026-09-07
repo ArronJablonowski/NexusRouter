@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,7 +57,7 @@ func TestValidateNoticeRejectsMalformedOrTamperedContent(t *testing.T) {
 			return bytes.Replace(body, []byte("Source-File: LICENSE"), []byte("Source-File: NOTICE"), 1)
 		},
 		"bad_count": func(body []byte) []byte {
-			return bytes.Replace(body, []byte("Module-Count: 1"), []byte("Module-Count: 2"), 1)
+			return bytes.Replace(body, []byte("Module-Count: 2"), []byte("Module-Count: 3"), 1)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -100,14 +101,20 @@ func TestThirdPartyNoticesMatchesCurrentTargetClosure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	darwin, err := thirdPartyNotices(ctx, root, "darwin", "amd64", environment())
-	if err != nil {
-		t.Fatal(err)
+	notices := map[string][]byte{}
+	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
+		body, noticeErr := thirdPartyNotices(ctx, root, target[0], target[1], environment())
+		if noticeErr != nil || validateNotice(body, target[0], target[1]) != nil {
+			t.Fatal(target, noticeErr)
+		}
+		for _, required := range []string{"Module: go.dev/toolchain", "Version: v" + strings.TrimPrefix(runtime.Version(), "go"), "Source-File: LICENSE", "Source-File: PATENTS", "Copyright 2009 The Go Authors."} {
+			if !strings.Contains(string(body), required) {
+				t.Fatal("Go toolchain attribution missing", target, required)
+			}
+		}
+		notices[target[0]+"/"+target[1]] = body
 	}
-	linux, err := thirdPartyNotices(ctx, root, "linux", "amd64", environment())
-	if err != nil {
-		t.Fatal(err)
-	}
+	darwin, linux := notices["darwin/amd64"], notices["linux/amd64"]
 	if !bytes.Contains(darwin, []byte("Module: github.com/ncruces/go-strftime")) || bytes.Contains(linux, []byte("Module: github.com/ncruces/go-strftime")) {
 		t.Fatal("target-specific module closures were not preserved")
 	}
@@ -115,6 +122,92 @@ func TestThirdPartyNoticesMatchesCurrentTargetClosure(t *testing.T) {
 		if !strings.Contains(string(darwin), required) || !strings.Contains(string(linux), required) {
 			t.Fatal("required dependency notice missing", required)
 		}
+	}
+}
+
+func TestGoToolchainLegalFilesFailClosed(t *testing.T) {
+	makeRoot := func(t *testing.T) string {
+		t.Helper()
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "LICENSE"), []byte(goLicenseText), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "PATENTS"), []byte(goPatentsText), 0644); err != nil {
+			t.Fatal(err)
+		}
+		return root
+	}
+	t.Run("exact", func(t *testing.T) {
+		files, err := validatedGoLegalFiles(makeRoot(t))
+		if err != nil || len(files) != 2 || files[0].Name != "LICENSE" || files[1].Name != "PATENTS" {
+			t.Fatal("exact legal files rejected", err)
+		}
+	})
+	t.Run("homebrew_split", func(t *testing.T) {
+		parent := t.TempDir()
+		root := filepath.Join(parent, "libexec")
+		if err := os.Mkdir(root, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(parent, "LICENSE"), []byte(goLicenseText), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "PATENTS"), []byte(goPatentsText), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := validatedGoLegalFiles(root); err != nil {
+			t.Fatal("supported split toolchain rejected", err)
+		}
+	})
+	for _, scenario := range []string{"missing", "mismatch", "symlink"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := makeRoot(t)
+			path := filepath.Join(root, "LICENSE")
+			switch scenario {
+			case "missing":
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+			case "mismatch":
+				if err := os.WriteFile(path, []byte("different\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			case "symlink":
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(filepath.Join(root, "PATENTS"), path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := validatedGoLegalFiles(root); err == nil {
+				t.Fatal("invalid toolchain legal files accepted")
+			}
+		})
+	}
+}
+
+func TestReleaseExecutableUsesExplicitAbsolutePATH(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "go")
+	if err := os.WriteFile(path, []byte("fixture\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := releaseExecutable([]string{"PATH=" + directory}, "go")
+	expected, evalErr := filepath.EvalSymlinks(path)
+	if err != nil || evalErr != nil || resolved != expected {
+		t.Fatal("explicit executable rejected", resolved, err)
+	}
+	for _, env := range [][]string{nil, {"PATH=relative"}, {"PATH=" + directory, "PATH=" + directory}} {
+		if _, err := releaseExecutable(env, "go"); err == nil {
+			t.Fatal("unsafe PATH accepted", env)
+		}
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := releaseExecutable([]string{"PATH=" + directory}, "go"); err == nil {
+		t.Fatal("nonexecutable tool accepted")
 	}
 }
 

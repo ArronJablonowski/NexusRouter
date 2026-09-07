@@ -50,7 +50,11 @@ type noticeFile struct {
 // project license is a separate release-approval decision.
 func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string, env []string) ([]byte, error) {
 	listEnv := append(append([]string(nil), env...), "GOOS="+targetOS, "GOARCH="+targetArch)
-	out, err := command(ctx, source, listEnv, "go", "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
+	toolchain, goExecutable, err := goToolchainAttribution(ctx, source, env)
+	if err != nil {
+		return nil, err
+	}
+	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +88,7 @@ func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string,
 	if len(modules) == 0 {
 		return nil, ErrInvalid
 	}
-	items := make([]noticeModule, 0, len(modules))
+	items := make([]noticeModule, 0, len(modules)+1)
 	for _, module := range modules {
 		files, err := noticeFiles(module.Dir)
 		if err != nil {
@@ -92,6 +96,7 @@ func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string,
 		}
 		items = append(items, noticeModule{Path: module.Path, Version: module.Version, Files: files})
 	}
+	items = append(items, toolchain)
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].Path == items[j].Path {
 			return items[i].Version < items[j].Version
@@ -147,6 +152,17 @@ func renderThirdPartyNotices(targetOS, targetArch string, modules []noticeModule
 		return nil, ErrInvalid
 	}
 	ordered := append([]noticeModule(nil), modules...)
+	toolchainPresent := false
+	for _, module := range ordered {
+		toolchainPresent = toolchainPresent || module.Path == goToolchainModulePath
+	}
+	if !toolchainPresent {
+		toolchain, err := embeddedGoToolchainModule()
+		if err != nil {
+			return nil, err
+		}
+		ordered = append(ordered, toolchain)
+	}
 	for i := range ordered {
 		ordered[i].Files = append([]noticeFile(nil), ordered[i].Files...)
 		sort.Slice(ordered[i].Files, func(a, b int) bool { return ordered[i].Files[a].Name < ordered[i].Files[b].Name })
@@ -158,14 +174,21 @@ func renderThirdPartyNotices(targetOS, targetArch string, modules []noticeModule
 		return ordered[i].Path < ordered[j].Path
 	})
 	var body bytes.Buffer
-	fmt.Fprintf(&body, "DarwinRouter third-party notices\nTarget: %s/%s\nGenerated from the cmd/darwin dependency closure.\nModule-Count: %d\n", targetOS, targetArch, len(ordered))
+	fmt.Fprintf(&body, "DarwinRouter third-party notices\nTarget: %s/%s\nGenerated from the cmd/darwin dependency closure and exact Go build toolchain.\nModule-Count: %d\n", targetOS, targetArch, len(ordered))
 	previousModule := ""
+	toolchainCount := 0
 	for _, module := range ordered {
 		moduleKey := module.Path + "@" + module.Version
 		if !safeNoticeModule(module.Path, module.Version) || moduleKey <= previousModule || len(module.Files) == 0 {
 			return nil, ErrInvalid
 		}
 		previousModule = moduleKey
+		if module.Path == goToolchainModulePath {
+			if !validGoToolchainModule(module) {
+				return nil, ErrInvalid
+			}
+			toolchainCount++
+		}
 		fmt.Fprintf(&body, "\n================================================================================\nModule: %s\nVersion: %s\nFile-Count: %d\n", module.Path, module.Version, len(module.Files))
 		previousFile, hasLicense := "", false
 		for _, file := range module.Files {
@@ -189,7 +212,7 @@ func renderThirdPartyNotices(targetOS, targetArch string, modules []noticeModule
 			return nil, ErrInvalid
 		}
 	}
-	if body.Len() > maxNotice {
+	if toolchainCount != 1 || body.Len() > maxNotice {
 		return nil, ErrInvalid
 	}
 	return body.Bytes(), nil
@@ -202,7 +225,7 @@ func validateNotice(body []byte, targetOS, targetArch string) error {
 	reader := bytes.NewReader(body)
 	if !expectNoticeLine(reader, "DarwinRouter third-party notices") ||
 		!expectNoticeLine(reader, "Target: "+targetOS+"/"+targetArch) ||
-		!expectNoticeLine(reader, "Generated from the cmd/darwin dependency closure.") {
+		!expectNoticeLine(reader, "Generated from the cmd/darwin dependency closure and exact Go build toolchain.") {
 		return ErrSignature
 	}
 	moduleCount, ok := noticeCountLine(reader, "Module-Count: ")
@@ -210,6 +233,7 @@ func validateNotice(body []byte, targetOS, targetArch string) error {
 		return ErrSignature
 	}
 	previousModule := ""
+	toolchainCount := 0
 	for range moduleCount {
 		if !expectNoticeLine(reader, "") || !expectNoticeLine(reader, strings.Repeat("=", 80)) {
 			return ErrSignature
@@ -228,6 +252,7 @@ func validateNotice(body []byte, targetOS, targetArch string) error {
 			return ErrSignature
 		}
 		previousFile, hasLicense := "", false
+		var observedFiles []noticeFile
 		for range fileCount {
 			if !expectNoticeLine(reader, "") || !expectNoticeLine(reader, strings.Repeat("-", 80)) {
 				return ErrSignature
@@ -265,12 +290,19 @@ func validateNotice(body []byte, targetOS, targetArch string) error {
 					return ErrSignature
 				}
 			}
+			observedFiles = append(observedFiles, noticeFile{Name: name, Body: content})
 		}
 		if !hasLicense {
 			return ErrSignature
 		}
+		if module == goToolchainModulePath {
+			if !validGoToolchainModule(noticeModule{Path: module, Version: version, Files: observedFiles}) {
+				return ErrSignature
+			}
+			toolchainCount++
+		}
 	}
-	if reader.Len() != 0 {
+	if toolchainCount != 1 || reader.Len() != 0 {
 		return ErrSignature
 	}
 	return nil
