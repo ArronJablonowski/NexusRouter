@@ -64,6 +64,7 @@ type Ranked struct {
 	AdvisoryInfluence                 float64
 	Model, Provider, FailureDomain    string
 	Score, Confidence                 float64
+	Recency, Uncertainty              float64
 	Samples                           int
 }
 
@@ -223,7 +224,7 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
 		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
-		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty})
+		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
 		a, b := out.Excluded[i], out.Excluded[j]

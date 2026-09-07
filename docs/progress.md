@@ -1,5 +1,29 @@
 # Implementation evidence
 
+Event persistence and fitness-explanation checkpoint: DAR-9 is now Done in
+native Linear; its completion comment was posted and read back with checkpoint
+`da3f362`. Linear automatically released DAR-13, DAR-19, DAR-24, DAR-28,
+DAR-31, DAR-40 and DAR-43. GitHub push/fetch verified matching heads and zero
+divergence before the next issue began.
+
+DAR-24 is In Progress under native Linear state activity
+`4b78fce4-31bb-45d4-b4b2-6ccca02d66fa`. Its normalized ranking already isolates
+evidence by model/provider/domain/profile, applies configurable unit-sum weights,
+shrinks sparse samples toward neutral priors, decays evidence by half-life, and
+normalizes latency/cost against fixed scales so unrelated pool membership cannot
+change another score. It returns stable sorted ranked and excluded explanations,
+score, confidence, samples, objective-validity penalty and bounded advisory
+influence. Review found recency and uncertainty were only inferable through
+confidence. Ranked explanations now expose both explicitly: recency is the
+half-life factor and uncertainty is one minus effective confidence. Tests prove
+fresh, half-life-decayed and unseen-domain values exactly, alongside score decay
+and domain isolation. The routing race suite passed three repetitions in 1.363s;
+application route persistence passed three focused race repetitions in 2.840s.
+Final `make check` passed format/LOC, vet, the complete native race suite and
+build; application tests took 219.250s, telemetry 147.052s, CLI 42.206s, SDK
+25.924s and tool-gate 20.039s. Backup and Linear completion evidence follow;
+the full PRD remains incomplete.
+
 Storage dependency-chain checkpoint: native Linear DAR-23 is Done with evidence
 comment `43827442`; its consolidated state activity is
 `b12799c3-3f42-41d4-95c6-374b1223bb35`. Linear released DAR-24 and DAR-27. The

@@ -50,17 +50,17 @@ func TestRankingDecayAndDomainIsolation(t *testing.T) {
 	p := Defaults()
 	e := map[Key]Evidence{{"local", "ollama", "code", "default"}: {Samples: 100, Quality: 1, Compliance: 1, Reliability: 1, Updated: now}}
 	out, err := Select(r, p, c, e, now, .9)
-	if err != nil || out.Primary.Model != "local" || out.Primary.Confidence != 1 {
+	if err != nil || out.Primary.Model != "local" || out.Primary.Confidence != 1 || out.Primary.Recency != 1 || out.Primary.Uncertainty != 0 {
 		t.Fatalf("%+v %v", out, err)
 	}
 	e[Key{"local", "ollama", "code", "default"}] = Evidence{Samples: 100, Quality: 1, Compliance: 1, Reliability: 1, Updated: now.Add(-p.HalfLife)}
 	decayed, err := Select(r, p, c, e, now, .9)
-	if err != nil || decayed.Primary.Confidence != .5 || decayed.Primary.Score >= out.Primary.Score {
+	if err != nil || decayed.Primary.Confidence != .5 || decayed.Primary.Recency != .5 || decayed.Primary.Uncertainty != .5 || decayed.Primary.Score >= out.Primary.Score {
 		t.Fatalf("%+v %v", decayed, err)
 	}
 	r.Domain = "math"
 	isolated, err := Select(r, p, c, e, now, .9)
-	if err != nil || isolated.Primary.Confidence != 0 {
+	if err != nil || isolated.Primary.Confidence != 0 || isolated.Primary.Recency != 0 || isolated.Primary.Uncertainty != 1 {
 		t.Fatalf("%+v %v", isolated, err)
 	}
 	if isolated.Ranked[0].Score != isolated.Ranked[1].Score {
