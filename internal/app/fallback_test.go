@@ -291,3 +291,44 @@ func TestAutomaticFallbackChainHasHardAttemptBound(t *testing.T) {
 		t.Fatalf("unbounded chain: calls=%d previous=%d err=%v", calls, len(out.PreviousTaskIDs), err)
 	}
 }
+
+func TestAutomaticContextOverflowDoesNotFallback(t *testing.T) {
+	svc, cfg := autoFixture(t)
+	calls := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"z"}]}`)
+			return
+		}
+		var request struct {
+			Model string `json:"model"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil {
+			t.Error("invalid provider request")
+			return
+		}
+		calls = append(calls, request.Model)
+		if request.Model == "a" {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+		t.Error("context failure reached fallback")
+		fmt.Fprintln(w, `{"message":{"content":"unsafe fallback"},"done":true,"done_reason":"stop"}`)
+	}))
+	defer server.Close()
+	svc.settings.Providers[0].Endpoint = server.URL
+
+	out, err := svc.Run(context.Background(), Request{Prompt: "oversized after provider tokenization"})
+	if err == nil || out.retryable || fmt.Sprint(calls) != "[a]" || len(out.PreviousTaskIDs) != 0 {
+		t.Fatalf("context overflow fallback: %+v err=%v calls=%v", out, err, calls)
+	}
+	db, openErr := telemetry.OpenReadOnly(context.Background(), cfg.Telemetry.Database)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	defer db.Close()
+	events, readErr := db.Read(context.Background(), out.TaskID, 0, 100)
+	if readErr != nil || len(events) == 0 || events[len(events)-1].Kind != runtime.TaskFailed || events[len(events)-1].Data.Code != "context_overflow" {
+		t.Fatalf("context overflow not retained: %v %v", events, readErr)
+	}
+}

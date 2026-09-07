@@ -42,3 +42,20 @@ func TestFailedTerminalPersistenceCannotAuthorizeRetry(t *testing.T) {
 		t.Fatalf("%+v %v", out, err)
 	}
 }
+
+func TestContextOverflowIsDurableAndNeverRetryable(t *testing.T) {
+	s, _ := store(t)
+	l := runtime.Loop{Journal: s, Provider: model(func(context.Context, providers.Request, func(providers.Chunk) error) error {
+		// Even a malformed custom provider cannot turn a context failure into
+		// retry authority by setting Retryable itself.
+		return &providers.Failure{Code: "context_overflow", Retryable: true}
+	})}
+	out, err := l.Run(context.Background(), runRequest())
+	if err == nil || out.Retryable {
+		t.Fatalf("context overflow authorized retry: %+v %v", out, err)
+	}
+	events, readErr := s.Read(context.Background(), "task", 0, 100)
+	if readErr != nil || len(events) == 0 || events[len(events)-1].Kind != runtime.TaskFailed || events[len(events)-1].Data.Code != "context_overflow" {
+		t.Fatalf("context overflow not durable: %v %v", events, readErr)
+	}
+}

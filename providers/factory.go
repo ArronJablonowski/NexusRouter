@@ -237,7 +237,7 @@ func normalizeAdapterError(err error, partial bool) (out error) {
 		switch f.Code {
 		case "transport", "rate_limit", "unavailable":
 			return &Failure{Code: f.Code, Partial: partial || f.Partial, Retryable: f.Retryable && !partial && !f.Partial}
-		case "invalid_request", "http_error", "authentication", "invalid_response", "invalid_conversation", "invalid_tool_schema", "invalid_role", "unpaired_tool_result", "invalid_tool_arguments", "invalid_schema", "incomplete_or_invalid_stream", "refusal", "invalid_stream", "invalid_tool_call", "invalid_usage", "incomplete_stream":
+		case "invalid_request", "context_overflow", "http_error", "authentication", "invalid_response", "invalid_conversation", "invalid_tool_schema", "invalid_role", "unpaired_tool_result", "invalid_tool_arguments", "invalid_schema", "incomplete_or_invalid_stream", "refusal", "invalid_stream", "invalid_tool_call", "invalid_usage", "incomplete_stream":
 			return &Failure{Code: f.Code, Partial: partial || f.Partial}
 		}
 	}

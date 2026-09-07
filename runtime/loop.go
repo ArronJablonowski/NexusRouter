@@ -204,6 +204,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if result.Retryable && errors.Is(cause, ErrProvider) {
 			code = "provider_retryable_no_output"
 		}
+		var providerFailure *providers.Failure
+		if errors.As(cause, &providerFailure) && providerFailure != nil && providerFailure.Code == "context_overflow" {
+			code = "context_overflow"
+			result.Retryable = false
+		}
 		if errors.Is(cause, ErrLimit) {
 			code = "budget_exhausted"
 		}
@@ -403,7 +408,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			var providerFailure *providers.Failure
 			safe := n == 0 && appliedSteering == 0 && text.Len() == 0 && len(calls) == 0 && ctx.Err() == nil && errors.As(err, &providerFailure) && providerFailure.Retryable && !providerFailure.Partial
 			result.Retryable = safe
-			out, failErr := fail(ErrProvider)
+			out, failErr := fail(errors.Join(ErrProvider, err))
 			out.Retryable = out.Retryable && safe && errors.Is(failErr, ErrProvider)
 			return out, failErr
 		}

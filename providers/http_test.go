@@ -118,7 +118,7 @@ func TestFailuresAndRedaction(t *testing.T) {
 		status int
 		code   string
 		retry  bool
-	}{{401, "authentication", false}, {429, "rate_limit", true}, {503, "unavailable", true}, {302, "http_error", false}} {
+	}{{400, "invalid_request", false}, {401, "authentication", false}, {413, "context_overflow", false}, {429, "rate_limit", true}, {503, "unavailable", true}, {302, "http_error", false}} {
 		t.Run(tc.code+fmt.Sprint(tc.status), func(t *testing.T) {
 			p := fixtureProvider(t, "openai_compatible", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Location", "https://example.invalid/secret")
@@ -131,6 +131,31 @@ func TestFailuresAndRedaction(t *testing.T) {
 				t.Fatalf("unexpected failure %v", err)
 			}
 		})
+	}
+}
+
+func TestOpenAIContextOverflowCodeIsNormalizedWithoutDetailLeakage(t *testing.T) {
+	for _, body := range []string{
+		`{"error":{"code":"context_length_exceeded","message":"fixture-secret"}}`,
+		`{"error":{"code":"other","message":"fixture-secret"}}`,
+		`{"error":{"code":"context_length_exceeded","message":"` + strings.Repeat("x", 4096) + `"}}`,
+	} {
+		p := fixtureProvider(t, "openai_compatible", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, body)
+		})
+		err := p.Stream(context.Background(), request(), func(Chunk) error {
+			t.Error("error response emitted a chunk")
+			return nil
+		})
+		var failure *Failure
+		want := "context_overflow"
+		if !strings.Contains(body, `"code":"context_length_exceeded"`) || len(body) > 4096 {
+			want = "invalid_request"
+		}
+		if !errors.As(err, &failure) || failure.Code != want || failure.Retryable || failure.Partial || strings.Contains(err.Error(), "secret") {
+			t.Fatalf("body classified unsafely: code=%q err=%v", want, err)
+		}
 	}
 }
 

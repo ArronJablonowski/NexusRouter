@@ -1106,7 +1106,10 @@ complete durable counts, so today's retryable no-output fallback chains report
 usage unavailable rather than exposing final-attempt tokens as a request total.
 Explicit model requests do not auto-fallback. Validation failure intentionally
 stops automatic fallback; bounded coordinator repair remains a separate explicit
-workflow. Adaptive retry policies remain unfinished. Loopback qualification exercises an actual
+workflow. HTTP413 and the exact OpenAI-compatible
+`context_length_exceeded` error normalize to a durable, non-retryable
+`context_overflow`; untrusted error prose cannot grant retry authority.
+Adaptive retry policies remain unfinished. Loopback qualification exercises an actual
 Ollama `503` followed by an OpenAI-compatible SSE completion, with distinct
 provider endpoints, exact cumulative estimated-cost admission, durable retry
 lineage and redacted route attribution. The paired local-required case proves

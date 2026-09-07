@@ -804,6 +804,12 @@ DarwinRouter must remain recoverable across crashes at every durable boundary: b
 
 Provider errors use normalized typed classifications. Expected operational failures return events and durable outcomes rather than panicking the daemon. OOM, context overflow, timeout, cancellation, quota exhaustion, invalid schemas, partial streams, and lost acknowledgements have explicit resolution paths.
 
+Provider-reported context overflow is a non-retryable execution outcome. HTTP
+413 and an exact recognized structured provider code normalize to the closed
+`context_overflow` classification; arbitrary response prose is never parsed for
+retry authority. The task records that terminal code and automatic fallback
+does not resend the same oversized context to another route.
+
 ## 16. Testing and Acceptance
 
 - Unit-test scoring, normalization, policies, schemas, migrations, redaction, state transitions, and safe retry rules.

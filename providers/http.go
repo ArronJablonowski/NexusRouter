@@ -71,6 +71,7 @@ func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.R
 		return nil, &Failure{Code: "transport", Retryable: true}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4097))
 		resp.Body.Close()
 		code := "http_error"
 		retry := false
@@ -80,6 +81,13 @@ func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.R
 		case resp.StatusCode == 429:
 			code = "rate_limit"
 			retry = true
+		case resp.StatusCode == http.StatusRequestEntityTooLarge:
+			code = "context_overflow"
+		case resp.StatusCode == http.StatusBadRequest:
+			code = "invalid_request"
+			if len(body) <= 4096 && p.kind == "openai_compatible" && openAIContextOverflow(body) {
+				code = "context_overflow"
+			}
 		case resp.StatusCode >= 500:
 			code = "unavailable"
 			retry = true
@@ -87,6 +95,15 @@ func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.R
 		return nil, &Failure{Code: code, Retryable: retry}
 	}
 	return resp, nil
+}
+
+func openAIContextOverflow(body []byte) bool {
+	var envelope struct {
+		Error *struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	return json.Unmarshal(body, &envelope) == nil && envelope.Error != nil && envelope.Error.Code == "context_length_exceeded"
 }
 
 func (p *HTTP) Models(ctx context.Context) ([]string, error) {

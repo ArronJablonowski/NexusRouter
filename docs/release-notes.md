@@ -141,6 +141,8 @@ production release, release tag or complete PRD acceptance is claimed.
   stream, CLI, SDK and detached-submission results expose the cumulative
   top-level route estimate. Usage is withheld when any fallback attempt lacks
   durable counts instead of mislabeling final-attempt tokens as a total.
+  Provider HTTP413 and exact OpenAI-compatible context-length codes produce a
+  durable non-retryable `context_overflow`; automatic fallback is suppressed.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
   → local Ollama → Sol round trip, historical continuation and a separate Sol
   output audit have been qualified. See [the integration guide](codex-coordinator-integration.md).
