@@ -48,6 +48,9 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	for _, group := range snapshot.Groups {
 		for _, count := range group.Counts {
 			expected := int64(1)
+			if group.Name == "runtime_events" {
+				expected = 0
+			}
 			if count.Value != expected {
 				t.Fatalf("%s %s %d", group.Name, count.State, count.Value)
 			}
@@ -56,6 +59,55 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || strings.Contains(string(body), "token") {
 		t.Fatal("payload leaked")
+	}
+}
+
+func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	if _, err := db.db.Exec(`INSERT INTO task_heads VALUES('event-task','private-session',16,'running')`); err != nil {
+		t.Fatal(err)
+	}
+	kinds := []string{
+		"task.started", "task.completed", "task.failed", "task.canceled",
+		"turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed",
+		"worker.started", "worker.heartbeat", "worker.completed", "route.selected",
+		"evaluation.recorded", "error.recorded", "steering.applied",
+	}
+	for i, kind := range kinds {
+		body, err := json.Marshal(map[string]any{"kind": kind, "data": map[string]string{"text": "private-payload"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = db.db.Exec(`INSERT INTO events(id,task_id,sequence,body) VALUES(?,?,?,?)`, fmt.Sprintf("event-%d", i), "event-task", i+1, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := db.Metrics(ctx)
+	if err != nil || snapshot.Validate() != nil {
+		t.Fatal(snapshot, err)
+	}
+	var found bool
+	for _, group := range snapshot.Groups {
+		if group.Name != "runtime_events" {
+			continue
+		}
+		found = true
+		if len(group.Counts) != len(kinds) {
+			t.Fatal(group)
+		}
+		for i, count := range group.Counts {
+			if count.State != kinds[i] || count.Value != 1 {
+				t.Fatal(count)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("runtime event group missing")
+	}
+	body, err := json.Marshal(snapshot)
+	if err != nil || strings.Contains(string(body), "private") {
+		t.Fatal("runtime event metric leaked payload", err)
 	}
 }
 
@@ -74,7 +126,7 @@ func TestMetricsLegacyAbsentTables(t *testing.T) {
 		t.Fatal(snapshot, err)
 	}
 	for _, group := range snapshot.Groups {
-		if group.Name != "tasks" && (group.Available || len(group.Counts) != 0) {
+		if group.Name != "tasks" && group.Name != "runtime_events" && (group.Available || len(group.Counts) != 0) {
 			t.Fatal(group)
 		}
 	}
@@ -95,7 +147,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 		if err != nil || snapshot.StorageSchema != schema {
 			t.Fatal(snapshot, err)
 		}
-		since := map[string]int{"tasks": 1, "submissions": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
+		since := map[string]int{"tasks": 1, "runtime_events": 1, "submissions": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
 		for _, group := range snapshot.Groups {
 			if group.Available != (schema >= since[group.Name]) {
 				t.Fatal(group)
@@ -115,7 +167,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 }
 
 func TestMetricsRejectUnknownLifecycleState(t *testing.T) {
-	for _, table := range []string{"task_heads", "submissions", "review_attempts"} {
+	for _, table := range []string{"task_heads", "events", "submissions", "review_attempts"} {
 		t.Run(table, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
@@ -127,6 +179,8 @@ func TestMetricsRejectUnknownLifecycleState(t *testing.T) {
 			switch table {
 			case "task_heads":
 				_, err = db.db.Exec(`UPDATE task_heads SET state=?`, secret)
+			case "events":
+				_, err = db.db.Exec(`INSERT INTO events(id,task_id,sequence,body) VALUES('event','task',1,json_object('kind',?))`, secret)
 			case "submissions":
 				queuedSubmission(t, db, "job")
 				_, err = db.db.Exec(`UPDATE submissions SET state=?`, secret)

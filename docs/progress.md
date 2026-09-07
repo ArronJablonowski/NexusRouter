@@ -1,5 +1,26 @@
 # Implementation evidence
 
+PRD runtime-metrics checkpoint: metrics snapshot schema version 2 adds a fixed
+`runtime_events` gauge with all sixteen canonical durable event kinds. It now
+reports content-free counts for task lifecycle, provider turns, model deltas,
+tool calls, worker lifecycle, route selection, evaluation events, errors and
+steering alongside the existing stored-population gauges and task-duration
+histograms. The SQLite reader selects only a closed CASE index and aggregate
+count from event bodies in the same bounded read transaction; it never releases
+event IDs, task/session/model/provider IDs, text, tool names or arbitrary labels.
+Unknown/corrupt event kinds fail the entire snapshot rather than creating a new
+label. Version 2 prevents this expanded fixed group list from silently changing
+the prior public snapshot contract. Tests cover every canonical kind, payload
+isolation, unknown-kind failure, legacy-schema availability, JSON ownership and
+OTLP wire output through application, API, CLI and SDK surfaces. Final `make
+check` passed formatting/LOC enforcement, vet, every native race-enabled package
+and production build; application took 222.321s, telemetry 147.496s, CLI
+41.860s, metrics 1.738s and SDK 24.928s. These are cumulative durable event
+gauges, not live spans, latency measurements, model-quality evidence or derived
+fallback/compaction/pressure counters. No live model, user database or external
+collector was used. Native Linear remains unavailable because the Mac is locked,
+so no issue update is claimed. The full PRD remains incomplete.
+
 PRD telemetry-gap checkpoint: `telemetry.opentelemetry_enabled` is no longer a
 reserved switch that disables the runtime. It is now a compatibility alias for
 enabling the explicitly configured periodic OTLP/HTTP metrics exporter; the

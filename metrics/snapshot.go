@@ -10,6 +10,8 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
+const SnapshotVersion = 2
+
 type Count struct {
 	State string `json:"state"`
 	Value int64  `json:"value"`
@@ -37,6 +39,7 @@ type definition struct {
 
 var definitions = []definition{
 	{"tasks", 1, []string{"running", "completed", "failed", "canceled"}},
+	{"runtime_events", 1, []string{"task.started", "task.completed", "task.failed", "task.canceled", "turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed", "worker.started", "worker.heartbeat", "worker.completed", "route.selected", "evaluation.recorded", "error.recorded", "steering.applied"}},
 	{"submissions", 12, []string{"queued", "running", "succeeded", "failed", "canceled"}},
 	{"reviews", 7, []string{"started", "completed", "failed"}},
 	{"evaluations", 2, []string{"stored"}},
@@ -49,7 +52,7 @@ var definitions = []definition{
 // rather than inventing measurements for features absent from that database.
 // Callers must validate the populated snapshot before releasing it.
 func NewSnapshot(schema int, at time.Time) Snapshot {
-	s := Snapshot{Version: 1, ObservedAt: at, StorageSchema: schema, Groups: []Group{}}
+	s := Snapshot{Version: SnapshotVersion, ObservedAt: at, StorageSchema: schema, Groups: []Group{}}
 	for _, def := range definitions {
 		g := Group{Name: def.name, Available: schema >= def.since, Counts: []Count{}}
 		if g.Available {
@@ -69,7 +72,7 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 // leak model names, task IDs, secret-bearing errors or arbitrary label values.
 // Canonical order also makes snapshots deterministic apart from observation time.
 func (s Snapshot) Validate() error {
-	if s.Version != 1 || s.StorageSchema < 1 || s.StorageSchema > 29 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
+	if s.Version != SnapshotVersion || s.StorageSchema < 1 || s.StorageSchema > 29 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
 		return ErrInvalid
 	}
 	if _, err := s.ObservedAt.MarshalJSON(); err != nil {

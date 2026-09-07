@@ -1398,14 +1398,17 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-The snapshot contains fixed groups for tasks, submissions, review attempts,
-evaluation records, audit records and submission recovery records. Tasks,
+Metrics snapshot version 2 contains fixed groups for tasks, submissions, review attempts,
+evaluation records, audit records, submission recovery records and all sixteen
+canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
 count stored records. Counts come from one SQLite read transaction and survive
 service restarts. Older schemas explicitly mark unsupported groups unavailable.
 No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
 
-These are current stored-population **gauges**, not monotonic counters, validated
+Runtime-event counts cover provider turns, tool calls, worker lifecycle, routes,
+steering and errors without exporting event envelopes or payloads. These are
+current stored-population **gauges**, not monotonic counters, validated
 success rates or proof that a `running` task/`started` review is alive. A completed
 task is not necessarily semantically correct. Evaluation revisions are not
 additional base evaluations; audit and recovery counts do not rate candidate

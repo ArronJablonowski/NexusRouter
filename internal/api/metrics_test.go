@@ -157,7 +157,7 @@ func TestMetricsCanceledRequestDoesNotInvokeHook(t *testing.T) {
 
 func TestMetricsRejectsInvalidHookSnapshot(t *testing.T) {
 	for name, mutate := range map[string]func(*metrics.Snapshot){
-		"version":      func(s *metrics.Snapshot) { s.Version = 2 },
+		"version":      func(s *metrics.Snapshot) { s.Version = metrics.SnapshotVersion + 1 },
 		"time":         func(s *metrics.Snapshot) { s.ObservedAt = time.Time{} },
 		"schema":       func(s *metrics.Snapshot) { s.StorageSchema = 30 },
 		"secret group": func(s *metrics.Snapshot) { s.Groups[0].Name = "private-token" },

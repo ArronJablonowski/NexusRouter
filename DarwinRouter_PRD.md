@@ -718,7 +718,10 @@ without blocking task readiness on collector failure. The legacy
 configured periodic metrics exporter; it requires the same explicit destination
 and policy checks and does not disable task or learning execution. Runtime traces,
 provider/tool-specific histograms and the complete instrumentation list above
-still require implementation.
+still require implementation. The exported closed-vocabulary gauges now also
+count every canonical durable runtime-event kind, providing content-free task,
+provider-turn, tool, worker, route, evaluation, error and steering activity.
+Derived fallback, compaction and pressure metrics remain separate work.
 
 Schema29 now records task start-to-terminal event wall time transactionally,
 including recovery terminals, and exports cumulative fixed-bucket histograms

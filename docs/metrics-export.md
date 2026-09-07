@@ -93,8 +93,13 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-The closed-vocabulary lifecycle snapshot contains tasks, submissions,
-reviews, evaluations, audits and recoveries. Each available group is a gauge named
+Snapshot schema version 2 adds runtime-event activity to the version 1 lifecycle
+groups. The closed-vocabulary lifecycle snapshot contains tasks, submissions,
+reviews, evaluations, audits, recoveries and durable runtime-event counts. The
+`runtime_events` group reports the sixteen canonical event kinds, covering task
+terminals, provider turns, model deltas, tool calls, workers, routes, evaluation
+events, errors and steering without exporting an envelope or payload field.
+Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
 current durable state, not cumulative activity counters, latency histograms or
@@ -141,10 +146,12 @@ after acceptance; failures do not prove zero delivery. No durable delivery ledge
 automatic failed-body retry, exactly-once guarantee or acknowledgement history is introduced.
 Explicitly rerunning the command sends a new snapshot and can repeat observations.
 
-Tests cover wire shape and integer limits, legacy availability, real SQLite
+Tests cover wire shape and integer limits, all canonical runtime-event kinds,
+unknown-kind rejection, legacy availability, real SQLite
 snapshots, owned loopback collectors, strict arguments, credential/policy changes,
 no storage mutation, cancellation, response bounds, partial rejection and redirect
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
-not qualify a production collector deployment, fleet cardinality, durable export
-delivery, traces, full histogram coverage or the full PRD telemetry scope.
+not qualify a production collector deployment, fleet cardinality, durable
+export delivery, derived fallback/compaction/pressure counters, traces, full
+histogram coverage or the full PRD telemetry scope.

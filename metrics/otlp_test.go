@@ -103,7 +103,7 @@ func TestMarshalOTLPLegacyAndClosedLabels(t *testing.T) {
 		t.Fatal(string(body))
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
-	if len(items) != 1 || items[0].Name != "darwinrouter.tasks" {
+	if len(items) != 2 || items[0].Name != "darwinrouter.tasks" || items[1].Name != "darwinrouter.runtime_events" {
 		t.Fatal("unavailable fabricated", items)
 	}
 	for _, mutate := range []func(*Snapshot){func(s *Snapshot) { s.Groups[0].Name = "private-task" }, func(s *Snapshot) { s.Groups[0].Counts[0].State = "secret-token" }, func(s *Snapshot) { s.Groups[0].Counts[0].Value = -1 }, func(s *Snapshot) { s.Groups[1].Counts = []Count{{State: "queued", Value: 1}} }, func(s *Snapshot) { s.Version++ }} {

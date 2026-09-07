@@ -74,11 +74,12 @@ func TestTaskDurationOwnedThresholdsAndWire(t *testing.T) {
 		t.Fatal("wire parse")
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
-	if len(items) != 8 || items[6].Gauge != nil || items[6].Histogram == nil || items[6].Histogram.AggregationTemporality != 2 || items[6].Unit != "s" {
+	histogramIndex := len(s.Groups)
+	if len(items) != histogramIndex+2 || items[histogramIndex].Gauge != nil || items[histogramIndex].Histogram == nil || items[histogramIndex].Histogram.AggregationTemporality != 2 || items[histogramIndex].Unit != "s" {
 		t.Fatal("invalid histogram")
 	}
-	p := items[6].Histogram.DataPoints[0]
-	if len(items[6].Histogram.DataPoints) != 3 || p.Count != "11" || p.StartTimeUnixNano != "1799996400000000001" || p.TimeUnixNano != "1800000000000000001" || p.Sum != g.SumSeconds || !reflect.DeepEqual(p.ExplicitBounds, s.TaskDuration.BoundsSeconds) {
+	p := items[histogramIndex].Histogram.DataPoints[0]
+	if len(items[histogramIndex].Histogram.DataPoints) != 3 || p.Count != "11" || p.StartTimeUnixNano != "1799996400000000001" || p.TimeUnixNano != "1800000000000000001" || p.Sum != g.SumSeconds || !reflect.DeepEqual(p.ExplicitBounds, s.TaskDuration.BoundsSeconds) {
 		t.Fatal(p)
 	}
 	for _, c := range p.BucketCounts {
@@ -86,7 +87,7 @@ func TestTaskDurationOwnedThresholdsAndWire(t *testing.T) {
 			t.Fatal("bucket precision")
 		}
 	}
-	if len(items[7].Gauge.DataPoints) != 6 || items[7].Gauge.DataPoints[0].AsInt != "2" || items[7].Gauge.DataPoints[1].AsInt != "3" {
+	if len(items[histogramIndex+1].Gauge.DataPoints) != 6 || items[histogramIndex+1].Gauge.DataPoints[0].AsInt != "2" || items[histogramIndex+1].Gauge.DataPoints[1].AsInt != "3" {
 		t.Fatal("missing unavailable observations")
 	}
 	legacy := NewSnapshot(28, at)
@@ -94,7 +95,7 @@ func TestTaskDurationOwnedThresholdsAndWire(t *testing.T) {
 	oldBody, _ := MarshalOTLP(legacy)
 	var old otlpRequest
 	_ = json.Unmarshal(oldBody, &old)
-	if !reflect.DeepEqual(items[:6], old.ResourceMetrics[0].ScopeMetrics[0].Metrics) {
+	if !reflect.DeepEqual(items[:histogramIndex], old.ResourceMetrics[0].ScopeMetrics[0].Metrics) {
 		t.Fatal("existing gauges changed")
 	}
 	after, _ := json.Marshal(s)
