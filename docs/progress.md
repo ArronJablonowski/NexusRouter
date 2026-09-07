@@ -1,5 +1,31 @@
 # Implementation evidence
 
+DAR-40 is completion-ready pending native Linear reconciliation. The
+authenticated Darwin-native API exposes synchronous and live task submission,
+durable detached submissions, cancellation, steering, task/event inspection
+and bounded replay. Task snapshots expose session and parent/retry lineage;
+`route.selected` durable events expose the complete redacted candidate,
+constraint, score and fallback explanation, so routes and sessions remain part
+of the canonical append-only task model rather than mutable parallel catalogs.
+Native endpoints also cover summary review/compaction, factual-memory
+query/export/correct/delete, skill discovery/generation/publication/comparison
+and task outcomes, user feedback/revisions, approvals, resource leases and
+attention, model deprecation reports, detailed health and identifier-free
+metrics. Mutations use strict versioned inputs, authentication, origin/query
+rules, bounded capacities and cooperative deadlines; inspection paths validate
+returned contracts and avoid inference or implicit database creation where
+documented. The entire native API package passed three race-enabled repetitions
+in 34.590s; the SDK passed in 66.995s, and the focused application route,
+session/event, health, metrics, memory, skill and continuation contracts passed
+three repetitions in 55.606s. An intentionally overbroad three-repeat full app
+command hit its five-minute aggregate test timeout in the unrelated heavy
+lease-corruption sweep; the focused rerun passed, and the immediately preceding
+single-pass full `make check` remains green across format/LOC, vet, every native
+race package and build. Separate top-level route/session list endpoints are not
+invented because the durable event/task representation is authoritative.
+Native Linear remains unavailable because the Mac is locked, so no DAR-40
+state/comment change is claimed. The full PRD remains incomplete.
+
 DAR-39 is completion-ready pending native Linear reconciliation. Authenticated
 `POST /v1/chat/completions` accepts the supported OpenAI-compatible text message
 shape, configured model aliases (including automatic routing), strict streaming
