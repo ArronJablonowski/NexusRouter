@@ -1,5 +1,27 @@
 # Implementation evidence
 
+DAR-21 is verified and ready for its Linear completion update. Native Linear
+moved the issue to In Progress under state activity
+`6f3c8af7-5c68-47bd-be10-b1b3a55527a3`. Delegation constructs an isolated child
+request from only the explicit prompt, validation target, parent/work lineage,
+privacy constraint and optional inherited read-only capability. Parent deny
+rules remain authoritative; children cannot delegate recursively or gain write
+tools. Each work item and execution child has its own durable correlated journal
+and submission lineage. Output is bounded and must pass host validation before
+worker acceptance; only then is it returned to the parent inside an untrusted
+JSON envelope containing the durable work and execution task IDs. Capacity,
+schema, validation, persistence, cancellation and provider failures return a
+generic rejection, while uncertain child state remains non-recoverable and
+cannot leak output. Parent context receives the accepted tool result through
+the normal paired runtime event path. Focused worker and application isolation,
+validation, capacity, batch-budget, cancellation, rejection and finalization
+race tests passed three repetitions (3.368s and 14.826s). The immediately
+preceding full `make check` on the same production tree passed format/LOC, vet,
+the complete native race suite and build. Current push/fetch verification at
+`096968f` showed matching local and remote heads, zero divergence and a clean
+worktree. GitHub/Linear completion evidence follows after synchronization. The
+full PRD remains incomplete.
+
 DAR-13 is Done in native Linear with its completion evidence comment submitted
 and read back; the native accessibility response truncated both activity URLs,
 so their opaque IDs are not claimed here. The provider-neutral loop persists
