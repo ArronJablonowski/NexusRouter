@@ -1,5 +1,25 @@
 # Implementation evidence
 
+DAR-13 is verified and ready for its Linear completion update. Native Linear
+moved the issue to In Progress. The provider-neutral loop persists typed task,
+route, turn, model-delta, tool,
+evaluation and terminal events before exposing the corresponding transition.
+Tool execution begins only after a durable `tool.started` intent and uses the
+scoped executor when available; call/result pairs remain ordered in subsequent
+provider context. Maximum turns, cumulative output bytes, context estimates,
+steering count and message bytes are bounded. Cancellation is observed after
+durable boundaries and before later dispatch, joins tool handling through its
+executor contract, records a bounded terminal when safe, and never conceals an
+ambiguous append. Confirmed and uncertain effects remain visible and are not
+retried; only an explicit failed/recoverable/no-effect result permits a fresh
+model repair turn within the existing budget. Focused runtime and application
+loop, budget, scoped-tool and cancellation race tests passed three repetitions
+(11.956s and 2.408s). The immediately preceding full `make check` on the same
+production tree passed format/LOC, vet, the complete native race suite and
+build. Current push/fetch verification at `6c34714` showed matching local and
+remote heads, zero divergence and a clean worktree. GitHub/Linear completion
+evidence follows after synchronization. The full PRD remains incomplete.
+
 DAR-20 is Done in native Linear under state activity
 `12eee5b4-4afd-4135-b076-2f84329950fd` with completion evidence comment
 `0d3816ea`. Shared reader leases allow concurrent read-only tools while writer
