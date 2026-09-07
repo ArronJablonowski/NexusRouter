@@ -1398,13 +1398,23 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 3 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 4 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
 count stored records. Counts come from one SQLite read transaction and survive
 service restarts. Older schemas explicitly mark unsupported groups unavailable.
 No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
+
+Application-backed snapshots also contain a fixed live resource block for CPU
+threads, RAM, swap, aggregate VRAM, thermal pressure and unified-memory status.
+Every measurement carries an availability bit, so unsupported probes and
+profiling failures are not reported as observed zero. Cloud-only or
+profiling-disabled services report explicit unavailability without probing;
+the storage-only CLI omits live resources. OTLP exports only fixed measurement
+names and values—never device IDs, GPU inventory, profiler provenance, thermal
+state strings or host identity. Resource values are instantaneous host readings,
+not queue depth, model residency or reservation accounting.
 
 Runtime-event counts cover provider turns, tool calls, worker lifecycle, routes,
 steering and errors without exporting event envelopes or payloads. These are
@@ -1428,7 +1438,7 @@ supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export; it does not enable tracing.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
-provider/tool latency and cost histograms, retention
+queue and per-device pressure, provider/tool latency and cost histograms, retention
 and production-scale metrics qualification remain unfinished.
 
 ## Next sprints

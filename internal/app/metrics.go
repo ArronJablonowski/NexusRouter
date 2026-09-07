@@ -28,5 +28,26 @@ func (s *Service) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 	if err != nil {
 		return metrics.Snapshot{}, ErrMetrics
 	}
+	observedAt := time.Now().UTC()
+	resourceMetrics := metrics.UnavailableResources(observedAt)
+	if s.settings.Mode != "cloud_only" && s.settings.Hardware.AutoProfile && s.profile != nil {
+		if profile, profileErr := s.profile(ctx); profileErr == nil {
+			if measured, measurementErr := metrics.ResourcesFromSnapshot(profile); measurementErr == nil {
+				resourceMetrics = measured
+			}
+		}
+	}
+	if ctx.Err() != nil {
+		return metrics.Snapshot{}, ErrMetrics
+	}
+	snapshot.ObservedAt = time.Now().UTC()
+	snapshot.Resources = &resourceMetrics
+	if snapshot.Validate() != nil {
+		resourceMetrics = metrics.UnavailableResources(snapshot.ObservedAt)
+		snapshot.Resources = &resourceMetrics
+		if snapshot.Validate() != nil {
+			return metrics.Snapshot{}, ErrMetrics
+		}
+	}
 	return snapshot, nil
 }

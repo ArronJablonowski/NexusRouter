@@ -723,7 +723,14 @@ count every canonical durable runtime-event kind, providing content-free task,
 provider-turn, tool, worker, route, evaluation, error and steering activity.
 Derived gauges count fallback-linked tasks, compactions, skill-context use,
 exploration and capacity/budget/privacy/health route exclusions. Direct thermal
-and queue-pressure measurements remain separate work.
+and other host-resource measurements are now attached to application-backed
+snapshot schema version 4 with explicit per-measurement availability. Exported
+values are limited to fixed CPU-thread, RAM, swap, aggregate VRAM,
+thermal-pressure and unified-memory gauges; device inventory, profiler
+provenance and host identity remain private. Cloud-only, disabled or failed
+profilers report unavailable rather than fabricated zero, while storage-only
+inspection omits the live block. Queue pressure, per-device capacity, model
+residency and reservation telemetry remain separate work.
 
 Schema29 now records task start-to-terminal event wall time transactionally,
 including recovery terminals, and exports cumulative fixed-bucket histograms

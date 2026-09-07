@@ -10,7 +10,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 3
+const SnapshotVersion = 4
 
 type Count struct {
 	State string `json:"state"`
@@ -29,6 +29,7 @@ type Snapshot struct {
 	StorageSchema int           `json:"storage_schema"`
 	Groups        []Group       `json:"groups"`
 	TaskDuration  *TaskDuration `json:"task_duration,omitempty"`
+	Resources     *Resources    `json:"resources,omitempty"`
 }
 
 type definition struct {
@@ -105,7 +106,11 @@ func (s Snapshot) Validate() error {
 		if s.TaskDuration != nil {
 			return ErrInvalid
 		}
-		return nil
+	} else if s.validateTaskDuration() != nil {
+		return ErrInvalid
 	}
-	return s.validateTaskDuration()
+	if s.Resources != nil && s.validateResources() != nil {
+		return ErrInvalid
+	}
+	return nil
 }

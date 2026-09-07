@@ -36,6 +36,9 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 	if snapshot.TaskDuration != nil {
 		items = append(items, otlpTaskDuration(snapshot.TaskDuration, at)...)
 	}
+	if snapshot.Resources != nil {
+		items = append(items, otlpResources(snapshot.Resources, at)...)
+	}
 	request := otlpRequest{ResourceMetrics: []otlpResourceMetrics{{
 		Resource:     otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}},
 		ScopeMetrics: []otlpScopeMetrics{{Scope: otlpScope{Name: "darwinrouter.metrics", Version: "1"}, Metrics: items}},
@@ -45,6 +48,28 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 	return body, nil
+}
+
+func otlpResources(resources *Resources, at string) []otlpMetric {
+	items := make([]otlpMetric, 0, len(resources.Measurements)+1)
+	availability := make([]otlpPoint, 0, len(resources.Measurements))
+	for i, measurement := range resources.Measurements {
+		available := int64(0)
+		if measurement.Available {
+			available = 1
+			items = append(items, otlpMetric{
+				Name:  "darwinrouter.resource." + measurement.Name,
+				Unit:  resourceDefinitions[i].unit,
+				Gauge: &otlpGauge{DataPoints: []otlpPoint{{Attributes: []otlpAttribute{}, TimeUnixNano: at, AsInt: strconv.FormatInt(measurement.Value, 10)}}},
+			})
+		}
+		availability = append(availability, otlpPoint{
+			Attributes:   []otlpAttribute{{Key: "resource", Value: otlpValue{StringValue: measurement.Name}}},
+			TimeUnixNano: at, AsInt: strconv.FormatInt(available, 10),
+		})
+	}
+	items = append(items, otlpMetric{Name: "darwinrouter.resource.available", Unit: "{bool}", Gauge: &otlpGauge{DataPoints: availability}})
+	return items
 }
 
 type otlpRequest struct {

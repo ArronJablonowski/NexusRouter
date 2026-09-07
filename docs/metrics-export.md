@@ -93,8 +93,25 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 3 includes runtime-event and derived-operation activity
-in addition to the version 1 lifecycle groups. The closed-vocabulary lifecycle snapshot contains tasks, submissions,
+Snapshot schema version 4 adds an optional live host-resource observation to
+the version 3 runtime-event and derived-operation activity. The application,
+daemon, HTTP API and SDK attach fixed CPU-thread, RAM, swap, aggregate VRAM,
+thermal-pressure and unified-memory measurements. Each value has an explicit
+availability bit: an unsupported or failed probe is unavailable, never an
+observed zero. Cloud-only and disabled-profiling services publish the same
+explicit unavailability block without invoking a profiler. Storage-only
+`darwin metrics --db` snapshots omit the block because reading a database is not
+a host observation.
+
+Available resource values export as individual gauges named
+`darwinrouter.resource.<measurement>` with fixed units, plus
+`darwinrouter.resource.available` for every fixed measurement. No device ID,
+GPU inventory, profiler source, thermal-state string or host identity is
+released. These are point-in-time host readings, not model residency,
+reservation, queue-depth or provider-load measurements. A profiling failure
+does not suppress the durable lifecycle snapshot.
+
+The closed-vocabulary lifecycle snapshot contains tasks, submissions,
 reviews, evaluations, audits, recoveries and durable runtime-event counts. The
 `runtime_events` group reports the sixteen canonical event kinds, covering task
 terminals, provider turns, model deltas, tool calls, workers, routes, evaluation
@@ -151,11 +168,11 @@ automatic failed-body retry, exactly-once guarantee or acknowledgement history i
 Explicitly rerunning the command sends a new snapshot and can repeat observations.
 
 Tests cover wire shape and integer limits, all canonical runtime-event kinds,
-unknown-kind rejection, legacy availability, real SQLite
+unknown-kind rejection, legacy and resource availability, real SQLite
 snapshots, owned loopback collectors, strict arguments, credential/policy changes,
 no storage mutation, cancellation, response bounds, partial rejection and redirect
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable
-export delivery, direct thermal/queue-pressure counters, traces, full
+export delivery, physical thermal-sensor accuracy, queue pressure, traces, full
 histogram coverage or the full PRD telemetry scope.

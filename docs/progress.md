@@ -1,5 +1,25 @@
 # Implementation evidence
 
+PRD live-resource-metrics checkpoint: application-backed metrics snapshot
+schema version 4 adds a fixed observation for CPU threads, RAM, swap, aggregate
+VRAM, thermal pressure and unified-memory status. Every value has an explicit
+availability bit, so unsupported probes, disabled profiling, cloud-only mode
+and measurement failures cannot masquerade as observed zero. Profiling failure
+degrades only this live block and does not suppress the durable SQLite-derived
+lifecycle snapshot. Storage-only inspection omits the block because it did not
+sample a host. OTLP exports only fixed measurement names, values and units plus
+availability gauges; device IDs, GPU inventory, profiler source strings,
+thermal-state text, host identity and task/model data remain excluded. Focused
+tests cover construction, ownership, bounds, invalid pairs, fixed OTLP wire
+shape, cloud/disabled no-probe behavior and profiler failure. Queue depth,
+per-device capacity, reservations, residency, provider/tool histograms and
+traces remain open. Final `make check` passed formatting/LOC enforcement, vet,
+every native race-enabled package and production build; application took
+220.934s, telemetry 148.620s, CLI 42.984s, metrics 2.900s and SDK 26.378s. No
+live model, user database or external collector was used. Native Linear remains
+unavailable because the app is not accessible to this task, so no issue update
+is claimed. The full PRD remains incomplete.
+
 Metrics-scale regression gate: `make qualify-performance` now includes three
 fresh runs of the production read-only metrics path over a generated
 100,000-task/200,000-event SQLite database. The benchmark verifies task heads,
