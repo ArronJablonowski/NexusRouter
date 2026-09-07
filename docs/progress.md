@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-29 is Done in native Linear under state activity
+`b03454b9-baee-4f10-82b3-1c71484d91a6` with completion evidence comment
+`611e186d`. User feedback is persisted as immutable, idempotent evaluation
+evidence with explicit cost attribution and revision/supersession history.
+Evidence resolution orders deterministic checks, tool results, explicit user
+feedback and then the optional LLM judge, while unsupported model self-ratings
+are rejected. Reviews are advisory, independently attributed, bounded,
+redacted, tool-free and single-call; admission enforces the judge kill switch,
+mode, privacy, context, cost and credentials. Routing caps advisory influence at
+0.25 for objective domains and 0.10 for creative or unknown domains, and direct
+user evidence removes contradictory same-attempt advice. New regression
+coverage supplies a large reviewer token-usage record and proves that it creates
+no candidate fitness; subsequent feedback contributes only its own explicitly
+recorded cost. Existing integration tests prove automatic review cannot replace
+candidate output or state, failed/canceled reviews create no advisory evidence,
+and the creative rubric defers taste to explicit user preferences. Focused race
+tests passed evaluation, routing, telemetry and application packages. Final
+`make check` passed format/LOC, vet, the complete native race suite and build;
+application tests took 221.257s, telemetry 147.682s, CLI 42.158s, SDK 24.699s,
+tool-gate 19.383s and workers 3.246s. The checkpoint is backed up at `22921fd`;
+push/fetch verification showed matching local and remote heads, zero divergence
+and a clean worktree before the Linear comment and Done state were read back.
+Linear released DAR-30. The full PRD remains incomplete.
+
 DAR-28 is Done in native Linear under consolidated state activity
 `f275d74e-f6d7-4be8-b0f3-1b2b18eee044` with completion evidence comment
 `c924bd1d`. Acceptance audit confirmed the runtime
