@@ -1,5 +1,24 @@
 # Implementation evidence
 
+DAR-37 is completion-ready pending native Linear reconciliation. The CLI now
+combines the existing layered, strictly validated and redacted `config
+validate/show`, daemon start/status/stop and host-resource inspection commands
+with read-only provider and model catalogs plus an authenticated `doctor`
+command. Provider diagnostics expose only identifiers, kinds, credential
+requirements, residency management and effective timeouts; endpoints,
+credential environment-variable names and credential values are withheld.
+Model diagnostics expose configured routing metadata without contacting a
+provider. `doctor` queries the running daemon's comprehensive `/v1/health`
+endpoint through the existing authenticated client, bounds and validates the
+response, prints the structured report, and exits nonzero when it is invalid,
+unavailable or not ready. The focused diagnostic, daemon, deprecation and
+resource CLI matrix passed three race-enabled repetitions in 27.877s. The full
+`make check` then passed format/LOC enforcement, vet, every native race package
+and build; the longest packages included application at 222.473s, telemetry at
+145.901s and CLI at 41.420s. The README documents the non-mutating diagnostic
+workflow. Native Linear remains unavailable because the Mac is locked, so no
+DAR-37 state/comment change is claimed. The full PRD remains incomplete.
+
 DAR-40 is completion-ready pending native Linear reconciliation. The
 authenticated Darwin-native API exposes synchronous and live task submission,
 durable detached submissions, cancellation, steering, task/event inspection

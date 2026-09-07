@@ -289,7 +289,19 @@ proposals, writes, legacy behavior and uncertain effects remain unsupported.
 ./bin/darwin config validate --config examples/local.yaml
 ./bin/darwin config show --config examples/local.yaml --set workers.max_in_process=1
 DARWIN__MODE=local_only ./bin/darwin config validate
+
+# Read-only configuration catalogs; output is safe for diagnostics.
+./bin/darwin providers list --config examples/local.yaml
+./bin/darwin models list --config examples/local.yaml
+
+# Query the authenticated health report of the running daemon.
+DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
+
+The provider and model catalogs only inspect configuration and never perform
+inference or mutate runtime state. Provider output omits endpoints and credential
+environment-variable names. `doctor` validates the daemon's comprehensive
+`/v1/health` report and exits nonzero when the daemon is unavailable or not ready.
 
 Precedence: defaults → OS user config directory `/darwinrouter/config.yaml` → working-directory `config.yaml` → `DARWIN__SECTION__FIELD` environment variables → repeated `--set section.field=value` flags. `--user-config` and `--config` select explicit files; missing explicit paths are errors. Nested mappings merge; arrays replace wholesale. Environment and CLI overrides address scalar settings only. Unknown fields, duplicate keys, aliases, nulls, and multi-document YAML are rejected. Configuration files are limited to 1 MiB.
 

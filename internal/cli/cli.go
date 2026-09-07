@@ -24,6 +24,9 @@ Usage:
   darwin submissions list --db path [--state state --after cursor --limit 25]
   darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
+  darwin doctor --config path  Inspect the running daemon and dependency health
+  darwin providers list --config path  List safe configured provider metadata
+  darwin models list --config path  List configured model routing metadata
   darwin resources leases --db path --scope scope  Inspect overlapping lease holders
   darwin resources attention --db path  Inspect durable lease attention records
   darwin resources attention-history --db path --id ID  Inspect attention transitions
@@ -81,7 +84,13 @@ func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, vers
 		return runDaemonControl(args[1:], stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "models" {
-		return runModelsDeprecation(args[1:], stdout, stderr)
+		return runModels(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "providers" {
+		return runCatalog("providers", args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "doctor" {
+		return runDoctor(args[1:], stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "skill-generations" {
 		return runSkillGenerations(args[1:], stdout, stderr)
