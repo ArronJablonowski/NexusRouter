@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
@@ -68,6 +71,7 @@ func TestAuditQualityLatestAndFeedbackDominance(t *testing.T) {
 	}
 	d := qualityTask(t, s, "d", "candidate", "", "")
 	d.Audit.Verdict, d.Audit.Confidence = "reject", .2
+	d.Usage = &providers.Usage{InputTokens: 9000, OutputTokens: 1000}
 	d.Time = time.Unix(200, 0).UTC()
 	if err := s.RecordAudit(ctx, d); err != nil {
 		t.Fatal(err)
@@ -75,6 +79,9 @@ func TestAuditQualityLatestAndFeedbackDominance(t *testing.T) {
 	out, err := s.AuditQuality(ctx, key)
 	if err != nil || out.Samples != 2 || math.Abs(out.Quality-.8) > 1e-12 || out.Confidence != .5 || !out.Updated.Equal(d.Time) {
 		t.Fatal(out, err)
+	}
+	if _, err := s.Fitness(ctx, key); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal("review usage created candidate fitness", err)
 	}
 	c.ID = "c-new"
 	c.Audit.Verdict = "abstain"
@@ -85,7 +92,7 @@ func TestAuditQualityLatestAndFeedbackDominance(t *testing.T) {
 	if err != nil || out.Samples != 1 || out.Quality != 0 {
 		t.Fatal("abstention resurrected old accept", out, err)
 	}
-	r := evaluation.Record{Version: 1, ID: "feedback", TaskID: "d", AttemptID: "attempt", Key: key, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: "user", Passed: true}}, Time: time.Unix(300, 0)}
+	r := evaluation.Record{Version: 1, ID: "feedback", TaskID: "d", AttemptID: "attempt", Key: key, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: "user", Passed: true}}, Cost: .25, Time: time.Unix(300, 0)}
 	if err := s.RecordEvaluation(ctx, r); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +101,7 @@ func TestAuditQualityLatestAndFeedbackDominance(t *testing.T) {
 		t.Fatal("feedback did not dominate", out, err)
 	}
 	f, err := s.Fitness(ctx, key)
-	if err != nil || f.Samples != 1 || f.Quality != 1 {
+	if err != nil || f.Samples != 1 || f.Quality != 1 || f.Cost != .25 {
 		t.Fatal("advisory mutated fitness", f, err)
 	}
 }
