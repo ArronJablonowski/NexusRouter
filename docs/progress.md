@@ -1,5 +1,18 @@
 # Implementation evidence
 
+DAR-51/54 RC4 integration checkpoint: clean commit
+`8ebb9411f4f366f62b984d5cef6e9c6009e61b9b` was pushed to `origin/main`,
+frozen as external candidate `1.0.0-rc.4`, and reverified against that exact
+source. The external candidate-record SHA-256 is
+`2b2eb5f3345c723597fb3ac7df94ee7d0d9da7e1c912b4a472e2a831d8709d6e`.
+`make qualify-release` passed on darwin/arm64: the deterministic MVP scenarios,
+eight byte-identical unsigned builds, four executable-format checks, guarded
+CLI signing with disposable authorization/trust/key material, tamper rejection,
+and native install, schema-28-to-29 migration, backup and rollback rehearsal.
+This is local qualification evidence only. It is not a four-target hosted run,
+operator approval, production signature, publication authorization, tag or
+release; those DAR-51/54 gates remain open.
+
 DAR-51/54 release-evidence and signing-safety checkpoint: native qualification
 now has a canonical single-target record and bounded transcript wrapper that
 runs `make check` and the version/commit-bound `make qualify-release`, rechecks
