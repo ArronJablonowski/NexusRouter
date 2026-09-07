@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-38 is completion-ready pending native Linear reconciliation. `darwin run
+--json` emits versioned committed lifecycle events followed by one terminal
+result, with bounded backpressure, provisional-text redaction, safe broken-pipe
+cancellation and no duplicate plain answer. `darwin chat` uses the same
+application service and streams provisional text before completion while
+retaining durable task identity. Successful answers advance an explicit
+continuation chain; failures and cancellations preserve the last successful
+source rather than importing partial history. `/steer` commits bounded guidance
+at runtime safe boundaries, `/cancel` joins active work, `/status`, `/new`,
+`/quit` and EOF have deterministic lifecycle behavior, and ordinary input while
+busy is rejected rather than silently reinterpreted. Interactive feedback can
+inspect, add and revision-check subjective evaluation for only the latest shown
+successful answer. Reviewed create/replace approvals are also handled without
+granting ambient write authority. Signal handling starts before prompt input;
+terminal/pipe reads and writes are bounded and ownership-restoring. The focused
+chat, JSON stream, output, steering, feedback, continuation, resume and live
+stream matrix passed three race-enabled repetitions: CLI 36.233s, application
+19.562s and SDK 2.008s. The immediately preceding full `make check` passed
+format/LOC, vet, all native race tests and build. A full-screen editor and
+arbitrary recovery are enhancements outside the issue's stated acceptance; no
+claim is made that provisional text is durable or that models obey steering.
+Native Linear remains unavailable because the Mac is locked, so no DAR-38
+state/comment change is claimed. The full PRD remains incomplete.
+
 DAR-17 is completion-ready pending native Linear reconciliation. Tool policy is
 resolved from immutable, bounded scope snapshots with exact tool/resource
 matching; child workers inherit every parent denial and can only become more
