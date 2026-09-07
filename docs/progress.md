@@ -1,5 +1,23 @@
 # Implementation evidence
 
+PRD audit-outcome-metrics checkpoint: metrics snapshot schema version 7 adds a
+fixed `audit_outcomes` group with accept, reject and abstain gauges derived from
+durable validated audit records. The SQLite query releases only the three
+closed verdict classes; evaluator/candidate/task identity, evidence references,
+confidence and findings never enter the public snapshot or OTLP labels. Unknown
+or corrupt verdicts fail the snapshot instead of creating dynamic cardinality.
+These gauges explicitly remain advisory and do not claim objective correctness,
+replace user feedback or become direct fitness samples. Focused tests cover all
+three outcomes, legacy availability, large private payload isolation, corrupt
+verdict rejection and snapshot validation. Final `make check` passed
+formatting/LOC enforcement, vet, every native race-enabled package and the
+production build; application took 220.736s, telemetry 148.638s, CLI 41.764s,
+SDK 25.308s, metrics 1.588s and tool gate 20.818s. No live model, user database
+or collector was used. Per-domain rubric
+metrics, separate objective/subjective dimensions, durable export delivery,
+retention and the complete PRD remain unfinished. Native Linear remains
+inaccessible because macOS is locked, so no issue update is claimed.
+
 PRD tool-effect-traces checkpoint: trace snapshot schema version 3 now attaches
 one instantaneous `tool_effect` child to every successfully paired durable tool
 completion. Outcomes are limited to `none`, `confirmed` and `uncertain`, using

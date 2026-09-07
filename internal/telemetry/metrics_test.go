@@ -30,7 +30,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.db.Exec(`INSERT INTO evaluations VALUES('evaluation','running','attempt','model','provider','domain','profile',zeroblob(9000000)); INSERT INTO audit_records VALUES('audit','running',zeroblob(9000000))`); err != nil {
+	if _, err := db.db.Exec(`INSERT INTO evaluations VALUES('evaluation','running','attempt','model','provider','domain','profile',zeroblob(9000000)); INSERT INTO audit_records VALUES('audit','running',json_set(json_object('Audit',json_object('verdict','accept')),'$.private',hex(zeroblob(4500000))))`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.db.Exec(`INSERT INTO submission_recoveries SELECT 'recovery',id,'private-digest',zeroblob(9000000) FROM submissions LIMIT 1`); err != nil {
@@ -62,6 +62,9 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 		for _, count := range group.Counts {
 			expected := int64(1)
 			if group.Name == "runtime_events" || group.Name == "runtime_operations" {
+				expected = 0
+			}
+			if group.Name == "audit_outcomes" && count.State != "accept" {
 				expected = 0
 			}
 			if count.Value != expected {
@@ -151,6 +154,43 @@ func TestMetricsQueueAgeRejectsPopulationBeyondAdmissionBound(t *testing.T) {
 	if _, err := db.Metrics(context.Background()); err == nil {
 		t.Fatal("overbound queue accepted")
 	}
+}
+
+func TestMetricsCountsAdvisoryAuditOutcomesWithoutIdentity(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	if _, err := db.db.Exec(`INSERT INTO task_heads VALUES('audit-task','private-session',1,'completed')`); err != nil {
+		t.Fatal(err)
+	}
+	for _, verdict := range []string{"accept", "reject", "abstain"} {
+		body, err := json.Marshal(map[string]any{"Audit": map[string]any{"verdict": verdict}, "private": "private-finding-" + verdict})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.db.Exec(`INSERT INTO audit_records VALUES(?,?,?)`, "private-audit-"+verdict, "audit-task", body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := db.Metrics(ctx)
+	if err != nil || snapshot.Validate() != nil {
+		t.Fatal(snapshot, err)
+	}
+	for _, group := range snapshot.Groups {
+		if group.Name != "audit_outcomes" {
+			continue
+		}
+		for _, count := range group.Counts {
+			if count.Value != 1 {
+				t.Fatal(group)
+			}
+		}
+		body, _ := json.Marshal(group)
+		if strings.Contains(string(body), "private") || strings.Contains(string(body), "finding") {
+			t.Fatal("audit content escaped", string(body))
+		}
+		return
+	}
+	t.Fatal("audit outcomes group missing")
 }
 
 func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
@@ -265,7 +305,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 		if err != nil || snapshot.StorageSchema != schema {
 			t.Fatal(snapshot, err)
 		}
-		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "queue_age": 12, "reviews": 7, "evaluations": 2, "audits": 5, "recoveries": 13}
+		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "queue_age": 12, "reviews": 7, "evaluations": 2, "audits": 5, "audit_outcomes": 5, "recoveries": 13}
 		for _, group := range snapshot.Groups {
 			if group.Available != (schema >= since[group.Name]) {
 				t.Fatal(group)
@@ -285,7 +325,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 }
 
 func TestMetricsRejectUnknownLifecycleState(t *testing.T) {
-	for _, table := range []string{"task_heads", "events", "submissions", "review_attempts"} {
+	for _, table := range []string{"task_heads", "events", "submissions", "review_attempts", "audit_records"} {
 		t.Run(table, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
@@ -304,6 +344,8 @@ func TestMetricsRejectUnknownLifecycleState(t *testing.T) {
 				_, err = db.db.Exec(`UPDATE submissions SET state=?`, secret)
 			case "review_attempts":
 				_, err = db.db.Exec(`INSERT INTO review_attempts VALUES('review','task',?,'{}')`, secret)
+			case "audit_records":
+				_, err = db.db.Exec(`INSERT INTO audit_records VALUES('audit','task',json_object('Audit',json_object('verdict',?)))`, secret)
 			}
 			if err != nil {
 				t.Fatal(err)

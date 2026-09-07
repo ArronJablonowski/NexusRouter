@@ -71,6 +71,8 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 			query = `SELECT 0,count(*) FROM evaluations`
 		case "audits":
 			query = `SELECT 0,count(*) FROM audit_records`
+		case "audit_outcomes":
+			query = `SELECT CASE json_extract(body,'$.Audit.verdict') WHEN 'accept' THEN 0 WHEN 'reject' THEN 1 WHEN 'abstain' THEN 2 ELSE -1 END,count(*) FROM audit_records GROUP BY 1`
 		case "recoveries":
 			query = `SELECT 0,count(*) FROM submission_recoveries`
 		default:

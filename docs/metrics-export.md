@@ -93,9 +93,13 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 6 adds provider-turn and tool-call duration histograms
-to version 5's queue-age gauge, version 4's live host observation, and version
-3's runtime activity. Schema-28-and-newer databases pair `turn.started` with
+Snapshot schema version 7 adds fixed advisory audit-outcome gauges (`accept`,
+`reject`, and `abstain`) to version 6's provider-turn and tool-call duration
+histograms, version 5's queue-age gauge, version 4's live host observation, and
+version 3's runtime activity. Audit outcomes are validated reviewer verdicts,
+not objective correctness, task acceptance, user feedback or direct fitness
+samples. No evaluator, candidate, task, evidence-reference or finding identity
+is exported. Schema-28-and-newer databases pair `turn.started` with
 `turn.completed` and `tool.started` with `tool.completed` by their durable
 task/turn/attempt/call identities. Only the fixed `provider` and `tool` operation
 labels are released. Missing starts, missing ends, malformed/noncanonical times,
@@ -140,7 +144,8 @@ reservation, queue-depth or provider-load measurements. A profiling failure
 does not suppress the durable lifecycle snapshot.
 
 The closed-vocabulary lifecycle snapshot contains tasks, submissions,
-reviews, evaluations, audits, recoveries and durable runtime-event counts. The
+reviews, evaluations, audits, fixed advisory audit outcomes, recoveries and
+durable runtime-event counts. The
 `runtime_events` group reports the sixteen canonical event kinds, covering task
 terminals, provider turns, model deltas, tool calls, workers, routes, evaluation
 events, errors and steering without exporting an envelope or payload field.

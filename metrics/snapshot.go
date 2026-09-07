@@ -10,7 +10,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 6
+const SnapshotVersion = 7
 
 type Count struct {
 	State string `json:"state"`
@@ -48,6 +48,7 @@ var definitions = []definition{
 	{"reviews", 7, []string{"started", "completed", "failed"}},
 	{"evaluations", 2, []string{"stored"}},
 	{"audits", 5, []string{"stored"}},
+	{"audit_outcomes", 5, []string{"accept", "reject", "abstain"}},
 	{"recoveries", 13, []string{"stored"}},
 }
 

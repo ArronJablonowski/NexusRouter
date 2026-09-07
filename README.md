@@ -1398,11 +1398,14 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 6 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 7 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
-count stored records. Counts come from one SQLite read transaction and survive
+count stored records. A separate fixed audit-outcome group counts accept,
+reject and abstain verdicts without evaluator, candidate, evidence or finding
+identity. These remain advisory: they do not assert objective correctness,
+replace user feedback or become direct fitness samples. Counts come from one SQLite read transaction and survive
 service restarts. Older schemas explicitly mark unsupported groups unavailable.
 No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
 

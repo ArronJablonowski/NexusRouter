@@ -738,7 +738,9 @@ count every canonical durable runtime-event kind, providing content-free task,
 provider-turn, tool, worker, route, evaluation, error and steering activity.
 Derived gauges count fallback-linked tasks, compactions, skill-context use,
 exploration and capacity/budget/privacy/health route exclusions. Snapshot schema
-version 6 also derives fixed provider-turn and tool-call duration histograms
+version 7 also reports fixed accept/reject/abstain advisory audit outcomes
+without evaluator, candidate, evidence or finding identity. These do not become
+objective success or direct fitness evidence. Version 6 derives fixed provider-turn and tool-call duration histograms
 from paired durable events. Observed, missing-start, missing-end and invalid-time
 samples reconcile with canonical start/completion totals without exporting any
 provider, model, tool, task, turn, attempt or call identity. These are retained
