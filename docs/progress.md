@@ -1,6 +1,7 @@
 # Implementation evidence
 
-DAR-25 is in progress in native Linear. Its bounded-exploration audit found
+DAR-25 is Done in native Linear with completion evidence comment `8ca1e122`.
+Its bounded-exploration audit found
 that a draw inside the exploration window could select the ordinary top-ranked
 route while still reporting `Explored`. Selection now maps the configured
 exploration window uniformly across eligible non-primary routes, so an
@@ -13,9 +14,10 @@ cannot be reached through exploration. The routing race suite passed five
 repetitions and focused application routing tests passed three. Final
 `make check` passed format/LOC, vet, the complete native race suite and build;
 application tests took 221.465s, telemetry 149.469s, CLI 42.025s, SDK 25.224s,
-tool-gate 20.732s, routing 2.174s and worker tests 4.800s. The checkpoint still
-needs to be committed, pushed, fetch-verified and recorded in Linear. The full
-PRD remains incomplete.
+tool-gate 20.732s, routing 2.174s and worker tests 4.800s. The checkpoint is
+backed up at `377d4d0`; push/fetch verification showed matching local and
+remote heads, zero divergence and a clean worktree before the Linear state and
+comment were read back. The full PRD remains incomplete.
 
 Event persistence and fitness-explanation checkpoint: DAR-9 is now Done in
 native Linear; its completion comment was posted and read back with checkpoint
