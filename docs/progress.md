@@ -1,7 +1,9 @@
 # Implementation evidence
 
-DAR-34 is verified and ready for its Linear completion update.
-Automatic learning scans durable completed workflows and groups only repeated
+DAR-34 is Done in native Linear under state activity
+`47622af5-eb33-40b5-8b30-0d37cfd452f7` with completion evidence comment
+`b61251bf`. Automatic learning scans durable completed workflows and groups
+only repeated
 procedures with the same domain, execution profile and observed successful tool
 sequence. At least two distinct tasks and sessions are required. Source
 eligibility is re-derived from current immutable deterministic, tool-result or
@@ -17,8 +19,10 @@ validation leaves the durable pending selection untouched. Focused grouping,
 generation, provenance and activation race tests passed three repetitions.
 Final `make check` passed format/LOC, vet, the complete native race suite and
 build; application tests took 222.545s, telemetry 148.105s, CLI 42.052s, SDK
-24.745s and tool-gate 19.219s. GitHub/Linear checkpoint evidence follows in
-this entry after synchronization. The full PRD remains incomplete.
+24.745s and tool-gate 19.219s. The checkpoint is backed up at `a216c07`;
+push/fetch verification showed matching local and remote heads, zero divergence
+and a clean worktree before the Linear comment and Done state were read back.
+Linear released DAR-35. The full PRD remains incomplete.
 
 DAR-33 is Done in native Linear under state activity
 `fee38c5c-9f0e-45d4-a94f-ad9918f8e436` with completion evidence comment
