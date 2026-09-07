@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -93,6 +94,44 @@ func environment() []string {
 	return result
 }
 
+type releaseExecutableIdentity struct {
+	path string
+	info os.FileInfo
+}
+
+func pinReleaseExecutable(env []string, name string) (releaseExecutableIdentity, error) {
+	path, err := releaseExecutable(env, name)
+	if err != nil {
+		return releaseExecutableIdentity{}, ErrInvalid
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+		return releaseExecutableIdentity{}, ErrInvalid
+	}
+	return releaseExecutableIdentity{path: path, info: info}, nil
+}
+
+func (identity releaseExecutableIdentity) verify() error {
+	if !filepath.IsAbs(identity.path) || identity.info == nil {
+		return ErrInvalid
+	}
+	info, err := os.Lstat(identity.path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 || !os.SameFile(identity.info, info) {
+		return ErrInvalid
+	}
+	return nil
+}
+
+func executableOnlyPATH(env []string, executable string) []string {
+	result := make([]string, 0, len(env))
+	for _, value := range env {
+		if !strings.HasPrefix(value, "PATH=") {
+			result = append(result, value)
+		}
+	}
+	return append(result, "PATH="+filepath.Dir(executable))
+}
+
 // Package stages all artifacts before publishing the directory. The exclusive
 // sibling lock prevents cooperating packagers from targeting the same output.
 func Package(ctx context.Context, o Options) error {
@@ -140,8 +179,13 @@ func Package(ctx context.Context, o Options) error {
 	if err = verify(); err != nil {
 		return err
 	}
-	toolchain, err := command(ctx, source, env, "go", "env", "GOVERSION")
-	if err != nil || !regexp.MustCompile(`^go[0-9]+\.[0-9]+(\.[0-9]+)?$`).MatchString(toolchain) {
+	goIdentity, err := pinReleaseExecutable(env, "go")
+	if err != nil || goIdentity.verify() != nil {
+		return ErrInvalid
+	}
+	goExecutable := goIdentity.path
+	toolchain, err := command(ctx, source, env, goExecutable, "env", "GOVERSION")
+	if err != nil || !signedToolchain.MatchString(toolchain) || toolchain != runtime.Version() || goIdentity.verify() != nil {
 		return ErrInvalid
 	}
 	stage, err := os.MkdirTemp(filepath.Dir(out), ".darwin-release-")
@@ -162,22 +206,35 @@ func Package(ctx context.Context, o Options) error {
 		return err
 	}
 	manifest := Manifest{SchemaVersion: 2, Version: o.Version, Commit: o.Commit, Toolchain: toolchain}
+	noticeEnv := executableOnlyPATH(env, goExecutable)
 	var sums strings.Builder
 	for _, target := range []struct{ os, arch string }{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
-		notices, e := thirdPartyNotices(ctx, buildSource, target.os, target.arch, env)
+		if err = goIdentity.verify(); err != nil {
+			return err
+		}
+		notices, e := thirdPartyNotices(ctx, buildSource, target.os, target.arch, noticeEnv)
 		if e != nil {
 			return e
 		}
 		// go list above materializes the target closure. Verify the module-cache
 		// contents, including the legal files just captured, against go.sum before
 		// either those notices or compiled code enter a release artifact.
-		if _, e = command(ctx, buildSource, env, "go", "mod", "verify"); e != nil {
+		if err = goIdentity.verify(); err != nil {
+			return err
+		}
+		if _, e = command(ctx, buildSource, env, goExecutable, "mod", "verify"); e != nil {
 			return e
 		}
 		binary := filepath.Join(stage, "darwin")
 		buildEnv := append(append([]string(nil), env...), "GOOS="+target.os, "GOARCH="+target.arch)
-		_, err = command(ctx, buildSource, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+o.Version, "-o", binary, "./cmd/darwin")
+		if err = goIdentity.verify(); err != nil {
+			return err
+		}
+		_, err = command(ctx, buildSource, buildEnv, goExecutable, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+o.Version, "-o", binary, "./cmd/darwin")
 		if err != nil {
+			return err
+		}
+		if err = goIdentity.verify(); err != nil {
 			return err
 		}
 		info, e := os.Lstat(binary)
@@ -232,6 +289,9 @@ func Package(ctx context.Context, o Options) error {
 		return err
 	}
 	if err = verify(); err != nil {
+		return err
+	}
+	if err = goIdentity.verify(); err != nil {
 		return err
 	}
 	if err = ctx.Err(); err != nil {
