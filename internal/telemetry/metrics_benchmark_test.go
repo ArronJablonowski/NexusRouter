@@ -96,6 +96,14 @@ func BenchmarkMetricsCompletedTasks(b *testing.B) {
 			if snapshot.Groups[0].Counts[1].Value != int64(size) || g.Count != int64(size) || g.BucketCounts[0] != int64(size) || math.Abs(g.SumSeconds-float64(size)*.1) > float64(size)*1e-10 {
 				b.Fatal("incorrect benchmark projection")
 			}
+			if snapshot.Groups[1].Name != "runtime_events" || snapshot.Groups[1].Counts[0].Value != int64(size) || snapshot.Groups[1].Counts[1].Value != int64(size) || snapshot.Groups[2].Name != "runtime_operations" {
+				b.Fatal("incorrect benchmark event projection")
+			}
+			for _, count := range snapshot.Groups[2].Counts {
+				if count.Value != 0 {
+					b.Fatal("unexpected benchmark operation", count)
+				}
+			}
 			for _, count := range g.BucketCounts[1:] {
 				if count != 0 {
 					b.Fatal("unexpected timing bucket")

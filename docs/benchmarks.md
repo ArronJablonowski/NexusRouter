@@ -8,6 +8,12 @@ Run the complete non-live matrix without concurrent project tests or builds:
 make qualify-performance
 ```
 
+The gate also runs one content-free lifecycle snapshot against a generated
+100,000-task/200,000-event SQLite store three times. This covers task-duration,
+canonical-event and derived-operation queries together and checks their counts,
+not just elapsed time. Each iteration includes a fresh database setup outside
+the timed region; the reported `ns/op` measures the read-only snapshot itself.
+
 On September 7, 2026, Apple M4 Max / darwin arm64 / Go 1.27.1, three runs
 measured the 64-model evidence selector at 16.00–16.52 microseconds per route.
 The eight-model automatic fixture with 1,000 seed tasks measured 54.16–54.36 ms

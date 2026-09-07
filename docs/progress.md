@@ -1,5 +1,22 @@
 # Implementation evidence
 
+Metrics-scale regression gate: `make qualify-performance` now includes three
+fresh runs of the production read-only metrics path over a generated
+100,000-task/200,000-event SQLite database. The benchmark verifies task heads,
+duration buckets, canonical task start/completion counts and zero derived
+operation counts before timing each snapshot, so a fast but incomplete query
+cannot pass. On this Apple M4 Max the three final snapshots measured
+1.595–1.609s/op against a 132,329,472-byte database, below the storage reader's
+three-second deadline on this host. Allocation was approximately 9.63–9.65MiB
+and 400,452–400,488 allocations per snapshot, leaving optimization headroom.
+Final `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and production build; application took 222.157s,
+telemetry 145.421s, CLI 41.614s and SDK 24.676s. This is isolated local evidence,
+not a contended workload, slower-platform guarantee or production retention
+qualification. No live model, user database or network collector was used.
+Native Linear remains unavailable because the Mac is locked, so no issue update
+is claimed. The full PRD remains incomplete.
+
 PRD derived-runtime-metrics checkpoint: metrics snapshot schema version 3 adds
 a closed `runtime_operations` gauge derived from durable event facts. It counts
 fallback-linked task starts, compacted continuations, skill-context uses,

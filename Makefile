@@ -22,6 +22,7 @@ qualify-linux-cgroup:
 qualify-performance:
 	go test ./routing -run '^$$' -bench '^BenchmarkSelect' -benchmem -benchtime=10000x -count=3
 	go test ./internal/telemetry -run '^$$' -bench '^BenchmarkDurableTaskStartAppend$$' -benchmem -benchtime=500x -count=3
+	go test ./internal/telemetry -run '^$$' -bench '^BenchmarkMetricsCompletedTasks/tasks_100000$$' -benchmem -benchtime=1x -count=3
 	go test ./resources -run '^$$' -bench '^BenchmarkLocalReservation$$' -benchmem -benchtime=100000x -count=3
 	go test ./internal/app -run '^TestTaskLatencyNearestRank$$' -bench '^BenchmarkAutomaticTaskOverhead/pool_8/seed_1000$$' -benchtime=100x -count=3
 
