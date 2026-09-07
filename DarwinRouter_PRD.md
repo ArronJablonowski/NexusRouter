@@ -810,6 +810,11 @@ Provider-reported context overflow is a non-retryable execution outcome. HTTP
 retry authority. The task records that terminal code and automatic fallback
 does not resend the same oversized context to another route.
 
+Local preflight uses the same durable overflow code when a trusted estimator's
+finite count exceeds the configured model window. Estimator errors and panics
+instead become `context_estimation_failed`; they must not be conflated with a
+known overflow or with generation, output, and iteration budget exhaustion.
+
 ## 16. Testing and Acceptance
 
 - Unit-test scoring, normalization, policies, schemas, migrations, redaction, state transitions, and safe retry rules.

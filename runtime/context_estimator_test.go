@@ -17,13 +17,13 @@ func (f loopContextEstimator) Estimate(ctx context.Context, r providers.Request)
 	return f(ctx, r)
 }
 
-func assertContextBudgetFailure(t *testing.T, events []runtime.Event, err error, wantTurns int) {
+func assertContextFailure(t *testing.T, events []runtime.Event, err, wantErr error, code string, wantTurns int) {
 	t.Helper()
-	if !errors.Is(err, runtime.ErrLimit) || err.Error() != runtime.ErrLimit.Error() {
-		t.Fatal("estimator failure escaped budget boundary", err)
+	if !errors.Is(err, wantErr) || err.Error() != wantErr.Error() {
+		t.Fatal("context failure escaped sanitized boundary", err)
 	}
-	if len(events) == 0 || events[len(events)-1].Kind != runtime.TaskFailed || events[len(events)-1].Data.Code != "budget_exhausted" {
-		t.Fatal("missing durable budget failure", events)
+	if len(events) == 0 || events[len(events)-1].Kind != runtime.TaskFailed || events[len(events)-1].Data.Code != code {
+		t.Fatal("missing durable context failure", events)
 	}
 	turns := 0
 	for _, e := range events {
@@ -68,7 +68,11 @@ func TestLoopContextEstimatorDeniesInitialDispatch(t *testing.T) {
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			assertContextBudgetFailure(t, events, err, 0)
+			wantErr, code := runtime.ErrContextOverflow, "context_overflow"
+			if mode == "error" || mode == "panic" {
+				wantErr, code = providers.ErrContextEstimate, "context_estimation_failed"
+			}
+			assertContextFailure(t, events, err, wantErr, code, 0)
 			if calls != 0 || estimates != 1 {
 				t.Fatal(calls, estimates)
 			}
@@ -124,7 +128,7 @@ func TestLoopContextEstimatorRechecksGrowingToolHistory(t *testing.T) {
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
-	assertContextBudgetFailure(t, events, err, 1)
+	assertContextFailure(t, events, err, runtime.ErrContextOverflow, "context_overflow", 1)
 	if calls != 1 || tools != 1 || estimates != 2 {
 		t.Fatal(calls, tools, estimates)
 	}
@@ -167,7 +171,11 @@ func TestLoopContextEstimatorGuardsSteeringBeforeCommit(t *testing.T) {
 				}
 			})}
 			_, err := l.Run(context.Background(), r)
-			assertContextBudgetFailure(t, journal.events, err, 0)
+			wantErr, code := runtime.ErrContextOverflow, "context_overflow"
+			if mode == "error" || mode == "panic" {
+				wantErr, code = providers.ErrContextEstimate, "context_estimation_failed"
+			}
+			assertContextFailure(t, journal.events, err, wantErr, code, 0)
 			if calls != 0 || estimates != 1 || len(journal.pending) != 1 {
 				t.Fatal(calls, estimates, len(journal.pending))
 			}

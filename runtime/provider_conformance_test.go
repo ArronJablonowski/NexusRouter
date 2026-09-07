@@ -64,7 +64,7 @@ func TestHTTPProviderConformanceStopsBeforeContextOverflow(t *testing.T) {
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			assertContextBudgetFailure(t, events, err, 1)
+			assertContextFailure(t, events, err, runtime.ErrContextOverflow, "context_overflow", 1)
 			if dispatches != 1 || estimates != 2 {
 				t.Fatalf("dispatches=%d estimates=%d", dispatches, estimates)
 			}

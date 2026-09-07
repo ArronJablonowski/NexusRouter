@@ -93,14 +93,15 @@ type Loop struct {
 }
 
 var (
-	ErrInvalidRun    = errors.New("invalid runtime request")
-	ErrProvider      = errors.New("model turn failed")
-	ErrProtocol      = errors.New("invalid model stream")
-	ErrLimit         = errors.New("runtime budget exhausted")
-	ErrEmptyOutput   = errors.New("required final text is empty")
-	ErrInvalidOutput = errors.New("final output failed requested validation")
-	ErrTool          = errors.New("tool execution failed or denied")
-	ErrPersistence   = errors.New("runtime persistence failed; inspect durable state before retry")
+	ErrInvalidRun      = errors.New("invalid runtime request")
+	ErrProvider        = errors.New("model turn failed")
+	ErrContextOverflow = errors.New("context window exceeded")
+	ErrProtocol        = errors.New("invalid model stream")
+	ErrLimit           = errors.New("runtime budget exhausted")
+	ErrEmptyOutput     = errors.New("required final text is empty")
+	ErrInvalidOutput   = errors.New("final output failed requested validation")
+	ErrTool            = errors.New("tool execution failed or denied")
+	ErrPersistence     = errors.New("runtime persistence failed; inspect durable state before retry")
 )
 
 // Run starts a new durable task. It does not resume or silently retry existing
@@ -212,6 +213,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if errors.Is(cause, ErrLimit) {
 			code = "budget_exhausted"
 		}
+		if errors.Is(cause, providers.ErrContextEstimate) {
+			code = "context_estimation_failed"
+		}
+		if errors.Is(cause, ErrContextOverflow) {
+			code = "context_overflow"
+		}
 		if errors.Is(cause, ErrEmptyOutput) {
 			code = "empty_output"
 		}
@@ -275,8 +282,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			}
 			if r.MaxContextTokens > 0 {
 				estimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, candidate)
-				if estimateErr != nil || estimate > r.MaxContextTokens {
-					return applied, ErrLimit
+				if estimateErr != nil {
+					return applied, providers.ErrContextEstimate
+				}
+				if estimate > r.MaxContextTokens {
+					return applied, ErrContextOverflow
 				}
 			}
 			if persistErr := persist(ctx, SteeringApplied, Data{SteeringID: message.ID, Text: message.Text}); persistErr != nil {
@@ -323,8 +333,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		if r.MaxContextTokens > 0 {
 			estimate, err := providers.EstimateWith(ctx, l.ContextEstimator, inference)
-			if err != nil || estimate > r.MaxContextTokens {
-				return fail(ErrLimit)
+			if err != nil {
+				return fail(providers.ErrContextEstimate)
+			}
+			if estimate > r.MaxContextTokens {
+				return fail(ErrContextOverflow)
 			}
 		}
 		turn = rand.Text()

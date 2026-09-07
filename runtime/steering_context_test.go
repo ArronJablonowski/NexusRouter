@@ -30,7 +30,11 @@ func TestSteeringCannotExpandContextBudget(t *testing.T) {
 			calls := 0
 			loop := runtime.Loop{Journal: journal, Steering: journal, Provider: model(func(context.Context, providers.Request, func(providers.Chunk) error) error { calls++; return nil })}
 			_, err := loop.Run(context.Background(), r)
-			if !errors.Is(err, runtime.ErrLimit) || calls != 0 || len(journal.pending) == 0 {
+			want := runtime.ErrLimit
+			if mode == "tokens" {
+				want = runtime.ErrContextOverflow
+			}
+			if !errors.Is(err, want) || calls != 0 || len(journal.pending) == 0 {
 				t.Fatal(err, calls, len(journal.pending))
 			}
 			if journal.events[len(journal.events)-1].Kind != runtime.TaskFailed {

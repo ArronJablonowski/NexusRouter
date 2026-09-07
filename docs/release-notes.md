@@ -143,6 +143,8 @@ production release, release tag or complete PRD acceptance is claimed.
   durable counts instead of mislabeling final-attempt tokens as a total.
   Provider HTTP413 and exact OpenAI-compatible context-length codes produce a
   durable non-retryable `context_overflow`; automatic fallback is suppressed.
+  Local pre-turn overflow converges on that code, while estimator unavailability
+  is distinguished as `context_estimation_failed`.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
   → local Ollama → Sol round trip, historical continuation and a separate Sol
   output audit have been qualified. See [the integration guide](codex-coordinator-integration.md).

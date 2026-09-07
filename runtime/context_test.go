@@ -23,7 +23,7 @@ func TestContextGrowthStopsBeforeNextProviderDispatch(t *testing.T) {
 	r.MaxOutputBytes = 8192
 	r.MaxContextTokens = 2048
 	_, err := l.Run(context.Background(), r)
-	if !errors.Is(err, runtime.ErrLimit) || dispatches != 1 {
+	if !errors.Is(err, runtime.ErrContextOverflow) || dispatches != 1 {
 		t.Fatalf("dispatches=%d err=%v", dispatches, err)
 	}
 	events, err := s.Read(context.Background(), r.TaskID, 0, 100)
@@ -31,7 +31,7 @@ func TestContextGrowthStopsBeforeNextProviderDispatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := events[len(events)-1]
-	if last.Kind != runtime.TaskFailed || last.Data.Code != "budget_exhausted" {
+	if last.Kind != runtime.TaskFailed || last.Data.Code != "context_overflow" {
 		t.Fatalf("%+v", last)
 	}
 	completed := false
@@ -51,7 +51,7 @@ func TestInitialContextLimitPreventsDispatch(t *testing.T) {
 	})}
 	r := runRequest()
 	r.MaxContextTokens = 1
-	if _, err := l.Run(context.Background(), r); !errors.Is(err, runtime.ErrLimit) {
+	if _, err := l.Run(context.Background(), r); !errors.Is(err, runtime.ErrContextOverflow) {
 		t.Fatal(err)
 	}
 }

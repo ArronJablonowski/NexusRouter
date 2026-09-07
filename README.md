@@ -1109,6 +1109,10 @@ stops automatic fallback; bounded coordinator repair remains a separate explicit
 workflow. HTTP413 and the exact OpenAI-compatible
 `context_length_exceeded` error normalize to a durable, non-retryable
 `context_overflow`; untrusted error prose cannot grant retry authority.
+The local pre-turn estimator produces the same terminal code when its count
+exceeds the configured window. Estimator failure is separately recorded as
+`context_estimation_failed`, while output and iteration limits retain
+`budget_exhausted`.
 Adaptive retry policies remain unfinished. Loopback qualification exercises an actual
 Ollama `503` followed by an OpenAI-compatible SSE completion, with distinct
 provider endpoints, exact cumulative estimated-cost admission, durable retry
