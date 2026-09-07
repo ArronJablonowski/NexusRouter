@@ -1,6 +1,8 @@
 # Implementation evidence
 
-DAR-28 is in progress in native Linear. Acceptance audit confirmed the runtime
+DAR-28 is Done in native Linear under consolidated state activity
+`f275d74e-f6d7-4be8-b0f3-1b2b18eee044` with completion evidence comment
+`c924bd1d`. Acceptance audit confirmed the runtime
 persists deterministic final-text and requested Go-source checks as typed
 evaluation events, later recomputes Go validity from the stored delivered text,
 and pairs every tool dispatch with a durable typed completion receipt. The
@@ -15,8 +17,11 @@ each for telemetry objective evidence, runtime final-output/tool receipts, and
 application Go validation. Final `make check` passed format/LOC, vet, the
 complete native race suite and build; application tests took 222.778s,
 telemetry 146.055s, CLI 42.447s, SDK 25.072s, tool-gate 19.524s, evaluation
-1.280s and workers 3.532s. The checkpoint still needs to be committed, pushed,
-fetch-verified and recorded in Linear. The full PRD remains incomplete.
+1.280s and workers 3.532s. The checkpoint is backed up at `c079f0f`;
+push/fetch verification showed matching local and remote heads, zero divergence
+and a clean worktree before the Linear state and comment were read back. Linear
+released DAR-29 and DAR-34; DAR-30 now remains blocked only by DAR-29. The full
+PRD remains incomplete.
 
 DAR-16 is Done in native Linear under consolidated state activity
 `33e723d1-ecbe-447b-9aec-a68d092fd1e0`; its completion evidence comment was
