@@ -4,6 +4,11 @@ name: Release qualification (no publication)
 # immutable commit captured by that dispatch, not a moving checkout ref.
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic release version without a leading v or build metadata
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,24 +24,38 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out the dispatched commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Install the declared Go toolchain
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: false
       - name: Verify source and record native platform
         id: source
         shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          [[ ${#RELEASE_VERSION} -le 100 && "$RELEASE_VERSION" =~ $version_pattern ]]
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            prerelease=${RELEASE_VERSION#*-}
+            IFS=. read -ra identifiers <<< "$prerelease"
+            for identifier in "${identifiers[@]}"; do
+              if [[ "$identifier" =~ ^[0-9]+$ && ${#identifier} -gt 1 && "$identifier" == 0* ]]; then
+                exit 1
+              fi
+            done
+          fi
           commit=$(git rev-parse HEAD)
           test "$commit" = "$GITHUB_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           {
+            echo "version=$RELEASE_VERSION"
             echo "commit=$commit"
             echo "os=$(go env GOHOSTOS)"
             echo "arch=$(go env GOHOSTARCH)"
@@ -49,6 +68,9 @@ jobs:
       - name: Run deterministic MVP and disposable-key packaging qualification
         id: qualification
         shell: bash
+        env:
+          DARWIN_RELEASE_VERSION: ${{ inputs.version }}
+          DARWIN_RELEASE_COMMIT: ${{ github.sha }}
         run: make qualify-release
       - name: Confirm source remains unchanged
         id: unchanged
@@ -62,6 +84,7 @@ jobs:
         shell: bash
         env:
           SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
           NATIVE_OS: ${{ steps.source.outputs.os }}
           NATIVE_ARCH: ${{ steps.source.outputs.arch }}
           GO_VERSION: ${{ steps.source.outputs.go }}
@@ -72,6 +95,7 @@ jobs:
         run: |
           {
             echo '## Release qualification — no publication'
+            printf '\nRelease version: `%s`\n' "${RELEASE_VERSION:-unavailable}"
             printf '\nDispatched commit: `%s`\n' "$GITHUB_SHA"
             printf '\nVerified checkout: `%s`\n' "${SOURCE_COMMIT:-unavailable}"
             printf '\nObserved native platform: `%s/%s`; Go: `%s`\n' "${NATIVE_OS:-unavailable}" "${NATIVE_ARCH:-unavailable}" "${GO_VERSION:-unavailable}"

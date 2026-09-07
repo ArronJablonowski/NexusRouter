@@ -1,20 +1,25 @@
 # Manual hosted release qualification
 
 The **Release qualification (no publication)** GitHub Actions workflow is
-manual-only. Select a reviewed branch or tag when dispatching it. The workflow
+manual-only. Select a reviewed branch or tag and enter the intended semantic
+release version when dispatching it. The required version excludes a leading
+`v` and build metadata and is validated before qualification. The workflow
 checks out the dispatch event's immutable `github.sha`, verifies HEAD and a clean
-worktree, and runs `make check` followed by `make qualify-release`. No separate
-commit input can redirect the checkout away from the dispatched source.
+worktree, and runs `make check` followed by a version- and commit-bound
+`make qualify-release`. No separate commit input can redirect the checkout away
+from the dispatched source.
 
-Each Ubuntu/macOS matrix job records the verified commit, actual Go host
-OS/architecture, Go version and individual gate outcomes in its job summary.
+Each Ubuntu/macOS matrix job records the requested version, verified commit,
+actual Go host OS/architecture, Go version and individual gate outcomes in its
+job summary.
 The qualification gate builds all four release targets twice, compares their
 unsigned bytes, verifies formats, exercises disposable-key signing and tamper
 rejection, and executes only the artifact matching that job's native platform.
 Other targets are cross-build evidence, not native execution evidence. The
 summary identifies failures and skipped gates; neither qualifies a release.
 
-The workflow has read-only repository permissions, disables checkout credential
+The workflow has read-only repository permissions, pins the checkout and Go
+setup actions to reviewed full commit IDs, disables checkout credential
 persistence and Go cache uploads, and has no publication or artifact-upload
 step. Test-generated archives and keys remain disposable runner-local files.
 It does not use the repository SSH key, production signing secrets or live model

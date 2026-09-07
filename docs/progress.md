@@ -4131,3 +4131,28 @@ tree. This establishes the testable MVP gate. DAR-46 remains intentionally open:
 signed v1.0.0 publication still requires operator decisions for license/notices,
 supported platforms, production signing-key custody and public trust, release
 approval and publication authority.
+
+DAR-46 release-candidate hardening checkpoint: manual hosted qualification now
+requires a restricted semantic version and binds both that version and the
+dispatch commit to the clean source checkout. Third-party workflow actions are
+pinned to reviewed commit IDs, and the local opt-in qualification requires the
+same explicit version/full-commit identity. Signing and offline verification now
+reject archives that are not the canonical single-file USTAR/gzip form emitted
+by the packager, including noncanonical metadata, extra entries, same-member
+suffixes, trailing compressed data, invalid trailers and bounded decompression
+bombs. Authenticated payload validation also requires a 64-bit little-endian
+Mach-O or ELF executable for the declared target, a plausible executable load
+segment and entry mechanism, and no ELF interpreter. Structural validation does
+not replace native execution evidence.
+
+Release documentation now provides fail-fast, non-overwriting versioned install
+steps, explicit host-to-artifact mapping, a fail-closed local configuration,
+schema-29 migration language, exact version assertions, and a recordable
+candidate checklist. Focused release-package race tests passed three times;
+package vetting, diff checks, and validation of all three shipped example
+configurations also passed. The hosted workflow has not yet run and no
+production signing key, public trust channel, approved license/notices,
+supported-target decision, final approval, tag, artifact upload or publication
+is claimed. Release archives still contain only the binary; operators must bind
+the separately reviewed documentation and sample configuration to the same
+source commit. DAR-46 remains In Progress.

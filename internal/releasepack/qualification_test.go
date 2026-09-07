@@ -25,6 +25,10 @@ func TestReleaseQualification(t *testing.T) {
 	if os.Getenv("DARWIN_RELEASE_QUALIFY") != "1" {
 		t.Skip("set DARWIN_RELEASE_QUALIFY=1 on a clean committed checkout")
 	}
+	version, expectedCommit := os.Getenv("DARWIN_RELEASE_VERSION"), os.Getenv("DARWIN_RELEASE_COMMIT")
+	if validate(Options{Version: version, Commit: expectedCommit, Out: "release"}) != nil {
+		t.Fatal("provide a valid DARWIN_RELEASE_VERSION and DARWIN_RELEASE_COMMIT")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
 	source, err := command(ctx, ".", environment(), "git", "rev-parse", "--show-toplevel")
@@ -35,10 +39,12 @@ func TestReleaseQualification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("qualifying source commit %s on %s/%s", commit, runtime.GOOS, runtime.GOARCH)
+	if commit != expectedCommit {
+		t.Fatalf("source commit %q does not match DARWIN_RELEASE_COMMIT", commit)
+	}
+	t.Logf("qualifying release %s from source commit %s on %s/%s", version, commit, runtime.GOOS, runtime.GOARCH)
 	parent := t.TempDir()
 	first, second := filepath.Join(parent, "first"), filepath.Join(parent, "second")
-	const version = "0.0.0-qualification"
 	if err = Package(ctx, Options{Version: version, Commit: commit, Out: first, Source: source}); err != nil {
 		t.Fatal(err)
 	}

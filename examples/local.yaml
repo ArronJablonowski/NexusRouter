@@ -16,8 +16,16 @@ models:
     model: local-model-id
     locality: local
     capabilities: [chat, summarize, classify]
-    # Required before execution: replace 0 with your measured conservative byte
-    # estimate for model weights plus maximum context/KV and runtime overhead.
+    # Required before automatic routing, tools, summaries, or compaction: replace
+    # 0 with a conservative input-token limit supported by the installed model.
+    # Keeping zero makes this template fail closed for those paths.
+    context_tokens: 0
+    # Local Ollama execution is treated as zero-cost for admission. Change this
+    # operator estimate if the deployment has a nonzero per-attempt cost.
+    estimated_cost: 0
+    # Required before any local execution: replace 0 with your measured
+    # conservative byte estimate for model weights plus maximum context/KV and
+    # runtime overhead. Keeping zero denies local resource admission.
     # On Apple unified memory, include GPU allocations here and leave VRAM zero.
     ram_bytes: 0
 telemetry:

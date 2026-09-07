@@ -7,10 +7,14 @@ A Go-based, local-first agent runtime with adaptive model routing. The product s
 Local release preparation now supports reproducible four-target archives,
 checksummed manifests, explicit Ed25519 signing and offline trusted-key
 verification. See [release packaging](docs/release-packaging.md) and
-`make qualify-release`. No release has been published; distribution identity,
-license approval and full runtime qualification remain separate gates.
+the recordable [release checklist](docs/release-checklist.md) for the required
+version- and commit-bound qualification command. The deterministic testable-MVP
+gate passes and 41 of 42 MVP issues are complete. DAR-46 remains open: no
+release has been published, and
+license/notices, supported platforms, production signing trust, release approval
+and publication authority remain operator gates.
 
-The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands, opt-in local read tools, reviewed new-file creation and bounded existing-file replacement are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. General patch editing, delegated writes and unattended write approvals remain unfinished; reviewed custom Go SDK tools have separate safety requirements. See the implementation evidence for remaining work; this is not a released MVP.
+The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands, opt-in local read tools, reviewed new-file creation and bounded existing-file replacement are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. General patch editing, delegated writes and unattended write approvals remain unfinished; reviewed custom Go SDK tools have separate safety requirements. See the implementation evidence for remaining work; passing the testable-MVP gate is not a published or production-qualified release.
 
 Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent or explicitly identified same-model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
@@ -334,12 +338,15 @@ prevention or protection against encoded/obfuscated variants.
 
 ## Run an explicit-model task
 
-Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model
-and set that model's `ram_bytes` to a conservative positive estimate covering
-weights, maximum context/KV memory and runtime overhead. The sample deliberately
-uses zero to deny execution until this estimate is supplied; configuration
-validation alone does not establish execution readiness. On Apple unified
-memory include GPU allocations in RAM and leave `vram_bytes` zero. Then run:
+Replace `local-model-id` in `examples/local.yaml` with an installed Ollama model.
+Set `context_tokens` to a conservative supported input limit and `ram_bytes` to
+a conservative positive estimate covering weights, maximum context/KV memory
+and runtime overhead. Review `estimated_cost`; zero is appropriate only when the
+local attempt has no monetary cost for admission purposes. The sample deliberately
+keeps both context and RAM at zero so automatic routing and local execution fail
+closed until the operator supplies those estimates. Configuration validation
+alone does not establish execution readiness. On Apple unified memory include
+GPU allocations in RAM and leave `vram_bytes` zero. Then run:
 
 ```sh
 ./bin/darwin run --config examples/local.yaml --model local-fast < prompt.txt
@@ -525,8 +532,8 @@ New guidance for a terminal task is rejected, but duplicate-key receipts remain
 retrievable. Use completed-session continuation for a new follow-up task.
 
 Steering storage was introduced in schema14; current storage migrates
-transactionally to [schema28](docs/event-kind-index.md). Back up operational databases
-before upgrades; older binaries cannot open schema28. The runtime turn
+transactionally to [schema29](docs/task-duration-metrics.md). Back up operational
+databases before upgrades; older binaries cannot open schema29. The runtime turn
 configuration changes durable submission fingerprints, so older queued requests
 require explicit configuration-mismatch handling. A full-screen interactive editor
 and general interrupted-session recovery remain unfinished.
@@ -637,7 +644,7 @@ The Go `sessions.Summarizer` component generates bounded proposals, and the appl
 ./bin/darwin summaries show --db ./data/darwin.db --id SUMMARY_ATTEMPT_ID
 ```
 
-The selected model needs configured `context_tokens` and `estimated_cost`; local models also need `ram_bytes`. The default zero cost ceiling permits only a configured zero-cost estimate. The sample local configuration needs this operator-supplied metadata before summary generation. Summarization may use the source model because it is not an independent quality audit; `evaluation.judge` does not disable explicitly requested summaries.
+The selected model needs configured `context_tokens` and `estimated_cost`; local models also need `ram_bytes`. The default zero cost ceiling permits only a configured zero-cost estimate. The sample local configuration supplies that zero-cost estimate but deliberately keeps context and RAM at zero until the operator provides conservative values; it is not ready for summary generation as shipped. Summarization may use the source model because it is not an independent quality audit; `evaluation.judge` does not disable explicitly requested summaries.
 
 The exact signed-in Sol `codex_app_server` model can also draft summaries of
 cloud-eligible sources using the same command. See [native session-summary

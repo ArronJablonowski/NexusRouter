@@ -1,9 +1,15 @@
 package releasepack
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"debug/elf"
+	"debug/macho"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
@@ -29,7 +36,7 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	manifest := Manifest{SchemaVersion: 1, Version: "1.0.0", Commit: strings.Repeat("a", 40), Toolchain: "go1.27.1"}
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
-		body := []byte("fixture " + name)
+		body := signingArchiveFixture(t, target[0], target[1])
 		writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(body), name)
 		manifest.Artifacts = append(manifest.Artifacts, Artifact{OS: target[0], Arch: target[1], File: name, SHA256: fmt.Sprintf("%x", sha256.Sum256(body))})
@@ -43,6 +50,101 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	fmt.Fprintf(&sums, "%x  manifest.json\n", sha256.Sum256(body))
 	writeSigningFixture(t, filepath.Join(dir, "SHA256SUMS"), []byte(sums.String()), 0644)
 	return
+}
+
+func signingArchiveFixture(t *testing.T, targetOS, targetArch string) []byte {
+	t.Helper()
+	executable := signingBinaryFixture(t, targetOS, targetArch)
+	var archive bytes.Buffer
+	if err := Archive(&archive, []Entry{{Name: "darwin", Data: executable}}); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
+
+func signingBinaryFixture(t *testing.T, targetOS, targetArch string) []byte {
+	t.Helper()
+	if targetOS == "darwin" {
+		// A minimal 64-bit Mach-O executable with an executable __TEXT segment
+		// and LC_UNIXTHREAD entry mechanism.
+		body := make([]byte, 128)
+		binary.LittleEndian.PutUint32(body[0:4], uint32(macho.Magic64))
+		cpu := uint32(macho.CpuAmd64)
+		if targetArch == "arm64" {
+			cpu = uint32(macho.CpuArm64)
+		}
+		binary.LittleEndian.PutUint32(body[4:8], cpu)
+		binary.LittleEndian.PutUint32(body[8:12], 3)
+		binary.LittleEndian.PutUint32(body[12:16], uint32(macho.TypeExec))
+		binary.LittleEndian.PutUint32(body[16:20], 2)
+		binary.LittleEndian.PutUint32(body[20:24], 96)
+		binary.LittleEndian.PutUint32(body[32:36], uint32(macho.LoadCmdSegment64))
+		binary.LittleEndian.PutUint32(body[36:40], 72)
+		copy(body[40:56], "__TEXT")
+		binary.LittleEndian.PutUint64(body[56:64], 0x100000000)
+		binary.LittleEndian.PutUint64(body[64:72], uint64(len(body)))
+		binary.LittleEndian.PutUint64(body[80:88], uint64(len(body)))
+		binary.LittleEndian.PutUint32(body[88:92], 7)
+		binary.LittleEndian.PutUint32(body[92:96], 5)
+		binary.LittleEndian.PutUint32(body[104:108], uint32(macho.LoadCmdUnixThread))
+		binary.LittleEndian.PutUint32(body[108:112], 24)
+		binary.LittleEndian.PutUint32(body[112:116], 1)
+		return body
+	}
+	// A minimal 64-bit little-endian ELF executable with one executable PT_LOAD
+	// segment and an entry point mapped by that segment.
+	body := make([]byte, 121)
+	copy(body, []byte{0x7f, 'E', 'L', 'F', byte(elf.ELFCLASS64), byte(elf.ELFDATA2LSB), byte(elf.EV_CURRENT)})
+	binary.LittleEndian.PutUint16(body[16:18], uint16(elf.ET_EXEC))
+	machine := uint16(elf.EM_X86_64)
+	if targetArch == "arm64" {
+		machine = uint16(elf.EM_AARCH64)
+	}
+	binary.LittleEndian.PutUint16(body[18:20], machine)
+	binary.LittleEndian.PutUint32(body[20:24], uint32(elf.EV_CURRENT))
+	binary.LittleEndian.PutUint64(body[24:32], 0x400078)
+	binary.LittleEndian.PutUint64(body[32:40], 64)
+	binary.LittleEndian.PutUint16(body[52:54], 64)
+	binary.LittleEndian.PutUint16(body[54:56], 56)
+	binary.LittleEndian.PutUint16(body[56:58], 1)
+	binary.LittleEndian.PutUint32(body[64:68], uint32(elf.PT_LOAD))
+	binary.LittleEndian.PutUint32(body[68:72], uint32(elf.PF_R|elf.PF_X))
+	binary.LittleEndian.PutUint64(body[80:88], 0x400000)
+	binary.LittleEndian.PutUint64(body[88:96], 0x400000)
+	binary.LittleEndian.PutUint64(body[96:104], uint64(len(body)))
+	binary.LittleEndian.PutUint64(body[104:112], uint64(len(body)))
+	binary.LittleEndian.PutUint64(body[112:120], 0x1000)
+	body[120] = 0xc3
+	return body
+}
+
+func headerOnlyBinaryFixture(targetOS, targetArch string) []byte {
+	var executable []byte
+	if targetOS == "darwin" {
+		executable = make([]byte, 32)
+		binary.LittleEndian.PutUint32(executable[0:4], 0xfeedfacf)
+		cpu := uint32(0x01000007)
+		if targetArch == "arm64" {
+			cpu = 0x0100000c
+		}
+		binary.LittleEndian.PutUint32(executable[4:8], cpu)
+		binary.LittleEndian.PutUint32(executable[8:12], 3)
+		binary.LittleEndian.PutUint32(executable[12:16], 2)
+	} else {
+		executable = make([]byte, 64)
+		copy(executable, []byte{0x7f, 'E', 'L', 'F', 2, 1, 1})
+		binary.LittleEndian.PutUint16(executable[16:18], 2)
+		machine := uint16(62)
+		if targetArch == "arm64" {
+			machine = 183
+		}
+		binary.LittleEndian.PutUint16(executable[18:20], machine)
+		binary.LittleEndian.PutUint32(executable[20:24], 1)
+		binary.LittleEndian.PutUint16(executable[52:54], 64)
+		binary.LittleEndian.PutUint16(executable[54:56], 56)
+		binary.LittleEndian.PutUint16(executable[58:60], 64)
+	}
+	return executable
 }
 
 func TestSigningManifestContract(t *testing.T) {
@@ -156,6 +258,166 @@ func TestSigningOfflineRoundTrip(t *testing.T) {
 	if err := Verify(dir, wrong); err != ErrSignature {
 		t.Fatal("untrusted key accepted", err)
 	}
+}
+
+func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
+	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
+		t.Run(scenario, func(t *testing.T) {
+			dir, seed, public := signingFixture(t)
+			name := "DarwinRouter_1.0.0_darwin_amd64.tar.gz"
+			var body []byte
+			switch scenario {
+			case "plain_string":
+				// This was the former fixture shape: authenticated bytes, but
+				// neither a gzip archive nor a DarwinRouter executable.
+				body = []byte("fixture " + name)
+			case "multiple_entries":
+				var archive bytes.Buffer
+				if err := Archive(&archive, []Entry{{Name: "darwin", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: "extra", Data: []byte("extra")}}); err != nil {
+					t.Fatal(err)
+				}
+				body = archive.Bytes()
+			case "wrong_name":
+				var archive bytes.Buffer
+				if err := Archive(&archive, []Entry{{Name: "other", Data: signingBinaryFixture(t, "darwin", "amd64")}}); err != nil {
+					t.Fatal(err)
+				}
+				body = archive.Bytes()
+			case "noncanonical_metadata":
+				body = customSigningArchive(t, signingBinaryFixture(t, "darwin", "amd64"), 0700, 0)
+			case "trailing_bytes":
+				body = customSigningArchive(t, signingBinaryFixture(t, "darwin", "amd64"), 0755, 8)
+			case "bad_gzip_crc":
+				body = signingArchiveFixture(t, "darwin", "amd64")
+				body[len(body)-8] ^= 1
+			case "compressed_bomb":
+				body = customSigningArchive(t, signingBinaryFixture(t, "darwin", "amd64"), 0755, maxTarStream+1)
+			case "wrong_os":
+				body = signingArchiveFixture(t, "linux", "amd64")
+			case "wrong_arch":
+				body = signingArchiveFixture(t, "darwin", "arm64")
+			case "header_only_macho":
+				body = archiveSigningBody(t, headerOnlyBinaryFixture("darwin", "amd64"))
+			case "header_only_elf":
+				body = archiveSigningBody(t, headerOnlyBinaryFixture("linux", "amd64"))
+			case "elf_interpreter":
+				body = archiveSigningBody(t, signingELFInterpreterFixture(t))
+			}
+			writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
+			refreshSigningFixture(t, dir)
+			if err := Sign(dir, seed); err != ErrSignature {
+				t.Fatal("invalid archive signed", err)
+			}
+			authenticateSigningFixture(t, dir, seed)
+			if err := Verify(dir, public); err != ErrSignature {
+				t.Fatal("invalid authenticated archive verified", err)
+			}
+		})
+	}
+}
+
+func archiveSigningBody(t *testing.T, body []byte) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	if err := Archive(&archive, []Entry{{Name: "darwin", Data: body}}); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
+
+func customSigningArchive(t *testing.T, body []byte, mode int64, suffix int64) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	gz.Header.ModTime = time.Time{}
+	gz.Header.OS = 255
+	tw := tar.NewWriter(gz)
+	header := &tar.Header{Name: "darwin", Mode: mode, Size: int64(len(body)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
+	if err := tw.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zeros := make([]byte, 1<<20)
+	for suffix > 0 {
+		chunk := int64(len(zeros))
+		if chunk > suffix {
+			chunk = suffix
+		}
+		if _, err := gz.Write(zeros[:chunk]); err != nil {
+			t.Fatal(err)
+		}
+		suffix -= chunk
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
+
+func signingELFInterpreterFixture(t *testing.T) []byte {
+	t.Helper()
+	body := signingBinaryFixture(t, "linux", "amd64")
+	body = append(body, make([]byte, 56)...)
+	binary.LittleEndian.PutUint16(body[56:58], 2)
+	offset := 64 + 56
+	binary.LittleEndian.PutUint32(body[offset:offset+4], uint32(elf.PT_INTERP))
+	binary.LittleEndian.PutUint32(body[offset+4:offset+8], uint32(elf.PF_R))
+	binary.LittleEndian.PutUint64(body[offset+8:offset+16], 120)
+	binary.LittleEndian.PutUint64(body[offset+32:offset+40], 1)
+	binary.LittleEndian.PutUint64(body[offset+40:offset+48], 1)
+	binary.LittleEndian.PutUint64(body[offset+48:offset+56], 1)
+	return body
+}
+
+func refreshSigningFixture(t *testing.T, dir string) {
+	t.Helper()
+	manifestPath := filepath.Join(dir, "manifest.json")
+	body, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err = json.Unmarshal(body, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	var sums strings.Builder
+	for i := range manifest.Artifacts {
+		artifactBody, readErr := os.ReadFile(filepath.Join(dir, manifest.Artifacts[i].File))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		digest := fmt.Sprintf("%x", sha256.Sum256(artifactBody))
+		manifest.Artifacts[i].SHA256 = digest
+		fmt.Fprintf(&sums, "%s  %s\n", digest, manifest.Artifacts[i].File)
+	}
+	body, err = json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = append(body, '\n')
+	writeSigningFixture(t, manifestPath, body, 0644)
+	fmt.Fprintf(&sums, "%x  manifest.json\n", sha256.Sum256(body))
+	writeSigningFixture(t, filepath.Join(dir, "SHA256SUMS"), []byte(sums.String()), 0644)
+}
+
+func authenticateSigningFixture(t *testing.T, dir, seedFile string) {
+	t.Helper()
+	seed, err := signingKeyFile(seedFile, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(seed)
+	sums, err := os.ReadFile(filepath.Join(dir, "SHA256SUMS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature := ed25519.Sign(ed25519.NewKeyFromSeed(seed), sums)
+	writeSigningFixture(t, filepath.Join(dir, signatureName), []byte(hex.EncodeToString(signature)+"\n"), 0644)
 }
 
 func TestSigningTampering(t *testing.T) {

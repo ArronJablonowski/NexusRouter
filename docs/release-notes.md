@@ -1,7 +1,9 @@
 # DarwinRouter release notes — unreleased
 
-This is a development summary, not a v1.0.0 release announcement. No signed
-production release, release tag or complete PRD acceptance is claimed.
+This is a development summary, not a v1.0.0 release announcement. The
+deterministic testable-MVP gate passes and 41 of 42 MVP issues are complete, but
+DAR-46 remains open. No signed production release, release tag, supported-platform
+decision or publication approval is claimed.
 
 ## Available for supervised testing
 
@@ -229,10 +231,11 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses schema 23. New resource leases carry private
+The current durable store uses SQLite schema 29. Schema-22-and-newer resource
+leases carry private
 [execution-image ownership](process-lifetime-ownership.md); foreign processes
 cannot mutate a bound lease merely by copying its token. Legacy leases remain
-unbound. The daemon can now reclaim only
+unbound. Schema 23 added the recovery receipts used when the daemon reclaims only
 [verified terminal orphan readers](terminal-reader-recovery.md), with atomic
 audit receipts and no model/tool replay. Running work, writers and unknown
 ownership remain unresolved. Guard storage currently
@@ -252,10 +255,12 @@ into DarwinRouter or artifacts.
 
 ## Required before announcing v1.0.0
 
-The deterministic DAR-45 MVP gate passes, but full PRD qualification,
+The deterministic DAR-45 testable-MVP gate passes and DAR-46 is the only open
+MVP issue, but full PRD qualification,
 built-in side-effecting CLI tools,
 automatic skill validation/activation, learning-attention controls,
 configuration reload and supported-platform qualification remain
 open. This list is not exhaustive. Distribution also requires an approved
 license and notices, a dedicated signing identity with an independent public-key
-trust record, approved version-specific notes and explicit publication.
+trust record, approved version-specific notes and explicit publication. Record
+the decisions and evidence in the [release checklist](release-checklist.md).

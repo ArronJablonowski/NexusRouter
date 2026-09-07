@@ -37,6 +37,7 @@ qualify-codex-repair:
 	DARWIN_CODEX_LIVE_FAILURE_REPAIR=1 go test -race ./internal/codexbridge -run '^TestLiveCodexRecoverableToolProtocol$$' -count=1 -v
 	DARWIN_CODEX_LIVE_REPAIR=1 go test -race ./internal/app -run '^TestLiveCodexDelegationRepair$$' -count=1 -v
 
-# Requires a clean committed checkout. Uses only disposable test signing keys.
+# Requires DARWIN_RELEASE_VERSION, DARWIN_RELEASE_COMMIT and a clean committed
+# checkout. Uses only disposable test signing keys.
 qualify-release: qualify-mvp
 	DARWIN_RELEASE_QUALIFY=1 go test -count=1 -timeout=45m -run '^TestReleaseQualification$$' -v ./internal/releasepack

@@ -121,23 +121,113 @@ another process from modifying files afterward. A valid signature establishes
 the signing key's approval of bytes, not that the code is safe or the claimed
 build process independently occurred.
 
-After verification, select the archive matching `uname -s`/`uname -m`, inspect
-that its only member is `darwin`, and extract into a new empty staging directory.
-Run the staged executable's `version` command and confirm the expected version
-before moving it into a user-controlled bin directory. Preserve any previous
-binary for rollback. No automatic installer or system-wide write is provided.
-Use [examples/local.yaml](../examples/local.yaml) as a local-first configuration
-template, replacing the model ID and conservative memory estimate before a
-task. The signed-in Sol coordinator profile is documented separately in
-[Codex coordinator integration](codex-coordinator-integration.md).
+After verification, map the host identity to an archive name. `uname -s` values
+`Darwin` and `Linux` map to `darwin` and `linux`; `uname -m` values `x86_64` and
+`amd64` map to `amd64`, while `arm64` and `aarch64` map to `arm64`. Any other
+value is unsupported and must stop installation rather than guessing.
+
+Use a new temporary staging directory and a new versioned, user-controlled
+prefix. Replace every uppercase placeholder before running these commands:
+
+```sh
+set -eu
+release_dir=/ABSOLUTE/VERIFIED/RELEASE_DIRECTORY
+release_version=RELEASE_VERSION
+install_root=/ABSOLUTE/USER_CONTROLLED/DARWINROUTER
+install_prefix="$install_root/releases/$release_version"
+stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/darwinrouter-install.XXXXXX")
+trap 'rm -rf -- "$stage_dir"' EXIT HUP INT TERM
+
+case "$(uname -s)" in
+  Darwin) release_os=darwin ;;
+  Linux) release_os=linux ;;
+  *) echo "unsupported operating system" >&2; exit 1 ;;
+esac
+case "$(uname -m)" in
+  x86_64|amd64) release_arch=amd64 ;;
+  arm64|aarch64) release_arch=arm64 ;;
+  *) echo "unsupported architecture" >&2; exit 1 ;;
+esac
+
+archive="$release_dir/DarwinRouter_${release_version}_${release_os}_${release_arch}.tar.gz"
+test "$(tar -tzf "$archive")" = darwin
+tar -xzf "$archive" -C "$stage_dir"
+test -f "$stage_dir/darwin" && test ! -L "$stage_dir/darwin"
+test "$("$stage_dir/darwin" version)" = "darwin $release_version"
+mkdir -p "$install_root/releases"
+mkdir "$install_prefix"
+mkdir "$install_prefix/bin"
+install -m 0755 "$stage_dir/darwin" "$install_prefix/bin/darwin"
+test "$("$install_prefix/bin/darwin" version)" = "darwin $release_version"
+```
+
+The two exact version assertions must pass. Remove the staging directory only
+after inspection. Do not replace an existing versioned prefix; retain the
+previous prefix and its matching database backup for rollback. No automatic
+installer, PATH change, symlink switch or system-wide write is provided.
+
+The archives contain only `darwin`, so create configuration separately from a
+reviewed template belonging to the same source commit. Use stable absolute paths
+for installed operation: a relative database such as `./data/darwin.db` changes
+meaning with the process working directory. Create private configuration and
+state directories (mode 0700), write the configuration file with mode 0600, and
+replace all placeholders below. The database parent must already exist.
+
+```yaml
+version: 1
+mode: local_only
+runtime:
+  max_turns: 8
+  auto_use_approved_summary: false
+providers:
+  - id: local-primary
+    kind: ollama
+    endpoint: http://127.0.0.1:11434
+    request_timeout: 5m
+models:
+  - id: local-fast
+    provider: local-primary
+    model: REPLACE_WITH_INSTALLED_OLLAMA_MODEL
+    locality: local
+    capabilities: [chat, summarize, classify]
+    context_tokens: 0
+    estimated_cost: 0
+    ram_bytes: 0
+telemetry:
+  database: /ABSOLUTE/PRIVATE/DARWINROUTER/state/darwin.db
+```
+
+The two zero resource/context estimates deliberately make the template fail
+closed. Before execution, set `context_tokens` to a conservative supported input
+limit and `ram_bytes` to a measured conservative byte estimate covering model
+weights, maximum context/KV memory and runtime overhead. Review whether the
+zero `estimated_cost` is appropriate. Validate the final absolute configuration
+and keep using that exact path:
+
+```sh
+"$install_prefix/bin/darwin" config validate \
+  --config /ABSOLUTE/PRIVATE/DARWINROUTER/config.yaml
+```
+
+The source-tree [local example](../examples/local.yaml) documents the same
+fail-closed fields. The signed-in Sol coordinator profile is documented
+separately in [Codex coordinator integration](codex-coordinator-integration.md).
 
 ## Repeatable qualification and remaining release gates
 
 After committing changes and with a clean worktree, run:
 
 ```sh
-make qualify-release
+DARWIN_RELEASE_VERSION=1.0.0-rc.1 \
+DARWIN_RELEASE_COMMIT=FULL_REVIEWED_COMMIT_ID \
+  make qualify-release
 ```
+
+Both values are required. The version must use the same restricted semantic
+version syntax as `package-release`, without a leading `v` or build metadata,
+and the commit must be the full lowercase ID of the current clean checkout.
+Qualification fails before packaging if either identity is invalid or HEAD does
+not equal the supplied commit.
 
 This opt-in target first runs the deterministic [MVP qualification](mvp-qualification.md),
 then builds all four targets twice from separate private snapshots, compares
@@ -165,3 +255,8 @@ Before a real release:
 - Produce approved signed artifacts and release notes from the reviewed commit,
   then explicitly authorize publication. No `v1.0.0` tag is implied by the PRD's
   document version or this development checkpoint.
+
+Use the recordable [release checklist](release-checklist.md) to bind these gates,
+the signing identity, publication authorization and post-publication verification
+to one version and reviewed commit. An incomplete checklist is a blocked release,
+not authority to infer or waive a decision.

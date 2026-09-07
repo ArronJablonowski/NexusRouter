@@ -37,6 +37,9 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 		if artifact.OS != target[0] || artifact.Arch != target[1] || artifact.File != name || artifact.SHA256 == "" || digests[name] != artifact.SHA256 {
 			return ErrSignature
 		}
+		if validateReleaseArchive(root, artifact) != nil {
+			return ErrSignature
+		}
 	}
 	return nil
 }
