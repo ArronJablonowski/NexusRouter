@@ -31,8 +31,15 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 			Timeout  int               `yaml:"timeout-minutes"`
 			Env      map[string]string `yaml:"env"`
 			Strategy struct {
-				FailFast bool                `yaml:"fail-fast"`
-				Matrix   map[string][]string `yaml:"matrix"`
+				FailFast bool `yaml:"fail-fast"`
+				Matrix   struct {
+					Include []struct {
+						Target       string `yaml:"target"`
+						Runner       string `yaml:"runner"`
+						ExpectedOS   string `yaml:"expected_os"`
+						ExpectedArch string `yaml:"expected_arch"`
+					} `yaml:"include"`
+				} `yaml:"matrix"`
 			} `yaml:"strategy"`
 			RunsOn string `yaml:"runs-on"`
 			Steps  []struct {
@@ -62,8 +69,21 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		t.Fatal("workflow authority expanded")
 	}
 	job, ok := workflow.Jobs["qualify"]
-	if !ok || job.Timeout != 90 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.os }}" || !reflect.DeepEqual(job.Strategy.Matrix["os"], []string{"ubuntu-latest", "macos-latest"}) || len(job.Steps) != 7 {
+	expectedMatrix := [][4]string{
+		{"darwin/amd64", "macos-15-intel", "darwin", "amd64"},
+		{"darwin/arm64", "macos-15", "darwin", "arm64"},
+		{"linux/amd64", "ubuntu-24.04", "linux", "amd64"},
+		{"linux/arm64", "ubuntu-24.04-arm", "linux", "arm64"},
+	}
+	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 90 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
+		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 7 {
 		t.Fatal("unexpected job structure")
+	}
+	for i, expected := range expectedMatrix {
+		got := job.Strategy.Matrix.Include[i]
+		if [4]string{got.Target, got.Runner, got.ExpectedOS, got.ExpectedArch} != expected {
+			t.Fatal("unexpected native runner matrix", i)
+		}
 	}
 	if !reflect.DeepEqual(job.Env, map[string]string{
 		"CGO_ENABLED": "0", "GODEBUG": "", "GOTOOLCHAIN": "local", "GOENV": "off",
@@ -80,7 +100,14 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if job.Steps[3].ID != "check" || job.Steps[3].Run != "make check" || job.Steps[4].ID != "qualification" || job.Steps[4].Run != "make qualify-release" {
 		t.Fatal("qualification gates bypassed")
 	}
-	if job.Steps[2].Env["RELEASE_VERSION"] != "${{ inputs.version }}" || !strings.Contains(job.Steps[2].Run, "version_pattern") || !strings.Contains(job.Steps[2].Run, "version=$RELEASE_VERSION") {
+	if job.Steps[2].Env["RELEASE_VERSION"] != "${{ inputs.version }}" ||
+		job.Steps[2].Env["EXPECTED_NATIVE_OS"] != "${{ matrix.expected_os }}" ||
+		job.Steps[2].Env["EXPECTED_NATIVE_ARCH"] != "${{ matrix.expected_arch }}" ||
+		!strings.Contains(job.Steps[2].Run, "version_pattern") || !strings.Contains(job.Steps[2].Run, "version=$RELEASE_VERSION") ||
+		!strings.Contains(job.Steps[2].Run, `test "$(go env GOOS)" = "$EXPECTED_NATIVE_OS"`) ||
+		!strings.Contains(job.Steps[2].Run, `test "$(go env GOARCH)" = "$EXPECTED_NATIVE_ARCH"`) ||
+		!strings.Contains(job.Steps[2].Run, `test "$(go env GOHOSTOS)" = "$EXPECTED_NATIVE_OS"`) ||
+		!strings.Contains(job.Steps[2].Run, `test "$(go env GOHOSTARCH)" = "$EXPECTED_NATIVE_ARCH"`) {
 		t.Fatal("release version is not validated and recorded")
 	}
 	if !reflect.DeepEqual(job.Steps[4].Env, map[string]string{"DARWIN_RELEASE_VERSION": "${{ inputs.version }}", "DARWIN_RELEASE_COMMIT": "${{ github.sha }}"}) {
@@ -107,6 +134,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		"schema-28-to-29 migration",
 		"backup and rollback rehearsal",
 		"installation outside the disposable runner-local rehearsal",
+		"All four successful matrix jobs are required for four-target native evidence",
 	} {
 		if !strings.Contains(report.Run, evidence) {
 			t.Fatal("hosted summary omits or misstates qualification evidence", evidence)

@@ -17,6 +17,7 @@ and sensitive logs out of this record and the repository.
 - Proposed publication channel and audience:
 - External canonical candidate-record location:
 - Candidate-record SHA-256:
+- Independent expected candidate-record SHA-256 source:
 - Candidate-record verification host/time/result:
 - [ ] The version is approved and has no leading `v` in package-tool inputs.
 - [ ] HEAD equals the recorded commit and the worktree is clean.
@@ -44,6 +45,8 @@ and sensitive logs out of this record and the repository.
 
 Record `unsupported` explicitly rather than leaving a target ambiguous.
 Cross-build or file-format inspection is not native execution evidence.
+Use the one-target [native qualification contract](native-target-qualification.md)
+without inferring architecture from a workflow runner label.
 The current schema always emits and verifies all four targets, so any target
 that is not approved blocks this release rather than permitting its archive to
 be omitted.
@@ -104,17 +107,26 @@ be omitted.
 - Key custodian/authorized signer:
 - Rotation and revocation procedure:
 - Release approval policy reference:
+- External canonical signing-authorization record location:
+- Independently supplied signing-authorization record SHA-256 and source:
+- Authorization approver identity, policy evidence and UTC approval time:
 - Signing host and time (UTC):
 - [ ] The production key is dedicated to releases and is not a Git/SSH key.
 - [ ] The private seed stayed outside the repository, artifacts and logs.
 - [ ] The exact active trust-record bytes, separately supplied record SHA-256,
   key ID and key fingerprint all agree.
-- [ ] A second operator obtained the public key through the independent trusted
-  channel and verified the candidate directory successfully.
+- [ ] The canonical signing authorization binds this exact candidate, checksum
+  set, trust record, key identity, supported targets and notice approval; its
+  publication gate remains unapproved.
+- [ ] The signing authorization and independently trusted record name the exact
+  same reviewed release-policy URL.
+- [ ] A second operator independently confirmed the trust and authorization
+  inputs before the production seed was unlocked.
 
 ## Signed artifacts
 
 - Artifact directory/evidence location:
+- Independently approved exact `SHA256SUMS` SHA-256 source:
 - `manifest.json` SHA-256:
 - `SHA256SUMS` SHA-256:
 - `SHA256SUMS.sig` SHA-256:
@@ -123,6 +135,8 @@ be omitted.
 - [ ] Exactly four approved archives, the manifest, checksums and signature are
   present; no unexpected files are included.
 - [ ] Native staged binary reports the approved release version.
+- [ ] A second operator retrieved the trust record through the independent
+  channel and verified the production-signed directory successfully.
 
 ## Publication authorization
 

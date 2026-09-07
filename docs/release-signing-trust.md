@@ -89,11 +89,16 @@ evidence binds the exact reviewed identity, status and policy links.
 ## Signing ceremony
 
 The release approver and signer must be distinct roles where staffing permits.
-The signer confirms the version, full commit, artifact-directory digest evidence,
-completed prerequisite gates and explicit approval before unlocking the seed. Run
-`sign-release` once against a private, quiescent directory. It exclusively creates
-`SHA256SUMS.sig`; never delete or overwrite a partial signature merely to retry.
-Move an uncertain candidate aside and repeat from newly packaged approved inputs.
+The signer confirms the version, full commit, independently supplied candidate
+record digest, exact `SHA256SUMS` digest, trust-record identity, completed
+prerequisite gates and the independently digested canonical
+[signing authorization](release-signing-authorization.md) before unlocking the
+seed. Run the full
+production `sign-release` command documented in
+[release packaging](release-packaging.md) once against a private, quiescent
+directory. It exclusively creates `SHA256SUMS.sig`; never delete or overwrite a
+partial signature merely to retry. Move an uncertain candidate aside and repeat
+from newly packaged approved inputs.
 
 The verifier must use a separately retrieved active trust record, exact expected
 record digest, key ID, key fingerprint and an independently trusted source

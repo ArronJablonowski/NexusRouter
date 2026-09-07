@@ -1,0 +1,289 @@
+package releasepack
+
+import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestApprovedSigningRoundTrip(t *testing.T) {
+	options, public := approvedSigningFixture(t)
+	if err := SignApproved(context.Background(), options); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyTrustRecord(options.Dir, options.TrustRecordFile, options.ExpectedKeyID,
+		options.ExpectedKeyFingerprint, options.ExpectedTrustRecordSHA256); err != nil {
+		t.Fatal(err)
+	}
+	signature, err := os.ReadFile(filepath.Join(options.Dir, signatureName))
+	if err != nil || len(signature) != 2*ed25519.SignatureSize+1 {
+		t.Fatal("signature output", err)
+	}
+	if err = SignApproved(context.Background(), options); err != ErrSignature {
+		t.Fatal("existing production signature overwritten", err)
+	}
+	if len(public) != ed25519.PublicKeySize {
+		t.Fatal("fixture public key")
+	}
+}
+
+func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
+	for _, scenario := range []string{
+		"candidate", "candidate_identity", "authorization", "policy_mismatch", "trust", "sums",
+		"artifact", "existing_signature", "source", "canceled",
+	} {
+		t.Run(scenario, func(t *testing.T) {
+			options, _ := approvedSigningFixture(t)
+			ctx := context.Background()
+			switch scenario {
+			case "candidate":
+				options.ExpectedCandidateSHA256 = "sha256:" + strings.Repeat("0", 64)
+			case "candidate_identity":
+				alternate := filepath.Join(t.TempDir(), "alternate-candidate.json")
+				commit := approvedSourceCommit(t, options.Source)
+				if err := FreezeCandidate(ctx, Options{Version: "1.0.1", Commit: commit, Out: alternate, Source: options.Source}); err != nil {
+					t.Fatal(err)
+				}
+				body, err := os.ReadFile(alternate)
+				if err != nil {
+					t.Fatal(err)
+				}
+				options.CandidateRecordFile, options.ExpectedCandidateSHA256 = alternate, prefixedDigest(body)
+			case "authorization":
+				options.ExpectedAuthorizationSHA256 = "sha256:" + strings.Repeat("0", 64)
+			case "policy_mismatch":
+				body, authorization := readAuthorizationFixture(t, options.AuthorizationRecordFile)
+				authorization.ReleasePolicyURL = "https://example.invalid/different-policy"
+				body = canonicalAuthorizationFixture(t, authorization)
+				writeSigningFixture(t, options.AuthorizationRecordFile, body, 0644)
+				options.ExpectedAuthorizationSHA256 = prefixedDigest(body)
+			case "trust":
+				options.ExpectedTrustRecordSHA256 = "sha256:" + strings.Repeat("0", 64)
+			case "sums":
+				options.ExpectedSumsSHA256 = "sha256:" + strings.Repeat("0", 64)
+			case "artifact":
+				path := filepath.Join(options.Dir, "DarwinRouter_1.0.0_darwin_amd64.tar.gz")
+				body, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = os.WriteFile(path, append(body, 'x'), 0644); err != nil {
+					t.Fatal(err)
+				}
+			case "existing_signature":
+				writeSigningFixture(t, filepath.Join(options.Dir, signatureName), []byte(strings.Repeat("0", 128)+"\n"), 0644)
+			case "source":
+				if err := os.WriteFile(filepath.Join(options.Source, "untracked"), []byte("dirty\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			calls := 0
+			reader := func(string) ([]byte, error) {
+				calls++
+				return make([]byte, ed25519.SeedSize), nil
+			}
+			if err := signApproved(ctx, options, reader); err != ErrSignature {
+				t.Fatal("failed preflight accepted", err)
+			}
+			if calls != 0 {
+				t.Fatalf("failed %s preflight invoked private-key reader", scenario)
+			}
+			if scenario != "existing_signature" {
+				if _, err := os.Lstat(filepath.Join(options.Dir, signatureName)); !os.IsNotExist(err) {
+					t.Fatal("failed preflight created a signature", err)
+				}
+			}
+		})
+	}
+}
+
+func TestApprovedSigningRejectsWrongSeed(t *testing.T) {
+	options, _ := approvedSigningFixture(t)
+	_, other, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(other)
+	if err = os.WriteFile(options.KeyFile, []byte(hex.EncodeToString(other.Seed())+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = SignApproved(context.Background(), options); err != ErrSignature {
+		t.Fatal("wrong private identity accepted", err)
+	}
+	if _, err = os.Lstat(filepath.Join(options.Dir, signatureName)); !os.IsNotExist(err) {
+		t.Fatal("failed preflight created a signature", err)
+	}
+}
+
+func TestApprovedSigningReadsPrivateKeyOnceAfterPreflight(t *testing.T) {
+	options, _ := approvedSigningFixture(t)
+	seed, err := signingKeyFile(options.KeyFile, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(seed)
+	calls := 0
+	reader := func(path string) ([]byte, error) {
+		calls++
+		if path != options.KeyFile {
+			t.Fatalf("unexpected private-key path %q", path)
+		}
+		return append([]byte(nil), seed...), nil
+	}
+	if err = signApproved(context.Background(), options, reader); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("private-key reader called %d times", calls)
+	}
+}
+
+func readAuthorizationFixture(t *testing.T, path string) ([]byte, SigningAuthorization) {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var authorization SigningAuthorization
+	if err = json.Unmarshal(body, &authorization); err != nil {
+		t.Fatal(err)
+	}
+	return body, authorization
+}
+
+func canonicalAuthorizationFixture(t *testing.T, authorization SigningAuthorization) []byte {
+	t.Helper()
+	body, err := json.MarshalIndent(authorization, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(body, '\n')
+}
+
+func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	t.Helper()
+	ctx := context.Background()
+	source := collateralSourceFixture(t)
+	var err error
+	source, err = filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte("module example.com/approved\n\ngo 1.27.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range [][]string{{"init"}, {"config", "user.email", "approved@example.invalid"}, {"config", "user.name", "Approved Test"}, {"add", "."}, {"commit", "-m", "fixture"}} {
+		if _, err = command(ctx, source, environment(), "git", step...); err != nil {
+			t.Fatal(step, err)
+		}
+	}
+	commit := approvedSourceCommit(t, source)
+	candidateFile := filepath.Join(t.TempDir(), "candidate.json")
+	if err = FreezeCandidate(ctx, Options{Version: "1.0.0", Commit: commit, Out: candidateFile, Source: source}); err != nil {
+		t.Fatal(err)
+	}
+	candidateBody, err := os.ReadFile(candidateFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := loadCollateral(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseDir := t.TempDir()
+	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: commit, Toolchain: "go1.27.1"}
+	var sums strings.Builder
+	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
+		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
+		entries, metadata, entryErr := releaseEntries(shared, signingNoticeFixture(target[0], target[1]), signingBinaryFixture(t, target[0], target[1]))
+		if entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		var archive strings.Builder
+		if entryErr = Archive(&archive, entries); entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		body := []byte(archive.String())
+		writeSigningFixture(t, filepath.Join(releaseDir, name), body, 0644)
+		digest := sha256.Sum256(body)
+		hash := hex.EncodeToString(digest[:])
+		fmt.Fprintf(&sums, "%s  %s\n", hash, name)
+		manifest.Artifacts = append(manifest.Artifacts, Artifact{OS: target[0], Arch: target[1], File: name, SHA256: hash, Entries: metadata})
+	}
+	manifestBody, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestBody = append(manifestBody, '\n')
+	writeSigningFixture(t, filepath.Join(releaseDir, "manifest.json"), manifestBody, 0644)
+	fmt.Fprintf(&sums, "%x  manifest.json\n", sha256.Sum256(manifestBody))
+	sumsBody := []byte(sums.String())
+	writeSigningFixture(t, filepath.Join(releaseDir, "SHA256SUMS"), sumsBody, 0644)
+
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyFile := filepath.Join(t.TempDir(), "seed")
+	writeSigningFixture(t, keyFile, []byte(hex.EncodeToString(private.Seed())+"\n"), 0600)
+	keyDigest := sha256.Sum256(public)
+	keyFingerprint := "sha256:" + hex.EncodeToString(keyDigest[:])
+	record := TrustRecord{
+		SchemaVersion: 1, Project: "DarwinRouter", Scope: trustScope, KeyID: "release-test-01",
+		Algorithm: "Ed25519", PublicKey: hex.EncodeToString(public), PublicKeySHA256: keyFingerprint,
+		Status: "active", PublishedAt: "2026-09-07T00:00:00Z",
+		ReleasePolicyURL: "https://example.invalid/release-policy", RotationRevocationURL: "https://example.invalid/key-status",
+	}
+	trustBody, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trustBody = append(trustBody, '\n')
+	trustFile := filepath.Join(t.TempDir(), "trust.json")
+	writeSigningFixture(t, trustFile, trustBody, 0644)
+	authorization := SigningAuthorization{
+		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
+		CandidateRecordSHA256: prefixedDigest(candidateBody), SHA256SUMSSHA256: prefixedDigest(sumsBody),
+		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: record.KeyID, KeyFingerprint: keyFingerprint,
+		Targets:    append([]SigningAuthorizationTarget(nil), authorizedTargets...),
+		Gates:      append([]SigningAuthorizationGate(nil), signingAuthorizationGates...),
+		ApproverID: "test:release-approver", ReleasePolicyURL: record.ReleasePolicyURL,
+		ApprovedAt: "2026-09-07T00:01:00Z",
+	}
+	authorizationBody, err := json.MarshalIndent(authorization, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizationBody = append(authorizationBody, '\n')
+	authorizationFile := filepath.Join(t.TempDir(), "authorization.json")
+	writeSigningFixture(t, authorizationFile, authorizationBody, 0644)
+	return ApprovedSigningOptions{
+		Dir: releaseDir, KeyFile: keyFile, CandidateRecordFile: candidateFile,
+		ExpectedCandidateSHA256: prefixedDigest(candidateBody), Source: source,
+		ExpectedSumsSHA256: prefixedDigest(sumsBody), TrustRecordFile: trustFile,
+		ExpectedTrustRecordSHA256: prefixedDigest(trustBody), ExpectedKeyID: record.KeyID,
+		ExpectedKeyFingerprint:  keyFingerprint,
+		AuthorizationRecordFile: authorizationFile, ExpectedAuthorizationSHA256: prefixedDigest(authorizationBody),
+	}, public
+}
+
+func approvedSourceCommit(t *testing.T, source string) string {
+	t.Helper()
+	commit, err := command(context.Background(), source, environment(), "git", "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return commit
+}

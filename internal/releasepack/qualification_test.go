@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"debug/elf"
 	"debug/macho"
 	"encoding/hex"
@@ -81,13 +82,66 @@ func TestReleaseQualification(t *testing.T) {
 	if err = os.WriteFile(publicFile, []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err = Sign(first, seedFile); err != nil {
+	candidateFile := filepath.Join(parent, "candidate.json")
+	if err = FreezeCandidate(ctx, Options{Version: version, Commit: commit, Out: candidateFile, Source: source}); err != nil {
+		t.Fatal("candidate record", err)
+	}
+	candidateBody, err := os.ReadFile(candidateFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDigest := sha256.Sum256(public)
+	keyFingerprint := "sha256:" + hex.EncodeToString(keyDigest[:])
+	trustRecord := TrustRecord{
+		SchemaVersion: 1, Project: "DarwinRouter", Scope: trustScope, KeyID: "qualification-key",
+		Algorithm: "Ed25519", PublicKey: hex.EncodeToString(public), PublicKeySHA256: keyFingerprint,
+		Status: "active", PublishedAt: "2026-09-07T00:00:00Z",
+		ReleasePolicyURL: "https://example.invalid/qualification-policy", RotationRevocationURL: "https://example.invalid/qualification-status",
+	}
+	trustBody, err := json.MarshalIndent(trustRecord, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trustBody = append(trustBody, '\n')
+	trustFile := filepath.Join(parent, "trust-record.json")
+	if err = os.WriteFile(trustFile, trustBody, 0644); err != nil {
+		t.Fatal(err)
+	}
+	sumsBody, err := os.ReadFile(filepath.Join(second, "SHA256SUMS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization := SigningAuthorization{
+		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
+		CandidateRecordSHA256: prefixedDigest(candidateBody), SHA256SUMSSHA256: prefixedDigest(sumsBody),
+		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: trustRecord.KeyID, KeyFingerprint: keyFingerprint,
+		Targets:    append([]SigningAuthorizationTarget(nil), authorizedTargets...),
+		Gates:      append([]SigningAuthorizationGate(nil), signingAuthorizationGates...),
+		ApproverID: "test:qualification-approver", ReleasePolicyURL: trustRecord.ReleasePolicyURL,
+		ApprovedAt: "2026-09-07T00:01:00Z",
+	}
+	authorizationBody, err := json.MarshalIndent(authorization, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizationBody = append(authorizationBody, '\n')
+	authorizationFile := filepath.Join(parent, "authorization.json")
+	if err = os.WriteFile(authorizationFile, authorizationBody, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err = signUncheckedForTest(first, seedFile); err != nil {
 		t.Fatal(err)
 	}
 	if err = Verify(first, publicFile); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/sign-release", "--dir", second, "--key", seedFile); err != nil {
+	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/sign-release",
+		"--dir", second, "--key", seedFile, "--candidate-record", candidateFile,
+		"--candidate-record-sha256", prefixedDigest(candidateBody), "--source", source,
+		"--expected-sums-sha256", prefixedDigest(sumsBody), "--trust-record", trustFile,
+		"--trust-record-sha256", prefixedDigest(trustBody), "--key-id", trustRecord.KeyID,
+		"--key-fingerprint", keyFingerprint, "--authorization-record", authorizationFile,
+		"--authorization-record-sha256", prefixedDigest(authorizationBody)); err != nil {
 		t.Fatal("signing CLI", err)
 	}
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", second, "--public-key", publicFile); err != nil {

@@ -1,5 +1,28 @@
 # Implementation evidence
 
+DAR-51/54 release-evidence and signing-safety checkpoint: native qualification
+now has a canonical single-target record and bounded transcript wrapper that
+runs `make check` and the version/commit-bound `make qualify-release`, rechecks
+the exact clean source between gates, and cannot claim an unexecuted target.
+The manual hosted workflow now maps the four packaged targets to explicit
+standard runners (`macos-15-intel`, `macos-15`, `ubuntu-24.04`, and
+`ubuntu-24.04-arm`) and asserts both Go execution and host OS/architecture before
+qualification. Four successful jobs are required for four-target native evidence;
+no hosted run is claimed by this source change.
+
+The production signing CLI no longer accepts only a directory and arbitrary
+seed. It binds exact canonical candidate, checksum, trust and signing-
+authorization records, independently supplied digests, clean source commit and
+the seed-derived Ed25519 public identity before exclusive signing. The external
+authorization explicitly approves the four targets, dependency notices and
+signing while leaving publication unapproved; DarwinRouter validates but never
+generates that approval. Signature and directory state are synced, the complete
+signed set is immediately reverified, and uncertain outcomes remain nonretryable.
+No production key, approval, signature, tag or release was created. DAR-51 still
+requires actual reviewed native evidence on every approved target. DAR-54 still
+requires a retained candidate-bound reproducible final build plus the real
+operator ceremony. DAR-46 and the full PRD remain open.
+
 DAR-47/50/53 release-control checkpoint: a canonical external candidate record
 now freezes an exact clean commit, version, schema-2 six-member archive contract,
 four-target matrix, collateral digests and deliberately unapproved operator

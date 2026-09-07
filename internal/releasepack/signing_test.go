@@ -256,7 +256,7 @@ func TestSigningManifestContract(t *testing.T) {
 				fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(body), name)
 			}
 			writeSigningFixture(t, filepath.Join(dir, "SHA256SUMS"), []byte(sums.String()), 0644)
-			if err := Sign(dir, seedFile); err != ErrSignature {
+			if err := signUncheckedForTest(dir, seedFile); err != ErrSignature {
 				t.Fatal("invalid contract signed", err)
 			}
 			// Even an authentic signature cannot turn malformed release metadata
@@ -283,13 +283,13 @@ func writeSigningFixture(t *testing.T, path string, body []byte, mode os.FileMod
 
 func TestSigningOfflineRoundTrip(t *testing.T) {
 	dir, seed, public := signingFixture(t)
-	if err := Sign(dir, seed); err != nil {
+	if err := signUncheckedForTest(dir, seed); err != nil {
 		t.Fatal(err)
 	}
 	if err := Verify(dir, public); err != nil {
 		t.Fatal(err)
 	}
-	if err := Sign(dir, seed); err != ErrSignature {
+	if err := signUncheckedForTest(dir, seed); err != ErrSignature {
 		t.Fatal("existing signature overwritten", err)
 	}
 	_, _, wrong := signingFixture(t)
@@ -362,7 +362,7 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 			}
 			writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 			refreshSigningFixture(t, dir)
-			if err := Sign(dir, seed); err != ErrSignature {
+			if err := signUncheckedForTest(dir, seed); err != ErrSignature {
 				t.Fatal("invalid archive signed", err)
 			}
 			authenticateSigningFixture(t, dir, seed)
@@ -499,7 +499,7 @@ func TestSigningTampering(t *testing.T) {
 	for _, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig"} {
 		t.Run(name, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
-			if err := Sign(dir, seed); err != nil {
+			if err := signUncheckedForTest(dir, seed); err != nil {
 				t.Fatal(err)
 			}
 			writeSigningFixture(t, filepath.Join(dir, name), []byte("tampered"), 0644)
@@ -561,7 +561,7 @@ func TestSigningRejectsUnsafeFilesAndIncompleteCoverage(t *testing.T) {
 			if scenario == "traversal" || scenario == "duplicate" || scenario == "unsorted" || scenario == "no_newline" {
 				writeSigningFixture(t, sumsPath, sums, 0644)
 			}
-			if err := Sign(dir, seed); err != ErrSignature {
+			if err := signUncheckedForTest(dir, seed); err != ErrSignature {
 				t.Fatal("unsafe release accepted", err)
 			}
 			if _, err := os.Lstat(filepath.Join(dir, signatureName)); !os.IsNotExist(err) {
@@ -575,7 +575,7 @@ func TestSigningVerificationSymlinksAndCoverage(t *testing.T) {
 	for _, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig", "public", "extra"} {
 		t.Run(name, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
-			if err := Sign(dir, seed); err != nil {
+			if err := signUncheckedForTest(dir, seed); err != nil {
 				t.Fatal(err)
 			}
 			if name == "extra" {

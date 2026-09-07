@@ -215,8 +215,13 @@ decision or publication approval is claimed.
   controls and recovery for the specifically qualified interruption boundaries.
 - Opt-in managed residency for dedicated Ollama servers. Sharing a managed
   endpoint with other clients is not supported.
-- Local four-target release packaging, checksummed manifests, independent-key
-  signing and offline verification. See [packaging instructions](release-packaging.md).
+- Local four-target release packaging, checksummed manifests, independently
+  bound production signing and offline verification. Each supported target has
+  a one-host [native evidence contract](native-target-qualification.md).
+  Production signing requires exact candidate, checksum, trust and external
+  [signing-authorization](release-signing-authorization.md) identities before
+  private-key access; signing authority cannot grant publication. See
+  [packaging instructions](release-packaging.md).
 
 Each item has narrower limits than the eventual PRD. [Implementation evidence](progress.md)
 records tests and remaining work; fixtures and cross-builds are not proof of all

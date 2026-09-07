@@ -83,14 +83,46 @@ same optional LF; it is not secret.
 ```sh
 go run ./cmd/sign-release \
   --dir /ABSOLUTE/RELEASE_DIRECTORY \
-  --key /ABSOLUTE/PRIVATE_RELEASE_SEED_FILE
+  --key /ABSOLUTE/PRIVATE_RELEASE_SEED_FILE \
+  --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+  --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
+  --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
+  --expected-sums-sha256 sha256:EXPECTED_EXACT_SHA256SUMS_SHA256 \
+  --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
+  --trust-record-sha256 sha256:EXPECTED_EXACT_TRUST_RECORD_SHA256 \
+  --key-id EXPECTED_RELEASE_KEY_ID \
+  --key-fingerprint sha256:EXPECTED_RELEASE_PUBLIC_KEY_SHA256 \
+  --authorization-record /ABSOLUTE/INDEPENDENT/SIGNING_AUTHORIZATION.json \
+  --authorization-record-sha256 sha256:EXPECTED_EXACT_AUTHORIZATION_SHA256
 ```
 
-Signing first checks every payload and the exact manifest contract, then
-exclusively creates `SHA256SUMS.sig`: 128 lowercase hex characters containing
-the Ed25519 signature over the exact checksum-file bytes, followed by LF. An
-existing signature is never replaced. A partial/uncertain signature write is
-left for inspection; do not treat failure as permission to overwrite it.
+Every digest and identity above is an approval input and must be obtained from
+the recorded independent evidence channel, not calculated ad hoc by the signer
+from whichever paths were supplied. Candidate and trust record digests cover
+their exact canonical bytes, including the `sha256:` prefix in command inputs.
+The external canonical [signing authorization](release-signing-authorization.md)
+must bind those same candidate, checksum, trust and key expectations, explicitly
+approve all four targets, dependency notices and production signing, and leave
+publication unapproved. Its exact digest is supplied independently as well.
+
+Before opening the private seed, production signing re-verifies the candidate
+record against the clean exact source commit, validates the active trust record
+and signing authorization, checks every payload and the manifest contract, binds
+manifest identity and shared collateral to the candidate, and matches the exact
+approved `SHA256SUMS` digest. The authorization and trust record must name the
+exact same release-policy URL. It then proves the seed-derived public key matches
+the expected trust identity. Signing exclusively creates `SHA256SUMS.sig`: 128
+lowercase hex characters containing the Ed25519 signature over the exact
+checksum-file bytes, followed by LF. It syncs the signature and containing
+directory, immediately verifies the complete signed set with the approved public
+key, and rechecks the source checkout. An existing signature is never replaced.
+A partial/uncertain signature or late source-change failure is left for
+inspection; move the directory aside and do not treat failure as permission to
+overwrite or retry it.
+
+The Go-level raw `releasepack.Sign` compatibility helper exists only for
+disposable-key qualification and legacy SDK tests. It does not enforce these
+production approval bindings and must not be used for a release ceremony.
 
 This authenticates the complete archive bytes through signed checksums. It is
 not Apple Developer ID signing/notarization, Authenticode or a hosted build

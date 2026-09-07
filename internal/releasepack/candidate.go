@@ -144,28 +144,44 @@ func VerifyCandidate(ctx context.Context, recordPath, source string) error {
 	if ctx == nil || recordPath == "" || source == "" {
 		return ErrInvalid
 	}
+	_, record, err := readCandidateRecord(recordPath)
+	if err != nil {
+		return err
+	}
+	return verifyCandidateRecord(ctx, record, source)
+}
+
+func readCandidateRecord(recordPath string) ([]byte, CandidateRecord, error) {
 	info, err := os.Lstat(recordPath)
 	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > maxCandidate {
-		return ErrInvalid
+		return nil, CandidateRecord{}, ErrInvalid
 	}
 	file, err := os.Open(recordPath)
 	if err != nil {
-		return ErrInvalid
+		return nil, CandidateRecord{}, ErrInvalid
 	}
 	defer file.Close()
 	opened, err := file.Stat()
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) || opened.Size() != info.Size() {
-		return ErrInvalid
+		return nil, CandidateRecord{}, ErrInvalid
 	}
 	body, err := io.ReadAll(io.LimitReader(file, maxCandidate+1))
 	if err != nil || int64(len(body)) != opened.Size() {
-		return ErrInvalid
+		return nil, CandidateRecord{}, ErrInvalid
 	}
 	record, err := parseCandidate(body)
 	if err != nil {
-		return err
+		return nil, CandidateRecord{}, err
 	}
+	return body, record, nil
+}
+
+func verifyCandidateRecord(ctx context.Context, record CandidateRecord, source string) error {
 	root, err := filepath.Abs(source)
+	if err != nil {
+		return ErrInvalid
+	}
+	root, err = filepath.EvalSymlinks(root)
 	if err != nil {
 		return ErrInvalid
 	}

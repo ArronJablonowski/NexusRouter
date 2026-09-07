@@ -17,24 +17,40 @@ var ErrSignature = errors.New("release signature verification or signing failed"
 
 const signatureName = "SHA256SUMS.sig"
 
-// Sign validates every release checksum before signing the exact SHA256SUMS
-// bytes. keyFile must contain a 32-byte Ed25519 seed as lowercase hex, optionally
-// followed by one newline, in a regular nonsymlink file with mode 0400 or 0600.
-// It exclusively creates SHA256SUMS.sig; existing signatures are never replaced.
-// This deliberately does not accept SSH keys or discover any signing identity.
-func Sign(dir, keyFile string) error {
-	seed, err := signingKeyFile(keyFile, true)
-	if err != nil {
-		return ErrSignature
-	}
-	defer clear(seed)
+// Sign is retained for disposable-key qualification and compatibility with
+// existing SDK tests. It does not enforce production candidate or trust
+// bindings; production command paths must use SignApproved.
+// Deprecated: use SignApproved for every non-test signing operation.
+func Sign(dir, keyFile string) error { return signUncheckedForTest(dir, keyFile) }
+
+// signUncheckedForTest is the raw primitive used only by in-package tests and
+// disposable-key qualification. Production callers must use SignApproved.
+func signUncheckedForTest(dir, keyFile string) error {
 	root, sums, err := checkedRelease(dir, false)
 	if err != nil {
 		return ErrSignature
 	}
-	defer root.Close()
+	seed, err := signingKeyFile(keyFile, true)
+	if err != nil {
+		root.Close()
+		return ErrSignature
+	}
+	defer clear(seed)
 	private := ed25519.NewKeyFromSeed(seed)
 	defer clear(private)
+	if err = writeSignature(root, sums, private); err != nil {
+		root.Close()
+		return ErrSignature
+	}
+	closeErr := root.Close()
+	verifyErr := verifyWithKey(dir, private.Public().(ed25519.PublicKey))
+	if closeErr != nil || verifyErr != nil {
+		return ErrSignature
+	}
+	return nil
+}
+
+func writeSignature(root *os.Root, sums []byte, private ed25519.PrivateKey) error {
 	signature := ed25519.Sign(private, sums)
 	f, err := root.OpenFile(signatureName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
@@ -46,6 +62,15 @@ func Sign(dir, keyFile string) error {
 	if writeErr != nil || syncErr != nil || closeErr != nil {
 		// Leave any partial file intact so an uncertain write cannot be silently
 		// retried or mistaken for permission to overwrite an existing signature.
+		return ErrSignature
+	}
+	directory, err := root.Open(".")
+	if err != nil {
+		return ErrSignature
+	}
+	syncErr = directory.Sync()
+	closeErr = directory.Close()
+	if syncErr != nil || closeErr != nil {
 		return ErrSignature
 	}
 	return nil

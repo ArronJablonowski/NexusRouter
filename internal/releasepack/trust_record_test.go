@@ -56,7 +56,7 @@ func trustRecordDigest(t *testing.T, path string) string {
 
 func TestTrustRecordVerification(t *testing.T) {
 	dir, seed, public := signingFixture(t)
-	if err := Sign(dir, seed); err != nil {
+	if err := signUncheckedForTest(dir, seed); err != nil {
 		t.Fatal(err)
 	}
 	recordFile, record := trustRecordFixture(t, public)
@@ -90,7 +90,7 @@ func TestTrustRecordVerification(t *testing.T) {
 
 func TestTrustRecordStatusAndSchemaFailClosed(t *testing.T) {
 	dir, seed, public := signingFixture(t)
-	if err := Sign(dir, seed); err != nil {
+	if err := signUncheckedForTest(dir, seed); err != nil {
 		t.Fatal(err)
 	}
 	recordFile, base := trustRecordFixture(t, public)
@@ -173,7 +173,7 @@ func TestTrustRecordStatusAndSchemaFailClosed(t *testing.T) {
 
 func TestTrustRecordRejectsTamperedSignature(t *testing.T) {
 	dir, seed, public := signingFixture(t)
-	if err := Sign(dir, seed); err != nil {
+	if err := signUncheckedForTest(dir, seed); err != nil {
 		t.Fatal(err)
 	}
 	recordFile, record := trustRecordFixture(t, public)
@@ -246,7 +246,7 @@ func TestTrustRecordFileBoundary(t *testing.T) {
 
 func TestTrustRecordConcurrentReplacementFailsClosed(t *testing.T) {
 	dir, seed, public := signingFixture(t)
-	if err := Sign(dir, seed); err != nil {
+	if err := signUncheckedForTest(dir, seed); err != nil {
 		t.Fatal(err)
 	}
 	valid, record := trustRecordFixture(t, public)

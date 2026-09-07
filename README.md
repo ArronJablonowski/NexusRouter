@@ -12,6 +12,10 @@ version- and commit-bound qualification command. Proposed release identity and
 the immutable artifact contract can be recorded externally with the
 [candidate contract](docs/release-candidate.md); production verification can
 bind an independently retrieved [signing trust record](docs/release-signing-trust.md).
+Each proposed platform produces separate [native target evidence](docs/native-target-qualification.md),
+and production signing requires an external canonical
+[signing authorization](docs/release-signing-authorization.md) that cannot grant
+publication authority.
 The deterministic testable-MVP
 gate passes and 41 of 42 MVP issues are complete. DAR-46 remains open: no
 release has been published, and

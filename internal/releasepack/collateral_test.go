@@ -245,7 +245,7 @@ func TestSigningRejectsCollateralMemberTamperMissingExtraAndReorder(t *testing.T
 			}
 			collateralWrite(t, path, archive)
 			refreshSigningFixture(t, dir)
-			if err := Sign(dir, seed); err != ErrSignature {
+			if err := signUncheckedForTest(dir, seed); err != ErrSignature {
 				t.Fatal("invalid collateral signed", err)
 			}
 			authenticateSigningFixture(t, dir, seed)
@@ -287,7 +287,7 @@ func TestSigningRejectsCrossTargetSharedCollateralMismatch(t *testing.T) {
 	}
 	collateralWrite(t, manifestPath, append(body, '\n'))
 	collateralRewriteSums(t, dir, manifest)
-	if err := Sign(dir, seed); err != ErrSignature {
+	if err := signUncheckedForTest(dir, seed); err != ErrSignature {
 		t.Fatal("cross-target collateral mismatch signed", err)
 	}
 }

@@ -64,29 +64,37 @@ func ParseTrustRecord(body []byte) (TrustRecord, error) {
 // The record is never loaded from the release directory and no network discovery
 // is performed.
 func VerifyTrustRecord(dir, recordFile, expectedKeyID, expectedFingerprint, expectedRecordSHA256 string) error {
-	if !trustKeyID.MatchString(expectedKeyID) || !trustFingerprint(expectedFingerprint) || !trustFingerprint(expectedRecordSHA256) {
-		return ErrTrustRecord
-	}
-	body, err := readTrustRecordFile(recordFile)
+	_, key, err := readExpectedTrustRecord(recordFile, expectedKeyID, expectedFingerprint, expectedRecordSHA256)
 	if err != nil {
-		return ErrTrustRecord
+		return err
 	}
-	digest := sha256.Sum256(body)
-	if expectedRecordSHA256 != "sha256:"+hex.EncodeToString(digest[:]) {
-		return ErrTrustRecord
-	}
-	record, err := ParseTrustRecord(body)
-	if err != nil || record.KeyID != expectedKeyID || record.PublicKeySHA256 != expectedFingerprint || record.Status != "active" {
-		return ErrTrustRecord
-	}
-	key, err := hex.DecodeString(record.PublicKey)
-	if err != nil || len(key) != ed25519.PublicKeySize {
-		return ErrTrustRecord
-	}
-	if verifyWithKey(dir, ed25519.PublicKey(key)) != nil {
+	if verifyWithKey(dir, key) != nil {
 		return ErrSignature
 	}
 	return nil
+}
+
+func readExpectedTrustRecord(recordFile, expectedKeyID, expectedFingerprint, expectedRecordSHA256 string) (TrustRecord, ed25519.PublicKey, error) {
+	if !trustKeyID.MatchString(expectedKeyID) || !trustFingerprint(expectedFingerprint) || !trustFingerprint(expectedRecordSHA256) {
+		return TrustRecord{}, nil, ErrTrustRecord
+	}
+	body, err := readTrustRecordFile(recordFile)
+	if err != nil {
+		return TrustRecord{}, nil, ErrTrustRecord
+	}
+	digest := sha256.Sum256(body)
+	if expectedRecordSHA256 != "sha256:"+hex.EncodeToString(digest[:]) {
+		return TrustRecord{}, nil, ErrTrustRecord
+	}
+	record, err := ParseTrustRecord(body)
+	if err != nil || record.KeyID != expectedKeyID || record.PublicKeySHA256 != expectedFingerprint || record.Status != "active" {
+		return TrustRecord{}, nil, ErrTrustRecord
+	}
+	key, err := hex.DecodeString(record.PublicKey)
+	if err != nil || len(key) != ed25519.PublicKeySize {
+		return TrustRecord{}, nil, ErrTrustRecord
+	}
+	return record, ed25519.PublicKey(key), nil
 }
 
 func trustFingerprint(value string) bool {

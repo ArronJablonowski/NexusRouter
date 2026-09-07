@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   qualify:
-    name: Qualify on ${{ matrix.os }}
+    name: Qualify ${{ matrix.target }}
     timeout-minutes: 90
     env:
       # Use only the setup-go toolchain and repository module/workspace state.
@@ -31,8 +31,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - target: darwin/amd64
+            runner: macos-15-intel
+            expected_os: darwin
+            expected_arch: amd64
+          - target: darwin/arm64
+            runner: macos-15
+            expected_os: darwin
+            expected_arch: arm64
+          - target: linux/amd64
+            runner: ubuntu-24.04
+            expected_os: linux
+            expected_arch: amd64
+          - target: linux/arm64
+            runner: ubuntu-24.04-arm
+            expected_os: linux
+            expected_arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out the dispatched commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -49,6 +65,8 @@ jobs:
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          EXPECTED_NATIVE_OS: ${{ matrix.expected_os }}
+          EXPECTED_NATIVE_ARCH: ${{ matrix.expected_arch }}
         run: |
           set -euo pipefail
           version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
@@ -65,6 +83,10 @@ jobs:
           commit=$(git rev-parse HEAD)
           test "$commit" = "$GITHUB_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
+          test "$(go env GOOS)" = "$EXPECTED_NATIVE_OS"
+          test "$(go env GOARCH)" = "$EXPECTED_NATIVE_ARCH"
+          test "$(go env GOHOSTOS)" = "$EXPECTED_NATIVE_OS"
+          test "$(go env GOHOSTARCH)" = "$EXPECTED_NATIVE_ARCH"
           {
             echo "version=$RELEASE_VERSION"
             echo "commit=$commit"
@@ -115,7 +137,7 @@ jobs:
             echo
             echo 'Only a successful qualification gate establishes the following evidence: deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact six-member schema-2 collateral and target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-28-to-29 migration, backup and rollback rehearsal.'
             echo
-            echo 'The other three target artifacts are cross-built and inspected, not executed by this job. Read the observed native platform above; runner labels alone are not architecture evidence. Failed/skipped gates do not qualify a release.'
+            echo 'This job natively executes only the observed platform above; the other three artifacts are cross-built and inspected. All four successful matrix jobs are required for four-target native evidence. Read the observed platform above; the workflow asserts it against the expected target instead of trusting the runner label alone. Failed/skipped gates do not qualify a release.'
             echo
             echo 'No live models, production signing key, tag, release, artifact upload, installation outside the disposable runner-local rehearsal, or publication. Logs and this summary are qualification evidence, not a release approval or independent build attestation.'
           } >> "$GITHUB_STEP_SUMMARY"
