@@ -509,6 +509,19 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		}
 	}
 	if err != nil {
+		if !capacityDenied && cfg.Runtime.AutoApprovedCompaction && !r.autoCompactionTried && r.ContinueTaskID != "" && r.Compaction == nil && r.SummaryAttemptID == "" && errors.Is(err, routing.ErrNoRoute) {
+			attempt, _, discoveryErr := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
+			if discoveryErr == nil {
+				r.autoCompactionTried = true
+				r.SummaryAttemptID = attempt.ID
+				r.continuation = nil
+				r.preparedContext = nil
+				return s.runAuto(executionCtx, r)
+			}
+			if !errors.Is(discoveryErr, sql.ErrNoRows) {
+				return Result{}, ErrAdmission
+			}
+		}
 		if capacityDenied && errors.Is(err, routing.ErrNoRoute) {
 			return Result{}, errors.Join(ErrAdmission, routing.ErrNoRoute, resources.ErrCapacity)
 		}

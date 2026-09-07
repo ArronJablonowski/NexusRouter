@@ -640,14 +640,14 @@ Drafting never modifies the source, starts a continuation or affects fitness. In
 
 Review is a local operator attestation, not automated proof of accuracy, and does not itself run a model. Rejection blocks subsequent direct admissions of that stored draft; it does not cancel already-started work or erase summary copies in existing sessions. Newly configured redaction that changes an approved summary requires a fresh draft and review. The manual summary-file route remains available for explicitly operator-supplied summaries.
 
-The storage layer can now select the newest currently approved draft for an exact source task while skipping revoked review heads. Selection is bounded and malformed durable records fail closed. No CLI or API request uses this discovery implicitly yet; explicit `--summary-attempt` remains required until automatic fit-aware compaction admission is implemented.
+The storage layer selects the newest currently approved draft for an exact source task while skipping revoked review heads. Selection is bounded and malformed durable records fail closed. Set `runtime.auto_use_approved_summary: true` to let automatic routing retry admission once with that draft, but only after the complete history produces no eligible route and before a task or provider call begins. The default is false. The retry repeats normal privacy, cost, capability, health, resource, context and transactional approval checks; it never generates or approves a summary. Explicit `--summary-attempt` remains the deterministic operator-controlled route.
 
 Embedded Go applications can generate, inspect, list and review these same
 proposals through the [SDK session-summary workflow](docs/sdk-session-summaries.md).
 The host must authenticate the reviewing operator; calling the SDK does not
 grant a model authority to approve its own draft.
 
-Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation/application, crash reconciliation and mid-task compaction remain unfinished.
+Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation, automatic summary creation/approval, crash reconciliation and mid-task compaction remain unfinished.
 
 ### Model-callable bounded workers
 

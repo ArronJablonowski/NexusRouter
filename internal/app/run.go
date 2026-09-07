@@ -47,6 +47,7 @@ type Request struct {
 	skillContext                    *skillContext
 	memoryPrepared                  bool
 	memoryContext                   *memoryContext
+	autoCompactionTried             bool
 	Validation                      string
 	onlyModelID, retryOfTaskID      string
 	ModelID, Prompt, ContinueTaskID string

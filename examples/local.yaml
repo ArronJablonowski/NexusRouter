@@ -2,6 +2,9 @@ version: 1
 mode: local_only
 runtime:
   max_turns: 8  # Shared iteration budget for initial work and active steering.
+  # Reuse a currently operator-approved stored summary only when full-history
+  # automatic routing has no eligible route. Never generates or approves one.
+  auto_use_approved_summary: false
 providers:
   - id: local-primary
     kind: ollama

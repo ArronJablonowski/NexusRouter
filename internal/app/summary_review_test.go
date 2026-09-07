@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
@@ -149,6 +150,64 @@ func TestApprovedSummaryContinuationPersistsFrozenCheckpoint(t *testing.T) {
 				t.Fatal("source mutated", original, err)
 			}
 		})
+	}
+}
+
+func TestAutomaticRoutingUsesApprovedSummaryOnlyAfterFullHistoryHasNoRoute(t *testing.T) {
+	ctx := context.Background()
+	svc, cfg := autoFixture(t)
+	source, err := svc.Run(ctx, Request{ModelID: "a", Prompt: strings.Repeat("long immutable history ", 200), Domain: "auto-compaction"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := sessions.Replay(ctx, db, source.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Requirements: []string{"Preserve the original long-history requirement"}}}
+	_, checkpoint, err := sessions.PrepareContinuation(snapshot, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt := sessions.SummaryAttempt{Version: 1, ID: "auto-approved-summary", TaskID: source.TaskID, SourceDigest: checkpoint.SourceDigest, Model: "a", Provider: "local", Status: "started", SourceSequence: snapshot.Sequence, Keep: 1, StartedAt: time.Unix(600, 0).UTC()}
+	if err := db.BeginSummary(ctx, attempt); err != nil {
+		t.Fatal(err)
+	}
+	attempt.Status, attempt.FinishedAt = "drafted", attempt.StartedAt.Add(time.Second)
+	attempt.Draft = &sessions.SummaryDraft{Request: request, Checkpoint: checkpoint, SourceTaskID: source.TaskID, SourceSequence: snapshot.Sequence, SourceDigest: checkpoint.SourceDigest, Model: "a", Elapsed: time.Second}
+	if err := db.CompleteSummary(ctx, attempt); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	review, err := svc.ReviewSummary(ctx, attempt.ID, "", "approved", "Compared the compact summary to the immutable source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 3000
+	}
+	if _, err := svc.Run(ctx, Request{ModelID: "auto", ContinueTaskID: source.TaskID, Prompt: "continue without implicit compaction", Domain: "auto-compaction"}); !errors.Is(err, routing.ErrNoRoute) {
+		t.Fatal("disabled automatic compaction admitted full history", err)
+	}
+	svc.settings.Runtime.AutoApprovedCompaction = true
+	out, err := svc.Run(ctx, Request{ModelID: "auto", ContinueTaskID: source.TaskID, Prompt: "continue with approved compact history", Domain: "auto-compaction"})
+	if err != nil || out.TaskID == "" {
+		t.Fatal(out, err)
+	}
+	db, err = telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	replayed, err := sessions.Replay(ctx, db, out.TaskID)
+	if err != nil || replayed.Compaction == nil || replayed.Compaction.SummaryAttemptID != attempt.ID || replayed.Compaction.SummaryReviewID != review.ID || replayed.ParentTaskID != source.TaskID {
+		t.Fatal("automatic compaction attribution missing", replayed, err)
 	}
 }
 

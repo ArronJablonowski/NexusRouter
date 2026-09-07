@@ -134,7 +134,8 @@ type Tools struct {
 }
 
 type Runtime struct {
-	MaxTurns int `yaml:"max_turns" json:"max_turns"`
+	MaxTurns               int  `yaml:"max_turns" json:"max_turns"`
+	AutoApprovedCompaction bool `yaml:"auto_use_approved_summary" json:"auto_use_approved_summary"`
 }
 
 func Defaults() Settings {

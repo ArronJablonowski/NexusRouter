@@ -36,10 +36,11 @@ production release, release tag or complete PRD acceptance is claimed.
   authentication belongs to the host; automatic approval remains disabled. See
   [SDK session summaries](sdk-session-summaries.md).
 
-- Bounded newest-approved-summary discovery for one immutable source task.
-  Current rejected heads are skipped, corrupted records fail closed, and the
-  task-start transaction still rechecks the selected approval. Automatic
-  fit-aware activation remains disabled.
+- Bounded newest-approved-summary discovery for one immutable source task,
+  plus an off-by-default automatic-routing policy that retries admission once
+  with that draft only when full history has no route. Current rejected heads
+  are skipped, corrupted records fail closed, and the task-start transaction
+  still rechecks the selected approval. It never drafts or approves summaries.
 
 - Explicit Sol continuation with manual or approved stored compaction, preserving
   canonical checkpoints, historical tool pairs and the durable-start approval

@@ -7,7 +7,7 @@ import (
 
 func TestRuntimeMaxTurnsDefaultsAndBounds(t *testing.T) {
 	s := Defaults()
-	if s.Runtime.MaxTurns != 8 || s.Validate() != nil {
+	if s.Runtime.MaxTurns != 8 || s.Runtime.AutoApprovedCompaction || s.Validate() != nil {
 		t.Fatal(s.Runtime)
 	}
 	for _, value := range []int{-1, 0, 1, 8, 32, 33} {
@@ -19,6 +19,18 @@ func TestRuntimeMaxTurnsDefaultsAndBounds(t *testing.T) {
 				t.Fatalf("turns %d error %v", value, err)
 			}
 		})
+	}
+}
+
+func TestRuntimeApprovedCompactionLayeringIsStrict(t *testing.T) {
+	s, err := Load(Options{ProjectFile: file(t, "runtime:\n  auto_use_approved_summary: false\n"), Env: map[string]string{"runtime.auto_use_approved_summary": "true"}, Flags: map[string]string{"runtime.auto_use_approved_summary": "false"}})
+	if err != nil || s.Runtime.AutoApprovedCompaction {
+		t.Fatal(s.Runtime, err)
+	}
+	for _, value := range []string{"not-bool", "1", "'true'", "null"} {
+		if _, err := Load(Options{ProjectFile: file(t, "runtime:\n  auto_use_approved_summary: "+value+"\n")}); err == nil {
+			t.Fatalf("accepted %s", value)
+		}
 	}
 }
 

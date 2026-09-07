@@ -550,9 +550,12 @@ not activate themselves. Explicit native compacted-history import supports
 operator-supplied summaries and approved stored drafts with canonical provenance
 and transactional review checks. Storage can deterministically discover the
 newest currently approved draft for an exact immutable source task, skipping
-revoked heads and failing closed on malformed or excessive review history. This
-is an admission primitive, not implicit activation. Automatic semantic
-validation/application remains required work; see [native summary drafting](docs/codex-session-summaries.md)
+revoked heads and failing closed on malformed or excessive review history. An
+opt-in runtime policy can use that primitive after full-history automatic
+routing finds no route: it rebuilds the continuation from the approved draft
+and reruns ordinary admission exactly once before task creation or inference dispatch.
+The default is off, and the policy never generates or approves a summary.
+Automatic semantic validation and mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory
