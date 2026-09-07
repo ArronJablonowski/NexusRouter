@@ -171,3 +171,43 @@ func TestAuditQualityAttributionAndBound(t *testing.T) {
 		t.Fatal("not bounded to latest 100", out, err)
 	}
 }
+
+func TestAuditQualitySameModelCanWarnButNeverCreatePositiveSignal(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "self-review.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	key := routing.Key{Model: "candidate", Provider: "candidate-provider", Domain: "code", Profile: "default"}
+	independent := qualityTask(t, s, "self-reviewed", key.Model, "", "")
+	independent.Audit.Verdict, independent.Audit.Confidence = "reject", .8
+	if err := s.RecordAudit(ctx, independent); err != nil {
+		t.Fatal(err)
+	}
+	self := independent
+	self.ID, self.EvaluatorModel, self.EvaluatorProvider = "self-accept", key.Model, key.Provider
+	self.Audit.Verdict, self.Audit.Confidence = "accept", 1
+	if err := s.RecordAudit(ctx, self); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.AuditQuality(ctx, key)
+	if err != nil || out.Samples != 1 || out.Quality != 0 || out.Confidence != .8 {
+		t.Fatal("self acceptance displaced independent warning", out, err)
+	}
+	self.ID, self.Audit.Verdict = "self-reject", "reject"
+	if err := s.RecordAudit(ctx, self); err != nil {
+		t.Fatal(err)
+	}
+	out, err = s.AuditQuality(ctx, key)
+	if err != nil || out.Samples != 1 || out.Quality != 0 || out.Confidence != .25 {
+		t.Fatal("same-model warning not capped", out, err)
+	}
+	feedback := evaluation.Record{Version: 1, ID: "user-feedback", TaskID: self.TaskID, AttemptID: self.AttemptID, Key: key, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: "user", Passed: true}}, Time: time.Now().UTC()}
+	if err := s.RecordEvaluation(ctx, feedback); err != nil {
+		t.Fatal(err)
+	}
+	if out, err = s.AuditQuality(ctx, key); err != nil || out != (routing.Advisory{}) {
+		t.Fatal("user feedback did not supersede same-model advice", out, err)
+	}
+}

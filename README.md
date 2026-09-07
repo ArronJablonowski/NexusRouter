@@ -12,7 +12,7 @@ license approval and full runtime qualification remain separate gates.
 
 The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands, opt-in local read tools, reviewed new-file creation and bounded existing-file replacement are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. General patch editing, delegated writes and unattended write approvals remain unfinished; reviewed custom Go SDK tools have separate safety requirements. See the implementation evidence for remaining work; this is not a released MVP.
 
-Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
+Application tasks reject empty or whitespace-only final answers with a durable deterministic failure; tool-only intermediate messages remain valid. Independent or explicitly identified same-model audits can run manually or automatically and remain advisory. Explicit user revisions of subjective evaluation records preserve history and avoid duplicate fitness samples.
 
 Known effect-free read/delegation failures can return explicit failure evidence
 to the coordinator for a fresh, bounded repair turn. Failed steps remain in the
@@ -186,7 +186,7 @@ daemon validator configuration, production workflow validators and semantic rele
 remain unfinished. As with memory, old skill snapshots remain in continuation
 history; changing an active version does not rewrite prior session messages.
 
-Advisory audits now influence automatic routing quality with bounded weight: creative/unknown domains receive less influence than coding/math/structured-output domains. Only the newest review per attempt counts; abstentions do not score, and direct evaluation/user feedback excludes that attempt's audit signal. Audits do not become measured execution samples or change cost/reliability statistics. `llm_judge_enabled: false` disables both review calls and advisory routing influence.
+Advisory audits influence automatic routing quality with bounded weight: creative/unknown domains receive less influence than coding/math/structured-output domains. Only the newest eligible review per attempt counts; abstentions do not score, and direct evaluation/user feedback excludes that attempt's audit signal. Same-model accept/abstain records cannot create or supersede routing evidence, while same-model rejection confidence is capped at 0.25. Audits do not become measured execution samples or change cost/reliability statistics. `llm_judge_enabled: false` disables both review calls and advisory routing influence.
 
 ## Build and verify
 
@@ -1383,14 +1383,14 @@ callbacks may run concurrently, but closed failed checks cannot commit a late
 rollback. See [durable monitoring](docs/durable-skill-regression-monitor.md) for
 bounded retention, policy bindings, inspection and remaining daemon limitations.
 
-`darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with an independent configured model. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
+`darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with a configured model. Independent evaluators are preferred; a separate invocation of the candidate model is permitted as explicitly bounded self-critique. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 The experimental signed-in Sol CLI provider now supports this audit service,
 including structured generation and independent result validation. See the
 [Codex output-audit guide](docs/codex-output-audits.md) for privacy requirements,
 supervised commands, live evidence and remaining limits.
 
-To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured independent model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
+To audit successful tasks automatically, set `evaluation.auto_review_model` to a configured model ID and `evaluation.auto_review_max_cost` to an estimated cost ceiling (default zero). This may be the coordinator/candidate model, although an independent reviewer is stronger evidence. `evaluation.llm_judge_enabled: false` disables manual and automatic review. Automatic review runs synchronously after task completion, adds up to a minute within the request deadline, and reports `audit_id`/`audit_status` through native task responses and CLI stderr. A failed review does not change the completed candidate task. OpenAI-compatible responses do not expose these native audit fields. Model estimates are not billing guarantees.
 
 The orchestrator's reviewer can assess code and missing deliverables, but its
 opinion is not a compiler, test runner, or proof of completion. The current
@@ -1402,6 +1402,8 @@ evidence policy distinguishes these cases:
 | Nonblank answer repeats the request, promises future work, or omits deliverables | Reviewer cites requirements and output; the finding remains advisory. |
 | Suspected code defect | Advisory code review; claims about executed tests require supplied execution evidence. |
 | Creative quality or taste | Bounded advisory influence; explicit user feedback takes precedence. |
+| Same-model accept or abstain | Persisted for inspection but contributes no positive routing signal. |
+| Same-model rejection | Capped at 0.25 confidence as an advisory warning only. |
 | Insufficient evidence | Reviewer may abstain; no success is invented. |
 
 User feedback removes the reviewed attempt from the advisory population, and

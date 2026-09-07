@@ -23,6 +23,9 @@ import (
 func auditSuccessfulDelegateFixture(t *testing.T, batch bool, mutation string) (*Service, *telemetry.Store) {
 	t.Helper()
 	svc, cfg := autoFixture(t)
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 16384
+	}
 	db, err := telemetry.Open(context.Background(), cfg.Telemetry.Database)
 	if err != nil {
 		t.Fatal(err)

@@ -138,6 +138,12 @@ production release, release tag or complete PRD acceptance is claimed.
   privacy-safe live host-resource availability, and paired provider/tool
   lifecycle histograms in metrics snapshot v7. Audit verdicts remain advisory
   and do not replace objective evidence or user feedback.
+
+- Coordinator same-model output audits now run as separate bounded invocations.
+  They explicitly target empty, nonresponsive and promise-only output. Accepts
+  and abstentions cannot create positive routing evidence; rejections are capped
+  at 0.25 advisory confidence, and later direct user feedback still supersedes
+  the entire audit signal.
 - Adaptive eligibility/ranking, a maximum32-attempt safe provider fallback
   chain with crash-recoverable immediate lineage, local resource admission,
   bounded delegation, validation evidence and advisory output audits. A

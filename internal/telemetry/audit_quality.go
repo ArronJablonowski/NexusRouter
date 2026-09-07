@@ -27,10 +27,14 @@ func (s *Store) AuditQuality(ctx context.Context, key routing.Key) (routing.Advi
 	  AND NULLIF(json_extract(p.body,'$.data.profile'),'') IS NOT NULL ORDER BY p.sequence DESC LIMIT 1),
 	 (SELECT json_extract(p.body,'$.data.profile') FROM events p WHERE p.task_id=a.task_id
 	  AND json_extract(p.body,'$.kind')='task.started' AND NULLIF(json_extract(p.body,'$.data.profile'),'') IS NOT NULL LIMIT 1),'default')=?
+	 AND NOT (json_extract(a.body,'$.EvaluatorModel')=? AND json_extract(a.body,'$.EvaluatorProvider')=?
+	  AND json_extract(a.body,'$.Audit.verdict')!='reject')
 	 AND NOT EXISTS(SELECT 1 FROM audit_records newer WHERE newer.task_id=a.task_id
-	  AND newer.rowid>a.rowid AND json_extract(newer.body,'$.AttemptID')=json_extract(a.body,'$.AttemptID'))
+	  AND newer.rowid>a.rowid AND json_extract(newer.body,'$.AttemptID')=json_extract(a.body,'$.AttemptID')
+	  AND NOT (json_extract(newer.body,'$.EvaluatorModel')=? AND json_extract(newer.body,'$.EvaluatorProvider')=?
+	   AND json_extract(newer.body,'$.Audit.verdict')!='reject'))
 	 AND NOT EXISTS(SELECT 1 FROM evaluations e WHERE e.task_id=a.task_id AND e.attempt_id=json_extract(a.body,'$.AttemptID'))
-	 ORDER BY a.rowid DESC LIMIT 100`, key.Model, key.Provider, key.Domain, key.Profile)
+	 ORDER BY a.rowid DESC LIMIT 100`, key.Model, key.Provider, key.Domain, key.Profile, key.Model, key.Provider, key.Model, key.Provider)
 	if err != nil {
 		return out, err
 	}
@@ -49,10 +53,14 @@ func (s *Store) AuditQuality(ctx context.Context, key routing.Key) (routing.Advi
 		if r.Audit.Verdict == "abstain" || r.Audit.Confidence == 0 {
 			continue
 		}
+		confidence := r.Audit.Confidence
+		if r.EvaluatorModel == key.Model && r.EvaluatorProvider == key.Provider && confidence > .25 {
+			confidence = .25
+		}
 		out.Samples++
-		weight += r.Audit.Confidence
+		weight += confidence
 		if r.Audit.Verdict == "accept" {
-			accepted += r.Audit.Confidence
+			accepted += confidence
 		}
 		if r.Time.After(out.Updated) {
 			out.Updated = r.Time

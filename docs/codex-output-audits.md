@@ -7,7 +7,7 @@ not Codex's repository-oriented `review/start` operation.
 
 ## Review contract
 
-The application checks source completeness, privacy, reviewer independence,
+The application checks source completeness, privacy, reviewer identity,
 estimated cost, resource requirements and bounded execution evidence first.
 It then persists a review attempt before estimating the assembled request or
 launching a CLI process. Context-estimator failure, context overflow and failed
@@ -38,10 +38,12 @@ detection, and an audit may still contain other sensitive task information.
 
 ## Supervised use
 
-Choose a completed, cloud-eligible task produced by another configured model.
-Do not use a local-only or legacy unknown-privacy task, and do not use Sol to
-audit its own final attempt. Cloud eligibility is not inferred from changing
-the configuration after a task was written.
+Choose a completed, cloud-eligible task. An independent configured reviewer is
+preferred, but Sol may run a separate bounded review invocation over its own
+final attempt. Same-model agreement is not positive evidence; only a rejection
+can become a capped advisory warning. Do not use a local-only or legacy
+unknown-privacy task. Cloud eligibility is not inferred from changing the
+configuration after a task was written.
 
 With the existing sample profile, enable judging only for the command:
 
@@ -59,13 +61,16 @@ For post-completion automatic review, configure `evaluation.auto_review_model`
 and `evaluation.auto_review_max_cost`, and enable `llm_judge_enabled`. This runs
 synchronously after a successful task, never recursively. Review failure leaves
 the candidate's completed state and text intact and reports a failed audit
-status. Admission still denies private histories and self-review.
+status. Admission still denies private histories. Same-model review does not
+recursively review the review invocation.
 
 Audits do not rewrite task outcomes or measured fitness evidence. The existing
 routing policy may consume their separate, bounded advisory signal; creative
-and unknown domains receive less weight, and direct evaluation/user feedback
-supersedes that attempt's audit signal. A review is not a compiler, test runner,
-skill activation, model-pruning decision or proof of correctness.
+and unknown domains receive less weight, same-model accepts and abstentions are
+excluded, same-model rejections are capped at 0.25 confidence, and direct
+evaluation/user feedback supersedes that attempt's audit signal. A review is
+not a compiler, test runner, skill activation, model-pruning decision or proof
+of correctness.
 
 ## Qualification and remaining work
 

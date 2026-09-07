@@ -22,16 +22,28 @@ func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := 0
+	selfGuidance := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		var body map[string]any
+		var body struct {
+			Model    string `json:"model"`
+			Tools    []any  `json:"tools"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
 		if json.NewDecoder(r.Body).Decode(&body) != nil {
 			t.Error("bad request")
 		}
-		if tools, ok := body["tools"].([]any); ok && len(tools) > 0 {
+		if len(body.Tools) > 0 {
 			t.Error("review tools exposed")
 		}
-		a := evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "reject", Confidence: .4, Findings: []evaluation.AuditFinding{{Summary: "private-token advisory", EvidenceRefs: []string{"candidate"}}}}
+		if body.Model == "a" {
+			for _, message := range body.Messages {
+				selfGuidance = selfGuidance || strings.Contains(message.Content, "same-model review invocation")
+			}
+		}
+		a := evaluation.Audit{Version: 1, EvaluatorID: body.Model, RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "reject", Confidence: .4, Findings: []evaluation.AuditFinding{{Summary: "private-token advisory", EvidenceRefs: []string{"candidate"}}}}
 		encoded, _ := json.Marshal(a)
 		fmt.Fprintf(w, "{\"message\":{\"content\":%q},\"done\":true,\"done_reason\":\"stop\"}\n", string(encoded))
 	}))
@@ -60,15 +72,16 @@ func TestAuditTaskPersistsIndependentRedactedReview(t *testing.T) {
 	if err != nil || len(attempts) != 1 || attempts[0].Status != "completed" || attempts[0].AuditID != record.ID {
 		t.Fatalf("review lifecycle: %+v %v", attempts, err)
 	}
-	if _, err := svc.AuditTask(ctx, source.TaskID, "a", 0); err == nil {
-		t.Fatal("self review admitted")
+	self, err := svc.AuditTask(ctx, source.TaskID, "a", 0)
+	if err != nil || self.EvaluatorModel != "a" || self.Audit.Verdict != "reject" || !selfGuidance {
+		t.Fatal("same-model advisory review failed", self, err)
 	}
 	svc.settings.Mode = "hybrid"
 	svc.settings.Models[1].Locality = "cloud"
 	if _, err := svc.AuditTask(ctx, source.TaskID, "z", 0); err == nil {
 		t.Fatal("local history escaped to cloud")
 	}
-	if calls != 1 {
+	if calls != 2 {
 		t.Fatal("denied review dispatched")
 	}
 }
@@ -134,14 +147,23 @@ func TestFailedReviewLifecycleSurvivesCancellation(t *testing.T) {
 
 func TestAutomaticReviewDoesNotReplaceCandidateOutcome(t *testing.T) {
 	svc, _ := autoFixture(t)
+	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Model string `json:"model"`
+			Model    string `json:"model"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
+		calls++
 		text := "candidate answer"
-		if body.Model == "z" {
-			encoded, _ := json.Marshal(evaluation.Audit{Version: 1, EvaluatorID: "z", RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "abstain", Confidence: 0, Findings: []evaluation.AuditFinding{}})
+		review := body.Model == "z"
+		for _, message := range body.Messages {
+			review = review || strings.Contains(message.Content, "bounded output auditor")
+		}
+		if review {
+			encoded, _ := json.Marshal(evaluation.Audit{Version: 1, EvaluatorID: body.Model, RubricVersion: "darwin-review-v2", Domain: "creative", Verdict: "abstain", Confidence: 0, Findings: []evaluation.AuditFinding{}})
 			text = string(encoded)
 		}
 		fmt.Fprintf(w, "{\"message\":{\"content\":%q},\"done\":true,\"done_reason\":\"stop\"}\n", text)
@@ -154,9 +176,10 @@ func TestAutomaticReviewDoesNotReplaceCandidateOutcome(t *testing.T) {
 		t.Fatalf("%+v %v", out, err)
 	}
 	svc.settings.Evaluation.AutoReviewModel = "a"
-	out, err = svc.Run(context.Background(), Request{ModelID: "a", Prompt: "hello"})
-	if err != nil || out.Text != "candidate answer" || out.AuditID != "" || out.AuditStatus != "failed" {
-		t.Fatalf("failed review changed task: %+v %v", out, err)
+	before := calls
+	out, err = svc.Run(context.Background(), Request{ModelID: "a", Prompt: "hello", Domain: "creative"})
+	if err != nil || out.Text != "candidate answer" || out.AuditID == "" || out.AuditStatus != "recorded" || calls-before != 2 {
+		t.Fatalf("same-model review changed task or recursed: %+v %v calls=%d", out, err, calls-before)
 	}
 	svc.settings.Evaluation.Judge = false
 	out, err = svc.Run(context.Background(), Request{ModelID: "a", Prompt: "hello"})

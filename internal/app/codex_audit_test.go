@@ -220,7 +220,7 @@ func TestCodexAuditFailureLifecycleAndCleanup(t *testing.T) {
 }
 
 func TestCodexAuditDeniedBeforeLaunch(t *testing.T) {
-	for _, mode := range []string{"privacy", "local_mode", "self_review", "budget", "no_context", "context_budget", "estimator"} {
+	for _, mode := range []string{"privacy", "local_mode", "budget", "no_context", "context_budget", "estimator"} {
 		t.Run(mode, func(t *testing.T) {
 			svc, task, db := codexAuditSource(t)
 			model := &svc.settings.Models[len(svc.settings.Models)-1]
@@ -234,9 +234,6 @@ func TestCodexAuditDeniedBeforeLaunch(t *testing.T) {
 				task = out.TaskID
 			case "local_mode":
 				svc.settings.Mode = "local_only"
-			case "self_review":
-				model.Provider = "local"
-				model.Model = "a"
 			case "budget":
 				cost := 1.0
 				model.EstimatedCost = &cost
