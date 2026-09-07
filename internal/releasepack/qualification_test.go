@@ -145,7 +145,11 @@ func TestReleaseQualification(t *testing.T) {
 			if e != nil || got != "darwin "+version {
 				t.Fatalf("native version mismatch: %q: %v", got, e)
 			}
-			rehearseNativeInstallAndMigration(t, ctx, source, filepath.Join(first, artifact.File), artifact, version)
+			rehearsalRoot := t.TempDir()
+			if err = os.Chmod(rehearsalRoot, 0700); err != nil {
+				t.Fatal(err)
+			}
+			rehearseNativeInstallAndMigration(t, ctx, rehearsalRoot, filepath.Join(first, artifact.File), artifact, version)
 			nativeRan = true
 		}
 	}
