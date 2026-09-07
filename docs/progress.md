@@ -4156,3 +4156,17 @@ supported-target decision, final approval, tag, artifact upload or publication
 is claimed. Release archives still contain only the binary; operators must bind
 the separately reviewed documentation and sample configuration to the same
 source commit. DAR-46 remains In Progress.
+
+Version-bound release-candidate qualification: on native darwin/arm64, clean
+commit `608bdd2cdc758cdc3a635a97b3f8c7a03e1cbdd8` passed
+`make qualify-release` as version `1.0.0-rc.1`. The gate first passed all nine
+named deterministic MVP scenarios, including hybrid Sol coordination, local and
+cloud execution, fallback locality, exactly-once feedback, privacy-bounded
+skills, retained failure evidence and process-kill recovery. It then produced
+two independent builds of all four targets; every unsigned byte matched, all
+four executable formats passed inspection, library and CLI packaging/signing/
+verification agreed using disposable keys, the native candidate reported
+`darwin 1.0.0-rc.1`, and tampering was rejected. The command left the tracked
+and untracked source tree clean. This is local candidate evidence, not the still
+missing hosted Ubuntu/macOS run, native execution of the other three targets,
+production signature, operator approvals or publication.
