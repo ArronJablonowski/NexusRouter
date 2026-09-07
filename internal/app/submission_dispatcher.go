@@ -153,6 +153,9 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	r, err := decodeSubmission(claim.Request)
 	var out Result
 	if err == nil {
+		err = d.awaitContinuation(job, r.ContinueTaskID)
+	}
+	if err == nil {
 		r.submissionID, r.submissionToken = claim.Status.ID, claim.Token
 		out, err = s.Run(job, r)
 	}
@@ -221,5 +224,31 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	// write is expected to be denied; it must not poison unrelated active work.
 	if finishErr != nil && !errors.Is(finishErr, submissions.ErrLeaseLost) {
 		d.recordError()
+	}
+}
+
+// awaitContinuation holds the already-bounded submission worker and its
+// renewable claim while an explicitly referenced source is still running.
+// It does not repair, retry or infer from the source. Once the source becomes
+// terminal, normal continuation admission decides whether its history is safe.
+func (d *Dispatcher) awaitContinuation(ctx context.Context, task string) error {
+	if task == "" {
+		return nil
+	}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		status, err := d.db.TaskContinuation(ctx, task)
+		if err != nil {
+			return err
+		}
+		if status.State != "running" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
 	}
 }
