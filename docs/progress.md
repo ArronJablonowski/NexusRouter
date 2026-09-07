@@ -1,7 +1,8 @@
 # Implementation evidence
 
-DAR-16 is in progress in native Linear after following DAR-30's dependency
-chain through DAR-28. The registry already provided declarative immutable tool
+DAR-16 is Done in native Linear under consolidated state activity
+`33e723d1-ecbe-447b-9aec-a68d092fd1e0`; its completion evidence comment was
+posted and read back. The registry already provided declarative immutable tool
 snapshots, JSON Schema 2020-12 compilation with external-reference denial,
 object-only arguments, duplicate-key/trailing-data rejection, typed effect
 results and stable sanitized failure categories. Audit found that extensions
@@ -16,9 +17,11 @@ typed result preservation and private handler-error removal. The tools race
 suite passed five repetitions and focused SDK tool paths passed three. Final
 `make check` passed format/LOC, vet, the complete native race suite and build;
 application tests took 223.444s, telemetry 149.256s, CLI 41.559s, SDK 25.002s,
-tool-gate 19.647s, tools 2.191s and workers 4.673s. The checkpoint still needs
-to be committed, pushed, fetch-verified and recorded in Linear. The full PRD
-remains incomplete.
+tool-gate 19.647s, tools 2.191s and workers 4.673s. The checkpoint is backed up
+at `b867d75`; push/fetch verification showed matching local and remote heads,
+zero divergence and a clean worktree before the Linear state and comment were
+read back. Linear released DAR-13, DAR-17, DAR-28 and DAR-33 (DAR-18 was already
+Done). The full PRD remains incomplete.
 
 DAR-26 is Done in native Linear with completion evidence comment `f5f6cf04`.
 Its audit found fallback diversity was measured only against the primary route,
