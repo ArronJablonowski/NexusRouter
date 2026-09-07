@@ -4,34 +4,47 @@ Status: release preparation, not a published or fully qualified v1.0.0. The
 tooling below creates local artifacts only. It does not create Git tags, upload
 files, change a GitHub release, install binaries, or use the Git SSH key.
 
-## Build from a reviewed checkpoint
+## Build the retained reviewed candidate
 
 Use a trusted Go toolchain matching `go.mod`, Git, and a clean committed checkout.
-Run `make check` first. Use an explicit semantic version without a leading `v`
-(prereleases such as `0.0.0-dev.1` are accepted; build metadata is not). Supply the
-full lowercase 40-character commit ID printed by `git rev-parse HEAD`.
+Run `make check` first. Freeze and independently review the canonical candidate
+record as described in [release candidate identity](release-candidate.md). The
+record supplies the semantic version and full source commit; its exact SHA-256
+must come from the independent review channel, not from the path handed to the
+build operator.
 
 From the repository root, replace the uppercase placeholders:
 
 ```sh
-go run ./cmd/package-release \
-  --version 0.0.0-dev.1 \
-  --commit FULL_REVIEWED_COMMIT_ID \
+go run ./cmd/build-approved-release \
   --source /ABSOLUTE/PATH/TO/DarwinRouter \
+  --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+  --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
   --out /ABSOLUTE/EXISTING/PARENT/new-release-directory
 ```
 
 The output directory must not exist; its parent must exist and be under your
-control. Prefer a directory outside the source checkout. A sibling `.lock` file
-prevents cooperating packagers from using the same destination. All artifacts
-are staged before an atomic no-replace directory rename on macOS or Linux. A
-failed build does not publish a partial artifact set or overwrite an old one.
-An abrupt process kill can leave private staging directories and the lock;
-inspect their ownership and confirm the original process is gone before manual
-cleanup. Do not delete an active packager's lock. Publication is not qualified
-against power loss or a hostile process changing parent directories.
+control and outside the source checkout. The command re-derives the candidate
+record from the exact clean commit, performs two complete four-target builds in
+separate private directories, validates both unsigned release sets, and directly
+compares every byte of all four archives, the manifest and checksums. It then
+uses an atomic no-replace rename to retain the first compared directory. It does
+not perform an unverified third build or copy artifacts into a new release set.
+The one-line JSON result reports the independently supplied candidate digest and
+the exact retained `SHA256SUMS` digest; record it, but have the signing approver
+obtain the expected checksum digest through the approved evidence channel.
 
-The packager checks that HEAD matches the supplied commit and that tracked and
+A sibling approval-build lock prevents cooperating builders from targeting the
+same destination. A failure before retention does not publish a partial set or
+overwrite an old one. An I/O or source-consistency failure after the destination
+appears leaves that directory for inspection and must not be treated as
+permission to rerun or overwrite it. An abrupt process kill can leave private
+staging directories and locks; inspect their ownership and confirm the original
+process is gone before manual cleanup. Do not delete an active builder's lock.
+Power-loss durability and hostile mutation of the operator-controlled parent
+directory remain outside this local build guarantee.
+
+Each underlying packaging pass checks that HEAD matches the candidate commit and that tracked and
 untracked work is clean before and after the build. It materializes one private
 snapshot directly from the commit's Git blobs, then builds all targets from
 that snapshot. Ignored files, working-tree changes, Git export attributes and
@@ -64,6 +77,11 @@ attestation: the installed Git/Go executables, their location on PATH, module
 cache and build host remain trusted. Missing public modules may be downloaded
 through Go's normal module resolution. Packaging is not a model-runtime task
 and is not covered by `mode: local_only` egress controls.
+
+`cmd/package-release` remains the lower-level one-pass packaging primitive for
+tests and diagnostics. It accepts explicit version and commit inputs but does
+not prove reproducibility or bind an independently reviewed candidate record;
+do not use it to create the production signable directory.
 
 ## Sign with a separate release identity
 

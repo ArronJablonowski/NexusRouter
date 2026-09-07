@@ -5,6 +5,13 @@ deterministic testable-MVP gate passes and 41 of 42 MVP issues are complete, but
 DAR-46 remains open. No signed production release, release tag, supported-platform
 decision or publication approval is claimed.
 
+- The production `build-approved-release` command now requires the exact
+  independently reviewed candidate-record digest, builds the four-target set
+  twice in isolated directories, compares every unsigned byte, and atomically
+  retains one compared output. It reports the retained checksum-set digest and
+  never substitutes a third build. Signing and publication remain separate
+  operator-controlled gates.
+
 ## Available for supervised testing
 
 - Versioned configured routing metadata through `darwin models list`, Go SDK

@@ -46,11 +46,27 @@ func TestReleaseQualification(t *testing.T) {
 	t.Logf("qualifying release %s from source commit %s on %s/%s", version, commit, runtime.GOOS, runtime.GOARCH)
 	parent := t.TempDir()
 	first, second := filepath.Join(parent, "first"), filepath.Join(parent, "second")
-	if err = Package(ctx, Options{Version: version, Commit: commit, Out: first, Source: source}); err != nil {
+	candidateFile := filepath.Join(parent, "candidate.json")
+	if err = FreezeCandidate(ctx, Options{Version: version, Commit: commit, Out: candidateFile, Source: source}); err != nil {
+		t.Fatal("candidate record", err)
+	}
+	candidateBody, err := os.ReadFile(candidateFile)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/package-release", "--version", version, "--commit", commit, "--out", second, "--source", source); err != nil {
-		t.Fatal("package CLI", err)
+	buildOutput, err := command(ctx, source, environment(), "go", "run", "./cmd/build-approved-release",
+		"--out", second, "--source", source, "--candidate-record", candidateFile,
+		"--candidate-record-sha256", prefixedDigest(candidateBody))
+	if err != nil {
+		t.Fatal("approved build CLI", err)
+	}
+	var buildResult ApprovedBuildResult
+	if json.Unmarshal([]byte(buildOutput), &buildResult) != nil ||
+		buildResult.CandidateRecordSHA256 != prefixedDigest(candidateBody) {
+		t.Fatal("approved build identity")
+	}
+	if err = copyQualificationRelease(second, first); err != nil {
+		t.Fatal(err)
 	}
 	entries, err := os.ReadDir(first)
 	if err != nil || len(entries) != 6 {
@@ -82,14 +98,6 @@ func TestReleaseQualification(t *testing.T) {
 	if err = os.WriteFile(publicFile, []byte(hex.EncodeToString(public)+"\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	candidateFile := filepath.Join(parent, "candidate.json")
-	if err = FreezeCandidate(ctx, Options{Version: version, Commit: commit, Out: candidateFile, Source: source}); err != nil {
-		t.Fatal("candidate record", err)
-	}
-	candidateBody, err := os.ReadFile(candidateFile)
-	if err != nil {
-		t.Fatal(err)
-	}
 	keyDigest := sha256.Sum256(public)
 	keyFingerprint := "sha256:" + hex.EncodeToString(keyDigest[:])
 	trustRecord := TrustRecord{
@@ -110,6 +118,9 @@ func TestReleaseQualification(t *testing.T) {
 	sumsBody, err := os.ReadFile(filepath.Join(second, "SHA256SUMS"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if buildResult.SHA256SUMSSHA256 != prefixedDigest(sumsBody) {
+		t.Fatal("approved build sums identity")
 	}
 	authorization := SigningAuthorization{
 		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
@@ -219,7 +230,27 @@ func TestReleaseQualification(t *testing.T) {
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", first, "--public-key", publicFile); err == nil {
 		t.Fatal("verification CLI accepted tampering")
 	}
-	t.Log("eight builds: every unsigned byte including signed collateral and target-specific dependency notices matched; four executable formats checked; package/sign/verify CLIs exercised; ephemeral signatures matched; native install/migration/rollback rehearsal passed; tampering rejected")
+	t.Log("approved build CLI retained one of eight compared target builds: every unsigned byte including signed collateral and target-specific dependency notices matched; four executable formats checked; sign/verify CLIs exercised; ephemeral signatures matched; native install/migration/rollback rehearsal passed; tampering rejected")
+}
+
+func copyQualificationRelease(source, destination string) error {
+	if err := os.Mkdir(destination, 0700); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(source)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		body, readErr := os.ReadFile(filepath.Join(source, entry.Name()))
+		if readErr != nil {
+			return readErr
+		}
+		if writeErr := os.WriteFile(filepath.Join(destination, entry.Name()), body, 0644); writeErr != nil {
+			return writeErr
+		}
+	}
+	return nil
 }
 
 func qualificationBinary(t *testing.T, path string, artifact Artifact) []byte {

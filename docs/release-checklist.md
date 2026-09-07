@@ -126,12 +126,19 @@ be omitted.
 ## Signed artifacts
 
 - Artifact directory/evidence location:
+- `build-approved-release` JSON result and command transcript location:
+- Retained-build host and time (UTC):
+- Independently confirmed candidate-record digest used by the build:
 - Independently approved exact `SHA256SUMS` SHA-256 source:
 - `manifest.json` SHA-256:
 - `SHA256SUMS` SHA-256:
 - `SHA256SUMS.sig` SHA-256:
 - Independent verification operator, host, time and result:
 - [ ] Manifest version and commit equal the recorded candidate identity.
+- [ ] `build-approved-release` performed two isolated builds and the retained
+  unsigned directory is one of those byte-compared outputs, not a later rebuild.
+- [ ] The retained checksum digest equals the exact independently authorized
+  `SHA256SUMS` digest supplied to production signing.
 - [ ] Exactly four approved archives, the manifest, checksums and signature are
   present; no unexpected files are included.
 - [ ] Native staged binary reports the approved release version.

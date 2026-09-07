@@ -16,6 +16,9 @@ Each proposed platform produces separate [native target evidence](docs/native-ta
 and production signing requires an external canonical
 [signing authorization](docs/release-signing-authorization.md) that cannot grant
 publication authority.
+The production build path binds that external candidate record before building,
+compares two isolated four-target outputs byte for byte, and retains one of the
+compared directories as the only signable artifact set.
 The deterministic testable-MVP
 gate passes and 41 of 42 MVP issues are complete. DAR-46 remains open: no
 release has been published, and
