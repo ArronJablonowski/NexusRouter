@@ -1,5 +1,31 @@
 # Implementation evidence
 
+DAR-54 retained-build checkpoint: production release construction now requires
+the exact independently supplied canonical candidate-record digest, re-derives
+that record from the clean source, performs two isolated four-target packaging
+passes, validates both sets, and directly compares every unsigned byte. An
+OS-level no-replace rename through a pinned parent-directory descriptor retains
+the first compared directory itself; no unverified third build or copy becomes
+the signable output. The command returns the exact retained `SHA256SUMS` digest,
+while approval and signing remain separate external gates. Pre-retention
+failure leaves no output; uncertain post-retention failure leaves the directory
+for inspection rather than authorizing overwrite or retry.
+
+Clean pushed commit `b43abe8e2c702fa7bce38ae4946dc19d2eb860b6` was
+frozen as external candidate `1.0.0-rc.5` with candidate-record SHA-256
+`fe6b9094cc3003e6ea202166f5b7e2be14b18f926123fe7bf826a486ef286b0e`.
+The production build command retained its byte-compared unsigned artifact set
+outside the repository with `SHA256SUMS` SHA-256
+`f5e10f3fdfaa1797b98827726d52661a137b5faf1d14af9931f49fd5edd4452a`.
+The revised `make qualify-release` exercised that production command and passed
+on darwin/arm64, including all deterministic MVP scenarios, eight target
+builds, sign/verify CLIs with disposable credentials, tamper rejection, and
+native install/schema-28-to-29 migration/backup/rollback rehearsal. Full
+`make check`, repeated focused race tests, vet, and Linux/amd64 cross-compilation
+passed. This closes DAR-54's retained reproducible-output code gap, not its
+operator gates: RC5 carries no production approval, key, signature, tag, upload,
+or publication authorization. DAR-46 and DAR-54 remain open.
+
 DAR-51/54 RC4 integration checkpoint: clean commit
 `8ebb9411f4f366f62b984d5cef6e9c6009e61b9b` was pushed to `origin/main`,
 frozen as external candidate `1.0.0-rc.4`, and reverified against that exact
