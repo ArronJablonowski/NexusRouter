@@ -1,5 +1,38 @@
 # Implementation evidence
 
+Daemon crash/restart qualification: this turn resumed from clean, GitHub-backed
+`a6e38ff`. Native Linear DAR-36 moved from Todo to In Progress. Existing daemon
+implementation already performs configuration, listener, database, provider,
+resource and supervisor startup checks; exposes detailed readiness; supports
+authenticated managed start/status/stop; and joins HTTP, dispatcher, learning and
+metrics services during cooperative shutdown.
+
+A new Unix process test builds and launches the actual DarwinRouter executable,
+waits for validated readiness, submits detached model work, and observes the
+provider receive its request. The provider emits a partial delta and blocks. The
+test kills and joins that exact daemon with verified SIGKILL, observes provider
+disconnect, and advances only the owned fixture's submission-claim expiry. A
+second fresh daemon process opens the same database, reaches readiness, and runs
+the production dispatcher recovery sweep. The original task/submission become
+failed with one `interrupted_model` receipt, one total provider call, empty result,
+an interrupted turn, preserved user context and no partial assistant message.
+The restarted daemon then exits through its authenticated graceful-stop path.
+
+The final focused native race test passed three runs in 5.565s. The final test
+also passed three times as a CGO-free Linux ARM64 binary in an unprivileged,
+read-only, network-disabled container. This qualifies actual daemon process death
+and restart-safe recovery for model-only interrupted work using a loopback
+provider and deterministic one-byte model footprint. Linux was not race-
+instrumented. It does not add or prove an OS crash-restart supervisor, automatic
+retry, live-provider compatibility, wall-clock lease waiting, power-loss durability,
+remote workers or arbitrary side-effect recovery. Final `make check` passed after
+all review changes: format/LOC enforcement, vet, the full native race suite, and
+production build. App tests took 220.401s, telemetry 146.082s, CLI 41.548s, SDK
+24.885s, and toolgate 19.653s; unchanged packages used cached results. Both exact
+DAR-36 acceptance criteria are now proven for the documented local daemon scope,
+so its native Linear completion follows GitHub publication. The full PRD remains
+incomplete.
+
 Process-separated recovery continuation qualification: this turn started clean
 from GitHub-backed 66295c9, a verified implementation checkpoint. The existing
 owned-process model-crash test now covers explicit continuation in a second

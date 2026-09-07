@@ -65,9 +65,19 @@ cover unrelated listeners, wrong launch identities, early exits, startup deadlin
 owned-child graceful/hard cleanup, stale stop identities, degraded control, malformed
 messages, cancellation, read bounds, and duplicate-bind non-creation of storage.
 
+An additional process test launches the production `serve` command, submits durable
+model work, and kills that exact daemon with SIGKILL after a partial provider stream.
+After advancing only the owned fixture's claim expiry, a fresh daemon process opens
+the same database, becomes ready, and lets the normal dispatcher recovery sweep
+close the task and submission as failed. The test requires one immutable recovery
+receipt, no second provider call, no partial assistant message, preserved user
+context, and a clean cooperative shutdown of the restarted daemon.
+
 This is not an OS login service or automatic crash-restart supervisor. Duplicate
 prevention is per endpoint, not a machine-wide database/resource lock. Arbitrary
 in-process tools may ignore cancellation; a stopping acknowledgement does not prove
 they have exited. Descendant containment, launchd/systemd integration, automatic
 restart, configuration reload and complete release qualification remain separate
-work. Tests use local fixtures and idle task queues, not live provider crash tests.
+work. Crash qualification uses a loopback provider fixture and advances the expired
+claim in owned test storage; it is not live-provider, wall-clock lease, power-loss,
+filesystem-durability, remote worker, or arbitrary side-effect evidence.
