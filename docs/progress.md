@@ -1,5 +1,28 @@
 # Implementation evidence
 
+DAR-31 is Done in native Linear under state activity
+`e2029aa1-a884-4d46-8192-11dbafcb9595` with completion evidence comment
+`31ebb037`. `Compact` validates the complete conversation and moves cuts inside
+parallel tool batches back to their assistant call, retaining complete
+call/result pairs. `PrepareContinuation` admits only completed histories with no
+interrupted turn, pending call or uncertain effect, retains removed system
+messages as stable context, and wraps the structured summary as untrusted
+reference data. The retained suffix and nested arguments are detached copies.
+Versioned checkpoints preserve the source task, sequence, digest, first retained
+message/event, removed count, context estimates, and structured requirements,
+activity, decisions, pending work, failures and artifacts. Summary proposals are
+bounded, redacted, persisted before inference, and require an explicit review;
+source event history remains append-only. New replay coverage proves all six
+summary categories and a recent paired tool turn survive together. Focused
+sessions/runtime/telemetry/application race tests passed three repetitions.
+Final `make check` passed format/LOC, vet, the complete native race suite and
+build; application tests took 222.808s, telemetry 148.009s, CLI 42.436s, SDK
+25.061s, tool-gate 19.533s and sessions 14.726s. The checkpoint is backed up at
+`6355a86`; push/fetch verification showed matching local and remote heads and
+zero divergence before the Linear comment and Done state were read back. Linear
+released DAR-32 and DAR-33 from this dependency; DAR-43 also cleared this
+dependency. The full PRD remains incomplete.
+
 DAR-30 is Done in native Linear under state activity
 `b64c57cb-07f4-4e97-8e3f-7db94ec1c7a8` with completion evidence comment
 `339be631`. `RecordEvaluation` resolves immutable evidence, verifies durable
