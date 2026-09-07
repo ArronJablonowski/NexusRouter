@@ -4170,3 +4170,63 @@ verification agreed using disposable keys, the native candidate reported
 and untracked source tree clean. This is local candidate evidence, not the still
 missing hosted Ubuntu/macOS run, native execution of the other three targets,
 production signature, operator approvals or publication.
+
+Release-license discovery checkpoint: the four `cmd/darwin` target dependency
+closures were enumerated separately with the release build tags. Darwin targets
+contain 13 non-standard-library modules and Linux targets contain 12; the only
+difference is Darwin-only `github.com/ncruces/go-strftime`. The new distribution
+dependency inventory records every module/version plus SHA-256 digests for the
+upstream license, NOTICE and PATENTS candidates found in the module cache and is
+linked from the release checklist. Test/build-only modules are excluded and no
+license family label is treated as legal approval. A final clean-download
+verification, complete text review, DarwinRouter license choice, attribution
+bundle and operator approval remain required.
+
+Project-license decision: the owner explicitly selected the same license family
+as the publicly available NousResearch Hermes Agent. The official repository
+README and commit-pinned license identify that family as MIT. DarwinRouter now
+has the standard MIT text with `Copyright (c) 2026 Arron Jablonowski`; the grant,
+conditions and disclaimer otherwise match the upstream template. This resolves
+the project-license-family decision, not the separate review and publication of
+third-party dependency notices.
+
+DAR-46 decomposition checkpoint: the release epic now has eleven short,
+dependency-linked child sprints, DAR-47 through DAR-57, covering candidate
+identity, licensing/notices, authenticated collateral, hosted and native target
+qualification, installation/migration rehearsal, production signing, final
+artifact construction, independent verification, publication and post-release
+byte verification. DAR-48 and DAR-49 are In Progress; all other children are
+Todo and DAR-46 remains In Progress. No issue is treated as complete merely
+because its local implementation started.
+
+DAR-48/DAR-49 release-collateral checkpoint: each target archive now has a
+closed six-member schema-2 contract containing authenticated installation
+instructions, the project MIT license, version-specific release notes,
+target-specific generated dependency notices, a conservative local-only sample
+and the target executable. The signed manifest binds every member's name, mode,
+size and SHA-256; signing and verification reject missing, extra, reordered,
+cross-target-divergent or malformed content. Notice generation begins from the
+exact target build closure, runs `go mod verify`, rejects replacements, records
+each included legal file's length and digest, and fails closed on unbounded or
+noncanonical input. The mechanical review inventory now lists every legal-file
+candidate included by the current generator, including the additional libc,
+memory and sqlite texts; final clean-download and legal review remain operator
+gates. The shipped local sample is rejected unless every provider is an
+uncredentialed loopback Ollama route and tools, memory, skills, learning,
+automatic activation and the optional LLM judge remain disabled.
+
+DAR-52 rehearsal checkpoint: native release qualification now verifies and
+installs the authenticated archive into a disposable versioned prefix, validates
+private runtime paths, starts/stops the owned daemon, checks SQLite WAL and
+integrity, preserves a synthetic fact across the real schema-28-to-29 migration,
+and verifies an exclusive immutable backup plus a separate schema-28 rollback
+copy. It neither opens user data nor fetches or runs a historical binary; the
+previous-published-binary rehearsal, retained operator evidence and non-native
+platform runs remain outstanding. Independent read-only review found no
+remaining production code blocker after stale schema-1 documentation,
+short-circuiting archive-security fixtures, missing inventory entries and a
+remote-endpoint sample gap were corrected. Focused release tests, a three-repeat
+race run, vet, sample validation and shell syntax checks passed. A full
+`make check` also passed the complete race-enabled suite and build on the
+implementation tree; a final post-documentation gate is still required before
+the checkpoint is pushed.

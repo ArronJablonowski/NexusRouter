@@ -22,6 +22,10 @@ and sensitive logs out of this record and the repository.
 
 ## License and notices
 
+- DarwinRouter licensing policy: MIT, selected by the project owner to match
+  Hermes Agent; see the repository-root `LICENSE`.
+- Mechanical dependency inventory:
+  [distribution dependency license inventory](dependency-license-inventory.md)
 - Approved repository license and evidence:
 - Dependency-license review evidence:
 - Approved dependency notices location:

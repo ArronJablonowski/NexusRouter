@@ -21,7 +21,7 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 		return ErrSignature
 	}
 	var manifest Manifest
-	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != 1 ||
+	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != 2 ||
 		validate(Options{Version: manifest.Version, Commit: manifest.Commit, Out: "release"}) != nil ||
 		len(manifest.Toolchain) > 64 || !signedToolchain.MatchString(manifest.Toolchain) || len(manifest.Artifacts) != 4 {
 		return ErrSignature
@@ -31,11 +31,24 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 		return ErrSignature
 	}
 	targets := [4][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}}
+	sharedIndexes := [...]int{0, 1, 2, 4}
+	var shared [len(sharedIndexes)]archiveEntryMetadata
 	for i, target := range targets {
 		artifact := manifest.Artifacts[i]
 		name := "DarwinRouter_" + manifest.Version + "_" + target[0] + "_" + target[1] + ".tar.gz"
-		if artifact.OS != target[0] || artifact.Arch != target[1] || artifact.File != name || artifact.SHA256 == "" || digests[name] != artifact.SHA256 {
+		if artifact.OS != target[0] || artifact.Arch != target[1] || artifact.File != name || artifact.SHA256 == "" || digests[name] != artifact.SHA256 || len(artifact.Entries) != len(archiveContract) {
 			return ErrSignature
+		}
+		if i == 0 {
+			for j, index := range sharedIndexes {
+				shared[j] = artifact.Entries[index]
+			}
+		} else {
+			for j, index := range sharedIndexes {
+				if artifact.Entries[index] != shared[j] {
+					return ErrSignature
+				}
+			}
 		}
 		if validateReleaseArchive(root, artifact) != nil {
 			return ErrSignature

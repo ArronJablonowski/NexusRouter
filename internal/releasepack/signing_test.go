@@ -33,13 +33,17 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	writeSigningFixture(t, seedFile, []byte(hex.EncodeToString(private.Seed())+"\n"), 0600)
 	writeSigningFixture(t, publicFile, []byte(hex.EncodeToString(public)+"\n"), 0644)
 	var sums strings.Builder
-	manifest := Manifest{SchemaVersion: 1, Version: "1.0.0", Commit: strings.Repeat("a", 40), Toolchain: "go1.27.1"}
+	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: strings.Repeat("a", 40), Toolchain: "go1.27.1"}
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
 		body := signingArchiveFixture(t, target[0], target[1])
 		writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(body), name)
-		manifest.Artifacts = append(manifest.Artifacts, Artifact{OS: target[0], Arch: target[1], File: name, SHA256: fmt.Sprintf("%x", sha256.Sum256(body))})
+		_, metadata, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(target[0], target[1]), signingBinaryFixture(t, target[0], target[1]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		manifest.Artifacts = append(manifest.Artifacts, Artifact{OS: target[0], Arch: target[1], File: name, SHA256: fmt.Sprintf("%x", sha256.Sum256(body)), Entries: metadata})
 	}
 	body, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -54,12 +58,32 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 
 func signingArchiveFixture(t *testing.T, targetOS, targetArch string) []byte {
 	t.Helper()
-	executable := signingBinaryFixture(t, targetOS, targetArch)
+	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(targetOS, targetArch), signingBinaryFixture(t, targetOS, targetArch))
+	if err != nil {
+		t.Fatal(err)
+	}
 	var archive bytes.Buffer
-	if err := Archive(&archive, []Entry{{Name: "darwin", Data: executable}}); err != nil {
+	if err := Archive(&archive, entries); err != nil {
 		t.Fatal(err)
 	}
 	return archive.Bytes()
+}
+
+func signingCollateralFixture() collateral {
+	return collateral{
+		install: []byte("# Install fixture\n"),
+		license: []byte("MIT License fixture\n"),
+		notes:   []byte("# Release notes fixture\n"),
+		config:  []byte("version: 1\nmode: local_only\n"),
+	}
+}
+
+func signingNoticeFixture(targetOS, targetArch string) []byte {
+	body, err := renderThirdPartyNotices(targetOS, targetArch, []noticeModule{{Path: "example.com/dependency", Version: "v1.0.0", Files: []noticeFile{{Name: "LICENSE", Body: []byte("fixture license\n")}}}})
+	if err != nil {
+		panic(err)
+	}
+	return body
 }
 
 func signingBinaryFixture(t *testing.T, targetOS, targetArch string) []byte {
@@ -148,7 +172,7 @@ func headerOnlyBinaryFixture(targetOS, targetArch string) []byte {
 }
 
 func TestSigningManifestContract(t *testing.T) {
-	for _, scenario := range []string{"schema", "version", "commit", "toolchain", "target", "hash", "filename", "count", "malformed", "duplicate_key", "missing_manifest", "extra_payload"} {
+	for _, scenario := range []string{"schema", "version", "commit", "toolchain", "target", "hash", "filename", "count", "entry_count", "entry_name", "entry_order", "entry_mode", "entry_size", "entry_hash", "shared_collateral", "malformed", "duplicate_key", "missing_manifest", "extra_payload"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seedFile, public := signingFixture(t)
 			path := filepath.Join(dir, "manifest.json")
@@ -162,7 +186,7 @@ func TestSigningManifestContract(t *testing.T) {
 			}
 			switch scenario {
 			case "schema":
-				manifest.SchemaVersion = 2
+				manifest.SchemaVersion = 1
 			case "version":
 				manifest.Version = "01.0.0"
 			case "commit":
@@ -177,6 +201,20 @@ func TestSigningManifestContract(t *testing.T) {
 				manifest.Artifacts[0].File = "different.tar.gz"
 			case "count":
 				manifest.Artifacts = manifest.Artifacts[:3]
+			case "entry_count":
+				manifest.Artifacts[0].Entries = manifest.Artifacts[0].Entries[:5]
+			case "entry_name":
+				manifest.Artifacts[0].Entries[0].Name = "OTHER.md"
+			case "entry_order":
+				manifest.Artifacts[0].Entries[0], manifest.Artifacts[0].Entries[1] = manifest.Artifacts[0].Entries[1], manifest.Artifacts[0].Entries[0]
+			case "entry_mode":
+				manifest.Artifacts[0].Entries[1].Mode = 0600
+			case "entry_size":
+				manifest.Artifacts[0].Entries[2].Size++
+			case "entry_hash":
+				manifest.Artifacts[0].Entries[4].SHA256 = strings.Repeat("0", 64)
+			case "shared_collateral":
+				manifest.Artifacts[1].Entries[0].SHA256 = strings.Repeat("1", 64)
 			}
 			body, err = json.MarshalIndent(manifest, "", "  ")
 			if err != nil {
@@ -187,7 +225,7 @@ func TestSigningManifestContract(t *testing.T) {
 				body = []byte("{invalid}")
 			}
 			if scenario == "duplicate_key" {
-				body = []byte(strings.Replace(string(body), `"schema_version": 1,`, `"schema_version": 1, "schema_version": 1,`, 1))
+				body = []byte(strings.Replace(string(body), `"schema_version": 2,`, `"schema_version": 2, "schema_version": 2,`, 1))
 			}
 			writeSigningFixture(t, path, body, 0644)
 			if scenario == "missing_manifest" {
@@ -261,7 +299,7 @@ func TestSigningOfflineRoundTrip(t *testing.T) {
 }
 
 func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
-	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
+	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "missing_notice", "missing_config", "tampered_license", "wrong_notice_target", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
 			name := "DarwinRouter_1.0.0_darwin_amd64.tar.gz"
@@ -273,16 +311,35 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 				body = []byte("fixture " + name)
 			case "multiple_entries":
 				var archive bytes.Buffer
-				if err := Archive(&archive, []Entry{{Name: "darwin", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: "extra", Data: []byte("extra")}}); err != nil {
+				if err := Archive(&archive, []Entry{{Name: "darwin", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: noticeName, Data: signingNoticeFixture("darwin", "amd64")}, {Name: "extra", Data: []byte("extra")}}); err != nil {
 					t.Fatal(err)
 				}
 				body = archive.Bytes()
 			case "wrong_name":
 				var archive bytes.Buffer
-				if err := Archive(&archive, []Entry{{Name: "other", Data: signingBinaryFixture(t, "darwin", "amd64")}}); err != nil {
+				if err := Archive(&archive, []Entry{{Name: "other", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: noticeName, Data: signingNoticeFixture("darwin", "amd64")}}); err != nil {
 					t.Fatal(err)
 				}
 				body = archive.Bytes()
+			case "missing_notice":
+				body = archiveSigningBody(t, signingBinaryFixture(t, "darwin", "amd64"), nil)
+			case "missing_config", "tampered_license":
+				entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), signingBinaryFixture(t, "darwin", "amd64"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "missing_config" {
+					entries = append(entries[:4], entries[5:]...)
+				} else {
+					entries[1].Data = []byte("changed license\n")
+				}
+				var archive bytes.Buffer
+				if err = Archive(&archive, entries); err != nil {
+					t.Fatal(err)
+				}
+				body = archive.Bytes()
+			case "wrong_notice_target":
+				body = archiveSigningBody(t, signingBinaryFixture(t, "darwin", "amd64"), signingNoticeFixture("linux", "amd64"))
 			case "noncanonical_metadata":
 				body = customSigningArchive(t, signingBinaryFixture(t, "darwin", "amd64"), 0700, 0)
 			case "trailing_bytes":
@@ -297,11 +354,11 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 			case "wrong_arch":
 				body = signingArchiveFixture(t, "darwin", "arm64")
 			case "header_only_macho":
-				body = archiveSigningBody(t, headerOnlyBinaryFixture("darwin", "amd64"))
+				body = archiveSigningBody(t, headerOnlyBinaryFixture("darwin", "amd64"), signingNoticeFixture("darwin", "amd64"))
 			case "header_only_elf":
-				body = archiveSigningBody(t, headerOnlyBinaryFixture("linux", "amd64"))
+				body = archiveSigningBody(t, headerOnlyBinaryFixture("linux", "amd64"), signingNoticeFixture("darwin", "amd64"))
 			case "elf_interpreter":
-				body = archiveSigningBody(t, signingELFInterpreterFixture(t))
+				body = archiveSigningBody(t, signingELFInterpreterFixture(t), signingNoticeFixture("darwin", "amd64"))
 			}
 			writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 			refreshSigningFixture(t, dir)
@@ -316,10 +373,18 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 	}
 }
 
-func archiveSigningBody(t *testing.T, body []byte) []byte {
+func archiveSigningBody(t *testing.T, body, notice []byte) []byte {
 	t.Helper()
+	entries := []Entry{{Name: "darwin", Data: body}}
+	if notice != nil {
+		var err error
+		entries, _, err = releaseEntries(signingCollateralFixture(), notice, body)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	var archive bytes.Buffer
-	if err := Archive(&archive, []Entry{{Name: "darwin", Data: body}}); err != nil {
+	if err := Archive(&archive, entries); err != nil {
 		t.Fatal(err)
 	}
 	return archive.Bytes()
@@ -327,17 +392,27 @@ func archiveSigningBody(t *testing.T, body []byte) []byte {
 
 func customSigningArchive(t *testing.T, body []byte, mode int64, suffix int64) []byte {
 	t.Helper()
+	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), body)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var archive bytes.Buffer
 	gz := gzip.NewWriter(&archive)
 	gz.Header.ModTime = time.Time{}
 	gz.Header.OS = 255
 	tw := tar.NewWriter(gz)
-	header := &tar.Header{Name: "darwin", Mode: mode, Size: int64(len(body)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
-	if err := tw.WriteHeader(header); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tw.Write(body); err != nil {
-		t.Fatal(err)
+	for _, entry := range entries {
+		entryMode := int64(0644)
+		if entry.Name == "darwin" {
+			entryMode = mode
+		}
+		header := &tar.Header{Name: entry.Name, Mode: entryMode, Size: int64(len(entry.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
+		if err := tw.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(entry.Data); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatal(err)

@@ -10,11 +10,16 @@ import (
 	"io"
 	"os"
 	"time"
+	"unicode/utf8"
 )
 
-const maxArchive = maxArtifact + (1 << 20)
-const maxTarStream = maxArtifact + 3*tarBlockSize
+const maxArchive = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig + (1 << 20)
 const tarBlockSize = 512
+
+// Six regular entries require six headers, up to one padding block per payload,
+// and two end-of-archive blocks. All payload maxima are block-aligned, but keep
+// the conservative derived allowance so later contract changes remain safe.
+const maxTarStream = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig + (2*6+2)*tarBlockSize
 
 // validateReleaseArchive checks the format that Package emits before a payload
 // can be signed or accepted. Checksums authenticate bytes; this check also
@@ -33,20 +38,32 @@ func validateReleaseArchive(root *os.Root, artifact Artifact) error {
 	gz.Multistream(false)
 	decompressed := &io.LimitedReader{R: gz, N: maxTarStream + 1}
 	tr := tar.NewReader(decompressed)
-	header, err := tr.Next()
-	if err != nil || header.Name != "darwin" || header.Typeflag != tar.TypeReg || header.Mode != 0755 ||
-		header.Size < 1 || header.Size > maxArtifact || header.Format != tar.FormatUSTAR ||
-		header.Uid != 0 || header.Gid != 0 || header.Uname != "" || header.Gname != "" ||
-		header.Linkname != "" || header.Devmajor != 0 || header.Devminor != 0 ||
-		!header.ModTime.Equal(time.Unix(0, 0)) || !header.AccessTime.IsZero() || !header.ChangeTime.IsZero() ||
-		len(header.PAXRecords) != 0 || len(header.Xattrs) != 0 {
-		gz.Close()
-		return ErrSignature
-	}
-	binary, err := io.ReadAll(io.LimitReader(tr, maxArtifact+1))
-	if err != nil || int64(len(binary)) != header.Size {
-		gz.Close()
-		return ErrSignature
+	var binary []byte
+	for index, contract := range archiveContract {
+		header, err := tr.Next()
+		if err != nil || !canonicalArchiveHeader(header, contract.name, int64(contract.mode), contract.max) {
+			gz.Close()
+			return ErrSignature
+		}
+		entry, err := io.ReadAll(io.LimitReader(tr, contract.max+1))
+		if err != nil || int64(len(entry)) != header.Size || !validEntryMetadata(artifact.Entries[index], index, entry) {
+			gz.Close()
+			return ErrSignature
+		}
+		switch contract.name {
+		case noticeName:
+			if validateNotice(entry, artifact.OS, artifact.Arch) != nil {
+				gz.Close()
+				return ErrSignature
+			}
+		case "darwin":
+			binary = entry
+		default:
+			if !utf8.Valid(entry) || bytes.IndexByte(entry, 0) >= 0 || bytes.IndexByte(entry, '\r') >= 0 || entry[len(entry)-1] != '\n' {
+				gz.Close()
+				return ErrSignature
+			}
+		}
 	}
 	if _, err = tr.Next(); err != io.EOF {
 		gz.Close()
@@ -64,6 +81,15 @@ func validateReleaseArchive(root *os.Root, artifact Artifact) error {
 		return ErrSignature
 	}
 	return validateReleaseBinary(binary, artifact.OS, artifact.Arch)
+}
+
+func canonicalArchiveHeader(header *tar.Header, name string, mode, maxSize int64) bool {
+	return header.Name == name && header.Typeflag == tar.TypeReg && header.Mode == mode &&
+		header.Size >= 1 && header.Size <= maxSize && header.Format == tar.FormatUSTAR &&
+		header.Uid == 0 && header.Gid == 0 && header.Uname == "" && header.Gname == "" &&
+		header.Linkname == "" && header.Devmajor == 0 && header.Devminor == 0 &&
+		header.ModTime.Equal(time.Unix(0, 0)) && header.AccessTime.IsZero() && header.ChangeTime.IsZero() &&
+		len(header.PAXRecords) == 0 && len(header.Xattrs) == 0
 }
 
 func validateReleaseBinary(body []byte, targetOS, targetArch string) error {

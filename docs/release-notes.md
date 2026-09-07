@@ -261,6 +261,6 @@ built-in side-effecting CLI tools,
 automatic skill validation/activation, learning-attention controls,
 configuration reload and supported-platform qualification remain
 open. This list is not exhaustive. Distribution also requires an approved
-license and notices, a dedicated signing identity with an independent public-key
+third-party dependency notices, a dedicated signing identity with an independent public-key
 trust record, approved version-specific notes and explicit publication. Record
 the decisions and evidence in the [release checklist](release-checklist.md).

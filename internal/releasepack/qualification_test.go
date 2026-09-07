@@ -111,7 +111,7 @@ func TestReleaseQualification(t *testing.T) {
 	}
 	nativeRan := false
 	for _, artifact := range manifest.Artifacts {
-		binary := qualificationBinary(t, filepath.Join(first, artifact.File))
+		binary := qualificationBinary(t, filepath.Join(first, artifact.File), artifact)
 		if artifact.OS == "darwin" {
 			f, e := macho.NewFile(bytes.NewReader(binary))
 			want := macho.CpuAmd64
@@ -145,6 +145,7 @@ func TestReleaseQualification(t *testing.T) {
 			if e != nil || got != "darwin "+version {
 				t.Fatalf("native version mismatch: %q: %v", got, e)
 			}
+			rehearseNativeInstallAndMigration(t, ctx, source, filepath.Join(first, artifact.File), artifact, version)
 			nativeRan = true
 		}
 	}
@@ -160,10 +161,10 @@ func TestReleaseQualification(t *testing.T) {
 	if _, err = command(ctx, source, environment(), "go", "run", "./cmd/verify-release", "--dir", first, "--public-key", publicFile); err == nil {
 		t.Fatal("verification CLI accepted tampering")
 	}
-	t.Log("eight builds: every unsigned byte matched; four executable formats checked; package/sign/verify CLIs exercised; ephemeral signatures matched; native version ran; tampering rejected")
+	t.Log("eight builds: every unsigned byte including signed collateral and target-specific dependency notices matched; four executable formats checked; package/sign/verify CLIs exercised; ephemeral signatures matched; native install/migration/rollback rehearsal passed; tampering rejected")
 }
 
-func qualificationBinary(t *testing.T, path string) []byte {
+func qualificationBinary(t *testing.T, path string, artifact Artifact) []byte {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
@@ -176,13 +177,25 @@ func qualificationBinary(t *testing.T, path string) []byte {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	h, err := tr.Next()
-	if err != nil || h.Name != "darwin" || h.Typeflag != tar.TypeReg || h.Mode != 0755 || h.Size > maxArtifact {
-		t.Fatalf("unexpected archive header: %v", err)
+	if len(artifact.Entries) != len(archiveContract) {
+		t.Fatal("invalid manifest entry count")
 	}
-	body, err := io.ReadAll(io.LimitReader(tr, maxArtifact+1))
-	if err != nil || int64(len(body)) != h.Size {
-		t.Fatal("archive size mismatch", err)
+	var body []byte
+	for i, contract := range archiveContract {
+		h, err := tr.Next()
+		if err != nil || !canonicalArchiveHeader(h, contract.name, int64(contract.mode), contract.max) {
+			t.Fatalf("unexpected archive header: %v", err)
+		}
+		entry, err := io.ReadAll(io.LimitReader(tr, contract.max+1))
+		if err != nil || int64(len(entry)) != h.Size || !validEntryMetadata(artifact.Entries[i], i, entry) {
+			t.Fatal("archive member mismatch", contract.name, err)
+		}
+		if contract.name == noticeName && validateNotice(entry, artifact.OS, artifact.Arch) != nil {
+			t.Fatal("invalid dependency notice")
+		}
+		if contract.name == "darwin" {
+			body = entry
+		}
 	}
 	if _, err = tr.Next(); err != io.EOF {
 		t.Fatal("unexpected trailing archive entry", err)

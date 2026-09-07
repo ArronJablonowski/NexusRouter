@@ -1,0 +1,119 @@
+# Installation, migration and rollback rehearsal
+
+This rehearsal qualifies the mechanics of a DarwinRouter installation without
+opening an operator configuration, database or model endpoint. It uses a native
+release archive, private disposable directories, a providerless configuration
+and one synthetic memory fact. It does not qualify live inference, production
+signing, publication or another operating system or architecture.
+
+## Automated local scaffold
+
+Run the focused test from the repository root:
+
+```sh
+go test ./internal/releasepack \
+  -run '^(TestNativeInstallMigrationRehearsal|TestExclusiveRehearsalCopyRejectsOverwrite)$' \
+  -count=1 -v
+```
+
+The test builds the current native command with network module resolution
+disabled, places it in a six-entry release archive, and installs only the
+contract-checked `darwin` member into a new versioned prefix. An actual candidate
+must already have passed signature verification. The test checks the exact
+version string, exclusive installation paths, private configuration and state
+permissions, configuration validation, authenticated daemon status/stop, exact
+owned-process exit, SQLite WAL mode, `quick_check`, and schema 29.
+
+It then records a synthetic local-only memory fact, converts that owned fixture
+to the real schema-28 boundary used by migration tests, and confirms its stored
+body before proceeding. With the writer stopped and the fixture proven to have
+no running task, queued/running submission or unreleased resource lease, the
+test checkpoints WAL and creates a mode-0600 backup using an exclusive file
+create. It records the backup SHA-256, migrates the source database from schema
+28 to 29 through normal daemon startup, and verifies the fact body, migration
+epoch and integrity. Finally, it copies the backup to a new rollback database,
+checks the digest and schema, reads the original fact without migration, and
+proves the upgraded database was not replaced.
+
+Runtime subprocesses receive an explicit `DARWIN_PROCESS_OWNER_DIR`, home,
+temporary directory and API token rooted under `testing.T.TempDir`. The build
+subprocess uses the caller's Go cache and home but disables module network
+resolution. No provider is configured. A loopback HTTP listener is used only
+for the owned daemon's control API. The test log paths are temporary; a
+candidate release checklist needs separately retained operator evidence.
+
+The helper `rehearseNativeInstallAndMigration` accepts an already selected
+native archive and its authenticated manifest metadata. The release
+qualification test can call it after signature verification and before any
+tampering test. Signature verification and public-key trust remain the caller's
+responsibility.
+
+## Candidate rehearsal record
+
+For an actual candidate, retain at least:
+
+- Candidate version and full source commit.
+- Independently verified manifest, checksums and signature references.
+- Native operating system, architecture and binary version output.
+- Absolute installation prefix, configuration path and database path.
+- Configuration/state permissions and validation result.
+- Source schema and previous binary version.
+- Evidence that the exact old writer exited and no active work remained.
+- Pre-upgrade backup path, SHA-256 and `quick_check` result.
+- Migrated schema, preserved-record digest and daemon lifecycle result.
+- Rollback binary prefix, restored database path/digest and smoke result.
+
+Do not place credentials, private signing material, user prompts, model output
+or the database itself in repository or CI logs.
+
+## Real previous-binary rehearsal
+
+The automated scaffold intentionally does not fetch or execute historical code.
+Before approving a release that upgrades an existing installation, obtain the
+previously distributed binary through its authenticated release channel and
+verify its version and signature. Install it in a different versioned prefix.
+Use it to create or open a disposable database matching the source schema and
+write only synthetic evidence. Stop that exact process and wait for exit before
+making the backup.
+
+Start the candidate against the disposable source database and verify the
+migration. Then show that the previous binary rejects the newer schema rather
+than modifying it. Copy the immutable pre-upgrade backup to a new database path,
+point the previous binary at that new path, and repeat its configuration,
+startup, inspection and shutdown smoke checks. Never run an old binary against
+the restored path until its digest and schema have been checked.
+
+There is no previous public DarwinRouter release at the time of this document.
+A binary built from development commit
+`596ee7f0d7738afb3df825fac1964cc5464f7dd5` is useful schema-28 development
+evidence, but it must be labelled as such and cannot substitute for a prior
+published release. Hosted CI should not fetch this ancestor implicitly.
+
+## Safety and rollback limits
+
+- Schema 29 is intentionally unsupported by the schema-28 binary. There is no
+  supported in-place downgrade. Rollback means selecting the older binary and a
+  restored matching backup as one pair.
+- Restore to a new path. Do not overwrite, rename or edit the migrated database;
+  retain it for inspection until the rollback decision is closed.
+- Rollback discards all work committed after the backup. Record and approve that
+  recovery point before an upgrade.
+- Operational backup requires all old writers to be stopped. A control response
+  saying `stopping` is insufficient; wait for the owned process to exit.
+- Do not back up a database with running tasks, queued/running submissions or
+  unreleased leases for this v1 procedure. Databases containing lease history
+  can depend on retained process-owner guard paths for conservative recovery.
+- Memory export is not a database backup. A main SQLite file copied without a
+  quiescent writer and successful WAL checkpoint is not a qualified backup.
+- The automated providerless configuration qualifies storage and daemon control
+  only. A separate supervised smoke test must qualify Hermes/Ollama or other
+  model execution.
+- A local-built macOS binary lacks downloaded-file quarantine and does not prove
+  Developer ID signing, notarization or Gatekeeper behavior.
+- Native execution on Darwin/arm64 says nothing about Linux or Darwin/amd64.
+  Each supported target needs its own native installation evidence.
+
+The current storage opener creates new databases privately when the operator
+has first created private directories. General protection against permissive
+pre-existing paths or database symlinks is outside this rehearsal and must not
+be inferred from its controlled fixture.

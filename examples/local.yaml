@@ -28,5 +28,21 @@ models:
     # runtime overhead. Keeping zero denies local resource admission.
     # On Apple unified memory, include GPU allocations here and leave VRAM zero.
     ram_bytes: 0
+tools:
+  # Enable tools only after reviewing their roots and approval policy.
+  enabled: false
+memory:
+  # Opt in only after selecting a private durable scope and retention policy.
+  enabled: false
+skills:
+  # Automatic workflow learning is deliberately disabled in this install sample.
+  enabled: false
+  auto_draft: false
+  auto_activate_after_validation: false
+  learning:
+    enabled: false
+evaluation:
+  # Subjective auxiliary judging is opt-in and may create provider traffic.
+  llm_judge_enabled: false
 telemetry:
   database: ./data/darwin.db

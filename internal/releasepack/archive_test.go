@@ -41,7 +41,11 @@ func TestArchiveDeterministic(t *testing.T) {
 			t.Fatal(e)
 		}
 		names = append(names, h.Name)
-		if h.Uid != 0 || h.Gid != 0 || h.Uname != "" || h.Gname != "" || h.ModTime.Unix() != 0 || h.Mode != 0755 {
+		wantMode := int64(0644)
+		if h.Name == "darwin" {
+			wantMode = 0755
+		}
+		if h.Uid != 0 || h.Gid != 0 || h.Uname != "" || h.Gname != "" || h.ModTime.Unix() != 0 || h.Mode != wantMode {
 			t.Fatal(h)
 		}
 	}
@@ -58,6 +62,34 @@ func TestArchiveRejectsPathsAndBounds(t *testing.T) {
 	}
 	if Archive(io.Discard, []Entry{{"a", []byte("x")}, {"a", []byte("y")}}) == nil || Archive(io.Discard, []Entry{{"a", nil}}) == nil || Archive(io.Discard, make([]Entry, 33)) == nil {
 		t.Fatal("bounds accepted")
+	}
+}
+
+func TestReleaseTarStreamLimitIncludesWorstCasePadding(t *testing.T) {
+	// One-byte bodies force 511 bytes of padding for each contract entry.
+	entries := make([]Entry, len(archiveContract))
+	for i, contract := range archiveContract {
+		entries[i] = Entry{Name: contract.name, Data: []byte("x")}
+	}
+	var archive bytes.Buffer
+	if err := Archive(&archive, entries); err != nil {
+		t.Fatal(err)
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(archive.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := io.ReadAll(gz)
+	closeErr := gz.Close()
+	if err != nil || closeErr != nil {
+		t.Fatal("read archive", err, closeErr)
+	}
+	// Six headers + six padded data blocks + two EOF blocks.
+	if len(stream) != 14*tarBlockSize {
+		t.Fatalf("unexpected canonical tar size: %d", len(stream))
+	}
+	if maxTarStream != maxReleaseData()+14*tarBlockSize {
+		t.Fatal("release tar limit does not reserve every header, padding block, and EOF block")
 	}
 }
 

@@ -17,10 +17,11 @@ import (
 
 type Options struct{ Version, Commit, Out, Source string }
 type Artifact struct {
-	OS     string `json:"os"`
-	Arch   string `json:"arch"`
-	File   string `json:"file"`
-	SHA256 string `json:"sha256"`
+	OS      string                 `json:"os"`
+	Arch    string                 `json:"arch"`
+	File    string                 `json:"file"`
+	SHA256  string                 `json:"sha256"`
+	Entries []archiveEntryMetadata `json:"entries"`
 }
 type Manifest struct {
 	SchemaVersion int        `json:"schema_version"`
@@ -156,9 +157,23 @@ func Package(ctx context.Context, o Options) error {
 	if err = snapshot(ctx, source, o.Commit, buildSource, env); err != nil {
 		return err
 	}
-	manifest := Manifest{SchemaVersion: 1, Version: o.Version, Commit: o.Commit, Toolchain: toolchain}
+	shared, err := loadCollateral(buildSource)
+	if err != nil {
+		return err
+	}
+	manifest := Manifest{SchemaVersion: 2, Version: o.Version, Commit: o.Commit, Toolchain: toolchain}
 	var sums strings.Builder
 	for _, target := range []struct{ os, arch string }{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
+		notices, e := thirdPartyNotices(ctx, buildSource, target.os, target.arch, env)
+		if e != nil {
+			return e
+		}
+		// go list above materializes the target closure. Verify the module-cache
+		// contents, including the legal files just captured, against go.sum before
+		// either those notices or compiled code enter a release artifact.
+		if _, e = command(ctx, buildSource, env, "go", "mod", "verify"); e != nil {
+			return e
+		}
 		binary := filepath.Join(stage, "darwin")
 		buildEnv := append(append([]string(nil), env...), "GOOS="+target.os, "GOARCH="+target.arch)
 		_, err = command(ctx, buildSource, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+o.Version, "-o", binary, "./cmd/darwin")
@@ -178,7 +193,12 @@ func Package(ctx context.Context, o Options) error {
 		if e != nil {
 			return e
 		}
-		e = Archive(f, []Entry{{Name: "darwin", Data: data}})
+		entries, metadata, e := releaseEntries(shared, notices, data)
+		if e != nil {
+			f.Close()
+			return e
+		}
+		e = Archive(f, entries)
 		closeErr := f.Close()
 		if e != nil {
 			return e
@@ -192,7 +212,7 @@ func Package(ctx context.Context, o Options) error {
 		}
 		digest := sha256.Sum256(archive)
 		hash := hex.EncodeToString(digest[:])
-		manifest.Artifacts = append(manifest.Artifacts, Artifact{target.os, target.arch, name, hash})
+		manifest.Artifacts = append(manifest.Artifacts, Artifact{OS: target.os, Arch: target.arch, File: name, SHA256: hash, Entries: metadata})
 		fmt.Fprintf(&sums, "%s  %s\n", hash, name)
 		if err = os.Remove(binary); err != nil {
 			return err

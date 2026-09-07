@@ -17,6 +17,10 @@ var ErrInvalid = errors.New("invalid release input")
 
 const maxArtifact = 256 << 20
 
+func maxReleaseData() int {
+	return maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig
+}
+
 type Entry struct {
 	Name string
 	Data []byte
@@ -41,10 +45,10 @@ func Archive(w io.Writer, entries []Entry) error {
 			}
 		}
 		seen[e.Name] = true
-		total += len(e.Data)
-		if total > maxArtifact {
+		if len(e.Data) > maxReleaseData()-total {
 			return ErrInvalid
 		}
+		total += len(e.Data)
 	}
 	for name := range seen {
 		for parent := path.Dir(name); parent != "."; parent = path.Dir(parent) {
@@ -59,7 +63,11 @@ func Archive(w io.Writer, entries []Entry) error {
 	gz.Header.OS = 255
 	tw := tar.NewWriter(gz)
 	for _, e := range owned {
-		h := &tar.Header{Name: e.Name, Mode: 0755, Size: int64(len(e.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
+		mode := int64(0644)
+		if e.Name == "darwin" {
+			mode = 0755
+		}
+		h := &tar.Header{Name: e.Name, Mode: mode, Size: int64(len(e.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
 		if err := tw.WriteHeader(h); err != nil {
 			return err
 		}

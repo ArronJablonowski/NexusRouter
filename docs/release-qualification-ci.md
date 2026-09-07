@@ -12,9 +12,12 @@ from the dispatched source.
 Each Ubuntu/macOS matrix job records the requested version, verified commit,
 actual Go host OS/architecture, Go version and individual gate outcomes in its
 job summary.
-The qualification gate builds all four release targets twice, compares their
-unsigned bytes, verifies formats, exercises disposable-key signing and tamper
-rejection, and executes only the artifact matching that job's native platform.
+The qualification gate builds all four six-member release archives twice,
+compares their unsigned bytes, verifies authenticated schema-2 member metadata,
+shared collateral and target-specific dependency notices, verifies executable
+formats, exercises disposable-key signing and tamper rejection, and rehearses
+installation plus schema migration/backup/rollback with only the artifact
+matching that job's native platform.
 Other targets are cross-build evidence, not native execution evidence. The
 summary identifies failures and skipped gates; neither qualifies a release.
 

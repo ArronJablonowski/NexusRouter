@@ -17,7 +17,7 @@ From the repository root, replace the uppercase placeholders:
 go run ./cmd/package-release \
   --version 0.0.0-dev.1 \
   --commit FULL_REVIEWED_COMMIT_ID \
-  --source /Users/aj_lobster/DarwinRouter \
+  --source /ABSOLUTE/PATH/TO/DarwinRouter \
   --out /ABSOLUTE/EXISTING/PARENT/new-release-directory
 ```
 
@@ -42,10 +42,13 @@ are 10,000 regular files, 1 MiB per file and 64 MiB total.
 
 Artifacts are produced for macOS (`darwin`) and Linux, both `amd64` and `arm64`:
 
-- Four `DarwinRouter_VERSION_OS_ARCH.tar.gz` archives, each containing only the
-  executable `darwin`, mode 0755.
-- `manifest.json`: schema version, release version, source commit, Go version,
-  and the four ordered target names and archive SHA-256 hashes.
+- Four `DarwinRouter_VERSION_OS_ARCH.tar.gz` archives. Each contains, in exact
+  order, `INSTALL.md`, `LICENSE`, `RELEASE_NOTES.md`,
+  `THIRD_PARTY_NOTICES.txt`, `config.example.yaml` (all mode 0644), and the
+  target executable `darwin` (mode 0755).
+- `manifest.json`: schema version 2, release version, source commit, Go version,
+  and the four ordered target names, archive SHA-256 hashes, and member
+  name/mode/size/SHA-256 metadata.
 - `SHA256SUMS`: sorted checksums of all four archives **and** the manifest.
 
 Builds use `CGO_ENABLED=0`, `-mod=readonly`, `-trimpath`, `-buildvcs=false`, a
@@ -111,9 +114,11 @@ Exit 0 means the signature, manifest and every declared file verified. Exit 1
 means verification failed; exit 2 denotes invalid command arguments. The
 verifier does not extract, run or install anything. Checks include safe
 basenames, regular nonsymlink files, no extra/missing payloads, the exact four
-target identities, and agreement between manifest and checksums. Manifest JSON
-must use the canonical schema-1 encoding emitted by the packager (two-space
-indentation, ordered fields, final LF); editing or reformatting invalidates it.
+target identities, exact ordered archive members and metadata, identical shared
+collateral across targets, target-specific dependency notices, and agreement
+between manifest and checksums. Manifest JSON must use the canonical schema-2
+encoding emitted by the packager (two-space indentation, ordered fields, final
+LF); editing or reformatting invalidates it.
 
 Use a quiescent directory you control for signing, verification and subsequent
 installation. Checks are point-in-time observations, not a lock preventing
@@ -126,92 +131,15 @@ After verification, map the host identity to an archive name. `uname -s` values
 `amd64` map to `amd64`, while `arm64` and `aarch64` map to `arm64`. Any other
 value is unsupported and must stop installation rather than guessing.
 
-Use a new temporary staging directory and a new versioned, user-controlled
-prefix. Replace every uppercase placeholder before running these commands:
-
-```sh
-set -eu
-release_dir=/ABSOLUTE/VERIFIED/RELEASE_DIRECTORY
-release_version=RELEASE_VERSION
-install_root=/ABSOLUTE/USER_CONTROLLED/DARWINROUTER
-install_prefix="$install_root/releases/$release_version"
-stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/darwinrouter-install.XXXXXX")
-trap 'rm -rf -- "$stage_dir"' EXIT HUP INT TERM
-
-case "$(uname -s)" in
-  Darwin) release_os=darwin ;;
-  Linux) release_os=linux ;;
-  *) echo "unsupported operating system" >&2; exit 1 ;;
-esac
-case "$(uname -m)" in
-  x86_64|amd64) release_arch=amd64 ;;
-  arm64|aarch64) release_arch=arm64 ;;
-  *) echo "unsupported architecture" >&2; exit 1 ;;
-esac
-
-archive="$release_dir/DarwinRouter_${release_version}_${release_os}_${release_arch}.tar.gz"
-test "$(tar -tzf "$archive")" = darwin
-tar -xzf "$archive" -C "$stage_dir"
-test -f "$stage_dir/darwin" && test ! -L "$stage_dir/darwin"
-test "$("$stage_dir/darwin" version)" = "darwin $release_version"
-mkdir -p "$install_root/releases"
-mkdir "$install_prefix"
-mkdir "$install_prefix/bin"
-install -m 0755 "$stage_dir/darwin" "$install_prefix/bin/darwin"
-test "$("$install_prefix/bin/darwin" version)" = "darwin $release_version"
-```
-
-The two exact version assertions must pass. Remove the staging directory only
-after inspection. Do not replace an existing versioned prefix; retain the
-previous prefix and its matching database backup for rollback. No automatic
-installer, PATH change, symlink switch or system-wide write is provided.
-
-The archives contain only `darwin`, so create configuration separately from a
-reviewed template belonging to the same source commit. Use stable absolute paths
-for installed operation: a relative database such as `./data/darwin.db` changes
-meaning with the process working directory. Create private configuration and
-state directories (mode 0700), write the configuration file with mode 0600, and
-replace all placeholders below. The database parent must already exist.
-
-```yaml
-version: 1
-mode: local_only
-runtime:
-  max_turns: 8
-  auto_use_approved_summary: false
-providers:
-  - id: local-primary
-    kind: ollama
-    endpoint: http://127.0.0.1:11434
-    request_timeout: 5m
-models:
-  - id: local-fast
-    provider: local-primary
-    model: REPLACE_WITH_INSTALLED_OLLAMA_MODEL
-    locality: local
-    capabilities: [chat, summarize, classify]
-    context_tokens: 0
-    estimated_cost: 0
-    ram_bytes: 0
-telemetry:
-  database: /ABSOLUTE/PRIVATE/DARWINROUTER/state/darwin.db
-```
-
-The two zero resource/context estimates deliberately make the template fail
-closed. Before execution, set `context_tokens` to a conservative supported input
-limit and `ram_bytes` to a measured conservative byte estimate covering model
-weights, maximum context/KV memory and runtime overhead. Review whether the
-zero `estimated_cost` is appropriate. Validate the final absolute configuration
-and keep using that exact path:
-
-```sh
-"$install_prefix/bin/darwin" config validate \
-  --config /ABSOLUTE/PRIVATE/DARWINROUTER/config.yaml
-```
-
-The source-tree [local example](../examples/local.yaml) documents the same
-fail-closed fields. The signed-in Sol coordinator profile is documented
-separately in [Codex coordinator integration](codex-coordinator-integration.md).
+The authenticated archive carries its own `INSTALL.md`, project license,
+release notes, exact target dependency notices and conservative local example.
+After verification, follow that embedded `INSTALL.md`; its source counterpart is
+[release-install.md](release-install.md). It checks all six members before
+extraction, uses a new versioned user-controlled prefix, installs documentation
+and the binary, and requires deployment-specific review of the fail-closed
+example. Do not replace an existing prefix; retain the previous binary and its
+matching database backup for rollback. No automatic installer, PATH change,
+symlink switch or system-wide write is provided.
 
 ## Repeatable qualification and remaining release gates
 
@@ -234,7 +162,8 @@ then builds all four targets twice from separate private snapshots, compares
 every unsigned output byte, checks executable platform/architecture, exercises
 the package/sign/verify CLIs, signs/verifies using disposable test keys, compares
 library/CLI signatures, runs the native binary's version command, and proves
-archive tampering is rejected. It uses temporary files removed by the test
+the native install/migration/backup/rollback mechanics, and proves archive
+tampering is rejected. It uses temporary files removed by the test
 framework. It does not sign with an operator identity, publish artifacts, run
 live model inference, or modify user configuration/databases.
 Ordinary `make check` skips this expensive test but covers packaging primitives,
@@ -244,8 +173,9 @@ Before a real release:
 
 - Keep the DAR-45 deterministic MVP gate passing and complete the remaining PRD
   acceptance; passing packaging tests alone does not qualify the agent runtime.
-- Select and approve the repository's distribution license and dependency
-  notices; no license has been invented or granted by this tooling.
+- Confirm the committed MIT `LICENSE` is present in the exact candidate and
+  complete the separate review and approval of third-party dependency notices;
+  the notice generator does not make a legal approval decision.
 - Provision a dedicated release key and independently publish its public-key
   trust record, rotation/revocation procedure and release approval policy.
 - Record hosted CI results and native execution on supported release targets.
