@@ -1,5 +1,24 @@
 # Implementation evidence
 
+DAR-35 is verified and ready for its Linear completion update. Skill bodies are
+immutable version files bound to digest-checked catalog metadata and remain
+inactive until a trusted deterministic validator passes. Activation and
+rollback compare the complete activation revision, so stale observations and
+ABA transitions cannot commit. Automatic mutation is default-off and rechecked
+after validation; disabling the kill switch during a callback prevents the
+commit. Regression validation runs against the pinned active version, records
+failed deterministic evidence atomically with restoration of the prior
+validated version, and preserves both history and proof across restart.
+Idempotent operation records, monitor checkpoints and outcome-window comparison
+support crash-safe retry without repeating decisions, while read-only stores,
+judge-only evidence, malformed proofs, exhausted history and policy changes
+cannot mutate the catalog. Focused skills and application activation,
+regression, outcome rollback, learning activation and crash-path race tests
+passed three repetitions (26.314s and 139.743s). The immediately preceding full
+`make check` on the same production tree passed format/LOC, vet, the complete
+native race suite and build. GitHub/Linear checkpoint evidence follows after
+synchronization. The full PRD remains incomplete.
+
 DAR-34 is Done in native Linear under state activity
 `47622af5-eb33-40b5-8b30-0d37cfd452f7` with completion evidence comment
 `b61251bf`. Automatic learning scans durable completed workflows and groups
