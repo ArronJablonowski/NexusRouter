@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-27 is completion-ready pending native Linear reconciliation. Resource
+pressure has three explicit outcomes. `reject` returns a capacity-classified
+admission failure before creating a task or contacting a provider. `wait`
+retains a bounded service slot, polls without holding the resource mutex, and
+rebuilds automatic planning against fresh observations until admission,
+cancellation or its 100ms–5m queue allowance expires. In hybrid mode automatic
+routing tries an eligible cloud failure domain before entering the local wait;
+local-required privacy cannot offload. Once admitted, the original caller
+deadline—not the queue allowance—owns inference. Retries are limited to definite
+pre-task capacity denials: provider failures, invalid metadata/observations,
+created task identities, partial output and tool activity are never replayed by
+the pressure wrapper. Fixed/adaptive concurrency, RAM/unified-memory, declared
+per-device VRAM, CPU/cgroup and thermal observations feed the same reservation
+budget, with managed Ollama residency as a separately authorized low-memory
+path. Focused pressure, configuration and resource race tests passed five
+repetitions (28.839s, 2.539s and 1.912s), covering reject, release/replan,
+cloud alternative, local-required denial, timeout, cancellation, provider
+failure and inference extending beyond the queue deadline. The immediately
+preceding full `make check` on the same production tree passed format/LOC, vet,
+all native race tests and build. Cross-process reservations and physical
+multi-platform pressure qualification remain release/hardening work, not hidden
+automatic authority. Native Linear remains unavailable because the Mac is
+locked, so no DAR-27 state/comment change is claimed. The full PRD remains
+incomplete.
+
 DAR-12 is verified in the repository and ready for native Linear
 reconciliation. Ollama configuration may now omit `endpoint`; DarwinRouter
 deterministically resolves only the standard pinned loopback endpoint
