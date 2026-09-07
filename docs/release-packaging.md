@@ -139,20 +139,21 @@ After committing changes and with a clean worktree, run:
 make qualify-release
 ```
 
-This opt-in test builds all four targets twice from separate private snapshots,
-compares every unsigned output byte, checks executable platform/architecture,
-exercises the package/sign/verify CLIs, signs/verifies using disposable test keys,
-compares library/CLI signatures, runs the native binary's version
-command, and proves archive tampering is rejected. It uses temporary files
-removed by the test framework. It does not sign with an operator identity,
-publish artifacts, run model inference, or modify user configuration/databases.
+This opt-in target first runs the deterministic [MVP qualification](mvp-qualification.md),
+then builds all four targets twice from separate private snapshots, compares
+every unsigned output byte, checks executable platform/architecture, exercises
+the package/sign/verify CLIs, signs/verifies using disposable test keys, compares
+library/CLI signatures, runs the native binary's version command, and proves
+archive tampering is rejected. It uses temporary files removed by the test
+framework. It does not sign with an operator identity, publish artifacts, run
+live model inference, or modify user configuration/databases.
 Ordinary `make check` skips this expensive test but covers packaging primitives,
 manifest validation, key handling, tampering, no-overwrite and source isolation.
 
 Before a real release:
 
-- Complete PRD and DAR-45 end-to-end qualification; passing packaging tests
-  does not qualify the agent runtime.
+- Keep the DAR-45 deterministic MVP gate passing and complete the remaining PRD
+  acceptance; passing packaging tests alone does not qualify the agent runtime.
 - Select and approve the repository's distribution license and dependency
   notices; no license has been invented or granted by this tooling.
 - Provision a dedicated release key and independently publish its public-key

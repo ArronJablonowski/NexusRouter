@@ -163,9 +163,10 @@ into DarwinRouter or artifacts.
 
 ## Required before announcing v1.0.0
 
-Full PRD qualification, built-in side-effecting CLI tools,
+The deterministic DAR-45 MVP gate passes, but full PRD qualification,
+built-in side-effecting CLI tools,
 automatic skill validation/activation, learning-attention controls,
-configuration reload, performance and supported-platform qualification remain
+configuration reload and supported-platform qualification remain
 open. This list is not exhaustive. Distribution also requires an approved
 license and notices, a dedicated signing identity with an independent public-key
 trust record, approved version-specific notes and explicit publication.
