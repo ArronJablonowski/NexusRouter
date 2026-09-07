@@ -1,5 +1,36 @@
 # Routing performance evidence
 
+## DAR-44 local qualification
+
+Run the complete non-live matrix without concurrent project tests or builds:
+
+```sh
+make qualify-performance
+```
+
+On September 7, 2026, Apple M4 Max / darwin arm64 / Go 1.27.1, three runs
+measured the 64-model evidence selector at 16.00–16.52 microseconds per route.
+The eight-model automatic fixture with 1,000 seed tasks measured 54.16–54.36 ms
+mean, 58.79–59.48 ms p95, 60.10–61.13 ms p99, and 60.68–61.66 ms maximum over
+100 tasks per run. This fixture includes admission, evidence reads, routing,
+SQLite writes and loopback protocol overhead; provider inference is immediate.
+Both the isolated selector and the broader deterministic fixture are below the
+PRD's 150 ms routing-overhead target on this qualified host.
+
+Individual SQLite/WAL `FULL`-synchronous task-start transactions measured
+177.6–192.5 microseconds (approximately 5,194–5,631 commits/second), with one
+writer and no contention. Fixed/adaptive in-memory reservation plus release
+measured 0.277–0.469 microseconds. Race-enabled low/mid/high tier, RAM/VRAM,
+thermal/unknown-pressure, queue/reject/offload, shared explicit/automatic
+capacity and concurrent admission tests separately passed three repetitions.
+
+DarwinRouter does not currently enable an auxiliary intent classifier, so the
+conditional 500 ms auxiliary-classification target has no executable MVP path
+to measure. Adding one requires its own benchmark before activation. These local
+figures are reproducible evidence for the current deterministic runtime, not a
+host-independent SLA, production inference benchmark, contended-write result or
+power-loss qualification.
+
 ## Schema28 indexed evidence reads
 
 The task/kind/sequence index described in [migration notes](event-kind-index.md)
@@ -171,8 +202,9 @@ benchmarks caught that regression before the checkpoint was committed.
 
 ## Limits and remaining work
 
-These results do not establish the PRD's 150 ms deterministic-routing or 500 ms
-auxiliary-classification SLA. They cover tiny prompts/answers, one provider,
+The DAR-44 qualification above establishes the deterministic target on its
+named local host, not a portable production SLA. No auxiliary classifier is
+enabled or measured. The fixtures cover tiny prompts/answers, one provider,
 no concurrent requests, no review calls, and at most 1,000 seed tasks. Larger
 outputs, more models, sparse domain/profile populations, long sessions, real
 resource profiling, database contention, and live providers remain unqualified.

@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-44 is completion-ready pending native Linear reconciliation. The opt-in
+`make qualify-performance` command now reproduces the qualified selector,
+durable-write, resource-reservation and worst-case existing automatic-task
+matrix without making live model calls. On the Apple M4 Max host, three runs
+measured 64-model selection at 16.00–16.52 microseconds and the eight-model,
+1,000-seed full deterministic fixture at 54.16–54.36ms mean, 58.79–59.48ms p95,
+60.10–61.13ms p99 and 60.68–61.66ms maximum across 100 tasks per run. The latter
+includes admission, indexed evidence reads, routing, loopback protocol and WAL
+writes with immediate inference, and is below the PRD's 150ms deterministic
+routing-overhead target on this host. A new single-writer SQLite/WAL `FULL`
+synchronous benchmark measured 177.6–192.5 microseconds per task-start commit,
+about 5,194–5,631 commits/second. Fixed/adaptive reservation and release measured
+0.277–0.469 microseconds. Low/mid/high resource tiers, RAM/VRAM and unknown/
+thermal pressure, queue/reject/offload decisions, shared explicit/automatic
+capacity and concurrent reservations passed three race-enabled repetitions in
+resources 1.356s and application 22.696s. The final full `make check` passed
+format/LOC, vet, all native race packages and build, including application at
+220.007s and telemetry at 144.390s. No auxiliary intent classifier is enabled,
+so its conditional 500ms target has no current execution path; it requires a
+separate benchmark before activation. Results are local qualification, not a
+portable production SLA, real-inference result, contended-write benchmark or
+power-loss guarantee. Native Linear remains unavailable because the Mac is
+locked, so no DAR-44 state/comment change is claimed. The full PRD remains
+incomplete.
+
 DAR-43 is completion-ready pending native Linear reconciliation. Its crash,
 replay and lease-recovery acceptance is covered at every named boundary. Real
 owned-process SIGKILL fixtures cover daemon/provider streaming, pre-dispatch
