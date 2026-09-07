@@ -1,5 +1,38 @@
 # Implementation evidence
 
+Storage dependency-chain checkpoint: native Linear DAR-23 is Done with evidence
+comment `43827442`; its consolidated state activity is
+`b12799c3-3f42-41d4-95c6-374b1223bb35`. Linear released DAR-24 and DAR-27. The
+credential-specific eligibility fix is backed up at `d5438ef` with matching
+local/remote heads and zero divergence.
+
+DAR-24 remained blocked by DAR-9, which remained blocked by DAR-7, so review
+continued at DAR-7. DAR-7 is now Done under state activity
+`18a6e129-b8fb-4b7f-a952-4a10066e5f93` with evidence comment `178c7431` posted
+and read back. The store creates a private 0600 on-disk database, enables and
+verifies WAL, FULL synchronous writes, foreign keys and quick-check integrity.
+Schema discovery and upgrades through version 29 run inside one serialized
+`BEGIN IMMEDIATE` transaction; future schemas fail closed and injected migration
+failures roll back. Focused interfaces expose event, session, memory, approval,
+evaluation, lease, submission and skill operations. Restart tests prove reopen,
+exact acknowledgement-loss retry, changed-ID and post-terminal rejection, ordered
+replay and single-winner concurrent append. The full telemetry race suite passed
+in 147.660s; three focused race repetitions passed in 2.654s. Linear released
+DAR-9, DAR-32 and DAR-42; DAR-36 was already Done.
+
+DAR-9 is now In Progress in native Linear. Append validates and encodes the
+immutable event, acquires the SQLite writer reservation, verifies expected
+sequence/session/state and any submission/worker ownership, inserts the event,
+updates its task projection and commits as one transaction. Exact committed
+retries are acknowledgement-safe; changed identity reuse conflicts. A new focused
+test appends and reopens two ordered events, then proves task, session, causation
+and correlation identities survive storage exactly. It complements existing
+concurrent-writer, rollback, terminal-state and bounded ordered-read tests.
+Three focused race repetitions passed in 2.634s. Final `make check` passed
+format/LOC enforcement, vet, the complete native race suite and build;
+application tests took 219.101s, telemetry 145.695s, CLI 42.286s, SDK 25.011s
+and tool-gate 19.521s. Backup and Linear completion evidence follow.
+
 Provider-contract and eligibility continuation: DAR-8 is now Done in native
 Linear with evidence comment `7bed654b`; its state activity remains
 `d8def7c5-8d7e-42d4-a7be-56d9bef19b58` because Linear consolidated the Todo to

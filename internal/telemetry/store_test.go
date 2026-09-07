@@ -58,6 +58,39 @@ func TestRecoveryIdempotencyAndTerminalState(t *testing.T) {
 	}
 }
 
+func TestAppendPreservesEventEnvelopeIdentities(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	start := event("start", 1, runtime.TaskStarted)
+	start.TaskID = "task-identity"
+	start.SessionID = "session-identity"
+	start.CausationID = "request-identity"
+	start.CorrelationID = "correlation-identity"
+	if err := s.Append(ctx, 0, start); err != nil {
+		t.Fatal(err)
+	}
+	turn := event("turn", 2, runtime.TurnStarted)
+	turn.TaskID, turn.SessionID = start.TaskID, start.SessionID
+	turn.CausationID, turn.CorrelationID = start.ID, start.CorrelationID
+	turn.TurnID, turn.AttemptID = "turn-identity", "attempt-identity"
+	if err := s.Append(ctx, 1, turn); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Read(ctx, start.TaskID, 0, 10)
+	if err != nil || len(got) != 2 {
+		t.Fatal(got, err)
+	}
+	for i, want := range []runtime.Event{start, turn} {
+		if got[i].TaskID != want.TaskID || got[i].SessionID != want.SessionID || got[i].CausationID != want.CausationID || got[i].CorrelationID != want.CorrelationID {
+			t.Fatalf("event envelope identity changed: got=%+v want=%+v", got[i], want)
+		}
+	}
+}
+
 func TestConcurrentWriters(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "state.db")
