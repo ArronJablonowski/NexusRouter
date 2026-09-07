@@ -93,6 +93,13 @@ func TestNoticeFilesIncludesCompleteLegalSet(t *testing.T) {
 	if _, err = noticeFiles(empty); err != ErrInvalid {
 		t.Fatal("module without legal files accepted", err)
 	}
+	symlinkOnly := t.TempDir()
+	if err = os.Symlink(filepath.Join(dir, "LICENSE"), filepath.Join(symlinkOnly, "LICENSE")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = noticeFiles(symlinkOnly); err != ErrInvalid {
+		t.Fatal("symlink legal file accepted", err)
+	}
 }
 
 func TestThirdPartyNoticesMatchesCurrentTargetClosure(t *testing.T) {

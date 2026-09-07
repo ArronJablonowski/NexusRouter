@@ -25,6 +25,18 @@ func TestRepositoryLicenseEvidenceDerivation(t *testing.T) {
 		if len(target.Modules) == 0 || !trustFingerprint(target.NoticeSHA256) {
 			t.Fatal("target closure missing", target.OS, target.Arch)
 		}
+		toolchains := 0
+		for _, module := range target.Modules {
+			if module.Path == goToolchainModulePath {
+				toolchains++
+				if !validLicenseEvidenceToolchain(module, record.Toolchain.GOVERSION) {
+					t.Fatal("exact Go toolchain legal evidence missing", target.OS, target.Arch)
+				}
+			}
+		}
+		if toolchains != 1 {
+			t.Fatal("expected exactly one Go toolchain evidence module", target.OS, target.Arch, toolchains)
+		}
 	}
 }
 
@@ -54,6 +66,12 @@ func TestLicenseEvidenceCanonicalContractRejectsDrift(t *testing.T) {
 		"notice":         func(r *LicenseEvidence) { r.Targets[0].NoticeSHA256 = "bad" },
 		"module":         func(r *LicenseEvidence) { r.Targets[0].Modules[0].Version = "bad" },
 		"file":           func(r *LicenseEvidence) { r.Targets[0].Modules[0].Files[0].Name = "../LICENSE" },
+		"toolchain_missing": func(r *LicenseEvidence) {
+			r.Targets[0].Modules = r.Targets[0].Modules[:len(r.Targets[0].Modules)-1]
+		},
+		"toolchain_license_digest": func(r *LicenseEvidence) {
+			r.Targets[0].Modules[len(r.Targets[0].Modules)-1].Files[0].SHA256 = "sha256:" + strings.Repeat("0", 64)
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := cloneLicenseEvidence(record)
@@ -164,12 +182,16 @@ func TestLicenseEvidenceMakeGateIsFailClosed(t *testing.T) {
 func licenseEvidenceRecordFixture() LicenseEvidence {
 	file := LicenseEvidenceFile{Name: "LICENSE", Size: 10, SHA256: "sha256:" + strings.Repeat("4", 64)}
 	module := LicenseEvidenceModule{Path: "example.com/module", Version: "v1.2.3", Files: []LicenseEvidenceFile{file}}
+	toolchain := LicenseEvidenceModule{Path: goToolchainModulePath, Version: "v1.27.1", Files: []LicenseEvidenceFile{
+		{Name: "LICENSE", Size: int64(len(goLicenseText)), SHA256: licenseEvidenceDigest([]byte(goLicenseText))},
+		{Name: "PATENTS", Size: int64(len(goPatentsText)), SHA256: licenseEvidenceDigest([]byte(goPatentsText))},
+	}}
 	targets := make([]LicenseEvidenceTarget, 0, len(licenseEvidenceTargets))
 	for _, target := range licenseEvidenceTargets {
-		targets = append(targets, LicenseEvidenceTarget{OS: target[0], Arch: target[1], NoticeSHA256: "sha256:" + strings.Repeat("3", 64), Modules: []LicenseEvidenceModule{module}})
+		targets = append(targets, LicenseEvidenceTarget{OS: target[0], Arch: target[1], NoticeSHA256: "sha256:" + strings.Repeat("3", 64), Modules: []LicenseEvidenceModule{module, toolchain}})
 	}
 	return LicenseEvidence{
-		SchemaVersion: 1, Scope: licenseEvidenceScope, SourceCommit: strings.Repeat("1", 40),
+		SchemaVersion: licenseEvidenceSchema, Scope: licenseEvidenceScope, SourceCommit: strings.Repeat("1", 40),
 		Toolchain:   LicenseEvidenceToolchain{GOVERSION: "go1.27.1", GoDirective: "1.27.1"},
 		RootLicense: LicenseEvidenceRoot{Source: "LICENSE", SPDX: "MIT", Size: 21, SHA256: "sha256:" + strings.Repeat("2", 64)},
 		Targets:     targets,

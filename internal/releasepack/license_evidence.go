@@ -11,12 +11,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 )
 
 const (
-	licenseEvidenceSchema = 1
+	licenseEvidenceSchema = 2
 	maxLicenseEvidence    = 256 << 10
 	licenseEvidenceScope  = "darwinrouter-candidate-license-evidence"
 )
@@ -218,57 +217,19 @@ func deriveLicenseEvidence(ctx context.Context, source, commit string, env []str
 }
 
 func deriveTargetLicenseEvidence(ctx context.Context, source, targetOS, targetArch string, env []string) (LicenseEvidenceTarget, error) {
-	listEnv := append(append([]string(nil), env...), "GOOS="+targetOS, "GOARCH="+targetArch)
-	out, err := command(ctx, source, listEnv, "go", "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
+	modules, err := targetNoticeModules(ctx, source, targetOS, targetArch, env)
 	if err != nil {
 		return LicenseEvidenceTarget{}, err
 	}
-	decoder := json.NewDecoder(strings.NewReader(out))
-	modules := map[string]listedModule{}
-	for {
-		var pkg listedPackage
-		decodeErr := decoder.Decode(&pkg)
-		if decodeErr == io.EOF {
-			break
-		}
-		if decodeErr != nil {
-			return LicenseEvidenceTarget{}, ErrInvalid
-		}
-		if pkg.Module == nil || pkg.Module.Main {
-			continue
-		}
-		module := *pkg.Module
-		if module.Replace != nil || !safeNoticeModule(module.Path, module.Version) || module.Dir == "" {
-			return LicenseEvidenceTarget{}, ErrInvalid
-		}
-		key := module.Path + "@" + module.Version
-		if previous, exists := modules[key]; exists && previous.Dir != module.Dir {
-			return LicenseEvidenceTarget{}, ErrInvalid
-		}
-		modules[key] = module
-	}
-	if len(modules) == 0 || len(modules) > 10_000 {
-		return LicenseEvidenceTarget{}, ErrInvalid
-	}
-	keys := make([]string, 0, len(modules))
-	for key := range modules {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
 	target := LicenseEvidenceTarget{OS: targetOS, Arch: targetArch}
-	for _, key := range keys {
-		module := modules[key]
-		files, fileErr := noticeFiles(module.Dir)
-		if fileErr != nil {
-			return LicenseEvidenceTarget{}, fileErr
-		}
+	for _, module := range modules {
 		item := LicenseEvidenceModule{Path: module.Path, Version: module.Version}
-		for _, file := range files {
+		for _, file := range module.Files {
 			item.Files = append(item.Files, LicenseEvidenceFile{Name: file.Name, Size: int64(len(file.Body)), SHA256: licenseEvidenceDigest(file.Body)})
 		}
 		target.Modules = append(target.Modules, item)
 	}
-	notice, err := thirdPartyNotices(ctx, source, targetOS, targetArch, env)
+	notice, err := renderThirdPartyNotices(targetOS, targetArch, modules)
 	if err != nil || validateNotice(notice, targetOS, targetArch) != nil {
 		return LicenseEvidenceTarget{}, ErrInvalid
 	}
@@ -304,6 +265,7 @@ func validateLicenseEvidence(record LicenseEvidence) error {
 			return ErrInvalid
 		}
 		previous := ""
+		toolchainCount := 0
 		for _, module := range target.Modules {
 			key := module.Path + "@" + module.Version
 			if !safeNoticeModule(module.Path, module.Version) || key <= previous || len(module.Files) == 0 || len(module.Files) > 1_000 {
@@ -322,9 +284,33 @@ func validateLicenseEvidence(record LicenseEvidence) error {
 			if !hasLicense {
 				return ErrInvalid
 			}
+			if module.Path == goToolchainModulePath {
+				if !validLicenseEvidenceToolchain(module, record.Toolchain.GOVERSION) {
+					return ErrInvalid
+				}
+				toolchainCount++
+			}
+		}
+		if toolchainCount != 1 {
+			return ErrInvalid
 		}
 	}
 	return nil
+}
+
+func validLicenseEvidenceToolchain(module LicenseEvidenceModule, goVersion string) bool {
+	if !goReleaseVersion.MatchString(goVersion) || module.Path != goToolchainModulePath ||
+		module.Version != "v"+strings.TrimPrefix(goVersion, "go") || len(module.Files) != 2 {
+		return false
+	}
+	expected := []noticeFile{{Name: "LICENSE", Body: []byte(goLicenseText)}, {Name: "PATENTS", Body: []byte(goPatentsText)}}
+	for i, file := range module.Files {
+		if file.Name != expected[i].Name || file.Size != int64(len(expected[i].Body)) ||
+			file.SHA256 != licenseEvidenceDigest(expected[i].Body) {
+			return false
+		}
+	}
+	return true
 }
 
 func readLicenseEvidence(path string) ([]byte, LicenseEvidence, error) {

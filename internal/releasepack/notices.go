@@ -49,6 +49,18 @@ type noticeFile struct {
 // cmd/darwin build closure. It intentionally excludes the main module: the
 // project license is a separate release-approval decision.
 func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string, env []string) ([]byte, error) {
+	items, err := targetNoticeModules(ctx, source, targetOS, targetArch, env)
+	if err != nil {
+		return nil, err
+	}
+	return renderThirdPartyNotices(targetOS, targetArch, items)
+}
+
+// targetNoticeModules captures the complete target-specific legal-file closure
+// once. Callers can therefore derive both structured evidence and the rendered
+// notice from the same owned bytes instead of independently re-reading mutable
+// module-cache paths.
+func targetNoticeModules(ctx context.Context, source, targetOS, targetArch string, env []string) ([]noticeModule, error) {
 	listEnv := append(append([]string(nil), env...), "GOOS="+targetOS, "GOARCH="+targetArch)
 	toolchain, goExecutable, err := goToolchainAttribution(ctx, source, env)
 	if err != nil {
@@ -103,7 +115,7 @@ func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string,
 		}
 		return items[i].Path < items[j].Path
 	})
-	return renderThirdPartyNotices(targetOS, targetArch, items)
+	return items, nil
 }
 
 func noticeFiles(dir string) ([]noticeFile, error) {
@@ -134,8 +146,18 @@ func noticeFiles(dir string) ([]noticeFile, error) {
 		if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > maxNotice {
 			return nil, ErrInvalid
 		}
-		body, err := root.ReadFile(name)
-		if err != nil || !utf8.Valid(body) || bytes.IndexByte(body, 0) >= 0 {
+		file, err := root.Open(name)
+		if err != nil {
+			return nil, ErrInvalid
+		}
+		actual, statErr := file.Stat()
+		body, readErr := io.ReadAll(io.LimitReader(file, info.Size()+1))
+		final, finalStatErr := file.Stat()
+		closeErr := file.Close()
+		if statErr != nil || finalStatErr != nil || closeErr != nil || !actual.Mode().IsRegular() ||
+			!os.SameFile(info, actual) || !os.SameFile(actual, final) || actual.Size() != info.Size() ||
+			final.Size() != actual.Size() || readErr != nil || int64(len(body)) != actual.Size() ||
+			!utf8.Valid(body) || bytes.IndexByte(body, 0) >= 0 {
 			return nil, ErrInvalid
 		}
 		total += len(body)
