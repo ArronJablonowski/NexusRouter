@@ -10,7 +10,7 @@ import (
 
 func signingAuthorizationFixture() SigningAuthorization {
 	return SigningAuthorization{
-		SchemaVersion:         1,
+		SchemaVersion:         signingAuthorizationSchema,
 		Project:               "DarwinRouter",
 		Scope:                 signingAuthorizationScope,
 		CandidateRecordSHA256: "sha256:" + strings.Repeat("1", 64),
@@ -80,10 +80,12 @@ func TestSigningAuthorizationContractFailsClosed(t *testing.T) {
 		{"target_missing", func(r *SigningAuthorization) { r.Targets = r.Targets[:3] }},
 		{"target_reordered", func(r *SigningAuthorization) { r.Targets[0], r.Targets[1] = r.Targets[1], r.Targets[0] }},
 		{"target_unapproved", func(r *SigningAuthorization) { r.Targets[0].Decision = "unapproved" }},
-		{"gate_missing", func(r *SigningAuthorization) { r.Gates = r.Gates[:2] }},
-		{"notice_unapproved", func(r *SigningAuthorization) { r.Gates[0].Status = "unapproved" }},
-		{"signing_unapproved", func(r *SigningAuthorization) { r.Gates[1].Status = "unapproved" }},
-		{"publication_approved", func(r *SigningAuthorization) { r.Gates[2].Status = "approved" }},
+		{"gate_missing", func(r *SigningAuthorization) { r.Gates = r.Gates[:3] }},
+		{"project_license_missing", func(r *SigningAuthorization) { r.Gates = r.Gates[1:] }},
+		{"project_license_unapproved", func(r *SigningAuthorization) { r.Gates[0].Status = "unapproved" }},
+		{"notice_unapproved", func(r *SigningAuthorization) { r.Gates[1].Status = "unapproved" }},
+		{"signing_unapproved", func(r *SigningAuthorization) { r.Gates[2].Status = "unapproved" }},
+		{"publication_approved", func(r *SigningAuthorization) { r.Gates[3].Status = "approved" }},
 		{"approver", func(r *SigningAuthorization) { r.ApproverID = "Human Name" }},
 		{"approver_too_short", func(r *SigningAuthorization) { r.ApproverID = "a" }},
 		{"policy_http", func(r *SigningAuthorization) { r.ReleasePolicyURL = "http://example.invalid/policy" }},
@@ -102,6 +104,20 @@ func TestSigningAuthorizationContractFailsClosed(t *testing.T) {
 				t.Fatal("invalid signing authorization accepted")
 			}
 		})
+	}
+}
+
+func TestSigningAuthorizationProjectLicenseGateIsDigestBound(t *testing.T) {
+	record := signingAuthorizationFixture()
+	approved := signingAuthorizationBody(t, record)
+	record.Gates = append([]SigningAuthorizationGate(nil), record.Gates...)
+	record.Gates[0].Status = "unapproved"
+	unapproved := signingAuthorizationBody(t, record)
+	if prefixedSigningAuthorizationDigest(approved) == prefixedSigningAuthorizationDigest(unapproved) {
+		t.Fatal("project-license decision did not change canonical record digest")
+	}
+	if _, err := ParseSigningAuthorization(unapproved); err == nil {
+		t.Fatal("unapproved project license accepted")
 	}
 }
 

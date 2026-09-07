@@ -15,7 +15,7 @@ import (
 var ErrSigningAuthorization = errors.New("release signing authorization validation failed")
 
 const (
-	signingAuthorizationSchema = 1
+	signingAuthorizationSchema = 2
 	signingAuthorizationScope  = "darwinrouter-release-signing-authorization"
 	maxSigningAuthorization    = 16 << 10
 )
@@ -71,6 +71,7 @@ var authorizedTargets = []SigningAuthorizationTarget{
 }
 
 var signingAuthorizationGates = []SigningAuthorizationGate{
+	{Name: "project_license", Status: "approved"},
 	{Name: "third_party_notices", Status: "approved"},
 	{Name: "production_signing", Status: "approved"},
 	{Name: "publication", Status: "unapproved"},
