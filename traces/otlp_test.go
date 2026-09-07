@@ -35,6 +35,7 @@ func TestMarshalOTLPContentFreeShapeAndFreshIDs(t *testing.T) {
 	var body struct {
 		ResourceSpans []struct {
 			ScopeSpans []struct {
+				Scope struct{ Version string }
 				Spans []struct {
 					TraceID, SpanID, ParentSpanID, Name string
 				}
@@ -43,6 +44,9 @@ func TestMarshalOTLPContentFreeShapeAndFreshIDs(t *testing.T) {
 	}
 	if json.Unmarshal(first, &body) != nil || len(body.ResourceSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans[0].Spans) != 4 {
 		t.Fatal(string(first))
+	}
+	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "2" {
+		t.Fatal("wrong schema version", body.ResourceSpans[0].ScopeSpans[0].Scope.Version)
 	}
 	spans := body.ResourceSpans[0].ScopeSpans[0].Spans
 	if len(spans[0].TraceID) != 32 || len(spans[0].SpanID) != 16 || spans[0].ParentSpanID != "" || spans[1].ParentSpanID != spans[0].SpanID || spans[2].ParentSpanID != spans[0].SpanID || spans[3].ParentSpanID != spans[0].SpanID {
@@ -93,6 +97,7 @@ func TestSpanVocabulary(t *testing.T) {
 		"route": {"selected", "explored"}, "evaluation": {"accepted", "rejected"},
 		"fallback": {"selected"}, "compaction": {"applied"}, "skill_context": {"loaded"},
 		"steering": {"applied"}, "error": {"recorded"},
+		"queue_residency":  {"lt_1s", "lt_10s", "lt_1m", "lt_5m", "lt_30m", "lt_1h", "gte_1h"},
 		"route_constraint": {"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"},
 	}
 	for name, outcomes := range valid {

@@ -1,5 +1,24 @@
 # Implementation evidence
 
+PRD queue-residency-traces checkpoint: each terminal top-level task linked to a
+durable submission now receives one instantaneous `queue_residency` child at
+task start. Trace snapshot schema version 2 owns this addition. Its outcome is
+one of seven fixed wait buckets from less than one
+second through at least one hour. The task root still begins at the canonical
+durable task start, so pre-start queue time cannot distort runtime duration or
+produce a child outside its parent. Retries and delegated children are excluded.
+The bounded SQLite read resolves the submission relationship and exact creation
+time internally; public snapshots and OTLP contain neither submission IDs nor
+arrival timestamps. Missing/corrupt linkage, malformed time and future creation
+time fail closed. Focused tests cover durable linkage, bucket boundaries,
+snapshot/OTLP privacy, malformed timestamps and the closed public vocabulary.
+Final `make check` passed formatting/LOC enforcement, vet, every native
+race-enabled package and the production build; application took 223.084s,
+telemetry 147.779s, CLI 42.248s, SDK 25.659s, traces 2.153s and tool gate
+20.770s. No live model, user database or collector was used. Queue
+arrival/service rates, durable trace delivery, retention and the complete PRD
+remain unfinished. Native Linear has not been updated in this checkpoint.
+
 PRD route-constraint-traces checkpoint: every durable route selection now
 projects fixed zero-duration observations for each present canonical exclusion
 class: mode, privacy, health, policy, credential, capacity, context, budget and

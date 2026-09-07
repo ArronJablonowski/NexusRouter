@@ -42,7 +42,7 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 			spans = append(spans, item)
 		}
 	}
-	request := otlpRequest{ResourceSpans: []otlpResourceSpans{{Resource: otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}}, ScopeSpans: []otlpScopeSpans{{Scope: otlpScope{Name: "darwinrouter.traces", Version: "1"}, Spans: spans}}}}}
+	request := otlpRequest{ResourceSpans: []otlpResourceSpans{{Resource: otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}}, ScopeSpans: []otlpScopeSpans{{Scope: otlpScope{Name: "darwinrouter.traces", Version: strconv.Itoa(SnapshotVersion)}, Spans: spans}}}}}
 	body, err := json.Marshal(request)
 	if err != nil || len(body) > 256<<10 {
 		return nil, ErrInvalid

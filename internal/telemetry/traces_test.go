@@ -9,6 +9,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	tracewire "github.com/ArronJablonowski/DarwinRouter/traces"
 )
 
 func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
@@ -70,6 +71,97 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatal("missing spans", want)
+	}
+}
+
+func TestTraceSnapshotBucketsTopLevelSubmissionQueueResidency(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	queuedSubmission(t, db, "private-queue-key")
+	claim := claimSubmission(t, db)
+	startedAt := time.Now().UTC().Add(-time.Second)
+	createdAt := startedAt.Add(-20 * time.Second)
+	if _, err := db.db.ExecContext(ctx, "UPDATE submissions SET created_at=? WHERE id=?", submissionTime(createdAt), claim.Status.ID); err != nil {
+		t.Fatal(err)
+	}
+	start := event("private-queue-start", 1, runtime.TaskStarted)
+	start.Time, start.Data.SubmissionID = startedAt, claim.Status.ID
+	done := event("private-queue-done", 2, runtime.TaskCompleted)
+	done.Time = startedAt.Add(500 * time.Millisecond)
+	if err := db.AppendSubmission(ctx, 0, start, claim.Status.ID, claim.Token); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AppendSubmission(ctx, 1, done, claim.Status.ID, claim.Token); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 2 {
+		t.Fatal(snapshot, err)
+	}
+	queue := snapshot.Traces[0].Spans[1]
+	if queue.Name != "queue_residency" || queue.Outcome != "lt_1m" || !queue.StartedAt.Equal(startedAt) || !queue.EndedAt.Equal(startedAt) {
+		t.Fatal(queue)
+	}
+	encoded, marshalErr := json.Marshal(snapshot)
+	otlp, otlpErr := tracewire.MarshalOTLP(snapshot)
+	for _, private := range []string{claim.Status.ID, submissionTime(createdAt), "private-queue"} {
+		if strings.Contains(string(encoded), private) || strings.Contains(string(otlp), private) {
+			t.Fatal("private queue data escaped", private)
+		}
+	}
+	if marshalErr != nil || otlpErr != nil {
+		t.Fatal(marshalErr, otlpErr)
+	}
+}
+
+func TestQueueResidencyBucketBoundaries(t *testing.T) {
+	cases := []struct {
+		wait time.Duration
+		want string
+	}{
+		{0, "lt_1s"}, {time.Second - 1, "lt_1s"},
+		{time.Second, "lt_10s"}, {10 * time.Second, "lt_1m"},
+		{time.Minute, "lt_5m"}, {5 * time.Minute, "lt_30m"},
+		{30 * time.Minute, "lt_1h"}, {time.Hour, "gte_1h"},
+	}
+	for _, tc := range cases {
+		if got := queueResidencyBucket(tc.wait); got != tc.want {
+			t.Fatalf("wait %s: got %s want %s", tc.wait, got, tc.want)
+		}
+	}
+}
+
+func TestTraceSnapshotRejectsCorruptSubmissionQueueLinkage(t *testing.T) {
+	for _, corruption := range []string{"malformed-time", "future-time", "missing-submission"} {
+		t.Run(corruption, func(t *testing.T) {
+			db, _ := submissionStore(t)
+			ctx := context.Background()
+			queuedSubmission(t, db, corruption)
+			claim := claimSubmission(t, db)
+			start := event("queue-start", 1, runtime.TaskStarted)
+			start.Time, start.Data.SubmissionID = time.Now().UTC().Add(-time.Second), claim.Status.ID
+			done := event("queue-done", 2, runtime.TaskCompleted)
+			done.Time = start.Time.Add(time.Millisecond)
+			if db.AppendSubmission(ctx, 0, start, claim.Status.ID, claim.Token) != nil || db.AppendSubmission(ctx, 1, done, claim.Status.ID, claim.Token) != nil {
+				t.Fatal("fixture")
+			}
+			var query string
+			var args []any
+			switch corruption {
+			case "malformed-time":
+				query, args = "UPDATE submissions SET created_at='not-a-time' WHERE id=?", []any{claim.Status.ID}
+			case "future-time":
+				query, args = "UPDATE submissions SET created_at=? WHERE id=?", []any{submissionTime(start.Time.Add(time.Second)), claim.Status.ID}
+			case "missing-submission":
+				query, args = "DELETE FROM submissions WHERE id=?", []any{claim.Status.ID}
+			}
+			if _, err := db.db.ExecContext(ctx, query, args...); err != nil {
+				t.Fatal(err)
+			}
+			if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+				t.Fatal("corrupt queue linkage escaped", snapshot, err)
+			}
+		})
 	}
 }
 

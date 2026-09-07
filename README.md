@@ -1454,7 +1454,9 @@ supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export. A separate explicit CLI/SDK
 [OTLP trace export](docs/traces-export.md) sends up to 32 recent terminal task
 roots with paired provider/tool/worker children and fixed route, evaluation,
-fallback, compaction, skill-context, steering and error observations. It uses
+fallback, compaction, skill-context, steering, error and top-level submission
+queue-residency observations. Queue waits use seven fixed buckets and expose no
+submission identity or exact arrival time. It uses
 fresh non-durable wire IDs and no session content or durable identities.
 Fixed route-constraint observations expose only mode/privacy/health/policy/
 credential/capacity/context/budget/capability reason classes, never candidates.
@@ -1464,7 +1466,7 @@ health is supplemental and delivery remains best effort. The legacy
 `opentelemetry_enabled` alias remains metrics-only.
 Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
 and explicit unavailable timing counts, including recovery terminals. Traces,
-outside this initial task/provider/tool slice, queue arrival/service rates,
+outside this bounded lifecycle slice, queue arrival/service rates,
 per-device pressure, cost histograms, retention and production-scale
 observability qualification remain unfinished.
 

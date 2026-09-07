@@ -13,6 +13,9 @@ production release, release tag or complete PRD acceptance is claimed.
   configured sequential daemon/SDK supervisor with supplemental health.
   Route constraints expose only nine fixed exclusion reason classes and reject
   unknown labels.
+  Linked top-level submissions expose pre-start queue residency through seven
+  fixed buckets; submission IDs and exact arrival times remain private, and
+  retries/delegated children are excluded.
   Delivery remains ephemeral and broader lifecycle spans are open. See
   [trace export](traces-export.md).
 

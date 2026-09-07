@@ -720,14 +720,16 @@ and policy checks and does not disable task or learning execution. Explicit
 CLI/SDK trace export now reconstructs bounded recent terminal-task roots with
 successfully paired provider-turn, tool-call and worker children plus fixed
 route/exploration, evaluation, fallback, compaction, skill-context, steering
-and error observations. Public snapshots have no content or durable identity,
+and error observations. A linked top-level submission also emits one fixed
+queue-residency bucket at task start without exposing submission identity or
+exact arrival time; retries and delegated children are excluded. Public snapshots have no content or durable identity,
 and fixed route-constraint observations expose only the nine canonical
 exclusion reason classes—not candidate identities. Unknown reasons fail closed.
 Each serialization uses fresh random OTLP trace/span IDs. An independently
 configured daemon/SDK trace supervisor now
 sends fresh bounded snapshots sequentially, fences configuration rotation and
 reports supplemental health; scheduling and delivery are non-durable. Broader
-span families, stable correlation and the complete instrumentation list above
+span families, queue arrival/service rates, stable correlation and the complete instrumentation list above
 remain unfinished. See [trace export](docs/traces-export.md). The exported
 closed-vocabulary gauges now also
 count every canonical durable runtime-event kind, providing content-free task,

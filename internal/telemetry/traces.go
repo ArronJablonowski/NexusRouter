@@ -26,8 +26,9 @@ type traceStart struct {
 }
 
 // Traces reconstructs a bounded recent terminal-task view inside one SQLite
-// read snapshot. Only pairing fields are selected; event bodies, durable IDs,
-// model/provider/tool names and session content never enter the returned value.
+// read snapshot. Only pairing fields and a bounded top-level submission time
+// are selected; event bodies, durable IDs, model/provider/tool names and session
+// content never enter the returned value.
 func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) {
 	if limit < 1 || limit > traces.MaxTraces {
 		return traces.Snapshot{}, errTraces
@@ -85,7 +86,17 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	 CASE WHEN json_extract(body,'$.data.route.Explored')=1 THEN 1 ELSE 0 END,
 	 CASE WHEN json_type(body,'$.data.accepted')='true' THEN 1 WHEN json_type(body,'$.data.accepted')='false' THEN 0 ELSE -1 END,
 	 COALESCE((SELECT sum(DISTINCT CASE r.value WHEN 'mode' THEN 1 WHEN 'privacy' THEN 2 WHEN 'health' THEN 4 WHEN 'policy' THEN 8 WHEN 'credential' THEN 16 WHEN 'capacity' THEN 32 WHEN 'context' THEN 64 WHEN 'budget' THEN 128 WHEN 'capability' THEN 256 ELSE 512 END)
-	  FROM json_each(json_extract(body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r),0)
+	  FROM json_each(json_extract(body,'$.data.route.Excluded')) AS x,json_each(json_extract(x.value,'$.Reasons')) AS r),0),
+	 CASE
+	  WHEN json_extract(body,'$.kind')<>'task.started' OR json_type(body,'$.data.submission_id') IS NULL THEN ''
+	  WHEN json_type(body,'$.data.submission_id')='text'
+	   AND length(CAST(json_extract(body,'$.data.submission_id') AS BLOB)) BETWEEN 1 AND 128
+	   AND json_type(body,'$.data.parent_task_id') IS NULL
+	   AND json_type(body,'$.data.retry_of_task_id') IS NULL
+	   AND (SELECT count(*) FROM submissions s WHERE s.id=json_extract(body,'$.data.submission_id'))=1
+	  THEN COALESCE((SELECT CASE WHEN length(CAST(s.created_at AS BLOB)) BETWEEN 1 AND 64 THEN s.created_at END FROM submissions s WHERE s.id=json_extract(body,'$.data.submission_id')),'!invalid!')
+	  ELSE '!invalid!'
+	 END
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
 	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied')
@@ -104,9 +115,9 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			return traces.Trace{}, errTraces
 		}
 		var sequence int64
-		var kind, turn, attempt, call, toolName, worker, encodedTime string
+		var kind, turn, attempt, call, toolName, worker, encodedTime, queuedAt string
 		var retry, compaction, skillContext, explored, accepted, routeConstraints int
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints) != nil || sequence < 1 {
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -119,6 +130,13 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				return traces.Trace{}, errTraces
 			}
 			rootStart = at
+			if queuedAt != "" {
+				created, parseErr := time.Parse(time.RFC3339Nano, queuedAt)
+				if parseErr != nil || created.Location() != time.UTC || created.After(at) {
+					return traces.Trace{}, errTraces
+				}
+				children = append(children, traceInstant("queue_residency", queueResidencyBucket(at.Sub(created)), at))
+			}
 			if retry == 1 {
 				children = append(children, traceInstant("fallback", "selected", at))
 			}
@@ -222,6 +240,25 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	spans[0] = traces.Span{Name: "task", Outcome: task.state, Parent: -1, StartedAt: rootStart, EndedAt: rootEnd}
 	spans = append(spans, children...)
 	return traces.Trace{Spans: spans}, nil
+}
+
+func queueResidencyBucket(wait time.Duration) string {
+	switch {
+	case wait < time.Second:
+		return "lt_1s"
+	case wait < 10*time.Second:
+		return "lt_10s"
+	case wait < time.Minute:
+		return "lt_1m"
+	case wait < 5*time.Minute:
+		return "lt_5m"
+	case wait < 30*time.Minute:
+		return "lt_30m"
+	case wait < time.Hour:
+		return "lt_1h"
+	default:
+		return "gte_1h"
+	}
 }
 
 func traceInstant(name, outcome string, at time.Time) traces.Span {

@@ -1,7 +1,8 @@
 # OTLP trace export
 
 DarwinRouter can explicitly export a bounded, content-free view of recent
-terminal task lifecycles as OTLP/HTTP JSON:
+terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 adds the
+fixed queue-residency observation:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -41,15 +42,21 @@ Each trace contains one terminal task root plus successfully paired
 provider-turn, tool-call and worker child spans. Fixed zero-duration
 observations additionally represent route selection/exploration, evaluation
 acceptance/rejection, fallback lineage, compaction, progressive skill-context
-loading, steering application and recorded errors. Each route also emits one
+loading, steering application and recorded errors. A top-level task created by
+the durable submission queue also receives one `queue_residency` observation at
+task start, classified as `lt_1s`, `lt_10s`, `lt_1m`, `lt_5m`, `lt_30m`,
+`lt_1h` or `gte_1h`. The observation is instantaneous: the bucket describes
+pre-start waiting without moving the task root before its durable start. Retry
+and delegated child tasks do not emit this observation. Each route also emits one
 fixed `route_constraint` observation per present mode, privacy, health, policy,
 credential, capacity, context, budget or capability exclusion reason. Candidate
 identity and counts are not exported. An unknown exclusion reason fails the
 snapshot rather than opening label cardinality. Names and outcomes use a closed
 vocabulary. Prompt/output text,
 messages, tool arguments/results, error details, model/provider/tool names and
-all durable task, session, event, route, worker, turn, attempt and call IDs are
-never selected into the public snapshot.
+all durable task, submission, session, event, route, worker, turn, attempt and
+call IDs are never selected into the public snapshot. Exact submission arrival
+times are used only inside the bounded storage read and are not exported.
 
 OTLP trace and span IDs are freshly generated for every serialization. They are
 not hashes or stable pseudonyms for durable DarwinRouter records. Consequently,
@@ -67,7 +74,9 @@ retains explicit missing-start and missing-end counts.
 
 This trace slice does not include running tasks, model deltas, worker
 heartbeats, resource leases/pressure, provider health, fitness mutations,
-automatic skill draft/activation/rollback operations or queue residency.
+automatic skill draft/activation/rollback operations or queue arrival/service
+rates. Queue residency is historical only for a successfully linked top-level
+task start; current queue pressure remains available through aggregate metrics.
 Fallback observations come from canonical safe-retry lineage; they do not
 assert that an arbitrary failed operation was retried. Skill-context loading
 does not prove semantic use. Paired spans measure retained lifecycle wall time,
