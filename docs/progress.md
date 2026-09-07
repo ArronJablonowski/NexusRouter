@@ -1,5 +1,22 @@
 # Implementation evidence
 
+DAR-20 is Done in native Linear under state activity
+`12eee5b4-4afd-4135-b076-2f84329950fd` with completion evidence comment
+`0d3816ea`. Shared reader leases allow concurrent read-only tools while writer
+leases exclude every overlapping side-effect scope. Application, SDK and child
+dispatch share the schema/policy/pending-identity-bound reader gate; cancellation
+joins handlers before ownership is released. Canonical workspace overlap covers
+nested and legacy filesystem aliases while unrelated scopes remain independent.
+Expired but unreleased readers still block writers, approvals retain exact
+resource and behavior bindings, and confirmed or uncertain effects are never
+automatically retried. Original implementation checkpoint `56991b5` and its
+focused SDK loopback, application, gate, storage, cancellation, alias, restart
+and exact-holder-limit evidence remain valid. The latest full `make check`,
+including the completed worker supervisor, passed the complete repository.
+Current push/fetch verification at `50373a1` showed matching local and remote
+heads, zero divergence and a clean worktree before the Linear comment and Done
+state were read back. Linear released DAR-21. The full PRD remains incomplete.
+
 DAR-19 is Done in native Linear under state activity
 `cf4b741a-7ade-4cf3-b004-087c2fec336a` with completion evidence comment
 `a7960fda`. The in-process supervisor enforces a
