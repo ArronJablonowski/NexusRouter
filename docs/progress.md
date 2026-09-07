@@ -1,8 +1,8 @@
 # Implementation evidence
 
-DAR-19 is verified and ready for its Linear completion update. Native Linear
-moved the issue to In Progress under state activity
-`fab98207-5c14-4d86-ac7f-dc7e06ad9f13`. The in-process supervisor enforces a
+DAR-19 is Done in native Linear under state activity
+`cf4b741a-7ade-4cf3-b004-087c2fec336a` with completion evidence comment
+`a7960fda`. The in-process supervisor enforces a
 configured 1-64 worker slot bound and retains each slot until execution and
 validation have joined, including after cancellation or adapter panic. Every
 worker owns a durable child journal and renewable read lease; journal appends
@@ -21,8 +21,10 @@ tests passed three repetitions across telemetry and application (28.066s and
 suite and build; application tests took 223.305s, telemetry 148.511s, CLI
 42.078s, SDK 24.809s, tool-gate 19.192s and workers 3.322s. The implementation
 checkpoint is backed up at `7b4d905`; push/fetch verification showed matching
-local and remote heads, zero divergence and a clean worktree. The full PRD
-remains incomplete.
+local and remote heads, zero divergence and a clean worktree before the Linear
+comment and Done state were read back. Linear released DAR-20 and DAR-43 from
+this dependency; other dependencies may remain. The full PRD remains
+incomplete.
 
 DAR-35 is Done in native Linear under state activity
 `b88f21bd-3c28-42b8-b011-2fd0b5beaeaa` with completion evidence comment
