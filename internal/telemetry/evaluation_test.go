@@ -30,7 +30,8 @@ func TestAtomicEvaluationAndReopen(t *testing.T) {
 	if err := s.Append(ctx, 1, turn); err != nil {
 		t.Fatal(err)
 	}
-	r := evaluation.Record{Version: 1, ID: "eval", TaskID: "task", AttemptID: "attempt", Key: routing.Key{Model: "model", Provider: "provider", Domain: "code", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "test-id", Passed: true}}, ExecutionSucceeded: true, Latency: time.Second, Cost: .1, Time: time.Unix(100, 0)}
+	schemaPassed := true
+	r := evaluation.Record{Version: 1, ID: "eval", TaskID: "task", AttemptID: "attempt", Key: routing.Key{Model: "model", Provider: "provider", Domain: "code", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "test-id", Passed: true}, {Source: evaluation.ToolResult, Reference: "tool-receipt", Passed: true}}, SchemaPassed: &schemaPassed, ExecutionSucceeded: true, Latency: time.Second, Cost: .1, Time: time.Unix(100, 0)}
 	if err := s.RecordEvaluation(ctx, r); !errors.Is(err, evaluation.ErrEvidence) {
 		t.Fatal("unfinished turn evaluated", err)
 	}
@@ -65,8 +66,12 @@ func TestAtomicEvaluationAndReopen(t *testing.T) {
 	}
 	defer s.Close()
 	e, err := s.Fitness(ctx, r.Key)
-	if err != nil || e.Samples != 1 || e.Quality != 1 || e.Reliability != 1 || e.Compliance != .5 || e.Latency != time.Second || e.Cost != .1 {
+	if err != nil || e.Samples != 1 || e.Quality != 1 || e.Reliability != 1 || e.Compliance != 1 || e.Latency != time.Second || e.Cost != .1 {
 		t.Fatalf("%+v %v", e, err)
+	}
+	history, err := s.EvaluationHistory(ctx, r.TaskID, r.AttemptID)
+	if err != nil || len(history) != 1 || history[0].SchemaPassed == nil || !*history[0].SchemaPassed || len(history[0].Checks) != 2 || history[0].Checks[1].Source != evaluation.ToolResult {
+		t.Fatalf("objective evidence history lost: %+v %v", history, err)
 	}
 	var records int
 	if err := s.db.QueryRow("SELECT count(*) FROM evaluations").Scan(&records); err != nil || records != 1 {

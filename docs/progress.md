@@ -1,5 +1,23 @@
 # Implementation evidence
 
+DAR-28 is in progress in native Linear. Acceptance audit confirmed the runtime
+persists deterministic final-text and requested Go-source checks as typed
+evaluation events, later recomputes Go validity from the stored delivered text,
+and pairs every tool dispatch with a durable typed completion receipt. The
+evaluation ledger separately stores deterministic test references, tool-result
+references and explicit schema compliance; evidence resolution gives
+deterministic checks precedence and never accepts an unsupported model
+self-rating. Missing coverage now directly proves deterministic test and tool
+receipt sources independently, and extends the atomic SQLite/reopen test to
+retain both sources plus schema-pass evidence and produce compliance fitness of
+one. Focused race tests passed five evaluation repetitions and three repetitions
+each for telemetry objective evidence, runtime final-output/tool receipts, and
+application Go validation. Final `make check` passed format/LOC, vet, the
+complete native race suite and build; application tests took 222.778s,
+telemetry 146.055s, CLI 42.447s, SDK 25.072s, tool-gate 19.524s, evaluation
+1.280s and workers 3.532s. The checkpoint still needs to be committed, pushed,
+fetch-verified and recorded in Linear. The full PRD remains incomplete.
+
 DAR-16 is Done in native Linear under consolidated state activity
 `33e723d1-ecbe-447b-9aec-a68d092fd1e0`; its completion evidence comment was
 posted and read back. The registry already provided declarative immutable tool
