@@ -348,7 +348,11 @@ failed, provider-declared retryable first turn with no output, steering or tool
 proposal, and each successor records immediate retry lineage. Partial output,
 validation failure, cancellation, persistence ambiguity, or any confirmed or
 uncertain external side effect stops the chain. Explicit-model requests never
-auto-fallback.
+auto-fallback. Cross-provider conformance must exercise the production adapter
+protocols, not merely relabel one provider fixture: a retryable Ollama failure
+must be durably closed before an OpenAI-compatible fallback begins, and a
+local-required request must make no discovery or inference request to that
+cloud fallback.
 
 ### 8.5 Route Explanations
 

@@ -134,7 +134,10 @@ production release, release tag or complete PRD acceptance is claimed.
   and do not replace objective evidence or user feedback.
 - Adaptive eligibility/ranking, a maximum32-attempt safe provider fallback
   chain with crash-recoverable immediate lineage, local resource admission,
-  bounded delegation, validation evidence and advisory output audits.
+  bounded delegation, validation evidence and advisory output audits. A
+  loopback cross-provider fixture qualifies Ollama retryable failure to an
+  OpenAI-compatible SSE fallback at the exact cumulative budget boundary and
+  proves local-required requests never contact the cloud fixture.
 - Experimental signed-in Codex coordinator integration: an actual GPT-5.6 Sol
   → local Ollama → Sol round trip, historical continuation and a separate Sol
   output audit have been qualified. See [the integration guide](codex-coordinator-integration.md).

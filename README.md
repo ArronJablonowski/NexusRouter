@@ -1098,7 +1098,12 @@ fallback. Each executed attempt has its own durable task ID and references its
 immediate predecessor; CLI/native results list all previous attempts in order.
 Returned text/usage belong to the final attempt, not aggregate billing. Explicit
 model requests do not auto-fallback. Validation-driven fallback and adaptive
-retry policies remain unfinished.
+retry policies remain unfinished. Loopback qualification exercises an actual
+Ollama `503` followed by an OpenAI-compatible SSE completion, with distinct
+provider endpoints, exact cumulative estimated-cost admission, durable retry
+lineage and redacted route attribution. The paired local-required case proves
+that the cloud adapter receives neither discovery nor inference traffic. This
+is protocol-fixture evidence, not a live-provider availability claim.
 
 `darwin memory list|show|export|put|delete --config path` inspects and maintains factual
 memory through the configured scope and credential-redaction boundary. Put reads
