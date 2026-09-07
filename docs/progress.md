@@ -1,5 +1,25 @@
 # Implementation evidence
 
+DAR-16 is in progress in native Linear after following DAR-30's dependency
+chain through DAR-28. The registry already provided declarative immutable tool
+snapshots, JSON Schema 2020-12 compilation with external-reference denial,
+object-only arguments, duplicate-key/trailing-data rejection, typed effect
+results and stable sanitized failure categories. Audit found that extensions
+validated tool metadata bounds but direct registry registration did not. All
+registration paths now enforce the same 64-character provider-safe name,
+bounded non-wildcard/control-free scope, UTF-8 and 4 KiB description, UTF-8 and
+64 KiB schema, compatible effect behavior and non-nil handler invariants before
+catalog admission. A table test proves each invalid form leaves the catalog
+empty and invokes no handler. Existing tests continue to prove valid schema
+dispatch, immutable catalogs, normalized argument/definition/execution errors,
+typed result preservation and private handler-error removal. The tools race
+suite passed five repetitions and focused SDK tool paths passed three. Final
+`make check` passed format/LOC, vet, the complete native race suite and build;
+application tests took 223.444s, telemetry 149.256s, CLI 41.559s, SDK 25.002s,
+tool-gate 19.647s, tools 2.191s and workers 4.673s. The checkpoint still needs
+to be committed, pushed, fetch-verified and recorded in Linear. The full PRD
+remains incomplete.
+
 DAR-26 is Done in native Linear with completion evidence comment `f5f6cf04`.
 Its audit found fallback diversity was measured only against the primary route,
 allowing repeated infrastructure

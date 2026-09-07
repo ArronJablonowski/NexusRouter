@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -123,5 +124,38 @@ func TestExternalSchemaAndHandlerFailures(t *testing.T) {
 		if err != ErrExecution || out.Effect != runtime.UncertainEffect || out.Content != "" {
 			t.Fatalf("%+v %v", out, err)
 		}
+	}
+}
+
+func TestRegistryRejectsInvalidDeclarativeMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Definition)
+	}{
+		{"empty name", func(d *Definition) { d.Tool.Name = "" }},
+		{"digit first name", func(d *Definition) { d.Tool.Name = "1lookup" }},
+		{"invalid name", func(d *Definition) { d.Tool.Name = "look-up" }},
+		{"long name", func(d *Definition) { d.Tool.Name = strings.Repeat("a", 65) }},
+		{"empty scope", func(d *Definition) { d.Scope = "" }},
+		{"wildcard scope", func(d *Definition) { d.Scope = "project*" }},
+		{"control scope", func(d *Definition) { d.Scope = "project\nsecret" }},
+		{"long scope", func(d *Definition) { d.Scope = strings.Repeat("a", 257) }},
+		{"invalid description", func(d *Definition) { d.Tool.Description = string([]byte{0xff}) }},
+		{"long description", func(d *Definition) { d.Tool.Description = strings.Repeat("a", 4097) }},
+		{"invalid schema encoding", func(d *Definition) { d.Tool.Parameters = json.RawMessage{0xff} }},
+		{"large schema", func(d *Definition) {
+			d.Tool.Parameters = json.RawMessage(`{"type":"object","description":"` + strings.Repeat("a", 64<<10) + `"}`)
+		}},
+		{"missing handler", func(d *Definition) { d.Handler = nil }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			d := definition(&calls)
+			tc.mutate(&d)
+			r := &Registry{}
+			if err := r.Register(d); !errors.Is(err, ErrDefinition) || len(r.Catalog()) != 0 || calls != 0 {
+				t.Fatalf("invalid definition admitted: err=%v catalog=%v calls=%d", err, r.Catalog(), calls)
+			}
+		})
 	}
 }

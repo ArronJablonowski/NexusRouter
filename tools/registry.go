@@ -104,7 +104,7 @@ func (r *Registry) Register(d Definition) error {
 	if behaviorErr != nil {
 		return behaviorErr
 	}
-	if d.Tool.Name == "" || d.Scope == "" || d.Handler == nil {
+	if !extensionName(d.Tool.Name) || !extensionScope(d.Scope) || d.Handler == nil || !utf8.ValidString(d.Tool.Description) || len(d.Tool.Description) > 4096 || !utf8.Valid(d.Tool.Parameters) || len(d.Tool.Parameters) > 64<<10 {
 		return ErrDefinition
 	}
 	v, err := decode(d.Tool.Parameters)
