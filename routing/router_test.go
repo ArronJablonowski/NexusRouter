@@ -90,6 +90,43 @@ func TestExplorationAndStableOrdering(t *testing.T) {
 	}
 }
 
+func TestExplorationAlwaysSelectsAnEligibleAlternative(t *testing.T) {
+	r, candidates, now := fixture()
+	third := candidates[0]
+	third.Model = "new-local"
+	candidates = append(candidates, third)
+	p := Defaults()
+	evidence := map[Key]Evidence{
+		{"local", "ollama", "code", "default"}: {Samples: 100, Quality: 1, Compliance: 1, Reliability: 1, Updated: now},
+		{"cloud", "remote", "code", "default"}: {Samples: 100, Quality: .8, Compliance: 1, Reliability: 1, Updated: now},
+	}
+
+	normal, err := Select(r, p, candidates, evidence, now, .9)
+	if err != nil || normal.Primary.Model != "local" {
+		t.Fatalf("normal selection: %+v %v", normal, err)
+	}
+	selected := map[string]bool{}
+	for _, fraction := range []float64{.01, .51, .99} {
+		out, err := Select(r, p, candidates, evidence, now, p.Exploration*fraction)
+		if err != nil || !out.Explored || out.Primary.Model == normal.Primary.Model {
+			t.Fatalf("fraction %.2f: %+v %v", fraction, out, err)
+		}
+		selected[out.Primary.Model] = true
+	}
+	if !selected["cloud"] || !selected["new-local"] {
+		t.Fatalf("eligible alternatives not reachable: %v", selected)
+	}
+}
+
+func TestExplorationCannotSelectFilteredCandidate(t *testing.T) {
+	r, candidates, now := fixture()
+	candidates[1].Healthy = false
+	out, err := Select(r, Defaults(), candidates, nil, now, 0)
+	if err != nil || out.Explored || out.Primary.Model != "local" || len(out.Excluded) != 1 || out.Excluded[0].Model != "cloud" {
+		t.Fatalf("%+v %v", out, err)
+	}
+}
+
 func TestFallbackFailureDomains(t *testing.T) {
 	r, c, now := fixture()
 	third := c[0]

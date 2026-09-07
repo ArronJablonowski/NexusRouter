@@ -1,5 +1,22 @@
 # Implementation evidence
 
+DAR-25 is in progress in native Linear. Its bounded-exploration audit found
+that a draw inside the exploration window could select the ordinary top-ranked
+route while still reporting `Explored`. Selection now maps the configured
+exploration window uniformly across eligible non-primary routes, so an
+exploration event always evaluates an alternative and every new or rarely used
+eligible model retains nonzero probability. Hard constraint filtering still
+runs first. Direct tests prove all eligible alternatives, including a
+zero-history model, are reachable; every exploration draw avoids the normal
+winner; the configured boundary is exclusive; and an unhealthy candidate
+cannot be reached through exploration. The routing race suite passed five
+repetitions and focused application routing tests passed three. Final
+`make check` passed format/LOC, vet, the complete native race suite and build;
+application tests took 221.465s, telemetry 149.469s, CLI 42.025s, SDK 25.224s,
+tool-gate 20.732s, routing 2.174s and worker tests 4.800s. The checkpoint still
+needs to be committed, pushed, fetch-verified and recorded in Linear. The full
+PRD remains incomplete.
+
 Event persistence and fitness-explanation checkpoint: DAR-9 is now Done in
 native Linear; its completion comment was posted and read back with checkpoint
 `da3f362`. Linear automatically released DAR-13, DAR-19, DAR-24, DAR-28,

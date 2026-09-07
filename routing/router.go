@@ -248,9 +248,11 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 	}
 	selected := 0
 	if p.Exploration > 0 && draw < p.Exploration && len(out.Ranked) > 1 {
-		// Uniform exploration among eligible models gives every cold-start
-		// candidate nonzero probability without overriding hard constraints.
-		selected = int(draw / p.Exploration * float64(len(out.Ranked)))
+		// Explore uniformly among eligible non-primary routes. Excluding the
+		// normal winner ensures an exploration decision actually evaluates an
+		// alternative while every cold-start candidate retains nonzero
+		// probability and hard constraints remain authoritative.
+		selected = 1 + int(draw/p.Exploration*float64(len(out.Ranked)-1))
 		out.Explored = true
 	}
 	out.Primary = out.Ranked[selected]
