@@ -1,5 +1,31 @@
 # Implementation evidence
 
+DAR-55 approval-bound verification checkpoint: a separate production verifier
+now requires independently supplied exact candidate, `SHA256SUMS`, trust-record,
+authorization-record, key-ID and key-fingerprint identities plus an independently
+trusted clean source checkout. It validates the active trust record and common
+release-policy URL, signed checksum bytes, canonical candidate artifact identity,
+and every release file twice through one pinned directory root. Its canonical
+JSON result contains only those public identities and the observed signature-file
+digest. It neither extracts nor executes artifacts and has no approval, signing,
+tagging, upload or publication capability. Tests reject public-input swaps,
+policy disagreement, unsigned sets, artifact/signature tampering, dirty source
+and cancellation.
+
+Clean pushed commit `c3fe84b30e7e520027c4fca631f1caf667b03ede` was
+frozen as external candidate `1.0.0-rc.6`; its candidate-record SHA-256 is
+`e816199a3d4362a8b2fa814041101e6e2e2c1db16143d39793f1b4d7f2fcb67c`.
+The revised darwin/arm64 `make qualify-release` passed all deterministic MVP
+scenarios, candidate-bound retained double-build construction, disposable
+production signing, raw verification, the new approval-bound verification CLI,
+four format checks, tamper rejection and native install/schema migration/backup/
+rollback rehearsal. Full `make check`, repeated focused race tests and vet passed.
+This qualifies the software path with disposable records only; DAR-55 still
+requires a different real operator/environment to retrieve the approved public
+inputs and verify the eventual production signature. No production key,
+authorization, signature, tag, upload or release was created. DAR-46 and DAR-55
+remain open.
+
 DAR-54 retained-build checkpoint: production release construction now requires
 the exact independently supplied canonical candidate-record digest, re-derives
 that record from the clean source, performs two isolated four-target packaging
