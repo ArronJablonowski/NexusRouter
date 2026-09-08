@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 // SummaryAttempt tracks a proposal, never activation of generated memory.
@@ -18,8 +20,12 @@ type SummaryAttempt struct {
 	SourceSequence                                          int64
 	Keep                                                    int
 	EstimatedCost                                           float64
-	StartedAt, FinishedAt                                   time.Time
-	Draft                                                   *SummaryDraft
+	// Usage and Elapsed preserve a verified terminal provider measurement when
+	// output validation fails. They are not validation evidence or a draft.
+	Usage                 *providers.Usage `json:",omitempty"`
+	Elapsed               time.Duration    `json:",omitempty"`
+	StartedAt, FinishedAt time.Time
+	Draft                 *SummaryDraft
 }
 
 func (a SummaryAttempt) Validate() error {
@@ -36,15 +42,15 @@ func (a SummaryAttempt) Validate() error {
 	}
 	switch a.Status {
 	case "started":
-		if !a.FinishedAt.IsZero() || a.Draft != nil || a.Code != "" {
+		if !a.FinishedAt.IsZero() || a.Draft != nil || a.Code != "" || a.Usage != nil || a.Elapsed != 0 {
 			return ErrHistory
 		}
 	case "failed":
-		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Draft != nil || (a.Code != "summary_failed" && a.Code != "canceled" && a.Code != "persistence_failed") {
+		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Draft != nil || (a.Code != "summary_failed" && a.Code != "canceled" && a.Code != "persistence_failed") || a.Elapsed < 0 || a.Elapsed > time.Minute || a.Elapsed > a.FinishedAt.Sub(a.StartedAt) || (a.Usage != nil && (a.Usage.InputTokens < 0 || a.Usage.OutputTokens < 0)) || (a.Usage == nil && a.Elapsed != 0) || (a.Code == "canceled" && (a.Usage != nil || a.Elapsed != 0)) {
 			return ErrHistory
 		}
 	case "drafted":
-		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Code != "" || a.Draft == nil {
+		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Code != "" || a.Draft == nil || a.Usage != nil || a.Elapsed != 0 {
 			return ErrHistory
 		}
 		d := a.Draft

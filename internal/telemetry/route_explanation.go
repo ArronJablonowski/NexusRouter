@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
@@ -29,6 +30,11 @@ func (s *Store) RouteExplanation(ctx context.Context, task string) (sessions.Rou
 		Provider: event.Data.ProviderID, Candidates: event.Data.RouteCandidates,
 		Policy: *event.Data.RoutePolicy, Selection: *event.Data.Route,
 	}
+	usage, err := s.UsageTotals(ctx, accounting.Scope{TaskID: task})
+	if err != nil || usage.Scope.SessionID != event.SessionID {
+		return zero, sessions.ErrRouteExplanation
+	}
+	out.Usage = &usage
 	if out.Validate() != nil {
 		return zero, sessions.ErrRouteExplanation
 	}

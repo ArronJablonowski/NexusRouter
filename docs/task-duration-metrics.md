@@ -1,6 +1,6 @@
 # Durable task-duration metrics
 
-Schema 29 adds a task timing projection and a persistent instrumentation epoch.
+Schema 29 introduced a task timing projection and a persistent instrumentation epoch.
 Normal task events, orphan-worker recovery and interrupted-submission recovery
 update timing in the same transaction as their event/head changes. A rejected or
 rolled-back append cannot leave a timing sample behind. Acknowledgement retries
@@ -18,7 +18,7 @@ unavailable, never clamped to a zero-duration success.
 
 Existing `darwin metrics --db path`, application metrics, authenticated
 `GET /v1/metrics`, SDK export and periodic daemon export carry the new
-`task_duration` field for schema-29 stores. Older schemas omit it rather than
+`task_duration` field for schema-29-and-newer stores. Older schemas omit it rather than
 inventing measurements. No additional endpoint or export permission is introduced.
 
 The fixed terminal groups are `completed`, `failed` and `canceled`. Each contains
@@ -52,6 +52,12 @@ reconstruct historical timing samples or change routing/evaluation evidence.
 Read-only commands never migrate a store. A failed migration rolls back the new
 tables and version change together.
 
+Schema 30 adds the separate [durable usage and cost ledger](usage-accounting.md).
+The 29→30 migration preserves the task-timing tables and their instrumentation
+epoch exactly; it neither reconstructs historical usage nor resets the cumulative
+duration stream. The native install rehearsal checks that preserved epoch across
+the stopped-writer backup, upgrade, and separate schema-29 rollback copy.
+
 Tasks that finished before instrumentation have no retrospective sample and are
 counted as `missing_start`. A pre-migration running task that later finishes is
 also missing its captured start. The unavailable count makes coverage explicit;
@@ -78,7 +84,7 @@ or restoring a database. No task-history retention/deletion operation is added.
 ## Scale and concurrent-read qualification
 
 `BenchmarkMetricsCompletedTasks` measures the actual read-only `Store.Metrics`
-path against disposable schema-29 databases. Each task has two valid journal
+path against disposable schema-29 timing fixtures. Each task has two valid journal
 events, a matching terminal head and timing projection, a unique canonical start
 timestamp, and a 100ms duration. One prepared transaction seeds the fixture
 outside timing; the writer is closed and a read-only store opened. The complete

@@ -72,7 +72,7 @@ func TestLeaseAttentionHistoryCLIStoredTransitions(t *testing.T) {
 		t.Fatal(code, errout.String())
 	}
 	var page workers.LeaseAttentionHistoryPage
-	if json.Unmarshal(out.Bytes(), &page) != nil || page.Version != 1 || page.StorageSchema != 29 || !page.Available || page.AttentionID != id || len(page.Items) != 1 || page.Items[0].Sequence != 1 || page.Items[0].Kind != "observed" || page.Items[0].Observation.State != "open" {
+	if json.Unmarshal(out.Bytes(), &page) != nil || page.Version != 1 || page.StorageSchema != 30 || !page.Available || page.AttentionID != id || len(page.Items) != 1 || page.Items[0].Sequence != 1 || page.Items[0].Kind != "observed" || page.Items[0].Observation.State != "open" {
 		t.Fatal(out.String())
 	}
 	if strings.Contains(out.String(), "private-") || strings.Contains(out.String(), path) || errout.Len() != 0 {

@@ -54,7 +54,7 @@ func TestTaskRouteCLIIsReadOnlyAndMetadataOnly(t *testing.T) {
 	if json.Unmarshal(out.Bytes(), &explanation) != nil || explanation.Validate() != nil || explanation.TaskID != "task" || explanation.Model != "fixture" {
 		t.Fatal(out.String())
 	}
-	if strings.Contains(out.String(), "prompt") || strings.Contains(out.String(), "output") || strings.Contains(out.String(), "endpoint") || strings.Contains(out.String(), "credential") {
+	if strings.Contains(out.String(), "prompt") || strings.Contains(out.String(), "raw_output") || strings.Contains(out.String(), "model_output") || strings.Contains(out.String(), "endpoint") || strings.Contains(out.String(), "credential") {
 		t.Fatal("route output contains forbidden content fields", out.String())
 	}
 	if Run([]string{"task", "route", "--db", path, "--task", "task"}, brokenWriter{}, &diagnostic, "dev") != 1 {

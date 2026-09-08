@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
@@ -106,6 +107,16 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 		if err := readOperationDuration(ctx, tx, &snapshot); err != nil {
 			return metrics.Snapshot{}, errMetrics
 		}
+	}
+	if schema >= 30 {
+		usage, usageErr := usageTotals(ctx, tx, accounting.Scope{})
+		if usageErr != nil || usage.Validate() != nil {
+			return metrics.Snapshot{}, errMetrics
+		}
+		snapshot.Accounting = &usage
+		// usageTotals records its own observation time. Advance the enclosing
+		// snapshot after that read so validation cannot observe time inversion.
+		snapshot.ObservedAt = time.Now().UTC()
 	}
 	if snapshot.Validate() != nil {
 		return metrics.Snapshot{}, errMetrics

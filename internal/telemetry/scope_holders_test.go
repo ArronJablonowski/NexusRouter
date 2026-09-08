@@ -106,7 +106,7 @@ func TestScopeLeaseStatusCorruption(t *testing.T) {
 		"owner": `UPDATE resource_leases SET owner=char(10)`, "token": `UPDATE resource_leases SET token=''`,
 		"expiry": `UPDATE resource_leases SET expires=9223372036854775807`, "writer": `PRAGMA ignore_check_constraints=ON; UPDATE resource_leases SET writer=2`,
 		"head": `UPDATE task_heads SET state='invalid'`, "session": `UPDATE task_heads SET session_id=''`, "sequence": `UPDATE task_heads SET sequence=0`,
-		"missing-head": `PRAGMA foreign_keys=OFF; DELETE FROM task_heads`, "schema": `PRAGMA user_version=30`,
+		"missing-head": `PRAGMA foreign_keys=OFF; DELETE FROM task_heads`, "schema": `PRAGMA user_version=31`,
 		"duplicate-writer": `UPDATE resource_leases SET writer=1; INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires) SELECT 'second',task_id,owner,scope,1,expires FROM resource_leases`,
 	} {
 		t.Run(name, func(t *testing.T) {

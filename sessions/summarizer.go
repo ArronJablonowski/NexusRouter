@@ -138,16 +138,27 @@ func (s Summarizer) Draft(ctx context.Context, source Snapshot, keep int) (Summa
 	if ctx.Err() != nil {
 		return SummaryDraft{}, ctx.Err()
 	}
+	trustedUsage := done && err == nil && callbackErr == nil && usage != nil
+	failure := func(cause error) (SummaryDraft, error) {
+		draft := SummaryDraft{}
+		// Preserve provider accounting only when its stream reached an error-free
+		// normal terminal. Host validation may still reject the proposed summary.
+		if trustedUsage {
+			copy := *usage
+			draft.Usage, draft.Elapsed = &copy, time.Since(start)
+		}
+		return draft, cause
+	}
 	if err != nil || callbackErr != nil || !done {
-		return SummaryDraft{}, ErrHistory
+		return failure(ErrHistory)
 	}
 	summary, err := ParseSummaryDraft([]byte(output.String()))
 	if err != nil {
-		return SummaryDraft{}, ErrHistory
+		return failure(ErrHistory)
 	}
 	_, provenance, err = PrepareContinuation(source, CompactionRequest{Keep: keep, Summary: summary})
 	if err != nil {
-		return SummaryDraft{}, ErrHistory
+		return failure(ErrHistory)
 	}
 	return SummaryDraft{
 		Checkpoint:   provenance,

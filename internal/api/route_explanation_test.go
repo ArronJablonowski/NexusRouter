@@ -35,6 +35,10 @@ func routeRequest(method, path string) *http.Request {
 
 func TestRouteExplanationHTTPIsMetadataOnly(t *testing.T) {
 	explanation := routeExplanationFixture(t)
+	usage := usageFixture("task")
+	usage.Scope.SessionID = explanation.SessionID
+	usage.CalculatedAt = explanation.RecordedAt.Add(time.Second).UTC()
+	explanation.Usage = &usage
 	s := services()
 	calls := 0
 	s.RouteExplanation = func(_ context.Context, task string) (sessions.RouteExplanation, error) {
@@ -48,7 +52,7 @@ func TestRouteExplanationHTTPIsMetadataOnly(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, routeRequest(http.MethodGet, "/v1/tasks/task/route"))
 	var got sessions.RouteExplanation
-	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &got) != nil || got.Validate() != nil || got.TaskID != "task" || calls != 1 {
+	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &got) != nil || got.Validate() != nil || got.TaskID != "task" || got.Usage == nil || got.Usage.Scope.TaskID != "task" || calls != 1 {
 		t.Fatal(w.Code, w.Body.String(), calls)
 	}
 	for _, private := range []string{"private prompt", "private output", "https://endpoint.invalid", "api-secret"} {
@@ -88,6 +92,12 @@ func TestRouteExplanationHTTPBackendFailsClosed(t *testing.T) {
 		{name: "backend", err: errors.New("private backend error"), status: http.StatusInternalServerError},
 		{name: "invalid", result: sessions.RouteExplanation{Version: 1, TaskID: "task"}, status: http.StatusInternalServerError},
 		{name: "mismatch", result: func() sessions.RouteExplanation { r := routeExplanationFixture(t); r.TaskID = "other"; return r }(), status: http.StatusInternalServerError},
+		{name: "usage mismatch", result: func() sessions.RouteExplanation {
+			r := routeExplanationFixture(t)
+			u := usageFixture("other")
+			r.Usage = &u
+			return r
+		}(), status: http.StatusInternalServerError},
 		{name: "panic", panic: true, status: http.StatusInternalServerError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -233,6 +233,7 @@ make build
 - `internal/config`: typed YAML settings, merging, overrides, and validation.
 - `runtime`: versioned event envelope, event kinds, and validation.
 - `providers`: streaming contracts, HTTP adapters, bounded protocol parsing and local conformance fixtures.
+- `accounting`: immutable provider-usage, normalized-cost, correction, and routed/auxiliary total contracts.
 - `routing`: eligibility filters, normalized evidence ranking, bounded exploration and fallback selection.
 - `tools`: schema-validated registry and scoped read-only authorization boundary.
 - `policy`: owned HTTP transport with endpoint allowlisting and loopback-only egress mode.
@@ -553,8 +554,10 @@ New guidance for a terminal task is rejected, but duplicate-key receipts remain
 retrievable. Use completed-session continuation for a new follow-up task.
 
 Steering storage was introduced in schema14; current storage migrates
-transactionally to [schema29](docs/task-duration-metrics.md). Back up operational
-databases before upgrades; older binaries cannot open schema29. The runtime turn
+transactionally to schema30, which adds [durable usage and cost accounting](docs/usage-accounting.md)
+without rewriting the [schema29 task-duration projection](docs/task-duration-metrics.md).
+Back up operational databases before upgrades; older binaries cannot open
+schema30. The runtime turn
 configuration changes durable submission fingerprints, so older queued requests
 require explicit configuration-mismatch handling. A full-screen interactive editor
 and general interrupted-session recovery remain unfinished.
@@ -798,7 +801,8 @@ All endpoints require `Authorization: Bearer <token>`:
 - `POST /v1/tasks`: JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. This initial endpoint waits for durable completion before returning HTTP 201 with `task_id`, `text`, `turns`, and the optional `route_estimated_cost` described under automatic routing.
 - `GET /v1/tasks?state=completed&limit=25`: newest-first, content-free task discovery with an optional opaque `after` cursor. The insertion boundary is frozen across pages, while state membership may change. Listing performs no inference or continuation check; configured credential collisions fail closed. See [task discovery](docs/task-discovery.md).
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
-- `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, and exploration flag. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
+- `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, exploration flag, and point-in-time routed/auxiliary usage totals. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
+- `GET /v1/tasks/{id}/usage`: read-only versioned task/session accounting with separate primary, fallback, classifier, summarizer, orchestrator-audit, optional-judge, routed, auxiliary, and overall totals. Missing token usage and cost remain explicit; configured estimates are not presented as provider billing. The bodyless/queryless route performs no inference, correction, migration, or retry. See [durable usage and cost accounting](docs/usage-accounting.md).
 - `POST /v1/tasks/{id}/audits`: start or exactly replay one independently attributed output audit. Supply exactly one `Idempotency-Key` header containing 16–128 printable non-space ASCII bytes and the strict JSON body `{"reviewer_model_id":"reviewer","max_cost":0.02}`. The 8 KiB body names a configured reviewer alias; provider-style `/` or `:` model names are not public IDs. A successful request is an SSE stream with `event: audit`: sequence 1 is durable `pending`, and sequence 2 is one of `completed`, `rejected`, `abstained`, `canceled`, or `failed`. Event IDs are `<audit_id>:1` and `<audit_id>:2`. A fixed-code `error` event can end delivery after pending when no terminal transition could be committed; inspect or cancel that pending operation rather than assuming it is safe to rerun. An exact retry replays committed state without repeating reviewer inference; reusing a key for changed intent or configuration returns a conflict. Do not send `Last-Event-ID` to this mutating route.
 - `GET /v1/tasks/{id}/audits/{audit_id}`: read one restart-safe public audit status. The response has no dedicated prompt, candidate-output, tool-payload, endpoint, credential, idempotency-key, or raw-error field. It does contain bounded, untrusted model-generated findings, which can quote or paraphrase task-derived content despite credential redaction; authorize and handle it as sensitive task inspection. Opaque evidence provenance, usage when reported, the fixed evidence order, and terminal disposition are also included.
 - `POST /v1/tasks/{id}/audits/{audit_id}/cancel`: send exactly `{}` as JSON to durably cancel a pending audit. A terminal operation wins a concurrent race and is returned unchanged. Cancellation applies only to the audit and does not alter the source task or authorize retry of task tool effects.
@@ -1495,7 +1499,7 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 7 contains fixed groups for tasks, submissions, review attempts,
+Metrics snapshot version 8 contains fixed groups for tasks, submissions, review attempts,
 evaluation records, audit records, submission recovery records and all sixteen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
@@ -1505,6 +1509,14 @@ identity. These remain advisory: they do not assert objective correctness,
 replace user feedback or become direct fitness samples. Counts come from one SQLite read transaction and survive
 service restarts. Older schemas explicitly mark unsupported groups unavailable.
 No prompts, output, task/model/provider IDs, paths or arbitrary labels are included.
+
+For schema-30 stores, the snapshot also carries identifier-free global accounting
+for the six exact usage roles and the routed, auxiliary, and overall aggregates.
+Known/unknown usage and cost counts remain separate; known partial token/cost
+sums are never relabeled as complete totals. OTLP exports fixed gauges with a
+closed `bucket` label. These retained-population gauges can include configured
+estimates and must not be treated as provider invoices. See
+[durable usage and cost accounting](docs/usage-accounting.md).
 
 The `queue_age` group classifies every currently queued submission into one of
 seven fixed age buckets from less than one second through at least one hour, or
@@ -1566,8 +1578,9 @@ credential/capacity/context/budget/capability reason classes, never candidates.
 independent sequential daemon exporter, while SDK hosts can own one explicitly;
 health is supplemental and delivery remains best effort. The legacy
 `opentelemetry_enabled` alias remains metrics-only.
-Schema29 also supplies [task-duration histograms](docs/task-duration-metrics.md)
-and explicit unavailable timing counts, including recovery terminals. Traces,
+Schema29 supplies [task-duration histograms](docs/task-duration-metrics.md) and
+explicit unavailable timing counts, including recovery terminals. Schema30 adds
+the separate [immutable usage ledger](docs/usage-accounting.md). Traces,
 outside this bounded lifecycle slice, queue arrival/service rates,
 per-device pressure, cost histograms, retention and production-scale
 observability qualification remain unfinished.

@@ -28,6 +28,17 @@ decision or publication approval is claimed.
 
 ## Available for supervised testing
 
+- Schema 30 durable provider accounting now records evidence-bound
+  `primary_execution`, `fallback`, `summarizer`, `orchestrator_audit`, and
+  `optional_judge` operations while reserving `classifier` for a future
+  authoritative lifecycle. Task-scoped API/SDK inspection, automatic route
+  explanations, and identifier-free metrics
+  keep routed and auxiliary totals separate. Missing usage remains unknown,
+  configured estimates remain distinguishable from billed/reconciled cost, and
+  reconciliation appends immutable corrections. The schema-29 migration does
+  not backfill pre-ledger work and preserves the task-duration epoch. See
+  [durable usage and cost accounting](usage-accounting.md).
+
 - Versioned configured routing metadata through `darwin models list`, Go SDK
   `ConfiguredModelCatalog`, and authenticated `GET /v1/routing/models`. The
   snapshot carries the redacted configuration fingerprint and declared
@@ -258,7 +269,10 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 29. Schema-22-and-newer resource
+The current durable store uses SQLite schema 30. Schema 30 adds the immutable
+[usage and cost ledger](usage-accounting.md) without reconstructing earlier
+usage; schema-29-and-newer stores retain the existing task-duration epoch.
+Schema-22-and-newer resource
 leases carry private
 [execution-image ownership](process-lifetime-ownership.md); foreign processes
 cannot mutate a bound lease merely by copying its token. Legacy leases remain

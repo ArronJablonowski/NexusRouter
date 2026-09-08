@@ -129,7 +129,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 	}
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
 	assertMode(t, database, 0600)
-	checkDatabase(t, database, 29, "", "")
+	checkDatabase(t, database, 30, "", "")
 
 	fact := memory.Fact{Version: 1, ID: "install-rehearsal", Scope: "release-rehearsal", Revision: 1, Content: "Synthetic schema migration evidence.", Provenance: "DAR-52 disposable fixture", Confidence: 1, Privacy: "local_only", Created: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC), Updated: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)}
 	factBody, err := json.Marshal(fact)
@@ -140,49 +140,50 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 		t.Fatalf("seed synthetic record: %q: %v", got, err)
 	}
 	evidenceBefore := databaseEvidence(t, database, fact.Scope, fact.ID)
-	downgradeFixtureToSchema28(t, database)
-	checkDatabase(t, database, 28, fact.Scope, fact.ID)
+	downgradeFixtureToSchema29(t, database)
+	checkDatabase(t, database, 29, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
-		t.Fatal("schema-28 fixture changed synthetic evidence")
+		t.Fatal("schema-29 fixture changed synthetic evidence")
 	}
+	timingEpoch := taskTimingEpoch(t, database)
 	assertQuiescent(t, database)
-	backup := filepath.Join(privateRoot, "backups", "darwin-schema28.db")
+	backup := filepath.Join(privateRoot, "backups", "darwin-schema29.db")
 	if err := os.Mkdir(filepath.Dir(backup), 0700); err != nil {
 		t.Fatal(err)
 	}
 	checkpointAndCopy(t, database, backup)
 	assertMode(t, backup, 0600)
 	backupDigest := fileDigest(t, backup)
-	checkDatabase(t, backup, 28, fact.Scope, fact.ID)
+	checkDatabase(t, backup, 29, fact.Scope, fact.ID)
+	if got := taskTimingEpoch(t, backup); got != timingEpoch {
+		t.Fatal("schema-29 backup changed task timing epoch")
+	}
 
 	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
-	checkDatabase(t, database, 29, fact.Scope, fact.ID)
+	checkDatabase(t, database, 30, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
 		t.Fatal("migration changed synthetic evidence")
 	}
-	var epoch string
-	db := openRehearsalDatabase(t, database, "ro")
-	epochErr := db.QueryRow(`SELECT started_at FROM task_timing_metadata WHERE singleton=1 AND version=1`).Scan(&epoch)
-	closeErr := db.Close()
-	if epochErr != nil || closeErr != nil {
-		t.Fatal("cannot inspect schema-29 migration epoch", epochErr, closeErr)
+	if got := taskTimingEpoch(t, database); got != timingEpoch {
+		t.Fatal("schema-30 migration changed schema-29 task timing epoch")
 	}
-	if at, err := time.Parse(time.RFC3339Nano, epoch); err != nil || at.UTC().Format(time.RFC3339Nano) != epoch {
-		t.Fatal("invalid schema-29 migration epoch", epoch, err)
-	}
+	assertEmptyUsageLedger(t, database)
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, database, fact)
 
-	rollback := filepath.Join(stateRoot, "rollback-schema28.db")
+	rollback := filepath.Join(stateRoot, "rollback-schema29.db")
 	copyExclusive(t, backup, rollback)
 	if fileDigest(t, rollback) != backupDigest {
 		t.Fatal("rollback copy differs from immutable backup")
 	}
-	checkDatabase(t, rollback, 28, fact.Scope, fact.ID)
+	checkDatabase(t, rollback, 29, fact.Scope, fact.ID)
+	if got := taskTimingEpoch(t, rollback); got != timingEpoch {
+		t.Fatal("schema-29 rollback copy changed task timing epoch")
+	}
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, rollback, fact)
-	checkDatabase(t, rollback, 28, fact.Scope, fact.ID) // Read-only inspection must not migrate.
-	checkDatabase(t, database, 29, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
-	t.Logf("native install=%s schema=29; backup_sha256=%s; migration=28->29; rollback_copy_schema=28", installPrefix, backupDigest)
+	checkDatabase(t, rollback, 29, fact.Scope, fact.ID) // Read-only inspection must not migrate.
+	checkDatabase(t, database, 30, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
+	t.Logf("native install=%s schema=30; backup_sha256=%s; migration=29->30; rollback_copy_schema=29", installPrefix, backupDigest)
 }
 
 func rehearsalArchiveBinary(t *testing.T, archive string, artifact Artifact) []byte {
@@ -354,7 +355,7 @@ func databaseEvidence(t *testing.T, path, scope, id string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func downgradeFixtureToSchema28(t *testing.T, path string) {
+func downgradeFixtureToSchema29(t *testing.T, path string) {
 	t.Helper()
 	db := openRehearsalDatabase(t, path, "rw")
 	defer db.Close()
@@ -363,11 +364,42 @@ func downgradeFixtureToSchema28(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; PRAGMA user_version=28`); err != nil {
+	if _, err = tx.Exec(`DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func taskTimingEpoch(t *testing.T, path string) string {
+	t.Helper()
+	db := openRehearsalDatabase(t, path, "ro")
+	defer db.Close()
+	var epoch string
+	if err := db.QueryRow(`SELECT started_at FROM task_timing_metadata WHERE singleton=1 AND version=1`).Scan(&epoch); err != nil {
+		t.Fatal("cannot inspect schema-29 task timing epoch", err)
+	}
+	if at, err := time.Parse(time.RFC3339Nano, epoch); err != nil || at.UTC().Format(time.RFC3339Nano) != epoch {
+		t.Fatal("invalid schema-29 task timing epoch", epoch, err)
+	}
+	return epoch
+}
+
+func assertEmptyUsageLedger(t *testing.T, path string) {
+	t.Helper()
+	db := openRehearsalDatabase(t, path, "ro")
+	defer db.Close()
+	var version, records, heads, corrections int
+	var epoch string
+	if err := db.QueryRow(`SELECT version,started_at FROM usage_metadata WHERE singleton=1`).Scan(&version, &epoch); err != nil || version != 1 {
+		t.Fatal("cannot inspect schema-30 usage metadata", version, epoch, err)
+	}
+	if at, err := time.Parse(time.RFC3339Nano, epoch); err != nil || at.UTC().Format(time.RFC3339Nano) != epoch {
+		t.Fatal("invalid schema-30 usage epoch", epoch, err)
+	}
+	if err := db.QueryRow(`SELECT (SELECT count(*) FROM usage_records),(SELECT count(*) FROM usage_heads),(SELECT count(*) FROM usage_corrections)`).Scan(&records, &heads, &corrections); err != nil || records != 0 || heads != 0 || corrections != 0 {
+		t.Fatal("schema-30 migration fabricated usage history", records, heads, corrections, err)
 	}
 }
 

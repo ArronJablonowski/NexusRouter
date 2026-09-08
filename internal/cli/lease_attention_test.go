@@ -34,7 +34,7 @@ func TestLeaseAttentionCLIReadOnly(t *testing.T) {
 		t.Fatal(code, errout.String())
 	}
 	var page workers.LeaseAttentionPage
-	if json.Unmarshal(out.Bytes(), &page) != nil || page.Version != 1 || !page.Available || page.StorageSchema != 29 || page.Items == nil || len(page.Items) != 0 || page.HasMore {
+	if json.Unmarshal(out.Bytes(), &page) != nil || page.Version != 1 || !page.Available || page.StorageSchema != 30 || page.Items == nil || len(page.Items) != 0 || page.HasMore {
 		t.Fatal(out.String())
 	}
 	if errout.Len() != 0 || strings.Contains(out.String(), "private") || strings.Contains(out.String(), path) {

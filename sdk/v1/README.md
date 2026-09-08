@@ -806,6 +806,15 @@ no route decision and returns an inspection error. Historical health and
 capacity fields describe admission time only and do not authorize a retry.
 See [route explanation inspection](../../docs/route-explanation.md).
 
+`InspectTaskUsage(ctx, taskID)` returns version-one immutable-ledger totals for
+the authoritative task/session scope. It separates primary, fallback,
+classifier, summarizer, orchestrator-audit and optional-judge roles plus routed,
+auxiliary and overall aggregates. Known and unknown token/cost records remain
+distinct, and complete totals are omitted when any measurement is unknown. The
+method opens existing storage read-only, performs no inference, migration,
+correction or retry, and returns an owned copy. See
+[durable usage and cost accounting](../../docs/usage-accounting.md).
+
 `ListTasks(ctx, TaskListOptions)` discovers newest-first durable task metadata
 without loading conversation or tool content. Each item contains only task and
 session IDs, current state, head sequence and start time. Opaque cursors freeze

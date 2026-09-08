@@ -58,7 +58,7 @@ func (s *Store) admitReview(ctx context.Context, r evaluation.ReviewAttempt, pub
 		}
 		same := string(priorBody) == string(body)
 		if public {
-			same = prior.TaskID == r.TaskID && prior.AttemptID == r.AttemptID && prior.EvaluatorModel == r.EvaluatorModel && prior.EvaluatorProvider == r.EvaluatorProvider && prior.ReviewerID == r.ReviewerID && prior.RequestDigest == r.RequestDigest
+			same = prior.TaskID == r.TaskID && prior.AttemptID == r.AttemptID && prior.EvaluatorModel == r.EvaluatorModel && prior.EvaluatorProvider == r.EvaluatorProvider && prior.ReviewerID == r.ReviewerID && prior.RequestDigest == r.RequestDigest && prior.EstimatedCost == r.EstimatedCost
 		}
 		if !same {
 			return evaluation.ReviewAttempt{}, false, ErrConflict
@@ -100,6 +100,9 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 	if err := finishReview(ctx, tx, r); err != nil {
 		return err
 	}
+	if err := appendReviewUsage(ctx, tx, r); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -118,6 +121,9 @@ func (s *Store) CompleteReview(ctx context.Context, r evaluation.ReviewAttempt, 
 		return err
 	}
 	if err := finishReview(ctx, tx, r); err != nil {
+		return err
+	}
+	if err := appendReviewUsage(ctx, tx, r); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -144,13 +150,22 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 	if err != nil {
 		return err
 	}
+	if r.Status == "completed" {
+		linked, linkErr := completedReviewForAudit(ctx, tx, r.TaskID, r.AuditID)
+		if linkErr == nil && linked.ID != r.ID {
+			return ErrConflict
+		}
+		if linkErr != nil && !errors.Is(linkErr, sql.ErrNoRows) {
+			return linkErr
+		}
+	}
 	if prior.Status != "started" {
 		if string(priorBody) != string(body) {
 			return ErrConflict
 		}
 		return nil
 	}
-	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || prior.ReviewerID != r.ReviewerID || prior.RequestDigest != r.RequestDigest || !prior.StartedAt.Equal(r.StartedAt) {
+	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || prior.ReviewerID != r.ReviewerID || prior.RequestDigest != r.RequestDigest || prior.EstimatedCost != r.EstimatedCost || !prior.StartedAt.Equal(r.StartedAt) {
 		return ErrConflict
 	}
 	if r.Status == "completed" {
@@ -175,6 +190,42 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		return ErrConflict
 	}
 	return nil
+}
+
+// completedReviewForAudit resolves the exclusive durable owner of one audit
+// evidence record. More than one match is corruption, never an arbitrary
+// winner; callers use the task-head writer transaction to serialize competing
+// completions before establishing this relationship.
+func completedReviewForAudit(ctx context.Context, tx *sql.Tx, task, auditID string) (evaluation.ReviewAttempt, error) {
+	rows, err := tx.QueryContext(ctx, "SELECT id,status,body FROM review_attempts WHERE task_id=? AND status='completed' AND json_extract(body,'$.AuditID')=? ORDER BY id LIMIT 2", task, auditID)
+	if err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	defer rows.Close()
+	var out evaluation.ReviewAttempt
+	count := 0
+	for rows.Next() {
+		var id, status string
+		var body []byte
+		if err := rows.Scan(&id, &status, &body); err != nil {
+			return evaluation.ReviewAttempt{}, err
+		}
+		review, err := decodeReviewAttempt(body, id, task, status)
+		if err != nil {
+			return evaluation.ReviewAttempt{}, err
+		}
+		out, count = review, count+1
+	}
+	if err := rows.Err(); err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	if count == 0 {
+		return evaluation.ReviewAttempt{}, sql.ErrNoRows
+	}
+	if count != 1 {
+		return evaluation.ReviewAttempt{}, evaluation.ErrAudit
+	}
+	return out, nil
 }
 
 // CancelReview is a cancellation-first compare-and-set. Once it commits, a
@@ -225,6 +276,9 @@ func (s *Store) CancelReview(ctx context.Context, task, id string, at time.Time)
 	}
 	if n, err := result.RowsAffected(); err != nil || n != 1 {
 		return evaluation.ReviewAttempt{}, ErrConflict
+	}
+	if err := appendReviewUsage(ctx, tx, canceled); err != nil {
+		return evaluation.ReviewAttempt{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return evaluation.ReviewAttempt{}, err

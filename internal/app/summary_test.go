@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
@@ -98,6 +99,10 @@ func TestSummarizeTaskPersistsDraftBeforeDispatchAndKeepsSource(t *testing.T) {
 	saved, err := db.SummaryAttempt(ctx, attempt.ID)
 	if err != nil || saved.Status != "drafted" || saved.Draft == nil {
 		t.Fatal(saved, err)
+	}
+	totals, err := db.UsageTotals(ctx, accounting.Scope{TaskID: source.TaskID})
+	if err != nil || totals.Summarizer.Records != 1 || totals.Summarizer.UnknownUsageRecords != 1 || totals.Summarizer.KnownCostRecords != 1 || totals.Auxiliary.Records != 1 {
+		t.Fatal("summary accounting not committed with draft", totals, err)
 	}
 	after, err := sessions.Replay(ctx, db, source.TaskID)
 	if err != nil || !reflect.DeepEqual(before, after) {
@@ -203,7 +208,7 @@ func TestSummarizeTaskFailureLifecycleSurvivesCancellation(t *testing.T) {
 					cancel()
 					return
 				}
-				fmt.Fprintln(w, `{"message":{"content":"sensitive-invalid-summary"},"done":true,"done_reason":"stop"}`)
+				fmt.Fprintln(w, `{"message":{"content":"sensitive-invalid-summary"},"done":true,"done_reason":"stop","prompt_eval_count":29,"eval_count":13}`)
 			}))
 			defer server.Close()
 			svc.settings.Providers[0].Endpoint = server.URL
@@ -225,6 +230,21 @@ func TestSummarizeTaskFailureLifecycleSurvivesCancellation(t *testing.T) {
 			}
 			if err != nil || len(attempts) != 1 || attempts[0].Status != "failed" || attempts[0].Code != code || attempts[0].Draft != nil || attempts[0].FinishedAt.Before(attempts[0].StartedAt) || time.Since(attempts[0].FinishedAt) > time.Minute {
 				t.Fatal("failure lifecycle", attempts, err)
+			}
+			if canceled {
+				if attempts[0].Usage != nil || attempts[0].Elapsed != 0 {
+					t.Fatal("canceled summary retained unverified usage", attempts[0])
+				}
+			} else if attempts[0].Usage == nil || attempts[0].Usage.InputTokens != 29 || attempts[0].Usage.OutputTokens != 13 || attempts[0].Elapsed <= 0 {
+				t.Fatal("verified failed-summary usage was lost", attempts[0])
+			}
+			totals, err := db.UsageTotals(ctx, accounting.Scope{TaskID: source.TaskID})
+			known := int64(1)
+			if canceled {
+				known = 0
+			}
+			if err != nil || totals.Summarizer.Records != 1 || totals.Summarizer.KnownUsageRecords != known || totals.Summarizer.UnknownUsageRecords != 1-known || totals.Summarizer.KnownInputTokens != known*29 || totals.Summarizer.KnownOutputTokens != known*13 || totals.Summarizer.KnownCostRecords != 1 || totals.Auxiliary.Records != 1 {
+				t.Fatal("summary failure accounting not committed", totals, err)
 			}
 			encoded, _ := json.Marshal(attempts)
 			if strings.Contains(string(encoded), "sensitive-invalid-summary") {

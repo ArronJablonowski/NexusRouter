@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
@@ -30,10 +31,17 @@ type RouteExplanation struct {
 	Candidates []routing.Candidate `json:"candidates"`
 	Policy     routing.Policy      `json:"policy"`
 	Selection  routing.Selection   `json:"selection"`
+	// Usage is observed when the explanation is inspected, after the immutable
+	// route decision. Nil preserves source compatibility for callers that build
+	// or decode the original route-only contract.
+	Usage *accounting.Totals `json:"usage,omitempty"`
 }
 
 func (r RouteExplanation) Validate() error {
 	if r.Version != 1 || !ValidEventPageID(r.TaskID) || !ValidEventPageID(r.SessionID) || !ValidEventPageID(r.RouteID) || r.Sequence != 2 || r.RecordedAt.IsZero() || len(r.ConfigID) != 64 || !validRouteText(r.Domain, 128) || !validRouteText(r.Profile, 128) || !validRouteText(r.Model, 512) || !validRouteText(r.Provider, 128) || r.Selection.Primary.Model != r.Model || r.Selection.Primary.Provider != r.Provider || routing.ValidateExplanation(r.Candidates, &r.Policy, &r.Selection) != nil {
+		return ErrRouteExplanation
+	}
+	if r.Usage != nil && (r.Usage.Validate() != nil || r.Usage.Scope.TaskID != r.TaskID || r.Usage.Scope.SessionID != r.SessionID || r.Usage.CalculatedAt.Before(r.RecordedAt)) {
 		return ErrRouteExplanation
 	}
 	digest, err := hex.DecodeString(r.ConfigID)

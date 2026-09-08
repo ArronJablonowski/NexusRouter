@@ -157,7 +157,7 @@ func TestResourceLeasesBackendValidation(t *testing.T) {
 				case "time":
 					out.ObservedAt = time.Time{}
 				case "schema":
-					out.StorageSchema = 30
+					out.StorageSchema = 31
 				case "available":
 					out.Available = false
 				case "nil_holders":

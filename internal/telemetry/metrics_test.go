@@ -8,8 +8,33 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
+
+func TestMetricsAccountingReconcilesRoutedAndAuxiliaryUsage(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	_ = usageTask(t, db, "accounted-task", false, &providers.Usage{InputTokens: 7, OutputTokens: 3}, runtime.TaskCompleted)
+	review := evaluation.ReviewAttempt{Version: 1, ID: "metrics-review", TaskID: "accounted-task", AttemptID: "candidate", EvaluatorModel: "judge-model", EvaluatorProvider: "judge-provider", EstimatedCost: .5, Status: "started", StartedAt: time.Date(2026, 9, 8, 12, 1, 0, 0, time.UTC)}
+	if err := db.BeginReview(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	review.Status, review.Code, review.FinishedAt = "failed", "review_failed", review.StartedAt.Add(time.Second)
+	if err := db.FinishReview(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := db.Metrics(ctx)
+	if err != nil || snapshot.Validate() != nil || snapshot.Accounting == nil {
+		t.Fatal(snapshot, err)
+	}
+	totals := snapshot.Accounting
+	if totals.Primary.Records != 1 || totals.Judge.Records != 1 || totals.Routed.Records != 1 || totals.Auxiliary.Records != 1 || totals.Overall.Records != 2 || totals.Overall.KnownInputTokens != 7 || totals.Overall.KnownOutputTokens != 3 || totals.Overall.UnknownUsageRecords != 1 {
+		t.Fatal("accounting did not reconcile", totals)
+	}
+}
 
 func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	db, path := submissionStore(t)
@@ -45,7 +70,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.StorageSchema != 29 || snapshot.Validate() != nil {
+	if snapshot.StorageSchema != 30 || snapshot.Validate() != nil {
 		t.Fatal(snapshot)
 	}
 	for _, group := range snapshot.Groups {
@@ -73,7 +98,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 		}
 	}
 	body, _ := json.Marshal(snapshot)
-	if strings.Contains(string(body), "private") || strings.Contains(string(body), "token") {
+	if strings.Contains(string(body), "private") || strings.Contains(string(body), "private-token") {
 		t.Fatal("payload leaked")
 	}
 }
@@ -271,7 +296,7 @@ func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
 
 func TestMetricsLegacyAbsentTables(t *testing.T) {
 	db, path := submissionStore(t)
-	if _, err := db.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; PRAGMA user_version=1`); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; DROP TABLE tool_approvals; DROP TABLE task_steering; DROP TABLE submission_recoveries; DROP TABLE submissions; DROP TABLE review_attempts; DROP TABLE audit_records; DROP TABLE evaluations; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=1`); err != nil {
 		t.Fatal(err)
 	}
 	ro, err := OpenReadOnly(context.Background(), path)

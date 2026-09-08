@@ -102,7 +102,7 @@ func TestLeaseAttentionHTTPReadOnlySQLite(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, continuationRequest("GET", "/v1/resources/attention"+tc.query, ""))
 		var page workers.LeaseAttentionPage
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &page) != nil || page.Validate() != nil || !page.Available || page.StorageSchema != 29 || page.HasMore != tc.more || page.NextCursor != tc.cursor {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &page) != nil || page.Validate() != nil || !page.Available || page.StorageSchema != 30 || page.HasMore != tc.more || page.NextCursor != tc.cursor {
 			t.Fatal(tc.query, w.Code, w.Body.String())
 		}
 		ids := []string{}
@@ -136,7 +136,7 @@ func TestLeaseAttentionHTTPLegacyAndMissingStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DROP TABLE lease_attention; PRAGMA user_version=23`); err != nil {
+	if _, err := db.Exec(`DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TABLE lease_attention; PRAGMA user_version=23`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

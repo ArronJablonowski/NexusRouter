@@ -93,10 +93,10 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 7 adds fixed advisory audit-outcome gauges (`accept`,
-`reject`, and `abstain`) to version 6's provider-turn and tool-call duration
-histograms, version 5's queue-age gauge, version 4's live host observation, and
-version 3's runtime activity. Audit outcomes are validated reviewer verdicts,
+Snapshot schema version 8 adds fixed, identifier-free usage-accounting gauges
+to version 7's advisory audit outcomes, version 6's provider-turn and tool-call
+duration histograms, version 5's queue-age gauge, version 4's live host
+observation, and version 3's runtime activity. Audit outcomes are validated reviewer verdicts,
 not objective correctness, task acceptance, user feedback or direct fitness
 samples. No evaluator, candidate, task, evidence-reference or finding identity
 is exported. Schema-28-and-newer databases pair `turn.started` with
@@ -114,6 +114,19 @@ provider time includes streaming until the completion event. It is a cumulative
 view of retained events beginning at the earliest valid retained operation time,
 not provider-reported server latency, an in-flight timer, or a breakdown by
 model/provider/tool identity.
+
+Schema-30 stores expose immutable-ledger totals for the six closed roles
+`primary_execution`, `fallback`, `classifier`, `summarizer`,
+`orchestrator_audit`, and `optional_judge`, plus `routed`, `auxiliary`, and
+`overall`. Eight fixed gauge families report record count, known/unknown usage
+records, known input/output token sums, known/unknown cost records, and known
+normalized USD cost. Their only attribute is the closed `bucket` value above.
+No task, session, route, provider, model, evidence or pricing-source identity is
+exported. The known sums can be partial and the normalized cost can include both
+configured estimates and reconciled measurements; these retained-population
+gauges are not invoices or monotonic billing counters. Schema-29-and-older
+snapshots omit accounting rather than reporting legacy work as zero. See
+[durable usage and cost accounting](usage-accounting.md).
 
 Version 5 added a fixed `queue_age` population gauge to version 4's optional
 live host-resource observation and version 3's runtime activity.

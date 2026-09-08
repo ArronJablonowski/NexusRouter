@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 )
@@ -113,7 +114,7 @@ func TestFailedReviewLifecycleSurvivesCancellation(t *testing.T) {
 					cancel()
 					return
 				}
-				fmt.Fprintln(w, `{"message":{"content":"sensitive-invalid-review"},"done":true,"done_reason":"stop"}`)
+				fmt.Fprintln(w, `{"message":{"content":"sensitive-invalid-review"},"done":true,"done_reason":"stop","prompt_eval_count":23,"eval_count":11}`)
 			}))
 			defer server.Close()
 			svc.settings.Providers[0].Endpoint = server.URL
@@ -133,6 +134,13 @@ func TestFailedReviewLifecycleSurvivesCancellation(t *testing.T) {
 			if err != nil || len(attempts) != 1 || attempts[0].Status != "failed" || attempts[0].Code != code || attempts[0].FinishedAt.Before(attempts[0].StartedAt) || time.Since(attempts[0].FinishedAt) > time.Minute {
 				t.Fatalf("failure lifecycle: %+v %v", attempts, err)
 			}
+			if canceled {
+				if attempts[0].Usage != nil || attempts[0].Elapsed != 0 {
+					t.Fatal("canceled review retained unverified usage", attempts[0])
+				}
+			} else if attempts[0].Usage == nil || attempts[0].Usage.InputTokens != 23 || attempts[0].Usage.OutputTokens != 11 || attempts[0].Elapsed <= 0 {
+				t.Fatal("verified failed-review usage was lost", attempts[0])
+			}
 			encoded, _ := json.Marshal(attempts)
 			if strings.Contains(string(encoded), "sensitive-invalid-review") {
 				t.Fatal("review payload persisted in lifecycle")
@@ -140,6 +148,14 @@ func TestFailedReviewLifecycleSurvivesCancellation(t *testing.T) {
 			audits, err := db.Audits(ctx, source.TaskID, "", 100)
 			if err != nil || len(audits) != 0 {
 				t.Fatalf("failure created advisory evidence: %+v %v", audits, err)
+			}
+			totals, err := db.UsageTotals(ctx, accounting.Scope{TaskID: source.TaskID})
+			known := int64(1)
+			if canceled {
+				known = 0
+			}
+			if err != nil || totals.Judge.Records != 1 || totals.Judge.KnownUsageRecords != known || totals.Judge.UnknownUsageRecords != 1-known || totals.Judge.KnownInputTokens != known*23 || totals.Judge.KnownOutputTokens != known*11 {
+				t.Fatalf("failed-review accounting mismatch: %#v %v", totals, err)
 			}
 		})
 	}

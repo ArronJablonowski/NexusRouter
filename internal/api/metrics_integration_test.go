@@ -100,7 +100,9 @@ func TestMetricsSurviveServiceRestartWithoutExecution(t *testing.T) {
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
-	if err != nil || response.StatusCode != 200 || len(body) > 4096 {
+	// Schema-30 accounting adds a fixed, identifier-free totals projection to
+	// the otherwise bounded metrics snapshot.
+	if err != nil || response.StatusCode != 200 || len(body) > 16<<10 {
 		t.Fatal("metrics response", response.StatusCode, err)
 	}
 	for _, secret := range []string{"private-", token, success.TaskID, cfg.Telemetry.Database, provider.URL, "0123456789abcdef"} {

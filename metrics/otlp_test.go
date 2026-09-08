@@ -119,3 +119,47 @@ func TestMarshalOTLPLegacyAndClosedLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalOTLPAccountingUsesClosedIdentifierFreeBuckets(t *testing.T) {
+	s := NewSnapshot(30, time.Unix(100, 0).UTC())
+	body, err := MarshalOTLP(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(body, []byte("task_id")) || bytes.Contains(body, []byte("session_id")) {
+		t.Fatal("accounting identity leaked", string(body))
+	}
+	var request otlpRequest
+	if json.Unmarshal(body, &request) != nil {
+		t.Fatal(string(body))
+	}
+	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
+	wantNames := map[string]bool{
+		"darwinrouter.accounting.records":               true,
+		"darwinrouter.accounting.usage.known_records":   true,
+		"darwinrouter.accounting.usage.unknown_records": true,
+		"darwinrouter.accounting.input_tokens.known":    true,
+		"darwinrouter.accounting.output_tokens.known":   true,
+		"darwinrouter.accounting.cost.known_records":    true,
+		"darwinrouter.accounting.cost.unknown_records":  true,
+		"darwinrouter.accounting.normalized_cost.known": true,
+	}
+	wantBuckets := []string{"primary_execution", "fallback", "classifier", "summarizer", "orchestrator_audit", "optional_judge", "routed", "auxiliary", "overall"}
+	for _, item := range items {
+		if !wantNames[item.Name] {
+			continue
+		}
+		delete(wantNames, item.Name)
+		if item.Gauge == nil || len(item.Gauge.DataPoints) != len(wantBuckets) {
+			t.Fatal(item.Name, item.Gauge)
+		}
+		for i, point := range item.Gauge.DataPoints {
+			if len(point.Attributes) != 1 || point.Attributes[0].Key != "bucket" || point.Attributes[0].Value.StringValue != wantBuckets[i] {
+				t.Fatal(item.Name, point)
+			}
+		}
+	}
+	if len(wantNames) != 0 {
+		t.Fatal("missing accounting metrics", wantNames)
+	}
+}

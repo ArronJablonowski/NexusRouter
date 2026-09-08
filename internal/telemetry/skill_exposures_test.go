@@ -88,7 +88,7 @@ func TestSkillExposuresMigration26BackfillAndRollback(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; PRAGMA user_version=26`); err != nil {
+			if _, err = s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=26`); err != nil {
 				t.Fatal(err)
 			}
 			if corrupt {
@@ -125,7 +125,7 @@ func TestSkillExposuresMigration26BackfillAndRollback(t *testing.T) {
 				t.Fatal("migration rewrote journal", err)
 			}
 			var n, version int
-			if opened.db.QueryRow("SELECT count(*) FROM skill_exposures").Scan(&n) != nil || n != 1 || opened.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != 29 {
+			if opened.db.QueryRow("SELECT count(*) FROM skill_exposures").Scan(&n) != nil || n != 1 || opened.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != 30 {
 				t.Fatal(n, version)
 			}
 			if err = opened.initialize(ctx); err != nil {

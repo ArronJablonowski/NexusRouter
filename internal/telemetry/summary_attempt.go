@@ -134,6 +134,9 @@ func (s *Store) finishSummary(ctx context.Context, a sessions.SummaryAttempt) er
 	if n, err := result.RowsAffected(); err != nil || n != 1 {
 		return ErrConflict
 	}
+	if err := appendSummaryUsage(ctx, tx, a); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

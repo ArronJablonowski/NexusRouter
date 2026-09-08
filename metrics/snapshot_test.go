@@ -8,13 +8,13 @@ import (
 )
 
 func TestSnapshotSchemaAvailability(t *testing.T) {
-	for schema := 1; schema <= 29; schema++ {
+	for schema := 1; schema <= 30; schema++ {
 		s := NewSnapshot(schema, time.Now().UTC())
 		if err := s.Validate(); err != nil {
 			t.Fatal(schema, err)
 		}
 		body, err := json.Marshal(s)
-		if err != nil || len(body) > 4096 {
+		if err != nil || len(body) > 8192 {
 			t.Fatal("unexpected payload size", len(body), err)
 		}
 		var decoded Snapshot
@@ -32,7 +32,7 @@ func TestSnapshotSchemaAvailability(t *testing.T) {
 func TestSnapshotRejectsInvalidOrUnboundedLabels(t *testing.T) {
 	cases := map[string]func(*Snapshot){
 		"version":              func(s *Snapshot) { s.Version++ },
-		"future schema":        func(s *Snapshot) { s.StorageSchema = 30 },
+		"future schema":        func(s *Snapshot) { s.StorageSchema = 31 },
 		"missing schema":       func(s *Snapshot) { s.StorageSchema = 0 },
 		"missing time":         func(s *Snapshot) { s.ObservedAt = time.Time{} },
 		"unserializable time":  func(s *Snapshot) { s.ObservedAt = time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC) },
@@ -68,5 +68,32 @@ func TestNewSnapshotDoesNotShareMutableState(t *testing.T) {
 	b := NewSnapshot(13, time.Now())
 	if b.Validate() != nil || b.Groups[0].Counts[0].Value != 0 {
 		t.Fatal("shared mutable state")
+	}
+}
+
+func TestSnapshotAccountingAvailabilityAndValidation(t *testing.T) {
+	at := time.Unix(100, 0).UTC()
+	legacy := NewSnapshot(29, at)
+	if legacy.Accounting != nil || legacy.Validate() != nil {
+		t.Fatal("schema 29 must not fabricate accounting", legacy)
+	}
+	current := NewSnapshot(30, at)
+	if current.Accounting == nil || current.Accounting.Coverage != "complete" || current.Accounting.Validate() != nil || current.Validate() != nil {
+		t.Fatal("schema 30 accounting is not canonical", current)
+	}
+	for name, mutate := range map[string]func(*Snapshot){
+		"missing":        func(s *Snapshot) { s.Accounting = nil },
+		"scoped task":    func(s *Snapshot) { s.Accounting.Scope.TaskID = "task" },
+		"scoped session": func(s *Snapshot) { s.Accounting.Scope.SessionID = "session" },
+		"future time":    func(s *Snapshot) { s.Accounting.CalculatedAt = s.ObservedAt.Add(time.Nanosecond) },
+		"unreconciled":   func(s *Snapshot) { s.Accounting.Primary.Records = 1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := NewSnapshot(30, at)
+			mutate(&s)
+			if s.Validate() == nil {
+				t.Fatal("invalid accounting accepted")
+			}
+		})
 	}
 }

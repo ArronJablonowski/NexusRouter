@@ -139,18 +139,12 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 			break
 		}
 	}
-	secrets := []string{}
+	secrets := memorySecrets(s.settings, s.secret)
 	key := ""
 	if s.secret != nil {
-		if token := s.secret("DARWIN_API_TOKEN"); token != "" {
-			secrets = append(secrets, token)
-		}
 		for _, p := range s.settings.Providers {
 			if p.APIKeyEnv != "" {
 				value := s.secret(p.APIKeyEnv)
-				if value != "" {
-					secrets = append(secrets, value)
-				}
 				if p.ID == provider.ID {
 					key = value
 				}
@@ -160,8 +154,17 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 	if provider.APIKeyEnv != "" && key == "" {
 		return bad()
 	}
-	if value := metricsExportSecret(s.settings, s.secret); value != "" {
-		secrets = append(secrets, value)
+	// These values are copied into review, audit, or usage-accounting records.
+	// A credential collision is therefore an admission failure, not an
+	// identity that may be silently rewritten to a redaction marker. The task
+	// and session may already exist, but this operation must not create another
+	// durable reference to either while it is a current configured secret.
+	if !selectionValueClean([]string{
+		task, history.SessionID,
+		start.TurnID, start.AttemptID, end.TurnID, end.AttemptID,
+		reviewerID, model.ID, model.Model, model.Provider, provider.ID,
+	}, secrets) {
+		return bad()
 	}
 	executionEvidence, err := auditExecutionEvidence(executionEvents, secrets)
 	if err != nil {
@@ -191,7 +194,7 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 		Sequence  int64  `json:"sequence"`
 		TurnID    string `json:"turn_id"`
 		AttemptID string `json:"attempt_id"`
-	}{1, end.Sequence, redact(end.TurnID, secrets), redact(end.AttemptID, secrets)})
+	}{1, end.Sequence, end.TurnID, end.AttemptID})
 	if err != nil {
 		return bad()
 	}
@@ -201,12 +204,21 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 	if operation != nil {
 		reviewID, requestDigest, reviewerIdentity = operation.id, operation.requestDigest, reviewerID
 	}
-	attempt := evaluation.ReviewAttempt{Version: 1, ID: reviewID, TaskID: task, AttemptID: start.AttemptID, ReviewerID: reviewerIdentity, EvaluatorModel: model.Model, EvaluatorProvider: model.Provider, RequestDigest: requestDigest, Status: "started", StartedAt: time.Now().UTC()}
+	attempt := evaluation.ReviewAttempt{Version: 1, ID: reviewID, TaskID: task, AttemptID: start.AttemptID, ReviewerID: reviewerIdentity, EvaluatorModel: model.Model, EvaluatorProvider: model.Provider, RequestDigest: requestDigest, EstimatedCost: *model.EstimatedCost, Status: "started", StartedAt: time.Now().UTC()}
+	// ID is also the auxiliary route, operation, and failed-review evidence ID.
+	// Validate the complete durable admission object after generating it and
+	// before resource reservation, provider construction, or persistence.
+	if !selectionValueClean(attempt, secrets) {
+		return bad()
+	}
 	var write *telemetry.Store
 	finish := func(status, code, auditID string) error {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		attempt.Status, attempt.Code, attempt.AuditID = status, code, auditID
+		if code == "canceled" || status == "completed" {
+			attempt.Usage, attempt.Elapsed = nil, 0
+		}
 		attempt.FinishedAt = time.Now().UTC()
 		return write.FinishReview(cleanup, attempt)
 	}
@@ -292,16 +304,33 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 		code := "review_failed"
 		if ctx.Err() != nil {
 			code = "canceled"
+		} else if out.Usage != nil {
+			usage := *out.Usage
+			attempt.Usage, attempt.Elapsed = &usage, out.Elapsed
 		}
 		return evaluation.AuditRecord{}, errors.Join(err, finish("failed", code, ""))
 	}
+	// Re-resolve after provider execution so newly configured credentials are
+	// removed from content and cannot become durable audit/accounting identity.
+	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	for i := range out.Audit.Findings {
 		out.Audit.Findings[i].Summary = redact(out.Audit.Findings[i].Summary, secrets)
 	}
 	record := evaluation.AuditRecord{Version: 1, ID: rand.Text(), TaskID: task, AttemptID: start.AttemptID, EvaluatorModel: model.Model, EvaluatorProvider: model.Provider, Audit: out.Audit, EvidenceRefs: refs, Usage: out.Usage, Elapsed: out.Elapsed, Time: time.Now().UTC()}
+	if !selectionValueClean(record, secrets) {
+		if out.Usage != nil {
+			usage := *out.Usage
+			attempt.Usage, attempt.Elapsed = &usage, out.Elapsed
+		}
+		return evaluation.AuditRecord{}, errors.Join(ErrAdmission, finish("failed", "review_failed", ""))
+	}
 	attempt.Status, attempt.AuditID = "completed", record.ID
 	attempt.FinishedAt = time.Now().UTC()
 	if err = write.CompleteReview(ctx, attempt, record); err != nil {
+		if out.Usage != nil {
+			usage := *out.Usage
+			attempt.Usage, attempt.Elapsed = &usage, out.Elapsed
+		}
 		return evaluation.AuditRecord{}, errors.Join(err, finish("failed", "persistence_failed", ""))
 	}
 	return record, nil

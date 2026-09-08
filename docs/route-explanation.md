@@ -19,6 +19,16 @@ exploration selected a non-leading route. Candidate credential fields are only
 booleans used by routing; no credential value or environment-variable name is
 stored in this record.
 
+Inspection also attaches a point-in-time version-one `usage` total from the
+schema-30 immutable ledger for that exact task. The task's primary or fallback
+operation remains separate from classifier, summarizer, orchestrator-audit, and
+optional-judge operations, with routed/auxiliary/overall aggregates. Linked
+retry tasks are inspected separately rather than rolled into this report.
+Unknown usage or cost is
+explicit and known partial sums are not presented as complete totals. This
+attached view may change after a valid immutable correction; it is not part of
+the original route decision. See [durable usage and cost accounting](usage-accounting.md).
+
 The reader returns exactly the first two-event boundary and separately validates
 the task's current head without returning its content. It requires `task.started`
 followed immediately by `route.selected`, validates the event page, then

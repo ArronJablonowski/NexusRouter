@@ -64,7 +64,7 @@ func TestLeaseAttentionPageValidation(t *testing.T) {
 	valid := func() LeaseAttentionPage {
 		return LeaseAttentionPage{Version: 1, StorageSchema: 24, Available: true, Items: []LeaseAttention{attentionFixture()}}
 	}
-	for schema := 1; schema <= 29; schema++ {
+	for schema := 1; schema <= 30; schema++ {
 		p := valid()
 		p.StorageSchema = schema
 		p.Available = schema >= 24
@@ -80,7 +80,7 @@ func TestLeaseAttentionPageValidation(t *testing.T) {
 		t.Fatal("cursor rejected")
 	}
 	for name, mutate := range map[string]func(*LeaseAttentionPage){
-		"version": func(p *LeaseAttentionPage) { p.Version = 2 }, "future": func(p *LeaseAttentionPage) { p.StorageSchema = 30 }, "availability": func(p *LeaseAttentionPage) { p.Available = false },
+		"version": func(p *LeaseAttentionPage) { p.Version = 2 }, "future": func(p *LeaseAttentionPage) { p.StorageSchema = 31 }, "availability": func(p *LeaseAttentionPage) { p.Available = false },
 		"nil": func(p *LeaseAttentionPage) { p.Items = nil }, "legacy-items": func(p *LeaseAttentionPage) { p.StorageSchema = 23; p.Available = false },
 		"missing-cursor": func(p *LeaseAttentionPage) { p.HasMore = true }, "extra-cursor": func(p *LeaseAttentionPage) { p.NextCursor = p.Items[0].ID },
 		"wrong-cursor": func(p *LeaseAttentionPage) { p.HasMore = true; p.NextCursor = "different" }, "empty-more": func(p *LeaseAttentionPage) { p.Items = []LeaseAttention{}; p.HasMore = true; p.NextCursor = "a" },

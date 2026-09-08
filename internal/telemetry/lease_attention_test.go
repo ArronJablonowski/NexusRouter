@@ -225,7 +225,7 @@ func TestLeaseAttentionReadOnlyListAndCorruption(t *testing.T) {
 	}
 	defer ro.Close()
 	first, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "open", Limit: 2})
-	if err != nil || first.Version != 1 || first.StorageSchema != 29 || !first.Available || len(first.Items) != 2 || !first.HasMore {
+	if err != nil || first.Version != 1 || first.StorageSchema != 30 || !first.Available || len(first.Items) != 2 || !first.HasMore {
 		t.Fatal(first, err)
 	}
 	second, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "all", After: first.Items[1].ID, Limit: 2})
@@ -266,7 +266,7 @@ func TestLeaseAttentionReadOnlyListAndCorruption(t *testing.T) {
 func TestLeaseAttentionLegacyListDoesNotCreateSchema(t *testing.T) {
 	s, path := leaseStore(t)
 	ctx := context.Background()
-	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; PRAGMA user_version=23`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=23`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

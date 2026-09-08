@@ -121,7 +121,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	var attention workers.LeaseAttentionPage
 	decodeErr := json.NewDecoder(response.Body).Decode(&attention)
 	closeErr := response.Body.Close()
-	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 29 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
+	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 30 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
 		t.Fatal("real daemon attention inspection failed", response.StatusCode, decodeErr, closeErr)
 	}
 	// The production serve wiring must bind audit inspection to the application
@@ -141,6 +141,20 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	auditCloseErr := auditResponse.Body.Close()
 	if auditResponse.StatusCode != http.StatusNotFound || auditReadErr != nil || auditCloseErr != nil || !bytes.Contains(auditBody, []byte(`"error":"audit_unavailable"`)) || bytes.Contains(auditBody, []byte(token)) {
 		t.Fatal("production audit inspection route not wired safely", auditResponse.StatusCode, auditReadErr, auditCloseErr, string(auditBody))
+	}
+	usageRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/v1/tasks/missing-task/usage", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	usageRequest.Header.Set("Authorization", "Bearer "+token)
+	usageResponse, err := client.Do(usageRequest)
+	if err != nil {
+		t.Fatal("usage inspection request failed", err)
+	}
+	usageBody, usageReadErr := io.ReadAll(io.LimitReader(usageResponse.Body, 8193))
+	usageCloseErr := usageResponse.Body.Close()
+	if usageResponse.StatusCode != http.StatusNotFound || usageReadErr != nil || usageCloseErr != nil || !bytes.Contains(usageBody, []byte(`"error":"usage_unavailable"`)) || bytes.Contains(usageBody, []byte(token)) {
+		t.Fatal("production usage inspection route not wired safely", usageResponse.StatusCode, usageReadErr, usageCloseErr, string(usageBody))
 	}
 	databaseURL := url.URL{Scheme: "file", Path: filepath.Join(dir, "tasks.db"), RawQuery: "mode=ro"}
 	database, err := sql.Open("sqlite", databaseURL.String())
@@ -215,7 +229,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	}
 	res, body = readHistory()
 	var history workers.LeaseAttentionHistoryPage
-	if res.StatusCode != http.StatusOK || json.Unmarshal(body, &history) != nil || history.Version != 1 || history.StorageSchema != 29 || !history.Available || history.AttentionID != "daemon-history" || len(history.Items) != 1 || history.Items[0].Sequence != 1 || history.Items[0].Kind != "baseline" || history.Items[0].Observation != observation {
+	if res.StatusCode != http.StatusOK || json.Unmarshal(body, &history) != nil || history.Version != 1 || history.StorageSchema != 30 || !history.Available || history.AttentionID != "daemon-history" || len(history.Items) != 1 || history.Items[0].Sequence != 1 || history.Items[0].Kind != "baseline" || history.Items[0].Observation != observation {
 		t.Fatal("positive history route not wired", res.StatusCode, string(body))
 	}
 	for _, private := range []string{token, "private-history-token", "private-owner", "private-scope"} {

@@ -46,7 +46,7 @@ func routeExplanationStore(t *testing.T) (*Store, routing.Selection) {
 func TestRouteExplanationIsBoundedMetadata(t *testing.T) {
 	db, selected := routeExplanationStore(t)
 	out, err := db.RouteExplanation(context.Background(), "task")
-	if err != nil || out.Validate() != nil || out.Sequence != 2 || out.Selection.Primary != selected.Primary || out.Model != "model" || out.Provider != "provider" {
+	if err != nil || out.Validate() != nil || out.Sequence != 2 || out.Selection.Primary != selected.Primary || out.Model != "model" || out.Provider != "provider" || out.Usage == nil || out.Usage.Scope.TaskID != "task" || out.Usage.Scope.SessionID != "session" || out.Usage.Overall.Records != 0 {
 		t.Fatal(out, err)
 	}
 	if strings.Contains(strings.ToLower(strings.Join([]string{out.ConfigID, out.Domain, out.Profile, out.Model, out.Provider}, " ")), "prompt") {

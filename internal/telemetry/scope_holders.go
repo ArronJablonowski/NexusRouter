@@ -26,7 +26,7 @@ func (s *Store) ScopeLeaseStatus(ctx context.Context, scope string, now time.Tim
 	}
 	defer tx.Rollback()
 	var version int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version < 1 || version > 29 {
+	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version) != nil || version < 1 || version > 30 {
 		return zero, workers.ErrScopeLeaseStatus
 	}
 	out := workers.ScopeLeaseStatus{Version: 1, OverlapPolicyVersion: 1, Scope: scope, ObservedAt: now, StorageSchema: version, Available: version >= 3, Holders: []workers.ScopeLeaseHolder{}}

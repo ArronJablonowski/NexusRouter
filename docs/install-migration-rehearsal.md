@@ -22,18 +22,21 @@ contract-checked `darwin` member into a new versioned prefix. An actual candidat
 must already have passed signature verification. The test checks the exact
 version string, exclusive installation paths, private configuration and state
 permissions, configuration validation, authenticated daemon status/stop, exact
-owned-process exit, SQLite WAL mode, `quick_check`, and schema 29.
+owned-process exit, SQLite WAL mode, `quick_check`, and schema 30.
 
 It then records a synthetic local-only memory fact, converts that owned fixture
-to the real schema-28 boundary used by migration tests, and confirms its stored
-body before proceeding. With the writer stopped and the fixture proven to have
+to the real schema-29 boundary used by migration tests, and confirms its stored
+body and existing task-timing epoch before proceeding. With the writer stopped
+and the fixture proven to have
 no running task, queued/running submission or unreleased resource lease, the
 test checkpoints WAL and creates a mode-0600 backup using an exclusive file
 create. It records the backup SHA-256, migrates the source database from schema
-28 to 29 through normal daemon startup, and verifies the fact body, migration
-epoch and integrity. Finally, it copies the backup to a new rollback database,
-checks the digest and schema, reads the original fact without migration, and
-proves the upgraded database was not replaced.
+29 to 30 through normal daemon startup, and verifies the fact body, unchanged
+schema-29 task-timing epoch, new empty usage-ledger metadata, and integrity. The
+migration deliberately does not fabricate usage records for pre-ledger work.
+Finally, the test copies the backup to a new rollback database, checks the digest,
+schema, timing epoch, and original fact without migration, and proves the upgraded
+database was not replaced.
 
 Runtime subprocesses receive an explicit `DARWIN_PROCESS_OWNER_DIR`, home,
 temporary directory and API token rooted under `testing.T.TempDir`. The build
@@ -84,14 +87,14 @@ startup, inspection and shutdown smoke checks. Never run an old binary against
 the restored path until its digest and schema have been checked.
 
 There is no previous public DarwinRouter release at the time of this document.
-A binary built from development commit
-`596ee7f0d7738afb3df825fac1964cc5464f7dd5` is useful schema-28 development
-evidence, but it must be labelled as such and cannot substitute for a prior
-published release. Hosted CI should not fetch this ancestor implicitly.
+The automated schema-29 fixture proves the candidate migration code against an
+owned boundary; it is not a historical binary or publication-channel test and
+cannot substitute for a prior published release. Hosted CI must not fetch or
+execute an ancestor implicitly.
 
 ## Safety and rollback limits
 
-- Schema 29 is intentionally unsupported by the schema-28 binary. There is no
+- Schema 30 is intentionally unsupported by the schema-29 binary. There is no
   supported in-place downgrade. Rollback means selecting the older binary and a
   restored matching backup as one pair.
 - Restore to a new path. Do not overwrite, rename or edit the migrated database;

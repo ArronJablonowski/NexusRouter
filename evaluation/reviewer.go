@@ -133,12 +133,24 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 	if ctx.Err() != nil {
 		return ReviewResult{}, ctx.Err()
 	}
+	trustedUsage := done && err == nil && callbackErr == nil && usage != nil
+	failure := func(cause error) (ReviewResult, error) {
+		result := ReviewResult{}
+		// Usage is trustworthy only after the provider contract completed cleanly.
+		// A later host parser may reject the output without erasing that separate
+		// terminal measurement; stream/protocol failures remain unknown.
+		if trustedUsage {
+			copy := *usage
+			result.Usage, result.Elapsed = &copy, time.Since(start)
+		}
+		return result, cause
+	}
 	if err != nil || callbackErr != nil || !done {
-		return ReviewResult{}, errors.New("review failed or unsupported")
+		return failure(errors.New("review failed or unsupported"))
 	}
 	audit, err := ParseAudit([]byte(output.String()), trusted)
 	if err != nil {
-		return ReviewResult{}, ErrAudit
+		return failure(ErrAudit)
 	}
 	return ReviewResult{Audit: audit, Usage: usage, Elapsed: time.Since(start)}, nil
 }

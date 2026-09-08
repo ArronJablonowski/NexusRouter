@@ -163,13 +163,13 @@ func TestLeaseAttentionSweepBoundsAndQueryFailure(t *testing.T) {
 	if cursor != "" || n != 2 || err != nil {
 		t.Fatal(cursor, n, err)
 	}
-	if _, err := s.db.Exec(`PRAGMA user_version=24`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=24`); err != nil {
 		t.Fatal(err)
 	}
 	if next, n, err := s.SweepLeaseAttentionPage(ctx, "2", now, 1); next != "2" || n != 0 || err == nil {
 		t.Fatal("unsupported schema advanced", next, n, err)
 	}
-	if _, err := s.db.Exec(`PRAGMA user_version=26; ALTER TABLE resource_leases RENAME TO hidden_leases`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=26; ALTER TABLE resource_leases RENAME TO hidden_leases`); err != nil {
 		t.Fatal(err)
 	}
 	if next, n, err := s.SweepLeaseAttentionPage(ctx, "2", now, 1); next != "2" || n != 0 || err == nil {

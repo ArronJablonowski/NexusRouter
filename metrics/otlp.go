@@ -3,6 +3,8 @@ package metrics
 import (
 	"encoding/json"
 	"strconv"
+
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 )
 
 // MarshalOTLP encodes an OTLP/HTTP JSON ExportMetricsServiceRequest, without
@@ -42,6 +44,9 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 	if snapshot.Resources != nil {
 		items = append(items, otlpResources(snapshot.Resources, at)...)
 	}
+	if snapshot.Accounting != nil {
+		items = append(items, otlpAccounting(snapshot.Accounting, at)...)
+	}
 	request := otlpRequest{ResourceMetrics: []otlpResourceMetrics{{
 		Resource:     otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}},
 		ScopeMetrics: []otlpScopeMetrics{{Scope: otlpScope{Name: "darwinrouter.metrics", Version: "1"}, Metrics: items}},
@@ -51,6 +56,40 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 	return body, nil
+}
+
+func otlpAccounting(totals *accounting.Totals, at string) []otlpMetric {
+	types := []struct {
+		name  string
+		total accounting.Total
+	}{
+		{"primary_execution", totals.Primary}, {"fallback", totals.Fallback},
+		{"classifier", totals.Classifier}, {"summarizer", totals.Summarizer},
+		{"orchestrator_audit", totals.OrchestratorAudit}, {"optional_judge", totals.Judge},
+		{"routed", totals.Routed}, {"auxiliary", totals.Auxiliary}, {"overall", totals.Overall},
+	}
+	integer := func(name, unit string, value func(accounting.Total) int64) otlpMetric {
+		points := make([]otlpPoint, 0, len(types))
+		for _, item := range types {
+			points = append(points, otlpPoint{Attributes: []otlpAttribute{{Key: "bucket", Value: otlpValue{StringValue: item.name}}}, TimeUnixNano: at, AsInt: strconv.FormatInt(value(item.total), 10)})
+		}
+		return otlpMetric{Name: "darwinrouter.accounting." + name, Unit: unit, Gauge: &otlpGauge{DataPoints: points}}
+	}
+	items := []otlpMetric{
+		integer("records", "{record}", func(t accounting.Total) int64 { return t.Records }),
+		integer("usage.known_records", "{record}", func(t accounting.Total) int64 { return t.KnownUsageRecords }),
+		integer("usage.unknown_records", "{record}", func(t accounting.Total) int64 { return t.UnknownUsageRecords }),
+		integer("input_tokens.known", "{token}", func(t accounting.Total) int64 { return t.KnownInputTokens }),
+		integer("output_tokens.known", "{token}", func(t accounting.Total) int64 { return t.KnownOutputTokens }),
+		integer("cost.known_records", "{record}", func(t accounting.Total) int64 { return t.KnownCostRecords }),
+		integer("cost.unknown_records", "{record}", func(t accounting.Total) int64 { return t.UnknownCostRecords }),
+	}
+	costs := make([]otlpPoint, 0, len(types))
+	for _, item := range types {
+		value := item.total.KnownNormalizedCost
+		costs = append(costs, otlpPoint{Attributes: []otlpAttribute{{Key: "bucket", Value: otlpValue{StringValue: item.name}}}, TimeUnixNano: at, AsDouble: &value})
+	}
+	return append(items, otlpMetric{Name: "darwinrouter.accounting.normalized_cost.known", Unit: "USD", Gauge: &otlpGauge{DataPoints: costs}})
 }
 
 func otlpResources(resources *Resources, at string) []otlpMetric {
@@ -105,7 +144,8 @@ type otlpGauge struct {
 type otlpPoint struct {
 	Attributes   []otlpAttribute `json:"attributes"`
 	TimeUnixNano string          `json:"timeUnixNano"`
-	AsInt        string          `json:"asInt"`
+	AsInt        string          `json:"asInt,omitempty"`
+	AsDouble     *float64        `json:"asDouble,omitempty"`
 }
 type otlpAttribute struct {
 	Key   string    `json:"key"`

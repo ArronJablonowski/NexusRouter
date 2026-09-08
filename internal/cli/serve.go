@@ -186,6 +186,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		Events:                db.ReadEventPage,
 		Run:                   service.Run,
 		Inspect:               db.TaskSnapshot,
+		TaskUsage:             service.InspectTaskUsage,
 		TaskContinuation:      db.TaskContinuation,
 		RouteExplanation:      db.RouteExplanation,
 		Tasks:                 service.ListTasks,

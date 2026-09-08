@@ -6,11 +6,13 @@ import (
 	"errors"
 	"math"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 )
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 7
+const SnapshotVersion = 8
 
 type Count struct {
 	State string `json:"state"`
@@ -31,6 +33,9 @@ type Snapshot struct {
 	TaskDuration      *TaskDuration      `json:"task_duration,omitempty"`
 	OperationDuration *OperationDuration `json:"operation_duration,omitempty"`
 	Resources         *Resources         `json:"resources,omitempty"`
+	// Accounting contains identifier-free global retained-population totals.
+	// It is unavailable on databases predating the immutable usage ledger.
+	Accounting *accounting.Totals `json:"accounting,omitempty"`
 }
 
 type definition struct {
@@ -73,6 +78,9 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 	if schema >= 28 {
 		s.OperationDuration = newOperationDuration(at)
 	}
+	if schema >= 30 {
+		s.Accounting = &accounting.Totals{Version: 1, Coverage: accounting.CompleteCoverage, CalculatedAt: at.UTC()}
+	}
 	return s
 }
 
@@ -80,7 +88,7 @@ func NewSnapshot(schema int, at time.Time) Snapshot {
 // leak model names, task IDs, secret-bearing errors or arbitrary label values.
 // Canonical order also makes snapshots deterministic apart from observation time.
 func (s Snapshot) Validate() error {
-	if s.Version != SnapshotVersion || s.StorageSchema < 1 || s.StorageSchema > 29 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
+	if s.Version != SnapshotVersion || s.StorageSchema < 1 || s.StorageSchema > 30 || s.ObservedAt.IsZero() || s.ObservedAt.Year() < 1 || s.ObservedAt.Year() > 9999 || len(s.Groups) != len(definitions) {
 		return ErrInvalid
 	}
 	if _, err := s.ObservedAt.MarshalJSON(); err != nil {
@@ -142,6 +150,13 @@ func (s Snapshot) Validate() error {
 		return ErrInvalid
 	}
 	if s.Resources != nil && s.validateResources() != nil {
+		return ErrInvalid
+	}
+	if s.StorageSchema < 30 {
+		if s.Accounting != nil {
+			return ErrInvalid
+		}
+	} else if s.Accounting == nil || s.Accounting.Validate() != nil || s.Accounting.Scope.TaskID != "" || s.Accounting.Scope.SessionID != "" || s.Accounting.CalculatedAt.After(s.ObservedAt) {
 		return ErrInvalid
 	}
 	return nil

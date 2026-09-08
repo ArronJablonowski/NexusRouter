@@ -4595,3 +4595,47 @@ then passed all 14 named scenarios, and the complete `make check` formatting,
 packages included application (250.259s), releasepack (283.073s), telemetry
 (162.415s), and SDK (31.049s). A live external HTTP or paid-cloud reviewer
 remains unverified at this checkpoint.
+
+DAR-68 documentation and migration-rehearsal checkpoint (implementation tree,
+pending repository-wide gates): schema 30 is now documented as an immutable,
+evidence-bound usage/cost ledger with the exact primary, fallback, classifier,
+summarizer, orchestrator-audit and optional-judge roles. The inspection contract
+keeps routed and auxiliary totals separate, preserves unknown usage/cost, labels
+configured prices as estimates rather than invoices, and describes append-only
+correction history, schema-29 legacy coverage, privacy boundaries, route/API/SDK/
+metrics surfaces, and the currently inactive classifier lifecycle. Release and
+task-duration guidance now preserves the historical fact that timing began in
+schema 29 while identifying schema 30 as current. The native release rehearsal
+now exercises the real 29→30 boundary: it verifies the stopped-writer schema-29
+backup, unchanged task-timing epoch, preserved synthetic fact, empty new ledger,
+and separate schema-29 rollback copy without replacing the upgraded store.
+`go run ./cmd/check` passed formatting and the 1,000-line limit. The focused
+release rehearsal/workflow tests passed normally in 7.030s and with the race
+detector in 14.948s. The shared DAR-68 implementation is still uncommitted and
+the repository-wide vet/race/build gates have not yet been run on the integrated
+tree, so no GitHub backup or Linear completion is claimed by this checkpoint.
+
+DAR-68 qualified implementation checkpoint: routed and auxiliary provider usage
+and configured cost estimates now have separate immutable schema-30 accounting
+roles, evidence links, correction history, SDK/API inspection, route-explanation
+views, identifier-free metrics, and explicit known/unknown coverage. Primary and
+fallback attribution is derived from durable runtime events; fallback lineage is
+bounded to 32 attempts and every predecessor must be an exact failed
+`provider_retryable_no_output` first-turn lifecycle with no output, steering,
+tool proposal, or effect. Auxiliary review and summary failures retain usage only
+after an error-free normal provider terminal followed by host-side validation
+failure; cancellation, stream/provider errors, abnormal finishes, and incomplete
+calls remain unknown. Current-secret collisions in provider, model, pricing, or
+operation identities fail before provider construction or new persistence.
+Exact replay now revalidates the complete head/history and source evidence, and
+global totals use two bounded set scans rather than per-record queries; a
+1,024-record/512-correction deadline fixture proves constant query count. The
+schema-29 backup, 29→30 migration, timing-epoch preservation, empty-ledger
+non-fabrication, and rollback-copy rehearsal passed. `make qualify-mvp` passed
+all 14 named scenarios, including Sol-coordinator delegation, safe fallback,
+audit evidence precedence, feedback idempotency, privacy, and restart recovery.
+The final `make check` passed formatting, the 1,000-line limit, vet, the complete
+race-enabled repository suite, and build; its longest packages included
+application (272.684s), releasepack (284.860s), telemetry (174.991s), SDK
+(29.614s), and toolgate (21.019s). The checkpoint remains uncommitted until the
+final diff/security inventory and GitHub synchronization complete.

@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
 	"github.com/ArronJablonowski/DarwinRouter/daemon"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
@@ -86,6 +87,7 @@ type Services struct {
 	InspectAudit           func(context.Context, string, string) (evaluation.AuditStatus, error)
 	CancelAudit            func(context.Context, string, string) (evaluation.AuditStatus, error)
 	AuditEvents            func(context.Context, string, string, int64) (evaluation.AuditEventPage, error)
+	TaskUsage              func(context.Context, string) (accounting.Totals, error)
 	Run                    func(context.Context, app.Request) (app.Result, error)
 	Inspect                func(context.Context, string) (sessions.Snapshot, error)
 	Health                 func(context.Context) error
@@ -190,6 +192,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveApprovals(w, r.WithContext(ctx))
 	case auditRoute(r.URL.Path):
 		h.serveAudits(w, r.WithContext(ctx))
+	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/usage"):
+		h.serveTaskUsage(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.Contains(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/steering"):
 		h.serveSteering(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/metrics" && r.Method == http.MethodGet:

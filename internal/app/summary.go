@@ -59,6 +59,12 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	if provider.APIKeyEnv != "" && key == "" {
 		return bad()
 	}
+	// Summary and usage-accounting records copy these identities verbatim.
+	// Existing source correlation does not authorize creating a new durable row
+	// when one of those values is now a configured secret.
+	if !selectionValueClean([]string{task, history.SessionID, modelID, model.ID, model.Model, model.Provider, provider.ID}, secrets) {
+		return bad()
+	}
 	selection, err := selectContextCompaction(ctx, s.contextEngine, history, sessions.CompactionRequest{Keep: keep, Summary: sessions.Summary{Decisions: []string{"pending draft"}}}, secrets)
 	if err != nil {
 		return bad()
@@ -78,6 +84,12 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		input.Messages, err = redactSummaryMessages(history.Messages, secrets)
 	}
 	if err != nil {
+		return bad()
+	}
+	attempt := sessions.SummaryAttempt{Version: 1, ID: rand.Text(), TaskID: task, SourceSequence: history.Sequence, SourceDigest: provenance.SourceDigest, Model: model.Model, Provider: model.Provider, Status: "started", Keep: keep, EstimatedCost: *model.EstimatedCost, StartedAt: time.Now().UTC()}
+	// ID is reused as the auxiliary operation, route, and evidence identity.
+	// Check the entire durable object before provider construction or dispatch.
+	if !selectionValueClean(attempt, secrets) {
 		return bad()
 	}
 	if local {
@@ -112,18 +124,20 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		return bad()
 	}
 	defer write.Close()
-	attempt := sessions.SummaryAttempt{Version: 1, ID: rand.Text(), TaskID: task, SourceSequence: history.Sequence, SourceDigest: provenance.SourceDigest, Model: model.Model, Provider: model.Provider, Status: "started", Keep: keep, EstimatedCost: *model.EstimatedCost, StartedAt: time.Now().UTC()}
 	if err := write.BeginSummary(ctx, attempt); err != nil {
 		return bad()
 	}
 	fail := func(code string, cause error) (sessions.SummaryAttempt, error) {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
+		if code == "canceled" {
+			attempt.Usage, attempt.Elapsed = nil, 0
+		}
 		attempt.Status, attempt.Code, attempt.Draft = "failed", code, nil
 		attempt.FinishedAt = time.Now().UTC()
 		if err := write.FinishSummary(cleanup, attempt); err != nil {
 			// Do not report a durable terminal state when its write is uncertain.
-			attempt.Status, attempt.Code, attempt.FinishedAt = "started", "", time.Time{}
+			attempt.Status, attempt.Code, attempt.Usage, attempt.Elapsed, attempt.FinishedAt = "started", "", nil, 0, time.Time{}
 			return attempt, errors.Join(cause, errors.New("cannot persist summary terminal state"))
 		}
 		return attempt, cause
@@ -134,11 +148,18 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		code := "summary_failed"
 		if ctx.Err() != nil {
 			code = "canceled"
+		} else if draft.Usage != nil {
+			usage := *draft.Usage
+			attempt.Usage, attempt.Elapsed = &usage, draft.Elapsed
 		}
 		return fail(code, errors.New("summary draft failed"))
 	}
+	if draft.Usage != nil {
+		usage := *draft.Usage
+		attempt.Usage, attempt.Elapsed = &usage, draft.Elapsed
+	}
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
-	if provider.Kind == "codex_app_server" && !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable, attempt.ID, attempt.SourceDigest}, secrets) {
+	if !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, model.Provider, provider.ID, provider.Executable, attempt.ID, attempt.SourceDigest}, secrets) {
 		// Keep the immutable started identity for lifecycle reconciliation, but
 		// do not publish a draft with newly classified credential metadata.
 		return fail("summary_failed", errors.New("summary metadata unavailable"))
@@ -153,7 +174,19 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	draft.Checkpoint = checkpoint
 	draft.SourceTaskID, draft.SourceSequence, draft.SourceDigest = task, history.Sequence, checkpoint.SourceDigest
 	attempt.Status, attempt.Draft, attempt.FinishedAt = "drafted", &draft, time.Now().UTC()
+	attempt.Usage, attempt.Elapsed = nil, 0
+	if !selectionValueClean(attempt, secrets) {
+		if draft.Usage != nil {
+			usage := *draft.Usage
+			attempt.Usage, attempt.Elapsed = &usage, draft.Elapsed
+		}
+		return fail("summary_failed", errors.New("summary metadata unavailable"))
+	}
 	if err := write.CompleteSummary(ctx, attempt); err != nil {
+		if draft.Usage != nil {
+			usage := *draft.Usage
+			attempt.Usage, attempt.Elapsed = &usage, draft.Elapsed
+		}
 		return fail("persistence_failed", errors.New("cannot persist summary draft"))
 	}
 	return attempt, nil

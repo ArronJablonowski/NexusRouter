@@ -137,7 +137,7 @@ models:
 		t.Fatal(err)
 	}
 	route, err := client.InspectRouteExplanation(ctx, automatic.TaskID)
-	if err != nil || route.Validate() != nil || route.TaskID != automatic.TaskID || route.Model != "fixture" || route.Provider != "local" {
+	if err != nil || route.Validate() != nil || route.TaskID != automatic.TaskID || route.Model != "fixture" || route.Provider != "local" || route.Usage == nil || route.Usage.Scope.TaskID != automatic.TaskID {
 		t.Fatal(route, err)
 	}
 	routeBody, err := json.Marshal(route)
@@ -146,8 +146,9 @@ models:
 	}
 	route.Candidates[0].Model = "mutated"
 	route.Selection.Ranked[0].Model = "mutated"
+	route.Usage.Scope.TaskID = "mutated"
 	freshRoute, err := client.InspectRouteExplanation(ctx, automatic.TaskID)
-	if err != nil || freshRoute.Model != "fixture" || freshRoute.Candidates[0].Model != "fixture" || freshRoute.Selection.Ranked[0].Model != "fixture" {
+	if err != nil || freshRoute.Model != "fixture" || freshRoute.Candidates[0].Model != "fixture" || freshRoute.Selection.Ranked[0].Model != "fixture" || freshRoute.Usage == nil || freshRoute.Usage.Scope.TaskID != automatic.TaskID {
 		t.Fatal("returned route record aliased durable state", freshRoute, err)
 	}
 	snapshot.Messages[0].Content = "mutated prompt"
