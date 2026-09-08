@@ -154,3 +154,78 @@ releases are enabled, that a tag/release name is unused, or that remote bytes
 match. DAR-56 still requires a separately authorized create-only draft, upload,
 readback, and publish ceremony. DAR-57 must independently re-download and verify
 the immutable release and its exact tag and assets afterward.
+
+## Authorized one-shot publication
+
+Only after every preceding gate is approved, run `publish-release` with the same
+inputs used by the offline preflight. It re-runs that preflight twice and derives
+the repository, tag, commit, notes, and exact seven uploaded files exclusively
+from the authorization. GitHub API origins are fixed in the binary; redirects,
+custom endpoints, replacement, and retry after uncertain mutation are rejected.
+
+The credential must arrive through a pipe, socket, or private regular file on an
+already-open file descriptor, never a command argument or interactive terminal.
+Standard input is descriptor `0`; a different descriptor can be named with
+`--credential-fd`. A regular credential file is accepted only when its mode has
+no group or other permissions. The source is single-use and is not read until the
+closing offline preflight succeeds. For example, append the following flags to
+the complete preflight arguments shown above:
+
+```sh
+YOUR_TRUSTED_SECRET_COMMAND | \
+  go run ./cmd/publish-release \
+    --dir /ABSOLUTE/SIGNED_RELEASE_DIRECTORY \
+    --source /ABSOLUTE/CLEAN/TRUSTED/DarwinRouter \
+    --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+    --candidate-record-sha256 sha256:EXPECTED_CANDIDATE \
+    --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+    --license-evidence-sha256 sha256:EXPECTED_LICENSE_EVIDENCE \
+    --expected-sums-sha256 sha256:EXPECTED_SHA256SUMS \
+    --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
+    --trust-record-sha256 sha256:EXPECTED_TRUST_RECORD \
+    --key-id EXPECTED_RELEASE_KEY_ID \
+    --key-fingerprint sha256:EXPECTED_PUBLIC_KEY \
+    --signing-authorization /ABSOLUTE/INDEPENDENT/SIGNING_AUTHORIZATION.json \
+    --signing-authorization-sha256 sha256:EXPECTED_SIGNING_AUTHORIZATION \
+    --publication-authorization /ABSOLUTE/INDEPENDENT/PUBLICATION_AUTHORIZATION.json \
+    --publication-authorization-sha256 sha256:EXPECTED_PUBLICATION_AUTHORIZATION \
+    --repository ArronJablonowski/DarwinRouter \
+    --release-notes /ABSOLUTE/APPROVED/RELEASE_NOTES.md \
+    --journal /ABSOLUTE/PRIVATE/NEW-publication-operation.jsonl \
+    --credential-fd 0
+```
+
+The token requires repository Contents write and Administration read access.
+Success emits public publication evidence. A failure after mutation may also emit
+public uncertain-state evidence and always leaves the durable journal for manual,
+read-only reconciliation. Never retry merely because the command returned an
+error; first reconcile the exact authorization, repository, and tag.
+
+## Independent post-publication verification
+
+After publication, a different operator should run
+`verify-published-release` with every evidence flag from the offline-preflight
+example above, plus two new paths:
+
+```sh
+go run ./cmd/verify-published-release \
+  [ALL OFFLINE-PREFLIGHT FLAGS FROM THE EXACT APPROVED RELEASE] \
+  --download-dir /ABSOLUTE/EXISTING/PARENT/NEW-verified-downloads \
+  --out /ABSOLUTE/EXISTING/PARENT/NEW-post-publication-receipt.json
+```
+
+The command uses a fixed `https://api.github.com` origin and a proxy-free,
+credential-free transport. It requires an immutable non-draft release and an
+annotated tag that peels to the authorized commit, downloads the exact seven
+assets into a new directory, compares both GitHub's and local digests, and runs
+the approval-bound release verifier again against those downloaded bytes. It
+then writes one canonical receipt with create-only semantics and prints that
+receipt's `sha256:` digest. The receipt path must be outside the source,
+approved signed-release, and download directories.
+
+Missing or mismatched remote state creates no receipt. A late local persistence
+failure can leave a receipt file whose durability is uncertain; inspect it and
+verify its canonical bytes before deciding whether any retry is safe. This
+read-only observation is required evidence for DAR-57/DAR-60 but is not itself
+publication approval, rollback authorization, or proof that future remote bytes
+will remain unchanged.
