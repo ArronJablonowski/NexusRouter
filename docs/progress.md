@@ -1,5 +1,32 @@
 # Implementation evidence
 
+DAR-66 deterministic audit qualification: the repeatable MVP gate now executes
+the production task, auxiliary-review and SQLite paths instead of accepting a
+coordinator string that merely claims review. A loopback candidate omits a
+required creative deliverable; an independent orchestrator audit rejects it
+with citable candidate-execution evidence and a durable completed review
+lifecycle. A later same-model accept does not create positive routing evidence,
+explicit user feedback supersedes the subjective advisory contribution, and
+local-only history is denied before a cloud-designated reviewer request. The
+focused race test and the complete ten-scenario `make qualify-mvp` gate passed.
+These deterministic fixtures qualify policy/data flow, not live model review
+quality, and DAR-67 through DAR-69 remain open.
+
+Clean pushed checkpoint `867d28d8ed9c5080738a47d3c69a30687b520ae0`
+was frozen as external RC10 candidate and license evidence. The canonical
+candidate-record digest is
+`sha256:3a80978b95a10982be7c7526426f18167e93addb26d1af72b5e79b3ac82fa71e`;
+the schema-2 license-evidence digest is
+`sha256:b9790b026bcfafa6a6cdf4a930982f46f3f23c2a81c76a923abe6cfab5394cf0`.
+Both independently reverified against the exact clean source. Local
+darwin/arm64 `make qualify-release` passed for `1.0.0-rc.10` in 135.195 seconds:
+all nine deterministic MVP scenarios, eight matching four-target builds,
+format/collateral checks, disposable signing and verification, tamper rejection,
+and the native install/schema-28-to-29 migration/backup/rollback rehearsal.
+This is local and cross-build evidence only. It grants no candidate, legal or
+platform approval and used no hosted dispatch, production key/signature, tag,
+upload or publication.
+
 PRD and DAR-47/50/51/57/60/64 implementation checkpoint: trusted Go hosts can
 now validate a durable session-summary draft with a named deterministic
 validator before continuation. Version-two append-only review evidence binds
