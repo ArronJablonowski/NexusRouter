@@ -4637,8 +4637,8 @@ audit evidence precedence, feedback idempotency, privacy, and restart recovery.
 The final `make check` passed formatting, the 1,000-line limit, vet, the complete
 race-enabled repository suite, and build; its longest packages included
 application (272.684s), releasepack (284.860s), telemetry (174.991s), SDK
-(29.614s), and toolgate (21.019s). The checkpoint remains uncommitted until the
-final diff/security inventory and GitHub synchronization complete.
+(29.614s), and toolgate (21.019s). The qualified DAR-68 checkpoint was committed
+and synchronized to GitHub as `182a2343873846c551bad6b691bb3b75665bdd14`.
 
 DAR-69 qualified implementation checkpoint: automatic routing now derives
 fitness and orchestrator-audit evidence from immutable observations and applies
@@ -4670,5 +4670,5 @@ gate. `make qualify-mvp` passed all 14 named scenarios. The complete `make check
 gate passed formatting, the 1,000-line limit, vet, repository-wide race tests,
 and build. Longest packages included application (297.423s), releasepack
 (297.609s), telemetry (204.338s), SDK (35.598s), toolgate (25.581s), and skills
-(26.085s). The checkpoint remains uncommitted until the final diff/security
-inventory and GitHub synchronization complete.
+(26.085s). The qualified DAR-69 implementation checkpoint was committed and
+synchronized to GitHub as `4aa0610dbe90db06064ae29d99efa56e0d8ccc80`.
