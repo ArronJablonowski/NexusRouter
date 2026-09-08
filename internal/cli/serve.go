@@ -157,6 +157,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		},
 		Metrics:              service.Metrics,
 		Submit:               service.Submit,
+		RunSubmission:        service.RunSubmission,
 		Submissions:          service.ListSubmissions,
 		SubmissionRecoveries: service.SubmissionRecoveries,
 		Submission:           service.SubmissionStatus,

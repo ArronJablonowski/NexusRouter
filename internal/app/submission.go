@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -78,6 +79,35 @@ func (s *Service) Submit(ctx context.Context, key string, r Request) (submission
 	defer db.Close()
 	status, err := db.CreateSubmission(ctx, submissionDigest([]byte(key)), submissionDigest(body), s.submissionConfigDigest(), body)
 	return status, submissionError(err)
+}
+
+// RunSubmission durably admits one idempotent request and waits for its
+// detached execution to become terminal. Canceling the caller stops only the
+// wait: the submission remains owned by the daemon dispatcher and can be
+// inspected or awaited again with the same key and request.
+func (s *Service) RunSubmission(ctx context.Context, key string, r Request) (submissions.Status, error) {
+	status, err := s.Submit(ctx, key, r)
+	if err != nil || status.State != "queued" && status.State != "running" {
+		return status, err
+	}
+	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return status, submissionError(err)
+	}
+	defer db.Close()
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return status, ctx.Err()
+		case <-ticker.C:
+		}
+		status, err = db.Submission(ctx, status.ID)
+		if err != nil || status.State != "queued" && status.State != "running" {
+			return status, submissionError(err)
+		}
+	}
 }
 
 func (s *Service) SubmissionStatus(ctx context.Context, id string) (submissions.Status, error) {

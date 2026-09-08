@@ -90,15 +90,17 @@ func TestHTTPCompactedContinuationPersistsBeforeProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, err := New(token, 1, Services{
-		Run:     svc.Run,
-		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
-		Health:  func(context.Context) error { return nil },
+		Run:           svc.Run,
+		RunSubmission: fixedIdempotent(svc.Run),
+		Inspect:       func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
+		Health:        func(context.Context) error { return nil },
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(h)
 	defer server.Close()
+	requestNumber := 0
 	call := func(method, path, body string, status int, output any) {
 		t.Helper()
 		r, err := http.NewRequest(method, server.URL+path, strings.NewReader(body))
@@ -107,6 +109,10 @@ func TestHTTPCompactedContinuationPersistsBeforeProvider(t *testing.T) {
 		}
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Content-Type", "application/json")
+		if method == http.MethodPost && path == "/v1/tasks" {
+			requestNumber++
+			r.Header.Set("Idempotency-Key", fmt.Sprintf("compaction-task-%016d", requestNumber))
+		}
 		response, err := server.Client().Do(r)
 		if err != nil {
 			t.Fatal(err)

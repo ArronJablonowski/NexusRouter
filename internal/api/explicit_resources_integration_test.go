@@ -64,7 +64,7 @@ func TestHTTPExplicitLocalTasksShareAutomaticResourceCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := New(token, 2, Services{Run: svc.Run,
+	h, err := New(token, 2, Services{Run: svc.Run, RunSubmission: fixedIdempotent(svc.Run),
 		Inspect: func(context.Context, string) (sessions.Snapshot, error) { return sessions.Snapshot{}, nil },
 		Health:  func(context.Context) error { return nil },
 	})
@@ -86,6 +86,7 @@ func TestHTTPExplicitLocalTasksShareAutomaticResourceCapacity(t *testing.T) {
 		}
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Idempotency-Key", "resource-task-"+model+"-00000000")
 		res, err := server.Client().Do(r)
 		if err != nil {
 			return response{err: err}

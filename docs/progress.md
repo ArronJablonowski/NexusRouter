@@ -4763,3 +4763,27 @@ and build. Longest packages included application (297.423s), releasepack
 (297.609s), telemetry (204.338s), SDK (35.598s), toolgate (25.581s), and skills
 (26.085s). The qualified DAR-69 implementation checkpoint was committed and
 synchronized to GitHub as `4aa0610dbe90db06064ae29d99efa56e0d8ccc80`.
+
+DAR-71 qualified implementation checkpoint: synchronous `POST /v1/tasks` now
+requires one strict idempotency key and admits the canonical request and current
+configuration into the durable submission journal before any execution. The
+daemon's detached dispatcher owns admitted work, so caller cancellation stops
+only the HTTP wait; exact concurrent retries converge on the same submission
+and task without redispatch, while changed requests or configuration conflict.
+Terminal responses expose the submission identity. There is no direct `Run`
+fallback, corrupt or nonterminal durable states fail closed, and dispatcher-side
+admission failures retain their 422 classification without exposing private
+errors. A connected caller that reaches the bounded server wait deadline now
+receives an explicit HTTP 202 with the durable identity instead of an implicit
+empty success, and invalid continuation references retain admission semantics.
+A production-composed HTTP test proved disconnect survival, two
+concurrent retries, one provider call, changed-body conflict, and post-admission
+denial. Focused API and application race suites passed three times; the wider
+application, API, and CLI race suites passed with the application package taking
+279.959 seconds. The final `make qualify-mvp` passed all 14 named scenarios in
+11.862 seconds, and the full
+`make check` formatting, 1,000-line, vet, repository-wide race, and build gate
+passed; its longest packages included application (294.693s), releasepack
+(307.207s), telemetry (198.272s), CLI (43.909s), and SDK (28.463s). DAR-72 is
+the separate Todo sprint for durable, reconnect-safe `POST /v1/tasks/stream`;
+the streaming endpoint is not claimed complete by this checkpoint.

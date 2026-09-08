@@ -21,6 +21,7 @@ func TestNativeValidationRequest(t *testing.T) {
 			}
 			return app.Result{TaskID: "task"}, nil
 		}
+		s.RunSubmission = fixedIdempotent(s.Run)
 		h, _ := New(token, 1, s)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("POST", "/v1/tasks", `{"model_id":"auto","prompt":"hello"`+tc.field+`}`))

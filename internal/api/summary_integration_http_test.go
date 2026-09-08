@@ -66,7 +66,7 @@ func TestHTTPSummaryGenerateReviewAndContinuation(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, err := New(token, 1, Services{
-		Run: svc.Run, Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) }, Health: func(context.Context) error { return nil },
+		Run: svc.Run, RunSubmission: fixedIdempotent(svc.Run), Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) }, Health: func(context.Context) error { return nil },
 		Summarize: svc.SummarizeTask, SummaryAttempt: db.SummaryAttempt, SummaryAttempts: db.ListSummaryAttempts, ReviewSummary: svc.ReviewSummary, SummaryReviews: db.SummaryReviews,
 	})
 	if err != nil {
@@ -74,6 +74,7 @@ func TestHTTPSummaryGenerateReviewAndContinuation(t *testing.T) {
 	}
 	server := httptest.NewServer(h)
 	defer server.Close()
+	requestNumber := 0
 	call := func(method, path string, payload any, status int, out any) {
 		t.Helper()
 		var body io.Reader
@@ -90,6 +91,10 @@ func TestHTTPSummaryGenerateReviewAndContinuation(t *testing.T) {
 		}
 		r.Header.Set("Authorization", "Bearer "+token)
 		r.Header.Set("Content-Type", "application/json")
+		if method == http.MethodPost && path == "/v1/tasks" {
+			requestNumber++
+			r.Header.Set("Idempotency-Key", fmt.Sprintf("summary-task-%016d", requestNumber))
+		}
 		response, err := server.Client().Do(r)
 		if err != nil {
 			t.Fatal(err)

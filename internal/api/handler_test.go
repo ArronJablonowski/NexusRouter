@@ -7,24 +7,44 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 const token = "fixture-token-at-least-32-characters"
 
 func services() Services {
-	return Services{Run: func(context.Context, app.Request) (app.Result, error) {
+	s := Services{Run: func(context.Context, app.Request) (app.Result, error) {
 		return app.Result{TaskID: "task", Text: "answer", Turns: 1}, nil
 	}, Inspect: func(context.Context, string) (sessions.Snapshot, error) {
 		return sessions.Snapshot{TaskID: "task", State: "completed"}, nil
 	}, Health: func(context.Context) error { return nil }}
+	s.RunSubmission = fixedIdempotent(s.Run)
+	return s
+}
+func fixedIdempotent(run func(context.Context, app.Request) (app.Result, error)) func(context.Context, string, app.Request) (submissions.Status, error) {
+	return func(ctx context.Context, _ string, request app.Request) (submissions.Status, error) {
+		result, err := run(ctx, request)
+		if err != nil {
+			return submissions.Status{}, err
+		}
+		if result.Turns == 0 {
+			result.Turns = 1
+		}
+		now := time.Unix(100, 0).UTC()
+		return submissions.Status{Version: 1, ID: "submission", State: "succeeded", CreatedAt: now, UpdatedAt: now, ConfigDigest: strings.Repeat("a", 64), TaskIDs: []string{result.TaskID}, Result: &submissions.Result{TaskID: result.TaskID, Text: result.Text, Turns: result.Turns, FinishReason: result.FinishReason, AuditID: result.AuditID, AuditStatus: result.AuditStatus, PreviousTaskIDs: result.PreviousTaskIDs, RouteEstimatedCost: result.RouteEstimatedCost, Usage: result.Usage}}, nil
+	}
 }
 func request(method, path, body string) *http.Request {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	r.Header.Set("Authorization", "Bearer "+token)
 	r.Header.Set("Content-Type", "application/json")
+	if method == http.MethodPost && path == "/v1/tasks" {
+		r.Header.Set("Idempotency-Key", "fixture-task-request")
+	}
 	return r
 }
 func TestAPIAdmission(t *testing.T) {
@@ -46,8 +66,9 @@ func TestAPIAdmission(t *testing.T) {
 			s := services()
 			s.Run = func(context.Context, app.Request) (app.Result, error) {
 				calls++
-				return app.Result{TaskID: "task"}, nil
+				return app.Result{TaskID: "task", Turns: 1}, nil
 			}
+			s.RunSubmission = fixedIdempotent(s.Run)
 			h, err := New(token, 1, s)
 			if err != nil {
 				t.Fatal(err)
@@ -70,6 +91,7 @@ func TestNativeTaskResultIncludesRouteEstimatedCost(t *testing.T) {
 	s.Run = func(context.Context, app.Request) (app.Result, error) {
 		return app.Result{TaskID: "task", Text: "answer", Turns: 1, RouteEstimatedCost: &cost}, nil
 	}
+	s.RunSubmission = fixedIdempotent(s.Run)
 	h, err := New(token, 1, s)
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +114,7 @@ func TestAuthenticationOriginsAndSafeErrors(t *testing.T) {
 				}
 				return app.Result{}, errors.New("private secret")
 			}
+			s.RunSubmission = fixedIdempotent(s.Run)
 			h, _ := New(token, 1, s)
 			r := request("POST", "/v1/tasks", `{"model_id":"m","prompt":"hi"}`)
 			want := 500
@@ -122,6 +145,7 @@ func TestConcurrencyAndCancellation(t *testing.T) {
 		<-ctx.Done()
 		return app.Result{}, ctx.Err()
 	}
+	s.RunSubmission = fixedIdempotent(s.Run)
 	h, _ := New(token, 1, s)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

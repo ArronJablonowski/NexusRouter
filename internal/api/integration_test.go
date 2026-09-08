@@ -37,6 +37,14 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	run := func(ctx context.Context, r app.Request) (app.Result, error) {
+		return app.RunExplicit(ctx, s, r, func(name string) string {
+			if name == "DARWIN_API_TOKEN" {
+				return token
+			}
+			return ""
+		})
+	}
 	h, err := New(token, 1, Services{
 		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
 			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
@@ -44,16 +52,10 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
 			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
 		},
-		Run: func(ctx context.Context, r app.Request) (app.Result, error) {
-			return app.RunExplicit(ctx, s, r, func(name string) string {
-				if name == "DARWIN_API_TOKEN" {
-					return token
-				}
-				return ""
-			})
-		},
-		Inspect: db.TaskSnapshot,
-		Health:  func(context.Context) error { return nil },
+		Run:           run,
+		RunSubmission: fixedIdempotent(run),
+		Inspect:       db.TaskSnapshot,
+		Health:        func(context.Context) error { return nil },
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
 		},
@@ -69,6 +71,7 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 	}
 	r.Header.Set("Authorization", "Bearer "+token)
 	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Idempotency-Key", "provider-task-00000001")
 	response, err := server.Client().Do(r)
 	if err != nil {
 		t.Fatal(err)

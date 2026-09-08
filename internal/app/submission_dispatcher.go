@@ -9,6 +9,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
@@ -165,6 +166,9 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	if err != nil {
 		state, code = "failed", "execution_failed"
 	}
+	if errors.Is(err, ErrAdmission) {
+		state, code = "failed", "admission_denied"
+	}
 	if job.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		state, code = "canceled", "canceled"
 	}
@@ -240,6 +244,9 @@ func (d *Dispatcher) awaitContinuation(ctx context.Context, task string) error {
 	for {
 		status, err := d.db.TaskContinuation(ctx, task)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) || errors.Is(err, sessions.ErrHistory) {
+				return ErrAdmission
+			}
 			return err
 		}
 		if status.State != "running" {

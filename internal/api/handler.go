@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,6 +58,7 @@ type Services struct {
 	SubmissionRecoveries   func(context.Context, string) ([]submissions.Recovery, error)
 	Submissions            func(context.Context, submissions.ListOptions) (submissions.Page, error)
 	Submit                 func(context.Context, string, app.Request) (submissions.Status, error)
+	RunSubmission          func(context.Context, string, app.Request) (submissions.Status, error)
 	Submission             func(context.Context, string) (submissions.Status, error)
 	CancelSubmission       func(context.Context, string) (submissions.Status, error)
 	Cancel                 func(context.Context, string) (runtime.CancellationStatus, error)
@@ -106,13 +106,14 @@ type Handler struct {
 	metricsSlots     chan struct{}
 	steeringSlots    chan struct{}
 	approvalSlots    chan struct{}
+	taskWaitTimeout  time.Duration
 }
 
 func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2)}, nil
+	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2), taskWaitTimeout: 5 * time.Minute}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -155,6 +156,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	timeout := 5 * time.Minute
+	if r.URL.Path == "/v1/tasks" && r.Method == http.MethodPost {
+		timeout = h.taskWaitTimeout
+	}
 	if r.URL.Path == "/v1/health" && r.Method == http.MethodGet {
 		timeout = 6 * time.Second
 	}
@@ -233,38 +237,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/v1/tasks" && r.Method == http.MethodGet:
 		h.serveTaskList(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks" && r.Method == http.MethodPost:
-		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || media != "application/json" {
-			failure(w, 415, "json_required")
-			return
-		}
-		// Reject excess work before reading a potentially slow request body.
-		select {
-		case h.slots <- struct{}{}:
-			defer func() { <-h.slots }()
-		default:
-			w.Header().Set("Retry-After", "1")
-			failure(w, 503, "capacity")
-			return
-		}
-		req, err := decodeRequest(http.MaxBytesReader(w, r.Body, 1<<20))
-		if err != nil {
-			failure(w, 400, "invalid_request")
-			return
-		}
-		result, err := h.services.Run(ctx, req)
-		if err != nil {
-			status := 500
-			code := "task_failed"
-			if errors.Is(err, app.ErrAdmission) {
-				status = 422
-				code = "admission_denied"
-			}
-			writeJSON(w, status, map[string]any{"error": code, "task_id": result.TaskID, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost})
-			return
-		}
-		// This synchronous endpoint acknowledges only a completed durable task.
-		writeJSON(w, 201, map[string]any{"task_id": result.TaskID, "text": result.Text, "turns": result.Turns, "audit_id": result.AuditID, "audit_status": result.AuditStatus, "previous_task_ids": result.PreviousTaskIDs, "route_estimated_cost": result.RouteEstimatedCost})
+		h.serveTask(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/events") && r.URL.Path != "/v1/tasks/events" && r.Method == http.MethodGet:
 		h.serveEventReplay(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && r.Method == http.MethodGet:
