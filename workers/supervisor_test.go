@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,6 +61,161 @@ func TestWorkerAcceptanceDurable(t *testing.T) {
 	leases, err := s.InspectLeases(context.Background(), "project")
 	if err != nil || len(leases) != 0 {
 		t.Fatal("lease retained after stop", leases, err)
+	}
+}
+
+func TestWorkerAuditRunsOnlyAfterValidationAndPersistsBeforeAcceptance(t *testing.T) {
+	s, sup := setup(t)
+	w := work("audited-child")
+	intent := &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+	w.DelegationAuditIntent = intent
+	var validated atomic.Bool
+	w.Validate = func(context.Context, string) error { validated.Store(true); return nil }
+	confidence := .8
+	w.Review = func(_ context.Context, output string) (*runtime.DelegationAudit, error) {
+		if !validated.Load() || output != "answer" {
+			t.Fatal("review preceded deterministic validation")
+		}
+		return &runtime.DelegationAudit{Version: 1, OperationID: "operation", ReviewerID: "reviewer", AuditID: "audit", Status: "completed", Verdict: "accept", Confidence: &confidence, Citations: []string{"candidate"}}, nil
+	}
+	if output, err := sup.Run(context.Background(), w); err != nil || output != "answer" {
+		t.Fatal(output, err)
+	}
+	events, err := s.Read(context.Background(), "audited-child", 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if events[0].Data.DelegationAuditIntent == nil {
+		t.Fatal("audit intent was not durable before execution")
+	}
+	var completed runtime.Event
+	for _, event := range events {
+		if event.Kind == runtime.WorkerCompleted {
+			completed = event
+		}
+	}
+	if completed.Data.DelegationAudit == nil || completed.Data.DelegationAudit.Status != "completed" {
+		t.Fatal("audit outcome not bound to accepted output", completed)
+	}
+}
+
+func TestWorkerAuditSkipsInvalidOutputAndCancellation(t *testing.T) {
+	for _, mode := range []string{"failed", "invalid", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			_, sup := setup(t)
+			w := work("audit-" + mode)
+			w.DelegationAuditIntent = &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+			var reviews atomic.Int32
+			w.Review = func(context.Context, string) (*runtime.DelegationAudit, error) {
+				reviews.Add(1)
+				return nil, errors.New("must not run")
+			}
+			ctx := context.Background()
+			if mode == "failed" {
+				w.Execute = func(context.Context) (string, error) { return "private partial", errors.New("failed") }
+			} else if mode == "invalid" {
+				w.Validate = func(context.Context, string) error { return errors.New("invalid") }
+			} else {
+				canceled, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = canceled
+			}
+			if output, err := sup.Run(ctx, w); err == nil || output != "" || reviews.Load() != 0 {
+				t.Fatal(output, err, reviews.Load())
+			}
+		})
+	}
+}
+
+func TestWorkerAdvisoryDispositionNeverOverridesValidation(t *testing.T) {
+	for _, status := range []string{"failed", "not_run", "abstained"} {
+		t.Run(status, func(t *testing.T) {
+			s, sup := setup(t)
+			w := work("advisory-" + status)
+			intent := &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+			w.DelegationAuditIntent = intent
+			w.Review = func(context.Context, string) (*runtime.DelegationAudit, error) {
+				result := &runtime.DelegationAudit{Version: 1, OperationID: "operation", ReviewerID: "reviewer", Status: status, Citations: []string{}}
+				if status == "abstained" {
+					confidence := 0.0
+					result.AuditID, result.Verdict, result.Confidence = "audit", "abstain", &confidence
+				}
+				return result, nil
+			}
+			if output, err := sup.Run(context.Background(), w); err != nil || output != "answer" {
+				t.Fatal("advisory disposition changed deterministic success", output, err)
+			}
+			events, err := s.Read(context.Background(), "advisory-"+status, 0, 100)
+			if err != nil || events[len(events)-1].Kind != runtime.TaskCompleted {
+				t.Fatal(events, err)
+			}
+		})
+	}
+}
+
+func TestWorkerCancellationDuringActiveAuditCannotPublishOutput(t *testing.T) {
+	s, sup := setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	w := work("audit-canceled-active")
+	w.DelegationAuditIntent = &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+	started, release := make(chan struct{}), make(chan struct{})
+	w.Review = func(context.Context, string) (*runtime.DelegationAudit, error) {
+		close(started)
+		<-release // Model an adapter that joins late despite cancellation.
+		return &runtime.DelegationAudit{Version: 1, OperationID: "operation", ReviewerID: "reviewer", Status: "failed", Citations: []string{}}, nil
+	}
+	done := make(chan error, 1)
+	go func() { _, err := sup.Run(ctx, w); done <- err }()
+	<-started
+	cancel()
+	select {
+	case err := <-done:
+		t.Fatal("worker returned before reviewer joined", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	events, err := s.Read(context.Background(), "audit-canceled-active", 0, 100)
+	if err != nil || events[len(events)-1].Kind != runtime.TaskCanceled {
+		t.Fatal(events, err)
+	}
+	for _, event := range events {
+		if event.Kind == runtime.WorkerCompleted || event.Kind == runtime.EvaluationRecorded {
+			t.Fatal("canceled audit output was accepted", event)
+		}
+	}
+}
+
+func TestWorkerLeaseLossDuringActiveAuditCannotPublishOutput(t *testing.T) {
+	s, _ := setup(t)
+	sup, err := workers.New(1, time.Millisecond, time.Second, failingLease{s}, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := work("audit-lease-lost")
+	w.DelegationAuditIntent = &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+	started := make(chan struct{})
+	w.Review = func(ctx context.Context, _ string) (*runtime.DelegationAudit, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	done := make(chan error, 1)
+	go func() { _, err := sup.Run(context.Background(), w); done <- err }()
+	<-started
+	if err := <-done; err != workers.ErrWork {
+		t.Fatal(err)
+	}
+	events, err := s.Read(context.Background(), "audit-lease-lost", 0, 100)
+	if err != nil || events[len(events)-1].Kind != runtime.TaskFailed {
+		t.Fatal(events, err)
+	}
+	for _, event := range events {
+		if event.Kind == runtime.WorkerCompleted || event.Kind == runtime.EvaluationRecorded {
+			t.Fatal("lease-lost audit output was accepted", event)
+		}
 	}
 }
 

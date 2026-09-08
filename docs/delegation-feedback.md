@@ -4,7 +4,12 @@ When a dispatched delegation fails, the coordinator receives a bounded
 diagnostic envelope instead of treating the rejected candidate as accepted
 output. The existing `error` discriminator is retained. If durable evidence can
 be verified, additive version-1 fields identify the work, execution and terminal
-records. Successful `untrusted_output` envelopes are unchanged.
+records. A successful `untrusted_output` envelope may additionally contain a
+sanitized `audit` object when `evaluation.judge` and
+`evaluation.auto_review_model` are enabled.
+It contains only `status`, optional `verdict` and `confidence`, and opaque
+`cited_evidence` identifiers; it never copies the review prompt, raw review,
+credentials, operation identity, or unrelated history.
 
 Illustrative invalid-output rejection:
 
@@ -47,9 +52,21 @@ delegation with confirmed or uncertain effects. Parent cancellation still
 prevents resuming the coordinator, while its rejection record remains durable.
 
 Single delegation and noncanceled batch items share this projection. Batch
-cancellation still suppresses all item outputs. Standalone auxiliary audits now
-verify single and batch result references and project child validation and
-terminal metadata; successful results additionally require durable supervisor
-acceptance and matching output. See [audit evidence scope and limits](delegated-audit-evidence.md).
-No change is made here to fitness updates, subjective feedback weighting, model
-pruning permissions or automatic retry behavior.
+cancellation still suppresses all item outputs. A configured per-child audit
+runs once, after deterministic validation succeeds and before the supervisor
+records acceptance. Its `completed`, `rejected`, `abstained`, `failed`, or
+`not_run` status is advisory: it cannot replace deterministic validation or
+turn failed, invalid, canceled, interrupted, or uncertain-effect work into a
+successful result. Reviewer cancellation or lease loss likewise prevents
+acceptance. The durable audit intent and outcome are paired with the worker
+record so restart recovery reproduces the same sanitized envelope without
+dispatching another review.
+
+Standalone auxiliary audits also verify single and batch result references and
+project child validation and terminal metadata; successful results require
+durable supervisor acceptance, matching output, and an exact audit
+intent/outcome pair when configured. See [audit evidence scope and limits](delegated-audit-evidence.md).
+Deterministic evidence remains authoritative. Explicit user feedback retains
+precedence for subjective work, same-model positive opinion cannot boost
+fitness, and no change is made to model-pruning permissions or automatic retry
+behavior.

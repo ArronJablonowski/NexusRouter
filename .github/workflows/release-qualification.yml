@@ -139,16 +139,54 @@ jobs:
           EXPECTED_NATIVE_ARCH: ${{ matrix.expected_arch }}
         run: |
           set -euo pipefail
+          umask 077
           record="$RUNNER_TEMP/native-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.json"
+          install_record="$RUNNER_TEMP/install-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.json"
+          install_verification="$RUNNER_TEMP/install-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}-verification.json"
           transcript="$RUNNER_TEMP/native-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.log"
           go run ./cmd/native-release-evidence \
             --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --source . --out "$record" \
+            --install-rehearsal-out "$install_record" \
             > "$transcript" 2>&1
           record_sha256="sha256:$(shasum -a 256 "$record" | awk '{print $1}')"
+          install_record_sha256="sha256:$(shasum -a 256 "$install_record" | awk '{print $1}')"
           transcript_sha256="sha256:$(shasum -a 256 "$transcript" | awk '{print $1}')"
+          test "$(grep -c '^darwin-install-rehearsal-evidence ' "$transcript")" -eq 1
+          read -r marker record_value artifact_name_value artifact_value backup_value source_value current_value \
+            < <(grep '^darwin-install-rehearsal-evidence ' "$transcript")
+          test "$marker" = darwin-install-rehearsal-evidence
+          test "$record_value" != "${record_value#record_sha256=}"
+          test "$artifact_name_value" != "${artifact_name_value#artifact_name=}"
+          test "$artifact_value" != "${artifact_value#artifact_sha256=}"
+          test "$backup_value" != "${backup_value#backup_sha256=}"
+          test "$source_value" != "${source_value#source_schema=}"
+          test "$current_value" != "${current_value#current_schema=}"
+          test "${record_value#record_sha256=}" = "$install_record_sha256"
+          artifact_name="${artifact_name_value#artifact_name=}"
+          artifact_sha256="${artifact_value#artifact_sha256=}"
+          backup_sha256="${backup_value#backup_sha256=}"
+          source_schema="${source_value#source_schema=}"
+          current_schema="${current_value#current_schema=}"
+          test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"
+          test "$source_schema" = 29
+          test "$current_schema" = 31
+          go run ./cmd/verify-install-rehearsal \
+            --record "$install_record" --record-sha256 "$install_record_sha256" \
+            --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" \
+            --target-os "$EXPECTED_NATIVE_OS" --target-arch "$EXPECTED_NATIVE_ARCH" \
+            --artifact "$artifact_name" --artifact-sha256 "$artifact_sha256" \
+            --source-schema "$source_schema" --current-schema "$current_schema" \
+            --backup-sha256 "$backup_sha256" > "$install_verification"
+          install_verification_sha256="sha256:$(shasum -a 256 "$install_verification" | awk '{print $1}')"
           test "$(wc -c < "$record" | tr -d ' ')" -le 32768
-          test "$(wc -c < "$transcript" | tr -d ' ')" -le 2097408
+          test "$(wc -c < "$install_record" | tr -d ' ')" -le 32768
+          test "$(wc -c < "$install_verification" | tr -d ' ')" -le 32768
+          test "$(wc -c < "$transcript" | tr -d ' ')" -le 2099200
           echo "record_sha256=$record_sha256" >> "$GITHUB_OUTPUT"
+          echo "install_record_sha256=$install_record_sha256" >> "$GITHUB_OUTPUT"
+          echo "install_verification_sha256=$install_verification_sha256" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha256=$artifact_sha256" >> "$GITHUB_OUTPUT"
+          echo "backup_sha256=$backup_sha256" >> "$GITHUB_OUTPUT"
           echo "transcript_sha256=$transcript_sha256" >> "$GITHUB_OUTPUT"
       - name: Retain canonical native evidence
         if: ${{ steps.native_evidence.outcome == 'success' }}
@@ -158,6 +196,8 @@ jobs:
           path: |
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.log
+            ${{ runner.temp }}/install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json
+            ${{ runner.temp }}/install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-verification.json
           if-no-files-found: error
           retention-days: 30
           compression-level: 9
@@ -186,6 +226,10 @@ jobs:
           LICENSE_EVIDENCE_OUTCOME: ${{ steps.license_evidence.outcome }}
           NATIVE_EVIDENCE_OUTCOME: ${{ steps.native_evidence.outcome }}
           NATIVE_RECORD_SHA256: ${{ steps.native_evidence.outputs.record_sha256 }}
+          INSTALL_RECORD_SHA256: ${{ steps.native_evidence.outputs.install_record_sha256 }}
+          INSTALL_VERIFICATION_SHA256: ${{ steps.native_evidence.outputs.install_verification_sha256 }}
+          INSTALL_ARTIFACT_SHA256: ${{ steps.native_evidence.outputs.artifact_sha256 }}
+          INSTALL_BACKUP_SHA256: ${{ steps.native_evidence.outputs.backup_sha256 }}
           NATIVE_TRANSCRIPT_SHA256: ${{ steps.native_evidence.outputs.transcript_sha256 }}
           UNCHANGED_OUTCOME: ${{ steps.unchanged.outcome }}
         run: |
@@ -200,11 +244,15 @@ jobs:
             printf '\n| Gate | Outcome |\n| --- | --- |\n'
             printf '| Source binding | %s |\n| Candidate record | %s |\n| Candidate license evidence | %s |\n| Canonical native evidence | %s |\n| Source unchanged | %s |\n' "$SOURCE_OUTCOME" "$CANDIDATE_OUTCOME" "$LICENSE_EVIDENCE_OUTCOME" "$NATIVE_EVIDENCE_OUTCOME" "$UNCHANGED_OUTCOME"
             printf '\nNative evidence record SHA-256: `%s`\n' "${NATIVE_RECORD_SHA256:-unavailable}"
+            printf '\nInstall rehearsal record SHA-256: `%s`\n' "${INSTALL_RECORD_SHA256:-unavailable}"
+            printf '\nInstall rehearsal in-job verification SHA-256: `%s`\n' "${INSTALL_VERIFICATION_SHA256:-unavailable}"
+            printf '\nObserved native archive SHA-256: `%s`\n' "${INSTALL_ARTIFACT_SHA256:-unavailable}"
+            printf '\nObserved immutable backup SHA-256: `%s`\n' "${INSTALL_BACKUP_SHA256:-unavailable}"
             printf '\nNative gate transcript SHA-256: `%s`\n' "${NATIVE_TRANSCRIPT_SHA256:-unavailable}"
             echo
             echo 'Only successful license-evidence and qualification gates establish the following evidence: the exact source commit, Go version and module directive, root MIT license digest, four target-specific dependency closures and notice digests; deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact six-member schema-2 collateral and target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-29-to-31 migration, backup and rollback rehearsal.'
             echo
             echo 'This job natively executes only the observed platform above; the other three artifacts are cross-built and inspected. All four successful matrix jobs are required for four-target native evidence. Read the observed platform above; the workflow asserts it against the expected target instead of trusting the runner label alone. Failed/skipped gates do not qualify a release.'
             echo
-            echo 'The supplied candidate and license-evidence digests are independent dispatch inputs; this workflow checks exact derivation. It does not grant candidate, platform or release approval and does not grant legal approval. A successful job retains only its bounded canonical native-evidence JSON and gate transcript as a workflow artifact for 30 days. No release archive, live model output, production signing key, tag, GitHub release asset, installation outside the disposable runner-local rehearsal, or publication. Records, transcripts and this summary are qualification evidence, not release approval or independent build attestation.'
+            echo 'The supplied candidate and license-evidence digests are independent dispatch inputs; this workflow checks exact derivation. The native archive and backup digests are generated observations from this job, emitted through the bounded native transcript, bound into the primary native record, and checked against the canonical install-rehearsal record in the same job. They are not independently approved expectations; a later operator must obtain and verify the retained record and digests through the external evidence channel. This workflow does not grant candidate, platform or release approval and does not grant legal approval. A successful job retains its bounded native record, install-rehearsal record, in-job verification result, and gate transcript for 30 days. No release archive, live model output, production signing key, tag, GitHub release asset, installation outside the disposable runner-local rehearsal, or publication. Records, transcripts and this summary are qualification evidence, not release approval or independent build attestation.'
           } >> "$GITHUB_STEP_SUMMARY"

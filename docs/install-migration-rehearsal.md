@@ -43,8 +43,11 @@ Runtime subprocesses receive an explicit `DARWIN_PROCESS_OWNER_DIR`, home,
 temporary directory and API token rooted under `testing.T.TempDir`. The build
 subprocess uses the caller's Go cache and home but disables module network
 resolution. No provider is configured. A loopback HTTP listener is used only
-for the owned daemon's control API. The test log paths are temporary; a
-candidate release checklist needs separately retained operator evidence.
+for the owned daemon's control API. The test log paths are temporary. During
+candidate qualification, `native-release-evidence --install-rehearsal-out
+NEW_EXTERNAL_FILE` passes the new destination through to this same rehearsal so
+it can retain canonical evidence derived inline from the observations below. It
+does not reconstruct a record later from an operator checklist.
 
 The helper `rehearseNativeInstallAndMigration` accepts an already selected
 native archive and its authenticated manifest metadata. The release
@@ -53,6 +56,49 @@ tampering test. Signature verification and public-key trust remain the caller's
 responsibility.
 
 ## Candidate rehearsal record
+
+The schema-1 record is bounded to 32 KiB and contains no filesystem paths,
+credentials, configuration body, database content, host identity, user content,
+or timestamps. It binds the exact semantic version, full source commit, native
+OS/architecture, archive name and SHA-256. Fixed result fields record private
+permissions, configuration validation, daemon start and exact owned-writer
+exit, schema-29 quick-check and quiescence, immutable backup digest and
+quick-check, schema-31 migration and synthetic-record preservation, unchanged
+task-timing provenance, empty legacy usage ledger, and the schema-29 rollback
+database digest plus the exact binary version/target used for its read-only
+smoke check. The rollback digest must equal the backup digest.
+
+The record is created mode 0600 with exclusive create through a pinned,
+nonsymlink parent directory outside the source checkout. Existing destinations
+are never replaced. Treat an absent record as a failed evidence-retention gate;
+never synthesize one from a transcript.
+
+Obtain its SHA-256 through the independent evidence channel, then verify exact
+canonical bytes and every independently expected identity:
+
+```sh
+go run ./cmd/verify-install-rehearsal \
+  --record /ABSOLUTE/EXTERNAL/EVIDENCE/install-TARGET.json \
+  --record-sha256 sha256:EXPECTED_RECORD \
+  --version 1.0.0 \
+  --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
+  --target-os darwin \
+  --target-arch arm64 \
+  --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
+  --artifact-sha256 sha256:EXPECTED_ARCHIVE \
+  --source-schema 29 \
+  --current-schema 31 \
+  --backup-sha256 sha256:EXPECTED_BACKUP
+```
+
+Verification opens only a stable regular record file, rejects symlinks,
+oversize data, duplicate/unknown/missing fields, noncanonical JSON, tampering,
+and any release, commit, target, artifact, schema, or backup expectation
+mismatch. Its JSON output repeats public identities only; it does not authorize
+support, signing, installation, migration, rollback, or publication.
+The record is unsigned mechanical evidence, not independent attestation that a
+host ran the named operations; retain its bounded transcript and operator/host
+provenance separately.
 
 For an actual candidate, retain at least:
 
@@ -66,6 +112,8 @@ For an actual candidate, retain at least:
 - Pre-upgrade backup path, SHA-256 and `quick_check` result.
 - Migrated schema, preserved-record digest and daemon lifecycle result.
 - Rollback binary prefix, restored database path/digest and smoke result.
+- Canonical rehearsal-record location/digest and independent verification
+  output, operator identity, host provenance, and UTC verification time.
 
 Do not place credentials, private signing material, user prompts, model output
 or the database itself in repository or CI logs.

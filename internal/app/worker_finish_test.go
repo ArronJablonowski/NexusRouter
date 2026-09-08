@@ -112,7 +112,7 @@ func TestWorkerFinishApplicationJournalPublishesOnlyAfterLeaseRelease(t *testing
 			err = registerDelegate(registry, db, journal, cfg, "parent", "session", "", true, func(ctx context.Context, prompt, validation, work string, _ bool) (Result, error) {
 				defer joined.Store(true)
 				return svc.Run(ctx, Request{ModelID: "child", Prompt: prompt, Validation: validation, delegatedParent: work})
-			})
+			}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

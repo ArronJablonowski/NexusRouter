@@ -17,6 +17,7 @@ func TestArguments(t *testing.T) {
 		{[]string{"--unknown"}, 2},
 		{[]string{"--version", "1.0.0"}, 2},
 		{[]string{"--version", "1.0.0", "--commit", "bad", "--out", "x"}, 1},
+		{[]string{"--version", "1.0.0", "--commit", "bad", "--out", "x", "--install-rehearsal-out", "install.json"}, 1},
 		{[]string{"--version", "1.0.0", "--commit", "0123456789abcdef0123456789abcdef01234567", "--out", "x", "extra"}, 2},
 	} {
 		var output bytes.Buffer

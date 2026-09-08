@@ -20,13 +20,23 @@ const (
 // NativeEvidence is one host's canonical qualification result. It deliberately
 // has no field capable of claiming that another target was executed.
 type NativeEvidence struct {
-	SchemaVersion  int                  `json:"schema_version"`
-	Scope          string               `json:"scope"`
-	ReleaseVersion string               `json:"release_version"`
-	SourceCommit   string               `json:"source_commit"`
-	Target         NativeEvidenceTarget `json:"target"`
-	Toolchain      NativeEvidenceGo     `json:"toolchain"`
-	Gates          []NativeEvidenceGate `json:"gates"`
+	SchemaVersion    int                           `json:"schema_version"`
+	Scope            string                        `json:"scope"`
+	ReleaseVersion   string                        `json:"release_version"`
+	SourceCommit     string                        `json:"source_commit"`
+	Target           NativeEvidenceTarget          `json:"target"`
+	Toolchain        NativeEvidenceGo              `json:"toolchain"`
+	Gates            []NativeEvidenceGate          `json:"gates"`
+	InstallRehearsal *NativeInstallEvidenceBinding `json:"install_rehearsal,omitempty"`
+}
+
+type NativeInstallEvidenceBinding struct {
+	RecordSHA256   string `json:"record_sha256"`
+	ArtifactName   string `json:"artifact_name"`
+	ArtifactSHA256 string `json:"artifact_sha256"`
+	BackupSHA256   string `json:"backup_sha256"`
+	SourceSchema   int    `json:"source_schema"`
+	CurrentSchema  int    `json:"current_schema"`
 }
 
 type NativeEvidenceTarget struct {
@@ -82,6 +92,20 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 		return err
 	}
 	defer outputRoot.Close()
+	var installOut string
+	if o.InstallEvidenceOut != "" {
+		installOut, err = filepath.Abs(o.InstallEvidenceOut)
+		if err != nil || installOut == out {
+			return ErrInvalid
+		}
+		installRoot, _, preflightErr := candidateOutputRoot(installOut, source)
+		if preflightErr != nil {
+			return preflightErr
+		}
+		if closeErr := installRoot.Close(); closeErr != nil {
+			return closeErr
+		}
+	}
 	env := environment()
 	top, err := command(ctx, source, env, "git", "rev-parse", "--show-toplevel")
 	if err != nil || top != source || verifyCandidateCheckout(ctx, source, o.Commit, env) != nil {
@@ -105,6 +129,9 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 		return err
 	}
 	qualificationEnv := append(append([]string(nil), env...), "DARWIN_RELEASE_VERSION="+o.Version, "DARWIN_RELEASE_COMMIT="+o.Commit)
+	if installOut != "" {
+		qualificationEnv = append(qualificationEnv, "DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT="+installOut)
+	}
 	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-release", transcript); err != nil {
 		return err
 	}
@@ -117,6 +144,28 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 		Target:    NativeEvidenceTarget{OS: observed.GOOS, Arch: observed.GOARCH},
 		Toolchain: NativeEvidenceGo{GOHOSTOS: observed.GOHOSTOS, GOHOSTARCH: observed.GOHOSTARCH, GOVERSION: observed.GOVERSION},
 		Gates:     append([]NativeEvidenceGate(nil), nativeEvidenceGates...),
+	}
+	if installOut != "" {
+		installBody, readErr := readInstallEvidence(installOut)
+		if readErr != nil {
+			return ErrInvalid
+		}
+		installRecord, parseErr := ParseInstallRehearsalEvidence(installBody)
+		if parseErr != nil || installRecord.Release.Version != o.Version || installRecord.Release.Commit != o.Commit ||
+			installRecord.Target.OS != observed.GOOS || installRecord.Target.Arch != observed.GOARCH {
+			return ErrInvalid
+		}
+		record.SchemaVersion = 2
+		record.InstallRehearsal = &NativeInstallEvidenceBinding{
+			RecordSHA256: installEvidenceDigest(installBody), ArtifactName: installRecord.Artifact.Name,
+			ArtifactSHA256: installRecord.Artifact.SHA256, BackupSHA256: installRecord.Backup.SHA256,
+			SourceSchema: installRecord.Source.Schema, CurrentSchema: installRecord.Migration.Schema,
+		}
+		if _, err = fmt.Fprintf(transcript, "darwin-install-rehearsal-evidence record_sha256=%s artifact_name=%s artifact_sha256=%s backup_sha256=%s source_schema=%d current_schema=%d\n",
+			record.InstallRehearsal.RecordSHA256, record.InstallRehearsal.ArtifactName, record.InstallRehearsal.ArtifactSHA256,
+			record.InstallRehearsal.BackupSHA256, record.InstallRehearsal.SourceSchema, record.InstallRehearsal.CurrentSchema); err != nil {
+			return err
+		}
 	}
 	body, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
@@ -178,10 +227,14 @@ func validateNativeEvidence(body []byte) error {
 }
 
 func validateNativeEvidenceRecord(record NativeEvidence) error {
-	if record.SchemaVersion != nativeEvidenceSchema || record.Scope != "single_native_target_only" ||
+	if (record.SchemaVersion != nativeEvidenceSchema && record.SchemaVersion != 2) || record.Scope != "single_native_target_only" ||
 		validate(Options{Version: record.ReleaseVersion, Commit: record.SourceCommit, Out: "evidence"}) != nil ||
 		validateNativeGo(nativeGoEnvironment{GOOS: record.Target.OS, GOARCH: record.Target.Arch, GOHOSTOS: record.Toolchain.GOHOSTOS, GOHOSTARCH: record.Toolchain.GOHOSTARCH, GOVERSION: record.Toolchain.GOVERSION}) != nil ||
 		len(record.Gates) != len(nativeEvidenceGates) {
+		return ErrInvalid
+	}
+	if record.SchemaVersion == nativeEvidenceSchema && record.InstallRehearsal != nil ||
+		record.SchemaVersion == 2 && !validNativeInstallBinding(record) {
 		return ErrInvalid
 	}
 	for i := range nativeEvidenceGates {
@@ -190,6 +243,17 @@ func validateNativeEvidenceRecord(record NativeEvidence) error {
 		}
 	}
 	return nil
+}
+
+func validNativeInstallBinding(record NativeEvidence) bool {
+	binding := record.InstallRehearsal
+	if binding == nil {
+		return false
+	}
+	expectedName := "DarwinRouter_" + record.ReleaseVersion + "_" + record.Target.OS + "_" + record.Target.Arch + ".tar.gz"
+	return validInstallDigest(binding.RecordSHA256) && binding.ArtifactName == expectedName &&
+		validInstallDigest(binding.ArtifactSHA256) && validInstallDigest(binding.BackupSHA256) &&
+		binding.SourceSchema == 29 && binding.CurrentSchema == 31
 }
 
 func validateNativeGo(observed nativeGoEnvironment) error {

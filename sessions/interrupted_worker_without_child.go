@@ -35,7 +35,7 @@ func PlanInterruptedWorkerWithoutChild(history []runtime.Event, now time.Time) (
 		budget -= len(body)
 		allowed := runtime.Data{}
 		if i == 0 {
-			allowed = runtime.Data{ParentTaskID: start.Data.ParentTaskID, SubmissionID: start.Data.SubmissionID, DelegationOrigin: start.Data.DelegationOrigin}
+			allowed = runtime.Data{ParentTaskID: start.Data.ParentTaskID, SubmissionID: start.Data.SubmissionID, DelegationOrigin: start.Data.DelegationOrigin, DelegationAuditIntent: start.Data.DelegationAuditIntent}
 		} else if (i == 1 && event.Kind != runtime.WorkerStarted) || (i > 1 && event.Kind != runtime.WorkerHeartbeat) {
 			return bad()
 		}

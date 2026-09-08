@@ -243,7 +243,11 @@ func TestReleaseQualification(t *testing.T) {
 			if err = os.Chmod(rehearsalRoot, 0700); err != nil {
 				t.Fatal(err)
 			}
-			rehearseNativeInstallAndMigration(t, ctx, rehearsalRoot, filepath.Join(first, artifact.File), artifact, version)
+			evidenceOut := os.Getenv("DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT")
+			if evidenceOut == "" {
+				evidenceOut = filepath.Join(rehearsalRoot, "install-rehearsal-evidence.json")
+			}
+			rehearseNativeInstallAndMigration(t, ctx, source, rehearsalRoot, filepath.Join(first, artifact.File), artifact, version, commit, evidenceOut)
 			nativeRan = true
 		}
 	}

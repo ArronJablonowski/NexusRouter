@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type Options struct{ Version, Commit, Out, Source string }
+type Options struct{ Version, Commit, Out, Source, InstallEvidenceOut string }
 type Artifact struct {
 	OS      string                 `json:"os"`
 	Arch    string                 `json:"arch"`

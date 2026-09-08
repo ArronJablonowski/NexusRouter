@@ -86,3 +86,52 @@ func TestEventValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestDelegationAuditEventPlacementValidation(t *testing.T) {
+	now := time.Now()
+	intent := &DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+	confidence := .5
+	outcome := &DelegationAudit{Version: 1, OperationID: "operation", ReviewerID: "reviewer", AuditID: "audit", Status: "completed", Verdict: "accept", Confidence: &confidence, Citations: []string{"candidate"}}
+	started := Event{Version: 1, ID: "started", TaskID: "work", SessionID: "session", CorrelationID: "work", WorkerID: "worker", Sequence: 1, Time: now, Kind: TaskStarted, Data: Data{ParentTaskID: "parent", DelegationAuditIntent: intent}}
+	completed := Event{Version: 1, ID: "completed", TaskID: "work", SessionID: "session", CorrelationID: "work", WorkerID: "worker", Sequence: 2, Time: now, Kind: WorkerCompleted, Data: Data{Text: "answer", DelegationAudit: outcome}}
+	if started.Validate() != nil || completed.Validate() != nil {
+		t.Fatal("valid audit event placement rejected")
+	}
+	for name, mutate := range map[string]func(*Event){
+		"intent wrong kind": func(e *Event) { e.Kind = TaskCompleted },
+		"intent no worker":  func(e *Event) { e.WorkerID = "" },
+		"intent malformed": func(e *Event) {
+			e.Data.DelegationAuditIntent = &DelegationAuditIntent{Version: 1, OperationID: "raw operation", ReviewerID: "reviewer"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := started
+			mutate(&e)
+			if e.Validate() == nil {
+				t.Fatal("invalid intent event accepted")
+			}
+		})
+	}
+	for name, mutate := range map[string]func(*Event){
+		"outcome wrong kind": func(e *Event) { e.Kind = WorkerStarted },
+		"outcome no worker":  func(e *Event) { e.WorkerID = "" },
+		"outcome malformed": func(e *Event) {
+			copy := *e.Data.DelegationAudit
+			copy.ReviewerID = ""
+			e.Data.DelegationAudit = &copy
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := completed
+			mutate(&e)
+			if e.Validate() == nil {
+				t.Fatal("invalid outcome event accepted")
+			}
+		})
+	}
+	changed := *intent
+	changed.ReviewerID = "other"
+	if outcome.Validate(&changed) == nil {
+		t.Fatal("cross-event reviewer mismatch accepted")
+	}
+}

@@ -112,7 +112,7 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 			seen[d.report.ExecutionID] = true
 			histories = append(histories, child)
 		}
-		if d.success != nil && (len(histories) != 2 || histories[1].snapshot.State != "completed" || !auditSuccessfulDelegation(work, histories[1], d.success.Output)) {
+		if d.success != nil && (len(histories) != 2 || histories[1].snapshot.State != "completed" || !auditSuccessfulDelegation(work, histories[1], d.success.Output, d.success.Audit)) {
 			return nil, ErrAdmission
 		}
 		var refs []delegateFailureEvidence

@@ -122,8 +122,13 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	native := job.Steps[5]
 	if native.ID != "native_evidence" || native.Env["RELEASE_VERSION"] != "${{ inputs.version }}" ||
 		!strings.Contains(native.Run, "native-release-evidence") || !strings.Contains(native.Run, `--commit "$GITHUB_SHA"`) ||
+		!strings.Contains(native.Run, `--install-rehearsal-out "$install_record"`) ||
+		!strings.Contains(native.Run, "verify-install-rehearsal") ||
+		!strings.Contains(native.Run, `test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"`) ||
+		!strings.Contains(native.Run, `test "${record_value#record_sha256=}" = "$install_record_sha256"`) ||
+		!strings.Contains(native.Run, "install_verification_sha256") || !strings.Contains(native.Run, "backup_sha256") ||
 		!strings.Contains(native.Run, `> "$transcript" 2>&1`) || !strings.Contains(native.Run, "record_sha256") ||
-		!strings.Contains(native.Run, "transcript_sha256") || !strings.Contains(native.Run, "2097408") {
+		!strings.Contains(native.Run, "transcript_sha256") || !strings.Contains(native.Run, "2099200") {
 		t.Fatal("canonical native qualification is not retained and bounded")
 	}
 	if job.Steps[2].Env["RELEASE_VERSION"] != "${{ inputs.version }}" ||
@@ -140,7 +145,9 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if upload.Uses != "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" || upload.If != "${{ steps.native_evidence.outcome == 'success' }}" ||
 		upload.With["retention-days"] != 30 || upload.With["if-no-files-found"] != "error" || upload.With["overwrite"] != false ||
 		!strings.Contains(upload.With["path"].(string), "native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json") ||
-		!strings.Contains(upload.With["path"].(string), "native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.log") {
+		!strings.Contains(upload.With["path"].(string), "native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.log") ||
+		!strings.Contains(upload.With["path"].(string), "install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json") ||
+		!strings.Contains(upload.With["path"].(string), "install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-verification.json") {
 		t.Fatal("native evidence upload authority changed")
 	}
 	for i, step := range job.Steps[2:] {
@@ -157,7 +164,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		}
 	}
 	report := job.Steps[8]
-	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["NATIVE_EVIDENCE_OUTCOME"] != "${{ steps.native_evidence.outcome }}" || report.Env["CANDIDATE_RECORD_SHA256"] != "${{ inputs.candidate_record_sha256 }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || !strings.Contains(report.Run, "Expected reviewed candidate-record digest") || !strings.Contains(report.Run, "Native evidence record SHA-256") {
+	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["NATIVE_EVIDENCE_OUTCOME"] != "${{ steps.native_evidence.outcome }}" || report.Env["CANDIDATE_RECORD_SHA256"] != "${{ inputs.candidate_record_sha256 }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || report.Env["INSTALL_RECORD_SHA256"] != "${{ steps.native_evidence.outputs.install_record_sha256 }}" || report.Env["INSTALL_VERIFICATION_SHA256"] != "${{ steps.native_evidence.outputs.install_verification_sha256 }}" || !strings.Contains(report.Run, "Expected reviewed candidate-record digest") || !strings.Contains(report.Run, "Install rehearsal record SHA-256") {
 		t.Fatal("missing failure-aware evidence")
 	}
 	for _, evidence := range []string{
@@ -170,7 +177,9 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		"backup and rollback rehearsal",
 		"installation outside the disposable runner-local rehearsal",
 		"All four successful matrix jobs are required for four-target native evidence",
-		"workflow artifact for 30 days",
+		"in-job verification result",
+		"not independently approved expectations",
+		"later operator must obtain and verify",
 		"does not grant candidate, platform or release approval",
 	} {
 		if !strings.Contains(report.Run, evidence) {

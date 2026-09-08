@@ -34,6 +34,7 @@ type Request struct {
 	delegatedParent                 string
 	delegatedTools                  *delegateTools
 	delegate                        delegateRunner
+	delegateAudit                   delegateAuditRunner
 	memoryStore                     memory.Store
 	skillStore                      skills.Store
 	admissionContext                context.Context
@@ -308,7 +309,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, toolPolicy); err != nil {
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
 			return result, ErrAdmission
 		}
 	}

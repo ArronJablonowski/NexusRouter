@@ -80,19 +80,27 @@ func TestNativeInstallMigrationRehearsal(t *testing.T) {
 	if err != nil || closeErr != nil {
 		t.Fatal(err, closeErr)
 	}
-	artifact := Artifact{OS: runtime.GOOS, Arch: runtime.GOARCH, File: filepath.Base(archive), Entries: metadata}
-	rehearseNativeInstallAndMigration(t, ctx, root, archive, artifact, rehearsalVersion)
+	artifact := Artifact{OS: runtime.GOOS, Arch: runtime.GOARCH, File: filepath.Base(archive), SHA256: fileDigest(t, archive), Entries: metadata}
+	rehearseNativeInstallAndMigration(t, ctx, source, root, archive, artifact, rehearsalVersion, strings.Repeat("0", 40), filepath.Join(root, "install-rehearsal-evidence.json"))
 }
 
 // rehearseNativeInstallAndMigration is also suitable for the native artifact
 // selected from a previously verified release directory. Verification and key
 // trust remain the caller's responsibility.
-func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, archive string, artifact Artifact, version string) {
+func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source, root, archive string, artifact Artifact, version, commit, evidenceOut string) {
 	t.Helper()
-	if artifact.OS != runtime.GOOS || artifact.Arch != runtime.GOARCH || !semver.MatchString(version) {
+	if artifact.OS != runtime.GOOS || artifact.Arch != runtime.GOARCH || validate(Options{Version: version, Commit: commit, Out: "evidence"}) != nil || evidenceOut == "" {
 		t.Fatal("rehearsal requires the exact native release artifact")
 	}
-	binary := rehearsalArchiveBinary(t, archive, artifact)
+	archiveBody, archiveRawDigest, err := readPinnedRehearsalArchive(archive, artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.SHA256 != archiveRawDigest {
+		t.Fatal("native release artifact digest mismatch")
+	}
+	archiveDigest := "sha256:" + archiveRawDigest
+	binary := rehearsalArchiveBinary(t, archiveBody, artifact)
 	installRoot := filepath.Join(root, "installation")
 	installPrefix := filepath.Join(installRoot, "releases", version)
 	for _, path := range []string{installRoot, filepath.Join(installRoot, "releases"), installPrefix, filepath.Join(installPrefix, "bin")} {
@@ -153,7 +161,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 	}
 	checkpointAndCopy(t, database, backup)
 	assertMode(t, backup, 0600)
-	backupDigest := fileDigest(t, backup)
+	backupDigest := "sha256:" + fileDigest(t, backup)
 	checkDatabase(t, backup, 29, fact.Scope, fact.ID)
 	if got := taskTimingEpoch(t, backup); got != timingEpoch {
 		t.Fatal("schema-29 backup changed task timing epoch")
@@ -173,7 +181,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 
 	rollback := filepath.Join(stateRoot, "rollback-schema29.db")
 	copyExclusive(t, backup, rollback)
-	if fileDigest(t, rollback) != backupDigest {
+	if "sha256:"+fileDigest(t, rollback) != backupDigest {
 		t.Fatal("rollback copy differs from immutable backup")
 	}
 	checkDatabase(t, rollback, 29, fact.Scope, fact.ID)
@@ -183,17 +191,68 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, rollback, fact)
 	checkDatabase(t, rollback, 29, fact.Scope, fact.ID) // Read-only inspection must not migrate.
 	checkDatabase(t, database, 31, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
-	t.Logf("native install=%s schema=31; backup_sha256=%s; migration=29->31; rollback_copy_schema=29", installPrefix, backupDigest)
-}
-
-func rehearsalArchiveBinary(t *testing.T, archive string, artifact Artifact) []byte {
-	t.Helper()
-	f, err := os.Open(archive)
+	rollbackDigest := "sha256:" + fileDigest(t, rollback)
+	if rollbackDigest != backupDigest {
+		t.Fatal("rollback smoke changed the restored database")
+	}
+	record := InstallRehearsalEvidence{
+		SchemaVersion: installEvidenceSchema, Scope: installEvidenceScope,
+		Release:      InstallEvidenceRelease{Version: version, Commit: commit},
+		Target:       NativeEvidenceTarget{OS: artifact.OS, Arch: artifact.Arch},
+		Artifact:     InstallEvidenceArtifact{Name: artifact.File, SHA256: archiveDigest},
+		Installation: InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
+		Source:       InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
+		Backup:       InstallEvidenceBackup{SHA256: backupDigest, Schema: 29, QuickCheck: "ok"},
+		Migration: InstallEvidenceMigration{Schema: 31, QuickCheck: "ok", PreservedRecordSHA256: "sha256:" + evidenceBefore,
+			TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
+		Rollback: InstallEvidenceRollback{DatabaseSHA256: rollbackDigest, Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version,
+			TargetOS: artifact.OS, TargetArch: artifact.Arch, Smoke: "passed"},
+	}
+	if err := retainInstallRehearsalEvidence(source, evidenceOut, record); err != nil {
+		t.Fatal("retain install rehearsal evidence", err)
+	}
+	body, err := readInstallEvidence(evidenceOut)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = VerifyInstallRehearsalEvidence(evidenceOut, InstallRehearsalExpectations{
+		RecordSHA256: installEvidenceDigest(body), Version: version, Commit: commit,
+		TargetOS: artifact.OS, TargetArch: artifact.Arch, ArtifactName: artifact.File,
+		ArtifactSHA256: archiveDigest, SourceSchema: 29, CurrentSchema: 31, BackupSHA256: backupDigest,
+	}); err != nil {
+		t.Fatal("verify retained install rehearsal evidence", err)
+	}
+	t.Logf("native install=%s schema=31; backup_sha256=%s; migration=29->31; rollback_copy_schema=29", installPrefix, backupDigest)
+}
+
+func readPinnedRehearsalArchive(archive string, artifact Artifact) ([]byte, string, error) {
+	if filepath.Base(archive) != artifact.File || filepath.Base(artifact.File) != artifact.File {
+		return nil, "", errors.New("archive path does not match authenticated artifact name")
+	}
+	before, err := os.Lstat(archive)
+	if err != nil || !before.Mode().IsRegular() || before.Size() < 1 || before.Size() > maxArchive {
+		return nil, "", errors.New("unsafe rehearsal archive")
+	}
+	f, err := os.Open(archive)
+	if err != nil {
+		return nil, "", err
+	}
 	defer f.Close()
-	gz, err := gzip.NewReader(f)
+	after, err := f.Stat()
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(before, after) || before.Size() != after.Size() {
+		return nil, "", errors.New("rehearsal archive identity changed")
+	}
+	body, err := io.ReadAll(io.LimitReader(f, maxArchive+1))
+	if err != nil || int64(len(body)) != after.Size() {
+		return nil, "", errors.New("cannot snapshot rehearsal archive")
+	}
+	digest := sha256.Sum256(body)
+	return body, hex.EncodeToString(digest[:]), nil
+}
+
+func rehearsalArchiveBinary(t *testing.T, archive []byte, artifact Artifact) []byte {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +454,9 @@ func assertEmptyUsageLedger(t *testing.T, path string) {
 	if err := db.QueryRow(`SELECT version,started_at FROM usage_metadata WHERE singleton=1`).Scan(&version, &epoch); err != nil || version != 1 {
 		t.Fatal("cannot inspect schema-30 usage metadata", version, epoch, err)
 	}
-	if at, err := time.Parse(time.RFC3339Nano, epoch); err != nil || at.UTC().Format(time.RFC3339Nano) != epoch {
+	// SQLite's strftime("%f") emits exactly millisecond precision, including
+	// significant trailing zeroes that RFC3339Nano formatting would trim.
+	if at, err := time.Parse(time.RFC3339Nano, epoch); err != nil || at.UTC().Format("2006-01-02T15:04:05.000Z") != epoch {
 		t.Fatal("invalid schema-30 usage epoch", epoch, err)
 	}
 	if err := db.QueryRow(`SELECT (SELECT count(*) FROM usage_records),(SELECT count(*) FROM usage_heads),(SELECT count(*) FROM usage_corrections)`).Scan(&records, &heads, &corrections); err != nil || records != 0 || heads != 0 || corrections != 0 {
@@ -525,5 +586,44 @@ func TestExclusiveRehearsalCopyRejectsOverwrite(t *testing.T) {
 	body, err := os.ReadFile(destination)
 	if err != nil || string(body) != "retained" {
 		t.Fatal("destination changed", err)
+	}
+}
+
+func TestPinnedRehearsalArchiveRejectsUnsafeIdentity(t *testing.T) {
+	root := t.TempDir()
+	name := "DarwinRouter_1.0.0_darwin_arm64.tar.gz"
+	path := filepath.Join(root, name)
+	body := []byte("one immutable descriptor snapshot")
+	if err := os.WriteFile(path, body, 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, digest, err := readPinnedRehearsalArchive(path, Artifact{File: name})
+	want := sha256.Sum256(body)
+	if err != nil || !bytes.Equal(got, body) || digest != hex.EncodeToString(want[:]) {
+		t.Fatal("regular archive snapshot failed", err)
+	}
+	if err := os.WriteFile(path, []byte("replacement"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, body) {
+		t.Fatal("captured archive changed after pathname replacement")
+	}
+	link := filepath.Join(root, "linked.tar.gz")
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatal(err)
+	}
+	for caseName, candidate := range map[string]struct {
+		path     string
+		artifact Artifact
+	}{
+		"basename":  {path: path, artifact: Artifact{File: "other.tar.gz"}},
+		"symlink":   {path: link, artifact: Artifact{File: filepath.Base(link)}},
+		"directory": {path: root, artifact: Artifact{File: filepath.Base(root)}},
+	} {
+		t.Run(caseName, func(t *testing.T) {
+			if _, _, err := readPinnedRehearsalArchive(candidate.path, candidate.artifact); err == nil {
+				t.Fatal("unsafe archive accepted")
+			}
+		})
 	}
 }

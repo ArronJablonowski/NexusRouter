@@ -11,7 +11,12 @@ import (
 // projectWorkerTerminal accepts only the supervisor's bounded terminal lifecycle,
 // never model/tool execution histories or an unacknowledged worker result.
 func projectWorkerTerminal(events []runtime.Event) (text string, completed bool, err error) {
-	bad := func() (string, bool, error) { return "", false, ErrHistory }
+	text, _, completed, err = projectWorkerTerminalAudit(events)
+	return
+}
+
+func projectWorkerTerminalAudit(events []runtime.Event) (text string, audit *runtime.DelegationAudit, completed bool, err error) {
+	bad := func() (string, *runtime.DelegationAudit, bool, error) { return "", nil, false, ErrHistory }
 	if len(events) < 1 || len(events) > 10000 {
 		return bad()
 	}
@@ -49,8 +54,14 @@ func projectWorkerTerminal(events []runtime.Event) (text string, completed bool,
 			}
 			stage = 2
 		case runtime.WorkerCompleted:
-			if stage != 2 || !utf8.ValidString(e.Data.Text) || strings.TrimSpace(e.Data.Text) == "" || len(e.Data.Text) > 64<<10 {
+			if stage != 2 || !utf8.ValidString(e.Data.Text) || strings.TrimSpace(e.Data.Text) == "" || len(e.Data.Text) > 64<<10 || (start.Data.DelegationAuditIntent == nil) != (e.Data.DelegationAudit == nil) {
 				return bad()
+			}
+			if e.Data.DelegationAudit != nil {
+				if e.Data.DelegationAudit.Validate(start.Data.DelegationAuditIntent) != nil {
+					return bad()
+				}
+				audit = e.Data.DelegationAudit.Clone()
 			}
 			stage = 3
 			text = e.Data.Text
@@ -77,5 +88,5 @@ func projectWorkerTerminal(events []runtime.Event) (text string, completed bool,
 	if replayErr != nil || (snapshot.State != "completed" && snapshot.State != "failed" && snapshot.State != "canceled") {
 		return bad()
 	}
-	return text, completed, nil
+	return text, audit, completed, nil
 }

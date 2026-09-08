@@ -99,11 +99,11 @@ func PlanInterruptedWorker(histories [][]runtime.Event, now time.Time) (Interrup
 		allowed := runtime.Data{}
 		switch e.Kind {
 		case runtime.TaskStarted:
-			allowed = runtime.Data{ParentTaskID: start.Data.ParentTaskID, SubmissionID: start.Data.SubmissionID, DelegationOrigin: start.Data.DelegationOrigin}
+			allowed = runtime.Data{ParentTaskID: start.Data.ParentTaskID, SubmissionID: start.Data.SubmissionID, DelegationOrigin: start.Data.DelegationOrigin, DelegationAuditIntent: start.Data.DelegationAuditIntent}
 		case runtime.EvaluationRecorded:
 			allowed = runtime.Data{Accepted: e.Data.Accepted, Code: "worker_validator"}
 		case runtime.WorkerCompleted:
-			allowed = runtime.Data{Text: e.Data.Text}
+			allowed = runtime.Data{Text: e.Data.Text, DelegationAudit: e.Data.DelegationAudit}
 		}
 		if !reflect.DeepEqual(e.Data, allowed) {
 			return bad()

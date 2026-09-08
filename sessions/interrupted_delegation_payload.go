@@ -79,7 +79,7 @@ type recoveryFailureEvidence struct {
 }
 
 func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error) {
-	text, accepted, err := projectWorkerTerminal(work)
+	text, audit, accepted, err := projectWorkerTerminalAudit(work)
 	if err != nil {
 		return nil, ErrHistory
 	}
@@ -101,11 +101,16 @@ func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error
 		if child.State != "succeeded" || child.Result == nil || child.Result.Text != text {
 			return nil, ErrHistory
 		}
+		var projected *recoveryDelegationAudit
+		if audit != nil {
+			projected = projectRecoveryDelegationAudit(audit)
+		}
 		return json.Marshal(struct {
-			WorkID      string `json:"work_task_id"`
-			ExecutionID string `json:"execution_task_id"`
-			Output      string `json:"untrusted_output"`
-		}{work[0].TaskID, execution[0].TaskID, text})
+			WorkID      string                   `json:"work_task_id"`
+			ExecutionID string                   `json:"execution_task_id"`
+			Output      string                   `json:"untrusted_output"`
+			Audit       *recoveryDelegationAudit `json:"audit,omitempty"`
+		}{work[0].TaskID, execution[0].TaskID, text, projected})
 	}
 	project := func(history []runtime.Event) (recoveryFailureEvidence, error) {
 		e := history[len(history)-1]
@@ -150,4 +155,23 @@ func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error
 		return nil, ErrHistory
 	}
 	return body, nil
+}
+
+type recoveryDelegationAudit struct {
+	Status     string   `json:"status"`
+	Verdict    string   `json:"verdict,omitempty"`
+	Confidence *float64 `json:"confidence,omitempty"`
+	Citations  []string `json:"cited_evidence"`
+}
+
+func projectRecoveryDelegationAudit(a *runtime.DelegationAudit) *recoveryDelegationAudit {
+	if a == nil {
+		return nil
+	}
+	out := &recoveryDelegationAudit{Status: a.Status, Verdict: a.Verdict, Citations: append([]string(nil), a.Citations...)}
+	if a.Confidence != nil {
+		confidence := *a.Confidence
+		out.Confidence = &confidence
+	}
+	return out
 }

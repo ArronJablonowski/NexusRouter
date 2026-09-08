@@ -40,10 +40,15 @@ type Work struct {
 	TaskID, SessionID, ParentID, Scope string
 	SubmissionID                       string
 	DelegationOrigin                   *runtime.DelegationOrigin
+	DelegationAuditIntent              *runtime.DelegationAuditIntent
 	// Execute must honor cancellation. Only inference and read-only tools are
 	// admitted here; there is no safe forced termination of arbitrary Go code.
 	Execute  func(context.Context) (string, error)
 	Validate func(context.Context, string) error
+	// Review runs only after Execute and deterministic Validate succeed. It is
+	// advisory: expected reviewer failure is represented by a valid durable
+	// projection, while an error means the projection cannot safely be recorded.
+	Review func(context.Context, string) (*runtime.DelegationAudit, error)
 }
 type Supervisor struct {
 	slots          chan struct{}
@@ -74,6 +79,16 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 		if w.DelegationOrigin.Validate() != nil {
 			return "", ErrWork
 		}
+	}
+	if (w.DelegationAuditIntent == nil) != (w.Review == nil) {
+		return "", ErrWork
+	}
+	if w.DelegationAuditIntent != nil {
+		intent := *w.DelegationAuditIntent
+		if intent.Validate() != nil {
+			return "", ErrWork
+		}
+		w.DelegationAuditIntent = &intent
 	}
 	select {
 	case s.slots <- struct{}{}:
@@ -122,7 +137,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 		}
 		return cause
 	}
-	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID, DelegationOrigin: w.DelegationOrigin}); err != nil {
+	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID, DelegationOrigin: w.DelegationOrigin, DelegationAuditIntent: w.DelegationAuditIntent}); err != nil {
 		return "", err
 	}
 	l, err := s.store.AcquireLease(ctx, w.TaskID, worker, w.Scope, false, time.Now(), s.ttl)
@@ -152,8 +167,9 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type outcome struct {
-		text string
-		err  error
+		text  string
+		audit *runtime.DelegationAudit
+		err   error
 	}
 	done := make(chan outcome, 1)
 	go func() {
@@ -169,6 +185,12 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 			result.err = w.Validate(run, result.text)
 		} else {
 			result.err = ErrWork
+		}
+		if result.err == nil && w.Review != nil {
+			result.audit, result.err = w.Review(run, result.text)
+			if result.err == nil && (result.audit == nil || result.audit.Validate(w.DelegationAuditIntent) != nil) {
+				result.err = ErrWork
+			}
 		}
 	}()
 	joined := false
@@ -228,7 +250,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 			if err := persist(ctx, runtime.EvaluationRecorded, runtime.Data{Accepted: &accepted, Code: "worker_validator"}); err != nil {
 				return "", err
 			}
-			if err := persist(ctx, runtime.WorkerCompleted, runtime.Data{Text: result.text}); err != nil {
+			if err := persist(ctx, runtime.WorkerCompleted, runtime.Data{Text: result.text, DelegationAudit: result.audit}); err != nil {
 				return "", err
 			}
 			if err := persist(ctx, runtime.TaskCompleted, runtime.Data{}); err != nil {

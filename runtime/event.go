@@ -63,36 +63,38 @@ type Event struct {
 }
 
 type Data struct {
-	SkillContext       *SkillContextUse     `json:"skill_context,omitempty"`
-	SteeringID         string               `json:"steering_id,omitempty"`
-	SubmissionID       string               `json:"submission_id,omitempty"`
-	Compaction         *ContextCompaction   `json:"compaction,omitempty"`
-	Validation         string               `json:"validation,omitempty"`
-	RetryOfTaskID      string               `json:"retry_of_task_id,omitempty"`
-	RouteCandidates    []routing.Candidate  `json:"route_candidates,omitempty"`
-	RoutePolicy        *routing.Policy      `json:"route_policy,omitempty"`
-	Resources          *resources.Snapshot  `json:"resources,omitempty"`
-	Route              *routing.Selection   `json:"route,omitempty"`
-	RouteEstimatedCost *float64             `json:"route_estimated_cost,omitempty"`
-	Domain             string               `json:"domain,omitempty"`
-	Profile            string               `json:"profile,omitempty"`
-	ConfigID           string               `json:"config_id,omitempty"`
-	ParentTaskID       string               `json:"parent_task_id,omitempty"`
-	DelegationOrigin   *DelegationOrigin    `json:"delegation_origin,omitempty"`
-	Privacy            string               `json:"privacy,omitempty"`
-	Text               string               `json:"text,omitempty"`
-	ModelID            string               `json:"model_id,omitempty"`
-	ProviderID         string               `json:"provider_id,omitempty"`
-	ToolCallID         string               `json:"tool_call_id,omitempty"`
-	ToolName           string               `json:"tool_name,omitempty"`
-	ToolBehavior       ToolBehavior         `json:"tool_behavior,omitempty"`
-	Effect             Effect               `json:"effect,omitempty"`
-	Code               string               `json:"code,omitempty"`
-	Accepted           *bool                `json:"accepted,omitempty"`
-	Messages           []providers.Message  `json:"messages,omitempty"`
-	ToolCalls          []providers.ToolCall `json:"tool_calls,omitempty"`
-	Usage              *providers.Usage     `json:"usage,omitempty"`
-	FinishReason       string               `json:"finish_reason,omitempty"`
+	SkillContext          *SkillContextUse       `json:"skill_context,omitempty"`
+	SteeringID            string                 `json:"steering_id,omitempty"`
+	SubmissionID          string                 `json:"submission_id,omitempty"`
+	Compaction            *ContextCompaction     `json:"compaction,omitempty"`
+	Validation            string                 `json:"validation,omitempty"`
+	RetryOfTaskID         string                 `json:"retry_of_task_id,omitempty"`
+	RouteCandidates       []routing.Candidate    `json:"route_candidates,omitempty"`
+	RoutePolicy           *routing.Policy        `json:"route_policy,omitempty"`
+	Resources             *resources.Snapshot    `json:"resources,omitempty"`
+	Route                 *routing.Selection     `json:"route,omitempty"`
+	RouteEstimatedCost    *float64               `json:"route_estimated_cost,omitempty"`
+	Domain                string                 `json:"domain,omitempty"`
+	Profile               string                 `json:"profile,omitempty"`
+	ConfigID              string                 `json:"config_id,omitempty"`
+	ParentTaskID          string                 `json:"parent_task_id,omitempty"`
+	DelegationOrigin      *DelegationOrigin      `json:"delegation_origin,omitempty"`
+	DelegationAuditIntent *DelegationAuditIntent `json:"delegation_audit_intent,omitempty"`
+	DelegationAudit       *DelegationAudit       `json:"delegation_audit,omitempty"`
+	Privacy               string                 `json:"privacy,omitempty"`
+	Text                  string                 `json:"text,omitempty"`
+	ModelID               string                 `json:"model_id,omitempty"`
+	ProviderID            string                 `json:"provider_id,omitempty"`
+	ToolCallID            string                 `json:"tool_call_id,omitempty"`
+	ToolName              string                 `json:"tool_name,omitempty"`
+	ToolBehavior          ToolBehavior           `json:"tool_behavior,omitempty"`
+	Effect                Effect                 `json:"effect,omitempty"`
+	Code                  string                 `json:"code,omitempty"`
+	Accepted              *bool                  `json:"accepted,omitempty"`
+	Messages              []providers.Message    `json:"messages,omitempty"`
+	ToolCalls             []providers.ToolCall   `json:"tool_calls,omitempty"`
+	Usage                 *providers.Usage       `json:"usage,omitempty"`
+	FinishReason          string                 `json:"finish_reason,omitempty"`
 }
 
 func (e Event) Validate() error {
@@ -107,6 +109,17 @@ func (e Event) Validate() error {
 	}
 	if e.Data.DelegationOrigin != nil && (e.Kind != TaskStarted || e.Data.ParentTaskID == "" || e.Data.DelegationOrigin.Validate() != nil) {
 		return errors.New("invalid delegation origin placement")
+	}
+	if e.Data.DelegationAuditIntent != nil && (e.Kind != TaskStarted || e.WorkerID == "" || e.Data.DelegationAuditIntent.Validate() != nil) {
+		return errors.New("invalid delegation audit intent placement")
+	}
+	if e.Data.DelegationAudit != nil {
+		// WorkerCompleted carries the outcome while TaskStarted carries the
+		// intent, so cross-event binding is enforced by worker projectors.
+		intent := &DelegationAuditIntent{Version: 1, OperationID: e.Data.DelegationAudit.OperationID, ReviewerID: e.Data.DelegationAudit.ReviewerID}
+		if e.Kind != WorkerCompleted || e.Data.DelegationAudit.Validate(intent) != nil {
+			return errors.New("invalid delegation audit placement")
+		}
 	}
 	if e.Data.SteeringID != "" && e.Kind != SteeringApplied {
 		return errors.New("invalid steering identity")

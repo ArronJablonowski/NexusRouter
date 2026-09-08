@@ -113,6 +113,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	}
 	if r.delegatedParent == "" {
 		r.delegate = s.bindDelegate(r)
+		r.delegateAudit = s.bindDelegationAudit()
 	}
 	return runExplicitAdmitted(ctx, s.settings, r, s.secret)
 }

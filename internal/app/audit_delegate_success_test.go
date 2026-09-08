@@ -76,7 +76,22 @@ func auditSuccessfulDelegateFixture(t *testing.T, batch bool, mutation string) (
 		if success && mutation == "missing origin" {
 			origin = nil
 		}
-		appendEvent(work, session, runtime.Event{Kind: runtime.TaskStarted, WorkerID: prefix, Data: runtime.Data{ParentTaskID: owner, DelegationOrigin: origin}})
+		var intent *runtime.DelegationAuditIntent
+		var audit *runtime.DelegationAudit
+		if success && strings.HasPrefix(mutation, "audit ") {
+			confidence := .5
+			intent = &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation-" + prefix, ReviewerID: "reviewer"}
+			audit = &runtime.DelegationAudit{Version: 1, OperationID: intent.OperationID, ReviewerID: intent.ReviewerID, AuditID: "audit-" + prefix, Status: "completed", Verdict: "accept", Confidence: &confidence, Citations: []string{"candidate"}}
+			switch mutation {
+			case "audit missing intent":
+				intent = nil
+			case "audit changed intent":
+				intent.ReviewerID = "other-reviewer"
+			case "audit changed outcome":
+				audit.ReviewerID = "other-reviewer"
+			}
+		}
+		appendEvent(work, session, runtime.Event{Kind: runtime.TaskStarted, WorkerID: prefix, Data: runtime.Data{ParentTaskID: owner, DelegationOrigin: origin, DelegationAuditIntent: intent}})
 		appendEvent(work, session, runtime.Event{Kind: runtime.WorkerStarted, WorkerID: prefix})
 		if success {
 			accepted := mutation != "false acceptance"
@@ -88,7 +103,7 @@ func auditSuccessfulDelegateFixture(t *testing.T, batch bool, mutation string) (
 				worker = "other-worker"
 			}
 			if mutation != "missing worker completion" {
-				appendEvent(work, session, runtime.Event{Kind: runtime.WorkerCompleted, WorkerID: worker, Data: runtime.Data{Text: output}})
+				appendEvent(work, session, runtime.Event{Kind: runtime.WorkerCompleted, WorkerID: worker, Data: runtime.Data{Text: output, DelegationAudit: audit}})
 			}
 			terminalWorker := prefix
 			if mutation == "terminal worker mismatch" {
@@ -127,10 +142,11 @@ func auditSuccessfulDelegateFixture(t *testing.T, batch bool, mutation string) (
 				returned = "invented output"
 			}
 			return encode(struct {
-				Work      string `json:"work_task_id"`
-				Execution string `json:"execution_task_id"`
-				Output    string `json:"untrusted_output"`
-			}{work, child, returned})
+				Work      string                   `json:"work_task_id"`
+				Execution string                   `json:"execution_task_id"`
+				Output    string                   `json:"untrusted_output"`
+				Audit     *delegateAuditProjection `json:"audit,omitempty"`
+			}{work, child, returned, projectDelegateAudit(audit)})
 		}
 		return encode(delegateFailure{Version: 1, Error: "delegate_unavailable_or_rejected", Reason: "invalid_output", WorkID: work, ExecutionID: child, Evidence: []delegateFailureEvidence{{TaskID: work, Sequence: 3, Kind: runtime.TaskFailed, Code: "worker_failed"}, {TaskID: child, Sequence: 5, Kind: runtime.TaskFailed, Code: "invalid_output"}}})
 	}
@@ -272,7 +288,7 @@ func TestAuditSuccessfulAndMixedBatchEvidence(t *testing.T) {
 }
 
 func TestAuditSuccessAndBatchForgeryRejectedBeforeDispatch(t *testing.T) {
-	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "missing acceptance", "false acceptance", "missing worker completion", "worker mismatch", "terminal worker mismatch", "failed execution", "changed output", "aliased field", "duplicate field", "duplicate child", "aliased batch", "empty batch", "unknown item", "dropped slot", "extra slot", "sibling origin", "swapped batch origin", "missing origin"} {
+	for _, mutation := range []string{"foreign work", "foreign session", "foreign execution", "missing acceptance", "false acceptance", "missing worker completion", "worker mismatch", "terminal worker mismatch", "failed execution", "changed output", "aliased field", "duplicate field", "duplicate child", "aliased batch", "empty batch", "unknown item", "dropped slot", "extra slot", "sibling origin", "swapped batch origin", "missing origin", "audit missing intent", "audit changed intent", "audit changed outcome"} {
 		t.Run(mutation, func(t *testing.T) {
 			svc, db := auditSuccessfulDelegateFixture(t, true, mutation)
 			var calls atomic.Int32

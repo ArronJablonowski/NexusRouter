@@ -11,9 +11,10 @@ import (
 )
 
 type auditDelegateSuccess struct {
-	WorkID      string `json:"work_task_id"`
-	ExecutionID string `json:"execution_task_id"`
-	Output      string `json:"untrusted_output"`
+	WorkID      string                   `json:"work_task_id"`
+	ExecutionID string                   `json:"execution_task_id"`
+	Output      string                   `json:"untrusted_output"`
+	Audit       *delegateAuditProjection `json:"audit,omitempty"`
 }
 
 // Only runtime-produced canonical envelopes are traversal authority. Generic
@@ -95,7 +96,7 @@ func parseAuditDelegationItem(e runtime.Event, body []byte) (*auditDelegation, e
 		canonical, err = json.Marshal(r)
 	} else {
 		var success auditDelegateSuccess
-		if json.Unmarshal(body, &success) != nil || !sessions.ValidEventPageID(success.WorkID) || !sessions.ValidEventPageID(success.ExecutionID) || success.WorkID == success.ExecutionID || len(success.Output) > 64<<10 || strings.TrimSpace(success.Output) == "" {
+		if json.Unmarshal(body, &success) != nil || !sessions.ValidEventPageID(success.WorkID) || !sessions.ValidEventPageID(success.ExecutionID) || success.WorkID == success.ExecutionID || len(success.Output) > 64<<10 || strings.TrimSpace(success.Output) == "" || !validDelegateAuditProjection(success.Audit) {
 			return nil, ErrAdmission
 		}
 		canonical, err = json.Marshal(success)
@@ -110,12 +111,13 @@ func parseAuditDelegationItem(e runtime.Event, body []byte) (*auditDelegation, e
 	return ref, nil
 }
 
-func auditSuccessfulDelegation(work, execution auditChildHistory, output string) bool {
+func auditSuccessfulDelegation(work, execution auditChildHistory, output string, audit *delegateAuditProjection) bool {
 	if len(work.events) < 4 || len(execution.events) < 3 {
 		return false
 	}
 	worker := ""
 	accepted, completed := false, false
+	var durableAudit *delegateAuditProjection
 	for _, e := range work.events {
 		switch e.Kind {
 		case runtime.WorkerStarted:
@@ -129,9 +131,11 @@ func auditSuccessfulDelegation(work, execution auditChildHistory, output string)
 			}
 			accepted = true
 		case runtime.WorkerCompleted:
-			if !accepted || completed || e.WorkerID != worker || e.Data.Text != output {
+			intent := work.events[0].Data.DelegationAuditIntent
+			if !accepted || completed || e.WorkerID != worker || e.Data.Text != output || (intent == nil) != (e.Data.DelegationAudit == nil) || (e.Data.DelegationAudit != nil && e.Data.DelegationAudit.Validate(intent) != nil) {
 				return false
 			}
+			durableAudit = projectDelegateAudit(e.Data.DelegationAudit)
 			completed = true
 		}
 	}
@@ -150,5 +154,25 @@ func auditSuccessfulDelegation(work, execution auditChildHistory, output string)
 			final = e
 		}
 	}
-	return final.Kind == runtime.TurnCompleted && len(final.Data.ToolCalls) == 0 && final.Data.Text == output
+	wantAudit, gotAudit := []byte("null"), []byte("null")
+	if audit != nil {
+		wantAudit, _ = json.Marshal(audit)
+	}
+	if durableAudit != nil {
+		gotAudit, _ = json.Marshal(durableAudit)
+	}
+	return bytes.Equal(wantAudit, gotAudit) && final.Kind == runtime.TurnCompleted && len(final.Data.ToolCalls) == 0 && final.Data.Text == output
+}
+
+func validDelegateAuditProjection(a *delegateAuditProjection) bool {
+	if a == nil {
+		return true
+	}
+	op := "operation"
+	auditID := ""
+	if a.Status == "completed" || a.Status == "rejected" || a.Status == "abstained" {
+		auditID = "audit"
+	}
+	full := runtime.DelegationAudit{Version: 1, OperationID: op, ReviewerID: "reviewer", AuditID: auditID, Status: a.Status, Verdict: a.Verdict, Confidence: a.Confidence, Citations: a.Citations}
+	return full.Validate(&runtime.DelegationAuditIntent{Version: 1, OperationID: op, ReviewerID: "reviewer"}) == nil
 }

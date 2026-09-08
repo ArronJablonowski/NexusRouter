@@ -41,8 +41,10 @@ installation plus schema migration/backup/rollback with only the artifact
 matching that job's asserted native platform. Other targets in that job are
 cross-build evidence, not native execution evidence. Four-target support
 requires four successful job summaries and four retained native evidence bundles
-for the exact version and commit. The summary identifies failures and skipped
-gates; neither qualifies a release.
+for the exact version and commit. Each bundle contains the primary native
+record, canonical install-rehearsal record, bounded transcript, and canonical
+in-job verification result. The summary identifies failures and skipped gates;
+neither qualifies a release.
 
 The workflow has read-only repository permissions, pins the checkout and Go
 setup actions to reviewed full commit IDs, disables checkout credential
@@ -50,14 +52,28 @@ persistence and Go cache uploads, forces the installed toolchain with
 `GOTOOLCHAIN=local`, disables ambient Go environment/workspace/flag and
 experiment settings, disables cgo, and fixes the documented amd64/arm64
 architecture baselines. A pinned `actions/upload-artifact` step runs only after
-successful native qualification and retains that target's canonical JSON record
-and bounded gate transcript for 30 days. It does not upload release archives or
-publication assets. Test-generated archives, installation, database, backup,
-rollback copy and keys remain disposable runner-local files.
+successful native qualification and retains both canonical JSON records, the
+bounded gate transcript, and the in-job verification result for 30 days. It
+does not upload release archives or publication assets. Test-generated archives,
+installation, database, backup, rollback copy and keys remain disposable
+runner-local files.
 It does not use the repository SSH key, production signing secrets or live model
 accounts. Standard Actions logs and summaries remain subject to repository
 access and retention settings. Treat the workflow artifact as sensitive
 operator evidence even though the qualification path uses no production secrets.
+
+The independently dispatched candidate and license-evidence digests remain the
+job's external inputs. The archive and backup digests cannot exist before the
+rehearsal; the native wrapper emits them through one fixed, bounded transcript
+line only after validating the generated companion record, and binds them into
+the schema-2 primary native record. The job computes the companion-record digest,
+checks those bindings, derives the expected archive name independently from the
+dispatched version and asserted native target, and runs
+`verify-install-rehearsal` with the observed archive/backup digests and fixed
+schema boundary. This catches truncation, noncanonical data, internal mismatch,
+and workflow plumbing errors. It is same-job verification, not independent
+operator approval. A later reviewer must retrieve the bundle, obtain its digests
+through the external evidence channel, and repeat verification before approval.
 
 Standard hosted runners consume included Actions minutes for private
 repositories and may incur metered charges afterward; see GitHub's current

@@ -1,5 +1,64 @@
 # Implementation evidence
 
+DAR-70 delegated-output audit checkpoint (uncommitted): configured successful
+worker executions now receive one idempotent orchestrator review after trusted
+deterministic validation and before supervisor acceptance. The worker log binds
+a versioned review intent to the exact operation and reviewer, then retains only
+the advisory status, verdict, confidence and opaque evidence identifiers. The
+parent receives that sanitized projection beside `untrusted_output`; prompts,
+raw reviews, credentials, operation/reviewer/audit identifiers and unrelated
+history are excluded. Batch items reuse the single-child path and preserve input
+order. Review failure, policy denial, reject or abstention cannot override
+deterministic acceptance; invalid, failed, canceled, interrupted and
+uncertain-effect children cannot be promoted or published by review. Existing
+privacy, provider, credential, resource, context and cost admission remains in
+force, reviewers receive no tools/delegation/retry authority, same-model positive
+opinion cannot boost fitness, and explicit user feedback retains precedence for
+subjective work.
+
+Append-only recovery validates the exact intent/outcome pair and reproduces the
+same projection without dispatch. Tamper tests reject missing or changed intent,
+operation, reviewer and outcome bindings. Active-review cancellation and lease
+loss join the reviewer and persist no accepted output; a real SQLite/WAL recovery
+fixture leaves a previously admitted pending review as the sole inspectable
+attempt while failing the interrupted worker and parent delegation closed.
+Independent code and documentation review approved the slice after two binding
+defects and one stale runbook claim were corrected. Focused race suites, the full
+`runtime`/`workers`/`sessions`/`internal/app` race suite, and the fourteen-scenario
+`make qualify-mvp` gate passed; the last gate completed in 11.745 seconds. Live
+review quality remains outside deterministic qualification.
+
+DAR-52 retained-evidence review-fix checkpoint (uncommitted): the actual native
+archive rehearsal optionally creates a bounded canonical schema-1 companion at
+an explicit new destination outside the checkout. It snapshots one pinned
+regular nonsymlink archive descriptor, checks its basename and authenticated
+manifest digest, and derives path-free evidence inline from completed permission,
+configuration, exact-writer-stop, quiescence, backup, migration, preservation,
+and rollback-smoke observations. Both output destinations are preflighted before
+qualification. When a companion is requested, the primary native record is
+withheld unless a newly created canonical record matches the exact version,
+commit and observed target; schema-2 primary evidence then binds its record,
+archive and backup digests and schema pair. The exclusive mode-0600 companion
+write fsyncs both file and pinned parent directory.
+
+The credential-free verifier/CLI require independently supplied record,
+candidate, artifact, schema and backup identities, reject unsafe files,
+noncanonical or unbounded JSON, tampering and mismatch, and distinguish help,
+usage, and verification/output exit statuses. Manual hosted qualification now
+uses a target-specific `RUNNER_TEMP` companion, checks its generated digest and
+bounded digest-output line, independently derives the archive name from dispatch
+and matrix identity, executes the verifier, reports all observed digests, and
+uploads both records, verification result and transcript. Generated archive and
+backup digests are explicitly same-job observations, not external approval.
+The consolidated focused race suite passed across releasepack, the native
+wrapper and the verifier CLI, including every primary-evidence suppression case.
+An additional unfiltered race run passed the actual daemon/migration/rollback
+rehearsal (`internal/releasepack` in 284.158 seconds) and both CLIs. Independent
+re-review approved all five original release-integrity fixes. This remains mechanical
+local code: no hosted workflow was dispatched, and no final candidate,
+historical published binary, non-native execution, platform approval, production
+key, signature, tag, upload or publication was used.
+
 DAR-66 completion qualification: the credential-free MVP gate now covers the
 full orchestrator-audit lifecycle through production provider adapters,
 `Service.Run`, `Service.AuditTask`, and SQLite/WAL. Malformed Go is reviewed

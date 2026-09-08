@@ -577,6 +577,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	r.delegate = s.bindDelegate(r)
+	r.delegateAudit = s.bindDelegationAudit()
 	result, runErr := runExplicitAdmitted(executionCtx, cfg, r, s.secret)
 	if runErr != nil {
 		s.discovery.clear()

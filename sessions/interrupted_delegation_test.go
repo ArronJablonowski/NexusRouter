@@ -353,3 +353,37 @@ func TestRecoveryWorkResultPreservesProducerOutputBounds(t *testing.T) {
 		t.Fatal("batch producer encoded bound bypassed")
 	}
 }
+
+func TestRecoveryWorkResultPreservesAndValidatesDelegationAudit(t *testing.T) {
+	h := interruptedDelegationFixture(t)
+	intent := &runtime.DelegationAuditIntent{Version: 1, OperationID: "operation", ReviewerID: "reviewer"}
+	confidence := .625
+	h[1][0].Data.DelegationAuditIntent = intent
+	h[1][3].Data.DelegationAudit = &runtime.DelegationAudit{Version: 1, OperationID: "operation", ReviewerID: "reviewer", AuditID: "audit", Status: "completed", Verdict: "accept", Confidence: &confidence, Citations: []string{"candidate"}}
+	body, err := recoveryWorkResult(h[1], h[2])
+	if err != nil || !bytes.Contains(body, []byte(`"audit":{"status":"completed","verdict":"accept","confidence":0.625,"cited_evidence":["candidate"]}`)) || bytes.Contains(body, []byte("operation")) {
+		t.Fatal(string(body), err)
+	}
+	for _, mutate := range []func([]runtime.Event){
+		func(work []runtime.Event) { work[3].Data.DelegationAudit = nil },
+		func(work []runtime.Event) { work[3].Data.DelegationAudit.OperationID = "other" },
+		func(work []runtime.Event) { work[0].Data.DelegationAuditIntent.ReviewerID = "other" },
+		func(work []runtime.Event) { work[3].Data.DelegationAudit.ReviewerID = "other" },
+		func(work []runtime.Event) { work[0].Data.DelegationAuditIntent = nil },
+	} {
+		work := append([]runtime.Event(nil), h[1]...)
+		work[0].Data = h[1][0].Data
+		work[3].Data = h[1][3].Data
+		if work[0].Data.DelegationAuditIntent != nil {
+			intent := *work[0].Data.DelegationAuditIntent
+			work[0].Data.DelegationAuditIntent = &intent
+		}
+		if work[3].Data.DelegationAudit != nil {
+			work[3].Data.DelegationAudit = work[3].Data.DelegationAudit.Clone()
+		}
+		mutate(work)
+		if _, err := recoveryWorkResult(work, h[2]); err == nil {
+			t.Fatal("unbound audit recovered")
+		}
+	}
+}

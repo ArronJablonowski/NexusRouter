@@ -103,6 +103,8 @@ be omitted.
 - Old-writer shutdown evidence:
 - Upgrade result and observed schema:
 - Rollback binary prefix and matching data-backup reference:
+- Canonical install-rehearsal record location and SHA-256:
+- Independent rehearsal verification result, operator and UTC time:
 - [ ] Configuration and state directories have reviewed private permissions.
 - [ ] The fail-closed sample fields were replaced with reviewed model ID,
   `context_tokens`, `estimated_cost` and `ram_bytes` values.

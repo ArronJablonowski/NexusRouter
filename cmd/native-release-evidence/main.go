@@ -22,6 +22,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	f.StringVar(&options.Version, "version", "", "explicit semantic release version")
 	f.StringVar(&options.Commit, "commit", "", "full lowercase source commit")
 	f.StringVar(&options.Out, "out", "", "new external evidence file")
+	f.StringVar(&options.InstallEvidenceOut, "install-rehearsal-out", "", "new external install/migration rehearsal evidence file")
 	f.StringVar(&options.Source, "source", ".", "clean source repository")
 	if err := f.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
