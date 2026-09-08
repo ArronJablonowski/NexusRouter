@@ -1,5 +1,28 @@
 # Implementation evidence
 
+Muse Glimmer review and RC9 checkpoint: the only uncommitted source change left
+by the local model moved `golang.org/x/sys v0.47.0` from the indirect block to
+the direct dependency block. That is correct because production Darwin/Linux
+process-guard and atomic release-publication files import `x/sys/unix` directly;
+`go mod tidy -diff` accepted the result and the full race-enabled `make check`
+passed before clean commit `fe15699a2d5b320eb8ef2cb4bdbe004808db66e0`
+was pushed. Muse's reported license-evidence freeze failure was reproduced as a
+workflow-order problem: the freezer deliberately rejects a dirty checkout, and
+Muse attempted it while `go.mod` was modified. From the exact clean pushed
+commit, external RC9 schema-2 license evidence was successfully frozen at
+`/Users/aj_lobster/DarwinRouter-release-evidence/1.0.0-rc.9/license-evidence.json`
+with digest `edb334e245d53d8365b075b2565334c4132725d1021645282d50c743f8297b03`,
+and `make qualify-license-evidence` independently re-derived and accepted it.
+The four target module counts and notice digests match RC7, as expected because
+dependency classification changed but the target build closures did not.
+`make qualify-release` then passed for `1.0.0-rc.9` on native darwin/arm64:
+all nine deterministic MVP scenarios, eight byte-compared four-target builds,
+four executable-format checks, disposable signing plus raw and approval-bound
+verification, tamper rejection, and isolated schema-28-to-29 install, backup
+and rollback rehearsal passed. This is mechanical/local evidence only; final
+candidate, legal/notices, target/platform, production signing and publication
+approvals remain open.
+
 DAR-48 candidate-bound licensing checkpoint: the canonical schema-2 license
 record now freezes one exact clean commit, Go runtime/directive, root MIT
 license digest, and the four ordered target dependency/legal-file closures.
