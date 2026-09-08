@@ -93,6 +93,26 @@ func readSubmission(ctx context.Context, tx *sql.Tx, id string) (submissions.Sta
 	return o, rows.Err()
 }
 
+func readSubmissionKeyRecord(ctx context.Context, tx *sql.Tx, keyDigest string) (id, requestDigest, configDigest string, err error) {
+	var size int64
+	err = tx.QueryRowContext(ctx, `SELECT id,request_digest,config_digest,length(CAST(request AS BLOB)) FROM submissions WHERE key_digest=?`, keyDigest).Scan(&id, &requestDigest, &configDigest, &size)
+	if err != nil {
+		return "", "", "", err
+	}
+	if !sessions.ValidEventPageID(id) || !submissionDigest(requestDigest) || !submissionDigest(configDigest) || size < 1 || size > submissions.MaxRequestBytes {
+		return "", "", "", submissions.ErrInvalid
+	}
+	var body []byte
+	if err = tx.QueryRowContext(ctx, `SELECT request FROM submissions WHERE id=?`, id).Scan(&body); err != nil {
+		return "", "", "", err
+	}
+	digest := sha256.Sum256(body)
+	if int64(len(body)) != size || requestDigest != hex.EncodeToString(digest[:]) || !utf8.Valid(body) || !json.Valid(body) {
+		return "", "", "", submissions.ErrInvalid
+	}
+	return id, requestDigest, configDigest, nil
+}
+
 func (s *Store) CreateSubmission(ctx context.Context, keyDigest, requestDigest, configDigest string, body []byte) (submissions.Status, error) {
 	if !submissionDigest(keyDigest) || !submissionDigest(requestDigest) || !submissionDigest(configDigest) || len(body) < 1 || len(body) > submissions.MaxRequestBytes || !utf8.Valid(body) || !json.Valid(body) {
 		return submissions.Status{}, submissions.ErrInvalid
@@ -106,8 +126,7 @@ func (s *Store) CreateSubmission(ctx context.Context, keyDigest, requestDigest, 
 		return submissions.Status{}, err
 	}
 	defer tx.Rollback()
-	var id, previousRequest, previousConfig string
-	err = tx.QueryRowContext(ctx, "SELECT id,request_digest,config_digest FROM submissions WHERE key_digest=?", keyDigest).Scan(&id, &previousRequest, &previousConfig)
+	id, previousRequest, previousConfig, err := readSubmissionKeyRecord(ctx, tx, keyDigest)
 	if err == nil {
 		if requestDigest != previousRequest || configDigest != previousConfig {
 			return submissions.Status{}, submissions.ErrConflict
@@ -155,6 +174,32 @@ func (s *Store) Submission(ctx context.Context, id string) (submissions.Status, 
 	}
 	if version < 12 {
 		return submissions.Status{}, sql.ErrNoRows
+	}
+	status, err := readSubmission(ctx, tx, id)
+	if err != nil {
+		return status, err
+	}
+	return status, tx.Commit()
+}
+
+// SubmissionByKey returns an existing submission only when the idempotency
+// key, canonical request, and active configuration all match. It never creates
+// work, which makes it safe to use while authorizing stream resumption.
+func (s *Store) SubmissionByKey(ctx context.Context, keyDigest, requestDigest, configDigest string) (submissions.Status, error) {
+	if !submissionDigest(keyDigest) || !submissionDigest(requestDigest) || !submissionDigest(configDigest) {
+		return submissions.Status{}, submissions.ErrInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	defer tx.Rollback()
+	id, storedRequest, storedConfig, err := readSubmissionKeyRecord(ctx, tx, keyDigest)
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	if storedRequest != requestDigest || storedConfig != configDigest {
+		return submissions.Status{}, submissions.ErrConflict
 	}
 	status, err := readSubmission(ctx, tx, id)
 	if err != nil {

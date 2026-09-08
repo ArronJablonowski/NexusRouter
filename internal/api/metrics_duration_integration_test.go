@@ -87,7 +87,7 @@ func TestTaskDurationPropagatesSQLiteAppHTTPAndSDKExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err := service.Metrics(ctx)
-	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != 31 || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
+	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != 32 || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
 		t.Fatal("missing duration snapshot", snapshot, err)
 	}
 	completed := snapshot.TaskDuration.Groups[0]

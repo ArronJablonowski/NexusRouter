@@ -144,7 +144,7 @@ func TestTerminalSubmissionRecoveryRejectsUnsafeHistory(t *testing.T) {
 			case "continuation":
 				query = `UPDATE events SET body=json_set(body,'$.data.parent_task_id','missing-work') WHERE sequence=1`
 			case "gap":
-				query = `DELETE FROM events WHERE sequence=2`
+				query = `DELETE FROM submission_stream_events WHERE task_sequence=2; DELETE FROM events WHERE sequence=2`
 			case "head":
 				query = `UPDATE task_heads SET state='failed'`
 			case "body":

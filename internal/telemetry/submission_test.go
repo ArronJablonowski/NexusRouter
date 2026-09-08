@@ -82,6 +82,22 @@ func TestSubmissionIdempotenceCapacityAndStatusPrivacy(t *testing.T) {
 	queuedSubmission(t, db, "newafterclaim")
 }
 
+func TestSubmissionExactRetryRejectsCorruptStoredRequest(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	created := queuedSubmission(t, db, "corrupt-request")
+	if _, err := db.db.Exec(`UPDATE submissions SET request='{"prompt":"changed-private"}' WHERE id=?`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte(`{"prompt":"private-request"}`)
+	if _, err := db.CreateSubmission(ctx, submitDigest("corrupt-request"), submitDigest(string(body)), submitDigest("config"), body); !errors.Is(err, submissions.ErrInvalid) {
+		t.Fatal(err)
+	}
+	if _, err := db.SubmissionByKey(ctx, submitDigest("corrupt-request"), submitDigest(string(body)), submitDigest("config")); !errors.Is(err, submissions.ErrInvalid) {
+		t.Fatal(err)
+	}
+}
+
 func TestSubmissionClaimRaceAndLeaseRules(t *testing.T) {
 	db, _ := submissionStore(t)
 	queuedSubmission(t, db, "one")

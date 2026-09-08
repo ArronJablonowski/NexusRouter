@@ -137,7 +137,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	}
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
 	assertMode(t, database, 0600)
-	checkDatabase(t, database, 31, "", "")
+	checkDatabase(t, database, 32, "", "")
 
 	fact := memory.Fact{Version: 1, ID: "install-rehearsal", Scope: "release-rehearsal", Revision: 1, Content: "Synthetic schema migration evidence.", Provenance: "DAR-52 disposable fixture", Confidence: 1, Privacy: "local_only", Created: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC), Updated: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)}
 	factBody, err := json.Marshal(fact)
@@ -169,12 +169,12 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 
 	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
-	checkDatabase(t, database, 31, fact.Scope, fact.ID)
+	checkDatabase(t, database, 32, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
 		t.Fatal("migration changed synthetic evidence")
 	}
 	if got := taskTimingEpoch(t, database); got != timingEpoch {
-		t.Fatal("schema-31 migration changed schema-29 task timing epoch")
+		t.Fatal("schema-32 migration changed schema-29 task timing epoch")
 	}
 	assertEmptyUsageLedger(t, database)
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, database, fact)
@@ -190,7 +190,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	}
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, rollback, fact)
 	checkDatabase(t, rollback, 29, fact.Scope, fact.ID) // Read-only inspection must not migrate.
-	checkDatabase(t, database, 31, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
+	checkDatabase(t, database, 32, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
 	rollbackDigest := "sha256:" + fileDigest(t, rollback)
 	if rollbackDigest != backupDigest {
 		t.Fatal("rollback smoke changed the restored database")
@@ -203,7 +203,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 		Installation: InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       InstallEvidenceBackup{SHA256: backupDigest, Schema: 29, QuickCheck: "ok"},
-		Migration: InstallEvidenceMigration{Schema: 31, QuickCheck: "ok", PreservedRecordSHA256: "sha256:" + evidenceBefore,
+		Migration: InstallEvidenceMigration{Schema: 32, QuickCheck: "ok", PreservedRecordSHA256: "sha256:" + evidenceBefore,
 			TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
 		Rollback: InstallEvidenceRollback{DatabaseSHA256: rollbackDigest, Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version,
 			TargetOS: artifact.OS, TargetArch: artifact.Arch, Smoke: "passed"},
@@ -218,11 +218,11 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	if _, err = VerifyInstallRehearsalEvidence(evidenceOut, InstallRehearsalExpectations{
 		RecordSHA256: installEvidenceDigest(body), Version: version, Commit: commit,
 		TargetOS: artifact.OS, TargetArch: artifact.Arch, ArtifactName: artifact.File,
-		ArtifactSHA256: archiveDigest, SourceSchema: 29, CurrentSchema: 31, BackupSHA256: backupDigest,
+		ArtifactSHA256: archiveDigest, SourceSchema: 29, CurrentSchema: 32, BackupSHA256: backupDigest,
 	}); err != nil {
 		t.Fatal("verify retained install rehearsal evidence", err)
 	}
-	t.Logf("native install=%s schema=31; backup_sha256=%s; migration=29->31; rollback_copy_schema=29", installPrefix, backupDigest)
+	t.Logf("native install=%s schema=32; backup_sha256=%s; migration=29->32; rollback_copy_schema=29", installPrefix, backupDigest)
 }
 
 func readPinnedRehearsalArchive(archive string, artifact Artifact) ([]byte, string, error) {
@@ -394,6 +394,10 @@ func checkDatabase(t *testing.T, path string, schema int, scope, id string) {
 	if db.QueryRow("PRAGMA user_version").Scan(&version) != nil || db.QueryRow("PRAGMA journal_mode").Scan(&mode) != nil || db.QueryRow("PRAGMA quick_check").Scan(&check) != nil || version != schema || strings.ToLower(mode) != "wal" || check != "ok" {
 		t.Fatal("database validation failed", version, mode, check)
 	}
+	var streamMapping bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='submission_stream_events')`).Scan(&streamMapping); err != nil || streamMapping != (schema >= 32) {
+		t.Fatal("submission stream schema boundary invalid", streamMapping, err)
+	}
 	if scope != "" {
 		var content string
 		if err := db.QueryRow(`SELECT content FROM memory_facts WHERE scope=? AND id=?`, scope, id).Scan(&content); err != nil || content != "Synthetic schema migration evidence." {
@@ -423,7 +427,7 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
+	if _, err = tx.Exec(`DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

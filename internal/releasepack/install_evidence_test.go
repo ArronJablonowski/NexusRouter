@@ -20,7 +20,7 @@ func validInstallEvidenceFixture() InstallRehearsalEvidence {
 		Installation: InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       InstallEvidenceBackup{SHA256: testInstallDigest("2"), Schema: 29, QuickCheck: "ok"},
-		Migration:    InstallEvidenceMigration{Schema: 31, QuickCheck: "ok", PreservedRecordSHA256: testInstallDigest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
+		Migration:    InstallEvidenceMigration{Schema: 32, QuickCheck: "ok", PreservedRecordSHA256: testInstallDigest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
 		Rollback:     InstallEvidenceRollback{DatabaseSHA256: testInstallDigest("2"), Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version, TargetOS: "darwin", TargetArch: "arm64", Smoke: "passed"},
 	}
 }

@@ -140,7 +140,7 @@ func TestInterruptedDelegationRecoveryGuardsAndRollback(t *testing.T) {
 			case "config":
 				config = submitDigest("other")
 			case "partial":
-				if _, err := db.db.Exec(`DELETE FROM events WHERE task_id='work' AND sequence=5`); err != nil {
+				if _, err := db.db.Exec(`DELETE FROM submission_stream_events WHERE task_id='work' AND task_sequence=5; DELETE FROM events WHERE task_id='work' AND sequence=5`); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := db.db.Exec(`UPDATE task_heads SET sequence=4,state='running' WHERE task_id='work'`); err != nil {

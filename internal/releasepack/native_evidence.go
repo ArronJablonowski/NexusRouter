@@ -253,7 +253,7 @@ func validNativeInstallBinding(record NativeEvidence) bool {
 	expectedName := "DarwinRouter_" + record.ReleaseVersion + "_" + record.Target.OS + "_" + record.Target.Arch + ".tar.gz"
 	return validInstallDigest(binding.RecordSHA256) && binding.ArtifactName == expectedName &&
 		validInstallDigest(binding.ArtifactSHA256) && validInstallDigest(binding.BackupSHA256) &&
-		binding.SourceSchema == 29 && binding.CurrentSchema == 31
+		binding.SourceSchema == 29 && binding.CurrentSchema == 32
 }
 
 func validateNativeGo(observed nativeGoEnvironment) error {

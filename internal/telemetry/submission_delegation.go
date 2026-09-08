@@ -126,6 +126,9 @@ func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDige
 		if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, body); err != nil {
 			return false, err
 		}
+		if err = appendSubmissionStreamEvent(ctx, tx, event, body, id); err != nil {
+			return false, err
+		}
 		if err = appendTaskTiming(ctx, tx, event); err != nil {
 			return false, err
 		}

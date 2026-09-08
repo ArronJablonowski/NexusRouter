@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 31 {
+	if version > 32 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -342,6 +342,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 32 {
+		if err = migrateSubmissionStream(ctx, conn); err != nil {
+			return err
+		}
+	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err
 }
@@ -405,6 +410,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	if err == nil {
 		if string(previous) != string(body) {
 			return ErrConflict
+		}
+		if err := validateSubmissionStreamRetry(ctx, tx, e, body, id); err != nil {
+			return err
 		}
 		if finish {
 			if err := finishedWorkerLease(ctx, tx, e, leaseToken, owner); err != nil {
@@ -479,6 +487,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO events VALUES (?, ?, ?, ?)", e.ID, e.TaskID, e.Sequence, body); err != nil {
 		return fmt.Errorf("append event: %w", err)
+	}
+	if err = appendSubmissionStreamEvent(ctx, tx, e, body, id); err != nil {
+		return err
 	}
 	if err = appendSkillExposures(ctx, tx, e); err != nil {
 		return err

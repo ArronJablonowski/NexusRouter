@@ -211,6 +211,9 @@ func TestTraceSnapshotRejectsCorruptSubmissionQueueLinkage(t *testing.T) {
 			case "future-time":
 				query, args = "UPDATE submissions SET created_at=? WHERE id=?", []any{submissionTime(start.Time.Add(time.Second)), claim.Status.ID}
 			case "missing-submission":
+				if _, err := db.db.ExecContext(ctx, "DELETE FROM submission_stream_events WHERE submission_id=?", claim.Status.ID); err != nil {
+					t.Fatal(err)
+				}
 				query, args = "DELETE FROM submissions WHERE id=?", []any{claim.Status.ID}
 			}
 			if _, err := db.db.ExecContext(ctx, query, args...); err != nil {

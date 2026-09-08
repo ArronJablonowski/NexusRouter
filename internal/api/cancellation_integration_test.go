@@ -42,6 +42,11 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dispatcher, err := app.StartDispatcher(ctx, runner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dispatcher.Close()
 	// A separate application service has no private handle to the runner's
 	// context. Cancellation must travel through committed database state.
 	controller, err := app.NewService(cfg, nil)
@@ -53,7 +58,7 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	h, err := New(token, 1, Services{Run: runner.Run, RunStream: runner.RunStream, Cancel: controller.CancelTask, Cancellation: controller.CancellationStatus,
+	h, err := New(token, 1, Services{Run: runner.Run, Submit: runner.Submit, ResumeSubmission: runner.ResumeSubmission, SubmissionStream: db.ReadSubmissionStreamPage, Cancel: controller.CancelTask, Cancellation: controller.CancellationStatus,
 		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
 		Health:  func(context.Context) error { return nil },
 	})
@@ -65,6 +70,7 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 	req, _ := http.NewRequestWithContext(ctx, "POST", server.URL+"/v1/tasks/stream", strings.NewReader(`{"model_id":"chat","prompt":"hello"}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "cancel-stream-key-0001")
 	response, err := server.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)

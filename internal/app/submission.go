@@ -35,16 +35,16 @@ func (s *Service) submissionConfigDigest() string {
 	return submissionDigest(body)
 }
 
-func (s *Service) Submit(ctx context.Context, key string, r Request) (submissions.Status, error) {
+func (s *Service) submissionPayload(key string, r Request) (string, string, []byte, error) {
 	if len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled {
-		return submissions.Status{}, ErrAdmission
+		return "", "", nil, ErrAdmission
 	}
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {
-		return submissions.Status{}, ErrAdmission
+		return "", "", nil, ErrAdmission
 	}
 	body, err := json.Marshal(submissionEnvelope{1, r})
 	if err != nil || len(body) > 8<<20 {
-		return submissions.Status{}, ErrAdmission
+		return "", "", nil, ErrAdmission
 	}
 	// Reject rather than rewrite secret-bearing intent. Check the JSON-escaped
 	// representation too, since credentials may contain quotes or controls.
@@ -68,16 +68,43 @@ func (s *Service) Submit(ctx context.Context, key string, r Request) (submission
 			}
 			escaped, _ := json.Marshal(secret)
 			if bytes.Contains(body, []byte(secret)) || bytes.Contains(body, escaped[1:len(escaped)-1]) {
-				return submissions.Status{}, ErrAdmission
+				return "", "", nil, ErrAdmission
 			}
 		}
+	}
+	return submissionDigest([]byte(key)), submissionDigest(body), body, nil
+}
+
+func (s *Service) Submit(ctx context.Context, key string, r Request) (submissions.Status, error) {
+	keyDigest, requestDigest, body, err := s.submissionPayload(key, r)
+	if err != nil {
+		return submissions.Status{}, err
 	}
 	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		return submissions.Status{}, ErrSubmission
 	}
 	defer db.Close()
-	status, err := db.CreateSubmission(ctx, submissionDigest([]byte(key)), submissionDigest(body), s.submissionConfigDigest(), body)
+	status, err := db.CreateSubmission(ctx, keyDigest, requestDigest, s.submissionConfigDigest(), body)
+	return status, submissionError(err)
+}
+
+// ResumeSubmission authorizes a reconnect against an existing exact
+// idempotent request. Unlike Submit, it can never create or dispatch work.
+func (s *Service) ResumeSubmission(ctx context.Context, key string, r Request) (submissions.Status, error) {
+	keyDigest, requestDigest, _, err := s.submissionPayload(key, r)
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return submissions.Status{}, sql.ErrNoRows
+		}
+		return submissions.Status{}, ErrSubmission
+	}
+	defer db.Close()
+	status, err := db.SubmissionByKey(ctx, keyDigest, requestDigest, s.submissionConfigDigest())
 	return status, submissionError(err)
 }
 

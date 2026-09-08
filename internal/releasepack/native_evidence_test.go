@@ -52,7 +52,7 @@ func TestNativeEvidenceSchemaTwoBindsInstallRehearsal(t *testing.T) {
 	record.InstallRehearsal = &NativeInstallEvidenceBinding{
 		RecordSHA256: testInstallDigest("1"),
 		ArtifactName: "DarwinRouter_1.0.0-rc.3_darwin_arm64.tar.gz", ArtifactSHA256: testInstallDigest("2"),
-		BackupSHA256: testInstallDigest("3"), SourceSchema: 29, CurrentSchema: 31,
+		BackupSHA256: testInstallDigest("3"), SourceSchema: 29, CurrentSchema: 32,
 	}
 	if validateNativeEvidence(nativeEvidenceBody(t, record)) != nil {
 		t.Fatal("schema-2 native evidence rejected")

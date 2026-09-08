@@ -8,7 +8,7 @@ import (
 )
 
 func TestSnapshotSchemaAvailability(t *testing.T) {
-	for schema := 1; schema <= 31; schema++ {
+	for schema := 1; schema <= 32; schema++ {
 		s := NewSnapshot(schema, time.Now().UTC())
 		if err := s.Validate(); err != nil {
 			t.Fatal(schema, err)
@@ -32,7 +32,7 @@ func TestSnapshotSchemaAvailability(t *testing.T) {
 func TestSnapshotRejectsInvalidOrUnboundedLabels(t *testing.T) {
 	cases := map[string]func(*Snapshot){
 		"version":              func(s *Snapshot) { s.Version++ },
-		"future schema":        func(s *Snapshot) { s.StorageSchema = 32 },
+		"future schema":        func(s *Snapshot) { s.StorageSchema = 33 },
 		"missing schema":       func(s *Snapshot) { s.StorageSchema = 0 },
 		"missing time":         func(s *Snapshot) { s.ObservedAt = time.Time{} },
 		"unserializable time":  func(s *Snapshot) { s.ObservedAt = time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC) },
@@ -77,7 +77,7 @@ func TestSnapshotAccountingAvailabilityAndValidation(t *testing.T) {
 	if legacy.Accounting != nil || legacy.Validate() != nil {
 		t.Fatal("schema 29 must not fabricate accounting", legacy)
 	}
-	current := NewSnapshot(31, at)
+	current := NewSnapshot(32, at)
 	if current.Accounting == nil || current.Accounting.Coverage != "complete" || current.Accounting.Validate() != nil || current.Validate() != nil {
 		t.Fatal("current schema accounting is not canonical", current)
 	}
@@ -89,7 +89,7 @@ func TestSnapshotAccountingAvailabilityAndValidation(t *testing.T) {
 		"unreconciled":   func(s *Snapshot) { s.Accounting.Primary.Records = 1 },
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := NewSnapshot(31, at)
+			s := NewSnapshot(32, at)
 			mutate(&s)
 			if s.Validate() == nil {
 				t.Fatal("invalid accounting accepted")

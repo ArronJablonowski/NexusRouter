@@ -46,7 +46,7 @@ func TestWorkflowSelectionMigrationFrom16PreservesExistingData(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 31 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 32 {
 			t.Fatal(schema, err)
 		}
 		events, err := s.Read(ctx, "task", 0, 10)

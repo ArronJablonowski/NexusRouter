@@ -181,6 +181,10 @@ func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.Interrup
 	if event.Kind != runtime.TaskFailed || event.TaskID != plan.ParentTaskID || event.Sequence != plan.ExpectedSequence+int64(len(plan.Events)) {
 		return ErrLeaseRecovery
 	}
+	submission, err := taskSubmissionID(ctx, tx, event.TaskID)
+	if err != nil {
+		return err
+	}
 	for i, e := range plan.Events {
 		if e.TaskID != event.TaskID || e.SessionID != event.SessionID || e.Sequence != plan.ExpectedSequence+int64(i)+1 || i < len(plan.Events)-1 && e.Kind != runtime.ToolCompleted {
 			return ErrLeaseRecovery
@@ -190,6 +194,9 @@ func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.Interrup
 			return err
 		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, e.ID, e.TaskID, e.Sequence, body); err != nil {
+			return err
+		}
+		if err = appendSubmissionStreamEvent(ctx, tx, e, body, submission); err != nil {
 			return err
 		}
 		if err = appendTaskTiming(ctx, tx, e); err != nil {

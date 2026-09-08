@@ -37,7 +37,7 @@ func ValidLeaseScope(scope string) bool {
 
 func (s ScopeLeaseStatus) Validate() error {
 	_, offset := s.ObservedAt.Zone()
-	if s.Version != 1 || s.OverlapPolicyVersion != 1 || !ValidLeaseScope(s.Scope) || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > 31 || s.Available != (s.StorageSchema >= 3) || s.Holders == nil || len(s.Holders) > 1000 || !s.Available && len(s.Holders) != 0 {
+	if s.Version != 1 || s.OverlapPolicyVersion != 1 || !ValidLeaseScope(s.Scope) || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > 32 || s.Available != (s.StorageSchema >= 3) || s.Holders == nil || len(s.Holders) > 1000 || !s.Available && len(s.Holders) != 0 {
 		return ErrScopeLeaseStatus
 	}
 	var total int64

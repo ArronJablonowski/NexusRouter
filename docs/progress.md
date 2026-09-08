@@ -4787,3 +4787,37 @@ passed; its longest packages included application (294.693s), releasepack
 (307.207s), telemetry (198.272s), CLI (43.909s), and SDK (28.463s). DAR-72 is
 the separate Todo sprint for durable, reconnect-safe `POST /v1/tasks/stream`;
 the streaming endpoint is not claimed complete by this checkpoint.
+
+DAR-72 qualified implementation checkpoint: native `POST /v1/tasks/stream`
+now admits work through the detached submission dispatcher and tails only its
+committed durable state. Disconnects, writer failures, and observation errors
+end delivery without canceling execution or fabricating a terminal response.
+Every request requires the same strict idempotency-key contract as native task
+creation. A reconnect supplies the exact key and canonical body plus a
+submission-wide `Last-Event-ID`; its non-creating lookup cannot dispatch work,
+and changed intent, configuration, foreign cursors, and cursors beyond the
+durable head fail before SSE headers.
+
+Schema 32 adds an append-time global sequence and SHA-256 body binding for each
+submission event. This immutable order spans fallback and delegated task
+journals while retaining each event's task-local identity. Appending an event
+and its stream mapping is transactional, exact retries cannot duplicate the
+mapping, and the virtual terminal result marker occupies the durable head plus
+one. Bounded readers length-probe before loading bodies, validate complete
+mapping/task coverage, canonical task starts, task-head projections, event
+identity and digest, and preserve tool/event boundaries through pagination.
+The schema-31 migration backfills interleaved commit order and rejects corrupt
+legacy histories atomically; the native schema-29→32 migration and rollback
+rehearsal uses a true pre-schema-32 fixture.
+
+Production-composed tests prove active reconnect while inference is running,
+disconnect survival, exact convergence of concurrent observers, offline daemon
+restart reconstruction, one-provider-call idempotency, multi-task fallback
+ordering and suffix replay, and no-task admission-failure replay. Focused unit
+and storage tests prove 105-event pagination, strict body/key rejection, and
+writer error/panic isolation. The final focused stream race run passed three
+times in 9.299 seconds for API and 6.222 seconds for telemetry. `make
+qualify-mvp` passed all 14 named scenarios in 11.892 seconds. The final `make
+check` gate passed formatting, the 1,000-line limit, vet, repository-wide race
+tests, and build; its longest packages included application (299.456s),
+releasepack (291.419s), telemetry (199.141s), CLI (44.310s), and SDK (29.619s).

@@ -41,6 +41,36 @@ func TestSubmissionIntakeIdempotencyAndCancellation(t *testing.T) {
 	}
 }
 
+func TestResumeSubmissionRequiresExistingExactRequestAndConfiguration(t *testing.T) {
+	s := submissionService(t)
+	ctx := context.Background()
+	request := Request{ModelID: "fixture", Prompt: "hello"}
+	created, err := s.Submit(ctx, "resume-exact-key", request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := s.ResumeSubmission(ctx, "resume-exact-key", request)
+	if err != nil || resumed.ID != created.ID {
+		t.Fatal(resumed, err)
+	}
+	changed := request
+	changed.Prompt = "changed"
+	if _, err := s.ResumeSubmission(ctx, "resume-exact-key", changed); !errors.Is(err, submissions.ErrConflict) {
+		t.Fatal(err)
+	}
+	s.settings.Workers.Max++
+	if _, err := s.ResumeSubmission(ctx, "resume-exact-key", request); !errors.Is(err, submissions.ErrConflict) {
+		t.Fatal(err)
+	}
+	missing := submissionService(t)
+	if _, err := missing.ResumeSubmission(ctx, "resume-missing-key", request); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(missing.settings.Telemetry.Database); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("resume created storage", err)
+	}
+}
+
 func TestSubmissionRejectsSecretsAndInvalidKeysWithoutStorage(t *testing.T) {
 	s := submissionService(t)
 	s.secret = func(string) string { return "private\"credential" }

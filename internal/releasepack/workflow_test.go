@@ -173,7 +173,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		"exact six-member schema-2 collateral",
 		"target-specific dependency notices",
 		"disposable native install",
-		"schema-29-to-31 migration",
+		"schema-29-to-32 migration",
 		"backup and rollback rehearsal",
 		"installation outside the disposable runner-local rehearsal",
 		"All four successful matrix jobs are required for four-target native evidence",

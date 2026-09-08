@@ -121,7 +121,7 @@ func TestMarshalOTLPLegacyAndClosedLabels(t *testing.T) {
 }
 
 func TestMarshalOTLPAccountingUsesClosedIdentifierFreeBuckets(t *testing.T) {
-	s := NewSnapshot(31, time.Unix(100, 0).UTC())
+	s := NewSnapshot(32, time.Unix(100, 0).UTC())
 	body, err := MarshalOTLP(s)
 	if err != nil {
 		t.Fatal(err)
