@@ -4639,3 +4639,36 @@ race-enabled repository suite, and build; its longest packages included
 application (272.684s), releasepack (284.860s), telemetry (174.991s), SDK
 (29.614s), and toolgate (21.019s). The checkpoint remains uncommitted until the
 final diff/security inventory and GitHub synchronization complete.
+
+DAR-69 qualified implementation checkpoint: automatic routing now derives
+fitness and orchestrator-audit evidence from immutable observations and applies
+event-time exponential decay to every current contribution before aggregation.
+Stable base/revision/audit identities, source-time ordering, full correction
+topology, exact replay, deterministic `(Time, ID)` audit supersession, direct
+evaluation precedence, future-clock rejection, and bounded underflow make late
+arrival and backfill independent of database insertion order. Corrections retain
+one sample and the original observation time. Audit direction remains weighted
+by validated confidence; judge-disabled routing skips audit storage entirely.
+The configured global half-life supports exact domain/profile overrides.
+
+Route decisions now expose raw/effective samples, average decay contribution,
+and source-time windows separately for direct, advisory, and validity evidence;
+inspection revalidates their arithmetic and rejects windows after the route
+event without exposing prompts, outputs, findings, credentials, or endpoints.
+Schema 31 adds a key-first evaluation index. Observation reads use two bounded
+set scans without N+1 queries, and an `EXPLAIN QUERY PLAN` regression proves the
+fitness/revision union seeks through the routing-key and base-revision indexes
+instead of scanning lifetime history. Migration tests preserve schema-30 data,
+fail atomically on a conflicting index, and converge under concurrent startup;
+the native rehearsal passed the real schema-29→31 path with the schema-30 usage
+boundary intact.
+
+An independent read-only review identified confidence weighting, disabled-judge
+reads, future explanation windows, evidence-precedence documentation, correction
+bounds, clock capture, and global-scan risks; all were corrected before the final
+gate. `make qualify-mvp` passed all 14 named scenarios. The complete `make check`
+gate passed formatting, the 1,000-line limit, vet, repository-wide race tests,
+and build. Longest packages included application (297.423s), releasepack
+(297.609s), telemetry (204.338s), SDK (35.598s), toolgate (25.581s), and skills
+(26.085s). The checkpoint remains uncommitted until the final diff/security
+inventory and GitHub synchronization complete.

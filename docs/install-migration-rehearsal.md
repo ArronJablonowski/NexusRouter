@@ -22,7 +22,7 @@ contract-checked `darwin` member into a new versioned prefix. An actual candidat
 must already have passed signature verification. The test checks the exact
 version string, exclusive installation paths, private configuration and state
 permissions, configuration validation, authenticated daemon status/stop, exact
-owned-process exit, SQLite WAL mode, `quick_check`, and schema 30.
+owned-process exit, SQLite WAL mode, `quick_check`, and schema 31.
 
 It then records a synthetic local-only memory fact, converts that owned fixture
 to the real schema-29 boundary used by migration tests, and confirms its stored
@@ -31,8 +31,9 @@ and the fixture proven to have
 no running task, queued/running submission or unreleased resource lease, the
 test checkpoints WAL and creates a mode-0600 backup using an exclusive file
 create. It records the backup SHA-256, migrates the source database from schema
-29 to 30 through normal daemon startup, and verifies the fact body, unchanged
-schema-29 task-timing epoch, new empty usage-ledger metadata, and integrity. The
+29 to 31 through normal daemon startup, and verifies the fact body, unchanged
+schema-29 task-timing epoch, schema-30 empty usage-ledger metadata, and schema-31
+integrity. The
 migration deliberately does not fabricate usage records for pre-ledger work.
 Finally, the test copies the backup to a new rollback database, checks the digest,
 schema, timing epoch, and original fact without migration, and proves the upgraded
@@ -94,7 +95,7 @@ execute an ancestor implicitly.
 
 ## Safety and rollback limits
 
-- Schema 30 is intentionally unsupported by the schema-29 binary. There is no
+- Schema 31 is intentionally unsupported by the schema-29 binary. There is no
   supported in-place downgrade. Rollback means selecting the older binary and a
   restored matching backup as one pair.
 - Restore to a new path. Do not overwrite, rename or edit the migrated database;

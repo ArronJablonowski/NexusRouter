@@ -38,7 +38,7 @@ type RouteExplanation struct {
 }
 
 func (r RouteExplanation) Validate() error {
-	if r.Version != 1 || !ValidEventPageID(r.TaskID) || !ValidEventPageID(r.SessionID) || !ValidEventPageID(r.RouteID) || r.Sequence != 2 || r.RecordedAt.IsZero() || len(r.ConfigID) != 64 || !validRouteText(r.Domain, 128) || !validRouteText(r.Profile, 128) || !validRouteText(r.Model, 512) || !validRouteText(r.Provider, 128) || r.Selection.Primary.Model != r.Model || r.Selection.Primary.Provider != r.Provider || routing.ValidateExplanation(r.Candidates, &r.Policy, &r.Selection) != nil {
+	if r.Version != 1 || !ValidEventPageID(r.TaskID) || !ValidEventPageID(r.SessionID) || !ValidEventPageID(r.RouteID) || r.Sequence != 2 || r.RecordedAt.IsZero() || len(r.ConfigID) != 64 || !validRouteText(r.Domain, 128) || !validRouteText(r.Profile, 128) || !validRouteText(r.Model, 512) || !validRouteText(r.Provider, 128) || r.Selection.Primary.Model != r.Model || r.Selection.Primary.Provider != r.Provider || routing.ValidateExplanation(r.Candidates, &r.Policy, &r.Selection) != nil || !validRouteObservationTimes(r.Selection.Ranked, r.RecordedAt) {
 		return ErrRouteExplanation
 	}
 	if r.Usage != nil && (r.Usage.Validate() != nil || r.Usage.Scope.TaskID != r.TaskID || r.Usage.Scope.SessionID != r.SessionID || r.Usage.CalculatedAt.Before(r.RecordedAt)) {
@@ -49,6 +49,20 @@ func (r RouteExplanation) Validate() error {
 		return ErrRouteExplanation
 	}
 	return nil
+}
+
+func validRouteObservationTimes(ranked []routing.Ranked, recordedAt time.Time) bool {
+	for _, item := range ranked {
+		for _, window := range []struct {
+			applied bool
+			end     time.Time
+		}{{item.DecayApplied, item.WindowEnd}, {item.AdvisoryDecayApplied, item.AdvisoryWindowEnd}, {item.ValidityDecayApplied, item.ValidityWindowEnd}} {
+			if window.applied && window.end.After(recordedAt) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func validRouteText(value string, limit int) bool {

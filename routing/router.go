@@ -12,9 +12,15 @@ type Key struct{ Model, Provider, Domain, Profile string }
 
 // Advisory is model-review evidence, separate from measured execution samples.
 type Advisory struct {
-	Samples             int
-	Quality, Confidence float64
-	Updated             time.Time
+	Samples           int
+	Quality           float64
+	Confidence        float64
+	Updated           time.Time
+	EffectiveSamples  float64   `json:",omitempty"`
+	DecayContribution float64   `json:",omitempty"`
+	WindowStart       time.Time `json:",omitzero"`
+	WindowEnd         time.Time `json:",omitzero"`
+	DecayApplied      bool      `json:",omitempty"`
 }
 
 // Validity measures objective output checks, not subjective quality or cost.
@@ -22,6 +28,12 @@ type Advisory struct {
 type Validity struct {
 	Samples, Failures int
 	Updated           time.Time
+	EffectiveSamples  float64   `json:",omitempty"`
+	EffectiveFailures float64   `json:",omitempty"`
+	DecayContribution float64   `json:",omitempty"`
+	WindowStart       time.Time `json:",omitzero"`
+	WindowEnd         time.Time `json:",omitzero"`
+	DecayApplied      bool      `json:",omitempty"`
 }
 type Evidence struct {
 	Validity                         Validity
@@ -31,6 +43,11 @@ type Evidence struct {
 	Latency                          time.Duration
 	Cost                             float64
 	Updated                          time.Time
+	EffectiveSamples                 float64   `json:",omitempty"`
+	DecayContribution                float64   `json:",omitempty"`
+	WindowStart                      time.Time `json:",omitzero"`
+	WindowEnd                        time.Time `json:",omitzero"`
+	DecayApplied                     bool      `json:",omitempty"`
 }
 type Candidate struct {
 	Model, Provider, FailureDomain            string
@@ -66,6 +83,22 @@ type Ranked struct {
 	Score, Confidence                 float64
 	Recency, Uncertainty              float64
 	Samples                           int
+	EffectiveSamples                  float64   `json:",omitempty"`
+	DecayContribution                 float64   `json:",omitempty"`
+	WindowStart                       time.Time `json:",omitzero"`
+	WindowEnd                         time.Time `json:",omitzero"`
+	DecayApplied                      bool      `json:",omitempty"`
+	AdvisoryEffectiveSamples          float64   `json:",omitempty"`
+	AdvisoryDecayContribution         float64   `json:",omitempty"`
+	AdvisoryWindowStart               time.Time `json:",omitzero"`
+	AdvisoryWindowEnd                 time.Time `json:",omitzero"`
+	AdvisoryDecayApplied              bool      `json:",omitempty"`
+	ValidityEffectiveSamples          float64   `json:",omitempty"`
+	ValidityEffectiveFailures         float64   `json:",omitempty"`
+	ValidityDecayContribution         float64   `json:",omitempty"`
+	ValidityWindowStart               time.Time `json:",omitzero"`
+	ValidityWindowEnd                 time.Time `json:",omitzero"`
+	ValidityDecayApplied              bool      `json:",omitempty"`
 }
 
 // Explanation has no prompt, endpoint, credentials, or model output fields.
@@ -160,12 +193,18 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			continue
 		}
 		e, ok := evidence[Key{c.Model, c.Provider, r.Domain, r.Profile}]
-		if ok && (e.Samples < 0 || !unit(e.Quality) || !unit(e.Compliance) || !unit(e.Reliability) || e.Latency < 0 || !nonnegative(e.Cost) || e.Updated.IsZero() || e.Updated.After(now)) {
+		if ok && (e.Samples < 0 || !unit(e.Quality) || !unit(e.Compliance) || !unit(e.Reliability) || e.Latency < 0 || !nonnegative(e.Cost) || e.Samples > 0 && (e.Updated.IsZero() || e.Updated.After(now))) {
 			return out, ErrInvalid
 		}
 		fresh := 0.0
 		confidence := 0.0
-		if ok && e.Samples > 0 {
+		if ok && e.DecayApplied {
+			if !validDecayAggregate(e.Samples, e.EffectiveSamples, e.DecayContribution, e.WindowStart, e.WindowEnd, now) {
+				return out, ErrInvalid
+			}
+			fresh = e.DecayContribution
+			confidence = math.Min(1, e.EffectiveSamples/float64(p.MinSamples))
+		} else if ok && e.Samples > 0 {
 			fresh = math.Exp2(-float64(now.Sub(e.Updated)) / float64(p.HalfLife))
 			confidence = math.Min(1, float64(e.Samples)/float64(p.MinSamples)) * fresh
 		}
@@ -178,6 +217,9 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		if a.Samples < 0 || !unit(a.Quality) || !unit(a.Confidence) {
 			return out, ErrInvalid
 		}
+		if a.DecayApplied && !validDecayAggregate(a.Samples, a.EffectiveSamples, a.DecayContribution, a.WindowStart, a.WindowEnd, now) {
+			return out, ErrInvalid
+		}
 		if a.Samples > 0 {
 			if a.Updated.IsZero() || a.Updated.After(now) {
 				return out, ErrInvalid
@@ -187,7 +229,11 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			case "code", "coding", "debugging", "math", "structured_json":
 				cap = .25
 			}
-			advisoryInfluence = (1 - confidence) * cap * a.Confidence * math.Min(1, float64(a.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(a.Updated))/float64(p.HalfLife))
+			advisorySamples, advisoryFresh := float64(a.Samples), math.Exp2(-float64(now.Sub(a.Updated))/float64(p.HalfLife))
+			if a.DecayApplied {
+				advisorySamples, advisoryFresh = a.EffectiveSamples, 1
+			}
+			advisoryInfluence = (1 - confidence) * cap * a.Confidence * math.Min(1, advisorySamples/float64(p.MinSamples)) * advisoryFresh
 		}
 		quality := shrink(e.Quality)
 		advisoryDelta := advisoryInfluence * (a.Quality - .5)
@@ -212,11 +258,20 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			return out, ErrInvalid
 		}
 		validityPenalty := 0.0
+		if v.DecayApplied && (!validDecayAggregate(v.Samples, v.EffectiveSamples, v.DecayContribution, v.WindowStart, v.WindowEnd, now) || !nonnegative(v.EffectiveFailures) || v.EffectiveFailures > v.EffectiveSamples) {
+			return out, ErrInvalid
+		}
 		if v.Samples > 0 {
 			if v.Updated.IsZero() || v.Updated.After(now) {
 				return out, ErrInvalid
 			}
-			validityPenalty = float64(v.Failures) / float64(v.Samples) * math.Min(1, float64(v.Samples)/float64(p.MinSamples)) * math.Exp2(-float64(now.Sub(v.Updated))/float64(p.HalfLife))
+			failures, samples, validityFresh := float64(v.Failures), float64(v.Samples), math.Exp2(-float64(now.Sub(v.Updated))/float64(p.HalfLife))
+			if v.DecayApplied {
+				failures, samples, validityFresh = v.EffectiveFailures, v.EffectiveSamples, 1
+			}
+			if samples > 0 {
+				validityPenalty = failures / samples * math.Min(1, samples/float64(p.MinSamples)) * validityFresh
+			}
 		}
 		// Objective invalidity discounts the quality component independently of
 		// user taste. Valid outputs add no quality bonus or execution samples.
@@ -224,7 +279,7 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
 		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
-		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty})
+		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, EffectiveSamples: e.EffectiveSamples, DecayContribution: e.DecayContribution, WindowStart: e.WindowStart, WindowEnd: e.WindowEnd, DecayApplied: e.DecayApplied, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, AdvisoryEffectiveSamples: a.EffectiveSamples, AdvisoryDecayContribution: a.DecayContribution, AdvisoryWindowStart: a.WindowStart, AdvisoryWindowEnd: a.WindowEnd, AdvisoryDecayApplied: a.DecayApplied, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty, ValidityEffectiveSamples: v.EffectiveSamples, ValidityEffectiveFailures: v.EffectiveFailures, ValidityDecayContribution: v.DecayContribution, ValidityWindowStart: v.WindowStart, ValidityWindowEnd: v.WindowEnd, ValidityDecayApplied: v.DecayApplied})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
 		a, b := out.Excluded[i], out.Excluded[j]
@@ -281,3 +336,13 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 }
 func nonnegative(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
 func unit(v float64) bool        { return nonnegative(v) && v <= 1 }
+
+func validDecayAggregate(samples int, effective, contribution float64, start, end, now time.Time) bool {
+	if samples < 0 || !nonnegative(effective) || effective > float64(samples) || !unit(contribution) {
+		return false
+	}
+	if samples == 0 {
+		return effective == 0 && contribution == 0 && start.IsZero() && end.IsZero()
+	}
+	return !start.IsZero() && !end.IsZero() && !start.After(end) && !end.After(now) && math.Abs(contribution-effective/float64(samples)) <= 1e-12
+}

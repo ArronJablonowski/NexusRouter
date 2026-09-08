@@ -50,6 +50,7 @@ type Service struct {
 	residencies      map[string]*residencyEndpoint
 	profile          func(context.Context) (resources.Snapshot, error)
 	draw             func() float64
+	now              func() time.Time
 	mu               sync.Mutex
 }
 
@@ -95,7 +96,14 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 		// must not invent capacity or allow local execution without admission.
 		profile = func(context.Context) (resources.Snapshot, error) { return resources.Snapshot{}, resources.ErrProfile }
 	}
-	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: profile, draw: rand.Float64}, nil
+	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: profile, draw: rand.Float64, now: time.Now}, nil
+}
+
+func (s *Service) routingNow() time.Time {
+	if s.now != nil {
+		return s.now().UTC()
+	}
+	return time.Now().UTC()
 }
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
@@ -349,10 +357,16 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	p.MinSamples = cfg.Routing.MinSamples
 	p.Exploration = cfg.Routing.Exploration
 	p.HalfLife, _ = config.Duration(cfg.Routing.HalfLife)
+	decayResolver := routing.DecayResolverFunc(func(key routing.Key) (time.Duration, bool) {
+		halfLife, err := cfg.Routing.DecayHalfLife(key.Domain, key.Profile)
+		return halfLife, err == nil
+	})
 	w := cfg.Routing.Weights
 	p.Weights = routing.Weights{Quality: w["quality"], Compliance: w["schema_compliance"], Reliability: w["reliability"], Latency: w["latency"], Cost: w["cost"], Recency: w["recency"], Uncertainty: w["uncertainty"]}
 	candidates := []routing.Candidate{}
 	evidence := map[routing.Key]routing.Evidence{}
+	observationSets := map[routing.Key]routing.ObservationSet{}
+	validitySets := map[routing.Key]routing.Validity{}
 	// Custom estimates are model-specific. Bound the whole measurement batch
 	// separately from provider health checks, and deny only unmeasurable models.
 	contextFits := map[string]bool{}
@@ -427,37 +441,41 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			}
 		}
 		key := routing.Key{Model: m.Model, Provider: m.Provider, Domain: r.Domain, Profile: r.Profile}
-		e, eerr := db.Fitness(ctx, key)
-		if eerr == nil {
-			evidence[key] = e
-		} else if !errors.Is(eerr, sql.ErrNoRows) {
-			return Result{}, errors.New("cannot read routing fitness")
+		observations, observationErr := db.ObservationSet(ctx, key, cfg.Evaluation.Judge)
+		if observationErr != nil {
+			return Result{}, errors.New("cannot read routing observations")
 		}
-		if cfg.Evaluation.Judge {
-			advisory, aerr := db.AuditQuality(ctx, key)
-			if aerr != nil {
-				return Result{}, errors.New("cannot read advisory evidence")
-			}
-			if advisory.Samples > 0 {
-				e.Advisory = advisory
-				if e.Updated.IsZero() {
-					e.Updated = advisory.Updated
-				}
-				evidence[key] = e
-			}
-		}
+		observationSets[key] = observations
 		validity, verr := db.OutputValidity(ctx, key, r.Validation)
 		if verr != nil {
 			return Result{}, errors.New("cannot read output validity")
 		}
+		validitySets[key] = validity
+		candidates = append(candidates, c)
+	}
+	// Capture one clock after the read snapshots. A concurrently committed
+	// observation cannot appear newer merely because provider health checks ran
+	// after an earlier clock sample. Every candidate still uses the same instant.
+	routingNow := s.routingNow()
+	for key, observations := range observationSets {
+		var e routing.Evidence
+		if len(observations.Fitness) > 0 || len(observations.Advisory) > 0 {
+			var observationErr error
+			e, observationErr = routing.AggregateEvidence(key, observations, routingNow, p, decayResolver)
+			if observationErr != nil {
+				return Result{}, errors.New("cannot aggregate routing observations")
+			}
+		}
+		validity := validitySets[key]
 		if validity.Samples > 0 {
 			e.Validity = validity
 			if e.Updated.IsZero() {
 				e.Updated = validity.Updated
 			}
+		}
+		if e.Samples > 0 || e.Advisory.Samples > 0 || e.Validity.Samples > 0 {
 			evidence[key] = e
 		}
-		candidates = append(candidates, c)
 	}
 	// Serialize profiling and the exploration draw. Each selected local route
 	// then performs fresh, serialized reservation admission; managed lifecycle
@@ -479,7 +497,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 				}
 			}
 		}
-		selected, err = routing.Select(routing.Request{Mode: cfg.Mode, Domain: r.Domain, Profile: r.Profile, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: contextTokens, MaxCost: r.MaxCost}, p, candidates, evidence, time.Now(), draw)
+		selected, err = routing.Select(routing.Request{Mode: cfg.Mode, Domain: r.Domain, Profile: r.Profile, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: contextTokens, MaxCost: r.MaxCost}, p, candidates, evidence, routingNow, draw)
 		if err != nil {
 			break
 		}

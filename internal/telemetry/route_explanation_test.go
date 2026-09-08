@@ -78,3 +78,22 @@ func TestRouteExplanationRejectsAbsentAndMalformedSelection(t *testing.T) {
 		t.Fatal(out, err)
 	}
 }
+
+func TestRouteExplanationRejectsObservationAfterRouteRecord(t *testing.T) {
+	db, _ := routeExplanationStore(t)
+	out, err := db.RouteExplanation(context.Background(), "task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := &out.Selection.Ranked[0]
+	item.Samples = 1
+	item.EffectiveSamples = 1
+	item.DecayContribution = 1
+	item.DecayApplied = true
+	item.WindowStart = out.RecordedAt.Add(time.Nanosecond)
+	item.WindowEnd = item.WindowStart
+	out.Selection.Primary = *item
+	if out.Validate() == nil {
+		t.Fatal("future observation window accepted")
+	}
+}

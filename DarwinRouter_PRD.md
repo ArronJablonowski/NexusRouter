@@ -287,6 +287,10 @@ routing:
   exploration_rate: 0.05
   minimum_samples: 20
   decay_half_life: 30d
+  decay_overrides:
+    - domain: coding
+      profile: local
+      half_life: 7d
   weights:
     quality: 0.35
     schema_compliance: 0.15
@@ -431,6 +435,8 @@ Acceptance tests must cover blank final answers versus tool-only intermediate tu
 ### 9.2 Fitness Updates
 
 Fitness updates are transactional, replay-safe, and linked to immutable evidence. Failed or canceled persistence cannot partially update routing state. Operator-approved corrections produce compensating records rather than rewriting history.
+
+Apply recency decay independently to every current observation using its immutable source timestamp, then aggregate weighted domain/profile evidence. A correction retains the base observation time and contributes one current sample. Exact replay is idempotent; conflicting identities, correction forks, future timestamps, and invalid clocks fail closed. Stable source-time/identity ordering makes late arrival and backfill independent of database insertion order. Configuration provides a global half-life plus exact domain/profile overrides. Route explanations expose raw and effective samples, average decay contribution, and the effective observation window without sensitive content. See [fitness observation decay](docs/fitness-decay.md).
 
 ### 9.3 Pruning
 

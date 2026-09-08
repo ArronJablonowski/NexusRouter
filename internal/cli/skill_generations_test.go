@@ -110,7 +110,7 @@ func TestSkillGenerationsCLIReadOnlyMissingLegacyAndCorruption(t *testing.T) {
 				}
 				query := `UPDATE skill_generation_attempts SET body='private-corrupt-payload'`
 				if kind == "legacy" {
-					query = `DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; PRAGMA user_version=15`
+					query = `DROP INDEX evaluations_routing_key; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TRIGGER workflow_scan_task_insert; DROP TABLE workflow_scan_tasks; DROP TABLE workflow_scan_pages; DROP TABLE workflow_scans; DROP TABLE workflow_selections; DROP TABLE skill_generation_attempts; PRAGMA user_version=15`
 				}
 				if _, err = raw.Exec(query); err != nil {
 					t.Fatal(err)

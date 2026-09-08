@@ -78,7 +78,10 @@ func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 			attempt = e.AttemptID
 		}
 	}
-	err = db.RecordEvaluation(ctx, evaluation.Record{Version: 1, ID: "eval", TaskID: prior.TaskID, AttemptID: attempt, Key: routing.Key{Model: "z", Provider: "local", Domain: "code", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "fixture", Passed: true}}, ExecutionSucceeded: true, Time: time.Now()})
+	routingNow := time.Now().UTC()
+	svc.now = func() time.Time { return routingNow }
+	svc.settings.Routing.DecayOverrides = []config.DecayOverride{{Domain: "code", Profile: "default", HalfLife: "1h"}}
+	err = db.RecordEvaluation(ctx, evaluation.Record{Version: 1, ID: "eval", TaskID: prior.TaskID, AttemptID: attempt, Key: routing.Key{Model: "z", Provider: "local", Domain: "code", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "fixture", Passed: true}}, ExecutionSucceeded: true, Time: routingNow.Add(-time.Hour)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,8 +98,13 @@ func TestAutomaticUsesDurableDomainFitnessAndAuditsBeforeTurn(t *testing.T) {
 	}
 	route := events[1]
 	raw, _ := route.Encode()
-	if strings.Contains(string(raw), "private payload") || strings.Contains(string(raw), cfg.Providers[0].Endpoint) || route.Data.Route.Primary.Samples != 1 || route.Data.ConfigID == "" {
+	primary := route.Data.Route.Primary
+	if strings.Contains(string(raw), "private payload") || strings.Contains(string(raw), cfg.Providers[0].Endpoint) || primary.Samples != 1 || primary.EffectiveSamples != .5 || primary.DecayContribution != .5 || !primary.WindowStart.Equal(routingNow.Add(-time.Hour)) || !primary.WindowEnd.Equal(routingNow.Add(-time.Hour)) || route.Data.ConfigID == "" {
 		t.Fatalf("invalid audit %s", raw)
+	}
+	explanation, err := db.RouteExplanation(ctx, out.TaskID)
+	if err != nil || explanation.Validate() != nil || explanation.Selection.Primary.DecayContribution != .5 {
+		t.Fatalf("decayed route explanation unavailable: %+v %v", explanation, err)
 	}
 	isolated, err := svc.Run(ctx, Request{Prompt: "hello", Domain: "math"})
 	if err != nil || isolated.Text != "a" {

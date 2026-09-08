@@ -99,6 +99,9 @@ func (s *Store) RecordEvaluation(ctx context.Context, r evaluation.Record) error
 	return tx.Commit()
 }
 
+// Fitness returns the legacy lifetime projection retained for compatibility and
+// transactional write checks. Adaptive routing reads ObservationSet and applies
+// event-time decay with an explicit clock and configuration snapshot.
 func (s *Store) Fitness(ctx context.Context, key routing.Key) (routing.Evidence, error) {
 	var e routing.Evidence
 	var schemas int

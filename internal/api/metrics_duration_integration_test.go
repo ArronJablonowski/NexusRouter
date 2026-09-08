@@ -49,7 +49,7 @@ func TestTaskDurationPropagatesSQLiteAppHTTPAndSDKExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := raw.Exec(`DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TABLE task_timings; DROP TABLE task_timing_metadata; PRAGMA user_version=28`); err != nil {
+	if _, err := raw.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TABLE task_timings; DROP TABLE task_timing_metadata; PRAGMA user_version=28`); err != nil {
 		raw.Close()
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestTaskDurationPropagatesSQLiteAppHTTPAndSDKExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err := service.Metrics(ctx)
-	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != 30 || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
+	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != 31 || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
 		t.Fatal("missing duration snapshot", snapshot, err)
 	}
 	completed := snapshot.TaskDuration.Groups[0]

@@ -29,7 +29,7 @@ func TestWorkflowConsumptionMigrationPreservesScanAndEvidence(t *testing.T) {
 	if err := s.db.QueryRow(`SELECT body FROM workflow_scans WHERE scope='scope' AND name='learning'`).Scan(&headBody); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=18`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; ALTER TABLE resource_leases DROP COLUMN process_id; DROP TABLE lease_processes; DROP TABLE learning_states; DROP TABLE memory_retired_ids; DROP TABLE workflow_scan_buckets; DROP TABLE workflow_scan_consumptions; DROP TABLE workflow_scan_consumers; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=18`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -56,7 +56,7 @@ func TestWorkflowConsumptionMigrationPreservesScanAndEvidence(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 30 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 31 {
 			t.Fatal(version, err)
 		}
 		if !reflect.DeepEqual(before, workflowSourceRawBodies(t, s)) {

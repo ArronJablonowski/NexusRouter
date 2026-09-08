@@ -129,7 +129,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 	}
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
 	assertMode(t, database, 0600)
-	checkDatabase(t, database, 30, "", "")
+	checkDatabase(t, database, 31, "", "")
 
 	fact := memory.Fact{Version: 1, ID: "install-rehearsal", Scope: "release-rehearsal", Revision: 1, Content: "Synthetic schema migration evidence.", Provenance: "DAR-52 disposable fixture", Confidence: 1, Privacy: "local_only", Created: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC), Updated: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)}
 	factBody, err := json.Marshal(fact)
@@ -161,12 +161,12 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 
 	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
-	checkDatabase(t, database, 30, fact.Scope, fact.ID)
+	checkDatabase(t, database, 31, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
 		t.Fatal("migration changed synthetic evidence")
 	}
 	if got := taskTimingEpoch(t, database); got != timingEpoch {
-		t.Fatal("schema-30 migration changed schema-29 task timing epoch")
+		t.Fatal("schema-31 migration changed schema-29 task timing epoch")
 	}
 	assertEmptyUsageLedger(t, database)
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, database, fact)
@@ -182,8 +182,8 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, root, 
 	}
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, rollback, fact)
 	checkDatabase(t, rollback, 29, fact.Scope, fact.ID) // Read-only inspection must not migrate.
-	checkDatabase(t, database, 30, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
-	t.Logf("native install=%s schema=30; backup_sha256=%s; migration=29->30; rollback_copy_schema=29", installPrefix, backupDigest)
+	checkDatabase(t, database, 31, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
+	t.Logf("native install=%s schema=31; backup_sha256=%s; migration=29->31; rollback_copy_schema=29", installPrefix, backupDigest)
 }
 
 func rehearsalArchiveBinary(t *testing.T, archive string, artifact Artifact) []byte {
@@ -364,7 +364,7 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
+	if _, err = tx.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {
@@ -399,7 +399,7 @@ func assertEmptyUsageLedger(t *testing.T, path string) {
 		t.Fatal("invalid schema-30 usage epoch", epoch, err)
 	}
 	if err := db.QueryRow(`SELECT (SELECT count(*) FROM usage_records),(SELECT count(*) FROM usage_heads),(SELECT count(*) FROM usage_corrections)`).Scan(&records, &heads, &corrections); err != nil || records != 0 || heads != 0 || corrections != 0 {
-		t.Fatal("schema-30 migration fabricated usage history", records, heads, corrections, err)
+		t.Fatal("migration fabricated schema-30 usage history", records, heads, corrections, err)
 	}
 }
 

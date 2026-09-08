@@ -85,7 +85,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 30 {
+	if version > 31 {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -334,6 +334,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 30 {
 		if err = migrateUsageAccounting(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 31 {
+		if err = migrateObservationIndex(ctx, conn); err != nil {
 			return err
 		}
 	}

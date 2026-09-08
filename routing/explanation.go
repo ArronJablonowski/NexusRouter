@@ -3,6 +3,7 @@ package routing
 import (
 	"math"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -38,7 +39,7 @@ func ValidateExplanation(candidates []Candidate, policy *Policy, selection *Sele
 	for i, item := range selection.Ranked {
 		key := [2]string{item.Model, item.Provider}
 		candidate, exists := candidateByRoute[key]
-		if !exists || !validExplanationRanked(item) || item.FailureDomain != candidate.FailureDomain {
+		if !exists || !validExplanationRanked(item) || !validExplanationPolicyProjection(item, *policy) || item.FailureDomain != candidate.FailureDomain {
 			return ErrInvalid
 		}
 		if _, exists := ranked[key]; exists {
@@ -136,7 +137,39 @@ func validExplanationCandidate(c Candidate) bool {
 }
 
 func validExplanationRanked(r Ranked) bool {
-	return safeExplanationLabel(r.Model, 512) && safeExplanationLabel(r.Provider, 128) && safeOptionalExplanationLabel(r.FailureDomain, 128) && r.Samples >= 0 && r.AdvisorySamples >= 0 && r.ValiditySamples >= 0 && r.ValidityFailures >= 0 && r.ValidityFailures <= r.ValiditySamples && unit(r.Score) && unit(r.Confidence) && unit(r.Recency) && unit(r.Uncertainty) && unit(r.AdvisoryInfluence) && unit(r.ValidityPenalty) && math.Abs(r.Confidence+r.Uncertainty-1) <= 1e-9
+	return safeExplanationLabel(r.Model, 512) && safeExplanationLabel(r.Provider, 128) && safeOptionalExplanationLabel(r.FailureDomain, 128) && r.Samples >= 0 && r.AdvisorySamples >= 0 && r.ValiditySamples >= 0 && r.ValidityFailures >= 0 && r.ValidityFailures <= r.ValiditySamples && unit(r.Score) && unit(r.Confidence) && unit(r.Recency) && unit(r.Uncertainty) && unit(r.AdvisoryInfluence) && unit(r.ValidityPenalty) && math.Abs(r.Confidence+r.Uncertainty-1) <= 1e-9 && validExplanationDecay(r.DecayApplied, r.Samples, r.EffectiveSamples, r.DecayContribution, r.WindowStart, r.WindowEnd) && validExplanationDecay(r.AdvisoryDecayApplied, r.AdvisorySamples, r.AdvisoryEffectiveSamples, r.AdvisoryDecayContribution, r.AdvisoryWindowStart, r.AdvisoryWindowEnd) && validExplanationDecay(r.ValidityDecayApplied, r.ValiditySamples, r.ValidityEffectiveSamples, r.ValidityDecayContribution, r.ValidityWindowStart, r.ValidityWindowEnd) && (!r.ValidityDecayApplied && r.ValidityEffectiveFailures == 0 || r.ValidityDecayApplied && nonnegative(r.ValidityEffectiveFailures) && r.ValidityEffectiveFailures <= r.ValidityEffectiveSamples)
+}
+
+func validExplanationDecay(applied bool, samples int, effective, contribution float64, start, end time.Time) bool {
+	if !applied {
+		return effective == 0 && contribution == 0 && start.IsZero() && end.IsZero()
+	}
+	if samples < 0 || !nonnegative(effective) || effective > float64(samples) || !unit(contribution) {
+		return false
+	}
+	if samples == 0 {
+		return effective == 0 && contribution == 0 && start.IsZero() && end.IsZero()
+	}
+	return !start.IsZero() && !end.IsZero() && !start.After(end) && math.Abs(contribution-effective/float64(samples)) <= 1e-12
+}
+
+func validExplanationPolicyProjection(r Ranked, p Policy) bool {
+	if r.DecayApplied {
+		confidence := math.Min(1, r.EffectiveSamples/float64(p.MinSamples))
+		if math.Abs(r.Confidence-confidence) > 1e-12 || math.Abs(r.Recency-r.DecayContribution) > 1e-12 {
+			return false
+		}
+	}
+	if r.ValidityDecayApplied {
+		penalty := 0.0
+		if r.ValidityEffectiveSamples > 0 {
+			penalty = r.ValidityEffectiveFailures / r.ValidityEffectiveSamples * math.Min(1, r.ValidityEffectiveSamples/float64(p.MinSamples))
+		}
+		if math.Abs(r.ValidityPenalty-penalty) > 1e-12 {
+			return false
+		}
+	}
+	return true
 }
 
 func rankedExplanationLess(a, b Ranked) bool {

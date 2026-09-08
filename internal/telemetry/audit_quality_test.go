@@ -29,10 +29,12 @@ func qualityTask(t *testing.T, s *Store, task, model, profile, routeProfile stri
 		e.TurnID, e.AttemptID = "turn", "attempt"
 		e.Data = runtime.Data{ModelID: model, ProviderID: "candidate-provider"}
 		if kind == runtime.TaskStarted {
+			e.Data.Domain = "code"
 			e.Data.Profile = profile
 		}
 		if kind == runtime.RouteSelected {
 			e.RouteID = "route"
+			e.Data.Domain = "code"
 			e.Data.Profile = routeProfile
 		}
 		if err := s.Append(context.Background(), int64(i), e); err != nil {

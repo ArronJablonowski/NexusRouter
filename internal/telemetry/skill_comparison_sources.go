@@ -44,7 +44,7 @@ func (s *Store) CheckSkillComparisonSources(ctx context.Context, report skills.C
 	}
 	defer tx.Rollback()
 	var schema int
-	if err = tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || (schema < 27 || schema > 30) {
+	if err = tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || (schema < 27 || schema > 31) {
 		return nil, skills.ErrInvalid
 	}
 	ids := report.Sources.Tasks

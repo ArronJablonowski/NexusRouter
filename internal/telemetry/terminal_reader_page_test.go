@@ -62,7 +62,7 @@ func TestTerminalReaderMigrationKeepsGuardBindings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=22`); err != nil {
+	if _, err = s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE lease_attention; DROP TABLE lease_recoveries; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=22`); err != nil {
 		t.Fatal(err)
 	}
 	// initialize serializes the same schema22-to23 migration used by Open.
@@ -74,7 +74,7 @@ func TestTerminalReaderMigrationKeepsGuardBindings(t *testing.T) {
 		t.Fatal("migration changed binding", err)
 	}
 	var version int
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 30 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 31 {
 		t.Fatal(version, err)
 	}
 	if recovered, err := s.RecoverTerminalReader(ctx, token, time.Now().UTC()); err != nil || !recovered {

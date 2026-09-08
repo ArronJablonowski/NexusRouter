@@ -187,7 +187,7 @@ func TestLeaseAttentionHistoryInputsAndLegacy(t *testing.T) {
 	if _, err := s.ListLeaseAttentionHistory(ctx, "invalid\n", workers.LeaseAttentionHistoryOptions{Limit: 1}); err == nil {
 		t.Fatal("invalid id")
 	}
-	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=24`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE skill_exposures; DROP INDEX task_heads_session; DROP TABLE learning_activation_intents; DROP TABLE lease_attention_history; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=24`); err != nil {
 		t.Fatal(err)
 	}
 	page, err := s.ListLeaseAttentionHistory(ctx, a.ID, workers.LeaseAttentionHistoryOptions{Limit: 1})

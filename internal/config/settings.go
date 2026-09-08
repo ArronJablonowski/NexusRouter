@@ -81,10 +81,20 @@ type Model struct {
 	Capabilities  []string `yaml:"capabilities" json:"capabilities"`
 }
 type Routing struct {
-	Exploration float64            `yaml:"exploration_rate" json:"exploration_rate"`
-	MinSamples  int                `yaml:"minimum_samples" json:"minimum_samples"`
-	HalfLife    string             `yaml:"decay_half_life" json:"decay_half_life"`
-	Weights     map[string]float64 `yaml:"weights" json:"weights"`
+	Exploration    float64            `yaml:"exploration_rate" json:"exploration_rate"`
+	MinSamples     int                `yaml:"minimum_samples" json:"minimum_samples"`
+	HalfLife       string             `yaml:"decay_half_life" json:"decay_half_life"`
+	DecayOverrides []DecayOverride    `yaml:"decay_overrides,omitempty" json:"decay_overrides,omitempty"`
+	Weights        map[string]float64 `yaml:"weights" json:"weights"`
+}
+
+// DecayOverride selects an exact task domain and execution profile. Ordered
+// lists merge predictably as one configuration value; duplicate selectors are
+// rejected rather than depending on declaration order.
+type DecayOverride struct {
+	Domain   string `yaml:"domain" json:"domain"`
+	Profile  string `yaml:"profile" json:"profile"`
+	HalfLife string `yaml:"half_life" json:"half_life"`
 }
 type Skills struct {
 	Learning         Learning         `yaml:"learning" json:"learning"`
@@ -142,7 +152,7 @@ type Runtime struct {
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
 		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
-		Routing: Routing{0.05, 20, "30d", map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
+		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
@@ -247,6 +257,20 @@ func (s Settings) Validate() error {
 	}
 	if _, err := Duration(s.Routing.HalfLife); err != nil {
 		return errors.New("invalid routing decay duration")
+	}
+	if len(s.Routing.DecayOverrides) > 128 {
+		return errors.New("too many routing decay overrides")
+	}
+	decaySelectors := map[[2]string]bool{}
+	for _, override := range s.Routing.DecayOverrides {
+		selector := [2]string{override.Domain, override.Profile}
+		if !identifier.MatchString(override.Domain) || !identifier.MatchString(override.Profile) || decaySelectors[selector] {
+			return errors.New("invalid or duplicate routing decay override")
+		}
+		if _, err := Duration(override.HalfLife); err != nil {
+			return errors.New("invalid routing decay override duration")
+		}
+		decaySelectors[selector] = true
 	}
 	known := Defaults().Routing.Weights
 	total := 0.0

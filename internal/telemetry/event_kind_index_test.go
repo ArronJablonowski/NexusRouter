@@ -15,7 +15,7 @@ func TestEventKindIndexMigration27PreservesEvidenceAndReadonly(t *testing.T) {
 	s, path := generationStore(t)
 	appendValidity(t, s, validityEvents("first", true))
 	before := workflowSourceRawBodies(t, s)
-	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=27`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=27`); err != nil {
 		t.Fatal(err)
 	}
 	old, err := OpenReadOnly(ctx, path)
@@ -38,7 +38,7 @@ func TestEventKindIndexMigration27PreservesEvidenceAndReadonly(t *testing.T) {
 	defer migrated.Close()
 	var schema int
 	var definition string
-	if err = migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 30 {
+	if err = migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 31 {
 		t.Fatal(schema, err)
 	}
 	if err = migrated.db.QueryRow(`SELECT sql FROM sqlite_master WHERE name='events_task_kind' AND type='index'`).Scan(&definition); err != nil || !strings.Contains(definition, "json_extract(body,'$.kind')") {
@@ -94,7 +94,7 @@ func TestEventKindIndexFailedMigrationRemains27AndCanReopen(t *testing.T) {
 	before := workflowSourceRawBodies(t, s)
 	// A conflicting schema object fails CREATE INDEX inside the migration, after
 	// discovery under BEGIN IMMEDIATE, without modifying the legacy journal.
-	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; CREATE TABLE events_task_kind(sentinel TEXT); INSERT INTO events_task_kind VALUES('retained'); DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; PRAGMA user_version=27`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP INDEX events_task_kind; CREATE TABLE events_task_kind(sentinel TEXT); INSERT INTO events_task_kind VALUES('retained'); DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=27`); err != nil {
 		t.Fatal(err)
 	}
 	if bad, err := Open(ctx, path); err == nil {
@@ -120,7 +120,7 @@ func TestEventKindIndexFailedMigrationRemains27AndCanReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reopened.Close()
-	if err = reopened.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 30 {
+	if err = reopened.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 31 {
 		t.Fatal(schema, err)
 	}
 	if !reflect.DeepEqual(before, workflowSourceRawBodies(t, reopened)) {

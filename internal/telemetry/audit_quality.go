@@ -6,8 +6,9 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
-// AuditQuality reads advisory reviews without changing objective fitness. The
-// latest inserted review supersedes prior reviews even when it abstains. Any
+// AuditQuality returns the legacy lifetime advisory snapshot. Adaptive routing
+// uses ObservationSet so each review is decayed from its immutable source time.
+// The latest inserted review supersedes prior reviews even when it abstains. Any
 // persisted evaluation removes that attempt from the advisory population.
 func (s *Store) AuditQuality(ctx context.Context, key routing.Key) (routing.Advisory, error) {
 	var out routing.Advisory

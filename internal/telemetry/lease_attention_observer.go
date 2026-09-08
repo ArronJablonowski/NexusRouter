@@ -162,7 +162,7 @@ func reserveLeaseAttention(ctx context.Context, tx *sql.Tx) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil {
 		return err
 	}
-	if schema < 26 || schema > 30 {
+	if schema < 26 || schema > 31 {
 		return workers.ErrLeaseAttention
 	}
 	return nil

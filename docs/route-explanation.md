@@ -19,6 +19,14 @@ exploration selected a non-leading route. Candidate credential fields are only
 booleans used by routing; no credential value or environment-variable name is
 stored in this record.
 
+For routes using immutable observation aggregation, each ranked candidate also
+reports raw and effective sample counts, average decay contribution, and oldest/
+newest source times independently for direct fitness, advisory audits, and
+objective validity when available. Inspection validates the projection
+arithmetic and rejects a source window after the route event. The timestamps
+describe evidence age, not database arrival order. See
+[fitness observation decay](fitness-decay.md).
+
 Inspection also attaches a point-in-time version-one `usage` total from the
 schema-30 immutable ledger for that exact task. The task's primary or fallback
 operation remains separate from classifier, summarizer, orchestrator-audit, and
