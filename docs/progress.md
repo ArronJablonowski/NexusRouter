@@ -4821,3 +4821,21 @@ qualify-mvp` passed all 14 named scenarios in 11.892 seconds. The final `make
 check` gate passed formatting, the 1,000-line limit, vet, repository-wide race
 tests, and build; its longest packages included application (299.456s),
 releasepack (291.419s), telemetry (199.141s), CLI (44.310s), and SDK (29.619s).
+
+RC12 release-evidence checkpoint: exact clean pushed commit
+`e026b231db5d3e39e4e83927b6527dd9590ae558` was frozen locally as
+`1.0.0-rc.12`. The canonical candidate-record SHA-256 is
+`a6a6f1c206a8c65516397d0832ba2a5570d70f74aa4014f5f7aefb64b65a07b0`
+and the independently derived schema-2 license-evidence SHA-256 is
+`1daa933f7b4834d043ca5458a118dc332bae38433fa8a72d48898d05a8c5754e`.
+`make qualify-release` passed on native Darwin/arm64: all 14 deterministic MVP
+scenarios passed, all four six-member target archives reproduced byte-for-byte
+across two builds, executable formats and disposable signatures verified,
+tampering was rejected, and the native install/schema-29-to-32
+migration/backup/rollback rehearsal passed. The observed immutable backup
+SHA-256 was
+`733464b9f4972e8853f4244f3e0c94c384b3ff5c4ed20b2244a268ad4c24fa2d`.
+This is current local mechanical evidence only. No hosted workflow was
+dispatched, no non-arm64 target was natively qualified, and no candidate,
+platform, legal/notices, production-signing, publication, or release approval
+is implied.
