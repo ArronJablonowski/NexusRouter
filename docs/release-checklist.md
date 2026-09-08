@@ -184,14 +184,29 @@ be omitted.
 - Publication time (UTC):
 - Re-downloaded artifact location:
 - Independent re-download verification operator/time/result:
+- Canonical post-publication receipt location and SHA-256:
+- Post-publication receipt verifier identity, host and UTC verification time:
 - Public-key retrieval channel used for re-verification:
 - Installation smoke result from published bytes:
+- Rollback-readiness mode: `first_release` / `upgrade`
+- Canonical rollback-readiness record location and SHA-256:
+- Rollback-readiness verification result, verifier identity and UTC time:
+- Rollback-readiness approval validity window:
 - Previous supported release/binary location:
 - Matching pre-upgrade data backup location:
 - Incident/rollback owner and procedure:
 - [ ] Re-downloaded bytes passed signature, manifest and checksum verification.
 - [ ] Published release notes, supported-target claims and public-key references
   match the approved records.
+- [ ] The canonical post-publication receipt binds the approved release, exact
+  downloaded bytes and independent verification inputs.
+- [ ] Exactly one rollback policy is recorded: `first_release` explicitly
+  approves that no previous public DarwinRouter release or pre-upgrade backup is
+  claimed, or `upgrade` binds the authenticated prior binary and its matching
+  pre-upgrade backup digest and schema.
+- [ ] The canonical rollback-readiness record is within its approval validity
+  window and passed read-only verification against the independently supplied
+  post-publication, rehearsal and, when applicable, backup evidence.
 - [ ] Rollback materials remain retained and accessible to the operator.
 
 ## Final record
