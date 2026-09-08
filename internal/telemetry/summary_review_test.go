@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,6 +107,38 @@ func TestSummaryReviewHistoryAndRevocationGate(t *testing.T) {
 	history, err := s.SummaryReviews(ctx, a.ID)
 	if err != nil || len(history) != 2 || history[0].ID != r.ID || history[1].PreviousID != r.ID {
 		t.Fatal(history, err)
+	}
+}
+
+func TestValidatedSummaryReviewMustBindStoredDraft(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "reviews.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	a, _ := reviewDraftFixture(t, s)
+	digest, err := sessions.SummaryDraftDigest(*a.Draft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := sessions.SummaryReview{Version: 2, ID: "validation", AttemptID: a.ID, Decision: "approved", Note: "project tests passed", ValidatorID: "project-tests-v1", SourceSequence: a.SourceSequence, SourceDigest: a.SourceDigest, DraftDigest: digest, Time: time.Unix(300, 0).UTC()}
+	for _, mutate := range []func(*sessions.SummaryReview){
+		func(r *sessions.SummaryReview) { r.SourceSequence++ },
+		func(r *sessions.SummaryReview) { r.SourceDigest = strings.Repeat("0", 64) },
+		func(r *sessions.SummaryReview) { r.DraftDigest = strings.Repeat("0", 64) },
+	} {
+		r := base
+		mutate(&r)
+		if err := s.RecordSummaryReview(ctx, r); !errors.Is(err, sessions.ErrHistory) {
+			t.Fatal("unbound validation persisted", err)
+		}
+	}
+	if err := s.RecordSummaryReview(ctx, base); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Append(ctx, 0, reviewedStart(a, base, "validated-continuation")); err != nil {
+		t.Fatal("bound validation did not authorize continuation", err)
 	}
 }
 

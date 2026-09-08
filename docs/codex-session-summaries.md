@@ -70,8 +70,27 @@ explicit [native compacted continuation](codex-compacted-continuation.md).
 The native path preserves source/checkpoint binding and the transactional
 approval boundary; draft generation itself still does not approve or apply it.
 
-Automatic summary validation/application, mid-task compaction,
-summary-attempt crash reconciliation and full PRD acceptance
+Trusted Go hosts may instead register a bounded set of named deterministic
+summary validators and explicitly request validation of an existing draft. A
+validation record binds the exact attempt, source sequence and digest, complete
+draft digest, validator identity and prior review head. The operation ID is also
+the immutable review ID, so retry after a lost acknowledgement returns the
+recorded decision without invoking the validator again. Changed validator
+semantics require a new identity.
+
+Only an `approved` deterministic decision authorizes later continuation. A
+`rejected` or `abstained` decision remains append-only and inactive; a later
+authenticated operator review may supersede it through the ordinary
+compare-and-swap chain. Validator errors, panics, malformed decisions, source or
+draft drift, stale review heads and timeouts produce no review. Callbacks are
+trusted cooperative Go code, not a sandbox, and must not perform side effects.
+The SDK exposes `NewSummaryValidatorRegistry`, `ValidateSummary`, and the opt-in
+`SummarizeTaskValidated` convenience. Draft generation itself remains
+single-use; only the validation operation has lost-ack replay semantics.
+
+The stock binary does not ship a generic semantic validator and an LLM
+self-review is not a deterministic validator. Configured unattended validation,
+mid-task compaction, summary-attempt crash reconciliation and full PRD acceptance
 remain open. The native launch profile is experimental, not a host/process
 isolation certification.
 

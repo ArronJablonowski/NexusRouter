@@ -51,6 +51,12 @@ func (s *Store) RecordSummaryReview(ctx context.Context, r sessions.SummaryRevie
 	if a.Status != "drafted" {
 		return sessions.ErrHistory
 	}
+	if r.Version == 2 {
+		digest, digestErr := sessions.SummaryDraftDigest(*a.Draft)
+		if digestErr != nil || r.SourceSequence != a.SourceSequence || r.SourceDigest != a.SourceDigest || r.DraftDigest != digest {
+			return sessions.ErrHistory
+		}
+	}
 	var head string
 	err = tx.QueryRowContext(ctx, "SELECT review_id FROM summary_review_heads WHERE attempt_id=?", r.AttemptID).Scan(&head)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -90,6 +96,16 @@ func (s *Store) CurrentSummaryReview(ctx context.Context, attempt string) (sessi
 	var id string
 	var body []byte
 	if err := s.db.QueryRowContext(ctx, "SELECT r.id,r.body FROM summary_review_heads h JOIN summary_reviews r ON r.id=h.review_id AND r.attempt_id=h.attempt_id WHERE h.attempt_id=?", attempt).Scan(&id, &body); err != nil {
+		return sessions.SummaryReview{}, err
+	}
+	return decodeSummaryReview(body, id, attempt)
+}
+
+// SummaryReview returns one exact immutable review. It is used to recognize a
+// lost acknowledgement without invoking a trusted validator again.
+func (s *Store) SummaryReview(ctx context.Context, attempt, id string) (sessions.SummaryReview, error) {
+	var body []byte
+	if err := s.db.QueryRowContext(ctx, "SELECT body FROM summary_reviews WHERE id=? AND attempt_id=?", id, attempt).Scan(&body); err != nil {
 		return sessions.SummaryReview{}, err
 	}
 	return decodeSummaryReview(body, id, attempt)
@@ -203,6 +219,12 @@ func validateSummaryGate(ctx context.Context, tx *sql.Tx, c *runtime.ContextComp
 	}
 	if a.Status != "drafted" || task != c.SourceTaskID {
 		return sessions.ErrHistory
+	}
+	if r.Version == 2 {
+		digest, digestErr := sessions.SummaryDraftDigest(*a.Draft)
+		if digestErr != nil || r.SourceSequence != a.SourceSequence || r.SourceDigest != a.SourceDigest || r.DraftDigest != digest {
+			return sessions.ErrHistory
+		}
 	}
 	clean := *c
 	clean.SummaryAttemptID, clean.SummaryReviewID = "", ""

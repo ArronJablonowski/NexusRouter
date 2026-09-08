@@ -279,6 +279,15 @@ draft/review workflow. See [SDK session summaries](../../docs/sdk-session-summar
 for operator responsibilities, pagination, errors and an example. Generation
 does not approve or apply a proposal automatically.
 
+Trusted Go hosts can bind deterministic callbacks with
+`NewSummaryValidatorRegistry` and call `ValidateSummary` using a stable operation
+ID. The resulting append-only review binds the exact source and complete draft;
+retrying that operation returns the stored result without rerunning the callback.
+`SummarizeTaskValidated` is an opt-in draft-then-validate convenience, but draft
+generation remains single-use. Rejected and abstaining validation never
+authorize continuation. Validator callbacks are trusted cooperative code, must
+be side-effect free, and must change identity when their semantics change.
+
 For an explicitly selected signed-in Sol model, `Request.Compaction` or
 `Request.SummaryAttemptID` with `ContinueTaskID` now uses the native compacted
 history path. Stored drafts require current operator review; source/checkpoint

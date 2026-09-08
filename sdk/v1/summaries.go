@@ -9,6 +9,21 @@ import (
 
 type SummaryAttempt = sessions.SummaryAttempt
 type SummaryReview = sessions.SummaryReview
+type SummaryValidationInput = sessions.SummaryValidationInput
+type SummaryValidationDecision = sessions.SummaryValidationDecision
+type SummaryValidator = sessions.SummaryValidator
+type SummaryValidatorFunc = sessions.SummaryValidatorFunc
+type SummaryValidatorRegistry = sessions.SummaryValidatorRegistry
+
+// NewSummaryValidatorRegistry binds stable identities to trusted deterministic
+// host validators. Changing validator semantics requires a new identity.
+func NewSummaryValidatorRegistry(input map[string]SummaryValidator) (*SummaryValidatorRegistry, error) {
+	registry, err := sessions.NewSummaryValidatorRegistry(input)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	return registry, nil
+}
 
 // SummarizeTask explicitly requests one bounded auxiliary draft. It never
 // approves the proposal or applies it to a continuation automatically.
@@ -20,6 +35,32 @@ func (c *Client) SummarizeTask(ctx context.Context, task, modelID string, keep i
 		return SummaryAttempt{}, err
 	}
 	return c.service.SummarizeTask(ctx, task, modelID, keep, maxCost)
+}
+
+// ValidateSummary runs one trusted deterministic validator against an existing
+// durable draft. operationID provides lost-ack idempotency. Approved evidence
+// authorizes later use but does not itself start a continuation.
+func (c *Client) ValidateSummary(ctx context.Context, attempt, expectedReview, operationID, validatorID string, registry *SummaryValidatorRegistry) (SummaryReview, error) {
+	if !c.valid(ctx) {
+		return SummaryReview{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return SummaryReview{}, err
+	}
+	return c.service.ValidateSummary(ctx, attempt, expectedReview, operationID, validatorID, registry)
+}
+
+// SummarizeTaskValidated is an opt-in draft-then-validate convenience. Draft
+// generation remains single-use and is not automatically retried after an
+// uncertain acknowledgement; use ValidateSummary to retry validation safely.
+func (c *Client) SummarizeTaskValidated(ctx context.Context, task, modelID string, keep int, maxCost float64, validatorID string, registry *SummaryValidatorRegistry) (SummaryAttempt, SummaryReview, error) {
+	if !c.valid(ctx) {
+		return SummaryAttempt{}, SummaryReview{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return SummaryAttempt{}, SummaryReview{}, err
+	}
+	return c.service.SummarizeTaskValidated(ctx, task, modelID, keep, maxCost, validatorID, registry)
 }
 
 // InspectSummaryAttempt reads an existing proposal without creating storage,

@@ -596,7 +596,15 @@ the terminal-tree attempt cap, and reruns all admission plus the transactional
 approval check. It never replays the failed provider call. Partial streams,
 delegated work, cancellation, ambiguous model identity and absent or stale
 approval remain terminal.
-Automatic semantic validation and mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
+Trusted Go hosts can opt into a named deterministic semantic validator after
+drafting. Version-two review evidence binds the exact source sequence and
+digest, complete draft digest, validator identity and previous review head;
+lost-ack retries use a caller-supplied operation ID and do not re-invoke the
+validator. Only approval authorizes continuation, while rejection and
+abstention remain inactive and append-only. The stock runtime does not infer a
+validator or treat an LLM self-review as deterministic approval. Configured
+unattended validation, a stock semantic validator and mid-task compaction remain
+required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory

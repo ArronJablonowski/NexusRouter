@@ -1,8 +1,9 @@
 # Session summaries through the Go SDK
 
-The embedded `sdk/v1.Client` supports the same explicit draft, operator-review
-and continuation workflow as the CLI and Darwin-native HTTP API. These methods
-do not enable automatic compaction, approval, retry or background inference.
+The embedded `sdk/v1.Client` supports the same explicit draft, review and
+continuation workflow as the CLI and Darwin-native HTTP API. It also supports
+opt-in trusted deterministic validation; no validator is selected implicitly.
+These methods do not enable automatic compaction, retry or background inference.
 
 Assuming an initialized `client`, caller-owned `ctx`, completed `sourceTaskID`
 and configured `summaryModelID`:
@@ -31,6 +32,31 @@ result, err := client.Run(ctx, darwin.Request{
     ContinueTaskID: sourceTaskID, SummaryAttemptID: draft.ID,
 })
 ```
+
+A trusted Go host may replace the manual decision with a registered deterministic
+validator:
+
+```go
+registry, err := darwin.NewSummaryValidatorRegistry(map[string]darwin.SummaryValidator{
+    "project-contract-v1": projectValidator,
+})
+if err != nil { return err }
+review, err := client.ValidateSummary(ctx, draft.ID, "", operationID,
+    "project-contract-v1", registry)
+if err != nil { return err }
+if review.Decision != "approved" {
+    // Rejected and abstained drafts remain inactive.
+    return nil
+}
+```
+
+The validation operation ID becomes the immutable review ID. Retrying the exact
+operation recognizes its existing record without invoking the callback again.
+Every version-two validation review binds the attempt, source digest, complete
+draft digest, validator identity and prior review head. Callbacks receive the
+full source and draft, must be local, side-effect free, deterministic,
+cancellation-cooperative and concurrency-safe. An LLM judgment is not a trusted
+deterministic validator. Use a new validator ID whenever semantics change.
 
 The examples assume `darwin` aliases the SDK import. The host must implement the
 actual operator interface; these snippets are not an unconditional approval
@@ -67,7 +93,7 @@ allocated empty slices; failed reads return no partial records. Nil clients,
 nil contexts and invalid read parameters return `ErrAdmission`; missing or
 corrupt storage and failed single-attempt lookup return `ErrInspection`.
 Inspection cancellation/deadline errors remain recognizable through `errors.Is`.
-All five SDK methods preserve an already-canceled caller context; cancellation
+All SDK methods preserve an already-canceled caller context; cancellation
 during generation or review may instead produce an existing normalized write-path
 error. Inspect durable state rather than assuming a failed return means no write.
 
