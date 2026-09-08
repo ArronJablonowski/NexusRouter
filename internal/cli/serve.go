@@ -174,6 +174,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {
 			return app.FeedbackHistory(ctx, s.Telemetry.Database, task)
 		},
+		RunAudit:     service.RunAudit,
+		InspectAudit: service.InspectAudit,
+		CancelAudit:  service.CancelAudit,
+		AuditEvents:  service.ReadAuditEvents,
 		ReviseFeedback: func(ctx context.Context, task, expected string, accepted bool) error {
 			return app.ReviseFeedback(ctx, s.Telemetry.Database, task, expected, accepted)
 		},

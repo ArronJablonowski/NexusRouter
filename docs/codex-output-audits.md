@@ -72,6 +72,109 @@ evaluation/user feedback supersedes that attempt's audit signal. A review is
 not a compiler, test runner, skill activation, model-pruning decision or proof
 of correctness.
 
+## Daemon and SDK operation API
+
+The daemon and `sdk/v1` expose the same version-one, restart-safe operation
+contract over the application service. HTTP callers authenticate with
+`Authorization: Bearer <DARWIN_API_TOKEN>`; browser-origin requests are denied.
+Create one operation with:
+
+```http
+POST /v1/tasks/TASK_ID/audits
+Authorization: Bearer REDACTED
+Idempotency-Key: client-generated-key-0001
+Content-Type: application/json
+
+{"reviewer_model_id":"coordinator","max_cost":0.10}
+```
+
+The idempotency header must occur exactly once and contain 16–128 printable
+non-space ASCII bytes. The strict JSON body is limited to 8 KiB and requires
+exactly the two shown fields. Task and configured reviewer aliases are bounded,
+path-safe IDs; a provider-native model name containing `/` or `:` must remain
+behind its configured alias. `max_cost` is a finite, nonnegative admission
+ceiling, not proof of provider billing. Query parameters, unknown/duplicate/null
+fields, malformed numbers, browser origins and a `Last-Event-ID` header on this
+POST are rejected before review dispatch.
+
+A successful POST uses `Content-Type: text/event-stream`. Every `event: audit`
+frame contains a versioned `AuditEvent`; its SSE ID is
+`<opaque-audit-id>:<sequence>`. Sequence 1 is the durable `pending` admission.
+Sequence 2, when present, is the sole terminal state:
+
+- `completed`: the independent reviewer returned `accept`.
+- `rejected`: the reviewer returned `reject`.
+- `abstained`: the reviewer returned `abstain`.
+- `canceled`: durable cancellation won before completion.
+- `failed`: the admitted review ended without a valid audit.
+
+If execution fails after sequence 1 without a durable terminal transition, the
+stream can end with a fixed-code `event: error` instead of sequence 2. The
+operation remains inspectable as pending; the error neither fabricates a result
+nor authorizes another provider dispatch.
+
+`terminal_disposition` is empty while pending and repeats the terminal status
+otherwise. Terminal review results can include bounded findings, their opaque
+evidence references, rubric/domain provenance, elapsed time and provider usage
+when reported. A pending or failed result does not fabricate those fields.
+Confidence is intentionally absent: model self-assessment is not acceptance
+evidence. Every projection carries the fixed precedence
+`deterministic`, `tool_result`, `user_feedback`, `llm_judge`. Darwin uses
+objective checks and tool results ahead of explicit user judgment; for
+subjective creative work, user feedback therefore outranks the optional model
+judge.
+
+The operation ID is an opaque, domain-separated SHA-256 digest of the caller
+key. The raw key is not persisted or returned, and rotating the daemon token
+does not change the operation identity. Retrying the exact task, reviewer, cost,
+configuration and key replays committed events without another provider call.
+Changing that intent under the same key returns HTTP 409. This operation-level
+idempotency does not make provider or tool side effects elsewhere safe to retry.
+
+Read and control the operation with:
+
+```text
+GET  /v1/tasks/TASK_ID/audits/AUDIT_ID
+POST /v1/tasks/TASK_ID/audits/AUDIT_ID/cancel
+GET  /v1/tasks/TASK_ID/audits/AUDIT_ID/events
+```
+
+Inspection returns one `AuditStatus` as JSON and never creates or migrates a
+missing database. Cancellation requires `Content-Type: application/json` and
+the exact body `{}`; it changes only a pending audit, while an already-terminal
+result wins unchanged. It does not cancel the source task. The events route is
+a finite SSE snapshot: omit `Last-Event-ID` for sequence zero, or supply the
+canonical `<audit-id>:<nonnegative-sequence>` cursor. It emits committed `audit`
+frames followed by an unidentified `checkpoint` containing `from_sequence`,
+`next_sequence`,
+`head_sequence`, and `has_more`. A pending operation has head 1; a terminal one
+has head 2. A syntactically valid cursor beyond that durable head returns a
+conflict rather than inventing an event. This is replay, not a live follow
+subscription.
+
+The corresponding embedded calls are `Client.RunAudit`, `InspectAudit`,
+`CancelAudit`, and `ReadAuditEvents`. Their typed requests, statuses, findings,
+usage, provenance, disposition, and callback delivery use the same validation
+rules. HTTP and SDK execution are synchronous: the caller connection/context
+owns the currently running reviewer. If delivery or the process is lost after
+durable admission, restart inspection can still observe `pending`, but Darwin
+does not guess whether provider inference occurred and never automatically
+dispatches that admitted operation again. An exact POST retry or event replay
+only returns durable state. Operators may cancel an indefinitely pending
+operation after reconciling its external state.
+
+Before any public projection, current configured credentials and sensitive
+values are redacted from finding summaries. Identity/provenance fields that
+collide with a secret fail closed rather than being rewritten ambiguously. There
+are no dedicated source-prompt, candidate-output, tool-payload, provider-endpoint,
+credential, raw-error, or idempotency-key fields. However, findings are untrusted
+model-generated text and can quote or paraphrase task-derived content that exact
+credential redaction does not recognize. Treat the complete status and event
+stream as sensitive task inspection. Errors and route explanations do not copy
+findings and use closed metadata/error contracts. Audit inspection follows the
+task-qualified path, so an operation under a different task is indistinguishable
+from an unknown operation.
+
 ## Qualification and remaining work
 
 The opt-in live test is:
@@ -94,3 +197,10 @@ proposals, panic cleanup, automatic-review non-recursion and source/fitness
 immutability. Default CI skips live inference. Host/process isolation, broad
 CLI-version compatibility, live crash recovery, automatic review of every
 delegated child, and complete PRD qualification remain open.
+
+The public daemon/SDK lifecycle uses deterministic and controlled provider
+fixtures in its default qualification. It has not been qualified against a live
+external HTTP reviewer or paid cloud account. The opt-in signed-in Codex CLI run
+described above is narrower evidence and does not qualify arbitrary external
+reviewers, production billing, provider availability, or crash behavior during
+live inference.

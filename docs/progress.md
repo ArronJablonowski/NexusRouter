@@ -4572,3 +4572,26 @@ mocked local controls only: no production credential, network mutation, tag,
 upload or release was used, and operator authorization, the live repository
 immutable setting, production execution and post-publication receipt remain open
 gates.
+
+DAR-67 public audit-operation wiring and documentation checkpoint: the foreground
+daemon now binds the application service's run, restart inspection, cancellation,
+and finite event-replay operations into the authenticated Darwin-native API.
+The route table and output-audit guide document the strict idempotency header and
+bounded request, connection-owned up-to-two-event SSE lifecycle, terminal status
+map, restart/pending behavior, no-automatic-redispatch rule, cancellation race,
+canonical replay cursor, fixed deterministic/tool/user/judge evidence order, and
+current privacy boundary. Audit findings are explicitly treated as sensitive,
+untrusted model text that may quote task-derived content; only dedicated raw
+prompt/output/tool/error fields are absent, and errors remain closed codes. A
+real child-process daemon test proved the production inspection hook returns a
+sanitized not-found result rather than the missing-hook response and performs no
+inference. That focused race test passed in 5.033 seconds; the complete
+`internal/cli` and `internal/api` race suites passed in 41.562 and 11.747 seconds,
+respectively. A subsequent focused cross-package race run covered contracts,
+storage, application lifecycle, SDK, API, and daemon wiring twice, including
+malformed reviewer output and a controlled provider timeout. `make qualify-mvp`
+then passed all 14 named scenarios, and the complete `make check` formatting,
+1,000-line, vet, repository-wide race, and build gate passed; its longest
+packages included application (250.259s), releasepack (283.073s), telemetry
+(162.415s), and SDK (31.049s). A live external HTTP or paid-cloud reviewer
+remains unverified at this checkpoint.

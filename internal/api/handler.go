@@ -82,6 +82,10 @@ type Services struct {
 	SummaryReviews         func(context.Context, string) ([]sessions.SummaryReview, error)
 	FeedbackHistory        func(context.Context, string) ([]evaluation.Record, error)
 	ReviseFeedback         func(context.Context, string, string, bool) error
+	RunAudit               func(context.Context, evaluation.AuditRequest, func(evaluation.AuditEvent) error) (evaluation.AuditStatus, error)
+	InspectAudit           func(context.Context, string, string) (evaluation.AuditStatus, error)
+	CancelAudit            func(context.Context, string, string) (evaluation.AuditStatus, error)
+	AuditEvents            func(context.Context, string, string, int64) (evaluation.AuditEventPage, error)
 	Run                    func(context.Context, app.Request) (app.Result, error)
 	Inspect                func(context.Context, string) (sessions.Snapshot, error)
 	Health                 func(context.Context) error
@@ -184,6 +188,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveSkillGenerations(w, r.WithContext(ctx))
 	case approvalRoute(r.URL.Path):
 		h.serveApprovals(w, r.WithContext(ctx))
+	case auditRoute(r.URL.Path):
+		h.serveAudits(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.Contains(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/steering"):
 		h.serveSteering(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/metrics" && r.Method == http.MethodGet:

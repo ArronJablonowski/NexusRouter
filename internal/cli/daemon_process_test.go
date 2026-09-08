@@ -124,6 +124,24 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	if response.StatusCode != http.StatusOK || decodeErr != nil || closeErr != nil || attention.Validate() != nil || attention.Version != 1 || attention.StorageSchema != 29 || !attention.Available || attention.Items == nil || len(attention.Items) != 0 || attention.HasMore || attention.NextCursor != "" {
 		t.Fatal("real daemon attention inspection failed", response.StatusCode, decodeErr, closeErr)
 	}
+	// The production serve wiring must bind audit inspection to the application
+	// service. An unknown operation is therefore a sanitized 404, not the 503
+	// returned when the hook is absent, and it performs no model dispatch.
+	auditURL := "http://" + address + "/v1/tasks/missing-task/audits/" + strings.Repeat("a", 64)
+	auditRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, auditURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditRequest.Header.Set("Authorization", "Bearer "+token)
+	auditResponse, err := client.Do(auditRequest)
+	if err != nil {
+		t.Fatal("audit inspection request failed", err)
+	}
+	auditBody, auditReadErr := io.ReadAll(io.LimitReader(auditResponse.Body, 8193))
+	auditCloseErr := auditResponse.Body.Close()
+	if auditResponse.StatusCode != http.StatusNotFound || auditReadErr != nil || auditCloseErr != nil || !bytes.Contains(auditBody, []byte(`"error":"audit_unavailable"`)) || bytes.Contains(auditBody, []byte(token)) {
+		t.Fatal("production audit inspection route not wired safely", auditResponse.StatusCode, auditReadErr, auditCloseErr, string(auditBody))
+	}
 	databaseURL := url.URL{Scheme: "file", Path: filepath.Join(dir, "tasks.db"), RawQuery: "mode=ro"}
 	database, err := sql.Open("sqlite", databaseURL.String())
 	if err != nil {

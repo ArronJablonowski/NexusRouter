@@ -5,37 +5,71 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 )
 
 func (s *Store) BeginReview(ctx context.Context, r evaluation.ReviewAttempt) error {
+	_, _, err := s.admitReview(ctx, r, false)
+	return err
+}
+
+// AdmitReview durably admits one public audit operation. Exact identity replays
+// return the existing row with created=false; reuse of the operation ID with a
+// changed request or reviewer fails closed.
+func (s *Store) AdmitReview(ctx context.Context, r evaluation.ReviewAttempt) (evaluation.ReviewAttempt, bool, error) {
+	return s.admitReview(ctx, r, true)
+}
+
+func (s *Store) admitReview(ctx context.Context, r evaluation.ReviewAttempt, public bool) (evaluation.ReviewAttempt, bool, error) {
 	if r.Validate() != nil || r.Status != "started" {
-		return evaluation.ErrAudit
+		return evaluation.ReviewAttempt{}, false, evaluation.ErrAudit
+	}
+	if public && (r.ReviewerID == "" || r.RequestDigest == "") {
+		return evaluation.ReviewAttempt{}, false, evaluation.ErrAudit
+	}
+	// Only identities crossing URL or caller-controlled operation boundaries
+	// must be path-safe. Provider-native model names are already bounded by
+	// ReviewAttempt.Validate and commonly contain ':' or '/'.
+	if public && (!evaluation.ValidAuditOperationID(r.ID) || !evaluation.ValidAuditOperationID(r.TaskID) || !evaluation.ValidAuditOperationID(r.AttemptID) || !evaluation.ValidAuditOperationID(r.ReviewerID)) {
+		return evaluation.ReviewAttempt{}, false, evaluation.ErrAudit
 	}
 	r.StartedAt = r.StartedAt.UTC()
 	body, err := json.Marshal(r)
 	if err != nil {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
 	defer tx.Rollback()
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", r.TaskID); err != nil {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
-	var prior []byte
-	err = tx.QueryRowContext(ctx, "SELECT body FROM review_attempts WHERE id=?", r.ID).Scan(&prior)
+	var priorBody []byte
+	var priorTask, priorStatus string
+	err = tx.QueryRowContext(ctx, "SELECT task_id,status,body FROM review_attempts WHERE id=?", r.ID).Scan(&priorTask, &priorStatus, &priorBody)
 	if err == nil {
-		if string(prior) != string(body) {
-			return ErrConflict
+		prior, decodeErr := decodeReviewAttempt(priorBody, r.ID, priorTask, priorStatus)
+		if decodeErr != nil {
+			return evaluation.ReviewAttempt{}, false, decodeErr
 		}
-		return tx.Commit()
+		same := string(priorBody) == string(body)
+		if public {
+			same = prior.TaskID == r.TaskID && prior.AttemptID == r.AttemptID && prior.EvaluatorModel == r.EvaluatorModel && prior.EvaluatorProvider == r.EvaluatorProvider && prior.ReviewerID == r.ReviewerID && prior.RequestDigest == r.RequestDigest
+		}
+		if !same {
+			return evaluation.ReviewAttempt{}, false, ErrConflict
+		}
+		if err := tx.Commit(); err != nil {
+			return evaluation.ReviewAttempt{}, false, err
+		}
+		return prior, false, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
 	var started, ended, terminal int
 	err = tx.QueryRowContext(ctx, `SELECT
@@ -43,15 +77,18 @@ func (s *Store) BeginReview(ctx context.Context, r evaluation.ReviewAttempt) err
 	 (SELECT count(*) FROM events WHERE task_id=? AND json_extract(body,'$.attempt_id')=? AND json_extract(body,'$.kind')='turn.completed'),
 	 (SELECT count(*) FROM task_heads WHERE task_id=? AND state IN ('completed','failed'))`, r.TaskID, r.AttemptID, r.TaskID, r.AttemptID, r.TaskID).Scan(&started, &ended, &terminal)
 	if err != nil {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
 	if started != 1 || ended != 1 || terminal != 1 {
-		return evaluation.ErrAudit
+		return evaluation.ReviewAttempt{}, false, evaluation.ErrAudit
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO review_attempts VALUES(?,?,?,?)", r.ID, r.TaskID, r.Status, body); err != nil {
-		return err
+		return evaluation.ReviewAttempt{}, false, err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return evaluation.ReviewAttempt{}, false, err
+	}
+	return r, true, nil
 }
 
 func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) error {
@@ -69,7 +106,7 @@ func (s *Store) FinishReview(ctx context.Context, r evaluation.ReviewAttempt) er
 // CompleteReview commits advisory evidence and its successful lifecycle together.
 // A conflict or persistence error rolls back both changes. Exact retries are safe.
 func (s *Store) CompleteReview(ctx context.Context, r evaluation.ReviewAttempt, a evaluation.AuditRecord) error {
-	if r.Validate() != nil || a.Validate() != nil || r.Status != "completed" || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider {
+	if r.Validate() != nil || a.Validate() != nil || r.Status != "completed" || r.AuditID != a.ID || r.TaskID != a.TaskID || r.AttemptID != a.AttemptID || r.EvaluatorModel != a.EvaluatorModel || r.EvaluatorProvider != a.EvaluatorProvider || (r.ReviewerID != "" && r.ReviewerID != a.Audit.EvaluatorID) {
 		return evaluation.ErrAudit
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -113,7 +150,7 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		}
 		return nil
 	}
-	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || !prior.StartedAt.Equal(r.StartedAt) {
+	if prior.TaskID != r.TaskID || prior.AttemptID != r.AttemptID || prior.EvaluatorModel != r.EvaluatorModel || prior.EvaluatorProvider != r.EvaluatorProvider || prior.ReviewerID != r.ReviewerID || prior.RequestDigest != r.RequestDigest || !prior.StartedAt.Equal(r.StartedAt) {
 		return ErrConflict
 	}
 	if r.Status == "completed" {
@@ -126,7 +163,7 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		if err != nil {
 			return err
 		}
-		if a.TaskID != r.TaskID || a.AttemptID != r.AttemptID || a.EvaluatorModel != r.EvaluatorModel || a.EvaluatorProvider != r.EvaluatorProvider {
+		if a.TaskID != r.TaskID || a.AttemptID != r.AttemptID || a.EvaluatorModel != r.EvaluatorModel || a.EvaluatorProvider != r.EvaluatorProvider || (r.ReviewerID != "" && a.Audit.EvaluatorID != r.ReviewerID) {
 			return evaluation.ErrAudit
 		}
 	}
@@ -138,6 +175,61 @@ func finishReview(ctx context.Context, tx *sql.Tx, r evaluation.ReviewAttempt) e
 		return ErrConflict
 	}
 	return nil
+}
+
+// CancelReview is a cancellation-first compare-and-set. Once it commits, a
+// concurrent completion cannot attach advisory evidence. Existing terminal
+// state is returned unchanged, making repeated cancellation safe.
+func (s *Store) CancelReview(ctx context.Context, task, id string, at time.Time) (evaluation.ReviewAttempt, error) {
+	if !evaluation.ValidAuditOperationID(task) || !evaluation.ValidAuditOperationID(id) || at.IsZero() {
+		return evaluation.ReviewAttempt{}, evaluation.ErrAudit
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", task); err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	var storedTask, status string
+	var body []byte
+	if err = tx.QueryRowContext(ctx, "SELECT task_id,status,body FROM review_attempts WHERE id=?", id).Scan(&storedTask, &status, &body); err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	prior, err := decodeReviewAttempt(body, id, storedTask, status)
+	if err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	if prior.TaskID != task {
+		return evaluation.ReviewAttempt{}, sql.ErrNoRows
+	}
+	if prior.Status != "started" {
+		if err := tx.Commit(); err != nil {
+			return evaluation.ReviewAttempt{}, err
+		}
+		return prior, nil
+	}
+	canceled := prior
+	canceled.Status, canceled.Code, canceled.FinishedAt = "failed", "canceled", at.UTC()
+	if canceled.Validate() != nil {
+		return evaluation.ReviewAttempt{}, evaluation.ErrAudit
+	}
+	terminalBody, err := json.Marshal(canceled)
+	if err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	result, err := tx.ExecContext(ctx, "UPDATE review_attempts SET status='failed',body=? WHERE id=? AND task_id=? AND status='started'", terminalBody, id, task)
+	if err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	if n, err := result.RowsAffected(); err != nil || n != 1 {
+		return evaluation.ReviewAttempt{}, ErrConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return evaluation.ReviewAttempt{}, err
+	}
+	return canceled, nil
 }
 
 func (s *Store) ReviewAttempt(ctx context.Context, id string) (evaluation.ReviewAttempt, error) {

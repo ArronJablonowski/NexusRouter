@@ -2,6 +2,38 @@
 
 This SDK is distributed under DarwinRouter's root [MIT License](../../LICENSE).
 
+`Client.RunAudit` starts an independently attributed, idempotent orchestrator
+review of an existing terminal task. Supply a version-one `AuditRequest`, a
+16–128 byte printable non-space ASCII idempotency key, the opaque task ID, a
+configured reviewer model alias, and a cost ceiling. A newly admitted owner
+normally receives the durable pending event followed by one terminal event
+through its synchronous callback. Restart or concurrent replay emits only the
+lifecycle state committed at read time, which can be pending-only. If delivery
+fails, retry the exact request and key or resume from `Client.ReadAuditEvents`;
+DarwinRouter does not repeat reviewer inference for an admitted operation.
+`Client.InspectAudit` is a
+restart-safe read, and `Client.CancelAudit` durably requests cancellation of a
+pending review.
+
+Audit status is advisory. It exposes bounded, credential-redacted findings and
+opaque evidence references, plus the fixed evidence precedence of deterministic
+checks, tool results, explicit user feedback, then LLM judgment. It has no
+dedicated prompt, candidate-output, tool-payload, provider-endpoint, credential,
+raw-error, or idempotency-key field. Findings are nevertheless untrusted
+model-generated text and can quote or paraphrase task-derived content; handle the
+whole status as sensitive task inspection. Cancellation does not authorize
+retrying an uncertain side effect, and an audit verdict does not directly update
+fitness.
+
+```go
+status, err := client.RunAudit(ctx, darwin.AuditRequest{
+    Version: 1, IdempotencyKey: operationKey,
+    TaskID: taskID, ReviewerModelID: "reviewer", MaxCost: 0.02,
+}, func(event darwin.AuditEvent) error {
+    return consume(event) // process synchronously; retain NextSequence afterward
+})
+```
+
 `Client.SkillLearningState(ctx)` inspects the configured learner's persisted
 phase, scan cursor and pending generation identity without starting background
 work. Inspection remains available when learning is disabled. The daemon owns
