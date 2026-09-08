@@ -1,5 +1,36 @@
 # Implementation evidence
 
+PRD and DAR-47/50/51/57/60/64 implementation checkpoint: trusted Go hosts can
+now validate a durable session-summary draft with a named deterministic
+validator before continuation. Version-two append-only review evidence binds
+the source sequence/digest, complete draft digest, validator identity and prior
+review head; storage rechecks those bindings at write and use, while a stable
+operation ID makes lost-ack validation replayable without re-invoking the
+callback. Rejected or abstaining drafts remain inactive and later operator
+review uses the existing compare-and-swap chain. This is an opt-in host seam,
+not a stock semantic validator, configured unattended compaction or LLM
+self-approval.
+
+The release path now has operator-facing one-shot commands rather than only
+internal mock-tested libraries. `publish-release` accepts a single-use token
+only through an already-open pipe/socket or owner-private regular-file
+descriptor after closing preflight, fixes GitHub API/upload origins, disables
+ambient proxies and emits public success or uncertain-state evidence while
+retaining the create-only journal. `verify-published-release` is credential-free,
+downloads the exact immutable seven-asset release through a fixed GitHub reader,
+re-runs approval-bound verification and create-only persists a canonical receipt
+outside protected roots. No real credential, network mutation, tag, upload or
+release was used.
+
+Manual hosted qualification now additionally requires the independently
+reviewed candidate-record digest, re-derives that record, runs the canonical
+native-evidence wrapper on each asserted runner and retains only the bounded
+JSON record/transcript for 30 days through a commit-pinned upload action. This
+closes the workflow's missing canonical per-target evidence path, not the live
+gate: no hosted run was dispatched, and DAR-50/51 still require four successful
+operator-reviewed native jobs. Focused race-enabled summary, publication,
+receipt and workflow tests passed before the final repository-wide gate.
+
 Muse Glimmer review and RC9 checkpoint: the only uncommitted source change left
 by the local model moved `golang.org/x/sys v0.47.0` from the indirect block to
 the direct dependency block. That is correct because production Darwin/Linux

@@ -2,22 +2,28 @@
 
 The **Release qualification (no publication)** GitHub Actions workflow is
 manual-only. Select a reviewed branch or tag and enter the intended semantic
-release version plus the independently reviewed canonical license-evidence
-SHA-256 when dispatching it. The required version excludes a leading `v` and
+release version plus independently reviewed canonical candidate-record and
+license-evidence SHA-256 values when dispatching it. The required version
+excludes a leading `v` and
 build metadata and is validated before qualification. The workflow
 checks out the dispatch event's immutable `github.sha`, verifies HEAD and a clean
-worktree, and runs `make check` followed by a version- and commit-bound
-`make qualify-release`. No separate commit input can redirect the checkout away
+worktree, independently re-derives and verifies the exact candidate record, and
+runs the canonical version- and commit-bound native-evidence wrapper. No
+separate commit input can redirect the checkout away
 from the dispatched source.
 
-Each Ubuntu/macOS matrix job independently freezes the schema-2 license record,
+Each Ubuntu/macOS matrix job independently freezes the candidate record and
+requires its digest to equal the candidate-record dispatch input before
+re-verifying it against the clean checkout. It independently freezes the
+schema-2 license record,
 requires its digest to equal the dispatch input, re-verifies it against the
 clean checkout, and records the expected digest and gate outcome. The record
 binds the commit, Go version/directive, root MIT license digest, all four target
 module/legal-file closures, exact Go `LICENSE`/`PATENTS` hashes and rendered
 notice hashes. Each job also records the requested version, verified commit,
 actual Go host OS/architecture, Go version and other gate outcomes in its job
-summary.
+summary. The native wrapper itself runs `make check`, rechecks the source, runs
+`make qualify-release`, and checks the source again before creating its record.
 The four-job matrix uses explicit standard hosted-runner labels:
 `macos-15-intel` for Darwin/amd64, `macos-15` for Darwin/arm64,
 `ubuntu-24.04` for Linux/amd64 and `ubuntu-24.04-arm` for Linux/arm64. Each job
@@ -34,20 +40,24 @@ formats, exercises disposable-key signing and tamper rejection, and rehearses
 installation plus schema migration/backup/rollback with only the artifact
 matching that job's asserted native platform. Other targets in that job are
 cross-build evidence, not native execution evidence. Four-target support
-requires four successful job summaries for the exact version and commit. The
-summary identifies failures and skipped gates; neither qualifies a release.
+requires four successful job summaries and four retained native evidence bundles
+for the exact version and commit. The summary identifies failures and skipped
+gates; neither qualifies a release.
 
 The workflow has read-only repository permissions, pins the checkout and Go
 setup actions to reviewed full commit IDs, disables checkout credential
 persistence and Go cache uploads, forces the installed toolchain with
 `GOTOOLCHAIN=local`, disables ambient Go environment/workspace/flag and
 experiment settings, disables cgo, and fixes the documented amd64/arm64
-architecture baselines. It has no publication or artifact-upload step.
-Test-generated archives, installation, database, backup, rollback copy and keys
-remain disposable runner-local files.
+architecture baselines. A pinned `actions/upload-artifact` step runs only after
+successful native qualification and retains that target's canonical JSON record
+and bounded gate transcript for 30 days. It does not upload release archives or
+publication assets. Test-generated archives, installation, database, backup,
+rollback copy and keys remain disposable runner-local files.
 It does not use the repository SSH key, production signing secrets or live model
 accounts. Standard Actions logs and summaries remain subject to repository
-access and retention settings.
+access and retention settings. Treat the workflow artifact as sensitive
+operator evidence even though the qualification path uses no production secrets.
 
 Standard hosted runners consume included Actions minutes for private
 repositories and may incur metered charges afterward; see GitHub's current
@@ -59,12 +69,15 @@ document.
 Running this workflow consumes hosted-runner time and requires the declared Go
 toolchain and runner labels to be available to the repository. Adding the
 workflow is not evidence of a hosted run: record the actual run URL, commit and
-per-job outcomes after an operator dispatches it. Matrix labels may change their
+per-job outcomes, workflow artifact IDs, record/transcript digests and observed
+targets after an operator dispatches it. Download the evidence before its
+30-day retention expires. Matrix labels may change their
 underlying architecture; do not infer four-platform coverage from two labels.
 
-The expected digest is an independent dispatch input, but the job does not
-authenticate the person or process that approved it and does not retain the
-external canonical record. Preserve that exact record and human review evidence
+The expected candidate and license-evidence digests are independent dispatch
+inputs, but the job does not authenticate the person or process that approved
+them and does not retain either externally reviewed input record. Preserve those
+exact records and human review evidence
 in the operator-controlled release evidence channel. Successful runs do not
 choose a distribution license, provision a production
 signing identity, independently distribute a trusted public key, approve a
