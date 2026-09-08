@@ -1,6 +1,37 @@
 # Implementation evidence
 
-DAR-70 delegated-output audit checkpoint (uncommitted): configured successful
+Clean pushed commit `fd20a4fb19dfb3b0567c899e859fa79556deb2f4`
+was frozen as external RC11 candidate and license evidence. The candidate-record
+SHA-256 is
+`f818b4034ee8f098172a1f87f24bb1f28aa9354992ff158942ee4f82ebefca45`;
+the schema-2 license-evidence SHA-256 is
+`2406367de76fe25646afcc19793817cce055c8af129cac537d05b4eac8bcceee`.
+Both independently reverified against the exact clean checkout. Local
+darwin/arm64 `make qualify-release` passed for `1.0.0-rc.11` in 141.897
+seconds after its fourteen-scenario MVP gate passed in 11.800 seconds.
+
+The canonical native wrapper then reran the clean-source, complete `make check`
+and release gates and exclusively retained a schema-2 native record plus its
+schema-1 install companion outside the checkout. Their SHA-256 values are
+`20c486692c2abb9c1afc76db93420337d13cded9c7ed08f215d55db3c746b3b5`
+and
+`587ee2c12d5f721e7da52f3bdbf8b5d254c4230ea6a091ed344c2b22d8154b25`;
+the bounded transcript SHA-256 is
+`76bb582dc9e58d033879997348d20a40a8c55fc2d5c8763f8567e64d3c422078`.
+Independent companion verification produced receipt SHA-256
+`756bf6096e759ae7c3028a2a60c6d1ef529e0e07c35da3b2d08294252237f62d`
+and accepted observed archive digest
+`34a0b8fb8a2d3263a5461a3b1bb14da20a515410b15f0641a0b155a995739887`,
+immutable backup digest
+`9d793a3518c267e275da8b50fd9f3773563d13fc27f324c8397dd0050a45941a`,
+source schema 29, migrated schema 31 and rollback schema 29. This proves one
+local Darwin/arm64 execution and cross-build inspection only. It is not final
+candidate, legal, platform, representative-data, rollback, signing or
+publication approval; no historical published binary, hosted matrix, production
+key/signature, tag, upload or release was used.
+
+DAR-70 delegated-output audit checkpoint at clean pushed commit
+`fd20a4fb19dfb3b0567c899e859fa79556deb2f4`: configured successful
 worker executions now receive one idempotent orchestrator review after trusted
 deterministic validation and before supervisor acceptance. The worker log binds
 a versioned review intent to the exact operation and reviewer, then retains only
@@ -28,7 +59,8 @@ defects and one stale runbook claim were corrected. Focused race suites, the ful
 `make qualify-mvp` gate passed; the last gate completed in 11.745 seconds. Live
 review quality remains outside deterministic qualification.
 
-DAR-52 retained-evidence review-fix checkpoint (uncommitted): the actual native
+DAR-52 retained-evidence review-fix checkpoint at clean pushed commit
+`fd20a4fb19dfb3b0567c899e859fa79556deb2f4`: the actual native
 archive rehearsal optionally creates a bounded canonical schema-1 companion at
 an explicit new destination outside the checkout. It snapshots one pinned
 regular nonsymlink archive descriptor, checks its basename and authenticated
