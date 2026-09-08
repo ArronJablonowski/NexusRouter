@@ -1,6 +1,27 @@
 # Implementation evidence
 
-DAR-66 deterministic audit qualification: the repeatable MVP gate now executes
+DAR-66 completion qualification: the credential-free MVP gate now covers the
+full orchestrator-audit lifecycle through production provider adapters,
+`Service.Run`, `Service.AuditTask`, and SQLite/WAL. Malformed Go is reviewed
+with its durable failed-syntax evidence; a deliberately contradictory audit
+accept remains inspectable but cannot displace deterministic validation. A
+separate production read-only tool turn binds its `ToolCompleted` event to a
+tool-result evaluation that likewise outranks a contrary audit, and objective
+fitness suppresses both lower-priority advisories. A retryable primary provider
+failure produces a linked fallback task, after which
+automatic review runs exactly once against the successful final result and
+never against the failed predecessor. Separate cases persist independent
+accept, reject, and abstain dispositions; malformed output, caller cancellation,
+and deadline expiry persist typed failed attempts without audit records or raw
+review payloads. The prior meaningless-output, same-model, explicit creative
+feedback, and local-history privacy cases remain in the same gate. Repeated
+focused race runs passed, including three combined runs in 5.846 seconds and
+twenty failure-mode runs in 14.710 seconds. The expanded fourteen-scenario
+`make qualify-mvp` gate passed in 10.738 seconds. These loopback fixtures prove
+runtime behavior without a cloud credential; live model review quality remains
+outside this deterministic qualification.
+
+Earlier partial DAR-66 qualification: the repeatable MVP gate began executing
 the production task, auxiliary-review and SQLite paths instead of accepting a
 coordinator string that merely claims review. A loopback candidate omits a
 required creative deliverable; an independent orchestrator audit rejects it
