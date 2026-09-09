@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "chat": {
+    "version": 1,
+    "action": "submit",
+    "idempotency_key": "fixture-chat-key-0001",
+    "chat_id": "chat-fixture",
+    "model_id": "auto",
+    "text": "Review the current task."
+  },
+  "approval": {
+    "version": 1,
+    "idempotency_key": "fixture-approval-0001",
+    "task_id": "task-fixture",
+    "approval_id": "approval-fixture",
+    "action": "allow",
+    "expected_revision": 1
+  },
+  "feedback": {
+    "version": 1,
+    "idempotency_key": "fixture-feedback-0001",
+    "task_id": "task-fixture",
+    "action": "record",
+    "accepted": true,
+    "attempt_cost": 0
+  },
+  "board": {
+    "version": 1,
+    "action": "card.create",
+    "idempotency_key": "fixture-board-key-0001",
+    "board_id": "board-fixture",
+    "expected_board_revision": 2,
+    "title": "Implement bounded fixture",
+    "description": "Candidate work remains subject to acceptance.",
+    "labels": ["testing"],
+    "dependencies": ["card-prerequisite"],
+    "criteria": [
+      {
+        "version": 1,
+        "id": "tests",
+        "kind": "objective",
+        "required_source": "deterministic",
+        "validator_id": "validator-ci",
+        "description": "Focused tests pass.",
+        "required": true
+      }
+    ]
+  }
+}

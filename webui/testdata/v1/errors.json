@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "errors": [
+    {
+      "version": 1,
+      "code": "revision_conflict",
+      "message": "The resource changed; refresh and retry.",
+      "retryable": true,
+      "current_revision": 4
+    },
+    {
+      "version": 1,
+      "code": "admission_denied",
+      "message": "The operation was not admitted.",
+      "retryable": false
+    }
+  ]
+}

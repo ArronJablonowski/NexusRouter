@@ -1,0 +1,973 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darwinrouter.local/schema/webui/workboard-v1",
+  "title": "DarwinRouter Workboard Presentation Contract v1",
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_limit",
+        "time_limit_ms",
+        "token_limit",
+        "cost_micros"
+      ],
+      "properties": {
+        "attempt_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "time_limit_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2592000000
+        },
+        "token_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "cost_micros": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        }
+      }
+    },
+    "board": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "revision",
+        "layout_revision",
+        "event_sequence",
+        "state",
+        "title",
+        "description",
+        "card_count",
+        "active_claims",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "layout_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "active",
+            "archived"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 256
+        },
+        "description": {
+          "type": "string",
+          "x-maxBytes": 65536
+        },
+        "card_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "active_claims": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "created_at": {
+          "$ref": "#/$defs/time"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "card_id",
+        "attempt_id",
+        "revision",
+        "state",
+        "owner_id",
+        "owner_type",
+        "expires_at",
+        "last_heartbeat"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "active",
+            "attention",
+            "released"
+          ]
+        },
+        "owner_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "owner_type": {
+          "enum": [
+            "operator",
+            "worker",
+            "validator",
+            "model",
+            "system"
+          ]
+        },
+        "task_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/time"
+        },
+        "last_heartbeat": {
+          "$ref": "#/$defs/time"
+        },
+        "released_at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "allOf": [{"if": {"properties": {"state": {"const": "released"}}}, "then": {"required": ["released_at"]}, "else": {"not": {"required": ["released_at"]}}}]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "revision",
+        "board_id",
+        "card_id",
+        "attempt_id",
+        "candidate_id",
+        "criterion_id",
+        "source",
+        "outcome",
+        "actor_id",
+        "actor_type",
+        "reference",
+        "candidate_digest",
+        "criteria_digest",
+        "policy_digest",
+        "created_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "candidate_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "criterion_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "source": {
+          "enum": [
+            "deterministic",
+            "user_feedback",
+            "model_audit"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "abstained"
+          ]
+        },
+        "actor_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "actor_type": {
+          "enum": [
+            "operator",
+            "worker",
+            "validator",
+            "model",
+            "system"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 128
+        },
+        "candidate_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "criteria_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "created_at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"source": {"const": "deterministic"}}}, "then": {"properties": {"actor_type": {"const": "validator"}}}},
+        {"if": {"properties": {"source": {"const": "user_feedback"}}}, "then": {"properties": {"actor_type": {"const": "operator"}, "outcome": {"enum": ["passed", "failed"]}}}},
+        {"if": {"properties": {"source": {"const": "model_audit"}}}, "then": {"properties": {"actor_type": {"const": "model"}}}}
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "card_id",
+        "attempt_id",
+        "revision",
+        "digest",
+        "criteria_digest",
+        "policy_digest",
+        "evidence_digest",
+        "evidence_count",
+        "summary",
+        "artifact_refs",
+        "submitted_by",
+        "created_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "criteria_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 65536
+        },
+        "artifact_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "v1#/$defs/id"
+          }
+        },
+        "submitted_by": {
+          "$ref": "v1#/$defs/id"
+        },
+        "created_at": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "card_id",
+        "ordinal",
+        "revision",
+        "state",
+        "worker_id",
+        "criteria_revision",
+        "criteria_digest",
+        "policy_digest",
+        "budget",
+        "criteria",
+        "task_ids",
+        "session_ids",
+        "evidence",
+        "started_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "running",
+            "review",
+            "accepted",
+            "rejected",
+            "failed",
+            "canceled"
+          ]
+        },
+        "worker_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "criteria_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "criteria_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "v1#/$defs/acceptance_criterion"
+          }
+        },
+        "task_ids": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "v1#/$defs/id"
+          }
+        },
+        "session_ids": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "v1#/$defs/id"
+          }
+        },
+        "claim": {
+          "$ref": "#/$defs/claim"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "acceptance_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "decision_by": {
+          "$ref": "v1#/$defs/id"
+        },
+        "decision_by_type": {
+          "enum": ["operator", "validator"]
+        },
+        "decision_authority_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "acceptance_evidence_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "started_at": {
+          "$ref": "#/$defs/time"
+        },
+        "ended_at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "running"}}}, "then": {"required": ["claim"], "not": {"anyOf": [{"required": ["ended_at"]}, {"required": ["candidate"]}, {"required": ["acceptance_id"]}, {"required": ["decision_by"]}, {"required": ["decision_by_type"]}, {"required": ["decision_authority_id"]}, {"required": ["acceptance_evidence_digest"]}]}}},
+        {"if": {"properties": {"state": {"const": "review"}}}, "then": {"required": ["claim", "candidate", "ended_at"], "not": {"anyOf": [{"required": ["acceptance_id"]}, {"required": ["decision_by"]}, {"required": ["decision_by_type"]}, {"required": ["decision_authority_id"]}, {"required": ["acceptance_evidence_digest"]}]}}},
+        {"if": {"properties": {"state": {"enum": ["accepted", "rejected"]}}}, "then": {"required": ["claim", "candidate", "acceptance_id", "decision_by", "decision_by_type", "decision_authority_id", "acceptance_evidence_digest", "ended_at"]}},
+        {"if": {"properties": {"state": {"enum": ["failed", "canceled"]}}}, "then": {"required": ["ended_at"], "not": {"anyOf": [{"required": ["candidate"]}, {"required": ["acceptance_id"]}, {"required": ["decision_by"]}, {"required": ["decision_by_type"]}, {"required": ["decision_authority_id"]}, {"required": ["acceptance_evidence_digest"]}]}}}
+      ]
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "revision",
+        "criteria_revision",
+        "state",
+        "rank",
+        "title",
+        "description",
+        "priority",
+        "labels",
+        "dependencies",
+        "remaining_dependencies",
+        "attempt_count",
+        "cancel_requested",
+        "pause_requested",
+        "budget",
+        "criteria",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "criteria_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "backlog",
+            "ready",
+            "in_progress",
+            "blocked",
+            "review",
+            "done",
+            "canceled"
+          ]
+        },
+        "rank": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 256
+        },
+        "description": {
+          "type": "string",
+          "x-maxBytes": 65536
+        },
+        "priority": {
+          "enum": [
+            "urgent",
+            "high",
+            "normal",
+            "low"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "x-maxBytes": 64
+          }
+        },
+        "parent_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "dependencies": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "v1#/$defs/id"
+          }
+        },
+        "remaining_dependencies": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "assignee_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "current_attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "current_claim_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "acceptance_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "block_reason": {
+          "$ref": "v1#/$defs/id"
+        },
+        "cancel_requested": {
+          "type": "boolean"
+        },
+        "pause_requested": {
+          "type": "boolean"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "v1#/$defs/acceptance_criterion"
+          }
+        },
+        "created_at": {
+          "$ref": "#/$defs/time"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "in_progress"}}}, "then": {"required": ["current_attempt_id", "current_claim_id"], "not": {"anyOf": [{"required": ["acceptance_id"]}, {"required": ["block_reason"]}]}}},
+        {"if": {"properties": {"state": {"const": "blocked"}}}, "then": {"required": ["current_attempt_id", "current_claim_id", "block_reason"], "not": {"required": ["acceptance_id"]}}},
+        {"if": {"properties": {"state": {"const": "review"}}}, "then": {"required": ["current_attempt_id"], "not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["acceptance_id"]}, {"required": ["block_reason"]}]}}},
+        {"if": {"properties": {"state": {"const": "done"}}}, "then": {"required": ["current_attempt_id", "acceptance_id"], "properties": {"remaining_dependencies": {"const": 0}}, "not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["block_reason"]}]}}},
+        {"if": {"properties": {"state": {"enum": ["backlog", "ready", "canceled"]}}}, "then": {"not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["acceptance_id"]}, {"required": ["block_reason"]}]}}},
+        {"if": {"properties": {"state": {"const": "ready"}}}, "then": {"properties": {"remaining_dependencies": {"const": 0}}}}
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "board",
+        "cards",
+        "has_more",
+        "graph_revision",
+        "graph_digest"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "board": {
+          "$ref": "#/$defs/board"
+        },
+        "cards": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/card"
+          }
+        },
+        "next_cursor": {
+          "$ref": "v1#/$defs/cursor"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "graph_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "graph_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"cards": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}]
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "items",
+        "has_more"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/board"
+          }
+        },
+        "next_cursor": {
+          "$ref": "v1#/$defs/cursor"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"items": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}]
+    },
+    "operation_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-invariants": [
+        "event_count == last_sequence - first_sequence + 1"
+      ],
+      "required": [
+        "version",
+        "board_id",
+        "operation_id",
+        "request_digest",
+        "response_digest",
+        "first_sequence",
+        "last_sequence",
+        "event_count",
+        "transaction_bytes",
+        "board_revision",
+        "outcome",
+        "created_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "operation_id": {
+          "$ref": "v1#/$defs/key"
+        },
+        "request_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "response_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "first_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "transaction_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "board_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "outcome": {
+          "$ref": "v1#/$defs/id"
+        },
+        "created_at": {
+          "$ref": "#/$defs/time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["card_revision"]},
+          "then": {"required": ["card_id"]}
+        },
+        {
+          "if": {"required": ["claim_revision"]},
+          "then": {"required": ["card_id", "card_revision"]}
+        },
+        {
+          "if": {"not": {"required": ["card_id"]}},
+          "then": {
+            "not": {
+              "anyOf": [
+                {"required": ["card_revision"]},
+                {"required": ["claim_revision"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "acceptance_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "card_id",
+        "attempt_id",
+        "candidate_id",
+        "candidate_digest",
+        "criteria_revision",
+        "criteria_digest",
+        "evidence_head_revision",
+        "evidence_set_digest",
+        "policy_digest",
+        "decision",
+        "decided_by",
+        "decided_by_type",
+        "decision_authority_id",
+        "decided_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "candidate_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "candidate_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "criteria_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "criteria_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_head_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_set_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "decision": {
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        "decided_by": {
+          "$ref": "v1#/$defs/id"
+        },
+        "decided_by_type": {
+          "enum": ["operator", "validator"]
+        },
+        "decision_authority_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "decided_at": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    },
+    "recovery_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-invariants": [
+        "last_sequence >= first_sequence",
+        "last_sequence - first_sequence + 1 <= 128"
+      ],
+      "required": [
+        "version",
+        "id",
+        "board_id",
+        "card_id",
+        "attempt_id",
+        "old_claim_id",
+        "old_claim_revision",
+        "card_revision",
+        "stop_proof_id",
+        "task_head_digest",
+        "process_proof_digest",
+        "effect_evidence_digest",
+        "effect_resolution",
+        "resulting_state",
+        "first_sequence",
+        "last_sequence",
+        "recovered_at"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "board_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "old_claim_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "old_claim_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "card_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stop_proof_id": {
+          "$ref": "v1#/$defs/id"
+        },
+        "task_head_digest": {"$ref": "#/$defs/digest"},
+        "process_proof_digest": {"$ref": "#/$defs/digest"},
+        "effect_evidence_digest": {"$ref": "#/$defs/digest"},
+        "effect_resolution": {
+          "enum": [
+            "effect_free",
+            "resolved_no_replay"
+          ]
+        },
+        "resulting_state": {"const": "ready"},
+        "first_sequence": {"type": "integer", "minimum": 1},
+        "last_sequence": {"type": "integer", "minimum": 1},
+        "recovered_at": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    }
+  }
+}

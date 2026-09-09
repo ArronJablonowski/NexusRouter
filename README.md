@@ -40,6 +40,16 @@ dependency, claim/lease, checkpoint, acceptance, and restart invariants. Linear
 issues DAR-76 through DAR-87 track implementation; this checkpoint does not yet
 serve the Web UI or expose workboard storage.
 
+The browser/workboard boundary is now specified in
+[ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
+types, JSON Schema, fixtures, hard payload bounds, a complete UI-operation map,
+same-origin session rules, resumable presentation-event semantics, and durable
+Kanban ownership rules. Closed presentation schemas include board/card/claim/
+attempt/evidence/candidate snapshots and acceptance/recovery receipts. This
+contract is testable scaffolding only; Web UI
+serving, browser authentication, workboard persistence, and feature views remain
+open.
+
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
 Third-party dependency licenses and notices remain separate and are inventoried

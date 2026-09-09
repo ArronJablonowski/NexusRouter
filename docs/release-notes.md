@@ -39,6 +39,15 @@ supported-platform decision or publication approval is claimed.
 
 ## Available for supervised testing
 
+- The Web UI and integrated Kanban now have an accepted architecture decision
+  plus reusable version-1 Go/JSON contracts and fixtures. The boundary preserves
+  native bearer APIs, requires a same-origin cookie/CSRF BFF, separates
+  provisional chat text from committed state, and makes the workboard a durable
+  CAS/idempotent domain with typed projections, bounded graph operations,
+  stop-proof recovery, and independently evidenced acceptance. No Web UI
+  handler, assets, browser session store, or Kanban persistence is implemented
+  yet.
+
 - An explicitly selected stock summary-integrity validator now emits bounded,
   deterministic advisory evidence without ever approving a model-authored
   summary. It rejects provenance/checkpoint drift, unsafe display controls,

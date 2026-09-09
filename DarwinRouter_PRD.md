@@ -365,6 +365,12 @@ tokens, or authoritative task state. Fully local mode vendors all UI assets and
 applies the same zero-egress transport policy; no CDN, font, analytics, or
 service-worker escape is permitted.
 
+The accepted implementation boundary, operation map, streaming semantics,
+workboard state ownership, and concrete browser controls are recorded in
+[ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md). Its versioned Go types,
+JSON Schema, and reusable fixtures live under `webui/`; the contract does not by
+itself implement the browser server or workboard store.
+
 Chat and board mutations use versioned native endpoints with idempotency keys.
 Streaming uses resumable Server-Sent Events with event IDs and bounded catch-up;
 the client must reconcile from durable state after gaps rather than infer

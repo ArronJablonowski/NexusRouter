@@ -1,0 +1,2392 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darwinrouter.local/schema/webui/v1",
+  "title": "DarwinRouter Web UI Contract v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/chat_request"
+    },
+    {
+      "$ref": "#/$defs/approval_request"
+    },
+    {
+      "$ref": "#/$defs/feedback_request"
+    },
+    {
+      "$ref": "#/$defs/board_request"
+    },
+    {
+      "$ref": "#/$defs/event"
+    },
+    {
+      "$ref": "#/$defs/error"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+      "x-maxBytes": 128
+    },
+    "model_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+      "x-maxBytes": 128
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "x-maxBytes": 512
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[!-~]{16,128}$",
+      "x-maxBytes": 128
+    },
+    "chat_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "action",
+        "idempotency_key"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "action": {
+          "enum": [
+            "submit",
+            "resume",
+            "steer",
+            "cancel"
+          ]
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/key"
+        },
+        "chat_id": {
+          "$ref": "#/$defs/id"
+        },
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "model_id": {
+          "$ref": "#/$defs/model_id"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576,
+          "x-maxBytes": 1048576
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "submit"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "text"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "task_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_revision"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "resume"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "chat_id",
+              "task_id",
+              "text",
+              "expected_revision"
+            ],
+            "properties": {
+              "expected_revision": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "steer"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id",
+              "text"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "model_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "chat_id"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "cancel"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "text"
+                  ]
+                },
+                {
+                  "required": [
+                    "model_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "chat_id"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "approval_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "idempotency_key",
+        "task_id",
+        "approval_id",
+        "action",
+        "expected_revision"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/key"
+        },
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/id"
+        },
+        "action": {
+          "enum": [
+            "allow",
+            "deny",
+            "revoke"
+          ]
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "feedback_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "idempotency_key",
+        "task_id",
+        "action",
+        "accepted",
+        "attempt_cost"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/key"
+        },
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "feedback_id": {
+          "$ref": "#/$defs/id"
+        },
+        "action": {
+          "enum": [
+            "record",
+            "revise"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "attempt_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "record"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "feedback_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_revision"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "revise"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "feedback_id",
+              "expected_revision"
+            ],
+            "properties": {
+              "expected_revision": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "work_budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_limit", "time_limit_ms", "token_limit", "cost_micros"],
+      "properties": {"attempt_limit": {"type": "integer", "minimum": 1, "maximum": 32}, "time_limit_ms": {"type": "integer", "minimum": 0, "maximum": 2592000000}, "token_limit": {"type": "integer", "minimum": 0, "maximum": 1000000000}, "cost_micros": {"type": "integer", "minimum": 0, "maximum": 1000000000000}}
+    },
+    "acceptance_criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "kind",
+        "required_source",
+        "validator_id",
+        "description",
+        "required"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "objective",
+            "subjective"
+          ]
+        },
+        "required_source": {
+          "enum": [
+            "deterministic",
+            "user_feedback"
+          ]
+        },
+        "validator_id": {
+          "$ref": "#/$defs/id"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 4096
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "objective"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "required_source": {
+                "const": "deterministic"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "subjective"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "required_source": {
+                "const": "user_feedback"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "board_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "action",
+        "idempotency_key"
+      ],
+      "x-allowedFieldsByAction": {
+        "board.create": [
+          "title",
+          "description"
+        ],
+        "card.create": [
+          "board_id",
+          "title",
+          "description",
+          "priority",
+          "labels",
+          "dependencies",
+          "criteria",
+          "parent_id",
+          "assignee_id",
+          "budget",
+          "expected_board_revision"
+        ],
+        "card.revise": [
+          "board_id",
+          "card_id",
+          "title",
+          "description",
+          "priority",
+          "labels",
+          "parent_id",
+          "assignee_id",
+          "budget",
+          "expected_card_revision"
+        ],
+        "card.move": [
+          "board_id",
+          "card_id",
+          "target_state",
+          "before_card_id",
+          "after_card_id",
+          "expected_board_revision",
+          "expected_layout_revision",
+          "expected_card_revision"
+        ],
+        "dependency.add": [
+          "board_id",
+          "card_id",
+          "dependency_id",
+          "expected_card_revision"
+        ],
+        "dependency.remove": [
+          "board_id",
+          "card_id",
+          "dependency_id",
+          "expected_card_revision"
+        ],
+        "card.claim": [
+          "board_id",
+          "card_id",
+          "expected_card_revision"
+        ],
+        "claim.heartbeat": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "attempt_id",
+          "expected_claim_revision"
+        ],
+        "claim.recover": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "attempt_id",
+          "expected_card_revision",
+          "expected_claim_revision",
+          "stop_proof_id",
+          "task_head_digest",
+          "process_proof_digest",
+          "effect_evidence_digest",
+          "effect_resolution"
+        ],
+        "criteria.revise": [
+          "board_id",
+          "card_id",
+          "criteria",
+          "expected_card_revision",
+          "expected_criteria_revision"
+        ],
+        "checkpoint.append": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "attempt_id",
+          "criteria_revision",
+          "expected_card_revision",
+          "expected_claim_revision",
+          "evidence"
+        ],
+        "candidate.submit": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "attempt_id",
+          "criteria_revision",
+          "expected_card_revision",
+          "expected_claim_revision",
+          "evidence"
+        ],
+        "acceptance.accept": [
+          "board_id",
+          "card_id",
+          "attempt_id",
+          "candidate_id",
+          "criteria_revision",
+          "expected_card_revision",
+          "evidence_head_revision",
+          "evidence",
+          "candidate_digest",
+          "criteria_digest",
+          "evidence_set_digest",
+          "policy_digest"
+        ],
+        "acceptance.reject": [
+          "board_id",
+          "card_id",
+          "attempt_id",
+          "candidate_id",
+          "criteria_revision",
+          "expected_card_revision",
+          "evidence_head_revision",
+          "evidence",
+          "candidate_digest",
+          "criteria_digest",
+          "evidence_set_digest",
+          "policy_digest"
+        ],
+        "card.pause_request": [
+          "board_id",
+          "card_id",
+          "reason_code",
+          "expected_card_revision"
+        ],
+        "card.cancel_request": [
+          "board_id",
+          "card_id",
+          "reason_code",
+          "expected_card_revision"
+        ],
+        "card.block": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "reason_code",
+          "expected_card_revision",
+          "expected_claim_revision"
+        ],
+        "card.unblock": [
+          "board_id",
+          "card_id",
+          "claim_id",
+          "reason_code",
+          "expected_card_revision",
+          "expected_claim_revision"
+        ]
+      },
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "action": {
+          "enum": [
+            "board.create",
+            "card.create",
+            "card.revise",
+            "card.move",
+            "dependency.add",
+            "dependency.remove",
+            "card.claim",
+            "claim.heartbeat",
+            "claim.recover",
+            "criteria.revise",
+            "checkpoint.append",
+            "candidate.submit",
+            "acceptance.accept",
+            "acceptance.reject",
+            "card.pause_request",
+            "card.cancel_request",
+            "card.block",
+            "card.unblock"
+          ]
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/key"
+        },
+        "board_id": {
+          "$ref": "#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "#/$defs/id"
+        },
+        "dependency_id": {
+          "$ref": "#/$defs/id"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/id"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate_id": {
+          "$ref": "#/$defs/id"
+        },
+        "criteria_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_criteria_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_head_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_board_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_card_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_claim_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_layout_revision": {"type": "integer", "minimum": 1},
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-maxBytes": 256
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 65536,
+          "x-maxBytes": 65536
+        },
+        "target_state": {
+          "enum": [
+            "backlog",
+            "ready"
+          ]
+        },
+        "priority": {"enum": ["urgent", "high", "normal", "low"]},
+        "parent_id": {"$ref": "#/$defs/id"},
+        "assignee_id": {"$ref": "#/$defs/id"},
+        "before_card_id": {"$ref": "#/$defs/id"},
+        "after_card_id": {"$ref": "#/$defs/id"},
+        "budget": {"$ref": "#/$defs/work_budget"},
+        "reason_code": {
+          "$ref": "#/$defs/id"
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "x-maxBytes": 65536
+        },
+        "candidate_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "criteria_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence_set_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stop_proof_id": {
+          "$ref": "#/$defs/id"
+        },
+        "task_head_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "process_proof_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "effect_evidence_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "effect_resolution": {
+          "enum": [
+            "effect_free",
+            "resolved_no_replay"
+          ]
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "x-maxBytes": 64
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/acceptance_criterion"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "board.create"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "title"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "board_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "card_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_card_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "board_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "card.create"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "title",
+              "expected_board_revision",
+              "criteria"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "card_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence_head_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_card_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence_set_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "policy_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "stop_proof_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "effect_resolution"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "card.revise"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "title"
+                ]
+              },
+              {
+                "required": [
+                  "description"
+                ]
+              },
+              {
+                "required": [
+                  "labels"
+                ]
+              }
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "card.revise",
+                  "card.move",
+                  "dependency.add",
+                  "dependency.remove",
+                  "card.claim",
+                  "card.pause_request",
+                  "card.cancel_request",
+                  "card.block",
+                  "card.unblock"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "card_id",
+              "expected_card_revision"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "card.move"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "target_state",
+              "expected_board_revision",
+              "expected_layout_revision"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "dependency.add",
+                  "dependency.remove"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "dependency_id"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "card.claim"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "card.pause_request",
+                  "card.cancel_request",
+                  "card.block",
+                  "card.unblock"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "attempt_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "card.block",
+                  "card.unblock"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "claim_id",
+              "reason_code",
+              "expected_claim_revision"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "claim.heartbeat"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "card_id",
+              "claim_id",
+              "attempt_id",
+              "expected_claim_revision"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_card_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "evidence"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "claim.recover"
+              }
+            }
+          },
+          "then": {
+            "propertyNames": {"enum": ["version", "action", "idempotency_key", "board_id", "card_id", "claim_id", "attempt_id", "expected_card_revision", "expected_claim_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"]},
+            "required": [
+              "card_id",
+              "claim_id",
+              "attempt_id",
+              "expected_card_revision",
+              "expected_claim_revision",
+              "stop_proof_id",
+              "task_head_digest",
+              "process_proof_digest",
+              "effect_evidence_digest",
+              "effect_resolution"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "criteria.revise"
+              }
+            }
+          },
+          "then": {
+            "propertyNames": {"enum": ["version", "action", "idempotency_key", "board_id", "card_id", "criteria", "expected_card_revision", "expected_criteria_revision"]},
+            "required": [
+              "card_id",
+              "expected_card_revision",
+              "expected_criteria_revision",
+              "criteria"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "checkpoint.append",
+                  "candidate.submit"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "card_id",
+              "claim_id",
+              "attempt_id",
+              "criteria_revision",
+              "expected_card_revision",
+              "expected_claim_revision",
+              "evidence"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "candidate_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "acceptance.accept",
+                  "acceptance.reject"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "card_id",
+              "attempt_id",
+              "candidate_id",
+              "criteria_revision",
+              "expected_card_revision",
+              "evidence_head_revision",
+              "evidence",
+              "candidate_digest",
+              "criteria_digest",
+              "evidence_set_digest",
+              "policy_digest"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dependency_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "claim_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_board_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_claim_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "title"
+                  ]
+                },
+                {
+                  "required": [
+                    "description"
+                  ]
+                },
+                {
+                  "required": [
+                    "target_state"
+                  ]
+                },
+                {
+                  "required": [
+                    "reason_code"
+                  ]
+                },
+                {
+                  "required": [
+                    "labels"
+                  ]
+                },
+                {
+                  "required": [
+                    "dependencies"
+                  ]
+                },
+                {
+                  "required": [
+                    "criteria"
+                  ]
+                },
+                {
+                  "required": [
+                    "expected_criteria_revision"
+                  ]
+                },
+                {
+                  "required": [
+                    "stop_proof_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "effect_resolution"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "presentation_message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "text",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 1048576
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "chat_delta_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "x-maxBytes": 1048576
+        }
+      }
+    },
+    "chat_snapshot_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chat_id",
+        "messages",
+        "has_more"
+      ],
+      "properties": {
+        "chat_id": {
+          "$ref": "#/$defs/id"
+        },
+        "messages": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/presentation_message"
+          }
+        },
+        "next_cursor": {
+          "$ref": "#/$defs/cursor"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "has_more": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "next_cursor"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "next_cursor"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "chat_final_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "state",
+        "message"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state": {
+          "const": "completed"
+        },
+        "message": {
+          "$ref": "#/$defs/presentation_message"
+        }
+      }
+    },
+    "lifecycle_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "state"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state": {
+          "$ref": "#/$defs/id"
+        },
+        "code": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "approval_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "approval_id",
+        "state"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "approval_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "feedback_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "feedback_id",
+        "state"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "feedback_id": {
+          "$ref": "#/$defs/id"
+        },
+        "state": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "board_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "board_id",
+        "change"
+      ],
+      "properties": {
+        "board_id": {
+          "$ref": "#/$defs/id"
+        },
+        "card_id": {
+          "$ref": "#/$defs/id"
+        },
+        "change": {
+          "enum": [
+            "board_created",
+            "board_revised",
+            "card_changed",
+            "dependency_changed",
+            "claim_changed",
+            "evidence_changed",
+            "acceptance_changed"
+          ]
+        },
+        "state": {
+          "enum": [
+            "backlog",
+            "ready",
+            "in_progress",
+            "blocked",
+            "review",
+            "done",
+            "canceled"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "change": {
+                "enum": [
+                  "board_created",
+                  "board_revised"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "card_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "state"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "card_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "change": {
+                "const": "card_changed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "state"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "state"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "checkpoint_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "next_cursor",
+        "has_more"
+      ],
+      "properties": {
+        "next_cursor": {
+          "$ref": "#/$defs/cursor"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      }
+    },
+    "attention_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/id"
+        },
+        "subject": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "stream_error_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "kind",
+        "durability",
+        "subject",
+        "revision",
+        "data"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "cursor": {
+          "$ref": "#/$defs/cursor"
+        },
+        "kind": {
+          "enum": [
+            "chat.snapshot",
+            "chat.delta",
+            "chat.final",
+            "lifecycle.event",
+            "approval.changed",
+            "feedback.changed",
+            "board.changed",
+            "checkpoint",
+            "attention",
+            "stream.error"
+          ]
+        },
+        "durability": {
+          "enum": [
+            "provisional",
+            "committed"
+          ]
+        },
+        "subject": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "data": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "chat.delta"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "provisional"
+              },
+              "revision": {
+                "const": 0
+              },
+              "data": {
+                "$ref": "#/$defs/chat_delta_data"
+              }
+            },
+            "not": {
+              "required": [
+                "cursor"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "chat.snapshot"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/chat_snapshot_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "chat.final"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/chat_final_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "lifecycle.event"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/lifecycle_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "approval.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/approval_changed_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "feedback.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/feedback_changed_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "board.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/board_changed_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "checkpoint"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/checkpoint_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "attention"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "const": "committed"
+              },
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/attention_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "stream.error"
+              },
+              "durability": {
+                "const": "provisional"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "revision": {
+                "const": 0
+              },
+              "data": {
+                "$ref": "#/$defs/stream_error_data"
+              }
+            },
+            "not": {
+              "required": [
+                "cursor"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "stream.error"
+              },
+              "durability": {
+                "const": "committed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "revision": {
+                "minimum": 1
+              },
+              "data": {
+                "$ref": "#/$defs/stream_error_data"
+              }
+            },
+            "required": [
+              "cursor"
+            ]
+          }
+        }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "code": {
+          "$ref": "#/$defs/id"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "x-maxBytes": 256
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "current_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      }
+    }
+  }
+}

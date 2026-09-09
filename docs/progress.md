@@ -5456,3 +5456,59 @@ remaining P0/P1/P2 finding. The final `make check` passed formatting and the
 build; the longest rebuilt packages were releasepack 479.510s, application
 338.498s, telemetry 255.639s, CLI 49.676s, SDK 41.166s, toolgate 24.212s,
 skills 23.880s, sessions 18.051s, and runtime 16.349s.
+
+## 2026-09-09 — DAR-76 Web UI and integrated workboard contract
+
+DAR-76 now has an accepted architecture decision and a reusable, versioned
+browser contract. The decision keeps `/v1` bearer behavior intact and places the
+embedded Web UI behind a same-origin `/app` BFF with one-time CLI-approved
+bootstrap, server-side browser sessions, HttpOnly/SameSite cookies, CSRF on
+mutations, strict Host/Origin checks, no CORS, self-only CSP, no-store sensitive
+responses, sanitized Markdown, and no browser-held authority. Fully local mode
+inherits the server's egress-deny policy and permits no CDN, remote font,
+analytics, service worker, or implicit content fetch.
+
+The contract distinguishes provisional chat deltas from committed presentation
+events, specifies cookie-authenticated GET SSE with bounded `Last-Event-ID`
+catch-up, and makes disconnect/reconnect observation-only. The checked-in
+operation map accounts for chat, steering, cancellation, approvals, feedback,
+route/health inspection, browser sessions, and the integrated Kanban, naming
+existing application primitives and all required new endpoints.
+
+The Kanban is specified as a separate durable `workboard` domain with an
+append-only event log, transactional projections, monotonic revisions,
+idempotency receipts, CAS mutations, dependency-cycle rejection, claims,
+heartbeats, conservative lease recovery, checkpoints, and separate candidate
+acceptance. A claimant cannot accept its own work and model audit remains
+advisory. Go validators, JSON Schema, and shared request/event/error fixtures
+enforce version, action, identifier, revision, object-payload, and byte bounds.
+
+Independent adversarial reviews then identified and drove tighter contracts:
+provisional deltas no longer carry replay cursors; event payloads are closed,
+typed, and duplicate-field rejecting; bootstrap routes have explicit security
+classes; browser approval/feedback adapters are correctly treated as new
+revision façades; model IDs follow configured-model grammar; and chat resume,
+model/resource inspection, board create/detail, and snapshot reconciliation are
+all mapped. Workboard commands now prevent generic moves into execution/review/
+done, establish and revise criteria, bind candidates and decisions to attempt,
+criteria, evidence, policy, and digest fences, and require stop/effect-resolution
+proof before recovery. Separate versioned workboard presentation schemas cover
+boards, cards, budgets, claims, attempts, evidence, candidates, snapshots,
+pages, acceptance decisions, recovery, and idempotency receipts. Hard graph,
+fan-out, event, byte, card, and depth limits make cycle proof and successor
+unlock fail closed.
+
+Receipt arithmetic is a normative `x-invariants` extension because stock JSON
+Schema cannot compare sibling numeric fields. Strict Go decoding and shared
+negative fixtures enforce the same rules and are conformance inputs for the
+future browser validator. The final bounded browser-security and workboard
+reviews reported no remaining P0/P1/P2 finding.
+
+Verification passed repeated `go test -race ./webui`, executable
+positive/negative JSON Schema and extension cases, workboard projection/schema
+parity, `go vet ./webui`, the source-format/1,000-line gate, and the complete
+`make check` repository race/vet/build gate. DAR-76 remains an architecture/
+contract sprint: the app shell, browser auth handlers, presentation projection,
+workboard store, API, agent tools, and chat/Kanban feature UI remain open in
+DAR-77 through DAR-87. The PRD's `web_ui` and `workboard` examples are still
+requirements, not currently accepted configuration fields.

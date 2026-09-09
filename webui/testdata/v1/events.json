@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "version": 1,
+      "kind": "chat.delta",
+      "durability": "provisional",
+      "subject": "chat-fixture",
+      "revision": 0,
+      "data": {"text": "Working"}
+    },
+    {
+      "version": 1,
+      "cursor": "chat-fixture:2",
+      "kind": "chat.final",
+      "durability": "committed",
+      "subject": "chat-fixture",
+      "revision": 2,
+      "data": {
+        "task_id": "task-fixture",
+        "state": "completed",
+        "message": {"id": "message-fixture", "role": "assistant", "text": "Working complete.", "revision": 2}
+      }
+    },
+    {
+      "version": 1,
+      "cursor": "board-fixture:4",
+      "kind": "board.changed",
+      "durability": "committed",
+      "subject": "board-fixture",
+      "revision": 4,
+      "data": {"board_id": "board-fixture", "card_id": "card-fixture", "change": "card_changed", "state": "review"}
+    }
+  ]
+}
