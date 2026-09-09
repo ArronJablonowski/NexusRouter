@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -91,8 +93,13 @@ func TestProviderEngineUsedForAuxiliaryModelsAndHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	var builds atomic.Int32
-	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+	var mu sync.Mutex
+	purposes := []providers.Purpose{}
+	svc.providerFactory = applicationProviderFactory(func(_ context.Context, connection providers.Connection) (providers.Provider, error) {
 		builds.Add(1)
+		mu.Lock()
+		purposes = append(purposes, connection.Purpose)
+		mu.Unlock()
 		return nil, errors.New("factory unavailable")
 	})
 	if _, err := svc.AuditTask(ctx, source.TaskID, "z", 0); err == nil || builds.Load() != 1 {
@@ -109,5 +116,10 @@ func TestProviderEngineUsedForAuxiliaryModelsAndHealth(t *testing.T) {
 		if check.Component == "provider" && check.Status == "healthy" {
 			t.Fatal("unavailable factory reported healthy")
 		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []providers.Purpose{providers.PurposeAuxiliary, providers.PurposeAuxiliary, providers.PurposeHealth}; !reflect.DeepEqual(purposes, want) {
+		t.Fatalf("provider purposes=%v, want %v", purposes, want)
 	}
 }

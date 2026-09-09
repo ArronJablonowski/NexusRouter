@@ -449,7 +449,7 @@ func TestSDKEventSinkFailureIsSanitizedAndClientReusable(t *testing.T) {
 			var providersBuilt atomic.Int32
 			client, _ := newSDKEventSinkClient(t, database, 1, sink, sdkEventSinkSuccessProvider(), &providersBuilt)
 			failed, err := client.Run(context.Background(), sdk.Request{Version: 1, ModelID: "chat", Prompt: "first"})
-			if !errors.Is(err, sdk.ErrEventDelivery) || strings.Contains(err.Error(), "private sink") || failed.TaskID == "" || providersBuilt.Load() != 1 || calls.Load() != 1 {
+			if !errors.Is(err, sdk.ErrEventDelivery) || strings.Contains(err.Error(), "private sink") || failed.TaskID == "" || providersBuilt.Load() != 0 || calls.Load() != 1 {
 				t.Fatal("sink failure was unsafe", failed, err, providersBuilt.Load(), calls.Load())
 			}
 			page, readErr := client.ReadEvents(context.Background(), failed.TaskID, 0, 100)
@@ -458,7 +458,7 @@ func TestSDKEventSinkFailureIsSanitizedAndClientReusable(t *testing.T) {
 			}
 			before := calls.Load()
 			succeeded, err := client.Run(context.Background(), sdk.Request{Version: 1, ModelID: "chat", Prompt: "second"})
-			if err != nil || succeeded.TaskID == "" || succeeded.TaskID == failed.TaskID || providersBuilt.Load() != 2 || calls.Load() <= before {
+			if err != nil || succeeded.TaskID == "" || succeeded.TaskID == failed.TaskID || providersBuilt.Load() != 1 || calls.Load() <= before {
 				t.Fatal("failed delivery poisoned client", succeeded, err, providersBuilt.Load(), calls.Load())
 			}
 		})

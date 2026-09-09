@@ -285,7 +285,7 @@ func TestCodexCompactionRevocationRespectsDurableStartBoundary(t *testing.T) {
 				return codexbridge.NewSession(ctx, wire, codexbridge.Options{Model: spec.Model, CWD: spec.CWD})
 			}
 			out, err := svc.Run(ctx, Request{ModelID: "brain", ContinueTaskID: task, SummaryAttemptID: a.ID, Prompt: "continue"})
-			if phase == "estimator" {
+			if phase == "estimator" || phase == "launcher" {
 				if err != nil || !revoked {
 					t.Fatal("post-start revocation canceled admitted task", err)
 				}

@@ -184,6 +184,11 @@ The SDK also accepts a process-local `EventSink` that receives detached,
 redacted runtime events only after durable commit across root, worker, and
 delegated-child task journals. Delivery is synchronous and live-only; explicit
 event replay remains the recovery mechanism after restart or uncertain receipt.
+Provider connections distinguish discovery, health, auxiliary, and selected
+execution purposes. The selected execution adapter and any owned Codex process
+must be constructed only after its task and turn starts are durably committed
+and accepted; pre-route discovery and managed-residency maintenance remain
+bounded control-plane preflight rather than task execution.
 
 The SDK must expose explicit session-summary drafting, bounded inspection and
 listing, operator review/history, and approved-summary continuation through the

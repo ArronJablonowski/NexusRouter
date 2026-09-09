@@ -5029,3 +5029,53 @@ and the 1,000-line limit, vet, the complete repository-wide race suite, and
 `go build ./...` in 7:54.93. Longest packages were releasepack 466.198s,
 application 301.829s, telemetry 203.656s, CLI 45.753s, SDK 36.464s, toolgate
 21.247s, sessions 18.355s, runtime 11.976s, and workers 6.759s.
+
+Execution-provider durability checkpoint: provider connections now carry an
+explicit `discovery`, `health`, `auxiliary`, or `execution` purpose, with empty
+purpose retaining the version-one execution default. Automatic model discovery
+and health probes remain bounded pre-task control-plane activity; audit,
+summary, and skill-generation adapters are separately identified as auxiliary.
+This distinction allows a conforming custom factory to distinguish routing
+probes and review work from the selected task execution.
+
+Every selected application execution now supplies the runtime with an inert,
+task-scoped provider wrapper. The wrapper performs no factory call, transport
+dispatch, or Codex launch until the runtime has committed and delivered that
+attempt's `task.started`, optional `route.selected`, and `turn.started` events.
+It opens once across a multi-turn loop, rejects discovery through the execution
+handle, sanitizes panic/error/typed-nil construction, preserves caller
+cancellation, and runs returned task-owned cleanup once. A failed start append or start-sink
+delivery performs zero execution construction. A post-start construction
+failure is recorded as the same task's nonretryable `task.failed`, rather than
+being misclassified as a pre-task admission denial; cancellation records
+`task.canceled`. Pre-admission egress and Codex message/compaction checks still
+fail before task creation.
+
+Race-tested integration fixtures read the committed SQLite start from inside
+the execution factory and cover explicit, automatic, fallback, and delegated
+child attempts. Each fallback waits for the primary terminal and each child
+observes its own start; sink failure on a fallback or child start prevents that
+attempt's construction and leaves no running worker lease. Approved compaction
+is frozen transactionally at start, so a later revocation affects future imports
+without retroactively canceling the already admitted attempt. Purpose admission,
+factory failure/panic/typed nil, cooperative cancellation, service reuse,
+cleanup idempotence, local-only egress, and start-persistence failure are also
+directly exercised.
+
+This checkpoint does not claim that pre-route discovery or managed Ollama
+residency is a durable task operation, that noncooperative in-process factories
+can be forcibly stopped, that arbitrary custom providers expose a Close hook, or
+that a terminal event means provider cleanup has already completed. Direct SDK
+runs have no automatic process-crash reconciliation; explicit inspection can
+reveal, but not repair, an incomplete running journal. Durable submitted work
+retains its existing lease/reconciliation path.
+
+The expanded `make qualify-mvp` passed in 50.958 seconds, including negative
+delivery and persistence boundaries at `task.started`, `route.selected`, and
+`turn.started`, zero owned-Codex launch across a rejected turn boundary, and the
+existing interrupted-model planning and fenced submission-recovery suites. On
+the frozen integrated tree, final `make check` passed formatting/LOC, vet, every
+repository package under the race detector, and `go build ./...` in 7:49.40.
+Longest packages were releasepack 461.604s, application 304.284s, telemetry
+198.919s, CLI 44.810s, SDK 33.850s, toolgate 19.989s, API 17.550s, and workers
+4.574s.

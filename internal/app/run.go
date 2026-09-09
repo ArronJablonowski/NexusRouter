@@ -315,12 +315,20 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
-	p, closeProvider, err := openTaskProvider(ctx, s, provider, model, r, messages, privacy, key)
+	providerOpen, providerAdmissionCleanup, err := prepareTaskProvider(s, provider, model, r, messages, privacy, key, providers.PurposeExecution)
 	if err != nil {
 		return result, ErrAdmission
 	}
-	defer closeProvider()
-	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: withMemoryUse(p, selectMemoryStore(r.memoryStore, db), r.memoryContext), Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
+	defer providerAdmissionCleanup()
+	deferredProvider := newDeferredTaskProvider(func(openCtx context.Context) (providers.Provider, func(), error) {
+		adapter, cleanup, openErr := providerOpen(openCtx)
+		if openErr != nil {
+			return nil, cleanup, openErr
+		}
+		return withMemoryUse(adapter, selectMemoryStore(r.memoryStore, db), r.memoryContext), cleanup, nil
+	})
+	defer deferredProvider.Close()
+	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: deferredProvider, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {

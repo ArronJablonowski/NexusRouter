@@ -47,7 +47,7 @@ type factoryTransport func(*http.Request) (*http.Response, error)
 func (f factoryTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func factoryConnection() Connection {
-	return Connection{Version: 1, ID: "test-provider", Endpoint: "http://localhost:11434", Kind: "ollama", APIKey: "credential-secret", Transport: &http.Transport{}}
+	return Connection{Version: 1, ID: "test-provider", Endpoint: "http://localhost:11434", Kind: "ollama", Purpose: PurposeExecution, APIKey: "credential-secret", Transport: &http.Transport{}}
 }
 
 func TestFactoryReceivesConnectionAndBoundedContext(t *testing.T) {

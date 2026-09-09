@@ -18,9 +18,26 @@ import (
 type Connection struct {
 	Version            int
 	ID, Endpoint, Kind string
-	Timeout            time.Duration
-	APIKey             string            `json:"-"`
-	Transport          http.RoundTripper `json:"-"`
+	// Purpose distinguishes pre-task discovery/health construction from the
+	// task-owned execution adapter. Empty retains the version-one execution
+	// default for behavioral compatibility.
+	Purpose   Purpose
+	Timeout   time.Duration
+	APIKey    string            `json:"-"`
+	Transport http.RoundTripper `json:"-"`
+}
+
+type Purpose string
+
+const (
+	PurposeExecution Purpose = "execution"
+	PurposeDiscovery Purpose = "discovery"
+	PurposeHealth    Purpose = "health"
+	PurposeAuxiliary Purpose = "auxiliary"
+)
+
+func validPurpose(purpose Purpose) bool {
+	return purpose == PurposeExecution || purpose == PurposeDiscovery || purpose == PurposeHealth || purpose == PurposeAuxiliary
 }
 
 // Factory creates a replaceable provider engine. Returned adapters must obey
@@ -39,7 +56,10 @@ func Build(ctx context.Context, factory Factory, connection Connection) (out Pro
 			out, err = nil, adapterFailure(false)
 		}
 	}()
-	if ctx == nil || connection.Version != 1 || !factoryLabel(connection.ID) {
+	if connection.Purpose == "" {
+		connection.Purpose = PurposeExecution
+	}
+	if ctx == nil || connection.Version != 1 || !factoryLabel(connection.ID) || !validPurpose(connection.Purpose) {
 		return nil, adapterFailure(false)
 	}
 	if ctx.Err() != nil {

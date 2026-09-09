@@ -182,10 +182,13 @@ Admission still checks configured model capabilities, deployment mode, privacy,
 context, resource capacity and budgets before execution. Injection does not add
 new configuration kinds or let a model select arbitrary endpoints.
 
-The version-one connection supplies provider ID, kind, endpoint, resolved API key
-and an origin-restricted HTTP transport. Custom adapters must use that transport
-for every network request, avoid logging credentials, honor cancellation and
-implement the provider streaming contract (ordered chunks and verified completion).
+The version-one connection supplies provider ID, kind, endpoint, resolved API
+key, an origin-restricted HTTP transport, and a `Purpose` of `discovery`,
+`health`, `auxiliary`, or `execution`. Empty purpose defaults to `execution` for
+behavioral compatibility; external code should use keyed `Connection` literals.
+Custom adapters must use the supplied transport for every network request,
+avoid logging credentials, honor cancellation and implement the provider
+streaming contract (ordered chunks and verified completion).
 Connection credentials are sensitive and must not be retained beyond their need.
 The factory and returned providers are trusted in-process code, not sandboxed
 plugins; policy cannot prevent arbitrary Go code from opening another transport.
@@ -193,9 +196,21 @@ Callers own concurrency safety and any external resources; the runtime does not
 call a custom provider's Close method. Custom engines are not serialized into
 queued submissions: daemon execution uses its own configured factory.
 
-Explicit execution and provisional live text use the same injected adapter,
-with normal runtime validation, redaction, journaling and cancellation. This is
-provider construction, not a general extension-hook API.
+Pre-route automatic discovery and health checks are bounded control-plane calls
+and may construct purpose-tagged probe adapters before a task exists. Auxiliary
+review, summary, and skill calls are tagged separately. For every selected
+application execution—including fallback and delegated child attempts—the
+execution-purpose factory and any owned Codex process are invoked only after
+that attempt's `task.started`, optional route, and `turn.started` events commit
+and their callbacks return. A failed start commit or delivery performs no
+execution construction; construction failures become sanitized durable task
+failures, and caller cancellation becomes a durable cancellation while journal
+ownership and persistence remain available. Expired submitted attempts use the
+existing reconciliation path; direct SDK runs have no automatic process-crash
+repair. The runtime does not automatically redispatch a generic construction failure. Custom
+factory timeouts remain cooperative, and returned custom providers still have
+no general Close contract. This is provider construction, not a general
+extension-hook API.
 
 ### Read-only tool extensions
 
@@ -790,11 +805,12 @@ sink runs first and each receives a separate copy of the current committed event
 even if the other consumer fails.
 
 `EventSink` is an observer and cancellation boundary, not pre-dispatch approval.
-Automatic routing/provider discovery and trusted provider construction may
-currently occur after admission but before `task.started` is committed; those
-preflight operations must not perform irreversible external actions. Provider
-inference begins only after the start event is durable and accepted by the sink.
-Moving all provider preflight behind that durable boundary remains a follow-on
+Automatic routing discovery and managed local-model residency remain bounded
+control-plane preflight and may occur before a task exists; they must not perform
+irreversible task effects. The selected execution adapter and any owned Codex
+process are constructed only after the start event is durable and accepted by
+the sink, and actual streaming follows a durable `turn.started`. Moving all
+control-plane preflight behind a separate durable operation remains a follow-on
 lifecycle sprint.
 
 Ordering is strict within each task's `Sequence`; parent, work, child, and

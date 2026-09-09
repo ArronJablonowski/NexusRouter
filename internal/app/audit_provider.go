@@ -64,5 +64,5 @@ func (s *Service) openAuxiliaryProvider(ctx context.Context, provider config.Pro
 		}
 		return &codexAuxiliaryProvider{settings: s.settings, provider: provider, model: model, privacy: privacy, launch: s.codexLauncher}, func() {}, nil
 	}
-	return openTaskProvider(ctx, s.settings, provider, model, Request{providerFactory: s.providerFactory}, nil, privacy, key)
+	return openTaskProvider(ctx, s.settings, provider, model, Request{providerFactory: s.providerFactory}, nil, privacy, key, providers.PurposeAuxiliary)
 }
