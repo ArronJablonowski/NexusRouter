@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,6 +23,8 @@ type flags struct {
 	priorArtifact, priorArtifactSHA, priorBinarySHA, priorReceiptSHA          string
 	priorVerificationSHA                                                      string
 	owner, statusURL, approver, policyURL                                     string
+	readinessVerifier, out                                                    string
+	firstDaemonAction, firstBinaryAction, firstDataAction                     string
 	releaseID, currentSchema, backupSchema, priorSchema                       int64
 }
 
@@ -54,7 +55,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, now func(
 	set.Int64Var(&f.releaseID, "release-id", 0, "expected immutable release ID")
 	set.Int64Var(&f.currentSchema, "current-schema", 0, "current durable-state schema")
 	set.StringVar(&f.mode, "mode", "", "explicit first_release or upgrade policy")
-	set.StringVar(&f.rehearsal, "rehearsal-evidence", "", "retained rehearsal evidence")
+	set.StringVar(&f.rehearsal, "rehearsal-evidence", "", "canonical published-install evidence")
 	set.StringVar(&f.rehearsalSHA, "rehearsal-sha256", "", "expected rehearsal evidence digest")
 	set.StringVar(&f.rehearsalVerifier, "rehearsal-verifier-id", "", "independent rehearsal verifier")
 	set.StringVar(&f.backup, "backup", "", "pre-upgrade backup (upgrade only)")
@@ -76,18 +77,28 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, now func(
 	set.StringVar(&f.statusURL, "status-url", "", "HTTPS incident status channel")
 	set.StringVar(&f.approver, "approver-id", "", "readiness approver identity")
 	set.StringVar(&f.policyURL, "policy-url", "", "HTTPS approval policy")
+	set.StringVar(&f.readinessVerifier, "readiness-verifier-id", "", "independent rollback-readiness verifier")
+	set.StringVar(&f.out, "out", "", "new canonical rollback-readiness verification receipt")
+	set.StringVar(&f.firstDaemonAction, "first-release-daemon-action", "", "approved first-release daemon action")
+	set.StringVar(&f.firstBinaryAction, "first-release-binary-action", "", "approved first-release binary action")
+	set.StringVar(&f.firstDataAction, "first-release-data-action", "", "approved first-release data action")
 	if err := set.Parse(args); err != nil || set.NArg() != 0 || (f.mode != "first_release" && f.mode != "upgrade") {
 		return errUsage
 	}
 	priorUsed := f.priorVersion != "" || f.priorCommit != "" || f.priorTag != "" || f.priorOS != "" || f.priorArch != "" || f.priorArtifact != "" || f.priorArtifactSHA != "" || f.priorBinarySHA != "" || f.priorReceiptSHA != "" || f.priorVerificationSHA != "" || f.priorSchema != 0
 	backupUsed := f.backup != "" || f.backupSHA != "" || f.backupSchema != 0 || f.backupVerifier != ""
-	if f.mode == "first_release" && (priorUsed || backupUsed) || f.mode == "upgrade" && (!priorUsed || !backupUsed) {
+	firstPolicyUsed := f.firstDaemonAction != "" || f.firstBinaryAction != "" || f.firstDataAction != ""
+	if f.out == "" || f.readinessVerifier == "" || f.mode == "first_release" && (priorUsed || backupUsed || !firstPolicyUsed) || f.mode == "upgrade" && (!priorUsed || !backupUsed || firstPolicyUsed) {
 		return errUsage
 	}
+	output, err := releasepack.PrepareRollbackEvidenceOutput(f.out)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
 	options := releasepack.RollbackReadinessOptions{
 		RecordFile: f.record, ReceiptFile: f.receipt, RehearsalFile: f.rehearsal,
-		ReceiptVerifier:  releasepack.CanonicalPostPublicationReceiptVerifier{VerifierID: f.receiptVerifier},
-		VerificationTime: now().UTC(),
+		ReceiptVerifier: releasepack.CanonicalPostPublicationReceiptVerifier{VerifierID: f.receiptVerifier},
 		Expectations: releasepack.RollbackReadinessExpectations{
 			RecordSHA256: f.recordSHA, PublicationReceiptSHA256: f.receiptSHA,
 			PublicationAuthorizationSHA256: f.authorizationSHA, ReceiptVerifierID: f.receiptVerifier,
@@ -95,7 +106,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, now func(
 			Tag: f.tag, ReleaseID: f.releaseID, CurrentStateSchema: int(f.currentSchema), Mode: f.mode,
 			RehearsalSHA256: f.rehearsalSHA, RehearsalVerifierID: f.rehearsalVerifier,
 			IncidentOwnerID: f.owner, StatusURL: f.statusURL, ApproverID: f.approver, PolicyURL: f.policyURL,
+			FirstReleaseDaemonAction: f.firstDaemonAction, FirstReleaseBinaryAction: f.firstBinaryAction, FirstReleaseDataAction: f.firstDataAction,
 		},
+		RehearsalVerifier:   releasepack.CanonicalRollbackRehearsalVerifier{VerifierID: f.rehearsalVerifier},
+		ReadinessVerifierID: f.readinessVerifier,
+		Now:                 func() time.Time { return now().UTC().Truncate(time.Second) },
 	}
 	if f.mode == "upgrade" {
 		options.BackupFile = f.backup
@@ -114,7 +129,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, now func(
 	if err != nil {
 		return err
 	}
-	encoder := json.NewEncoder(stdout)
-	encoder.SetEscapeHTML(false)
-	return encoder.Encode(result)
+	body, err := releasepack.MarshalRollbackReadinessResult(result)
+	if err != nil {
+		return err
+	}
+	digest, err := output.CommitCanonical(body)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(stdout, digest)
+	return err
 }

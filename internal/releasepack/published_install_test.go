@@ -138,7 +138,7 @@ func publishedInstallFixture(t *testing.T) (string, string, PublishedInstallExpe
 	preflight, signedDir := publishedExecutableFixture(t)
 	downloadDir := filepath.Join(t.TempDir(), "download")
 	receipt, err := VerifyPublishedRelease(t.Context(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
-		Preflight: preflight, DownloadDir: downloadDir,
+		Preflight: preflight, DownloadDir: downloadDir, VerifierID: "idp:release-verifier",
 	})
 	if err != nil {
 		t.Fatal(err)

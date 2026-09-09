@@ -16,7 +16,7 @@ func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		download := filepath.Join(t.TempDir(), "download")
 		reader := &fixtureReleaseReader{source: signedDir}
-		receipt, err := VerifyPublishedRelease(context.Background(), reader, PublishedVerificationOptions{Preflight: preflight, DownloadDir: download})
+		receipt, err := VerifyPublishedRelease(context.Background(), reader, PublishedVerificationOptions{Preflight: preflight, DownloadDir: download, VerifierID: "idp:release-verifier"})
 		if err != nil || receipt.Repository != preflight.ExpectedRepository || !receipt.Immutable || len(receipt.Assets) != 7 {
 			t.Fatal("published release rejected", receipt, err)
 		}
@@ -25,14 +25,15 @@ func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
 			t.Fatal(err)
 		}
 		parsed, err := ParsePostPublicationReceipt(body)
-		if err != nil || parsed.PublicationAuthorizationSHA256 != preflight.ExpectedPublicationAuthorizationSHA256 {
+		if err != nil || parsed.PublicationAuthorizationSHA256 != preflight.ExpectedPublicationAuthorizationSHA256 ||
+			parsed.VerifierID != "idp:release-verifier" || parsed.VerificationPolicy != PostPublicationVerificationPolicy {
 			t.Fatal("canonical receipt rejected", parsed, err)
 		}
 	})
 	t.Run("replaced_download", func(t *testing.T) {
 		reader := &fixtureReleaseReader{source: signedDir, corruptAfterCopy: true}
 		result, err := VerifyPublishedRelease(context.Background(), reader, PublishedVerificationOptions{
-			Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"),
+			Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:release-verifier",
 		})
 		if err == nil || result.SchemaVersion != 0 || result.Repository != "" || len(result.Assets) != 0 {
 			t.Fatal("replaced remote bytes accepted", result, err)
@@ -49,7 +50,7 @@ func TestPostPublicationReceiptRejectsNonGitHubEvidenceURL(t *testing.T) {
 func TestPostPublicationReceiptRejectsCrossAuthorityAssetURL(t *testing.T) {
 	preflight, signedDir := publishedFixture(t)
 	receipt, err := VerifyPublishedRelease(context.Background(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
-		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"),
+		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:release-verifier",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +63,47 @@ func TestPostPublicationReceiptRejectsCrossAuthorityAssetURL(t *testing.T) {
 	body = append(body, '\n')
 	if _, err = ParsePostPublicationReceipt(body); err == nil {
 		t.Fatal("cross-repository asset URL accepted by canonical receipt parser")
+	}
+}
+
+func TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity(t *testing.T) {
+	preflight, signedDir := publishedFixture(t)
+	receipt, err := VerifyPublishedRelease(context.Background(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
+		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:release-verifier",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, change := range map[string]func(*PostPublicationReceipt){
+		"missing_verifier": func(r *PostPublicationReceipt) { r.VerifierID = "" },
+		"bad_verifier":     func(r *PostPublicationReceipt) { r.VerifierID = "INVALID VERIFIER" },
+		"missing_policy":   func(r *PostPublicationReceipt) { r.VerificationPolicy = "" },
+		"changed_policy": func(r *PostPublicationReceipt) {
+			r.VerificationPolicy = "darwinrouter-github-post-publication-verification/v2"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := receipt
+			change(&changed)
+			body, marshalErr := json.MarshalIndent(changed, "", "  ")
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			if _, parseErr := ParsePostPublicationReceipt(append(body, '\n')); parseErr == nil {
+				t.Fatal("tampered verification identity accepted")
+			}
+		})
+	}
+}
+
+func TestVerifyPublishedReleaseRejectsPublicationApproverAsVerifierBeforeRemote(t *testing.T) {
+	preflight, signedDir := publishedFixture(t)
+	reader := &fixtureReleaseReader{source: signedDir}
+	result, err := VerifyPublishedRelease(context.Background(), reader, PublishedVerificationOptions{
+		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:publication-approver",
+	})
+	if err == nil || reader.called || result.SchemaVersion != 0 {
+		t.Fatal("publication approver accepted as independent verifier", result, reader.called, err)
 	}
 }
 
@@ -124,9 +166,11 @@ func publishedFixtureWithExecutable(t *testing.T, executableNative bool) (Public
 type fixtureReleaseReader struct {
 	source           string
 	corruptAfterCopy bool
+	called           bool
 }
 
 func (f *fixtureReleaseReader) Verify(_ context.Context, plan githubverify.Plan) (githubverify.Observation, error) {
+	f.called = true
 	if err := os.Mkdir(plan.DownloadDir, 0700); err != nil {
 		return githubverify.Observation{}, err
 	}

@@ -194,5 +194,5 @@ func samePublicationPreflight(a, b PublicationPreflightResult) bool {
 		a.ReleaseVersion == b.ReleaseVersion && a.SourceCommit == b.SourceCommit && a.Tag == b.Tag &&
 		a.ReleaseTitle == b.ReleaseTitle && a.TagMessage == b.TagMessage && a.Tagger == b.Tagger &&
 		a.Prerelease == b.Prerelease && a.MakeLatest == b.MakeLatest &&
-		a.ReleaseNotesSHA256 == b.ReleaseNotesSHA256 && equalPublicationAssets(a.Assets, b.Assets)
+		a.ReleaseNotesSHA256 == b.ReleaseNotesSHA256 && a.PublicationApproverID == b.PublicationApproverID && equalPublicationAssets(a.Assets, b.Assets)
 }

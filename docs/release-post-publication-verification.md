@@ -26,10 +26,19 @@ operator-supplied authorization record and the original signed set. It then:
 
 A successful check can be encoded as a canonical schema-versioned
 `PostPublicationReceipt`. The receipt binds the observed immutable release,
-asset IDs and URLs, server and local hashes, observation timestamps, and the
-complete approval-verification identity. It is point-in-time evidence, not a
+asset IDs and URLs, server and local hashes, observation timestamps, the required
+independent verifier identity, the fixed versioned verifier policy, and the
+complete approval-verification identity. The verifier identity is an operator
+assertion and must be reconciled with separately retained host and authentication
+evidence. It is point-in-time evidence, not a
 claim that GitHub will remain available or unchanged forever and not an
 authorization to publish or roll back anything.
+
+The verifier must not be the publication approver recorded in the canonical
+publication authorization; that conflict is rejected before GitHub is queried.
+Because the current authorization schema does not carry the credentialed
+publication executor's identity, retain that identity separately and require a
+different post-publication verifier as an operator gate.
 
 The production API endpoint is fixed to `https://api.github.com`. Tests use an
 injected transport and loopback HTTP servers; they never use GitHub credentials

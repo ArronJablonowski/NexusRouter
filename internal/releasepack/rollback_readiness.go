@@ -11,6 +11,8 @@ import (
 	"os"
 	"regexp"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 var ErrRollbackReadiness = errors.New("rollback readiness verification failed")
@@ -44,6 +46,35 @@ type PublicationReceiptVerifier interface {
 	VerifyPublicationReceipt(context.Context, string, string) (PublicationReceiptIdentity, error)
 }
 
+type RehearsalEvidenceIdentity struct {
+	EvidenceSHA256                 string
+	Scenario                       string
+	FromSchema                     int
+	ToSchema                       int
+	Status                         string
+	RehearsedAt                    string
+	VerifierID                     string
+	Repository                     string
+	ReleaseVersion                 string
+	SourceCommit                   string
+	Tag                            string
+	ReleaseID                      int64
+	PublicationReceiptSHA256       string
+	PublicationAuthorizationSHA256 string
+	InstallEvidenceSHA256          string
+	TargetOS                       string
+	TargetArch                     string
+	ArtifactName                   string
+	ArtifactSHA256                 string
+	InstalledBinarySHA256          string
+	BackupSHA256                   string
+	RollbackSchema                 int
+}
+
+type RehearsalEvidenceVerifier interface {
+	VerifyRehearsalEvidence(context.Context, string, string) (RehearsalEvidenceIdentity, error)
+}
+
 type RollbackReadiness struct {
 	SchemaVersion int                       `json:"schema_version"`
 	Project       string                    `json:"project"`
@@ -71,6 +102,13 @@ type RollbackHistoryPolicy struct {
 	Mode                 string                        `json:"mode"`
 	FirstReleaseDecision string                        `json:"first_release_decision"`
 	PriorSupportedBinary *RollbackPriorSupportedBinary `json:"prior_supported_binary"`
+	FirstReleaseRollback *FirstReleaseRollbackPolicy   `json:"first_release_rollback"`
+}
+
+type FirstReleaseRollbackPolicy struct {
+	DaemonAction string `json:"daemon_action"`
+	BinaryAction string `json:"binary_action"`
+	DataAction   string `json:"data_action"`
 }
 
 type RollbackPriorSupportedBinary struct {
@@ -141,19 +179,26 @@ type RollbackReadinessExpectations struct {
 	StatusURL                      string
 	ApproverID                     string
 	PolicyURL                      string
+	FirstReleaseDaemonAction       string
+	FirstReleaseBinaryAction       string
+	FirstReleaseDataAction         string
 }
 
 type RollbackReadinessOptions struct {
-	RecordFile       string
-	ReceiptFile      string
-	RehearsalFile    string
-	BackupFile       string
-	Expectations     RollbackReadinessExpectations
-	ReceiptVerifier  PublicationReceiptVerifier
-	VerificationTime time.Time
+	RecordFile          string
+	ReceiptFile         string
+	RehearsalFile       string
+	BackupFile          string
+	Expectations        RollbackReadinessExpectations
+	ReceiptVerifier     PublicationReceiptVerifier
+	RehearsalVerifier   RehearsalEvidenceVerifier
+	ReadinessVerifierID string
+	Now                 func() time.Time
 }
 
 type RollbackReadinessResult struct {
+	SchemaVersion            int    `json:"schema_version"`
+	Scope                    string `json:"scope"`
 	RecordSHA256             string `json:"record_sha256"`
 	PublicationReceiptSHA256 string `json:"publication_receipt_sha256"`
 	Repository               string `json:"repository"`
@@ -164,6 +209,9 @@ type RollbackReadinessResult struct {
 	Mode                     string `json:"mode"`
 	StateSchema              int    `json:"state_schema"`
 	ValidUntil               string `json:"valid_until"`
+	RehearsalSHA256          string `json:"rehearsal_sha256"`
+	ReadinessVerifierID      string `json:"readiness_verifier_id"`
+	VerifiedAt               string `json:"verified_at"`
 }
 
 func ParseRollbackReadiness(body []byte) (RollbackReadiness, error) {
@@ -178,9 +226,20 @@ func ParseRollbackReadiness(body []byte) (RollbackReadiness, error) {
 	return record, nil
 }
 
+func MarshalRollbackReadiness(record RollbackReadiness) ([]byte, error) {
+	if validateRollbackReadiness(record) != nil {
+		return nil, ErrRollbackReadiness
+	}
+	body, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		return nil, ErrRollbackReadiness
+	}
+	return append(body, '\n'), nil
+}
+
 func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptions) (RollbackReadinessResult, error) {
 	var result RollbackReadinessResult
-	if ctx == nil || options.ReceiptVerifier == nil || options.RecordFile == "" || options.ReceiptFile == "" || options.RehearsalFile == "" || options.VerificationTime.IsZero() || options.VerificationTime.Location() != time.UTC || !validRollbackExpectations(options.Expectations) || ctx.Err() != nil {
+	if ctx == nil || options.ReceiptVerifier == nil || options.RehearsalVerifier == nil || options.RecordFile == "" || options.ReceiptFile == "" || options.RehearsalFile == "" || options.Now == nil || !rollbackIdentity.MatchString(options.ReadinessVerifierID) || !validRollbackExpectations(options.Expectations) || ctx.Err() != nil {
 		return result, ErrRollbackReadiness
 	}
 	body, err := readRollbackFile(options.RecordFile, maxRollbackReadiness)
@@ -195,7 +254,8 @@ func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptio
 	if err != nil || !receiptMatches(record, receipt) || ctx.Err() != nil {
 		return result, ErrRollbackReadiness
 	}
-	if digest, err := digestRollbackFile(options.RehearsalFile, maxRehearsalEvidence); err != nil || digest != record.Rehearsal.EvidenceSHA256 || digest != options.Expectations.RehearsalSHA256 {
+	rehearsal, err := options.RehearsalVerifier.VerifyRehearsalEvidence(ctx, options.RehearsalFile, options.Expectations.RehearsalSHA256)
+	if err != nil || !rehearsalMatches(record, rehearsal) || rehearsal.VerifierID != options.Expectations.RehearsalVerifierID {
 		return result, ErrRollbackReadiness
 	}
 	if record.History.Mode == "upgrade" {
@@ -212,12 +272,12 @@ func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptio
 	validUntil, _ := strictRollbackTime(record.Approval.ValidUntil)
 	receiptAt, _ := strictRollbackTime(receipt.VerifiedAt)
 	rehearsedAt, _ := strictRollbackTime(record.Rehearsal.RehearsedAt)
-	if receipt.VerifierID != options.Expectations.ReceiptVerifierID || approvedAt.Before(receiptAt) || approvedAt.Before(rehearsedAt) || options.VerificationTime.Before(approvedAt) || options.VerificationTime.After(validUntil) || !validUntil.After(approvedAt) || record.Approval.ApproverID == receipt.VerifierID || record.Approval.ApproverID == record.Rehearsal.VerifierID {
+	if receipt.VerifierID != options.Expectations.ReceiptVerifierID || approvedAt.Before(receiptAt) || approvedAt.Before(rehearsedAt) || !validUntil.After(approvedAt) || record.Approval.ApproverID == receipt.VerifierID || record.Approval.ApproverID == record.Rehearsal.VerifierID || record.Approval.ApproverID == options.ReadinessVerifierID || options.ReadinessVerifierID == receipt.VerifierID || options.ReadinessVerifierID == rehearsal.VerifierID {
 		return result, ErrRollbackReadiness
 	}
 	if record.Backup != nil {
 		capturedAt, _ := strictRollbackTime(record.Backup.CapturedAt)
-		if approvedAt.Before(capturedAt) || record.Approval.ApproverID == record.Backup.VerifierID {
+		if approvedAt.Before(capturedAt) || record.Approval.ApproverID == record.Backup.VerifierID || options.ReadinessVerifierID == record.Backup.VerifierID {
 			return result, ErrRollbackReadiness
 		}
 	}
@@ -227,7 +287,53 @@ func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptio
 	if err != nil || finalReceipt != receipt || ctx.Err() != nil {
 		return result, ErrRollbackReadiness
 	}
-	return RollbackReadinessResult{RecordSHA256: options.Expectations.RecordSHA256, PublicationReceiptSHA256: receipt.ReceiptSHA256, Repository: receipt.Repository, ReleaseVersion: receipt.ReleaseVersion, SourceCommit: receipt.SourceCommit, Tag: receipt.Tag, ReleaseID: receipt.ReleaseID, Mode: record.History.Mode, StateSchema: record.Current.StateSchema, ValidUntil: record.Approval.ValidUntil}, nil
+	finalRehearsal, err := options.RehearsalVerifier.VerifyRehearsalEvidence(ctx, options.RehearsalFile, options.Expectations.RehearsalSHA256)
+	finalBody, bodyErr := readRollbackFile(options.RecordFile, maxRollbackReadiness)
+	if err != nil || finalRehearsal != rehearsal || bodyErr != nil || !bytes.Equal(finalBody, body) {
+		return result, ErrRollbackReadiness
+	}
+	if record.History.Mode == "upgrade" {
+		if digest, digestErr := digestRollbackFile(options.BackupFile, maxBackupEvidence); digestErr != nil || digest != options.Expectations.BackupSHA256 {
+			return result, ErrRollbackReadiness
+		}
+	}
+	verifiedAt := options.Now()
+	if verifiedAt.IsZero() || verifiedAt.Location() != time.UTC || verifiedAt.Nanosecond() != 0 || verifiedAt.Before(approvedAt) || verifiedAt.After(validUntil) || ctx.Err() != nil {
+		return result, ErrRollbackReadiness
+	}
+	result = RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: options.Expectations.RecordSHA256, PublicationReceiptSHA256: receipt.ReceiptSHA256, Repository: receipt.Repository, ReleaseVersion: receipt.ReleaseVersion, SourceCommit: receipt.SourceCommit, Tag: receipt.Tag, ReleaseID: receipt.ReleaseID, Mode: record.History.Mode, StateSchema: record.Current.StateSchema, ValidUntil: record.Approval.ValidUntil, RehearsalSHA256: rehearsal.EvidenceSHA256, ReadinessVerifierID: options.ReadinessVerifierID, VerifiedAt: verifiedAt.Format("2006-01-02T15:04:05Z")}
+	if _, err = MarshalRollbackReadinessResult(result); err != nil {
+		return RollbackReadinessResult{}, err
+	}
+	return result, nil
+}
+
+func MarshalRollbackReadinessResult(result RollbackReadinessResult) ([]byte, error) {
+	if result.SchemaVersion != 1 || result.Scope != "darwinrouter-rollback-readiness-verification" || !trustFingerprint(result.RecordSHA256) || !trustFingerprint(result.PublicationReceiptSHA256) || !trustFingerprint(result.RehearsalSHA256) || !rollbackRepository.MatchString(result.Repository) || validate(Options{Version: result.ReleaseVersion, Commit: result.SourceCommit, Out: "release"}) != nil || result.Tag != "v"+result.ReleaseVersion || result.ReleaseID < 1 || (result.Mode != "first_release" && result.Mode != "upgrade") || result.StateSchema != stateschema.Current || !rollbackIdentity.MatchString(result.ReadinessVerifierID) {
+		return nil, ErrRollbackReadiness
+	}
+	verified, e1 := strictRollbackTime(result.VerifiedAt)
+	valid, e2 := strictRollbackTime(result.ValidUntil)
+	if e1 != nil || e2 != nil || verified.After(valid) {
+		return nil, ErrRollbackReadiness
+	}
+	body, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return nil, ErrRollbackReadiness
+	}
+	return append(body, '\n'), nil
+}
+
+func ParseRollbackReadinessResult(body []byte) (RollbackReadinessResult, error) {
+	var result RollbackReadinessResult
+	if len(body) == 0 || len(body) > maxRollbackReadiness || json.Unmarshal(body, &result) != nil {
+		return RollbackReadinessResult{}, ErrRollbackReadiness
+	}
+	canonical, err := MarshalRollbackReadinessResult(result)
+	if err != nil || !bytes.Equal(body, canonical) {
+		return RollbackReadinessResult{}, ErrRollbackReadiness
+	}
+	return result, nil
 }
 
 func validateRollbackReadiness(record RollbackReadiness) error {
@@ -248,11 +354,11 @@ func validateRollbackReadiness(record RollbackReadiness) error {
 	}
 	switch record.History.Mode {
 	case "first_release":
-		if record.History.FirstReleaseDecision != "approved_no_previous_public_release" || record.History.PriorSupportedBinary != nil || record.Backup != nil || record.Rehearsal.Scenario != "first_release_install_recovery" || record.Rehearsal.FromSchema != 0 || record.Rehearsal.ToSchema != record.Current.StateSchema {
+		if record.History.FirstReleaseDecision != "approved_no_previous_public_release" || record.History.PriorSupportedBinary != nil || record.Backup != nil || !validFirstReleasePolicy(record.History.FirstReleaseRollback) || record.Rehearsal.Scenario != "published_native_install_rollback" || record.Rehearsal.FromSchema >= record.Rehearsal.ToSchema || record.Rehearsal.ToSchema != record.Current.StateSchema {
 			return ErrRollbackReadiness
 		}
 	case "upgrade":
-		if record.History.FirstReleaseDecision != "not_applicable" || record.History.PriorSupportedBinary == nil || record.Backup == nil || !validPriorBinary(*record.History.PriorSupportedBinary, record.Current.Repository) || !validBackup(*record.Backup) || record.Rehearsal.Scenario != "published_release_upgrade_rollback" || record.Rehearsal.FromSchema != record.Backup.StateSchema || record.Rehearsal.FromSchema != record.History.PriorSupportedBinary.StateSchema || record.Rehearsal.ToSchema != record.Current.StateSchema || record.Rehearsal.FromSchema >= record.Rehearsal.ToSchema {
+		if record.History.FirstReleaseDecision != "not_applicable" || record.History.FirstReleaseRollback != nil || record.History.PriorSupportedBinary == nil || record.Backup == nil || !validPriorBinary(*record.History.PriorSupportedBinary, record.Current.Repository) || !validBackup(*record.Backup) || record.Rehearsal.Scenario != "published_native_install_rollback" || record.Rehearsal.FromSchema != record.Backup.StateSchema || record.Rehearsal.FromSchema != record.History.PriorSupportedBinary.StateSchema || record.Rehearsal.ToSchema != record.Current.StateSchema || record.Rehearsal.FromSchema >= record.Rehearsal.ToSchema {
 			return ErrRollbackReadiness
 		}
 		if record.History.PriorSupportedBinary.ReleaseVersion == record.Current.ReleaseVersion || record.History.PriorSupportedBinary.SourceCommit == record.Current.SourceCommit {
@@ -265,7 +371,11 @@ func validateRollbackReadiness(record RollbackReadiness) error {
 }
 
 func validCurrentRollback(current RollbackCurrentRelease) bool {
-	return trustFingerprint(current.PublicationReceiptSHA256) && trustFingerprint(current.PublicationAuthorizationSHA256) && rollbackRepository.MatchString(current.Repository) && validate(Options{Version: current.ReleaseVersion, Commit: current.SourceCommit, Out: "release"}) == nil && current.Tag == "v"+current.ReleaseVersion && current.ReleaseID > 0 && current.StateSchema > 0 && current.StateSchema <= 1_000_000
+	return trustFingerprint(current.PublicationReceiptSHA256) && trustFingerprint(current.PublicationAuthorizationSHA256) && rollbackRepository.MatchString(current.Repository) && validate(Options{Version: current.ReleaseVersion, Commit: current.SourceCommit, Out: "release"}) == nil && current.Tag == "v"+current.ReleaseVersion && current.ReleaseID > 0 && current.StateSchema == stateschema.Current
+}
+
+func validFirstReleasePolicy(policy *FirstReleaseRollbackPolicy) bool {
+	return policy != nil && policy.DaemonAction == "stop" && policy.BinaryAction == "uninstall" && policy.DataAction == "preserve_current_schema_no_restore"
 }
 
 func validPriorBinary(prior RollbackPriorSupportedBinary, repository string) bool {
@@ -281,11 +391,11 @@ func validBackup(backup RollbackBackup) bool {
 }
 
 func validRollbackExpectations(expected RollbackReadinessExpectations) bool {
-	if !trustFingerprint(expected.RecordSHA256) || !trustFingerprint(expected.PublicationReceiptSHA256) || !trustFingerprint(expected.PublicationAuthorizationSHA256) || !rollbackRepository.MatchString(expected.Repository) || validate(Options{Version: expected.ReleaseVersion, Commit: expected.SourceCommit, Out: "release"}) != nil || expected.Tag != "v"+expected.ReleaseVersion || expected.ReleaseID < 1 || expected.CurrentStateSchema < 1 || expected.CurrentStateSchema > 1_000_000 || !trustFingerprint(expected.RehearsalSHA256) || !rollbackIdentity.MatchString(expected.ReceiptVerifierID) || !rollbackIdentity.MatchString(expected.RehearsalVerifierID) || !rollbackIdentity.MatchString(expected.IncidentOwnerID) || !trustHTTPSURL(expected.StatusURL) || !rollbackIdentity.MatchString(expected.ApproverID) || !trustHTTPSURL(expected.PolicyURL) {
+	if !trustFingerprint(expected.RecordSHA256) || !trustFingerprint(expected.PublicationReceiptSHA256) || !trustFingerprint(expected.PublicationAuthorizationSHA256) || !rollbackRepository.MatchString(expected.Repository) || validate(Options{Version: expected.ReleaseVersion, Commit: expected.SourceCommit, Out: "release"}) != nil || expected.Tag != "v"+expected.ReleaseVersion || expected.ReleaseID < 1 || expected.CurrentStateSchema != stateschema.Current || !trustFingerprint(expected.RehearsalSHA256) || !rollbackIdentity.MatchString(expected.ReceiptVerifierID) || !rollbackIdentity.MatchString(expected.RehearsalVerifierID) || !rollbackIdentity.MatchString(expected.IncidentOwnerID) || !trustHTTPSURL(expected.StatusURL) || !rollbackIdentity.MatchString(expected.ApproverID) || !trustHTTPSURL(expected.PolicyURL) {
 		return false
 	}
 	if expected.Mode == "first_release" {
-		return expected.ExpectedPrior == nil && expected.BackupSHA256 == "" && expected.BackupStateSchema == 0 && expected.BackupVerifierID == ""
+		return expected.ExpectedPrior == nil && expected.BackupSHA256 == "" && expected.BackupStateSchema == 0 && expected.BackupVerifierID == "" && expected.FirstReleaseDaemonAction == "stop" && expected.FirstReleaseBinaryAction == "uninstall" && expected.FirstReleaseDataAction == "preserve_current_schema_no_restore"
 	}
 	return expected.Mode == "upgrade" && expected.ExpectedPrior != nil && validPriorBinary(*expected.ExpectedPrior, expected.Repository) && trustFingerprint(expected.BackupSHA256) && expected.BackupStateSchema > 0 && rollbackIdentity.MatchString(expected.BackupVerifierID)
 }
@@ -295,9 +405,17 @@ func rollbackMatchesExpectations(record RollbackReadiness, expected RollbackRead
 		return false
 	}
 	if expected.Mode == "first_release" {
-		return record.History.PriorSupportedBinary == nil && record.Backup == nil
+		return record.History.PriorSupportedBinary == nil && record.Backup == nil && record.History.FirstReleaseRollback != nil && record.History.FirstReleaseRollback.DaemonAction == expected.FirstReleaseDaemonAction && record.History.FirstReleaseRollback.BinaryAction == expected.FirstReleaseBinaryAction && record.History.FirstReleaseRollback.DataAction == expected.FirstReleaseDataAction
 	}
 	return record.History.PriorSupportedBinary != nil && *record.History.PriorSupportedBinary == *expected.ExpectedPrior && record.Backup != nil && record.Backup.SHA256 == expected.BackupSHA256 && record.Backup.StateSchema == expected.BackupStateSchema && record.Backup.VerifierID == expected.BackupVerifierID
+}
+
+func rehearsalMatches(record RollbackReadiness, evidence RehearsalEvidenceIdentity) bool {
+	base := trustFingerprint(evidence.EvidenceSHA256) && evidence.EvidenceSHA256 == record.Rehearsal.EvidenceSHA256 && evidence.Scenario == record.Rehearsal.Scenario && evidence.FromSchema == record.Rehearsal.FromSchema && evidence.ToSchema == record.Rehearsal.ToSchema && evidence.Status == record.Rehearsal.Status && evidence.RehearsedAt == record.Rehearsal.RehearsedAt && evidence.VerifierID == record.Rehearsal.VerifierID && evidence.Repository == record.Current.Repository && evidence.ReleaseVersion == record.Current.ReleaseVersion && evidence.SourceCommit == record.Current.SourceCommit && evidence.Tag == record.Current.Tag && evidence.ReleaseID == record.Current.ReleaseID && evidence.PublicationReceiptSHA256 == record.Current.PublicationReceiptSHA256 && evidence.PublicationAuthorizationSHA256 == record.Current.PublicationAuthorizationSHA256 && trustFingerprint(evidence.InstallEvidenceSHA256) && trustFingerprint(evidence.ArtifactSHA256) && trustFingerprint(evidence.InstalledBinarySHA256) && evidence.ToSchema == stateschema.Current && evidence.RollbackSchema == evidence.FromSchema
+	if !base {
+		return false
+	}
+	return record.History.Mode == "first_release" || record.Backup != nil && evidence.BackupSHA256 == record.Backup.SHA256
 }
 
 func receiptMatches(record RollbackReadiness, receipt PublicationReceiptIdentity) bool {

@@ -47,7 +47,7 @@ func validPublishedReceipt(t *testing.T) PostPublicationReceipt {
 	t.Helper()
 	preflight, signedDir := publishedFixture(t)
 	receipt, err := VerifyPublishedRelease(t.Context(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
-		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"),
+		Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:release-verifier",
 	})
 	if err != nil {
 		t.Fatal(err)

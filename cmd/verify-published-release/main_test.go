@@ -26,6 +26,7 @@ func fullArgs() []string {
 		"--signing-authorization", "/signing", "--signing-authorization-sha256", digest,
 		"--publication-authorization", "/publication", "--publication-authorization-sha256", digest,
 		"--repository", "ArronJablonowski/DarwinRouter", "--release-notes", "/notes",
+		"--verifier-id", "idp:independent-release-verifier",
 		"--download-dir", "/downloads", "--out", "/receipt",
 	}
 }
@@ -49,9 +50,31 @@ func TestCLIForwardsAuthorityAndPersistsCanonicalReceipt(t *testing.T) {
 			return digest, nil
 		})
 	if code != 0 || diagnostic.Len() != 0 || out.String() != digest+"\n" || got.DownloadDir != "/downloads" ||
+		got.VerifierID != "idp:independent-release-verifier" ||
 		got.Preflight.ExpectedRepository != "ArronJablonowski/DarwinRouter" || got.Preflight.Verification.ExpectedKeyID != "release-1" ||
 		len(protected) != 3 || protected[0] != "/source" || protected[1] != "/signed" || protected[2] != "/downloads" {
 		t.Fatalf("authority not preserved: code=%d options=%+v protected=%v out=%q err=%q", code, got, protected, out.String(), diagnostic.String())
+	}
+}
+
+func TestCLIRejectsMalformedVerifierIdentityBeforeNetwork(t *testing.T) {
+	called := false
+	args := fullArgs()
+	for i := range args {
+		if args[i] == "idp:independent-release-verifier" {
+			args[i] = "INVALID VERIFIER"
+		}
+	}
+	code := run(t.Context(), args, &bytes.Buffer{}, &bytes.Buffer{}, func() (releasepack.PublishedReleaseReader, error) {
+		called = true
+		return readerFixture{}, nil
+	}, func(context.Context, releasepack.PublishedReleaseReader, releasepack.PublishedVerificationOptions) (releasepack.PostPublicationReceipt, error) {
+		return releasepack.PostPublicationReceipt{}, nil
+	}, func(string, releasepack.PostPublicationReceipt, ...string) (string, error) {
+		return "", nil
+	})
+	if code != 2 || called {
+		t.Fatal("malformed verifier identity reached network", code, called)
 	}
 }
 

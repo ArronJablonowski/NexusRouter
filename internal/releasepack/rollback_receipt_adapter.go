@@ -5,8 +5,9 @@ import (
 )
 
 // CanonicalPostPublicationReceiptVerifier adapts the canonical, independently
-// observed post-publication receipt to rollback readiness. VerifierID names the
-// independent observation channel; it is not inferred from the receipt author.
+// observed post-publication receipt to rollback readiness. VerifierID is an
+// independently supplied expectation and must match the identity bound into the
+// canonical receipt.
 type CanonicalPostPublicationReceiptVerifier struct {
 	VerifierID string
 }
@@ -21,7 +22,7 @@ func (v CanonicalPostPublicationReceiptVerifier) VerifyPublicationReceipt(ctx co
 		return empty, ErrRollbackReadiness
 	}
 	receipt, err := ParsePostPublicationReceipt(body)
-	if err != nil || ctx.Err() != nil {
+	if err != nil || ctx.Err() != nil || receipt.VerifierID != v.VerifierID {
 		return empty, ErrRollbackReadiness
 	}
 	publishedAt, err := strictRollbackTime(receipt.PublishedAt)
@@ -38,6 +39,6 @@ func (v CanonicalPostPublicationReceiptVerifier) VerifyPublicationReceipt(ctx co
 		SourceCommit:                   receipt.SourceCommit,
 		PublicationAuthorizationSHA256: receipt.PublicationAuthorizationSHA256,
 		ReleaseID:                      receipt.ReleaseID, VerifiedAt: receipt.ObservedAt,
-		VerifierID: v.VerifierID,
+		VerifierID: receipt.VerifierID,
 	}, nil
 }

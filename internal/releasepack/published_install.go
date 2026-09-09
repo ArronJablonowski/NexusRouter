@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 var ErrPublishedInstallEvidence = errors.New("published install evidence verification failed")
@@ -112,7 +114,7 @@ func CreatePublishedInstallEvidence(ctx context.Context, receiptFile, installFil
 	verified, err := VerifyInstallRehearsalEvidence(installFile, InstallRehearsalExpectations{
 		RecordSHA256: expected.InstallEvidenceSHA256, Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit,
 		TargetOS: expected.TargetOS, TargetArch: expected.TargetArch, ArtifactName: artifactName, ArtifactSHA256: artifactSHA,
-		SourceSchema: 29, CurrentSchema: 32, BackupSHA256: expected.BackupSHA256,
+		SourceSchema: 29, CurrentSchema: stateschema.Current, BackupSHA256: expected.BackupSHA256,
 	})
 	observedAt, observedErr := time.Parse("2006-01-02T15:04:05Z", receipt.ObservedAt)
 	if err != nil || observedErr != nil || ctx.Err() != nil {
@@ -159,7 +161,7 @@ func MarshalPublishedInstallEvidence(evidence PublishedInstallEvidence) ([]byte,
 		(evidence.TargetArch != "amd64" && evidence.TargetArch != "arm64") || evidence.ArtifactName != expectedArtifact ||
 		!validInstallDigest(evidence.ArtifactSHA256) || !validInstallDigest(evidence.InstalledBinarySHA256) ||
 		evidence.InstalledBinaryMode != "0755" || evidence.VersionOutput != "darwin "+evidence.ReleaseVersion ||
-		evidence.SourceSchema != 29 || evidence.CurrentSchema != 32 ||
+		evidence.SourceSchema != 29 || evidence.CurrentSchema != stateschema.Current ||
 		!validInstallDigest(evidence.BackupSHA256) || evidence.RollbackSchema != 29 || !rollbackIdentity.MatchString(evidence.VerifierID) {
 		return nil, ErrPublishedInstallEvidence
 	}

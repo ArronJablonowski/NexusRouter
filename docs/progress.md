@@ -4864,3 +4864,31 @@ network-denied host and preserves incomplete reservations/install roots for
 investigation rather than blind retry. No live release, public download,
 production signature, installation outside owned test roots, or publication
 authority is claimed.
+
+DAR-60 independent-verification identity checkpoint: post-publication
+verification now requires a canonical operator identity, rejects the
+publication approver before remote access, and binds both that identity and the
+fixed `darwinrouter-github-post-publication-verification/v1` policy into the
+canonical receipt. Publication preflight carries the authorization's approver
+identity across both point-in-time checks, and the rollback adapter requires its
+independently supplied verifier expectation to match the receipt. The
+authorization schema still has no credentialed publication-executor identity;
+executor/verifier separation therefore remains an explicit retained operator
+gate. No GitHub release was queried or changed by this checkpoint.
+
+DAR-61 rollback-readiness hardening checkpoint: the gate no longer accepts an
+arbitrary rehearsal transcript or free-standing `passed` assertion. It parses
+the exact-digest canonical published-install record and derives the repository,
+release, publication receipt and authorization, native artifact/binary,
+install-evidence, backup, schema, verifier, and completion identities before
+matching the readiness record. First-release stop, uninstall, and
+preserve-current-schema behavior is encoded as approved policy rather than
+misrepresented as an observed action. Schema 32 is now shared through one
+authoritative build constant across storage, native/install evidence, and
+readiness; database initialization verifies that migration actually reaches
+that constant before commit. The read-only gate rechecks its evidence and emits
+a canonical, mode-0600, create-only, fsynced verification receipt carrying an
+independent verifier and post-check completion time. These changes provide the
+mechanical verifier and evidence contract only; real publication, separate-host
+rehearsal, policy approval, rollback authority, and retained production evidence
+remain operator gates.

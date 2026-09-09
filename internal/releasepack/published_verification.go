@@ -18,7 +18,13 @@ type PublishedReleaseReader interface {
 type PublishedVerificationOptions struct {
 	Preflight   PublicationPreflightOptions
 	DownloadDir string
+	VerifierID  string
 }
+
+// PostPublicationVerificationPolicy identifies the exact verifier contract
+// enforced by this implementation. It is fixed by code rather than supplied by
+// an operator so a receipt cannot claim a different policy than the one run.
+const PostPublicationVerificationPolicy = "darwinrouter-github-post-publication-verification/v1"
 
 // PostPublicationReceipt is canonical public evidence of one remote observation
 // and approval-bound verification. It is not a durability or future-state claim.
@@ -42,6 +48,8 @@ type PostPublicationReceipt struct {
 	Immutable                      bool                       `json:"immutable"`
 	PublishedAt                    string                     `json:"published_at"`
 	ObservedAt                     string                     `json:"observed_at"`
+	VerifierID                     string                     `json:"verifier_id"`
+	VerificationPolicy             string                     `json:"verification_policy"`
 	Assets                         []PostPublicationAsset     `json:"assets"`
 	ApprovalVerification           ApprovedVerificationResult `json:"approval_verification"`
 }
@@ -60,11 +68,11 @@ type PostPublicationAsset struct {
 // fresh local download directory, and reuses the production approval verifier.
 func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, options PublishedVerificationOptions) (PostPublicationReceipt, error) {
 	var empty PostPublicationReceipt
-	if ctx == nil || remote == nil || options.DownloadDir == "" {
+	if ctx == nil || remote == nil || options.DownloadDir == "" || !ValidPostPublicationVerifierID(options.VerifierID) {
 		return empty, ErrPublicationAuthorization
 	}
 	preflight, err := VerifyPublicationPreflight(ctx, options.Preflight)
-	if err != nil {
+	if err != nil || !ValidPostPublicationVerifierID(preflight.PublicationApproverID) || options.VerifierID == preflight.PublicationApproverID {
 		return empty, ErrPublicationAuthorization
 	}
 	body, err := readPublicationInput(options.Preflight.ReleaseNotesFile, maxReleaseNotes)
@@ -122,6 +130,7 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 		ReleaseNotesSHA256: preflight.ReleaseNotesSHA256, Prerelease: preflight.Prerelease,
 		AuthorizedMakeLatest: preflight.MakeLatest, Immutable: true,
 		PublishedAt: observation.PublishedAt, ObservedAt: observation.ObservedAt,
+		VerifierID: options.VerifierID, VerificationPolicy: PostPublicationVerificationPolicy,
 		ApprovalVerification: verification,
 	}
 	for _, asset := range observation.Assets {
@@ -145,7 +154,8 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		receipt.ReleaseTitle != "DarwinRouter "+receipt.Tag || !trustFingerprint(receipt.ReleaseNotesSHA256) || !receipt.Immutable ||
 		(receipt.Prerelease && receipt.AuthorizedMakeLatest) || receipt.Prerelease != strings.Contains(receipt.ReleaseVersion, "-") ||
 		!wholeSecondUTC(receipt.PublishedAt) || !wholeSecondUTC(receipt.ObservedAt) || len(receipt.Assets) != 7 ||
-		!observationAfterPublication(receipt.PublishedAt, receipt.ObservedAt) || !validReceiptVerification(receipt.ApprovalVerification) {
+		!observationAfterPublication(receipt.PublishedAt, receipt.ObservedAt) || !ValidPostPublicationVerifierID(receipt.VerifierID) ||
+		receipt.VerificationPolicy != PostPublicationVerificationPolicy || !validReceiptVerification(receipt.ApprovalVerification) {
 		return nil, ErrPublicationAuthorization
 	}
 	previous := ""
@@ -169,6 +179,12 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		return nil, ErrPublicationAuthorization
 	}
 	return append(body, '\n'), nil
+}
+
+// ValidPostPublicationVerifierID reports whether value is a bounded, canonical
+// operator identity suitable for durable independent-verification evidence.
+func ValidPostPublicationVerifierID(value string) bool {
+	return rollbackIdentity.MatchString(value)
 }
 
 func receiptAssetSHA(assets []PostPublicationAsset, name string) string {

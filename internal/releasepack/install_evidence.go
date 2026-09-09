@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 var ErrInstallRehearsalEvidence = errors.New("install rehearsal evidence verification failed")
@@ -220,7 +222,7 @@ func validateInstallEvidence(r InstallRehearsalEvidence) error {
 		r.Installation.BinaryVersion != r.Release.Version || !passed(r.Installation.PrivatePermissions) || !passed(r.Installation.Configuration) || !passed(r.Installation.DaemonStart) || !passed(r.Installation.ExactWriterStop) ||
 		r.Source.Schema != 29 || r.Source.QuickCheck != "ok" || !passed(r.Source.Quiescence) ||
 		r.Backup.Schema != r.Source.Schema || r.Backup.QuickCheck != "ok" || !validInstallDigest(r.Backup.SHA256) ||
-		r.Migration.Schema != 32 || r.Migration.QuickCheck != "ok" || !validInstallDigest(r.Migration.PreservedRecordSHA256) || !passed(r.Migration.TaskTimingPreserved) || !passed(r.Migration.LegacyUsageNotFabricated) ||
+		r.Migration.Schema != stateschema.Current || r.Migration.QuickCheck != "ok" || !validInstallDigest(r.Migration.PreservedRecordSHA256) || !passed(r.Migration.TaskTimingPreserved) || !passed(r.Migration.LegacyUsageNotFabricated) ||
 		r.Rollback.DatabaseSHA256 != r.Backup.SHA256 || r.Rollback.Schema != r.Source.Schema || r.Rollback.Pairing != "current_binary_read_only_schema_fixture" || r.Rollback.BinaryVersion != r.Release.Version || r.Rollback.TargetOS != r.Target.OS || r.Rollback.TargetArch != r.Target.Arch || !passed(r.Rollback.Smoke) {
 		return ErrInstallRehearsalEvidence
 	}
@@ -230,7 +232,7 @@ func validateInstallEvidence(r InstallRehearsalEvidence) error {
 func validInstallExpectations(e InstallRehearsalExpectations) bool {
 	return validInstallDigest(e.RecordSHA256) && validate(Options{Version: e.Version, Commit: e.Commit, Out: "evidence"}) == nil &&
 		(e.TargetOS == "darwin" || e.TargetOS == "linux") && (e.TargetArch == "amd64" || e.TargetArch == "arm64") &&
-		installArtifactName.MatchString(e.ArtifactName) && validInstallDigest(e.ArtifactSHA256) && e.SourceSchema == 29 && e.CurrentSchema == 32 && validInstallDigest(e.BackupSHA256)
+		installArtifactName.MatchString(e.ArtifactName) && validInstallDigest(e.ArtifactSHA256) && e.SourceSchema == 29 && e.CurrentSchema == stateschema.Current && validInstallDigest(e.BackupSHA256)
 }
 
 func installEvidenceMatches(r InstallRehearsalEvidence, e InstallRehearsalExpectations) bool {

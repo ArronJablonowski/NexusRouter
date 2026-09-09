@@ -196,7 +196,8 @@ be omitted.
 - Incomplete output/install quarantine location and execution-state classification (if any):
 - Rollback-readiness mode: `first_release` / `upgrade`
 - Canonical rollback-readiness record location and SHA-256:
-- Rollback-readiness verification result, verifier identity and UTC time:
+- Canonical rollback-readiness verification receipt location and SHA-256,
+  verifier identity and UTC completion time:
 - Rollback-readiness approval validity window:
 - Previous supported release/binary location:
 - Matching pre-upgrade data backup location:

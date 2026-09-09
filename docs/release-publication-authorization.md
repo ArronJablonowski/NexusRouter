@@ -205,11 +205,12 @@ error; first reconcile the exact authorization, repository, and tag.
 
 After publication, a different operator should run
 `verify-published-release` with every evidence flag from the offline-preflight
-example above, plus two new paths:
+example above, plus the verifier identity and two new paths:
 
 ```sh
 go run ./cmd/verify-published-release \
   [ALL OFFLINE-PREFLIGHT FLAGS FROM THE EXACT APPROVED RELEASE] \
+  --verifier-id idp:INDEPENDENT_RELEASE_VERIFIER \
   --download-dir /ABSOLUTE/EXISTING/PARENT/NEW-verified-downloads \
   --out /ABSOLUTE/EXISTING/PARENT/NEW-post-publication-receipt.json
 ```
@@ -221,7 +222,15 @@ assets into a new directory, compares both GitHub's and local digests, and runs
 the approval-bound release verifier again against those downloaded bytes. It
 then writes one canonical receipt with create-only semantics and prints that
 receipt's `sha256:` digest. The receipt path must be outside the source,
-approved signed-release, and download directories.
+approved signed-release, and download directories. `--verifier-id` is required,
+is recorded in the receipt, and must identify the independent operator who ran
+the check. The receipt also binds the code-fixed, versioned verifier policy
+`darwinrouter-github-post-publication-verification/v1`; it cannot be selected by
+the operator. The verifier identity must differ from the publication approver
+bound into the canonical publication authorization; matching identities are
+rejected before any GitHub request. The current authorization schema does not
+encode the credentialed publication executor, so operators must separately
+retain that identity and confirm the verifier is also independent of it.
 
 Missing or mismatched remote state creates no receipt. A late local persistence
 failure can leave a receipt file whose durability is uncertain; inspect it and

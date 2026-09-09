@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	_ "modernc.org/sqlite"
 )
@@ -85,7 +86,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return err
 	}
-	if version > 32 {
+	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
 	if version == 0 {
@@ -342,10 +343,13 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
-	if version < 32 {
+	if version < stateschema.Current {
 		if err = migrateSubmissionStream(ctx, conn); err != nil {
 			return err
 		}
+	}
+	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
+		return errors.New("migration did not reach current database version")
 	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err

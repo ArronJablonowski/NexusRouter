@@ -46,6 +46,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, factory r
 	flags.StringVar(&p.ExpectedPublicationAuthorizationSHA256, "publication-authorization-sha256", "", "independently supplied publication-authorization digest")
 	flags.StringVar(&p.ExpectedRepository, "repository", "", "independently approved GitHub owner/repository")
 	flags.StringVar(&p.ReleaseNotesFile, "release-notes", "", "exact approved GitHub release-notes body")
+	flags.StringVar(&options.VerifierID, "verifier-id", "", "independent verifier identity")
 	flags.StringVar(&options.DownloadDir, "download-dir", "", "new directory for verified remote bytes")
 	flags.StringVar(&out, "out", "", "new canonical post-publication receipt file")
 	if err := flags.Parse(args); err != nil {
@@ -54,8 +55,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, factory r
 		}
 		return 2
 	}
-	if flags.NArg() != 0 || ctx == nil || factory == nil || verify == nil || write == nil || out == "" || options.DownloadDir == "" || missing(*p) {
-		fmt.Fprintln(stderr, "all approved-release evidence, publication authorization, repository, release-notes, download-dir, and out inputs are required")
+	if flags.NArg() != 0 || ctx == nil || factory == nil || verify == nil || write == nil || out == "" || options.DownloadDir == "" ||
+		!releasepack.ValidPostPublicationVerifierID(options.VerifierID) || missing(*p) {
+		fmt.Fprintln(stderr, "all approved-release evidence, publication authorization, repository, release-notes, verifier-id, download-dir, and out inputs are required and valid")
 		return 2
 	}
 	reader, err := factory()

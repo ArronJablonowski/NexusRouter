@@ -31,6 +31,7 @@ type PublicationPreflightResult struct {
 	Prerelease                     bool               `json:"prerelease"`
 	MakeLatest                     bool               `json:"make_latest"`
 	ReleaseNotesSHA256             string             `json:"release_notes_sha256"`
+	PublicationApproverID          string             `json:"publication_approver_id"`
 	Assets                         []PublicationAsset `json:"assets"`
 }
 
@@ -90,7 +91,7 @@ func VerifyPublicationPreflight(ctx context.Context, options PublicationPrefligh
 		SourceCommit: authorization.SourceCommit, Tag: authorization.Tag, ReleaseTitle: authorization.ReleaseTitle,
 		TagMessage: authorization.TagMessage, Tagger: authorization.Tagger,
 		Prerelease: authorization.Prerelease, MakeLatest: authorization.MakeLatest,
-		ReleaseNotesSHA256: notesSHA, Assets: assets,
+		ReleaseNotesSHA256: notesSHA, PublicationApproverID: authorization.ApproverID, Assets: assets,
 	}, nil
 }
 

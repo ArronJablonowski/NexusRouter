@@ -53,7 +53,7 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 	}
 	result, err := VerifyPublicationPreflight(context.Background(), options)
 	if err != nil || result.Tag != record.Tag || result.SourceCommit != record.SourceCommit ||
-		!equalPublicationAssets(result.Assets, assets) {
+		result.PublicationApproverID != record.ApproverID || !equalPublicationAssets(result.Assets, assets) {
 		t.Fatal("preflight rejected", result, err)
 	}
 
