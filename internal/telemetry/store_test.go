@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -144,7 +145,7 @@ func TestCanceledAppendAndFutureMigration(t *testing.T) {
 	if err != nil || len(items) != 0 {
 		t.Fatal("cancellation persisted state")
 	}
-	if _, err = s.db.Exec("PRAGMA user_version=35"); err != nil {
+	if _, err = s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", currentStorageSchema+1)); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()

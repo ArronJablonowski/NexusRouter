@@ -49,8 +49,8 @@ and host resources. It explicitly distinguishes unavailable projections from
 unknown measurements and separates routed execution usage from auxiliary
 classifier, summarizer, audit, and optional-judge usage. Inspection is bounded
 and GET-only: it does not change models, routing policy, approvals, or runtime
-state. Workboard storage, APIs, agent tools, and Kanban views remain assigned to
-DAR-81 onward.
+state. DAR-81 now provides the schema-35 durable workboard foundation; command
+APIs, agent tools, and Kanban views remain assigned to DAR-82 through DAR-84.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -64,8 +64,9 @@ the bounded DAR-79 mutation/control surface, and DAR-80 read-only inspection
 projections. Tool inspection exposes paired lifecycle metadata without
 arguments or results; audit inspection exposes sanitized findings, evidence
 references, rubric provenance, and ordered evidence precedence without raw
-prompts or provider responses. Workboard persistence and Kanban feature views
-remain open.
+prompts or provider responses. Schema 35 now reserves normalized, bounded
+workboard storage in the primary SQLite/WAL database. Workboard command APIs,
+agent tools, and Kanban feature views remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
@@ -1685,7 +1686,7 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Build durable Kanban storage, APIs, Web UI, and agent tools in DAR-81 through DAR-85.
+1. Build workboard command APIs, agent tools, and the Kanban Web UI in DAR-82 through DAR-85.
 2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

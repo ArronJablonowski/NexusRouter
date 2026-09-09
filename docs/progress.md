@@ -5686,8 +5686,9 @@ change configured models, route policy, approvals, tasks, or submissions; the
 DAR-79 mutation and reconciliation controls remain separate. Focused contract,
 schema, BFF, shell/source-behavior, syntax, and asset-digest tests cover valid,
 unknown, unavailable, malformed, paginated, bounded, responsive, and redacted
-states. Workboard persistence, APIs, agent tools, and Kanban views remain open
-for DAR-81 onward.
+states. At the DAR-80 checkpoint, workboard persistence, APIs, agent tools, and
+Kanban views remained open; DAR-81 subsequently supplied the storage foundation
+described below.
 
 Final verification passed on the integrated tree with `make check`: the source
 format/1,000-line gate, `go vet ./...`, the repository-wide race suite, and
@@ -5699,3 +5700,39 @@ CLI. Cross-lane review caught and closed stale schema bounds, route-corruption
 classification, health/usage/provenance validation, and a JavaScript module
 size violation before release. The final first-party JavaScript sources are
 997, 427, and 55 lines; shell tests enforce that each remains below 1,000.
+
+## 2026-09-09 — DAR-81 durable workboard storage foundation
+
+Primary-store schema 35 now reserves the native `workboard` domain without
+adding an HTTP route, agent tool, or Kanban feature view. Twenty normalized
+tables cover boards, seven canonical columns, cards and labels, dependency
+edges, attempts and linked task/session IDs, claims, immutable heartbeats and
+bounded attempt checkpoints, criteria, candidates and artifact references, evidence, acceptance decisions,
+recovery proofs/receipts, scoped idempotency receipts, and attributed immutable
+events. Ten indexes support board ordering, reverse dependencies, active work,
+expiry, checkpoints, evidence, event, and receipt access. Eleven triggers enforce bounded
+board/card fanout and normalized collection counts.
+
+The database additionally constrains lifecycle enums, revisions, byte limits,
+frozen budget fields, committed-only receipts, strict claim/heartbeat leases of
+at most ten minutes, same-board foreign-key bindings, and composite recovery
+identity. Dependency cycle/depth checks and transaction-wide event/byte
+preflight remain the responsibility of the DAR-82 command service.
+
+Migration runs under the existing serialized `BEGIN IMMEDIATE` boundary,
+validates exact retained table shapes, rules, indexes, triggers, and foreign-key
+integrity, and rolls back without advancing `user_version` when it encounters a
+partial or forged object set. Tests reconstruct seven columns, two ordered
+cards, a dependency, criterion, running attempt, live claim and heartbeat, and
+its operation/event after restart; they also cover concurrent opens, scoped-key
+replay constraints, TTL/budget/state rejection, composite recovery binding,
+mid-migration rollback, and forged retained-trigger rejection.
+
+Final verification passed on the integrated tree with `make check`: the source
+format/1,000-line gate, `go vet ./...`, repository-wide race suite, and
+`go build ./...` all succeeded. The longest rebuilt packages were application
+545.761s, releasepack 496.510s, telemetry 426.414s, SDK 66.419s, CLI 65.367s,
+toolgate 30.665s, runtime 24.906s, workers 12.088s, Web UI 5.116s, and browser
+BFF 4.361s. Focused workboard, Web UI, migration, restart, and race tests also
+passed. DAR-82, DAR-83, and DAR-84 still own the workboard command service/API,
+policy-constrained agent tools, and integrated Kanban UI.

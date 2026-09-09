@@ -45,7 +45,7 @@ func TestEventModelIndexMigrationAndAppend(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 34 {
+	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != currentStorageSchema {
 		t.Fatal(version, err)
 	}
 	after, err := s.Read(ctx, "task", 0, 100)

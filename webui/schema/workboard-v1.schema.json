@@ -110,11 +110,34 @@
         "updated_at": {
           "$ref": "#/$defs/time"
         }
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "archived"}}}, "then": {"properties": {"active_claims": {"const": 0}}}}
+      ]
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-invariants": [
+        "id == state"
+      ],
+      "required": ["version", "id", "board_id", "state", "title", "rank"],
+      "properties": {
+        "version": {"const": 1},
+        "id": {"$ref": "v1#/$defs/id"},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "state": {"enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"]},
+        "title": {"type": "string", "minLength": 1, "x-maxBytes": 256},
+        "rank": {"type": "string", "minLength": 1, "x-maxBytes": 128}
       }
     },
     "claim": {
       "type": "object",
       "additionalProperties": false,
+      "x-invariants": [
+        "last_heartbeat < expires_at <= last_heartbeat + 10 minutes for active or attention claims",
+        "released_at >= last_heartbeat for released claims"
+      ],
       "required": [
         "version",
         "id",
@@ -159,13 +182,7 @@
           "$ref": "v1#/$defs/id"
         },
         "owner_type": {
-          "enum": [
-            "operator",
-            "worker",
-            "validator",
-            "model",
-            "system"
-          ]
+          "const": "worker"
         },
         "task_id": {
           "$ref": "v1#/$defs/id"
@@ -361,6 +378,11 @@
     "attempt": {
       "type": "object",
       "additionalProperties": false,
+      "x-invariants": [
+        "candidate.submitted_by == worker_id",
+        "claim owner, board, card, and attempt identities match the attempt",
+        "candidate and evidence criteria, policy, candidate, board, card, and attempt bindings match the attempt"
+      ],
       "required": [
         "version",
         "id",
@@ -651,9 +673,16 @@
     "snapshot": {
       "type": "object",
       "additionalProperties": false,
+      "x-invariants": [
+        "included card ids are unique",
+        "visible parent and dependency cards belong to the snapshot board",
+        "included parent and dependency edges are acyclic with depth <= 64",
+        "remaining_dependencies >= included non-done dependencies; absent references may be on another page"
+      ],
       "required": [
         "version",
         "board",
+        "columns",
         "cards",
         "has_more",
         "graph_revision",
@@ -665,6 +694,18 @@
         },
         "board": {
           "$ref": "#/$defs/board"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {"$ref": "#/$defs/column"},
+          "x-invariants": [
+            "exact canonical state order: backlog, ready, in_progress, blocked, review, done, canceled",
+            "column board_id == board.id",
+            "column ids, states, and ranks are unique",
+            "column ranks are strictly ascending"
+          ]
         },
         "cards": {
           "type": "array",
@@ -787,7 +828,7 @@
           "minimum": 1
         },
         "outcome": {
-          "$ref": "v1#/$defs/id"
+          "const": "committed"
         },
         "created_at": {
           "$ref": "#/$defs/time"

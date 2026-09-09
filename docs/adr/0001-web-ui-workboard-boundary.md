@@ -4,7 +4,7 @@
 - Date: 2026-09-09
 - Linear issue: DAR-76
 - Contract version: `webui.v1`
-- Refined by: DAR-77 through DAR-80
+- Refined by: DAR-77 through DAR-81
 
 ## Context
 
@@ -213,6 +213,15 @@ canonical states are `backlog`, `ready`, `in_progress`, `blocked`, `review`,
 `done`, and `canceled`. A user view may group or hide states but cannot redefine
 them.
 
+DAR-81 reserves this domain in primary-store schema 35. The migration creates
+normalized bounded tables for boards and seven canonical columns, cards and
+dependency edges, immutable events and scoped idempotency receipts, attempts,
+claims, heartbeats and checkpoints, candidates, evidence, acceptance, and recovery proofs.
+It validates retained table shapes, rules, indexes, limit triggers, and foreign
+keys before advancing the schema, and rolls back atomically on an inconsistent
+partial object set. Schema availability alone grants no mutation authority;
+the transactional command service remains DAR-82.
+
 The service enforces this transition table; generic movement cannot bypass it:
 
 | From | Command | To | Required fence |
@@ -376,7 +385,8 @@ the server or UI exists.
 
 DAR-77 through DAR-80 implement the app shell, authentication boundary, chat
 presentation and reconciliation, bounded chat mutations, and the read-only
-operational inspector described above. They do not implement workboard storage,
-workboard endpoints, agent board tools, or Kanban feature UI; those remain in
-DAR-81 through DAR-87. Inspection projections do not grant policy mutation or
-work-dispatch authority.
+operational inspector described above. DAR-81 adds only the schema-35 durable
+workboard foundation. Workboard command endpoints, agent board tools, and the
+Kanban feature UI remain DAR-82 through DAR-84, with later qualification in
+DAR-85 through DAR-87. Inspection projections and storage availability do not
+grant policy mutation or work-dispatch authority.

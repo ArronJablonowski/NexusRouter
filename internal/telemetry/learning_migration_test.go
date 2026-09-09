@@ -41,7 +41,7 @@ func TestLearningMigrationAndRollback(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 34 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != currentStorageSchema {
 		t.Fatal(version, err)
 	}
 	if got, err := s.GetMemory(ctx, fact.Scope, fact.ID); err != nil || got != fact {

@@ -388,8 +388,12 @@ execution accounting separate from auxiliary classifier, summarizer,
 orchestrator-audit, and optional-judge accounting, and never exposes raw
 prompts, tool arguments, tool results, or provider responses. These views are
 observational: they cannot change routing policy, configured models, approvals,
-or task execution. The workboard store, APIs, agent tools, and Kanban feature
-views remain open.
+or task execution. DAR-81 implements the schema-35 workboard storage foundation
+inside the primary SQLite/WAL database: normalized bounded records for boards,
+canonical columns, cards, dependency edges, events, attempts, claims,
+heartbeats and checkpoints, candidates, evidence, acceptance, recovery proofs, and scoped
+idempotency receipts. It does not expose workboard mutations. The command APIs,
+agent tools, and Kanban feature views remain DAR-82, DAR-83, and DAR-84 work.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

@@ -36,7 +36,7 @@ func TestLeaseAttentionMigrationPreservesLeaseAndJournal(t *testing.T) {
 		t.Fatal("prior receipt changed", err)
 	}
 	var version, count int
-	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 34 || s.db.QueryRow(`SELECT count(*) FROM lease_attention`).Scan(&count) != nil || count != 0 {
+	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != currentStorageSchema || s.db.QueryRow(`SELECT count(*) FROM lease_attention`).Scan(&count) != nil || count != 0 {
 		t.Fatal(version, count)
 	}
 	if _, err := s.db.Exec(`INSERT INTO lease_attention(id,lease_token,task_id,state,body) VALUES('attention','private-token',?,'open','{}')`, req.TaskID); err != nil {

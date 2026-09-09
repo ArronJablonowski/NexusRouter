@@ -125,7 +125,7 @@ func TestSkillExposuresMigration26BackfillAndRollback(t *testing.T) {
 				t.Fatal("migration rewrote journal", err)
 			}
 			var n, version int
-			if opened.db.QueryRow("SELECT count(*) FROM skill_exposures").Scan(&n) != nil || n != 1 || opened.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != 34 {
+			if opened.db.QueryRow("SELECT count(*) FROM skill_exposures").Scan(&n) != nil || n != 1 || opened.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != currentStorageSchema {
 				t.Fatal(n, version)
 			}
 			if err = opened.initialize(ctx); err != nil {

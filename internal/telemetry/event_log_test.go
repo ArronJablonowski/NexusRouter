@@ -206,7 +206,7 @@ func TestCommittedEventLogMigrationBackfillsCanonicalHistory(t *testing.T) {
 		t.Fatal(page, err)
 	}
 	var schema int
-	if db.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || schema != 34 {
+	if db.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || schema != currentStorageSchema {
 		t.Fatal(schema)
 	}
 }

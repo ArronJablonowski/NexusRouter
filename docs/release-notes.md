@@ -56,7 +56,20 @@ supported-platform decision or publication approval is claimed.
   feedback record/revision, and tool-approval allow/deny/revoke. The embedded
   client reconciles task controls, feedback context, approvals, recent
   operations, and submission status after refresh or ambiguous acknowledgement.
-  Kanban persistence/UI remain open.
+  Schema-35 Kanban persistence now exists; command APIs, agent tools, and the
+  Kanban feature UI remain open.
+
+- Schema 35 adds the native workboard storage foundation to the primary
+  SQLite/WAL database. Normalized bounded tables cover boards, seven canonical
+  columns, ordered cards, dependency edges, immutable events, attempts, claims,
+  heartbeats and checkpoints, candidates, evidence, acceptance decisions, recovery proofs,
+  and scoped idempotency receipts. Database constraints enforce identity,
+  lifecycle enums, referential bindings, lease TTLs, row sizes, and local count
+  limits where SQLite can do so; cycle, depth, and transaction-wide graph
+  checks remain application-service responsibilities. Migration is serialized,
+  restart-safe, and fails atomically on partial or forged retained objects.
+  This is storage only: DAR-82, DAR-83, and DAR-84 still own command APIs, agent
+  tools, and the integrated Kanban UI.
 
 - Schema 34 adds the session-subject-bound browser operation journal and
   additive browser feedback revision chain to the primary SQLite/WAL database;
@@ -346,14 +359,16 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 34. Schema 30 added the immutable
+The current durable store uses SQLite schema 35. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
 digests for reconnect-safe native task streaming, schema 33 adds the globally
 ordered committed-runtime-event ledger used for restart-safe SDK catch-up, and
 schema 34 adds browser-session-bound operation and additive subjective-feedback
-records in the same SQLite/WAL store. Browser authority remains process-local
+records in the same SQLite/WAL store. Schema 35 adds bounded normalized native
+workboard storage and validates its exact tables, rules, indexes, triggers, and
+foreign-key integrity before advancing. Browser authority remains process-local
 and is revoked on restart even though these durable records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores

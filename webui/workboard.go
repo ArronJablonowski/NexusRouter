@@ -30,6 +30,7 @@ const (
 	MaxCriterionAggregate    = 64 << 10
 	MaxActorBytes            = 128
 	MaxReferenceBytes        = 128
+	MaxClaimLease            = 10 * time.Minute
 	MaxWorkDurationMillis    = int64(30 * 24 * time.Hour / time.Millisecond)
 	MaxWorkTokens            = int64(1_000_000_000)
 	MaxWorkCostMicros        = int64(1_000_000_000_000)
@@ -67,6 +68,26 @@ type Board struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+// Column is one of the seven durable, canonical workboard lanes. Its identity
+// is the card state; title and rank are server-owned presentation metadata.
+type Column struct {
+	Version int    `json:"version"`
+	ID      string `json:"id"`
+	BoardID string `json:"board_id"`
+	State   string `json:"state"`
+	Title   string `json:"title"`
+	Rank    string `json:"rank"`
+}
+
+func (c Column) Validate() error {
+	if c.Version != ContractVersion || !validID(c.BoardID) || !validBoardState(c.State) ||
+		c.ID != c.State || requireText(c.Title, MaxTitleBytes) != nil ||
+		!boundedPrintable(c.Rank, 1, MaxRankBytes) {
+		return ErrContract
+	}
+	return encodedWithin(c, 4<<10)
+}
+
 func (b Board) Validate() error {
 	if b.Version != ContractVersion || !validID(b.ID) || b.Revision < 1 ||
 		b.LayoutRevision < 1 || b.EventSequence < 1 ||
@@ -75,6 +96,7 @@ func (b Board) Validate() error {
 		!boundedText(b.Description, MaxDescriptionBytes, true) ||
 		b.CardCount < 0 || b.CardCount > MaxCardsPerBoard ||
 		b.ActiveClaims < 0 || b.ActiveClaims > b.CardCount ||
+		b.State == "archived" && b.ActiveClaims != 0 ||
 		!validWorkboardTime(b.CreatedAt) || !validWorkboardTime(b.UpdatedAt) ||
 		b.UpdatedAt.Before(b.CreatedAt) {
 		return ErrContract
@@ -207,14 +229,14 @@ type Claim struct {
 func (c Claim) Validate() error {
 	if c.Version != ContractVersion || !validID(c.ID) || !validID(c.BoardID) ||
 		!validID(c.CardID) || !validID(c.AttemptID) || c.Revision < 1 ||
-		!validID(c.OwnerID) || !validActorType(c.OwnerType) || !optionalID(c.TaskID) ||
+		!validID(c.OwnerID) || c.OwnerType != "worker" || !optionalID(c.TaskID) ||
 		!validWorkboardTime(c.ExpiresAt) || !validWorkboardTime(c.LastHeartbeat) ||
 		c.ExpiresAt.Before(c.LastHeartbeat) {
 		return ErrContract
 	}
 	switch c.State {
 	case "active", "attention":
-		if c.ReleasedAt != nil {
+		if c.ReleasedAt != nil || !c.ExpiresAt.After(c.LastHeartbeat) || c.ExpiresAt.Sub(c.LastHeartbeat) > MaxClaimLease {
 			return ErrContract
 		}
 	case "released":
@@ -386,6 +408,7 @@ func (a Attempt) Validate() error {
 	if a.Candidate != nil {
 		if a.Candidate.Validate() != nil || a.Candidate.BoardID != a.BoardID ||
 			a.Candidate.CardID != a.CardID || a.Candidate.AttemptID != a.ID ||
+			a.Candidate.SubmittedBy != a.WorkerID ||
 			a.Candidate.CriteriaDigest != a.CriteriaDigest || a.Candidate.PolicyDigest != a.PolicyDigest ||
 			a.Candidate.EvidenceCount > len(a.Evidence) ||
 			a.Candidate.EvidenceDigest != EvidenceDigest(a.Evidence[:a.Candidate.EvidenceCount]) {
@@ -429,19 +452,21 @@ func (a Attempt) Validate() error {
 }
 
 type BoardSnapshot struct {
-	Version       int    `json:"version"`
-	Board         Board  `json:"board"`
-	Cards         []Card `json:"cards"`
-	NextCursor    string `json:"next_cursor,omitempty"`
-	HasMore       bool   `json:"has_more"`
-	GraphRevision int64  `json:"graph_revision"`
-	GraphDigest   string `json:"graph_digest"`
+	Version       int      `json:"version"`
+	Board         Board    `json:"board"`
+	Columns       []Column `json:"columns"`
+	Cards         []Card   `json:"cards"`
+	NextCursor    string   `json:"next_cursor,omitempty"`
+	HasMore       bool     `json:"has_more"`
+	GraphRevision int64    `json:"graph_revision"`
+	GraphDigest   string   `json:"graph_digest"`
 }
 
 func (s BoardSnapshot) Validate() error {
 	if s.Version != ContractVersion || s.Board.Validate() != nil || len(s.Cards) > MaxCardPageItems ||
 		s.HasMore != (s.NextCursor != "") || s.GraphRevision < 1 || !validWorkboardDigest(s.GraphDigest) ||
-		(s.NextCursor != "" && !boundedPrintable(s.NextCursor, 1, MaxCursorBytes)) {
+		(s.NextCursor != "" && !boundedPrintable(s.NextCursor, 1, MaxCursorBytes)) ||
+		validateColumns(s.Board.ID, s.Columns) != nil {
 		return ErrContract
 	}
 	seen := map[string]bool{}
@@ -452,6 +477,9 @@ func (s BoardSnapshot) Validate() error {
 		seen[card.ID] = true
 	}
 	if len(s.Cards) == 0 && s.HasMore {
+		return ErrContract
+	}
+	if validateSnapshotGraph(s.Cards) != nil {
 		return ErrContract
 	}
 	return encodedWithin(s, MaxTransactionBytes)
@@ -580,7 +608,7 @@ func (r OperationReceipt) Validate() error {
 		int64(r.EventCount) != r.LastSequence-r.FirstSequence+1 ||
 		r.TransactionBytes < 1 || r.TransactionBytes > MaxTransactionBytes ||
 		r.BoardRevision < 1 || !optionalID(r.CardID) || !positiveOptionalRevision(r.CardRevision) ||
-		!positiveOptionalRevision(r.ClaimRevision) || !validID(r.Outcome) ||
+		!positiveOptionalRevision(r.ClaimRevision) || r.Outcome != "committed" ||
 		!validWorkboardTime(r.CreatedAt) {
 		return ErrContract
 	}

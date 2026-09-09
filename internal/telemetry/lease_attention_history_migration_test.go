@@ -37,7 +37,7 @@ func TestLeaseAttentionHistoryMigrationPreservesBaseline(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count, version int
-	if s.db.QueryRow(`SELECT count(*) FROM lease_attention_history`).Scan(&count) != nil || count != 1 || s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 34 {
+	if s.db.QueryRow(`SELECT count(*) FROM lease_attention_history`).Scan(&count) != nil || count != 1 || s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != currentStorageSchema {
 		t.Fatal("duplicate migration", count, version)
 	}
 	for _, statement := range []string{`INSERT INTO lease_attention_history VALUES('baseline-attention',0,'observed','{}')`, `INSERT INTO lease_attention_history VALUES('baseline-attention',2,'unknown','{}')`, `INSERT INTO lease_attention_history VALUES('missing',1,'baseline','{}')`, `INSERT INTO lease_attention_history VALUES('baseline-attention',1,'observed','{}')`} {

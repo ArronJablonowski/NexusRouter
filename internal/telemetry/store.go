@@ -360,6 +360,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 35 {
+		if err = migrateWorkboards(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
 		return errors.New("migration did not reach current database version")
 	}

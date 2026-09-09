@@ -26,6 +26,16 @@ func boardFixture() Board {
 	return Board{Version: 1, ID: "board-a", Revision: 1, LayoutRevision: 1, EventSequence: 1, State: "active", Title: "DarwinRouter", Description: "Work", CardCount: 1, ActiveClaims: 1, CreatedAt: now, UpdatedAt: now}
 }
 
+func columnFixtures(boardID string) []Column {
+	states := []string{"backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"}
+	titles := []string{"Backlog", "Ready", "In progress", "Blocked", "Review", "Done", "Canceled"}
+	columns := make([]Column, len(states))
+	for index := range states {
+		columns[index] = Column{Version: 1, ID: states[index], BoardID: boardID, State: states[index], Title: titles[index], Rank: string(rune('a' + index))}
+	}
+	return columns
+}
+
 func cardFixture() Card {
 	now := workboardTime()
 	return Card{Version: 1, ID: "card-a", BoardID: "board-a", Revision: 2, CriteriaRevision: 1, State: "in_progress", Rank: "a0", Title: "Build storage", Description: "Implement the durable store.", Priority: "high", Labels: []string{"storage"}, Dependencies: []string{}, AssigneeID: "worker-a", AttemptCount: 1, CurrentAttemptID: "attempt-a", CurrentClaimID: "claim-a", Budget: WorkBudget{AttemptLimit: 3, TimeLimitMS: 86_400_000, TokenLimit: 100_000, CostMicros: 5_000_000}, Criteria: []AcceptanceCriterion{criterion("tests", "objective")}, CreatedAt: now, UpdatedAt: now}
@@ -87,7 +97,7 @@ func TestWorkboardProjectionFixturesValidate(t *testing.T) {
 			t.Fatalf("valid %s attempt rejected: %v", state, err)
 		}
 	}
-	snapshot := BoardSnapshot{Version: 1, Board: board, Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}
+	snapshot := BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}
 	if err := snapshot.Validate(); err != nil {
 		t.Fatal("valid snapshot rejected", err)
 	}
@@ -236,6 +246,11 @@ func TestWorkboardBoundsAreFiniteAndConsistent(t *testing.T) {
 	if receipt.Validate() == nil {
 		t.Fatal("claim revision without card identity and revision accepted")
 	}
+	receipt.ClaimRevision = nil
+	receipt.Outcome = "pending"
+	if receipt.Validate() == nil {
+		t.Fatal("non-committed idempotency receipt accepted")
+	}
 	recovery := recoveryFixture()
 	recovery.LastSequence = recovery.FirstSequence - 1
 	if recovery.Validate() == nil {
@@ -264,6 +279,10 @@ func TestPublishedReceiptSchemaDeclaresCrossFieldInvariants(t *testing.T) {
 	want := map[string][]string{
 		"operation_receipt": {"event_count == last_sequence - first_sequence + 1"},
 		"recovery_receipt":  {"last_sequence >= first_sequence", "last_sequence - first_sequence + 1 <= 128"},
+		"column":            {"id == state"},
+		"claim":             {"last_heartbeat < expires_at <= last_heartbeat + 10 minutes for active or attention claims", "released_at >= last_heartbeat for released claims"},
+		"attempt":           {"candidate.submitted_by == worker_id", "claim owner, board, card, and attempt identities match the attempt", "candidate and evidence criteria, policy, candidate, board, card, and attempt bindings match the attempt"},
+		"snapshot":          {"included card ids are unique", "visible parent and dependency cards belong to the snapshot board", "included parent and dependency edges are acyclic with depth <= 64", "remaining_dependencies >= included non-done dependencies; absent references may be on another page"},
 	}
 	for definition, invariants := range want {
 		got := document.Definitions[definition].Invariants
@@ -298,7 +317,7 @@ func TestSharedInvalidReceiptFixturesRequireNormativeInvariantChecks(t *testing.
 func TestSnapshotRejectsDuplicateAndOversizedCards(t *testing.T) {
 	board := boardFixture()
 	card := cardFixture()
-	snapshot := BoardSnapshot{Version: 1, Board: board, Cards: []Card{card, card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}
+	snapshot := BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card, card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}
 	if snapshot.Validate() == nil {
 		t.Fatal("duplicate card accepted")
 	}
@@ -332,9 +351,10 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		value      any
 	}{
 		{"board", board},
+		{"column", columnFixtures(board.ID)[0]},
 		{"card", card},
 		{"attempt", attempt},
-		{"snapshot", BoardSnapshot{Version: 1, Board: board, Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
+		{"snapshot", BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
 		{"page", Page{Version: 1, Items: []Board{board}}},
 		{"operation_receipt", receipt},
 		{"acceptance_decision", acceptanceFixture(attempt)},
@@ -348,6 +368,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, body, true)
 	}
 	negative := []struct{ definition, body string }{
+		{"board", `{"version":1,"id":"board-a","revision":1,"layout_revision":1,"event_sequence":1,"state":"archived","title":"Board","description":"","card_count":1,"active_claims":1,"created_at":"2026-09-09T12:00:00Z","updated_at":"2026-09-09T12:00:00Z"}`},
+		{"claim", `{"version":1,"id":"claim-a","board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","revision":1,"state":"active","owner_id":"operator-a","owner_type":"operator","expires_at":"2026-09-09T12:01:00Z","last_heartbeat":"2026-09-09T12:00:00Z"}`},
 		{"claim", `{"version":1,"id":"claim-a","board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","revision":1,"state":"released","owner_id":"worker-a","owner_type":"worker","expires_at":"2026-09-09T12:01:00Z","last_heartbeat":"2026-09-09T12:00:00Z"}`},
 		{"evidence", `{"version":1,"id":"evidence-a","revision":1,"board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","candidate_id":"candidate-a","criterion_id":"tests","source":"user_feedback","outcome":"abstained","actor_id":"model-a","actor_type":"model","reference":"ref","candidate_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","criteria_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","policy_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","created_at":"2026-09-09T12:00:00Z"}`},
 		{"snapshot", `{"version":1,"board":{},"cards":[],"has_more":true,"graph_revision":1,"graph_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`},

@@ -38,7 +38,7 @@ func TestEventKindIndexMigration27PreservesEvidenceAndReadonly(t *testing.T) {
 	defer migrated.Close()
 	var schema int
 	var definition string
-	if err = migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 34 {
+	if err = migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != currentStorageSchema {
 		t.Fatal(schema, err)
 	}
 	if err = migrated.db.QueryRow(`SELECT sql FROM sqlite_master WHERE name='events_task_kind' AND type='index'`).Scan(&definition); err != nil || !strings.Contains(definition, "json_extract(body,'$.kind')") {
@@ -120,7 +120,7 @@ func TestEventKindIndexFailedMigrationRemains27AndCanReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reopened.Close()
-	if err = reopened.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != 34 {
+	if err = reopened.db.QueryRow(`PRAGMA user_version`).Scan(&schema); err != nil || schema != currentStorageSchema {
 		t.Fatal(schema, err)
 	}
 	if !reflect.DeepEqual(before, workflowSourceRawBodies(t, reopened)) {
