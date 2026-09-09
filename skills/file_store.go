@@ -181,7 +181,7 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 		}
 		known := map[string]bool{}
 		for _, v := range e.Versions {
-			if !versionID(v.Version) || v.Key != e.Key || known[v.Version] || len(v.Digest) != 64 {
+			if !versionID(v.Version) || v.Key != e.Key || known[v.Version] || len(v.Digest) != 64 || !validPrivacy(v.Privacy) {
 				return ErrInvalid
 			}
 			known[v.Version] = true
@@ -344,7 +344,9 @@ func (s *FileStore) Discover(ctx context.Context, scope string, tags []string, l
 					}
 				}
 				if match {
-					result = append(result, m)
+					owned := m
+					owned.Tags = append([]string(nil), m.Tags...)
+					result = append(result, owned)
 				}
 			}
 		}
@@ -389,7 +391,7 @@ func (s *FileStore) Load(ctx context.Context, key Key, id string) (Version, erro
 		if v.ID != id || v.Draft.Key != key || !v.Draft.valid() || digest(v) != wantDigest {
 			return ErrInvalid
 		}
-		if metadata.Description != v.Draft.Description || len(metadata.Tags) != len(v.Draft.Tags) {
+		if metadata.Description != v.Draft.Description || metadata.Privacy != v.Draft.Privacy || len(metadata.Tags) != len(v.Draft.Tags) {
 			return ErrInvalid
 		}
 		for i, tag := range metadata.Tags {
@@ -432,7 +434,7 @@ func (s *FileStore) Draft(ctx context.Context, d Draft, automatic bool) (Version
 		if err := s.write("version-"+v.ID+".json", v, true); err != nil {
 			return err
 		}
-		e.Versions = append(e.Versions, Metadata{Key: d.Key, Version: v.ID, Digest: digest(v), Description: d.Description, Tags: d.Tags})
+		e.Versions = append(e.Versions, Metadata{Key: d.Key, Version: v.ID, Digest: digest(v), Privacy: d.Privacy, Description: d.Description, Tags: d.Tags})
 		c.Skills[d.Key.index()] = e
 		return nil
 	}, true)

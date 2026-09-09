@@ -33,7 +33,7 @@ func contextSkillStore(t *testing.T) (*skills.FileStore, config.Skills) {
 
 func seedContextSkill(t *testing.T, s *skills.FileStore, scope, name, tag, body string, required []string, active bool) skills.Version {
 	t.Helper()
-	d := skills.Draft{Key: skills.Key{Scope: scope, Name: name}, Description: "Description " + name, Tags: []string{tag}, SourceSessions: []string{"session"}, Steps: []string{body}, RequiredTools: required, Risks: []string{"Review the result"}, ValidationCases: []string{"fixture"}, Configuration: "excluded configuration"}
+	d := skills.Draft{Key: skills.Key{Scope: scope, Name: name}, Privacy: skills.PrivacyPublic, Description: "Description " + name, Tags: []string{tag}, SourceSessions: []string{"session"}, Steps: []string{body}, RequiredTools: required, Risks: []string{"Review the result"}, ValidationCases: []string{"fixture"}, Configuration: "excluded configuration"}
 	v, err := s.Draft(context.Background(), d, false)
 	if err != nil {
 		t.Fatal(err)

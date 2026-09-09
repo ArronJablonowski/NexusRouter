@@ -1206,7 +1206,7 @@ available when prompt retrieval is disabled and do not invoke models. See
 [operator memory management](docs/memory-management.md) for the authenticated
 HTTP contract, redaction, storage requirements and uncertain-write handling.
 
-`darwin skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive.
+`darwin skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires a trusted programmatic validator; these commands do not enable automatic skill mutation. Treat memory and skill exports as sensitive. Skill privacy is durable provenance: `"privacy":"public"` explicitly permits cloud-model context, while `"privacy":"local_only"` confines the workflow to local models. Legacy drafts with no privacy field fail closed as local-only. Automatically generated skills inherit local-only when any admitted source is local-only, and later configuration changes cannot relax that restriction.
 
 Rollback undoes the latest activation that has not already been reversed, not
 the latest appearance of a version ID. Reactivating an older version therefore

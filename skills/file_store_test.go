@@ -212,6 +212,30 @@ func TestConcurrentActivationCAS(t *testing.T) {
 	}
 }
 
+func TestDiscoveryOwnsPrivacyMetadata(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t, testPath(t))
+	d := sample()
+	d.Privacy = PrivacyPublic
+	v, err := s.Draft(ctx, d, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Activate(ctx, d.Key, v.ID, "", pass, false); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := s.Discover(ctx, d.Key.Scope, d.Tags, 1)
+	if err != nil || len(metadata) != 1 || metadata[0].Privacy != PrivacyPublic {
+		t.Fatal(metadata, err)
+	}
+	metadata[0].Privacy = PrivacyLocalOnly
+	metadata[0].Tags[0] = "mutated"
+	again, err := s.Discover(ctx, d.Key.Scope, d.Tags, 1)
+	if err != nil || len(again) != 1 || again[0].Privacy != PrivacyPublic || again[0].Tags[0] != d.Tags[0] {
+		t.Fatal("caller mutated owned metadata", again, err)
+	}
+}
+
 func TestCorruptionAndDirectoryPermissions(t *testing.T) {
 	for _, p := range []string{"", "/"} {
 		if s, e := Open(p, []string{"project"}); e == nil {

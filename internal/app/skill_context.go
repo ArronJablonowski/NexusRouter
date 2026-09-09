@@ -83,6 +83,7 @@ func loadSkillContextFrom(ctx context.Context, store skills.Store, settings conf
 		available[name] = true
 	}
 	selected := []contextSkill{}
+	localOnly := settings.LocalOnly
 	use := &runtime.SkillContextUse{Version: 1, Complete: true, References: []runtime.SkillReference{}}
 	for _, m := range metadata {
 		if ctx.Err() != nil {
@@ -127,11 +128,14 @@ func loadSkillContextFrom(ctx context.Context, store skills.Store, settings conf
 			continue
 		}
 		selected = next
+		localOnly = localOnly || v.Draft.LocalOnly()
 		if use.Complete {
 			use.References = append(use.References, runtime.SkillReference{Scope: m.Key.Scope, Name: m.Key.Name, Version: m.Version, Digest: m.Digest})
 			use = redactSkillContextUse(use, secrets)
 		}
-		result = &skillContext{Messages: messages, LocalOnly: settings.LocalOnly, Use: use}
+		// Disclosure is monotonic: global policy or any selected immutable skill
+		// can require local execution. Legacy skills have no field and fail closed.
+		result = &skillContext{Messages: messages, LocalOnly: localOnly, Use: use}
 	}
 	if ctx.Err() != nil {
 		return nil, ErrAdmission

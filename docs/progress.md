@@ -4892,3 +4892,33 @@ independent verifier and post-check completion time. These changes provide the
 mechanical verifier and evidence contract only; real publication, separate-host
 rehearsal, policy approval, rollback authority, and retained production evidence
 remain operator gates.
+
+DAR-73 qualified implementation checkpoint: the deterministic MVP gate now
+proves the automatic procedural-skill lifecycle as one scheduled production
+flow. Repeated accepted workflow evidence converges on one generated version;
+trusted deterministic validation activates it; a separate service progressively
+loads the relevant workflow; a regression monitor records failed deterministic
+evidence and rolls back to the prior validated version; and two subsequent
+service restarts preserve the restored activation, immutable generated version,
+activation history, and monitor cadence without regeneration or reactivation.
+Companion race fixtures prove failed and nondeterministic validation remain
+inactive, independent generation and activation claims converge, and scope,
+automatic-mutation kill switch, privacy, and redaction rules fail closed.
+
+The review also found and closed a source-privacy gap. Generated skills now bind
+durable `public` or `local_only` privacy derived by the host from their admitted
+sources and current policy; model output cannot author or relax it. Privacy is
+matched across the immutable version, progressive-discovery metadata,
+publication receipt path, loading, and restart. Legacy versions with no privacy
+field remain readable but are treated as local-only. Runtime context ORs every
+selected skill's durable restriction with global policy, so a local-only learned
+workflow is rejected before cloud provider construction even if later settings
+allow cloud skills. A paired public-source fixture proves explicitly public
+skills remain cloud-usable, while the denied path creates no task and persists
+no private workflow body.
+
+`make qualify-mvp` passed the expanded application and skills race gates.
+`go run ./cmd/check`, `go vet ./...`, the complete repository-wide race suite,
+and `go build ./...` all passed on the integrated tree. Longest packages were
+releasepack 477.583s, application 305.648s, telemetry 205.935s, CLI 45.539s,
+SDK 33.265s, skills 23.523s, and toolgate 24.268s.

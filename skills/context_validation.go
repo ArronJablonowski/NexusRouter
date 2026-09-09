@@ -12,14 +12,14 @@ import (
 // It does not prove activation: Discover's active-only contract remains the
 // responsibility of the trusted store implementation.
 func ValidateContextMetadata(m Metadata, scope, domain string) error {
-	if len(scope) > 64 || len(domain) > 64 || len(m.Key.Scope) > 64 || len(m.Key.Name) > 64 || !m.Key.valid() || m.Key.Scope != scope || len(m.Version) != 32 || !versionID(m.Version) || len(m.Digest) != 64 || m.Digest != strings.ToLower(m.Digest) || len(m.Description) == 0 || len(m.Description) > 1024 || len(m.Tags) > 4096 {
+	if len(scope) > 64 || len(domain) > 64 || len(m.Key.Scope) > 64 || len(m.Key.Name) > 64 || !m.Key.valid() || m.Key.Scope != scope || len(m.Version) != 32 || !versionID(m.Version) || len(m.Digest) != 64 || m.Digest != strings.ToLower(m.Digest) || !validPrivacy(m.Privacy) || len(m.Description) == 0 || len(m.Description) > 1024 || len(m.Tags) > 4096 {
 		return ErrInvalid
 	}
 	if _, err := hex.DecodeString(m.Digest); err != nil {
 		return ErrInvalid
 	}
 	budget := maxFile
-	if !contextStrings(&budget, []string{m.Key.Scope, m.Key.Name, m.Version, m.Digest, m.Description}) || !contextStrings(&budget, m.Tags) {
+	if !contextStrings(&budget, []string{m.Key.Scope, m.Key.Name, m.Version, m.Digest, m.Privacy, m.Description}) || !contextStrings(&budget, m.Tags) {
 		return ErrInvalid
 	}
 	matched := false
@@ -39,7 +39,7 @@ func ValidateContextMetadata(m Metadata, scope, domain string) error {
 // discovery metadata without granting it permissions or proving activation.
 // Bound raw bytes and list counts before serialization and digest computation.
 func ValidateContextVersion(m Metadata, v Version, scope, domain string) error {
-	if ValidateContextMetadata(m, scope, domain) != nil || len(v.ID) != 32 || !versionID(v.ID) || m.Version != v.ID || v.Draft.Key != m.Key || len(v.Parent) > 32 || (v.Parent != "" && !versionID(v.Parent)) || v.CreatedAt.IsZero() {
+	if ValidateContextMetadata(m, scope, domain) != nil || len(v.ID) != 32 || !versionID(v.ID) || m.Version != v.ID || v.Draft.Key != m.Key || m.Privacy != v.Draft.Privacy || len(v.Parent) > 32 || (v.Parent != "" && !versionID(v.Parent)) || v.CreatedAt.IsZero() {
 		return ErrInvalid
 	}
 	year := v.CreatedAt.UTC().Year()
@@ -47,7 +47,7 @@ func ValidateContextVersion(m Metadata, v Version, scope, domain string) error {
 		return ErrInvalid
 	}
 	budget := maxFile
-	if !contextStrings(&budget, []string{m.Key.Scope, m.Key.Name, m.Version, m.Digest, m.Description}) || !contextStrings(&budget, m.Tags) || !contextStrings(&budget, []string{v.ID, v.Parent, v.Draft.Key.Scope, v.Draft.Key.Name, v.Draft.Description, v.Draft.Configuration}) {
+	if !contextStrings(&budget, []string{m.Key.Scope, m.Key.Name, m.Version, m.Digest, m.Privacy, m.Description}) || !contextStrings(&budget, m.Tags) || !contextStrings(&budget, []string{v.ID, v.Parent, v.Draft.Key.Scope, v.Draft.Key.Name, v.Draft.Privacy, v.Draft.Description, v.Draft.Configuration}) {
 		return ErrInvalid
 	}
 	for _, list := range [][]string{v.Draft.Tags, v.Draft.SourceSessions, v.Draft.SourceEvidence, v.Draft.Steps, v.Draft.RequiredTools, v.Draft.Risks, v.Draft.ValidationCases} {

@@ -29,7 +29,7 @@ func seedTaskSkills(t *testing.T) string {
 		name, tag string
 		active    bool
 	}{{"active", "code", true}, {"draft", "code", false}, {"unrelated", "creative", true}} {
-		d := skills.Draft{Key: skills.Key{Scope: "project", Name: item.name}, Description: item.name + " workflow", Tags: []string{item.tag}, SourceSessions: []string{"source"}, Steps: []string{item.name + "-procedure secret-token"}, ValidationCases: []string{"fixture"}}
+		d := skills.Draft{Key: skills.Key{Scope: "project", Name: item.name}, Privacy: skills.PrivacyPublic, Description: item.name + " workflow", Tags: []string{item.tag}, SourceSessions: []string{"source"}, Steps: []string{item.name + "-procedure secret-token"}, ValidationCases: []string{"fixture"}}
 		v, err := s.Draft(context.Background(), d, false)
 		if err != nil {
 			t.Fatal(err)

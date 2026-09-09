@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -213,7 +214,7 @@ func TestConfiguredLearningCloseJoinsValidator(t *testing.T) {
 	}
 }
 
-func TestConfiguredLearningGeneratesActivatesAndRollsBack(t *testing.T) {
+func TestMVPAutomaticSkillEvolutionSurvivesRestartAndRollsBack(t *testing.T) {
 	svc, _, calls := learningFixture(t)
 	configureNamedLearning(svc)
 	fixture := filepath.Join(t.TempDir(), "lookup.json")
@@ -283,6 +284,14 @@ func TestConfiguredLearningGeneratesActivatesAndRollsBack(t *testing.T) {
 	if calls.Load() != 1 || checks.Load() < 2 {
 		t.Fatal("supervisor did not generate and validate", calls.Load(), checks.Load())
 	}
+	beforeRegression, err := store.History(ctx, key)
+	if err != nil || beforeRegression.Active != active.Active || len(beforeRegression.Versions) != 2 || len(beforeRegression.Activations) != 2 {
+		t.Fatal("generated skill history did not converge", beforeRegression, err)
+	}
+	generated, err := store.Load(ctx, key, active.Active)
+	if err != nil || generated.ID != active.Active {
+		t.Fatal("activated generated version is not loadable", generated, err)
+	}
 	// A separate service must discover the activated workflow through actual
 	// task context assembly, even though the generator returned no domain tags.
 	// This qualifies retrieval, not semantic execution of an arbitrary skill.
@@ -319,6 +328,18 @@ func TestConfiguredLearningGeneratesActivatesAndRollsBack(t *testing.T) {
 	_ = owned.Close()
 	if rolled.Active != baseline.ID {
 		t.Fatal(rolled)
+	}
+	afterRegression, err := store.History(ctx, key)
+	if err != nil || afterRegression.Active != baseline.ID || !reflect.DeepEqual(afterRegression.Versions, beforeRegression.Versions) || len(afterRegression.Activations) != 3 {
+		t.Fatal("rollback changed immutable version history", afterRegression, err)
+	}
+	rollback := afterRegression.Activations[2]
+	if !rollback.Rollback || rollback.From != active.Active || rollback.To != baseline.ID || rollback.Regression == nil || rollback.Regression.Passed || !rollback.Regression.Deterministic {
+		t.Fatal("rollback lacks deterministic regression evidence", rollback)
+	}
+	retained, err := store.Load(ctx, key, active.Active)
+	if err != nil || !reflect.DeepEqual(retained, generated) {
+		t.Fatal("rollback destroyed generated version history", retained, err)
 	}
 	fresh, err := NewService(svc.settings, svc.secret)
 	if err != nil {
@@ -360,6 +381,22 @@ func TestConfiguredLearningGeneratesActivatesAndRollsBack(t *testing.T) {
 	_ = restarted.Close()
 	if state, err := fresh.SkillActivationState(ctx, key); err != nil || state != rolled || calls.Load() != 1 {
 		t.Fatal("restart reactivated or regenerated work", state, err, calls.Load())
+	}
+	secondRestart, err := NewService(svc.settings, svc.secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state, err := secondRestart.SkillActivationState(ctx, key); err != nil || state != rolled {
+		t.Fatal("second restart lost rollback", state, err)
+	}
+	readOnly, err := skills.OpenReadOnly(svc.settings.Skills.Root, []string{pinned.Scope})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer readOnly.Close()
+	finalHistory, err := readOnly.History(ctx, key)
+	if err != nil || !reflect.DeepEqual(finalHistory, afterRegression) {
+		t.Fatal("second restart changed durable skill history", finalHistory, err)
 	}
 	if errors.Is(owned.Close(), context.DeadlineExceeded) {
 		t.Fatal("lifecycle only ended by timeout")

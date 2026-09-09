@@ -406,7 +406,11 @@ checks count, exact scope/domain, identifiers, UTF-8, duplicate keys, bounded
 draft structure and SHA-256 agreement with discovery metadata. Versions are
 pinned across discovery/loading; automatic routing freezes one context snapshot.
 Missing tool permissions exclude a skill rather than granting capabilities.
-Content is redacted and remains untrusted reference material.
+Content is redacted and remains untrusted reference material. `Draft.Privacy`
+and matching discovery `Metadata.Privacy` are durable disclosure policy:
+`public` permits cloud-model context and `local_only` does not. An omitted legacy
+value is accepted for compatibility but interpreted as local-only. A custom store
+must preserve this value exactly between discovery and loading.
 
 The overall discovery/loading allowance is three seconds, cooperatively enforced.
 Errors and panics deny admission without leaking backend details. Hosts must

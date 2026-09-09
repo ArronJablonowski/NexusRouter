@@ -296,6 +296,11 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		return fail("generation_failed")
 	}
 	draft := result.Draft
+	if localRequired {
+		draft.Privacy = skills.PrivacyLocalOnly
+	} else {
+		draft.Privacy = skills.PrivacyPublic
+	}
 	draft.Description = redact(draft.Description, secrets)
 	draft.Configuration = redact(draft.Configuration, secrets)
 	draft.Tags = redactSkillStrings(draft.Tags, secrets)

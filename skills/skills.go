@@ -19,6 +19,13 @@ var (
 
 var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 
+const (
+	// PrivacyPublic permits a skill body to be included in cloud-model context.
+	PrivacyPublic = "public"
+	// PrivacyLocalOnly confines a skill body to local-model context.
+	PrivacyLocalOnly = "local_only"
+)
+
 type Key struct {
 	Scope string `json:"scope"`
 	Name  string `json:"name"`
@@ -29,7 +36,10 @@ func (k Key) index() string { return k.Scope + "/" + k.Name }
 
 // Draft describes a proposed workflow, not executable trusted instructions.
 type Draft struct {
-	Key             Key      `json:"key"`
+	Key Key `json:"key"`
+	// Privacy is durable provenance-derived policy, not model-authored content.
+	// Empty is retained for backward compatibility and is interpreted as local-only.
+	Privacy         string   `json:"privacy,omitempty"`
 	Description     string   `json:"description"`
 	Tags            []string `json:"tags"`
 	SourceSessions  []string `json:"source_sessions"`
@@ -42,7 +52,7 @@ type Draft struct {
 }
 
 func (d Draft) valid() bool {
-	if !d.Key.valid() || d.Description == "" || len(d.Description) > 1024 || len(d.Steps) == 0 || len(d.SourceSessions) == 0 || len(d.ValidationCases) == 0 {
+	if !d.Key.valid() || !validPrivacy(d.Privacy) || d.Description == "" || len(d.Description) > 1024 || len(d.Steps) == 0 || len(d.SourceSessions) == 0 || len(d.ValidationCases) == 0 {
 		return false
 	}
 	for _, list := range [][]string{d.SourceSessions, d.SourceEvidence, d.Tags, d.RequiredTools} {
@@ -62,6 +72,14 @@ func (d Draft) valid() bool {
 	return true
 }
 
+func validPrivacy(value string) bool {
+	return value == "" || value == PrivacyPublic || value == PrivacyLocalOnly
+}
+
+// LocalOnly reports the effective disclosure policy. Legacy records without a
+// privacy field fail closed and remain confined to local models.
+func (d Draft) LocalOnly() bool { return d.Privacy != PrivacyPublic }
+
 type Version struct {
 	ID        string    `json:"id"`
 	Parent    string    `json:"parent,omitempty"`
@@ -75,6 +93,7 @@ type Metadata struct {
 	Key         Key      `json:"key"`
 	Version     string   `json:"version"`
 	Digest      string   `json:"digest"`
+	Privacy     string   `json:"privacy,omitempty"`
 	Description string   `json:"description"`
 	Tags        []string `json:"tags"`
 }

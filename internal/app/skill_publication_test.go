@@ -40,7 +40,7 @@ func TestPublishSkillGenerationInactiveRepeatRestart(t *testing.T) {
 	svc, a := publicationFixture(t)
 	ctx := context.Background()
 	version, err := svc.PublishSkillGeneration(ctx, a.ID)
-	if err != nil || version.ID == "" || !reflect.DeepEqual(version.Draft, a.Result.Draft) {
+	if err != nil || version.ID == "" || version.Draft.Privacy != skills.PrivacyLocalOnly || !reflect.DeepEqual(version.Draft, a.Result.Draft) {
 		t.Fatal(version, err)
 	}
 	for range 2 {

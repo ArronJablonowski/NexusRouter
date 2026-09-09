@@ -72,7 +72,7 @@ func (s *FileStore) PublishGeneration(ctx context.Context, a GenerationAttempt, 
 				return err
 			}
 			storedDraft, err := json.Marshal(version.Draft)
-			if err != nil || version.ID != receipt.Version || version.Draft.Key != owned.Key || !version.Draft.valid() || metadata.Key != owned.Key || metadata.Digest != digest(version) || metadata.Description != version.Draft.Description || !bytes.Equal(storedDraft, draftBody) || len(metadata.Tags) != len(version.Draft.Tags) {
+			if err != nil || version.ID != receipt.Version || version.Draft.Key != owned.Key || !version.Draft.valid() || metadata.Key != owned.Key || metadata.Digest != digest(version) || metadata.Privacy != version.Draft.Privacy || metadata.Description != version.Draft.Description || !bytes.Equal(storedDraft, draftBody) || len(metadata.Tags) != len(version.Draft.Tags) {
 				return ErrInvalid
 			}
 			for i, tag := range metadata.Tags {
@@ -92,7 +92,7 @@ func (s *FileStore) PublishGeneration(ctx context.Context, a GenerationAttempt, 
 		if err := s.write("version-"+version.ID+".json", version, true); err != nil {
 			return err
 		}
-		entry.Versions = append(entry.Versions, Metadata{Key: owned.Key, Version: version.ID, Digest: digest(version), Description: draft.Description, Tags: draft.Tags})
+		entry.Versions = append(entry.Versions, Metadata{Key: owned.Key, Version: version.ID, Digest: digest(version), Privacy: draft.Privacy, Description: draft.Description, Tags: draft.Tags})
 		c.Skills[owned.Key.index()] = entry
 		if c.Publications == nil {
 			c.Publications = map[string]PublicationRecord{}

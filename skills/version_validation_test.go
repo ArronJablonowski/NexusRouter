@@ -41,6 +41,29 @@ func TestVersionValidateManualAndGeneratedWithoutActivation(t *testing.T) {
 	}
 }
 
+func TestVersionPrivacySerializationIsBackwardCompatibleAndFailClosed(t *testing.T) {
+	legacy := serializedVersionFixture()
+	body, err := json.Marshal(legacy)
+	if err != nil || strings.Contains(string(body), `"privacy"`) {
+		t.Fatal("legacy zero value changed serialization", string(body), err)
+	}
+	var decoded Version
+	if err = json.Unmarshal(body, &decoded); err != nil || decoded.Validate() != nil || !decoded.Draft.LocalOnly() {
+		t.Fatal("legacy version was not readable and local-only", decoded, err)
+	}
+	for _, privacy := range []string{PrivacyPublic, PrivacyLocalOnly} {
+		v := serializedVersionFixture()
+		v.Draft.Privacy = privacy
+		body, err = json.Marshal(v)
+		if err != nil || !strings.Contains(string(body), `"privacy":"`+privacy+`"`) {
+			t.Fatal("privacy not serialized", privacy, string(body), err)
+		}
+		if v.Validate() != nil || v.Draft.LocalOnly() != (privacy == PrivacyLocalOnly) {
+			t.Fatal("privacy semantics invalid", privacy)
+		}
+	}
+}
+
 func TestVersionValidateRejectsMalformedAndOversizedRecords(t *testing.T) {
 	for name, mutate := range map[string]func(*Version){
 		"empty_id":          func(v *Version) { v.ID = "" },
@@ -55,6 +78,7 @@ func TestVersionValidateRejectsMalformedAndOversizedRecords(t *testing.T) {
 		"old_time":          func(v *Version) { v.CreatedAt = time.Date(1969, 12, 31, 0, 0, 0, 0, time.UTC) },
 		"future_time":       func(v *Version) { v.CreatedAt = time.Date(2261, 1, 1, 0, 0, 0, 0, time.UTC) },
 		"nonutc_time":       func(v *Version) { v.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("offset", 3600)) },
+		"invalid_privacy":   func(v *Version) { v.Draft.Privacy = "cloud_allowed" },
 		"nil_steps":         func(v *Version) { v.Draft.Steps = nil },
 		"blank_steps":       func(v *Version) { v.Draft.Steps = []string{" "} },
 		"no_sources":        func(v *Version) { v.Draft.SourceSessions = nil },

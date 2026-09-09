@@ -77,7 +77,7 @@ func TestGenerateSkillDraftUsesVerifiedHistoryAndRedactsBeforePersistence(t *tes
 	}
 	key := skills.Key{Scope: "project", Name: "creative-workflow"}
 	a, err := svc.GenerateSkillDraft(ctx, "generation", "a", key, tasks, 0)
-	if err != nil || a.Status != "drafted" || a.Result == nil || calls.Load() != 1 {
+	if err != nil || a.Status != "drafted" || a.Result == nil || a.Result.Draft.Privacy != skills.PrivacyLocalOnly || calls.Load() != 1 {
 		t.Fatal(a, err, calls.Load())
 	}
 	body, _ := json.Marshal(a)

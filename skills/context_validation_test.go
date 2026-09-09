@@ -30,7 +30,7 @@ func TestValidateContextVersionAndMetadata(t *testing.T) {
 }
 
 func TestValidateContextRejectsMetadataMismatch(t *testing.T) {
-	for _, mode := range []string{"scope", "name", "version", "digest", "digestcase", "description", "tags", "domain", "manytags"} {
+	for _, mode := range []string{"scope", "name", "version", "digest", "digestcase", "privacy", "invalidprivacy", "description", "tags", "domain", "manytags"} {
 		t.Run(mode, func(t *testing.T) {
 			m, v := contextFixture()
 			domain := "go"
@@ -45,6 +45,10 @@ func TestValidateContextRejectsMetadataMismatch(t *testing.T) {
 				m.Digest = strings.Repeat("z", 64)
 			case "digestcase":
 				m.Digest = strings.ToUpper(m.Digest)
+			case "privacy":
+				m.Privacy = PrivacyPublic
+			case "invalidprivacy":
+				m.Privacy = "cloud_allowed"
 			case "description":
 				m.Description = "different"
 			case "tags":
