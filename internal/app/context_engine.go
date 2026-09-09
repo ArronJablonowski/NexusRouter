@@ -10,6 +10,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
@@ -36,6 +37,13 @@ func NewServiceWithContextEngine(settings config.Settings, secret func(string) s
 // NewServiceWithContextEngineAndEvaluator composes custom context assembly and
 // provider-neutral evaluation without changing either engine's authority.
 func NewServiceWithContextEngineAndEvaluator(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, engine contextengine.Engine, evaluator evaluation.Evaluator) (*Service, error) {
+	return NewServiceWithContextEngineEvaluatorAndEventSink(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, engine, evaluator, nil)
+}
+
+// NewServiceWithContextEngineEvaluatorAndEventSink composes context assembly,
+// evaluation, and live committed-event delivery without changing their separate
+// authority boundaries.
+func NewServiceWithContextEngineEvaluatorAndEventSink(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, engine contextengine.Engine, evaluator evaluation.Evaluator, sink runtime.EventSink) (*Service, error) {
 	svc, err := NewServiceWithContextEngine(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, engine)
 	if err != nil {
 		return nil, err
@@ -46,6 +54,9 @@ func NewServiceWithContextEngineAndEvaluator(settings config.Settings, secret fu
 		}
 	}
 	svc.evaluator = evaluator
+	if err := installEventSink(svc, sink); err != nil {
+		return nil, err
+	}
 	return svc, nil
 }
 

@@ -187,7 +187,32 @@ func (e Event) Encode() ([]byte, error) {
 	return json.Marshal(e)
 }
 
+// Clone returns an owned, canonical copy suitable for delivery across a
+// process-local extension boundary. Event contains nested slices and pointers,
+// so a shallow assignment is not an immutable projection.
+func (e Event) Clone() (Event, error) {
+	raw, err := e.Encode()
+	if err != nil {
+		return Event{}, err
+	}
+	var clone Event
+	if err := json.Unmarshal(raw, &clone); err != nil {
+		return Event{}, err
+	}
+	return clone, nil
+}
+
 // EventSink acknowledges an event only after its implementation accepts it.
 type EventSink interface {
 	Emit(context.Context, Event) error
+}
+
+// EventSinkFunc adapts a function to EventSink.
+type EventSinkFunc func(context.Context, Event) error
+
+func (f EventSinkFunc) Emit(ctx context.Context, event Event) error {
+	if f == nil {
+		return errors.New("nil event sink")
+	}
+	return f(ctx, event)
 }

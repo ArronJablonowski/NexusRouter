@@ -41,6 +41,7 @@ type Service struct {
 	contextEstimator providers.ContextEstimator
 	contextEngine    contextengine.Engine
 	evaluator        evaluation.Evaluator
+	eventSink        runtime.EventSink
 	memoryStore      memory.Store
 	skillStore       skills.Store
 	execution        chan struct{}
@@ -109,7 +110,21 @@ func (s *Service) routingNow() time.Time {
 }
 
 // Run dispatches an explicit model or performs automatic admission and ranking.
-func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
+func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr error) {
+	if s == nil || ctx == nil {
+		return Result{}, ErrAdmission
+	}
+	if r.eventDelivery == nil && (s.eventSink != nil || r.eventSink != nil) {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		r.eventDelivery = newEventDelivery(cancel, s.eventSink, r.eventSink)
+		r.deliverPerCall = true
+		r.eventSink = nil
+		defer func() {
+			cancel()
+			runErr = errors.Join(runErr, r.eventDelivery.Err())
+		}()
+	}
 	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled) && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
 		return Result{}, ErrAdmission
 	}
@@ -132,10 +147,8 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 			return Result{}, ctx.Err()
 		}
 	}
-	var result Result
-	var err error
-	result, err = s.runRouteChain(ctx, r)
-	if recovered, ok := s.providerOverflowCompaction(ctx, r, result, err); ok {
+	result, runErr = s.runRouteChain(ctx, r)
+	if recovered, ok := s.providerOverflowCompaction(ctx, r, result, runErr); ok {
 		next, nextErr := s.runRouteChain(ctx, recovered)
 		if next.TaskID != "" {
 			previous := append([]string(nil), result.PreviousTaskIDs...)
@@ -143,10 +156,10 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 			next.PreviousTaskIDs = append(previous, next.PreviousTaskIDs...)
 			next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
 			next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
-			result, err = next, nextErr
+			result, runErr = next, nextErr
 		}
 	}
-	if err == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
+	if runErr == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
 		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
 		result.AuditStatus = "failed"
 		if auditErr == nil {
@@ -154,7 +167,7 @@ func (s *Service) Run(ctx context.Context, r Request) (Result, error) {
 			result.AuditStatus = "recorded"
 		}
 	}
-	return result, err
+	return result, runErr
 }
 
 func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) {

@@ -35,11 +35,15 @@ func delegateSpec() providers.Tool {
 // admission, transport policy, cancellation or durable runtime recording.
 func (s *Service) bindDelegate(request Request) delegateRunner {
 	return func(ctx context.Context, prompt, validation, parent string, localOnly bool) (Result, error) {
-		return s.runDelegate(ctx, prompt, validation, parent, localOnly, request.submissionID, request.submissionToken)
+		return s.runDelegate(ctx, prompt, validation, parent, localOnly, request.submissionID, request.submissionToken, request.eventDelivery)
 	}
 }
 
-func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent string, localOnly bool, submissionID, submissionToken string) (Result, error) {
+func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent string, localOnly bool, submissionID, submissionToken string, deliveries ...*eventDelivery) (Result, error) {
+	var delivery *eventDelivery
+	if len(deliveries) > 0 {
+		delivery = deliveries[0]
+	}
 	if ctx.Err() != nil || s.settings.Workers.DelegateModel == "" {
 		return Result{}, ErrAdmission
 	}
@@ -49,7 +53,7 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 	default:
 		return Result{}, ErrAdmission
 	}
-	r := Request{ModelID: s.settings.Workers.DelegateModel, Prompt: prompt, Validation: validation, LocalRequired: localOnly, delegatedParent: parent, submissionID: submissionID, submissionToken: submissionToken}
+	r := Request{ModelID: s.settings.Workers.DelegateModel, Prompt: prompt, Validation: validation, LocalRequired: localOnly, delegatedParent: parent, submissionID: submissionID, submissionToken: submissionToken, eventDelivery: delivery}
 	if s.settings.Workers.DelegateReadTools {
 		capability, ok := ctx.Value(delegateToolsKey{}).(*delegateTools)
 		if !ok || capability == nil || capability.Registry == nil || capability.Policy == nil || capability.Policy.Decide("read_file", "workspace") != tools.Allow {

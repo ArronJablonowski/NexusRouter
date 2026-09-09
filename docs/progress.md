@@ -4990,3 +4990,42 @@ packages were releasepack 475.594s, application 303.879s, telemetry 203.613s,
 CLI 45.466s, SDK 34.204s, toolgate 22.305s, sessions 18.429s, and runtime
 12.794s. This checkpoint does not claim the remaining `EventSink`, release, or
 full PRD work complete.
+
+EventSink extension checkpoint: the version-one Go SDK now accepts a configured
+`EventSink` for synchronous, process-local observation of newly committed
+runtime events. Delivery covers plain and streaming root runs, fallback route
+attempts, worker lifecycle, and delegated child execution. Every callback gets
+an owned deep copy only after its SQLite transaction commits and storage locks
+are released; configured secrets are redacted before both persistence and
+delivery. Per-call `RunStream` callbacks deliberately remain scoped to the
+top-level route chain, while the configured sink observes the full execution
+graph. Separate tasks may invoke the same sink concurrently, but event sequence
+is serialized within each execution graph.
+
+The failure boundary is explicit and durable. Typed nils fail before service
+construction. Callback errors and panics are reduced to `ErrEventDelivery`, are
+not retried, cancel only the affected execution graph, and never reclassify an
+already committed event as a storage failure. Independent configured and
+per-call consumers each receive one detached copy of the current committed
+event even when the other consumer fails; later callbacks and associated text
+are suppressed after failure. External cancellation still persists and delivers
+the terminal cancellation event with the bounded terminal context. Delivery
+failures at delegated-child start and worker evaluation or completion boundaries
+leave no running task or retained lease, and a failed database commit is never
+emitted.
+
+The expanded `make qualify-mvp` passed the EventSink race gate, including
+commit-before-delivery readback, redaction, cancellation, callback isolation,
+root/worker/child lineage, concurrent per-task ordering, restart behavior, and
+public external-module consumption. The sink is live-only: `Inspect` and
+`ReadEvents` provide explicit bounded catch-up and construction never replays
+history. A global cursor, reconciliation/audit-stream delivery, direct daemon
+dispatch qualification, automatic-compaction qualification, and moving trusted
+provider construction behind durable `task.started` remain follow-on work; no
+claim is made for those behaviors here.
+
+On the frozen integrated EventSink tree, final `make check` passed formatting
+and the 1,000-line limit, vet, the complete repository-wide race suite, and
+`go build ./...` in 7:54.93. Longest packages were releasepack 466.198s,
+application 301.829s, telemetry 203.656s, CLI 45.753s, SDK 36.464s, toolgate
+21.247s, sessions 18.355s, runtime 11.976s, and workers 6.759s.

@@ -164,6 +164,9 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 	if err := persist(ctx, runtime.WorkerStarted, runtime.Data{}); err != nil {
 		return "", err
 	}
+	if ctx.Err() != nil {
+		return "", finish(ctx.Err())
+	}
 	run, cancel := context.WithCancel(ctx)
 	defer cancel()
 	type outcome struct {
@@ -250,8 +253,14 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 			if err := persist(ctx, runtime.EvaluationRecorded, runtime.Data{Accepted: &accepted, Code: "worker_validator"}); err != nil {
 				return "", err
 			}
+			if ctx.Err() != nil {
+				return "", finish(ctx.Err())
+			}
 			if err := persist(ctx, runtime.WorkerCompleted, runtime.Data{Text: result.text, DelegationAudit: result.audit}); err != nil {
 				return "", err
+			}
+			if ctx.Err() != nil {
+				return "", finish(ctx.Err())
 			}
 			if err := persist(ctx, runtime.TaskCompleted, runtime.Data{}); err != nil {
 				return "", err

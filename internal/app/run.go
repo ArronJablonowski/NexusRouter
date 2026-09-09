@@ -40,6 +40,8 @@ type Request struct {
 	admissionContext                context.Context
 	submissionID, submissionToken   string
 	eventSink                       func(runtime.Event)
+	eventDelivery                   *eventDelivery
+	deliverPerCall                  bool
 	textSink                        func(string)
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
@@ -301,7 +303,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if sessionID == "" {
 		sessionID = result.TaskID
 	}
-	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, submissionID: r.submissionID, submissionToken: r.submissionToken}
+	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken}
 	if r.textSink != nil {
 		j.textDelivery = &textDelivery{secrets: secrets, emit: r.textSink}
 	}
@@ -309,7 +311,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
 			return result, ErrAdmission
 		}
 	}
@@ -364,6 +366,8 @@ type redactingJournal struct {
 	db                            *telemetry.Store
 	secrets                       []string
 	eventSink                     func(runtime.Event)
+	eventDelivery                 *eventDelivery
+	deliverPerCall                bool
 	textDelivery                  *textDelivery
 }
 
@@ -426,23 +430,34 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 		return errors.New("cannot redact event")
 	}
 	e.Data = redacted
+	commit := func() error {
+		if finish {
+			return j.db.FinishWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
+		}
+		if token != "" {
+			return j.db.AppendWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
+		}
+		if j.submissionID != "" {
+			return j.db.AppendSubmission(ctx, expected, e, j.submissionID, j.submissionToken)
+		}
+		return j.db.Append(ctx, expected, e)
+	}
 	var appendErr error
-	if finish {
-		appendErr = j.db.FinishWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
-	} else if token != "" {
-		appendErr = j.db.AppendWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
-	} else if j.submissionID != "" {
-		appendErr = j.db.AppendSubmission(ctx, expected, e, j.submissionID, j.submissionToken)
+	if j.eventDelivery != nil {
+		appendErr = j.eventDelivery.CommitAndDeliver(ctx, e, j.deliverPerCall, commit)
 	} else {
-		appendErr = j.db.Append(ctx, expected, e)
+		appendErr = commit()
 	}
 	if err := appendErr; err != nil {
 		return err
 	}
 	if j.eventSink != nil {
-		j.eventSink(e)
+		clone, err := e.Clone()
+		if err == nil {
+			j.eventSink(clone)
+		}
 	}
-	if j.textDelivery != nil {
+	if j.textDelivery != nil && (j.eventDelivery == nil || !j.eventDelivery.Failed()) {
 		j.textDelivery.accept(e.Kind, rawText)
 	}
 	return nil

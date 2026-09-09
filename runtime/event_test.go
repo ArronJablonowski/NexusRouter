@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
 func TestCanonicalEventKindsEncode(t *testing.T) {
@@ -84,6 +86,34 @@ func TestEventValidation(t *testing.T) {
 		if _, err := e.Encode(); err == nil {
 			t.Fatalf("invalid event accepted: %+v", e)
 		}
+	}
+}
+
+func TestEventCloneOwnsNestedStateAndCanonicalizesTime(t *testing.T) {
+	usage := &providers.Usage{InputTokens: 2, OutputTokens: 3}
+	event := Event{
+		Version: 1, ID: "id", TaskID: "task", SessionID: "session",
+		CorrelationID: "correlation", Sequence: 1,
+		Time: time.Date(2026, 9, 8, 12, 0, 0, 0, time.FixedZone("equivalent", -4*60*60)),
+		Kind: TaskStarted,
+		Data: Data{
+			Messages:  []providers.Message{{Role: "user", Content: "owned"}},
+			ToolCalls: []providers.ToolCall{{ID: "call", Name: "tool", Arguments: json.RawMessage(`{"value":"owned"}`)}},
+			Usage:     usage,
+		},
+	}
+	clone, err := event.Clone()
+	if err != nil || clone.Time.Location() != time.UTC {
+		t.Fatal(clone, err)
+	}
+	clone.Data.Messages[0].Content = "changed"
+	clone.Data.ToolCalls[0].Arguments[0] = 'x'
+	clone.Data.Usage.InputTokens = 99
+	if event.Data.Messages[0].Content != "owned" || string(event.Data.ToolCalls[0].Arguments) != `{"value":"owned"}` || usage.InputTokens != 2 {
+		t.Fatal("clone retained aliases")
+	}
+	if invalid, err := (Event{}).Clone(); err == nil || invalid.ID != "" {
+		t.Fatal("invalid event cloned", invalid, err)
 	}
 }
 

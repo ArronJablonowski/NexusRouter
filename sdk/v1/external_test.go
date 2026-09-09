@@ -132,6 +132,7 @@ import (
  "net/http"
  "os"
  "strings"
+ "sync/atomic"
  "time"
  sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
  "github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -152,7 +153,9 @@ func (fixtureEvaluator) Evaluate(context.Context,sdk.EvaluatorRequest)(sdk.Evalu
 }
 func main() {
  ctx,cancel:=context.WithTimeout(context.Background(),20*time.Second);defer cancel()
- client,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1],ResourceProfiler:fixtureProfiler{},Evaluator:fixtureEvaluator{},LookupSecret:func(name string)string{if name=="SDK_FIXTURE_SECRET" {return "fake-sdk-private-marker"};return ""}})
+ var sinkCalls atomic.Int64
+ sink:=sdk.EventSinkFunc(func(ctx context.Context,event sdk.Event)error{check(ctx.Err()==nil&&event.Version==1&&event.Validate()==nil,"configured event sink");sinkCalls.Add(1);return nil})
+ client,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1],ResourceProfiler:fixtureProfiler{},Evaluator:fixtureEvaluator{},EventSink:sink,LookupSecret:func(name string)string{if name=="SDK_FIXTURE_SECRET" {return "fake-sdk-private-marker"};return ""}})
  check(err==nil,"construction failed")
  plan,err:=client.ResourcePlan(ctx,sdk.ResourcePlanRequest{Version:1,RAMBytes:1,LocalRequired:true})
  check(err==nil&&plan.Validate()==nil&&plan.Version==1&&plan.Action==sdk.ResourcePlanExecuteLocal&&plan.MaxAdditionalLocal==1&&!plan.Pressure,"resource plan failed")
@@ -197,8 +200,9 @@ func main() {
  check(err!=nil,"version accepted")
  _,err=client.RunStream(ctx,sdk.Request{Version:1,ModelID:"chat",Prompt:"do not dispatch"},func(runtime.Event)error{return errors.New("private callback detail")})
  check(err!=nil&&!strings.Contains(err.Error(),"private callback detail"),"delivery error unsafe")
+ beforeSink:=sinkCalls.Load()
  result,err=client.Run(ctx,sdk.Request{Version:1,ModelID:"chat",Prompt:"second"})
- check(err==nil&&result.Version==1&&result.TaskID!=""&&result.RouteEstimatedCost!=nil&&*result.RouteEstimatedCost==0,"run failed")
+ check(err==nil&&result.Version==1&&result.TaskID!=""&&result.RouteEstimatedCost!=nil&&*result.RouteEstimatedCost==0&&sinkCalls.Load()>beforeSink,"run failed")
  queuedRequest:=sdk.Request{Version:1,ModelID:"chat",Prompt:"queued only; do not execute"}
  queued,err:=client.Submit(ctx,"external-submission-key",queuedRequest)
  check(err==nil&&queued.Version==1&&queued.ID!=""&&queued.State=="queued"&&len(queued.TaskIDs)==0,"submission failed")

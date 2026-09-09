@@ -169,7 +169,8 @@ The versioned SDK exposes stable interfaces for:
 - `SkillStore`: discover, load, draft, validate, activate, version, and roll back skills.
 - `Evaluator`: accept evidence and return a typed outcome with confidence and provenance.
 - `ResourceProfiler`: snapshot capacity and pressure and recommend safe execution budgets.
-- `EventSink`: receive ordered, versioned runtime events.
+- `EventSink`: receive task-locally ordered, versioned runtime events; separate
+  concurrent operations do not imply a global event order.
 
 Interfaces accept `context.Context`; implementations must honor cancellation. Public records include schema versions and reject unknown incompatible major versions.
 
@@ -179,7 +180,10 @@ uses configured hard limits and the same live in-process budget as execution to
 recommend local execution, queueing, cloud offload, or rejection without
 reserving capacity or invoking a provider. Its result is an instantaneous,
 conservative recommendation; execution must remeasure and reserve atomically.
-The `EventSink` application-level extension remains a separate required sprint.
+The SDK also accepts a process-local `EventSink` that receives detached,
+redacted runtime events only after durable commit across root, worker, and
+delegated-child task journals. Delivery is synchronous and live-only; explicit
+event replay remains the recovery mechanism after restart or uncertain receipt.
 
 The SDK must expose explicit session-summary drafting, bounded inspection and
 listing, operator review/history, and approved-summary continuation through the

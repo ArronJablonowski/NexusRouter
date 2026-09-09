@@ -8,6 +8,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
@@ -96,6 +97,13 @@ func NewServiceWithContextEstimator(settings config.Settings, secret func(string
 // provider-neutral evaluation engine. A nil evaluator retains the built-in
 // provider-backed reviewer path.
 func NewServiceWithContextEstimatorAndEvaluator(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, estimator providers.ContextEstimator, evaluator evaluation.Evaluator) (*Service, error) {
+	return NewServiceWithContextEstimatorEvaluatorAndEventSink(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, estimator, evaluator, nil)
+}
+
+// NewServiceWithContextEstimatorEvaluatorAndEventSink installs all trusted SDK
+// extensions before the service is shared. The sink observes newly committed
+// runtime events; it is not a replay subscription.
+func NewServiceWithContextEstimatorEvaluatorAndEventSink(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, estimator providers.ContextEstimator, evaluator evaluation.Evaluator, sink runtime.EventSink) (*Service, error) {
 	svc, err := NewServiceWithContextEstimator(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, estimator)
 	if err != nil {
 		return nil, err
@@ -106,5 +114,8 @@ func NewServiceWithContextEstimatorAndEvaluator(settings config.Settings, secret
 		}
 	}
 	svc.evaluator = evaluator
+	if err := installEventSink(svc, sink); err != nil {
+		return nil, err
+	}
 	return svc, nil
 }

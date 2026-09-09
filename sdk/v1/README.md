@@ -778,6 +778,49 @@ fields. Public provider messages, runtime events and session compaction records
 are shared with the core. Do not concurrently mutate request data or secret
 callbacks while a call uses them.
 
+`ConfigOptions.EventSink` installs a client-wide, live-only observer for newly
+committed version-one runtime events. The sink receives an owned, deeply
+detached copy only after the corresponding SQLite transaction commits and all
+storage locks are released. It observes plain `Run`, `RunTextStream`,
+`RunStream`, `RunLiveStream`, durable worker lifecycle, and delegated child
+execution. Per-call `RunStream` and `RunLiveStream` lifecycle callbacks remain
+top-level route-chain scoped: they include fallback-attempt task IDs but exclude
+worker/work and delegated-child journals. When both are present, the configured
+sink runs first and each receives a separate copy of the current committed event
+even if the other consumer fails.
+
+`EventSink` is an observer and cancellation boundary, not pre-dispatch approval.
+Automatic routing/provider discovery and trusted provider construction may
+currently occur after admission but before `task.started` is committed; those
+preflight operations must not perform irreversible external actions. Provider
+inference begins only after the start event is durable and accepted by the sink.
+Moving all provider preflight behind that durable boundary remains a follow-on
+lifecycle sprint.
+
+Ordering is strict within each task's `Sequence`; parent, work, child, and
+fallback task IDs retain independent sequence spaces. Separate concurrent SDK
+operations may call the same sink concurrently, so implementations must be
+concurrency-safe, return promptly, honor the supplied context, and avoid
+synchronously waiting for the observed task. Synchronous delivery applies
+backpressure to subsequent parent, worker, and child commits in that execution
+graph; a noncooperative callback cannot be forcibly interrupted. Cancellation
+terminals use the runtime's bounded cleanup context, so `Emit` must treat its
+context as the commit/delivery budget rather than compare it by identity with
+the original request context. An error or panic is reduced to
+`ErrEventDelivery`, cancels only that execution graph, is never retried, and
+does not turn an already committed event into a persistence failure. A terminal
+delivery failure can therefore return a populated result together with an
+error. Treat event content as sensitive and untrusted even though configured
+secrets are redacted and `model.delta` text is omitted.
+
+The sink is not a durable subscription and construction never replays history.
+After uncertain delivery or restart, checkpoint `(TaskID, Sequence)` only once
+`Emit` returns nil, then use `ReadEvents` for explicit bounded catch-up and
+deduplication. Reconciliation-generated records, the distinct audit-operation
+event stream, forced interruption of noncooperative callbacks, and a global
+cross-task cursor remain outside this contract. Direct qualification of
+daemon-dispatched and automatic-compaction delivery is also deferred.
+
 `RunTextStream` accepts a synchronous callback for provisional, incrementally
 redacted assistant text after the corresponding lifecycle marker commits. It
 withholds possible secret fragments across chunks and can include intermediate
@@ -946,7 +989,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Automatic semantic context compaction, broader extension hooks
-including `EventSink`, a signed release, and full PRD SDK contract coverage remain
-unfinished. Existing low-level packages are not a
+qualification. Automatic semantic context compaction, broader extension hooks,
+a signed release, and full PRD SDK contract coverage remain unfinished. Existing
+low-level packages are not a
 substitute for those future application-level extension contracts.

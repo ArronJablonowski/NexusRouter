@@ -87,6 +87,10 @@ type ConfigOptions struct {
 	// code, must honor cancellation, and cannot grant tool authority. Nil keeps
 	// the configured provider-backed reviewer. Typed nils are rejected.
 	Evaluator Evaluator
+	// EventSink receives owned, redacted runtime events only after their durable
+	// commit. It is trusted, synchronous, live-only, and must support concurrent
+	// calls from separate Client operations. Typed nils are rejected.
+	EventSink EventSink
 	// Tools registers trusted handlers independently of filesystem
 	// tools. Definitions and policy are snapshotted at construction; nil policy
 	// denies all custom tools. Handlers must honor cancellation and concurrency.
@@ -134,6 +138,9 @@ type Result struct {
 }
 
 func New(options ConfigOptions) (*Client, error) {
+	if !validSDKEventSink(options.EventSink) {
+		return nil, ErrAdmission
+	}
 	clone := func(input map[string]string) map[string]string {
 		out := make(map[string]string, len(input))
 		for k, v := range input {
@@ -158,9 +165,9 @@ func New(options ConfigOptions) (*Client, error) {
 	}
 	var service *app.Service
 	if options.ContextEngine != nil {
-		service, err = app.NewServiceWithContextEngineAndEvaluator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEngine, options.Evaluator)
+		service, err = app.NewServiceWithContextEngineEvaluatorAndEventSink(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEngine, options.Evaluator, options.EventSink)
 	} else {
-		service, err = app.NewServiceWithContextEstimatorAndEvaluator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator, options.Evaluator)
+		service, err = app.NewServiceWithContextEstimatorEvaluatorAndEventSink(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator, options.Evaluator, options.EventSink)
 	}
 	if err != nil {
 		return nil, ErrAdmission
