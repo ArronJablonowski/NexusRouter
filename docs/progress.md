@@ -5159,3 +5159,48 @@ Branch merge/latest-leaf selection, automatic resume, and generic-start request
 parsing overhead qualification also remain open. The Linear connector is now
 registered in Codex, but its live workspace read still returns an unknown-tool
 error; no Linear issue status or comment was changed in this checkpoint.
+
+Recovered-history resume checkpoint: the Go SDK, authenticated HTTP
+`POST /v1/tasks/{source}/resumes`, daemon service, and queue-only `darwin resume`
+command now admit a fresh task from an exact `recovered_model` or
+`recovered_delegation` history. This is distinct from reconnecting to an
+existing submission and from branching completed work. The caller supplies a
+content-free task-head fence and an explicit new prompt; messages, compaction,
+summary selection, and a second continuation target are rejected. Interrupted
+model calls, partial deltas, delegation calls, and tool effects are never
+replayed.
+
+The private durable fence binds the task, session, canonical head event and
+sequence, complete history digest, failed state, exact recovery reason, source
+privacy, and effective privacy ceiling. Source authority additionally requires
+the original canonical failed submission result plus its bounded canonical
+recovery-receipt chain: every earlier receipt must be a lease-expired/no-task
+requeue, and the final receipt must be the unique failed interrupted-model or
+interrupted-delegation recovery at the exact terminal-event time. Synthetic
+event tails, missing or corrupt receipts, altered result/status/lease data,
+worker sources, forged parent/retry lineage, and ordinary failed or completed
+tasks fail closed.
+
+Creation, exact-key replay, dispatcher validation, every root/fallback/worker
+`task.started`, and undispatched, terminal, interrupted-model, and
+interrupted-delegation recovery all rederive the same authority. The canonical
+resume request mirrors the complete application wire shape, preventing partial,
+unknown, duplicate, case-aliased, or poison envelopes from occupying durable
+idempotency keys. Generic and branch submissions retain their prior wire bytes;
+reserved branch/resume aliases are rejected at low-level create, append, and
+recovery gates. No schema or table was added.
+
+Race tests cover real recovered-model and recovered-delegation execution,
+restart-safe idempotency, source immutability, privacy, safe fallback and worker
+lineage, every positive recovery path across reopen, source/fence/request/
+receipt corruption, and zero provider construction on denial. SDK, CLI, and a
+real authenticated HTTP-to-application-to-SQLite fixture prove successful
+durable admission without inference. The expanded `make qualify-mvp` passed
+with the new resume gate. The final `make check` passed formatting and LOC
+enforcement, vet, every repository package under the race detector, and
+`go build ./...`; the longest packages were releasepack 450.372s, application
+305.937s, telemetry 210.038s, CLI 45.413s, SDK 34.459s, toolgate 19.821s,
+runtime 10.379s, and workers 5.773s. Automatic resume, branch
+merge/latest-leaf selection, and live provider quality remain outside this
+slice. The Linear MCP live read remains unavailable, so no inferred issue
+number or Linear status is claimed.

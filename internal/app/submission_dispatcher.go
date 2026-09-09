@@ -159,6 +159,12 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 			err = ErrAdmission
 		}
 	}
+	if err == nil && envelope.Resume != nil {
+		err = d.db.ValidateResumeSubmission(job, claim.Status.ID)
+		if errors.Is(err, submissions.ErrInvalid) || errors.Is(err, sql.ErrNoRows) || errors.Is(err, sessions.ErrHistory) {
+			err = ErrAdmission
+		}
+	}
 	var out Result
 	if err == nil {
 		err = d.awaitContinuation(job, r.ContinueTaskID)

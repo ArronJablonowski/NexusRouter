@@ -64,6 +64,39 @@ type BranchSourceFence struct {
 	EffectivePrivacy string `json:"effective_privacy"`
 }
 
+// ResumeSourceFence binds a new task to one exact, safely recovered failed
+// history. Recovery makes completed context reusable; it never makes the
+// interrupted provider call or tool effect retryable.
+type ResumeSourceFence struct {
+	Version          int    `json:"version"`
+	TaskID           string `json:"task_id"`
+	SessionID        string `json:"session_id"`
+	HeadSequence     int64  `json:"head_sequence"`
+	HeadEventID      string `json:"head_event_id"`
+	HistoryDigest    string `json:"history_digest"`
+	SourceState      string `json:"source_state"`
+	RecoveryReason   string `json:"recovery_reason"`
+	SourcePrivacy    string `json:"source_privacy"`
+	EffectivePrivacy string `json:"effective_privacy"`
+}
+
+func (f ResumeSourceFence) Validate() error {
+	digest, err := hex.DecodeString(f.HistoryDigest)
+	if f.Version != 1 || !validID(f.TaskID) || !validID(f.SessionID) || !validID(f.HeadEventID) || f.HeadSequence < 1 || f.HeadSequence > 10000 || err != nil || len(digest) != 32 || strings.ToLower(f.HistoryDigest) != f.HistoryDigest || f.SourceState != "failed" {
+		return ErrInvalid
+	}
+	if f.RecoveryReason != "recovered_model" && f.RecoveryReason != "recovered_delegation" {
+		return ErrInvalid
+	}
+	if f.SourcePrivacy != "" && f.SourcePrivacy != "local_only" && f.SourcePrivacy != "cloud_allowed" {
+		return ErrInvalid
+	}
+	if f.EffectivePrivacy != "local_only" && f.EffectivePrivacy != "cloud_allowed" || f.SourcePrivacy != "cloud_allowed" && f.EffectivePrivacy != "local_only" {
+		return ErrInvalid
+	}
+	return nil
+}
+
 func (f BranchSourceFence) Validate() error {
 	digest, err := hex.DecodeString(f.HistoryDigest)
 	if f.Version != 1 || !validID(f.TaskID) || !validID(f.SessionID) || !validID(f.HeadEventID) || f.HeadSequence < 1 || f.HeadSequence > 10000 || err != nil || len(digest) != 32 || strings.ToLower(f.HistoryDigest) != f.HistoryDigest {

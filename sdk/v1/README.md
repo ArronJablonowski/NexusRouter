@@ -906,6 +906,17 @@ idempotency key, fence, and request. The authenticated HTTP equivalent is
 JSON object `{version, source, request}`; the path task must equal
 `source.task_id`.
 
+`SubmitResume(ctx, key, TaskHeadFence, Request{Version: 1, ...})` queues new
+work only from an exact history whose durable recovery terminal is eligible for
+resume. It is distinct from completed-history branching: the application
+replays and revalidates the recovered source, its fence, unresolved tool
+effects, and submission lineage before admission. The authenticated HTTP form
+is `POST /v1/tasks/{source_task}/resumes`, and the CLI form is `darwin resume`;
+both require the same source task, session, head sequence, head event, new
+prompt, and 16–128-byte printable idempotency key. These surfaces queue work but
+never execute inference themselves. Retry uncertain admission only with the
+identical key, source fence, and request.
+
 `InspectTask` returns a versioned `TaskSnapshot` with messages, sequence, task
 state, pending tool calls and uncertainty flags. It reads one coherent SQLite
 snapshot, bounded to10,000 events and8MiB of serialized history, with a ten-second

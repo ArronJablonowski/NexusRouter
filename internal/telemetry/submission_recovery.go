@@ -25,7 +25,13 @@ func validateBranchRecoveryTx(ctx context.Context, tx *sql.Tx, id string) error 
 		return submissions.ErrInvalid
 	}
 	if !submissionDeclaresBranch(body) {
-		return nil
+		if !submissionDeclaresResume(body) {
+			return nil
+		}
+		return validateResumeSubmissionTx(ctx, tx, id)
+	}
+	if submissionDeclaresResume(body) {
+		return submissions.ErrInvalid
 	}
 	return validateBranchSubmissionTx(ctx, tx, id)
 }

@@ -24,6 +24,7 @@ type submissionEnvelope struct {
 	Version int                            `json:"version"`
 	Request Request                        `json:"request"`
 	Branch  *submissions.BranchSourceFence `json:"branch,omitempty"`
+	Resume  *submissions.ResumeSourceFence `json:"resume,omitempty"`
 }
 
 func submissionDigest(body []byte) string {
@@ -48,7 +49,7 @@ func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvel
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {
 		return "", "", nil, ErrAdmission
 	}
-	if envelope.Version != 1 || envelope.Branch != nil && envelope.Branch.Validate() != nil {
+	if envelope.Version != 1 || envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
 		return "", "", nil, ErrAdmission
 	}
 	body, err := json.Marshal(envelope)
@@ -82,6 +83,44 @@ func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvel
 		}
 	}
 	return submissionDigest([]byte(key)), submissionDigest(body), body, nil
+}
+
+// SubmitResume admits a fresh task from one exact recovered model or
+// delegation checkpoint. The caller must supply new prompt intent; recovery
+// output is context only and no interrupted provider or tool call is replayed.
+func (s *Service) SubmitResume(ctx context.Context, key string, source sessions.TaskHeadFence, r Request) (submissions.Status, error) {
+	if source.Validate() != nil || strings.TrimSpace(r.Prompt) == "" || len(r.Messages) != 0 || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" {
+		return submissions.Status{}, ErrAdmission
+	}
+	r.ContinueTaskID = source.TaskID
+	// Reject malformed public intent and secret-bearing input before opening or
+	// creating storage. The durable resume authority is derived afterward.
+	if _, _, _, err := s.submissionPayload(key, r); err != nil {
+		return submissions.Status{}, err
+	}
+	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return submissions.Status{}, ErrSubmission
+	}
+	defer db.Close()
+	fence, err := db.ResumeSource(ctx, source.TaskID)
+	if err != nil {
+		return submissions.Status{}, submissionError(err)
+	}
+	if fence.TaskID != source.TaskID || fence.SessionID != source.SessionID || fence.HeadSequence != source.HeadSequence || fence.HeadEventID != source.HeadEventID {
+		return submissions.Status{}, ErrAdmission
+	}
+	if fence.SourcePrivacy != "cloud_allowed" || r.LocalRequired {
+		fence.EffectivePrivacy = "local_only"
+	} else {
+		fence.EffectivePrivacy = "cloud_allowed"
+	}
+	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r, Resume: &fence})
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	status, err := db.CreateResumeSubmission(ctx, keyDigest, requestDigest, s.submissionConfigDigest(), body)
+	return status, submissionError(err)
 }
 
 // SubmitBranch admits a new direct child of an exact, already-completed task
@@ -241,7 +280,7 @@ func decodeSubmissionEnvelope(body []byte) (submissionEnvelope, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || validateInput(envelope.Request) != nil || envelope.Branch != nil && envelope.Branch.Validate() != nil {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || validateInput(envelope.Request) != nil || envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
 		return submissionEnvelope{}, ErrAdmission
 	}
 	// Only the intake's canonical representation is accepted: this additionally
@@ -251,6 +290,9 @@ func decodeSubmissionEnvelope(body []byte) (submissionEnvelope, error) {
 		return submissionEnvelope{}, ErrAdmission
 	}
 	if envelope.Branch != nil && (envelope.Request.ContinueTaskID != envelope.Branch.TaskID || envelope.Request.Compaction != nil || envelope.Request.SummaryAttemptID != "") {
+		return submissionEnvelope{}, ErrAdmission
+	}
+	if envelope.Resume != nil && (envelope.Request.ContinueTaskID != envelope.Resume.TaskID || strings.TrimSpace(envelope.Request.Prompt) == "" || len(envelope.Request.Messages) != 0 || envelope.Request.Compaction != nil || envelope.Request.SummaryAttemptID != "") {
 		return submissionEnvelope{}, ErrAdmission
 	}
 	return envelope, nil

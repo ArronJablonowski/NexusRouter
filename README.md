@@ -335,6 +335,9 @@ DARWIN__MODE=local_only ./bin/darwin config validate
 # Queue a child from one exact completed head returned by that inspection.
 ./bin/darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
 
+# Queue new work from one exact safely recovered failed history.
+./bin/darwin resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+
 # Query the authenticated health report of the running daemon.
 DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
@@ -822,6 +825,7 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /v1/tasks?state=completed&limit=25`: newest-first, content-free task discovery with an optional opaque `after` cursor. The insertion boundary is frozen across pages, while state membership may change. Listing performs no inference or continuation check; configured credential collisions fail closed. See [task discovery](docs/task-discovery.md).
 - `GET /v1/sessions/{session_id}/tasks?limit=25`: bounded, content-free task lineage for one session. Parent links resolve to an earlier task in that session; automatic fallback retry links may cross sessions but must match the bounded output-free retry lifecycle. An opaque `after` cursor is bound to both the session and insertion fence. This read performs no inference and grants no continuation authority. See [session task inspection](docs/session-task-inspection.md).
 - `POST /v1/tasks/{id}/branches`: queue a direct child of an exact completed task head. Supply an `Idempotency-Key` and strict `{version, source, request}` body, where the content-free source fence comes from session-task inspection and matches the path. Admission, claim, and `task.started` each revalidate the immutable source; unsafe, stale, worker-derived, or recovered failed history is rejected before execution-provider construction. See [durable session branching](docs/session-branching.md).
+- `POST /v1/tasks/{id}/resumes`: queue new work from an exact safely recovered failed task. Supply an `Idempotency-Key` and the same strict `{version, source, request}` public shape; the path and content-free task-head fence must agree. Only replay-validated `recovered_model` and `recovered_delegation` histories qualify. The endpoint never retries the interrupted provider call or tool effect and does not execute inference itself. See [recovered-history resume](docs/recovered-history-resume.md).
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, exploration flag, and point-in-time routed/auxiliary usage totals. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
 - `GET /v1/tasks/{id}/usage`: read-only versioned task/session accounting with separate primary, fallback, classifier, summarizer, orchestrator-audit, optional-judge, routed, auxiliary, and overall totals. Missing token usage and cost remain explicit; configured estimates are not presented as provider billing. The bodyless/queryless route performs no inference, correction, migration, or retry. See [durable usage and cost accounting](docs/usage-accounting.md).
@@ -967,6 +971,7 @@ The CLI can operate on the same private SQLite store:
 ```sh
 darwin submit --config examples/local.yaml --key unique-request-key-001 --model local-fast < prompt.txt
 darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+darwin resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
 darwin submissions list --db /absolute/path/tasks.db --state running --limit 25
 darwin submissions show --db /absolute/path/tasks.db --id SUBMISSION_ID
 darwin submissions cancel --db /absolute/path/tasks.db --id SUBMISSION_ID
@@ -983,6 +988,11 @@ the30-second submission deadline; pipe/terminal reads support cancellation.
 `branch` has the same queue-only behavior but requires the exact content-free
 task-head fence returned by session-task inspection. The source must already be
 completed and safe; see [durable session branching](docs/session-branching.md).
+
+`resume` is also queue-only, but accepts only an exact failed task head produced
+by safe interrupted-model or interrupted-delegation recovery. It supplies new
+prompt intent and never replays the interrupted call or tool effect; see
+[recovered-history resume](docs/recovered-history-resume.md).
 
 Regular files and custom readers remain cooperative. Show/list are read-only; cancel
 requires local access to the configured database. An expired running lease is

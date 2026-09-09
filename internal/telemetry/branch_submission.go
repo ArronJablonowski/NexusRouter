@@ -32,12 +32,20 @@ type branchRequestProjection struct {
 }
 
 func submissionDeclaresBranch(body []byte) bool {
+	return submissionDeclaresControl(body, "branch")
+}
+
+func submissionDeclaresControl(body []byte, control string) bool {
 	var object map[string]json.RawMessage
 	if json.Unmarshal(body, &object) != nil {
 		return false
 	}
-	_, ok := object["branch"]
-	return ok
+	for key := range object {
+		if key == control || !canonicalBranchControlName(key, control) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseBranchSubmission(body []byte) (submissions.BranchSourceFence, bool, error) {
