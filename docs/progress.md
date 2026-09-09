@@ -4839,3 +4839,28 @@ This is current local mechanical evidence only. No hosted workflow was
 dispatched, no non-arm64 target was natively qualified, and no candidate,
 platform, legal/notices, production-signing, publication, or release approval
 is implied.
+
+DAR-57 published-byte installation evidence checkpoint: the independent
+post-publication path now requires more than matching archive digests. Given a
+canonical post-publication receipt, a fresh directory containing the exact
+receipt-bound downloaded byte set, the final native install/migration evidence,
+and independently supplied record
+and backup digests, `verify-published-install` selects only the actual runtime
+OS/architecture. It revalidates the closed signed set and receipt-bound
+manifest, checksums, signature and complete archive bytes, extracts into a new
+private install root through pinned directory handles, and revalidates the path
+and inode chain around the installed binary's bounded `version` command under a
+minimal environment. It then rereads the binary and release inputs. Its output
+is durably reserved before execution, and its create-only mode-0600 canonical
+evidence binds the completion timestamp and observed binary digest,
+mode, and exact version output to both the publication receipt and the full
+schema-29-to-32 migration/backup/rollback rehearsal. Exact-digest verification
+detects later record tampering. Fixtures exercise a real native executable and
+reject changed downloads, unsafe install roots, non-native targets, unbound
+rehearsal evidence, canonical-field tampering, symlinked persistence, and
+overwrite attempts. The execution environment is explicitly not a sandbox;
+the runbook requires a disposable low-privilege, credential-free,
+network-denied host and preserves incomplete reservations/install roots for
+investigation rather than blind retry. No live release, public download,
+production signature, installation outside owned test roots, or publication
+authority is claimed.

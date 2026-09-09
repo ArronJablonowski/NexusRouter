@@ -188,6 +188,12 @@ be omitted.
 - Post-publication receipt verifier identity, host and UTC verification time:
 - Public-key retrieval channel used for re-verification:
 - Installation smoke result from published bytes:
+- Canonical published-native install evidence location and SHA-256:
+- Published native target, archive SHA-256, installed binary SHA-256 and version output:
+- Disposable verification host identity/provenance and low-privilege account:
+- Network-denial and credential-absence evidence:
+- Published-install command transcript location:
+- Incomplete output/install quarantine location and execution-state classification (if any):
 - Rollback-readiness mode: `first_release` / `upgrade`
 - Canonical rollback-readiness record location and SHA-256:
 - Rollback-readiness verification result, verifier identity and UTC time:
@@ -200,6 +206,13 @@ be omitted.
   match the approved records.
 - [ ] The canonical post-publication receipt binds the approved release, exact
   downloaded bytes and independent verification inputs.
+- [ ] The host-matching archive was installed and executed from a fresh
+  directory containing the exact receipt-bound downloaded byte set; its
+  canonical evidence binds the completion time and observed binary
+  digest and version output to both the receipt and full migration rehearsal.
+- [ ] Native execution used a disposable low-privilege, credential-free,
+  network-denied host; the retained transcript and independently delivered
+  digest are reviewed, and any incomplete reservation is quarantined.
 - [ ] Exactly one rollback policy is recorded: `first_release` explicitly
   approves that no previous public DarwinRouter release or pre-upgrade backup is
   claimed, or `upgrade` binds the authenticated prior binary and its matching

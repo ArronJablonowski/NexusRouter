@@ -34,3 +34,71 @@ authorization to publish or roll back anything.
 The production API endpoint is fixed to `https://api.github.com`. Tests use an
 injected transport and loopback HTTP servers; they never use GitHub credentials
 or the public network.
+
+## Published native install evidence
+
+After retaining the post-publication receipt, run the host-matching archive from
+a fresh directory containing the exact receipt-bound downloaded byte set rather
+than copying or rebuilding a binary:
+
+```sh
+go run ./cmd/verify-published-install \
+  --publication-receipt /ABSOLUTE/EVIDENCE/post-publication.json \
+  --publication-receipt-sha256 sha256:EXPECTED_RECEIPT \
+  --install-evidence /ABSOLUTE/EVIDENCE/final-native-install.json \
+  --install-evidence-sha256 sha256:EXPECTED_INSTALL_EVIDENCE \
+  --backup-sha256 sha256:EXPECTED_BACKUP \
+  --target-os darwin --target-arch arm64 \
+  --verifier-id idp:INDEPENDENT_VERIFIER \
+  --download-dir /ABSOLUTE/VERIFIED/DOWNLOADS \
+  --install-root /ABSOLUTE/EXISTING/PARENT/NEW-published-install \
+  --out /ABSOLUTE/EVIDENCE/NEW-published-install.json
+```
+
+Run this command only on a disposable, low-privilege verification host with no
+production credentials and with outbound network access denied. The minimal
+child environment, private directory modes, timeout, and bounded output are
+defense in depth; they are not a sandbox and do not restrict the downloaded
+program's filesystem, process, or network authority beyond that of the operator.
+
+The command accepts only the actual runtime OS and architecture. Before native
+execution, it validates and durably creates an empty, mode-0600, create-only
+reservation at `--out`; an unsafe, unwritable, overlapping, or existing output
+fails before the binary runs. It then rechecks
+the closed signed release set and the receipt-bound manifest, checksum,
+signature, and whole-archive digests; extracts the authenticated binary; creates
+a new mode-0700 install root and mode-0755 binary through pinned directory
+handles; and runs only `darwin version` with bounded output, time, and
+environment. It revalidates the path and pinned inode chain immediately before
+and after execution, rereads the installed binary and release inputs, and only
+then records a whole-second UTC completion time and commits the canonical
+record into the reservation. The record binds the observed binary digest and
+version output to both the post-publication receipt and the separately retained
+full installation/migration/backup/rollback evidence for the same archive.
+
+Directory pinning and private modes close parent-replacement and other-user
+races, but they cannot isolate a hostile process already running as the same OS
+user. The disposable-host requirement remains mandatory. Retain the command
+transcript, host identity/provenance, record digest, and independent digest
+delivery channel with the release evidence; the canonical record is an
+operator/mechanical assertion, not a signed attestation.
+
+This proves a native version smoke of the freshly downloaded bytes. It does not
+repeat the full schema rehearsal, approve the earlier rehearsal record, qualify
+another target, or authorize publication, installation, migration, or rollback.
+Retain the printed record digest through the independent evidence channel and
+verify the stored record with that exact digest:
+
+```sh
+go run ./cmd/verify-published-install-record \
+  --record /ABSOLUTE/EVIDENCE/published-install.json \
+  --record-sha256 sha256:INDEPENDENTLY_OBTAINED_RECORD_DIGEST
+```
+
+On any failure after output reservation, do not delete the zero-length or
+partial output and do not blindly retry: the install root may also contain
+partial or executed state. Quarantine both paths, retain the command transcript,
+classify whether execution began, and use entirely new output/install paths only
+after an operator decides a retry is safe. A failure to print the digest after a
+successful commit means the record may be complete; verify it independently
+before taking further action.

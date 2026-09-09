@@ -66,8 +66,21 @@ func TestPostPublicationReceiptRejectsCrossAuthorityAssetURL(t *testing.T) {
 }
 
 func publishedFixture(t *testing.T) (PublicationPreflightOptions, string) {
+	return publishedFixtureWithExecutable(t, false)
+}
+
+func publishedExecutableFixture(t *testing.T) (PublicationPreflightOptions, string) {
+	return publishedFixtureWithExecutable(t, true)
+}
+
+func publishedFixtureWithExecutable(t *testing.T, executableNative bool) (PublicationPreflightOptions, string) {
 	t.Helper()
-	signing, _ := approvedSigningFixture(t)
+	var signing ApprovedSigningOptions
+	if executableNative {
+		signing, _ = approvedSigningExecutableFixture(t)
+	} else {
+		signing, _ = approvedSigningFixture(t)
+	}
 	if err := SignApproved(context.Background(), signing); err != nil {
 		t.Fatal(err)
 	}

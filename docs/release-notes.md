@@ -5,6 +5,16 @@ deterministic testable-MVP gate passes and 41 of 42 MVP issues are complete, but
 DAR-46 remains open. No signed production release, release tag, supported-platform
 decision or publication approval is claimed.
 
+- Independent post-publication verification can now reserve durable evidence,
+  install through pinned private directories, and retain canonical native
+  evidence after executing the host-matching artifact from the exact
+  receipt-bound downloaded bytes. The evidence binds the completion time,
+  installed binary digest, mode, and exact version output to both the
+  immutable-release receipt and final install/migration/backup/rollback
+  rehearsal. Execution still requires a disposable, low-privilege,
+  credential-free, network-denied host; the minimal child environment is not a
+  sandbox. This adds no publication, installation, or rollback authority.
+
 - The production `build-approved-release` command now requires the exact
   independently reviewed candidate-record digest, builds the four-target set
   twice in isolated directories, compares every unsigned byte, and atomically

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -234,14 +235,18 @@ func canonicalAuthorizationFixture(t *testing.T, authorization SigningAuthorizat
 }
 
 func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, false)
+	return approvedSigningFixtureWithOptions(t, false, false)
 }
 
 func approvedSigningFixtureWithNoticeMismatch(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, true)
+	return approvedSigningFixtureWithOptions(t, true, false)
 }
 
-func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice bool) (ApprovedSigningOptions, ed25519.PublicKey) {
+func approvedSigningExecutableFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithOptions(t, false, true)
+}
+
+func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableNative bool) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
 	source := collateralSourceFixture(t)
@@ -256,7 +261,11 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice bool) (Appro
 	if err = os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte("package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"), 0644); err != nil {
+	program := "package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"
+	if executableNative {
+		program = "package main\n\nimport (\n  \"fmt\"\n  _ \"github.com/google/uuid\"\n  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin 1.0.0\")\n    return\n  }\n  os.Exit(2)\n}\n"
+	}
+	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte(program), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = command(ctx, source, environment(), "go", "mod", "tidy"); err != nil {
@@ -303,7 +312,19 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice bool) (Appro
 		if mismatchNotice && target[0] == "darwin" && target[1] == "amd64" {
 			notice = signingNoticeFixture(target[0], target[1])
 		}
-		entries, metadata, entryErr := releaseEntries(shared, notice, signingBinaryFixture(t, target[0], target[1]))
+		binary := signingBinaryFixture(t, target[0], target[1])
+		if executableNative && target[0] == runtime.GOOS && target[1] == runtime.GOARCH {
+			binaryPath := filepath.Join(t.TempDir(), "darwin")
+			buildEnv := append(environment(), "GOOS="+target[0], "GOARCH="+target[1])
+			if _, entryErr = command(ctx, source, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", binaryPath, "./cmd/darwin"); entryErr != nil {
+				t.Fatal(entryErr)
+			}
+			binary, entryErr = os.ReadFile(binaryPath)
+			if entryErr != nil {
+				t.Fatal(entryErr)
+			}
+		}
+		entries, metadata, entryErr := releaseEntries(shared, notice, binary)
 		if entryErr != nil {
 			t.Fatal(entryErr)
 		}

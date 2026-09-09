@@ -229,3 +229,12 @@ verify its canonical bytes before deciding whether any retry is safe. This
 read-only observation is required evidence for DAR-57/DAR-60 but is not itself
 publication approval, rollback authorization, or proof that future remote bytes
 will remain unchanged.
+
+The independent verifier must then run the host-matching archive directly from
+a fresh directory containing the exact receipt-bound downloaded byte set with
+`verify-published-install`, following
+[post-publication verification](release-post-publication-verification.md). Its
+create-only canonical record binds the actual installed binary and version
+output to this receipt and the final native install/migration rehearsal. A
+digest-only comparison without execution is not published-byte installation
+evidence.
