@@ -126,7 +126,7 @@ func (s Summary) Validate() error {
 		return ErrInvalid
 	}
 	switch s.ErrorCode {
-	case "", "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed", "recovery_exhausted":
+	case "", "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed", "recovery_exhausted", "configuration_changed":
 	default:
 		return ErrInvalid
 	}

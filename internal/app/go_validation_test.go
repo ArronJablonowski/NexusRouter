@@ -90,7 +90,7 @@ func TestGoValidationUsesRedactedDeliveredSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	v, err := db.OutputValidity(ctx, routing.Key{Model: "a", Provider: "local", Domain: "general", Profile: "default"}, "go_source")
+	v, err := db.OutputValidity(ctx, routing.Key{Model: "a", Provider: "local", Domain: "code", Profile: "default"}, "go_source")
 	if err != nil || v.Samples != 1 || v.Failures != 1 {
 		t.Fatal("persisted source disagrees with validator", v, err)
 	}

@@ -239,7 +239,7 @@ func validateSubmissionStreamTasks(ctx context.Context, tx *sql.Tx, status submi
 
 func validSubmissionStreamFailure(code string) bool {
 	switch code {
-	case "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed", "recovery_exhausted":
+	case "task_failed", "execution_failed", "canceled", "interrupted", "lease_lost", "admission_denied", "deadline_exceeded", "persistence_failed", "recovery_exhausted", "configuration_changed":
 		return true
 	}
 	return false

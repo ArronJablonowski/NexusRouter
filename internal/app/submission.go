@@ -13,12 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 var ErrSubmission = errors.New("submission unavailable")
+
+// submissionContractVersion fences durable queued work from binaries whose
+// admission or canonicalization semantics differ. Increment it whenever a
+// change can reinterpret a persisted submission request.
+const submissionContractVersion = 1
 
 type submissionEnvelope struct {
 	Version int                            `json:"version"`
@@ -33,7 +39,10 @@ func submissionDigest(body []byte) string {
 }
 
 func (s *Service) submissionConfigDigest() string {
-	body, _ := json.Marshal(s.settings)
+	body, _ := json.Marshal(struct {
+		Version  int             `json:"version"`
+		Settings config.Settings `json:"settings"`
+	}{Version: submissionContractVersion, Settings: s.settings})
 	return submissionDigest(body)
 }
 
@@ -42,7 +51,11 @@ func (s *Service) submissionPayload(key string, r Request) (string, string, []by
 }
 
 func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
-	r := envelope.Request
+	r, err := classifyRequestIntent(envelope.Request)
+	if err != nil {
+		return "", "", nil, err
+	}
+	envelope.Request = r
 	if len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled {
 		return "", "", nil, ErrAdmission
 	}

@@ -114,6 +114,11 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	if s == nil || ctx == nil {
 		return Result{}, ErrAdmission
 	}
+	var classifyErr error
+	r, classifyErr = classifyRequestIntent(r)
+	if classifyErr != nil {
+		return Result{}, classifyErr
+	}
 	if r.eventDelivery == nil && (s.eventSink != nil || r.eventSink != nil) {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
@@ -286,6 +291,11 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
+	var classifyErr error
+	r, classifyErr = classifyRequestIntent(r)
+	if classifyErr != nil {
+		return Result{}, classifyErr
+	}
 	r.contextEngine = s.contextEngine
 	r = s.bindToolExtension(r)
 	r.providerFactory = s.providerFactory
@@ -358,15 +368,6 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	if r.ContextTokens > contextTokens {
 		contextTokens = r.ContextTokens
-	}
-	if r.Domain == "" {
-		r.Domain = "general"
-	}
-	if r.Profile == "" {
-		r.Profile = "default"
-	}
-	if len(r.Capabilities) == 0 {
-		r.Capabilities = []string{"chat"}
 	}
 	p := routing.Defaults()
 	p.MinSamples = cfg.Routing.MinSamples

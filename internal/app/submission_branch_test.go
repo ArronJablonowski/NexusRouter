@@ -104,6 +104,10 @@ func TestSubmittedBranchUsesExactCompletedSourceWithoutMutation(t *testing.T) {
 	if err != nil || child.ParentTaskID != source.TaskID || child.SessionID != source.TaskID || child.State != "completed" {
 		t.Fatal(child, err)
 	}
+	childEvents, err := db.Read(ctx, status.Result.TaskID, 0, 100)
+	if err != nil || len(childEvents) == 0 || childEvents[0].Data.Domain != "general" || childEvents[0].Data.Profile != "default" {
+		t.Fatal("branch intent was not classified before durable execution", childEvents, err)
+	}
 	after, err := db.Read(ctx, source.TaskID, 0, 100)
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("branch mutated its source", err)

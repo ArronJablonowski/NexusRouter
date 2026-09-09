@@ -224,6 +224,10 @@ func TestSubmittedResumeUsesExactRecoveredModelAfterRestart(t *testing.T) {
 	if err != nil || child.ParentTaskID != fence.TaskID || child.SessionID != fence.SessionID || child.State != "completed" || child.Privacy != "local_only" {
 		t.Fatal(child, err)
 	}
+	childEvents, err := db.Read(ctx, status.Result.TaskID, 0, 100)
+	if err != nil || len(childEvents) == 0 || childEvents[0].Data.Domain != "general" || childEvents[0].Data.Profile != "default" {
+		t.Fatal("resume intent was not classified before durable execution", childEvents, err)
+	}
 	after, err := db.Read(ctx, fence.TaskID, 0, 100)
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("resume mutated recovered source", err)

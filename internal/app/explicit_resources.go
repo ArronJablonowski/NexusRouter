@@ -13,6 +13,11 @@ import (
 // RunExplicit is a one-shot execution without automatic review or fallback.
 // Concurrent callers must reuse a Service to share resource reservations.
 func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret func(string) string) (Result, error) {
+	var classifyErr error
+	r, classifyErr = classifyRequestIntent(r)
+	if classifyErr != nil {
+		return Result{}, classifyErr
+	}
 	svc, err := NewService(cfg, secret)
 	if err != nil {
 		return Result{}, ErrAdmission
@@ -27,6 +32,11 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 }
 
 func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
+	var classifyErr error
+	r, classifyErr = classifyRequestIntent(r)
+	if classifyErr != nil {
+		return Result{}, classifyErr
+	}
 	if s == nil || s.settings.Validate() != nil || validateInput(r) != nil || ctx.Err() != nil {
 		return Result{}, ErrAdmission
 	}

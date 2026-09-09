@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
@@ -14,6 +15,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	readerAfter := ""
 	workerAfter := ""
 	attentionAfter := ""
+	configAfter := ""
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -23,6 +25,21 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		d.supervisorHeartbeat(-1)
 		if workerErr != nil && ctx.Err() == nil {
 			d.recordError()
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		query, cancel = context.WithTimeout(ctx, 5*time.Second)
+		nextConfig, configErr := d.reconcileConfigurationPage(query, configDigest, configAfter)
+		cancel()
+		d.supervisorHeartbeat(-1)
+		if nextConfig != "" {
+			configAfter = nextConfig
+		}
+		if configErr != nil {
+			if ctx.Err() == nil {
+				d.recordError()
+			}
 		}
 		if ctx.Err() != nil {
 			return
@@ -71,6 +88,57 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// reconcileConfigurationPage never executes old-generation work. Safe
+// pre-start rows are retired, while started rows may only use the existing
+// history-derived terminal/interruption recovery paths under their own digest.
+func (d *Dispatcher) reconcileConfigurationPage(ctx context.Context, currentDigest, after string) (string, error) {
+	page, pageErr := d.db.ConfigurationMismatchCandidatesPage(ctx, currentDigest, after, 100, time.Now().UTC())
+	permanentErr := pageErr
+	for _, item := range page.Items {
+		if item.State == "running" {
+			recovered, recoverErr := d.db.RecoverTerminalSubmission(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
+			if recoverErr != nil {
+				if errors.Is(recoverErr, submissions.ErrInvalid) {
+					permanentErr = recoverErr
+					continue
+				}
+				return after, recoverErr
+			}
+			if !recovered {
+				recovered, recoverErr = d.db.RecoverInterruptedModel(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
+			}
+			if recoverErr != nil {
+				if errors.Is(recoverErr, submissions.ErrInvalid) {
+					permanentErr = recoverErr
+					continue
+				}
+				return after, recoverErr
+			}
+			if !recovered {
+				recovered, recoverErr = d.db.RecoverInterruptedDelegation(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
+			}
+			if recoverErr != nil {
+				if errors.Is(recoverErr, submissions.ErrInvalid) {
+					permanentErr = recoverErr
+					continue
+				}
+				return after, recoverErr
+			}
+			if recovered {
+				continue
+			}
+		}
+		if _, retireErr := d.db.RetireConfigurationMismatch(ctx, item.ID, currentDigest, time.Now().UTC()); retireErr != nil {
+			if errors.Is(retireErr, submissions.ErrInvalid) {
+				permanentErr = retireErr
+				continue
+			}
+			return after, retireErr
+		}
+	}
+	return page.NextCursor, permanentErr
 }
 
 // One bounded page per tick avoids monopolizing the writer even when a large

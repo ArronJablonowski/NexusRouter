@@ -5232,3 +5232,61 @@ per-call event sinks receive the same committed sanitized failure sequence, and
 failed live-text delivery discards its withheld sensitive tail. Two independent
 reviews found no remaining P0/P1 defect; stronger process isolation remains a
 post-MVP requirement.
+
+Production-daemon branch/resume qualification checkpoint: a bounded process
+fixture now builds and starts the real `darwin serve` binary with a disposable
+configuration, loopback Ollama-shaped provider, authenticated HTTP endpoint,
+and SQLite database. It completes one branch source, kills the daemon during a
+partial second source, expires only that owned lease, and restarts against the
+same database. Recovery is required to terminalize the interrupted source
+without a second provider call before clients obtain exact task-head fences from
+the native session API.
+
+The restarted daemon then proves authentication and browser-origin denials have
+no provider effect, submits a completed-history branch and recovered-history
+resume twice with the same respective idempotency keys, and requires one child
+execution each. It verifies same-session parent lineage and compares every raw
+source event body before and after derived execution. The focused race test
+`TestDaemonBranchAndRecoveredResumeAcrossRestart` passes without live providers,
+signed-in account usage, configured user data, or production-file changes.
+
+Structured task-intent checkpoint: requests now receive one canonical domain
+and profile before any skill discovery, route selection, evaluation, event
+persistence, or submission digest. Explicit values remain authoritative. A
+blank Go-source validation request maps to `code`; otherwise exactly one
+recognized capability family can select `code`, `math`, `structured_json`, or
+`creative`, while conflicting or absent structured evidence maps to `general`.
+Free-form prompt text is intentionally excluded. Unsafe explicit labels fail
+before database creation or provider construction, and automatic routing alone
+retains the historical default `chat` capability. Direct explicit, delegated,
+branch, resume, and idempotent submitted execution use the same projection.
+
+Submission-generation reconciliation checkpoint: the configuration digest now
+also binds a versioned durable submission contract, so a binary that changes
+request interpretation cannot claim an older queued envelope under identical
+settings. Obsolete queued and expired pre-start claims are transactionally
+closed with an inspectable `configuration_changed` recovery receipt and no
+provider, tool, evaluator, or task execution. Cancellation retains precedence;
+terminal and narrowly recoverable interrupted histories are projected only
+from their immutable evidence under their stored generation, while started or
+uncertain histories remain fenced.
+
+The dispatcher uses a configuration-bound, insertion-fenced telemetry cursor
+that selects only obsolete queued or expired-running candidates. It does not
+walk terminal/current history, and permanent candidate corruption is surfaced
+as degraded health while the cursor advances so later safe work is not pinned.
+Transient storage failures remain retryable. Tests cover canonical restart
+idempotency, an authentic legacy blank-intent envelope, queue/task-start races,
+cancellation, request and summary corruption, irrelevant history, bounded
+paging, restart persistence, and continued current-generation throughput.
+
+Integrated verification passed the expanded `make qualify-mvp` gate and the
+complete `make check` gate: formatting and the 1,000-line limit, `go vet`, every
+repository package under the race detector, and `go build ./...`. The longest
+packages were releasepack 452.145s, application 314.273s, telemetry 214.063s,
+CLI 47.463s, SDK 34.445s, toolgate 19.749s, runtime 11.978s, and workers 5.738s.
+Independent adversarial review found and drove fixes for the binary-generation
+fence, unbounded historical scan, corrupt-row cursor pinning, later lease
+expiry, and repaired-corruption reconsideration; its final production review
+found no remaining P0/P1/P2 issue in this slice. Linear MCP remains noncallable,
+so no Linear issue status is inferred or changed.

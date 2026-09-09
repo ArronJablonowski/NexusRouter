@@ -41,6 +41,8 @@ qualify-mvp:
 	go test -race ./sessions ./submissions ./internal/telemetry ./internal/app ./sdk/v1 ./internal/api ./internal/cli -run 'Resume' -count=1 -v
 	go test -race ./runtime ./internal/app -run '^(TestProviderPanic|TestProviderCallback|TestToolExecutorPanic|TestToolPanic|TestDispatcherContainsRootPanic|TestSubmittedDelegatedChildPanic)' -count=1 -v
 	go test -race ./sessions ./internal/telemetry -run '^(TestPlanInterruptedModelBeforeAndAfterModelBoundaries|TestInterruptedModelRecoveryAtomicAndFenced)$$' -count=1 -v
+	go test -race ./internal/cli -run '^TestDaemonBranchAndRecoveredResumeAcrossRestart$$' -count=1 -v
+	go test -race ./internal/app ./internal/telemetry -run '^(TestClassifyRequestIntentUsesOnlyStructuredEvidence|TestClassifiedDomainPrecedesSkillDiscoveryAndPersistsEveryUse|TestSubmissionDigestUsesCanonicalIntentBeforeStorage|TestSubmissionContractGenerationFencesLegacyQueuedIntent|TestDispatcherRetiresOldConfigurationAndContinuesCurrentWork|TestConfigurationReconciliationAdvancesPastCorruptRequest|TestConfigurationReconciliationReconsidersLaterExpiration|TestConfigurationMismatchCandidatesSkipHistoryAndAdvancePastCorruption|TestConfigurationMismatchCandidatesReconsiderNewlyExpiredWork)$$' -count=1 -v
 
 # Explicit supervised signed-in cloud inference with controlled local results.
 # Uses account usage; never included in check/test or ordinary CI.
