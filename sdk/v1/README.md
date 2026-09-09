@@ -34,6 +34,46 @@ status, err := client.RunAudit(ctx, darwin.AuditRequest{
 })
 ```
 
+### Replaceable advisory evaluator
+
+Set `ConfigOptions.Evaluator` to an `sdk.Evaluator` when the embedding process
+has its own bounded output-review engine. The evaluator publishes a stable
+`EvaluatorDescriptor` and receives an owned, versioned `EvaluatorRequest` with
+the candidate, requirements, and caller-attributed evidence. It returns an
+`EvaluatorResponse`; DarwinRouter independently validates the evaluator identity,
+rubric, domain, verdict, size, and every cited evidence reference before writing
+an audit. Typed nils, panics, private callback errors, descriptor changes,
+malformed results, invented references, and cooperative timeouts fail closed.
+
+Injection replaces only the final advisory review invocation. Configured reviewer
+selection, task/privacy admission, durable idempotency, cancellation, audit event
+delivery, and the fixed deterministic → tool result → user feedback → judge
+evidence precedence remain runtime-owned. No reviewer provider is constructed for
+an injected invocation, and an audit verdict does not directly update fitness.
+The descriptor ID must match the `ReviewerModelID` selected by the audit request;
+that configured model remains the admission identity even though its provider is
+not invoked.
+Nil retains provider-backed reviewing. Evaluators are trusted in-process Go code,
+receive sensitive task-derived content, must honor cancellation, and must not
+retain or mutate request data after returning. They receive no tools or approval
+authority and are not serialized into daemon submission work.
+
+```go
+type evaluator struct{}
+
+func (evaluator) Descriptor() darwin.EvaluatorDescriptor {
+    return darwin.EvaluatorDescriptor{
+        Version: 1, ID: "policy-reviewer", Revision: "implementation-v1",
+        RubricVersion: "policy-rubric-v1",
+    }
+}
+
+func (evaluator) Evaluate(ctx context.Context, request darwin.EvaluatorRequest) (darwin.EvaluatorResponse, error) {
+    // Inspect only request evidence; return a bounded, correctly attributed audit.
+    return darwin.EvaluatorResponse{/* ... */}, nil
+}
+```
+
 `Client.SkillLearningState(ctx)` inspects the configured learner's persisted
 phase, scan cursor and pending generation identity without starting background
 work. Inspection remains available when learning is disabled. The daemon owns

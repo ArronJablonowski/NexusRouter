@@ -4922,3 +4922,35 @@ no private workflow body.
 and `go build ./...` all passed on the integrated tree. Longest packages were
 releasepack 477.583s, application 305.648s, telemetry 205.935s, CLI 45.539s,
 SDK 33.265s, skills 23.523s, and toolgate 24.268s.
+
+DAR-74 evaluator-extension checkpoint: `evaluation.Evaluator` is now a
+versioned, provider-neutral advisory-review contract exposed through
+`sdk/v1.ConfigOptions`. The host owns evaluator identity, implementation
+revision, rubric, domain, bounded evidence references, privacy admission, and
+the durable review lifecycle. Requests and results are copied and revalidated;
+typed nils, panics, private errors, descriptor changes, malformed verdicts,
+invalid confidence, invented evidence references, oversized data, cancellation,
+and cooperative timeouts fail closed. The evaluator remains advisory and does
+not outrank deterministic validation, tool results, or explicit user feedback.
+
+Injected review is admitted durably before exactly one evaluator call. Its
+implementation revision and `evaluator_extension` provenance are persisted
+without claiming that the configured reviewer provider ran. It bypasses only
+reviewer provider construction, key lookup requirements, local-model resource
+reservation, and provider context estimation; configured reviewer identity,
+mode/privacy checks, redaction, cancellation, event delivery, atomic completion,
+and the caller's bounded cost-limit syntax remain runtime-owned. The injected
+path records zero provider cost because it performs no provider dispatch.
+Concurrent callers and clean restarts
+replay the same terminal operation without reinvocation. Nil preserves the
+existing provider-backed reviewer path, and SDK documentation warns that an
+in-process evaluator is trusted code receiving sensitive task-derived content.
+
+The expanded `make qualify-mvp` passed the application, skills, evaluation, and
+SDK race gates. The final full `make check` passed formatting and the 1,000-line
+limit, vet, every repository package under the race detector, and `go build
+./...` in 489.84 seconds. The longest packages were releasepack 481.994s,
+application 303.452s, telemetry 202.699s, CLI 44.591s, SDK 30.974s, toolgate
+20.055s, API 17.622s, and workers 4.672s. These fixtures
+qualify the trusted in-process SDK boundary, not arbitrary third-party evaluator
+quality, forced termination of non-cooperative callbacks, or process isolation.

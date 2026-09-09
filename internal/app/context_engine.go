@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/ArronJablonowski/DarwinRouter/contextengine"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -29,6 +30,22 @@ func NewServiceWithContextEngine(settings config.Settings, secret func(string) s
 		return nil, err
 	}
 	svc.contextEngine = engine
+	return svc, nil
+}
+
+// NewServiceWithContextEngineAndEvaluator composes custom context assembly and
+// provider-neutral evaluation without changing either engine's authority.
+func NewServiceWithContextEngineAndEvaluator(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, engine contextengine.Engine, evaluator evaluation.Evaluator) (*Service, error) {
+	svc, err := NewServiceWithContextEngine(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, engine)
+	if err != nil {
+		return nil, err
+	}
+	if evaluator != nil {
+		if _, err := evaluation.DescribeEvaluator(evaluator); err != nil {
+			return nil, ErrAdmission
+		}
+	}
+	svc.evaluator = evaluator
 	return svc, nil
 }
 

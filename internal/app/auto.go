@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/contextengine"
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
@@ -39,6 +40,7 @@ type Service struct {
 	codexLauncher    codexLaunch
 	contextEstimator providers.ContextEstimator
 	contextEngine    contextengine.Engine
+	evaluator        evaluation.Evaluator
 	memoryStore      memory.Store
 	skillStore       skills.Store
 	execution        chan struct{}

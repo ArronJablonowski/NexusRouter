@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -88,5 +89,22 @@ func NewServiceWithContextEstimator(settings config.Settings, secret func(string
 		return nil, err
 	}
 	svc.contextEstimator = estimator
+	return svc, nil
+}
+
+// NewServiceWithContextEstimatorAndEvaluator additionally installs a trusted,
+// provider-neutral evaluation engine. A nil evaluator retains the built-in
+// provider-backed reviewer path.
+func NewServiceWithContextEstimatorAndEvaluator(settings config.Settings, secret func(string) string, profiler resources.Profiler, store memory.Store, skillStore skills.Store, factory providers.Factory, extension *tools.Extension, reviewer tools.ApprovalReviewer, presenter tools.ApprovalPresenter, estimator providers.ContextEstimator, evaluator evaluation.Evaluator) (*Service, error) {
+	svc, err := NewServiceWithContextEstimator(settings, secret, profiler, store, skillStore, factory, extension, reviewer, presenter, estimator)
+	if err != nil {
+		return nil, err
+	}
+	if evaluator != nil {
+		if _, err := evaluation.DescribeEvaluator(evaluator); err != nil {
+			return nil, ErrAdmission
+		}
+	}
+	svc.evaluator = evaluator
 	return svc, nil
 }

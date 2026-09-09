@@ -40,6 +40,15 @@ type ContextEstimator = providers.ContextEstimator
 
 type ContextEngine = contextengine.Engine
 
+type Evaluator = evaluation.Evaluator
+type EvaluatorDescriptor = evaluation.EvaluatorDescriptor
+type EvaluatorRequest = evaluation.EvaluatorRequest
+type EvaluatorEvidence = evaluation.EvaluatorEvidence
+type EvaluatorResponse = evaluation.EvaluatorResponse
+type EvaluatorResult = evaluation.EvaluatorResult
+type Audit = evaluation.Audit
+type AuditFinding = evaluation.AuditFinding
+
 type Tool = tools.Definition
 type ToolPolicy = tools.Policy
 type ApprovalPrompt = tools.ApprovalPrompt
@@ -72,6 +81,12 @@ type ConfigOptions struct {
 	// Trusted code must honor cancellation and privacy; this is not a sandbox.
 	ContextEstimator ContextEstimator
 	ContextEngine    ContextEngine
+	// Evaluator replaces provider-backed advisory review execution while keeping
+	// configured reviewer identity, privacy admission, durable lifecycle, and
+	// evidence precedence under DarwinRouter control. It is trusted in-process
+	// code, must honor cancellation, and cannot grant tool authority. Nil keeps
+	// the configured provider-backed reviewer. Typed nils are rejected.
+	Evaluator Evaluator
 	// Tools registers trusted handlers independently of filesystem
 	// tools. Definitions and policy are snapshotted at construction; nil policy
 	// denies all custom tools. Handlers must honor cancellation and concurrency.
@@ -143,9 +158,9 @@ func New(options ConfigOptions) (*Client, error) {
 	}
 	var service *app.Service
 	if options.ContextEngine != nil {
-		service, err = app.NewServiceWithContextEngine(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEngine)
+		service, err = app.NewServiceWithContextEngineAndEvaluator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEngine, options.Evaluator)
 	} else {
-		service, err = app.NewServiceWithContextEstimator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator)
+		service, err = app.NewServiceWithContextEstimatorAndEvaluator(cfg, options.LookupSecret, options.ResourceProfiler, options.MemoryStore, options.SkillStore, options.ProviderFactory, extension, options.ApprovalReviewer, options.ApprovalPresenter, options.ContextEstimator, options.Evaluator)
 	}
 	if err != nil {
 		return nil, ErrAdmission

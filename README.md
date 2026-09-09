@@ -239,6 +239,7 @@ make build
 - `policy`: owned HTTP transport with endpoint allowlisting and loopback-only egress mode.
 - `memory`: factual-memory contracts backed by SQLite, with provenance and scoped privacy-aware queries.
 - `skills`: private local versioned procedural workflows with validation-gated activation and rollback.
+- `evaluation`: deterministic evidence, advisory audits, and a versioned provider-neutral evaluator extension contract.
 - `internal/telemetry`: SQLite migration, atomic event append, and paginated replay.
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.
@@ -246,7 +247,8 @@ make build
 The module path is `github.com/ArronJablonowski/DarwinRouter`. The development
 [Go SDK](sdk/v1/README.md) embeds the same application service through `sdk/v1`;
 see [the compilable example](examples/sdk/main.go). It is not yet a tagged stable
-release, and full application-level extension contracts remain unfinished.
+release, and remaining application-level extension contracts and production
+qualification remain unfinished.
 
 SDK `InspectTask`, CLI `task show` and the daemon task-inspection route reconstruct
 one bounded SQLite snapshot (at most10,000 events/8MiB of serialized history).
