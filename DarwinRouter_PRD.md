@@ -13,7 +13,7 @@
 
 DarwinRouter is a Go-based, local-first agent runtime whose defining capability is adaptive model routing. It evaluates tasks, chooses among heterogeneous local and cloud models, executes provider-neutral agent and tool loops, measures outcomes, and improves future routing from durable evidence.
 
-The product combines a compact event-driven runtime, persistent sessions and memory, progressively loaded procedural skills, bounded worker delegation, hardware-aware scheduling, auditable policy enforcement, and restart-safe telemetry. It runs as a persistent daemon controlled through a CLI, a versioned Go SDK, an OpenAI-compatible HTTP surface, and Darwin-native task-management APIs.
+The product combines a compact event-driven runtime, persistent sessions and memory, progressively loaded procedural skills, bounded worker delegation, hardware-aware scheduling, auditable policy enforcement, and restart-safe telemetry. It runs as a persistent daemon controlled through a CLI, a versioned Go SDK, an OpenAI-compatible HTTP surface, Darwin-native task-management APIs, and an authenticated Web UI for chat and durable work planning.
 
 DarwinRouter supports fully local, fully cloud, and hybrid operation. Fully local mode is an enforced privacy boundary: unauthorized outbound transports must be denied, not merely left unconfigured. Hybrid mode favors local execution when it satisfies task, privacy, quality, and resource constraints, then uses cloud capacity where policy permits.
 
@@ -37,6 +37,11 @@ DarwinRouter 1.0 is successful when it can:
 8. Meet routing-overhead targets of under 150 ms for deterministic classification and under 500 ms for auxiliary-model classification, excluding provider inference.
 9. Create and revise procedural skills automatically within configured scope, with validation, version history, and rollback.
 10. Explain every model route without persisting secrets, full prompts, or sensitive output.
+11. Provide an authenticated, responsive Web UI for streaming chats, session
+    history, approvals, feedback, route inspection, and runtime status.
+12. Provide an integrated Kanban board whose durable cards, dependencies,
+    leases, acceptance evidence, and lifecycle state can be used by both an
+    operator and policy-constrained DarwinRouter workers for long-running work.
 
 ### 2.3 Non-Goals for 1.0
 
@@ -45,7 +50,8 @@ DarwinRouter 1.0 is successful when it can:
 - Automatic model deletion, disabling, or policy changes without operator approval.
 - Parallel side-effecting agents without isolated execution.
 - Built-in subprocess, Git-worktree, container, SSH, or remote worker backends; these are post-MVP adapters.
-- A production web dashboard.
+- Multi-tenant enterprise administration, native mobile clients, or direct
+  synchronization with third-party boards such as Linear.
 
 ### 2.4 Licensing and Attribution
 
@@ -79,7 +85,8 @@ Sources: [Hermes MIT license](https://github.com/NousResearch/hermes-agent/blob/
 
 Pi demonstrates a small provider-neutral loop driven by typed streaming events, append-only sessions, resumable branches, safe compaction boundaries, steering, and extension hooks. DarwinRouter adopts a compact core loop, event-first integration, paired tool-call/result preservation, structured compaction records, and cross-provider conformance testing.
 
-Terminal presentation remains outside the runtime. CLI, HTTP, and future UIs consume the same event stream through adapters.
+Presentation remains outside the runtime. CLI, HTTP, and the first-class Web UI
+consume the same application service and typed event stream through adapters.
 
 Sources: [Pi monorepo](https://github.com/badlogic/pi-mono), [agent loop](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/agent-loop.ts), [compaction](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/compaction.md), and [extension lifecycle](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md).
 
@@ -104,7 +111,7 @@ Mode changes apply to new tasks without daemon downtime. An active task retains 
 ## 5. System Architecture
 
 ```text
-+---------------- CLI / SDK / HTTP ----------------+
++------------- CLI / SDK / HTTP / Web UI ----------+
 |                                                   |
 |                 Application Service               |
 |        admission, sessions, tasks, feedback       |
@@ -152,6 +159,10 @@ The Go module uses focused packages with narrow interfaces:
 - `resources`: CPU, RAM, swap, thermal pressure, unified memory/VRAM, and concurrency budgets.
 - `policy`: egress control, secrets, redaction, approvals, and audit decisions.
 - `telemetry`: migrations, repositories, metrics, traces, retention, and export.
+- `workboard`: durable cards, dependencies, ordering, leases, acceptance state,
+  and idempotent board operations shared by agents and operators.
+- `webui`: embedded browser assets and a thin client over authenticated native
+  APIs and runtime event streams; it owns no authoritative execution state.
 - `api`, `cli`, and `daemon`: thin adapters over the application service.
 
 No hand-written source file may exceed 1,000 lines. CI enforces the limit, excluding generated code and vendored dependencies. Packages must be split before the limit is reached rather than waived for convenience.
@@ -253,6 +264,8 @@ DarwinRouter exposes:
 - Feedback and evaluation endpoints.
 - Memory and skill inspection/management endpoints.
 - Health, readiness, and metrics endpoints.
+- Workboard endpoints for bounded card discovery, creation, revision, movement,
+  dependency management, lease/heartbeat observation, and acceptance evidence.
 
 Mutating native endpoints accept idempotency keys. Authentication is required unless the daemon is explicitly bound to a protected local transport.
 
@@ -283,6 +296,85 @@ Only successful task completion advances conversation/feedback state; failed
 partial output must not silently become the next task's history. Delivery
 failure must cancel/join work without rewriting already committed events.
 
+### 6.4 Web UI and Integrated Kanban
+
+The daemon serves a responsive Web UI that provides a familiar conversational
+surface without creating a second runtime. Operators can create and resume
+chats, select configured models or automatic routing, stream provisional text
+and committed lifecycle events, cancel or steer work, review tool approvals,
+submit feedback, inspect route explanations, and see provider/resource health.
+Conversation history is reconstructed from the same durable session records used
+by the CLI, SDK, and HTTP API. A browser refresh or daemon restart must not
+silently convert partial output into committed history.
+
+The same Web UI includes native DarwinRouter Kanban boards for larger and
+long-running work; they are not proxies for Linear or another external service.
+Multiple boards are supported. At a minimum each board provides backlog, ready,
+in-progress, blocked, review, done, and canceled states; configurable views may
+group or hide states without changing their durable meaning. Cards carry a
+stable ID, title, bounded Markdown description, priority, labels, dependency
+DAG, parent/child relationships, assignee/worker identity, lifecycle timestamps,
+WIP/attempt/time/token/cost budgets, current claim and lease, linked task/session/
+attempt IDs, checkpoints, block reason, immutable-per-attempt acceptance
+criteria, evidence, and a monotonic revision. The UI supports filtered board and
+list views, card detail, dependencies and blockers, activity/checkpoint views,
+accessible keyboard movement, and optimistic updates with server-side compare-
+and-swap conflict handling.
+
+DarwinRouter may discover eligible cards, decompose work within configured
+depth/fan-out budgets, create and link child cards, atomically claim a ready card
+whose dependencies are satisfied, heartbeat leases, append checkpoints and
+progress evidence, request review, and transition accepted work through an
+agent-facing tool contract. One active claim/attempt is permitted per card.
+These operations are not hidden planner memory: all state is transactional,
+inspectable, replayable, and attributable to an actor, model, reason, and
+evidence. Agent writes must pass ordinary allow/deny/ask policy, inherit parent
+denials, use idempotency keys, and hold the board's single-writer lease for the
+affected card. A worker cannot weaken active criteria or policy, or mark its own
+candidate accepted. Candidate completion enters review; done requires durable
+configured acceptance, using deterministic evidence first and explicit operator
+review for subjective work. An LLM audit remains advisory unless objective
+evidence independently authorizes acceptance. WIP limits, attempt budgets,
+bounded retries, and stall/attention states prevent runaway work. Lease expiry
+makes work recoverable but does not prove execution stopped or authorize replay
+of confirmed or uncertain side effects.
+
+Long-running cards may span multiple runtime tasks and sessions. On restart the
+supervisor re-derives board state from the append-only work log, task journals,
+claims, leases, checkpoints, and runtime observations rather than trusting
+private in-memory state. Dependency cycles are rejected. Accepted completion
+atomically unlocks eligible successors; parent progress is derived rather than
+cached as independent truth. Operators can pause, cancel, steer, reprioritize,
+or revise future acceptance criteria at safe boundaries, but those changes do
+not expand an active worker's permissions.
+
+The Web UI is bound to loopback by default and uses a same-origin browser
+session/BFF boundary over the daemon's authenticated application service. Host
+bootstrap secrets never enter JavaScript, URLs, local storage, or IndexedDB.
+Cookie-backed sessions use HttpOnly and SameSite protections, Secure when TLS is
+used, explicit expiry/logout, strict Host/Origin checks, and CSRF tokens on
+mutations; existing bearer-token API semantics remain available to non-browser
+clients and are not weakened for EventSource convenience. Remote access requires
+explicit configuration and TLS at the deployment boundary. Request and output
+bodies, rates, and concurrency are bounded. Content Security Policy uses self-
+only assets with no object/frame execution. Prompts, tool output, Markdown,
+links, attachments, route details, and model-produced HTML are untrusted and
+rendered with raw HTML disabled, without script execution or implicit external
+fetches. Browser storage must not contain credentials, capability/approval
+tokens, or authoritative task state. Fully local mode vendors all UI assets and
+applies the same zero-egress transport policy; no CDN, font, analytics, or
+service-worker escape is permitted.
+
+Chat and board mutations use versioned native endpoints with idempotency keys.
+Streaming uses resumable Server-Sent Events with event IDs and bounded catch-up;
+the client must reconcile from durable state after gaps rather than infer
+success or restart work merely because the browser reconnects. Chat history uses
+a bounded, paginated, redacted presentation projection distinct from metadata-
+only task discovery and raw event/tool payloads. Board transitions, dependency
+edits, claims, lease changes, approval decisions, and acceptance results emit
+typed audit events and OpenTelemetry-compatible metrics without sensitive card
+or chat content.
+
 ## 7. Configuration
 
 Configuration precedence is:
@@ -301,6 +393,20 @@ mode: hybrid
 
 daemon:
   listen: "127.0.0.1:7788"
+
+web_ui:
+  enabled: true
+  path_prefix: "/app"
+  allowed_origins: ["http://127.0.0.1:7788"]
+  browser_session_ttl: 8h
+
+workboard:
+  enabled: true
+  max_active_claims: 3
+  max_decomposition_depth: 4
+  max_children_per_card: 16
+  default_attempt_limit: 3
+  agent_mutation_policy: ask
 
 hardware:
   auto_profile: true
@@ -676,9 +782,12 @@ digest, complete draft digest, validator identity and previous review head;
 lost-ack retries use a caller-supplied operation ID and do not re-invoke the
 validator. Only approval authorizes continuation, while rejection and
 abstention remain inactive and append-only. The stock runtime does not infer a
-validator or treat an LLM self-review as deterministic approval. Configured
-unattended validation, a stock semantic validator and broader provider/context-engine
-mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
+validator or treat an LLM self-review as deterministic approval. The SDK ships
+an explicitly selected deterministic integrity linter which can reject bounded
+mechanical defects but never returns approval; clean or ambiguous drafts
+abstain for operator/domain review. Configured unattended semantic validation,
+typed claim-level evidence and broader provider/context-engine mid-task
+compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory
@@ -968,6 +1077,10 @@ known overflow or with generation, output, and iteration budget exhaustion.
 - Require attributable evidence under the domain-sensitive evaluation policy before a result updates fitness; automatic skill activation still requires deterministic validation.
 - Restart from a clean process and reproduce task, route, worker, evaluation, memory, and skill state.
 - Benchmark deterministic routing below 150 ms and auxiliary classification below 500 ms, excluding provider inference.
+- Qualify chat and Kanban flows with browser end-to-end tests covering stream
+  resume, refresh/restart recovery, stale revisions, dependency cycles, lease
+  expiry, approval boundaries, content injection, CSRF/origin enforcement,
+  keyboard accessibility, and local-only zero-egress behavior.
 
 ### 16.1 Release Artifact Acceptance
 
@@ -1009,11 +1122,17 @@ Evaluation ladder, transactional fitness updates, safe compaction, memory, progr
 
 ### Phase 5: Product Surfaces and Hardening
 
-Daemon, CLI, Go SDK, OpenAI-compatible API, Darwin-native API, local-only egress enforcement, redaction, recovery qualification, performance benchmarks, and release packaging.
+Daemon, CLI, Go SDK, OpenAI-compatible API, Darwin-native API, authenticated Web
+UI chat, durable integrated Kanban, agent-facing board operations, local-only
+egress enforcement, redaction, recovery qualification, performance benchmarks,
+and release packaging.
 
 ### Post-MVP
 
-Subprocess, Git-worktree, container, SSH, and remote worker backends; multi-stage agent pipelines; messaging and scheduling adapters; and an operational dashboard.
+Subprocess, Git-worktree, container, SSH, and remote worker backends; multi-stage
+agent pipelines; and messaging and scheduling adapters. Advanced analytics and
+cross-installation board federation remain post-MVP; the core Web UI and Kanban
+are 1.0 requirements.
 
 ## 18. Risks and Mitigations
 
@@ -1026,6 +1145,8 @@ Subprocess, Git-worktree, container, SSH, and remote worker backends; multi-stag
 | Context summaries lose critical state | Safe boundaries, structured summaries, recent-event retention, and durable original history. |
 | Provider-specific behavior leaks into core | Narrow contracts, adapters, normalized events/errors, and conformance suites. |
 | Telemetry exposes sensitive data | Structured redaction, local defaults, export opt-in, retention controls, and privacy classifications. |
+| Web content executes model-controlled code | Strict sanitization, CSP, no implicit external fetches, and browser/API security tests. |
+| Agent board updates bypass acceptance or duplicate work | Durable dependencies, revisions, idempotency, scoped leases, policy checks, and separate acceptance state. |
 
 ## 19. Default Decisions
 
@@ -1034,7 +1155,8 @@ Subprocess, Git-worktree, container, SSH, and remote worker backends; multi-stag
 - MVP isolation: bounded in-process workers.
 - Parallelism: concurrent inference/read-only work and single-writer side effects.
 - Persistence: SQLite/WAL behind storage interfaces.
-- User surfaces: daemon, CLI, Go SDK, and HTTP API.
+- User surfaces: daemon, CLI, Go SDK, HTTP API, and authenticated Web UI with
+  integrated chat and Kanban work planning.
 - Learning: automatic telemetry, fitness updates, and validated skill evolution.
 - Approval: required for model pruning, policy changes, and destructive actions.
 - Privacy: local storage and export-off defaults.

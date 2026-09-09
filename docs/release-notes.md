@@ -1,9 +1,10 @@
 # DarwinRouter release notes — unreleased
 
 This is a development summary, not a v1.0.0 release announcement. The
-deterministic testable-MVP gate passes and 41 of 42 MVP issues are complete, but
-DAR-46 remains open. No signed production release, release tag, supported-platform
-decision or publication approval is claimed.
+deterministic testable-MVP gate passes and 41 of the original 42 MVP issues are
+complete, but DAR-46 remains open. The newly required Web UI and integrated
+Kanban backlog is also unfinished. No signed production release, release tag,
+supported-platform decision or publication approval is claimed.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
@@ -37,6 +38,17 @@ decision or publication approval is claimed.
   binds the exact evidence digest before signing or independent verification.
 
 ## Available for supervised testing
+
+- An explicitly selected stock summary-integrity validator now emits bounded,
+  deterministic advisory evidence without ever approving a model-authored
+  summary. It rejects provenance/checkpoint drift, unsafe display controls,
+  duplicate normalized entries, and unsupported high-confidence anchors; clean
+  or ambiguous drafts abstain for authenticated operator or domain validation.
+
+- The 1.0 PRD now includes an authenticated embedded Web UI for streaming chat
+  and a native durable Kanban for operator- and agent-managed long-running work.
+  This is specified scope and a dependency-linked Linear backlog, not completed
+  runtime functionality in this checkpoint.
 
 - Schema 30 durable provider accounting now records evidence-bound
   `primary_execution`, `fallback`, `summarizer`, `orchestrator_audit`, and

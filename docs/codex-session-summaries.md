@@ -88,11 +88,21 @@ The SDK exposes `NewSummaryValidatorRegistry`, `ValidateSummary`, and the opt-in
 `SummarizeTaskValidated` convenience. Draft generation itself remains
 single-use; only the validation operation has lost-ack replay semantics.
 
-The stock binary does not ship a generic semantic validator and an LLM
-self-review is not a deterministic validator. Configured unattended validation,
-mid-task compaction, summary-attempt crash reconciliation and full PRD acceptance
-remain open. The native launch profile is experimental, not a host/process
-isolation certification.
+The SDK now ships `NewSummaryIntegrityValidator` under the stable identity
+`darwin.summary.integrity.v1`. It is a conservative deterministic linter, not a
+generic semantic validator: it rejects binding/checkpoint drift, unsafe display
+controls, duplicate normalized entries, and unsupported unambiguous issue,
+revision, or URL anchors. When those checks pass it deliberately returns
+`abstained`, never `approved`, because lexical support cannot prove a free-form
+summary is complete or semantically faithful. Its bounded note contains counts
+and reason codes only, not source excerpts or anchors. A later authenticated
+operator may supersede that advisory review through the existing compare-and-
+swap chain.
+
+An LLM self-review is not a deterministic validator. Configured unattended
+semantic approval, typed per-claim evidence, summary-attempt crash reconciliation
+and full PRD acceptance remain open. The native launch profile is experimental,
+not a host/process isolation certification.
 
 ## Qualification
 

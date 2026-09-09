@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -71,6 +72,31 @@ func TestValidateSummaryAbstentionAndCASRemainInactive(t *testing.T) {
 	}))
 	if _, err := svc.ValidateSummary(context.Background(), attempt.ID, "", "stale-operation", "project-tests-v1", secondRegistry); !errors.Is(err, telemetry.ErrConflict) {
 		t.Fatal("stale compare-and-swap accepted", err)
+	}
+}
+
+func TestStockSummaryIntegrityEvidenceNeverSelfApproves(t *testing.T) {
+	svc, db, task := codexCompactionFixture(t)
+	attempt := codexCompactionDraft(t, svc, task)
+	registry, err := sessions.NewSummaryValidatorRegistry(map[string]sessions.SummaryValidator{
+		sessions.SummaryIntegrityValidatorID: sessions.NewSummaryIntegrityValidator(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	review, err := svc.ValidateSummary(context.Background(), attempt.ID, "", "stock-integrity-operation", sessions.SummaryIntegrityValidatorID, registry)
+	if err != nil || review.Decision != "abstained" || !strings.Contains(review.Note, "approval=false") {
+		t.Fatalf("review=%+v err=%v", review, err)
+	}
+	if _, _, err := db.LatestApprovedSummary(context.Background(), task); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatal("stock linter authorized continuation", err)
+	}
+	approved, err := svc.ReviewSummary(context.Background(), attempt.ID, review.ID, "approved", "Operator compared the draft with its source")
+	if err != nil || approved.PreviousID != review.ID || approved.Decision != "approved" {
+		t.Fatal("operator could not supersede advisory evidence", approved, err)
+	}
+	if _, current, err := db.LatestApprovedSummary(context.Background(), task); err != nil || current.ID != approved.ID {
+		t.Fatal("explicit operator approval did not become current", current, err)
 	}
 }
 

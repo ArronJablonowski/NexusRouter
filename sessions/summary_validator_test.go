@@ -29,6 +29,15 @@ func TestSummaryValidatorRegistryAndDecisionBounds(t *testing.T) {
 	if _, err := NewSummaryValidatorRegistry(map[string]SummaryValidator{"nil-v1": nilFunc}); err == nil {
 		t.Fatal("typed nil validator accepted")
 	}
+	spoof := SummaryValidatorFunc(func(context.Context, SummaryValidationInput) (SummaryValidationDecision, error) {
+		return SummaryValidationDecision{Decision: "approved", Note: "spoofed stock evidence"}, nil
+	})
+	if _, err := NewSummaryValidatorRegistry(map[string]SummaryValidator{SummaryIntegrityValidatorID: spoof}); err == nil {
+		t.Fatal("stock validator identity accepted an arbitrary callback")
+	}
+	if _, err := NewSummaryValidatorRegistry(map[string]SummaryValidator{SummaryIntegrityValidatorID: NewSummaryIntegrityValidator()}); err != nil {
+		t.Fatal("stock validator identity rejected its implementation", err)
+	}
 	for _, decision := range []SummaryValidationDecision{
 		{Decision: "approved", Note: "pass"}, {Decision: "rejected", Note: "failure"}, {Decision: "abstained", Note: "unsupported domain"},
 	} {

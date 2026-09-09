@@ -393,6 +393,11 @@ retrying that operation returns the stored result without rerunning the callback
 generation remains single-use. Rejected and abstaining validation never
 authorize continuation. Validator callbacks are trusted cooperative code, must
 be side-effect free, and must change identity when their semantics change.
+`NewSummaryIntegrityValidator` provides a deterministic stock linter with the
+stable `SummaryIntegrityValidatorID`. It rejects demonstrable binding,
+checkpoint, display, duplicate-entry, and unsupported-anchor defects but always
+abstains otherwise. It cannot self-approve a draft or replace an authenticated
+operator/domain validator.
 
 For an explicitly selected signed-in Sol model, `Request.Compaction` or
 `Request.SummaryAttemptID` with `ContinueTaskID` now uses the native compacted

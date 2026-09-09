@@ -14,6 +14,16 @@ type SummaryValidationDecision = sessions.SummaryValidationDecision
 type SummaryValidator = sessions.SummaryValidator
 type SummaryValidatorFunc = sessions.SummaryValidatorFunc
 type SummaryValidatorRegistry = sessions.SummaryValidatorRegistry
+type SummaryIntegrityValidator = sessions.SummaryIntegrityValidator
+
+const SummaryIntegrityValidatorID = sessions.SummaryIntegrityValidatorID
+
+// NewSummaryIntegrityValidator returns the conservative stock linter. It can
+// reject mechanical integrity defects but always abstains otherwise, so it
+// never grants continuation authority without a later operator review.
+func NewSummaryIntegrityValidator() SummaryValidator {
+	return sessions.NewSummaryIntegrityValidator()
+}
 
 // NewSummaryValidatorRegistry binds stable identities to trusted deterministic
 // host validators. Changing validator semantics requires a new identity.

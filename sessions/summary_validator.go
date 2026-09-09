@@ -53,6 +53,14 @@ func NewSummaryValidatorRegistry(input map[string]SummaryValidator) (*SummaryVal
 		if !summaryValidatorID.MatchString(id) || validator == nil || summaryValidatorNil(validator) {
 			return nil, ErrHistory
 		}
+		// Built-in identities are evidence provenance, not merely labels. Do not
+		// let a host bind an arbitrary approving callback under the stock
+		// non-authorizing linter's stable identity.
+		if id == SummaryIntegrityValidatorID {
+			if _, ok := validator.(SummaryIntegrityValidator); !ok {
+				return nil, ErrHistory
+			}
+		}
 		owned[id] = validator
 	}
 	return &SummaryValidatorRegistry{validators: owned}, nil

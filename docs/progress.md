@@ -5412,3 +5412,47 @@ and drove corrections for auto-route residency ordering, metric/trace event
 vocabularies, cumulative journal bytes, replay tool identities, event-count
 recovery capacity and definitive journal-limit terminalization; its closing
 review reported no remaining concrete P0/P1/P2 issue in this slice.
+
+## 2026-09-09 — Web UI/Kanban scope and advisory summary integrity
+
+The 1.0 PRD now makes an authenticated embedded Web UI a first-class product
+surface rather than a post-MVP dashboard. It specifies ChatGPT/Hermes-style
+streaming chat over the existing application service, bounded durable history,
+steering/cancellation/feedback/approval flows, route and resource inspection,
+a same-origin browser-session boundary, CSP/sanitized Markdown, vendored offline
+assets, and zero-egress local-only behavior. The same UI includes native durable
+Kanban boards for long-running work. Cards use dependency DAGs, monotonic
+revisions, atomic claims, leases/heartbeats, task/session/attempt links,
+checkpoints, budgets, policy-gated agent mutations, separate review/acceptance,
+and restart-safe state discovery. Model self-assessment cannot promote work to
+done or weaken active criteria.
+
+Linear access is now live. DAR-75 was independently audited against all seven
+resource-plan acceptance criteria, reverified under the focused race suite, and
+moved to Done with commit/test evidence. A new Web UI milestone, `web-ui` label,
+and dependency-linked Todo sprints DAR-76 through DAR-87 now cover architecture,
+embedded/authenticated serving, chat, lifecycle controls, inspection, durable
+Kanban storage/API/UI, agent board tools, long-running recovery/acceptance,
+security/accessibility/E2E qualification, and packaging documentation.
+
+The SDK additionally exposes the explicitly selected
+`darwin.summary.integrity.v1` stock linter. It revalidates immutable source/draft
+bindings and the canonical compaction checkpoint, rejects unsafe display
+controls, normalized duplicate entries, and unsupported high-confidence issue,
+revision, or URL anchors without echoing source content. Every otherwise clean
+or ambiguous draft returns `abstained`; this component never returns `approved`
+and therefore cannot activate model-authored history. An authenticated operator
+or qualified domain validator remains necessary. Focused race tests cover stable
+decisions, provenance and checkpoint drift, content-free rejection notes,
+cancellation, inactive durable evidence, and operator compare-and-swap
+supersession. Generic semantic completeness, typed claim evidence, unattended
+approval, and implementation of the Web UI/Kanban backlog remain open.
+
+Adversarial review found and drove fixes for stock validator-ID spoofing, URL
+prefix/case/punctuation/userinfo/IPv6/IPvFuture collisions, oversized anchors,
+and invisible Unicode format/separator controls. Its final review reported no
+remaining P0/P1/P2 finding. The final `make check` passed formatting and the
+1,000-line limit, `go vet`, the complete repository race suite, and production
+build; the longest rebuilt packages were releasepack 479.510s, application
+338.498s, telemetry 255.639s, CLI 49.676s, SDK 41.166s, toolgate 24.212s,
+skills 23.880s, sessions 18.051s, and runtime 16.349s.

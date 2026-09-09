@@ -50,6 +50,20 @@ if review.Decision != "approved" {
 }
 ```
 
+DarwinRouter also exports a non-authorizing stock integrity linter:
+
+```go
+registry, err := darwin.NewSummaryValidatorRegistry(map[string]darwin.SummaryValidator{
+    darwin.SummaryIntegrityValidatorID: darwin.NewSummaryIntegrityValidator(),
+})
+if err != nil { return err }
+review, err := client.ValidateSummary(ctx, draft.ID, "", operationID,
+    darwin.SummaryIntegrityValidatorID, registry)
+if err != nil { return err }
+// The stock linter returns rejected or abstained, never approved. Present its
+// bounded evidence to an authenticated operator before any approval.
+```
+
 The validation operation ID becomes the immutable review ID. Retrying the exact
 operation recognizes its existing record without invoking the callback again.
 Every version-two validation review binds the attempt, source digest, complete
@@ -57,6 +71,9 @@ draft digest, validator identity and prior review head. Callbacks receive the
 full source and draft, must be local, side-effect free, deterministic,
 cancellation-cooperative and concurrency-safe. An LLM judgment is not a trusted
 deterministic validator. Use a new validator ID whenever semantics change.
+The stock integrity validator checks mechanical provenance and high-confidence
+lexical anchors only. It intentionally cannot certify natural-language
+completeness, polarity, authority, tool effects, or subjective fidelity.
 
 The examples assume `darwin` aliases the SDK import. The host must implement the
 actual operator interface; these snippets are not an unconditional approval
