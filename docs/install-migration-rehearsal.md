@@ -22,7 +22,7 @@ contract-checked `darwin` member into a new versioned prefix. An actual candidat
 must already have passed signature verification. The test checks the exact
 version string, exclusive installation paths, private configuration and state
 permissions, configuration validation, authenticated daemon status/stop, exact
-owned-process exit, SQLite WAL mode, `quick_check`, and schema 32.
+owned-process exit, SQLite WAL mode, `quick_check`, and schema 33.
 
 It then records a synthetic local-only memory fact, converts that owned fixture
 to the real schema-29 boundary used by migration tests, and confirms its stored
@@ -31,13 +31,21 @@ and the fixture proven to have
 no running task, queued/running submission or unreleased resource lease, the
 test checkpoints WAL and creates a mode-0600 backup using an exclusive file
 create. It records the backup SHA-256, migrates the source database from schema
-29 to 32 through normal daemon startup, and verifies the fact body, unchanged
+29 to 33 through normal daemon startup, and verifies the fact body, unchanged
 schema-29 task-timing epoch, schema-30 empty usage-ledger metadata, schema-31
-routing index, and schema-32 durable submission-stream mapping integrity. The
+routing index, schema-32 durable submission-stream mapping integrity, and
+schema-33 globally ordered committed-event ledger integrity. The
 migration deliberately does not fabricate usage records for pre-ledger work.
 Finally, the test copies the backup to a new rollback database, checks the digest,
 schema, timing epoch, and original fact without migration, and proves the upgraded
 database was not replaced.
+
+Schema 33 admits only canonical runtime events that can fit individually within
+the bounded committed-event SDK page, including worst-case cursor overhead. If
+a legacy schema-32 database contains a larger event, migration fails and rolls
+back completely rather than dropping or truncating history. Keep the source and
+pre-upgrade backup unchanged, correct the source only through an explicitly
+reviewed recovery procedure, and rerun migration; no automatic skip is provided.
 
 Runtime subprocesses receive an explicit `DARWIN_PROCESS_OWNER_DIR`, home,
 temporary directory and API token rooted under `testing.T.TempDir`. The build
@@ -63,7 +71,7 @@ or timestamps. It binds the exact semantic version, full source commit, native
 OS/architecture, archive name and SHA-256. Fixed result fields record private
 permissions, configuration validation, daemon start and exact owned-writer
 exit, schema-29 quick-check and quiescence, immutable backup digest and
-quick-check, schema-32 migration and synthetic-record preservation, unchanged
+quick-check, schema-33 migration and synthetic-record preservation, unchanged
 task-timing provenance, empty legacy usage ledger, and the schema-29 rollback
 database digest plus the exact binary version/target used for its read-only
 smoke check. The rollback digest must equal the backup digest.
@@ -87,7 +95,7 @@ go run ./cmd/verify-install-rehearsal \
   --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 \
-  --current-schema 32 \
+  --current-schema 33 \
   --backup-sha256 sha256:EXPECTED_BACKUP
 ```
 

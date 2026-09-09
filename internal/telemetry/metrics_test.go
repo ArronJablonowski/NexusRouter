@@ -70,7 +70,7 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.StorageSchema != 32 || snapshot.Validate() != nil {
+	if snapshot.StorageSchema != 33 || snapshot.Validate() != nil {
 		t.Fatal(snapshot)
 	}
 	for _, group := range snapshot.Groups {

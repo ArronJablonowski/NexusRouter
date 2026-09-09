@@ -844,9 +844,38 @@ second terminal nor redeliver the first, so `ReadEvents` is required for
 catch-up. Configuration retirement, terminal-history projection, lease and
 reader housekeeping, and other reconciliation paths that append no runtime
 event emit nothing. The distinct audit-operation event stream, forced
-interruption of noncooperative callbacks, and a global cross-task cursor remain
+interruption of noncooperative callbacks, and durable push delivery remain
 outside this contract. Direct qualification of
 daemon-dispatched and automatic-compaction delivery is also deferred.
+
+`ReadCommittedEvents(ctx, ReadCommittedEventsOptions{After: cursor, Limit: 100})`
+provides an SDK-only, database-wide ledger of committed runtime events. Each
+page freezes an insertion high-water mark and orders records by an opaque
+numeric position; positions are not event IDs or task sequences. The canonical
+base64url cursor binds both its last position and frozen high-water position to
+their exact event IDs, so a cursor from a ledger whose anchors do not match, or
+one invalidated by position remapping, fails closed. A caught-up page still
+returns a cursor; polling with it validates the prior anchors before refreshing
+the high-water mark.
+
+Consumption is at least once. Handle the entire page, deduplicate by
+`CommittedEvent.Event.ID`, and only then persist `page.NextCursor`. A live
+`EventSink` event cannot safely be converted into a global checkpoint: sinks
+may run concurrently for different tasks, so receiving one event does not prove
+that every lower ledger position was handled. Use task-local `ReadEvents` for a
+specific sink gap, or sequential `ReadCommittedEvents` pages for global
+catch-up. The ledger does not automatically replay, and event bodies remain
+sensitive even though configured credential redaction applies before normal
+persistence. No HTTP endpoint, CLI command, or global SSE stream is exposed by
+this contract.
+
+Every schema-33 append is transactionally checked against the serialized
+single-event page limit with worst-case cursor overhead, preventing an
+unreadable event from blocking all later positions. A legacy schema-32 database
+containing an event that cannot satisfy that bound is not partially migrated or
+silently truncated; opening it for migration returns the size error and leaves
+schema 32 intact for explicit backup restoration or operator repair.
+Callers can match the bounded-size failure through `sdk.ErrEventTooLarge`.
 
 `RunTextStream` accepts a synchronous callback for provisional, incrementally
 redacted assistant text after the corresponding lifecycle marker commits. It

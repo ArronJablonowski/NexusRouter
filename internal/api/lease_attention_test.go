@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -185,7 +186,7 @@ func TestLeaseAttentionHTTPBackendValidation(t *testing.T) {
 				case "version":
 					out.Version = 2
 				case "schema":
-					out.StorageSchema = 33
+					out.StorageSchema = stateschema.Current + 1
 				case "unavailable":
 					out.Available = false
 				case "nil_items":

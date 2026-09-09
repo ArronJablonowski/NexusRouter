@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -86,7 +87,7 @@ func TestResourceLeasesHTTPReadOnlySQLite(t *testing.T) {
 			}
 		}
 		var out workers.ScopeLeaseStatus
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &out) != nil || out.Validate() != nil || out.Scope != scope || !out.Available || out.StorageSchema != 32 {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &out) != nil || out.Validate() != nil || out.Scope != scope || !out.Available || out.StorageSchema != stateschema.Current {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		want := []workers.ScopeLeaseHolder{}

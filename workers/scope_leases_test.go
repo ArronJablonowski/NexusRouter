@@ -16,7 +16,7 @@ func TestScopeLeaseStatusValidation(t *testing.T) {
 	for name, mutate := range map[string]func(*ScopeLeaseStatus){
 		"version": func(s *ScopeLeaseStatus) { s.Version = 2 }, "policy": func(s *ScopeLeaseStatus) { s.OverlapPolicyVersion = 2 },
 		"scope": func(s *ScopeLeaseStatus) { s.Scope = " x" }, "nil": func(s *ScopeLeaseStatus) { s.Holders = nil },
-		"schema": func(s *ScopeLeaseStatus) { s.StorageSchema = 33 }, "availability": func(s *ScopeLeaseStatus) { s.Available = false },
+		"schema": func(s *ScopeLeaseStatus) { s.StorageSchema = maxStorageSchema + 1 }, "availability": func(s *ScopeLeaseStatus) { s.Available = false },
 		"legacy": func(s *ScopeLeaseStatus) { s.StorageSchema = 2; s.Available = false }, "order": func(s *ScopeLeaseStatus) { s.Holders[0].TaskID = "z" },
 		"duplicate": func(s *ScopeLeaseStatus) { s.Holders[1].TaskID = "a" }, "invalidtask": func(s *ScopeLeaseStatus) { s.Holders[0].TaskID = " x" },
 		"zero": func(s *ScopeLeaseStatus) { s.Holders[0].LiveReaders = 0 }, "negative": func(s *ScopeLeaseStatus) { s.Holders[0].LiveReaders = -1 },
@@ -31,7 +31,7 @@ func TestScopeLeaseStatusValidation(t *testing.T) {
 			}
 		})
 	}
-	for _, schema := range []int{1, 2, 3, 23} {
+	for _, schema := range []int{1, 2, 3, 23, maxStorageSchema} {
 		s := valid()
 		s.StorageSchema = schema
 		s.Available = schema >= 3

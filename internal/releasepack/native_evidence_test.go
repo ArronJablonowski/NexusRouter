@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func nativeEvidenceFixture() NativeEvidence {
@@ -52,7 +54,7 @@ func TestNativeEvidenceSchemaTwoBindsInstallRehearsal(t *testing.T) {
 	record.InstallRehearsal = &NativeInstallEvidenceBinding{
 		RecordSHA256: testInstallDigest("1"),
 		ArtifactName: "DarwinRouter_1.0.0-rc.3_darwin_arm64.tar.gz", ArtifactSHA256: testInstallDigest("2"),
-		BackupSHA256: testInstallDigest("3"), SourceSchema: 29, CurrentSchema: 32,
+		BackupSHA256: testInstallDigest("3"), SourceSchema: 29, CurrentSchema: stateschema.Current,
 	}
 	if validateNativeEvidence(nativeEvidenceBody(t, record)) != nil {
 		t.Fatal("schema-2 native evidence rejected")
@@ -64,7 +66,7 @@ func TestNativeEvidenceSchemaTwoBindsInstallRehearsal(t *testing.T) {
 		"artifact_digest": func(r *NativeEvidence) { r.InstallRehearsal.ArtifactSHA256 = "bad" },
 		"backup":          func(r *NativeEvidence) { r.InstallRehearsal.BackupSHA256 = "bad" },
 		"source_schema":   func(r *NativeEvidence) { r.InstallRehearsal.SourceSchema = 28 },
-		"current_schema":  func(r *NativeEvidence) { r.InstallRehearsal.CurrentSchema = 30 },
+		"current_schema":  func(r *NativeEvidence) { r.InstallRehearsal.CurrentSchema = stateschema.Current - 1 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := record

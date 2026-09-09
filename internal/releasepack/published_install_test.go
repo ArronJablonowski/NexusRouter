@@ -11,13 +11,15 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func TestPublishedInstallEvidenceBindsDownloadedArchiveAndReceipt(t *testing.T) {
 	receiptFile, installFile, expected := publishedInstallFixture(t)
 	evidence, err := CreatePublishedInstallEvidence(context.Background(), receiptFile, installFile, expected)
 	if err != nil || evidence.PublicationReceiptSHA256 != expected.PublicationReceiptSHA256 ||
-		evidence.InstallEvidenceSHA256 != expected.InstallEvidenceSHA256 || evidence.ArtifactSHA256 == "" || evidence.CurrentSchema != 32 ||
+		evidence.InstallEvidenceSHA256 != expected.InstallEvidenceSHA256 || evidence.ArtifactSHA256 == "" || evidence.CurrentSchema != stateschema.Current ||
 		evidence.VerifiedAt != "2026-09-07T01:02:00Z" {
 		t.Fatal("published install evidence rejected", evidence, err)
 	}
@@ -105,7 +107,7 @@ func TestPublishedInstallEvidenceRejectsCanonicalFieldTampering(t *testing.T) {
 		"version_output": func(e *PublishedInstallEvidence) {
 			e.VersionOutput = "darwin other"
 		},
-		"schema": func(e *PublishedInstallEvidence) { e.CurrentSchema = 31 },
+		"schema": func(e *PublishedInstallEvidence) { e.CurrentSchema = stateschema.Current - 1 },
 		"time":   func(e *PublishedInstallEvidence) { e.VerifiedAt = "2026-09-07T00:00:00Z" },
 		"fractional_time": func(e *PublishedInstallEvidence) {
 			e.VerifiedAt = "2026-09-07T01:02:00.5Z"

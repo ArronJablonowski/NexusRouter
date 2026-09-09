@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
 )
 
@@ -159,7 +160,7 @@ func TestMetricsRejectsInvalidHookSnapshot(t *testing.T) {
 	for name, mutate := range map[string]func(*metrics.Snapshot){
 		"version":      func(s *metrics.Snapshot) { s.Version = metrics.SnapshotVersion + 1 },
 		"time":         func(s *metrics.Snapshot) { s.ObservedAt = time.Time{} },
-		"schema":       func(s *metrics.Snapshot) { s.StorageSchema = 33 },
+		"schema":       func(s *metrics.Snapshot) { s.StorageSchema = stateschema.Current + 1 },
 		"secret group": func(s *metrics.Snapshot) { s.Groups[0].Name = "private-token" },
 		"secret state": func(s *metrics.Snapshot) { s.Groups[0].Counts[0].State = "private-token" },
 		"availability": func(s *metrics.Snapshot) { s.Groups[0].Available = false },

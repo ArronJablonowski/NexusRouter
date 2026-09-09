@@ -201,7 +201,7 @@ func TestMemoryRetirementMigrationPreservesPayload(t *testing.T) {
 	if err = s.db.QueryRow("SELECT body FROM memory_facts").Scan(&after); err != nil || !bytes.Equal(before, after) {
 		t.Fatal("migration changed payload", err)
 	}
-	if err = s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 32 {
+	if err = s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 33 {
 		t.Fatal(version, err)
 	}
 	if err = s.db.QueryRow("SELECT count(*) FROM memory_retired_ids").Scan(&count); err != nil || count != 0 {

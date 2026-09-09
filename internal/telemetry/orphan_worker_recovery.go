@@ -196,6 +196,9 @@ func appendOrphanFailure(ctx context.Context, tx *sql.Tx, plan sessions.Interrup
 		if _, err = tx.ExecContext(ctx, `INSERT INTO events VALUES(?,?,?,?)`, e.ID, e.TaskID, e.Sequence, body); err != nil {
 			return err
 		}
+		if err = appendEventLog(ctx, tx, e, body); err != nil {
+			return err
+		}
 		if err = appendSubmissionStreamEvent(ctx, tx, e, body, submission); err != nil {
 			return err
 		}

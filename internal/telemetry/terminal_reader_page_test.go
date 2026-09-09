@@ -74,7 +74,7 @@ func TestTerminalReaderMigrationKeepsGuardBindings(t *testing.T) {
 		t.Fatal("migration changed binding", err)
 	}
 	var version int
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 32 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 33 {
 		t.Fatal(version, err)
 	}
 	if recovered, err := s.RecoverTerminalReader(ctx, token, time.Now().UTC()); err != nil || !recovered {

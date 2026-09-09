@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func TestRunPassesExplicitFirstReleaseExpectations(t *testing.T) {
@@ -48,10 +50,10 @@ func TestRunRejectsPolicyInferenceAndMixedEvidence(t *testing.T) {
 
 func baseArgs(t *testing.T) []string {
 	t.Helper()
-	args := strings.Fields("--record readiness.json --record-sha256 sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --publication-receipt receipt.json --publication-receipt-sha256 sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --publication-authorization-sha256 sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --receipt-verifier-id idp:receipt --repository ArronJablonowski/DarwinRouter --version 1.0.0 --commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --tag v1.0.0 --release-id 1 --current-schema 32 --mode first_release --rehearsal-evidence rehearsal.log --rehearsal-sha256 sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd --rehearsal-verifier-id idp:rehearsal --incident-owner team:incident --status-url https://status.example.invalid --approver-id idp:approver --policy-url https://policy.example.invalid --readiness-verifier-id idp:readiness --first-release-daemon-action stop --first-release-binary-action uninstall --first-release-data-action preserve_current_schema_no_restore")
+	args := strings.Fields("--record readiness.json --record-sha256 sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --publication-receipt receipt.json --publication-receipt-sha256 sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --publication-authorization-sha256 sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --receipt-verifier-id idp:receipt --repository ArronJablonowski/DarwinRouter --version 1.0.0 --commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --tag v1.0.0 --release-id 1 --current-schema " + strconv.Itoa(stateschema.Current) + " --mode first_release --rehearsal-evidence rehearsal.log --rehearsal-sha256 sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd --rehearsal-verifier-id idp:rehearsal --incident-owner team:incident --status-url https://status.example.invalid --approver-id idp:approver --policy-url https://policy.example.invalid --readiness-verifier-id idp:readiness --first-release-daemon-action stop --first-release-binary-action uninstall --first-release-data-action preserve_current_schema_no_restore")
 	return append(args, "--out", t.TempDir()+"/verification.json")
 }
 
 func validCLIResult(mode string) releasepack.RollbackReadinessResult {
-	return releasepack.RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: "sha256:" + strings.Repeat("a", 64), PublicationReceiptSHA256: "sha256:" + strings.Repeat("b", 64), RehearsalSHA256: "sha256:" + strings.Repeat("d", 64), Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 1, Mode: mode, StateSchema: 32, ValidUntil: "2026-09-09T00:00:00Z", ReadinessVerifierID: "idp:readiness", VerifiedAt: "2026-09-08T01:00:00Z"}
+	return releasepack.RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: "sha256:" + strings.Repeat("a", 64), PublicationReceiptSHA256: "sha256:" + strings.Repeat("b", 64), RehearsalSHA256: "sha256:" + strings.Repeat("d", 64), Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 1, Mode: mode, StateSchema: stateschema.Current, ValidUntil: "2026-09-09T00:00:00Z", ReadinessVerifierID: "idp:readiness", VerifiedAt: "2026-09-08T01:00:00Z"}
 }

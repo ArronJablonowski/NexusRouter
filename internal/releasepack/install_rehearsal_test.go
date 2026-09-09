@@ -24,7 +24,10 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/daemon"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
+	darwinruntime "github.com/ArronJablonowski/DarwinRouter/runtime"
 	_ "modernc.org/sqlite"
 )
 
@@ -137,7 +140,8 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	}
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
 	assertMode(t, database, 0600)
-	checkDatabase(t, database, 32, "", "")
+	checkDatabase(t, database, stateschema.Current, "", "")
+	seedRehearsalEvents(t, database)
 
 	fact := memory.Fact{Version: 1, ID: "install-rehearsal", Scope: "release-rehearsal", Revision: 1, Content: "Synthetic schema migration evidence.", Provenance: "DAR-52 disposable fixture", Confidence: 1, Privacy: "local_only", Created: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC), Updated: time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)}
 	factBody, err := json.Marshal(fact)
@@ -169,12 +173,12 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 
 	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
 	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
-	checkDatabase(t, database, 32, fact.Scope, fact.ID)
+	checkDatabase(t, database, stateschema.Current, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
 		t.Fatal("migration changed synthetic evidence")
 	}
 	if got := taskTimingEpoch(t, database); got != timingEpoch {
-		t.Fatal("schema-32 migration changed schema-29 task timing epoch")
+		t.Fatal("current-schema migration changed schema-29 task timing epoch")
 	}
 	assertEmptyUsageLedger(t, database)
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, database, fact)
@@ -189,8 +193,8 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 		t.Fatal("schema-29 rollback copy changed task timing epoch")
 	}
 	assertMemoryCLI(t, ctx, installed, root, runtimeEnv, rollback, fact)
-	checkDatabase(t, rollback, 29, fact.Scope, fact.ID) // Read-only inspection must not migrate.
-	checkDatabase(t, database, 32, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
+	checkDatabase(t, rollback, 29, fact.Scope, fact.ID)                  // Read-only inspection must not migrate.
+	checkDatabase(t, database, stateschema.Current, fact.Scope, fact.ID) // Rollback must not overwrite the upgraded store.
 	rollbackDigest := "sha256:" + fileDigest(t, rollback)
 	if rollbackDigest != backupDigest {
 		t.Fatal("rollback smoke changed the restored database")
@@ -203,7 +207,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 		Installation: InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       InstallEvidenceBackup{SHA256: backupDigest, Schema: 29, QuickCheck: "ok"},
-		Migration: InstallEvidenceMigration{Schema: 32, QuickCheck: "ok", PreservedRecordSHA256: "sha256:" + evidenceBefore,
+		Migration: InstallEvidenceMigration{Schema: stateschema.Current, QuickCheck: "ok", PreservedRecordSHA256: "sha256:" + evidenceBefore,
 			TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
 		Rollback: InstallEvidenceRollback{DatabaseSHA256: rollbackDigest, Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version,
 			TargetOS: artifact.OS, TargetArch: artifact.Arch, Smoke: "passed"},
@@ -218,11 +222,30 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	if _, err = VerifyInstallRehearsalEvidence(evidenceOut, InstallRehearsalExpectations{
 		RecordSHA256: installEvidenceDigest(body), Version: version, Commit: commit,
 		TargetOS: artifact.OS, TargetArch: artifact.Arch, ArtifactName: artifact.File,
-		ArtifactSHA256: archiveDigest, SourceSchema: 29, CurrentSchema: 32, BackupSHA256: backupDigest,
+		ArtifactSHA256: archiveDigest, SourceSchema: 29, CurrentSchema: stateschema.Current, BackupSHA256: backupDigest,
 	}); err != nil {
 		t.Fatal("verify retained install rehearsal evidence", err)
 	}
-	t.Logf("native install=%s schema=32; backup_sha256=%s; migration=29->32; rollback_copy_schema=29", installPrefix, backupDigest)
+	t.Logf("native install=%s schema=%d; backup_sha256=%s; migration=29->%d; rollback_copy_schema=29", installPrefix, stateschema.Current, backupDigest, stateschema.Current)
+}
+
+func seedRehearsalEvents(t *testing.T, path string) {
+	t.Helper()
+	db, err := telemetry.Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	now := time.Date(2026, 9, 7, 12, 1, 0, 0, time.UTC)
+	events := []darwinruntime.Event{
+		{Version: 1, ID: "install-rehearsal-start", TaskID: "install-rehearsal-task", SessionID: "install-rehearsal-session", CorrelationID: "install-rehearsal-task", Sequence: 1, Time: now, Kind: darwinruntime.TaskStarted},
+		{Version: 1, ID: "install-rehearsal-complete", TaskID: "install-rehearsal-task", SessionID: "install-rehearsal-session", CorrelationID: "install-rehearsal-task", Sequence: 2, Time: now.Add(time.Second), Kind: darwinruntime.TaskCompleted, CausationID: "install-rehearsal-start"},
+	}
+	for i, event := range events {
+		if err := db.Append(context.Background(), int64(i), event); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func readPinnedRehearsalArchive(archive string, artifact Artifact) ([]byte, string, error) {
@@ -398,11 +421,67 @@ func checkDatabase(t *testing.T, path string, schema int, scope, id string) {
 	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='submission_stream_events')`).Scan(&streamMapping); err != nil || streamMapping != (schema >= 32) {
 		t.Fatal("submission stream schema boundary invalid", streamMapping, err)
 	}
+	checkRehearsalEventLog(t, db, schema)
 	if scope != "" {
 		var content string
 		if err := db.QueryRow(`SELECT content FROM memory_facts WHERE scope=? AND id=?`, scope, id).Scan(&content); err != nil || content != "Synthetic schema migration evidence." {
 			t.Fatal("synthetic record unavailable", err)
 		}
+	}
+}
+
+func checkRehearsalEventLog(t *testing.T, db *sql.DB, schema int) {
+	t.Helper()
+	var tableSQL string
+	err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='event_log'`).Scan(&tableSQL)
+	if schema < stateschema.Current {
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Fatal("pre-current fixture retained event log", err)
+		}
+		return
+	}
+	const canonical = `CREATE TABLE event_log (
+		position INTEGER PRIMARY KEY AUTOINCREMENT CHECK(position>0),
+		event_id TEXT NOT NULL UNIQUE,
+		task_id TEXT NOT NULL,
+		task_sequence INTEGER NOT NULL CHECK(task_sequence>0),
+		body_digest TEXT NOT NULL)`
+	if err != nil || strings.Join(strings.Fields(tableSQL), " ") != strings.Join(strings.Fields(canonical), " ") {
+		t.Fatal("current event log schema is not canonical", err)
+	}
+	rows, err := db.Query(`SELECT l.position,l.event_id,l.task_id,l.task_sequence,l.body_digest,e.body
+		FROM event_log l JOIN events e ON e.id=l.event_id AND e.task_id=l.task_id AND e.sequence=l.task_sequence ORDER BY l.position`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	position := int64(0)
+	for rows.Next() {
+		position++
+		var gotPosition, sequence int64
+		var eventID, taskID, digest string
+		var body []byte
+		if err := rows.Scan(&gotPosition, &eventID, &taskID, &sequence, &digest, &body); err != nil || gotPosition != position {
+			t.Fatal("event log position gap", gotPosition, position, err)
+		}
+		var event darwinruntime.Event
+		canonicalBody, decodeErr := func() ([]byte, error) {
+			if err := json.Unmarshal(body, &event); err != nil {
+				return nil, err
+			}
+			return event.Encode()
+		}()
+		sum := sha256.Sum256(body)
+		if decodeErr != nil || !bytes.Equal(canonicalBody, body) || event.ID != eventID || event.TaskID != taskID || event.Sequence != sequence || digest != hex.EncodeToString(sum[:]) {
+			t.Fatal("event log backfill is not canonically bound", eventID, decodeErr)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	var eventCount int64
+	if err := db.QueryRow(`SELECT count(*) FROM events`).Scan(&eventCount); err != nil || eventCount != position {
+		t.Fatal("event log did not preserve every event", eventCount, position, err)
 	}
 }
 
@@ -427,7 +506,7 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
+	if _, err = tx.Exec(`DROP TABLE event_log; DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

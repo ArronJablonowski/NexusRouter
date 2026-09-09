@@ -40,7 +40,7 @@ func (s *Store) SkillComparisonSelection(ctx context.Context, policy skills.Comp
 	}
 	defer tx.Rollback()
 	var schema int
-	if err = tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || (schema < 27 || schema > 32) {
+	if err = tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || (schema < 27 || schema > 33) {
 		return report, nil, skills.ErrInvalid
 	}
 	report.Version, report.Policy = 1, policy

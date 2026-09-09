@@ -4,10 +4,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
 var ErrTaskLeaseStatus = errors.New("task lease status unavailable")
+
+const maxStorageSchema = stateschema.Current
 
 // TaskLeaseStatus is a bounded observation, not admission or process-liveness proof.
 // Nil feature groups mean unsupported storage, never a verified zero count.
@@ -39,7 +42,7 @@ type TaskRecoveryCounts struct {
 
 func (s TaskLeaseStatus) Validate() error {
 	_, offset := s.ObservedAt.Zone()
-	if s.Version != 1 || !sessions.ValidEventPageID(s.TaskID) || s.Sequence < 1 || s.Sequence > 10000 || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > 32 || (s.Leases == nil) != (s.StorageSchema < 3) || (s.Recoveries == nil) != (s.StorageSchema < 23) {
+	if s.Version != 1 || !sessions.ValidEventPageID(s.TaskID) || s.Sequence < 1 || s.Sequence > 10000 || offset != 0 || s.ObservedAt.Year() < 1970 || s.ObservedAt.Year() >= 2261 || s.StorageSchema < 1 || s.StorageSchema > maxStorageSchema || (s.Leases == nil) != (s.StorageSchema < 3) || (s.Recoveries == nil) != (s.StorageSchema < 23) {
 		return ErrTaskLeaseStatus
 	}
 	switch s.TaskState {

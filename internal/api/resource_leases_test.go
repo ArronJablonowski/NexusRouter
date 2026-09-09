@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -157,7 +158,7 @@ func TestResourceLeasesBackendValidation(t *testing.T) {
 				case "time":
 					out.ObservedAt = time.Time{}
 				case "schema":
-					out.StorageSchema = 33
+					out.StorageSchema = stateschema.Current + 1
 				case "available":
 					out.Available = false
 				case "nil_holders":

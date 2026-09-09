@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
@@ -66,7 +67,7 @@ func TestSDKLeaseAttentionHistoryReadOnly(t *testing.T) {
 	}
 	t.Setenv("DARWIN_PROCESS_OWNER_DIR", "")
 	first, err := client.ListLeaseAttentionHistory(ctx, id, sdk.LeaseAttentionHistoryOptions{Limit: 1})
-	if err != nil || first.Version != 1 || first.StorageSchema != 32 || !first.Available || first.AttentionID != id || len(first.Items) != 1 || !first.HasMore || first.NextSequence != 1 || first.Items[0].Sequence != 1 || first.Items[0].Observation.State != "open" {
+	if err != nil || first.Version != 1 || first.StorageSchema != stateschema.Current || !first.Available || first.AttentionID != id || len(first.Items) != 1 || !first.HasMore || first.NextSequence != 1 || first.Items[0].Sequence != 1 || first.Items[0].Observation.State != "open" {
 		t.Fatal(first, err)
 	}
 	second, err := client.ListLeaseAttentionHistory(ctx, id, sdk.LeaseAttentionHistoryOptions{AfterSequence: first.NextSequence, Limit: 1})

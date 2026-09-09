@@ -65,7 +65,7 @@ func (a LeaseAttention) Validate() error {
 }
 
 func (p LeaseAttentionPage) Validate() error {
-	if p.Version != 1 || p.StorageSchema < 1 || p.StorageSchema > 32 || p.Available != (p.StorageSchema >= 24) || p.Items == nil || len(p.Items) > 100 || p.HasMore != (p.NextCursor != "") || (!p.Available && (len(p.Items) != 0 || p.HasMore)) {
+	if p.Version != 1 || p.StorageSchema < 1 || p.StorageSchema > maxStorageSchema || p.Available != (p.StorageSchema >= 24) || p.Items == nil || len(p.Items) > 100 || p.HasMore != (p.NextCursor != "") || (!p.Available && (len(p.Items) != 0 || p.HasMore)) {
 		return ErrLeaseAttention
 	}
 	previous := ""

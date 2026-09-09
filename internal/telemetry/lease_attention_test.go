@@ -225,7 +225,7 @@ func TestLeaseAttentionReadOnlyListAndCorruption(t *testing.T) {
 	}
 	defer ro.Close()
 	first, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "open", Limit: 2})
-	if err != nil || first.Version != 1 || first.StorageSchema != 32 || !first.Available || len(first.Items) != 2 || !first.HasMore {
+	if err != nil || first.Version != 1 || first.StorageSchema != 33 || !first.Available || len(first.Items) != 2 || !first.HasMore {
 		t.Fatal(first, err)
 	}
 	second, err := ro.ListLeaseAttention(ctx, workers.LeaseAttentionOptions{State: "all", After: first.Items[1].ID, Limit: 2})

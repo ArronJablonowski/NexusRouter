@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
@@ -37,7 +38,7 @@ func TestSDKLeaseAttentionReadOnly(t *testing.T) {
 	}
 	for _, state := range []string{"open", "resolved", "all"} {
 		page, err := client.ListLeaseAttention(ctx, sdk.LeaseAttentionOptions{State: state, Limit: 25})
-		if err != nil || page.Version != 1 || page.StorageSchema != 32 || !page.Available || page.Items == nil || len(page.Items) != 0 || page.HasMore || page.NextCursor != "" {
+		if err != nil || page.Version != 1 || page.StorageSchema != stateschema.Current || !page.Available || page.Items == nil || len(page.Items) != 0 || page.HasMore || page.NextCursor != "" {
 			t.Fatal(page, err)
 		}
 		body, err := json.Marshal(page)

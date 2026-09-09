@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func validInstallEvidenceFixture() InstallRehearsalEvidence {
@@ -20,7 +22,7 @@ func validInstallEvidenceFixture() InstallRehearsalEvidence {
 		Installation: InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       InstallEvidenceBackup{SHA256: testInstallDigest("2"), Schema: 29, QuickCheck: "ok"},
-		Migration:    InstallEvidenceMigration{Schema: 32, QuickCheck: "ok", PreservedRecordSHA256: testInstallDigest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
+		Migration:    InstallEvidenceMigration{Schema: stateschema.Current, QuickCheck: "ok", PreservedRecordSHA256: testInstallDigest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
 		Rollback:     InstallEvidenceRollback{DatabaseSHA256: testInstallDigest("2"), Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version, TargetOS: "darwin", TargetArch: "arm64", Smoke: "passed"},
 	}
 }
@@ -43,7 +45,7 @@ func TestInstallRehearsalEvidenceCanonicalContract(t *testing.T) {
 		"writer":           func(r *InstallRehearsalEvidence) { r.Installation.ExactWriterStop = "unknown" },
 		"quiescence":       func(r *InstallRehearsalEvidence) { r.Source.Quiescence = "failed" },
 		"backup_schema":    func(r *InstallRehearsalEvidence) { r.Backup.Schema = 28 },
-		"migration_schema": func(r *InstallRehearsalEvidence) { r.Migration.Schema = 30 },
+		"migration_schema": func(r *InstallRehearsalEvidence) { r.Migration.Schema = stateschema.Current - 1 },
 		"preservation":     func(r *InstallRehearsalEvidence) { r.Migration.TaskTimingPreserved = "failed" },
 		"rollback_digest":  func(r *InstallRehearsalEvidence) { r.Rollback.DatabaseSHA256 = testInstallDigest("4") },
 		"rollback_pairing": func(r *InstallRehearsalEvidence) { r.Rollback.Pairing = "prior_release" },
@@ -113,7 +115,7 @@ func TestVerifyInstallRehearsalEvidenceBindsAllExpectations(t *testing.T) {
 		"artifact":        func(e *InstallRehearsalExpectations) { e.ArtifactName = "DarwinRouter_1.0.0-rc.11_linux_arm64.tar.gz" },
 		"artifact_digest": func(e *InstallRehearsalExpectations) { e.ArtifactSHA256 = testInstallDigest("4") },
 		"source_schema":   func(e *InstallRehearsalExpectations) { e.SourceSchema = 28 },
-		"current_schema":  func(e *InstallRehearsalExpectations) { e.CurrentSchema = 30 },
+		"current_schema":  func(e *InstallRehearsalExpectations) { e.CurrentSchema = stateschema.Current - 1 },
 		"backup":          func(e *InstallRehearsalExpectations) { e.BackupSHA256 = testInstallDigest("4") },
 	} {
 		t.Run(name, func(t *testing.T) {

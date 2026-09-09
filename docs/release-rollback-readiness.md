@@ -68,7 +68,7 @@ go run ./cmd/verify-rollback-readiness \
   --publication-authorization-sha256 sha256:AUTHORIZATION \
   --receipt-verifier-id idp:release-observer \
   --repository ArronJablonowski/DarwinRouter --version 1.0.0 \
-  --commit FULL40HEXCOMMIT --tag v1.0.0 --release-id 123 --current-schema 32 \
+  --commit FULL40HEXCOMMIT --tag v1.0.0 --release-id 123 --current-schema 33 \
   --mode first_release \
   --rehearsal-evidence published-install.json \
   --rehearsal-sha256 sha256:PUBLISHED_INSTALL_RECORD \

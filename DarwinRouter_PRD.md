@@ -204,6 +204,29 @@ changing its already-proven child-result provenance remains fenced rather than
 persisting or emitting the synthesized parent events. Sink callbacks must not
 re-enter the same service synchronously.
 
+Schema 33 adds a database-wide committed-runtime-event ledger for durable SDK
+catch-up. Every ordinary, interrupted-model, interrupted-delegation, and orphan
+worker append receives one global insertion position in the same SQLite
+transaction as its canonical task event and state projection. Reads freeze a
+high-water mark, validate the complete ledger and task histories, and return a
+canonical cursor anchored to the exact event IDs at both the consumed and
+high-water positions. Consumers process pages at least once, deduplicate by
+event ID, and persist a cursor only after the complete page succeeds. A live
+`EventSink` callback is deliberately not convertible to a global checkpoint:
+callbacks for unrelated tasks may complete out of order. Task-local gaps use
+bounded session replay; database-wide recovery consumes sequential ledger
+pages. The initial surface is trusted, read-only Go SDK access only—there is no
+automatic replay, consumer-offset table, HTTP/CLI endpoint, or global SSE
+stream—and event bodies remain sensitive application data.
+
+Schema-33 event admission must also prove that the event can fit by itself in
+the public maximum-size page using worst-case cursor/position overhead. An
+unreadable event is rejected in the same transaction as its task append, so it
+cannot strand every later global consumer. Migration never drops, truncates,
+or silently skips an incompatible legacy row: an oversized pre-schema-33 event
+fails the upgrade atomically and leaves the prior schema available for explicit
+backup restoration or operator repair.
+
 The SDK must expose explicit session-summary drafting, bounded inspection and
 listing, operator review/history, and approved-summary continuation through the
 same application service as the CLI/API. Current implementation and limits are
@@ -877,6 +900,14 @@ including recovery terminals, and exports cumulative fixed-bucket histograms
 with explicit missing/invalid timing counts. This is not inference latency or
 quality evidence. Historical tasks are not retrospectively sampled; see
 [task-duration metrics](docs/task-duration-metrics.md) for coverage and reset limits.
+
+Schema33 introduces the canonical global runtime-event ledger described in the
+SDK section. Migration deterministically backfills legacy canonical event rows
+in SQLite insertion order with bounded memory, rejects incomplete or corrupt
+history transactionally, and resumes autoincrement positions after the migrated
+high-water mark. The ledger is an ordering and catch-up mechanism, not an
+acceptance decision, delivery acknowledgement, or permission to retry model or
+tool effects.
 
 ## 14. Security and Privacy
 

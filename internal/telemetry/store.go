@@ -343,8 +343,13 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
-	if version < stateschema.Current {
+	if version < 32 {
 		if err = migrateSubmissionStream(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 33 {
+		if err = migrateEventLog(ctx, conn); err != nil {
 			return err
 		}
 	}
@@ -414,6 +419,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	if err == nil {
 		if string(previous) != string(body) {
 			return ErrConflict
+		}
+		if err := validateEventLogRetry(ctx, tx, e, body); err != nil {
+			return err
 		}
 		if err := validateSubmissionStreamRetry(ctx, tx, e, body, id); err != nil {
 			return err
@@ -491,6 +499,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO events VALUES (?, ?, ?, ?)", e.ID, e.TaskID, e.Sequence, body); err != nil {
 		return fmt.Errorf("append event: %w", err)
+	}
+	if err = appendEventLog(ctx, tx, e, body); err != nil {
+		return err
 	}
 	if err = appendSubmissionStreamEvent(ctx, tx, e, body, id); err != nil {
 		return err

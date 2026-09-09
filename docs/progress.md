@@ -5321,3 +5321,48 @@ found no remaining P0/P1/P2 defect after correcting duplicate/empty credential
 capacity handling and adding direct dispatcher qualification. Linear tools are
 advertised by the connector but its live workspace call still returns an
 unknown-tool error, so no Linear issue status is inferred or changed.
+
+Schema-33 global committed-event catch-up checkpoint: every ordinary runtime
+append and every interrupted-model, interrupted-delegation, and orphan-worker
+recovery batch now writes one globally ordered `event_log` row in the same
+SQLite transaction as its canonical task event and projections. The Go SDK can
+read frozen-high-water pages through canonical position/event-ID-anchored
+cursors, restart from a persisted cursor, refresh after reaching a prior head,
+and distinguish the public size error. Consumption is at least once: consumers
+deduplicate event IDs and persist the cursor only after the whole page succeeds.
+Concurrent live EventSink delivery cannot establish a global checkpoint, so
+task-local gaps still use `ReadEvents` and global gaps use sequential ledger
+pages. No HTTP, CLI, global SSE, automatic replay, or consumer-offset surface was
+added.
+
+Migration backfills schema-32 history in deterministic SQLite insertion order
+with one bounded body in memory, preserves bounded valid-UTF-8 opaque legacy
+event IDs (including delimiters and whitespace), proves
+complete canonical task histories and task-sequence monotonicity, and continues
+AUTOINCREMENT at the migrated high-water mark. Reads revalidate the exact schema
+and table definition, complete event/ledger mapping, dense positions, task
+heads, per-task order, body digests and canonical event bytes before returning
+any page. Cursor anchors reject foreign ledgers and remapped anchor positions;
+arbitrary cross-task non-anchor remapping is not claimed without a future durable
+predecessor-chain identity.
+
+Append admission now proves that each event fits a serialized one-event page
+using worst-case cursor and signed-64-bit position overhead. Raw or wrapper-only
+oversize events and unsafe ledger-visible identities roll back before becoming a
+global poison record; a legacy incompatible row aborts migration and leaves
+schema 32 unchanged for explicit restoration or reviewed repair. Tests cover
+ordinary and recovery atomicity, exact retry, colon compatibility, interleaved
+legacy ordering, autoincrement exhaustion, position gaps/remaps, orphan/missing/
+corrupt history, wrapper overflow, cancellation, restart polling and zero
+partial results. The final integrated `make qualify-mvp` passed. Independent
+review found no remaining actionable P0/P1/P2 issue after the ordering and size
+defects were corrected. Linear tools remain advertised but the live workspace
+read still returns an unknown-tool error, so no Linear issue status is inferred
+or changed.
+
+Final schema-33 checkpoint verification passed formatting and the 1,000-line
+limit, `go vet`, the complete repository under the race detector, and
+`go build ./...`. The longest packages were releasepack 453.586s, application
+326.344s, telemetry 232.778s, CLI 48.018s, SDK 37.220s, toolgate 20.777s,
+sessions 17.422s, runtime 13.327s, and workers 6.521s. The final opaque-ID
+compatibility adjustment was included in that run.

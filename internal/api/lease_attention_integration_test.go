@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
@@ -102,7 +103,7 @@ func TestLeaseAttentionHTTPReadOnlySQLite(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, continuationRequest("GET", "/v1/resources/attention"+tc.query, ""))
 		var page workers.LeaseAttentionPage
-		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &page) != nil || page.Validate() != nil || !page.Available || page.StorageSchema != 32 || page.HasMore != tc.more || page.NextCursor != tc.cursor {
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &page) != nil || page.Validate() != nil || !page.Available || page.StorageSchema != stateschema.Current || page.HasMore != tc.more || page.NextCursor != tc.cursor {
 			t.Fatal(tc.query, w.Code, w.Body.String())
 		}
 		ids := []string{}

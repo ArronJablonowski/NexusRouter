@@ -17,6 +17,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/metrics"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -87,7 +88,7 @@ func TestTaskDurationPropagatesSQLiteAppHTTPAndSDKExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err := service.Metrics(ctx)
-	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != 32 || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
+	if err != nil || snapshot.Validate() != nil || snapshot.StorageSchema != stateschema.Current || snapshot.TaskDuration == nil || snapshot.Accounting == nil {
 		t.Fatal("missing duration snapshot", snapshot, err)
 	}
 	completed := snapshot.TaskDuration.Groups[0]

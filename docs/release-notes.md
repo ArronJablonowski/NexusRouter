@@ -279,11 +279,13 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 32. Schema 30 added the immutable
+The current durable store uses SQLite schema 33. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
-digests for reconnect-safe native task streaming, and schema-29-and-newer stores
+digests for reconnect-safe native task streaming, schema 33 adds the globally
+ordered committed-runtime-event ledger used for restart-safe SDK catch-up, and
+schema-29-and-newer stores
 retain the existing task-duration epoch.
 Schema-22-and-newer resource
 leases carry private

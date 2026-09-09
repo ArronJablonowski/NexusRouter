@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func TestRunVerifiesCanonicalRecord(t *testing.T) {
@@ -26,7 +28,7 @@ func TestRunVerifiesCanonicalRecord(t *testing.T) {
 		Installation: releasepack.InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       releasepack.InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       releasepack.InstallEvidenceBackup{SHA256: digest("2"), Schema: 29, QuickCheck: "ok"},
-		Migration:    releasepack.InstallEvidenceMigration{Schema: 32, QuickCheck: "ok", PreservedRecordSHA256: digest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
+		Migration:    releasepack.InstallEvidenceMigration{Schema: stateschema.Current, QuickCheck: "ok", PreservedRecordSHA256: digest("3"), TaskTimingPreserved: "passed", LegacyUsageNotFabricated: "passed"},
 		Rollback:     releasepack.InstallEvidenceRollback{DatabaseSHA256: digest("2"), Schema: 29, Pairing: "current_binary_read_only_schema_fixture", BinaryVersion: version, TargetOS: "darwin", TargetArch: "arm64", Smoke: "passed"},
 	}
 	body, err := json.MarshalIndent(record, "", "  ")
@@ -41,7 +43,7 @@ func TestRunVerifiesCanonicalRecord(t *testing.T) {
 	sum := sha256.Sum256(body)
 	args := []string{"--record", path, "--record-sha256", "sha256:" + hex.EncodeToString(sum[:]), "--version", version, "--commit", commit,
 		"--target-os", "darwin", "--target-arch", "arm64", "--artifact", record.Artifact.Name, "--artifact-sha256", record.Artifact.SHA256,
-		"--source-schema", "29", "--current-schema", "32", "--backup-sha256", record.Backup.SHA256}
+		"--source-schema", "29", "--current-schema", strconv.Itoa(stateschema.Current), "--backup-sha256", record.Backup.SHA256}
 	var stdout, stderr bytes.Buffer
 	if code := run(args, &stdout, &stderr, releasepack.VerifyInstallRehearsalEvidence); code != 0 || !strings.Contains(stdout.String(), `"rollback_schema":29`) || stderr.Len() != 0 {
 		t.Fatalf("real verification failed: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
@@ -55,13 +57,13 @@ func TestRunRequiresAndForwardsIndependentExpectations(t *testing.T) {
 		"--target-os", "darwin", "--target-arch", "arm64",
 		"--artifact", "DarwinRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
 		"--artifact-sha256", "sha256:" + strings.Repeat("2", 64),
-		"--source-schema", "29", "--current-schema", "32",
+		"--source-schema", "29", "--current-schema", strconv.Itoa(stateschema.Current),
 		"--backup-sha256", "sha256:" + strings.Repeat("3", 64),
 	}
 	want := releasepack.InstallRehearsalExpectations{
 		RecordSHA256: "sha256:" + strings.Repeat("1", 64), Version: "1.0.0-rc.11", Commit: strings.Repeat("a", 40),
 		TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "DarwinRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
-		ArtifactSHA256: "sha256:" + strings.Repeat("2", 64), SourceSchema: 29, CurrentSchema: 32,
+		ArtifactSHA256: "sha256:" + strings.Repeat("2", 64), SourceSchema: 29, CurrentSchema: stateschema.Current,
 		BackupSHA256: "sha256:" + strings.Repeat("3", 64),
 	}
 	called := false
@@ -83,7 +85,7 @@ func TestRunExitSemantics(t *testing.T) {
 		"--record", "/evidence/rehearsal.json", "--record-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--version", "1.0.0", "--commit", strings.Repeat("a", 40), "--target-os", "darwin", "--target-arch", "arm64",
 		"--artifact", "DarwinRouter_1.0.0_darwin_arm64.tar.gz", "--artifact-sha256", "sha256:" + strings.Repeat("2", 64),
-		"--source-schema", "29", "--current-schema", "32", "--backup-sha256", "sha256:" + strings.Repeat("3", 64),
+		"--source-schema", "29", "--current-schema", strconv.Itoa(stateschema.Current), "--backup-sha256", "sha256:" + strings.Repeat("3", 64),
 	}
 	verifyOK := func(string, releasepack.InstallRehearsalExpectations) (releasepack.InstallRehearsalVerification, error) {
 		return releasepack.InstallRehearsalVerification{}, nil

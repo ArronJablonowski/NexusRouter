@@ -115,7 +115,7 @@ func TestLeaseProcessMigrationPreservesLegacyUnknown(t *testing.T) {
 	if err = s.db.QueryRow(`SELECT count(*) FROM lease_processes`).Scan(&count); err != nil || count != 0 {
 		t.Fatal(count, err)
 	}
-	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 32 {
+	if err = s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 33 {
 		t.Fatal(version, err)
 	}
 	if err = s.RenewLease(ctx, "legacy", "owner", time.Now(), time.Minute); err != nil {

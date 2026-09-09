@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 type receiptVerifierFixture struct {
@@ -140,7 +142,7 @@ func TestRollbackCanonicalEvidenceOutputIsExclusiveAndPrivate(t *testing.T) {
 	if _, err = WriteRollbackReadiness(out, record); err == nil {
 		t.Fatal("existing evidence overwritten")
 	}
-	result := RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: digest, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, RehearsalSHA256: record.Rehearsal.EvidenceSHA256, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, Mode: "first_release", StateSchema: 32, ValidUntil: record.Approval.ValidUntil, ReadinessVerifierID: "idp:readiness-verifier", VerifiedAt: "2026-09-08T00:00:00Z"}
+	result := RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: digest, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, RehearsalSHA256: record.Rehearsal.EvidenceSHA256, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, Mode: "first_release", StateSchema: stateschema.Current, ValidUntil: record.Approval.ValidUntil, ReadinessVerifierID: "idp:readiness-verifier", VerifiedAt: "2026-09-08T00:00:00Z"}
 	resultBody, err := MarshalRollbackReadinessResult(result)
 	if err != nil {
 		t.Fatal(err)
@@ -304,16 +306,16 @@ func TestCanonicalRollbackRehearsalVerifierDerivesPublishedReleaseIdentity(t *te
 func rollbackFixture(mode string) RollbackReadiness {
 	record := RollbackReadiness{
 		SchemaVersion: 1, Project: "DarwinRouter", Scope: rollbackReadinessScope,
-		Current:   RollbackCurrentRelease{PublicationReceiptSHA256: fingerprint("1"), PublicationAuthorizationSHA256: fingerprint("2"), Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 41, StateSchema: 32},
+		Current:   RollbackCurrentRelease{PublicationReceiptSHA256: fingerprint("1"), PublicationAuthorizationSHA256: fingerprint("2"), Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 41, StateSchema: stateschema.Current},
 		History:   RollbackHistoryPolicy{Mode: "first_release", FirstReleaseDecision: "approved_no_previous_public_release", FirstReleaseRollback: &FirstReleaseRollbackPolicy{DaemonAction: "stop", BinaryAction: "uninstall", DataAction: "preserve_current_schema_no_restore"}},
-		Rehearsal: RollbackRehearsal{EvidenceSHA256: fingerprint("3"), Scenario: "published_native_install_rollback", FromSchema: 29, ToSchema: 32, Status: "passed", RehearsedAt: "2026-09-07T12:00:00Z", VerifierID: "idp:rehearsal-verifier"},
+		Rehearsal: RollbackRehearsal{EvidenceSHA256: fingerprint("3"), Scenario: "published_native_install_rollback", FromSchema: 29, ToSchema: stateschema.Current, Status: "passed", RehearsedAt: "2026-09-07T12:00:00Z", VerifierID: "idp:rehearsal-verifier"},
 		Incident:  RollbackIncident{OwnerID: "team:release-incident", StatusURL: "https://status.example.invalid/darwinrouter"},
 		Approval:  RollbackReadinessApproval{ApproverID: "idp:readiness-approver", PolicyURL: "https://policy.example.invalid/rollback", ApprovedAt: "2026-09-07T13:00:00Z", ValidUntil: "2026-09-09T00:00:00Z"},
 	}
 	if mode == "upgrade" {
 		record.History = RollbackHistoryPolicy{Mode: "upgrade", FirstReleaseDecision: "not_applicable", PriorSupportedBinary: priorFixture()}
 		record.Backup = backupFixture()
-		record.Rehearsal = RollbackRehearsal{EvidenceSHA256: fingerprint("3"), Scenario: "published_native_install_rollback", FromSchema: 28, ToSchema: 32, Status: "passed", RehearsedAt: "2026-09-07T12:00:00Z", VerifierID: "idp:rehearsal-verifier"}
+		record.Rehearsal = RollbackRehearsal{EvidenceSHA256: fingerprint("3"), Scenario: "published_native_install_rollback", FromSchema: 28, ToSchema: stateschema.Current, Status: "passed", RehearsedAt: "2026-09-07T12:00:00Z", VerifierID: "idp:rehearsal-verifier"}
 	}
 	return record
 }

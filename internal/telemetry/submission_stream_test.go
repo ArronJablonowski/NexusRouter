@@ -235,7 +235,7 @@ func TestSubmissionStreamMigrationBackfillsStableOrder(t *testing.T) {
 	for i := range page.Events {
 		got[i] = page.Events[i].Event.ID
 	}
-	if migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || schema != 32 || err != nil || !reflect.DeepEqual(got, want) || page.ResultSequence != 5 {
+	if migrated.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || schema != 33 || err != nil || !reflect.DeepEqual(got, want) || page.ResultSequence != 5 {
 		t.Fatal(schema, page, err)
 	}
 }
