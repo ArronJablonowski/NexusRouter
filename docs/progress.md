@@ -5204,3 +5204,31 @@ runtime 10.379s, and workers 5.773s. Automatic resume, branch
 merge/latest-leaf selection, and live provider quality remain outside this
 slice. The Linear MCP live read remains unavailable, so no inferred issue
 number or Linear status is claimed.
+
+Runtime panic-containment checkpoint: direct provider and both legacy/scoped
+tool interfaces now fail through narrow sanitized guards. Provider callback
+persistence, cancellation, and lease-loss errors outrank a later adapter panic;
+accepted tool proposals and completion markers never become actionable after a
+panic. Journal panics remain commit-ambiguous `ErrPersistence`. Tool panics close
+the durable call/result pair once with an empty uncertain-effect failure, never
+retry or fall back, and preserve that evidence before a racing cancellation.
+
+The submitted-work dispatcher now has a last-resort per-claim recovery boundary.
+Every unwind stops and joins heartbeat renewal, supervisor health becomes
+degraded without persisting the panic value, the ambiguous claim remains fenced
+for normal lease-expiry reconciliation, and the same worker continues unrelated
+work. Tests exercise a genuine pre-task submitted panic, safe undispatched
+recovery, a panicking delegated child, worker reuse, and secret non-persistence.
+This does not provide process isolation or authorize replay after a started tool
+or model boundary. The Linear MCP is still not callable, so no Linear status is
+claimed for this checkpoint.
+
+Final deterministic evidence for this slice includes the complete
+`make qualify-mvp` gate on the integrated tree, three repeated focused race
+runs, and an independent ten-run adversarial race review. Commit-then-panic
+journal behavior and repeated callbacks after a latched error are included:
+both retain `ErrPersistence` and create no synthetic terminal. Configured and
+per-call event sinks receive the same committed sanitized failure sequence, and
+failed live-text delivery discards its withheld sensitive tail. Two independent
+reviews found no remaining P0/P1 defect; stronger process isolation remains a
+post-MVP requirement.

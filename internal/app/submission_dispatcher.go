@@ -97,7 +97,18 @@ func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 		claim, err := d.db.ClaimSubmission(query, s.submissionConfigDigest(), time.Now().UTC(), 30*time.Second)
 		cancel()
 		if err == nil {
-			d.executeWorker(ctx, s, claim, id)
+			if d.executeWorkerContained(ctx, s, claim, id) {
+				// The claim may have crossed an unknown side-effect boundary. Keep
+				// it fenced until ordinary lease-expiry reconciliation can inspect
+				// durable history, while retaining this worker for unrelated work.
+				timer := time.NewTimer(250 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+			}
 			continue
 		}
 		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
@@ -112,6 +123,21 @@ func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 	}
 }
 
+// executeWorkerContained is the worker-loop's last-resort containment boundary.
+// It deliberately records neither the recovered value nor a synthetic terminal
+// event: durable history and lease-expiry recovery remain the authority for an
+// execution whose side-effect state is unknown.
+func (d *Dispatcher) executeWorkerContained(ctx context.Context, s *Service, claim submissions.Claim, workerID int) (panicked bool) {
+	defer func() {
+		if recover() != nil {
+			d.recordError()
+			panicked = true
+		}
+	}()
+	d.executeWorker(ctx, s, claim, workerID)
+	return false
+}
+
 func (d *Dispatcher) execute(ctx context.Context, s *Service, claim submissions.Claim) {
 	d.executeWorker(ctx, s, claim, -2)
 }
@@ -122,7 +148,9 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	heartbeat, stopHeartbeat := context.WithCancel(job)
 	heartbeatDone := make(chan error, 1)
 	go func() {
+		d.mu.Lock()
 		interval := d.renewInterval
+		d.mu.Unlock()
 		if interval <= 0 {
 			interval = 5 * time.Second
 		}
@@ -151,6 +179,16 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 			}
 		}
 	}()
+	joinHeartbeat := func() error {
+		if heartbeatDone == nil {
+			return nil
+		}
+		stopHeartbeat()
+		err := <-heartbeatDone
+		heartbeatDone = nil
+		return err
+	}
+	defer joinHeartbeat()
 	envelope, err := decodeSubmissionEnvelope(claim.Request)
 	r := envelope.Request
 	if err == nil && envelope.Branch != nil {
@@ -173,8 +211,7 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 		r.submissionID, r.submissionToken = claim.Status.ID, claim.Token
 		out, err = s.Run(job, r)
 	}
-	stopHeartbeat()
-	leaseErr := <-heartbeatDone
+	leaseErr := joinHeartbeat()
 	state, code := "succeeded", ""
 	if err != nil {
 		state, code = "failed", "execution_failed"

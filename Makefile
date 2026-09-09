@@ -39,6 +39,7 @@ qualify-mvp:
 	go test -race ./sessions ./internal/telemetry ./internal/app ./sdk/v1 ./internal/api ./internal/cli -run 'SessionTask' -count=1 -v
 	go test -race ./sessions ./internal/telemetry ./internal/app ./sdk/v1 ./internal/api ./internal/cli -run 'Branch' -count=1 -v
 	go test -race ./sessions ./submissions ./internal/telemetry ./internal/app ./sdk/v1 ./internal/api ./internal/cli -run 'Resume' -count=1 -v
+	go test -race ./runtime ./internal/app -run '^(TestProviderPanic|TestProviderCallback|TestToolExecutorPanic|TestToolPanic|TestDispatcherContainsRootPanic|TestSubmittedDelegatedChildPanic)' -count=1 -v
 	go test -race ./sessions ./internal/telemetry -run '^(TestPlanInterruptedModelBeforeAndAfterModelBoundaries|TestInterruptedModelRecoveryAtomicAndFenced)$$' -count=1 -v
 
 # Explicit supervised signed-in cloud inference with controlled local results.

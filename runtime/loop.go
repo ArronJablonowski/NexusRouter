@@ -155,7 +155,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if k == SteeringApplied {
 			e.TurnID, e.AttemptID = "", ""
 		}
-		if err := l.Journal.Append(ctx, seq, e); err != nil {
+		if err := invokeJournalAppend(ctx, l.Journal, seq, e); err != nil {
 			if errors.Is(err, ErrSteeringPending) {
 				return ErrSteeringPending
 			}
@@ -354,8 +354,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		var usage *providers.Usage
 		done := false
 		reason := ""
+		committedOutput := false
 		var callbackErr error
-		err := l.Provider.Stream(ctx, inference, func(c providers.Chunk) error {
+		err := invokeProviderStream(ctx, l.Provider, inference, func(c providers.Chunk) error {
 			if callbackErr != nil {
 				return callbackErr
 			}
@@ -378,6 +379,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 					if err := persist(ctx, ModelDelta, Data{Text: c.Text}); err != nil {
 						return err
 					}
+					committedOutput = true
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}
@@ -407,7 +409,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			}
 			callbackErr = accept()
 			return callbackErr
-		})
+		}, &committedOutput)
 		if errors.Is(callbackErr, ErrPersistence) {
 			return result, ErrPersistence
 		}
@@ -533,14 +535,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			out := ToolResult{Effect: NoEffect}
 			toolErr := ctx.Err()
 			if toolErr == nil {
-				if scoped, ok := l.Tools.(ScopedToolExecutor); ok {
-					// The executor owns its argument bytes, not the conversation's.
-					owned := call
-					owned.Arguments = append(json.RawMessage(nil), call.Arguments...)
-					out, toolErr = scoped.ExecuteScoped(ctx, ToolExecution{TaskID: r.TaskID, SessionID: r.SessionID, TurnID: turn, AttemptID: attempt, Call: owned})
-				} else {
-					out, toolErr = l.Tools.Execute(ctx, call)
-				}
+				out, toolErr = invokeTool(ctx, l.Tools, ToolExecution{TaskID: r.TaskID, SessionID: r.SessionID, TurnID: turn, AttemptID: attempt, Call: call})
 			}
 			if out.Effect != NoEffect && out.Effect != ConfirmedEffect && out.Effect != UncertainEffect {
 				out.Effect = UncertainEffect
