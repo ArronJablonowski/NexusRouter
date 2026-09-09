@@ -650,8 +650,9 @@ Chat accepts canonical terminals and UTF-8 files/pipes, with up to64KiB per line
 canonical settings are unchanged. Idle input has no timeout; cancellation joins
 borrowed pipe/terminal reads and restores descriptor flags. Custom embedded readers,
 writers and regular-file kernel operations remain cooperative. A full-screen
-editor, multiline editing, automatic context compaction and interrupted-task resume
-are not implemented. Chat supports the same routing/continuation flags as `run`,
+editor, multiline editing and general interrupted-task resume are not
+implemented. The opt-in approved-summary policy described below can compact
+eligible continued tasks at a later safe turn boundary. Chat supports the same routing/continuation flags as `run`,
 but JSON output belongs to `run --json`.
 
 Give explicit feedback before starting another task:
@@ -722,16 +723,33 @@ Review is a local operator attestation, not automated proof of accuracy, and doe
 
 The storage layer selects the newest currently approved draft for an exact source task while skipping revoked review heads. Selection is bounded and malformed durable records fail closed. Set `runtime.auto_use_approved_summary: true` to let automatic routing retry admission once with that draft after complete history produces no eligible route. An explicitly selected model may also use it when the complete initial request—history, current prompt, selected memory/skills and tool schemas—exceeds the built-in conservative context floor and the approved form fits. Both paths act before task creation or inference. The default is false. They repeat normal privacy, cost, capability, health/resource where applicable, context and transactional approval checks; they never generate or approve a summary. Explicit `--summary-attempt` remains the deterministic operator-controlled route.
 
+When the complete initial request fits, the same opt-in policy can retain the
+full history for turn one and freeze the exact currently approved replacement
+as a one-shot alternative. If context added by a completed model/tool turn or
+queued steering would overflow a later provider request, the runtime first
+commits `context.compacted`, then replaces only the frozen initial prefix and
+dispatches the next turn. Every live suffix message and complete tool pair is
+retained. SQLite rechecks the exact approval and source-bound replacement in
+the same writer transaction, replay applies the replacement deterministically,
+and bounded journal reserves keep later lifecycle/terminal recovery readable.
+The reserve covers both serialized bytes and the durable event-count ceiling;
+a definitive exhaustion commits a failed terminal without another provider call.
+Revocation before activation, estimator failure, a replacement that does not
+fit, redaction drift, or persistence failure prevents activation and provider
+redispatch. This path currently uses the built-in history-first assembly and
+stateless HTTP/local providers; delegated tasks, custom context engines,
+already-compacted continuations, and `codex_app_server` fail closed.
+
 The explicit preflight does not invoke a custom `ContextEstimator`, because doing so again inside the durable runtime could make a stateful estimator disagree or perform work twice. A custom estimator may therefore reject a built-in-fitting full or compact request at task start with the normal durable context error.
 
-The same opt-in policy can recover from a provider-reported `context_overflow`, but only by starting one separately linked task with the currently approved summary and the same model. Before doing so, DarwinRouter replays the failed task and requires an exact first-turn event shape proving that the provider produced no model output, tool activity or side effect. Partial output, uncertain state, a missing/currently rejected summary, a different parent, an unrecognized model/provider pair, cancellation, delegated work, exhausted route-attempt capacity or an insufficient aggregate cost budget all leave the original failure terminal. The new task repeats ordinary admission and the transactional approval check; it never replays the failed call. Aggregate route cost and ordered failed-task lineage cover any safe fallback attempts that preceded the overflow. Mid-task growth still does not trigger automatic redispatch.
+The same opt-in policy can recover from a provider-reported `context_overflow`, but only by starting one separately linked task with the currently approved summary and the same model. Before doing so, DarwinRouter replays the failed task and requires an exact first-turn event shape proving that the provider produced no model output, tool activity or side effect. Partial output, uncertain state, a missing/currently rejected summary, a different parent, an unrecognized model/provider pair, cancellation, delegated work, exhausted route-attempt capacity or an insufficient aggregate cost budget all leave the original failure terminal. The new task repeats ordinary admission and the transactional approval check; it never replays the failed call. Aggregate route cost and ordered failed-task lineage cover any safe fallback attempts that preceded the overflow. Later growth uses only the frozen in-task activation path above; it never repeats an already dispatched provider call.
 
 Embedded Go applications can generate, inspect, list and review these same
 proposals through the [SDK session-summary workflow](docs/sdk-session-summaries.md).
 The host must authenticate the reviewing operator; calling the SDK does not
 grant a model authority to approve its own draft.
 
-Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; provider rejection may occur after billable input processing even when no output was observed, and summaries, review notes and inspection output can contain sensitive session information. Automatic semantic validation, automatic summary creation/approval, crash reconciliation and mid-task compaction remain unfinished.
+Source provenance refers to unchanged durable history, even when the auxiliary input was redacted. Estimates are operator estimates, not billing guarantees; provider rejection may occur after billable input processing even when no output was observed, and summaries, review notes and inspection output can contain sensitive session information. Automatic summary creation/approval, a stock semantic validator, broader mid-task compaction backends, and general crash reconciliation remain unfinished.
 
 ### Model-callable bounded workers
 

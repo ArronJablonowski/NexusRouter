@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,12 @@ func TestCanonicalEventKindsEncode(t *testing.T) {
 		{EvaluationRecorded, func(e *Event) { e.Data.Accepted = &accepted }},
 		{ErrorRecorded, func(e *Event) { e.Data.Code = "provider_unavailable" }},
 		{SteeringApplied, func(e *Event) { e.Data.SteeringID, e.Data.Text = "steering", "continue with tests" }},
+		{ContextCompacted, func(e *Event) {
+			e.Data.ParentTaskID = "parent"
+			e.Data.ReplacedMessages = 1
+			e.Data.Messages = []providers.Message{{Role: "user", Content: "approved summary"}}
+			e.Data.Compaction = &ContextCompaction{Version: 1, SummaryAttemptID: "attempt", SummaryReviewID: "review", SourceTaskID: "parent", SourceSequence: 2, SourceDigest: strings.Repeat("a", 64), RemovedMessages: 1, Summary: ContextSummary{Decisions: []string{"retain"}}}
+		}},
 	}
 
 	seen := make(map[Kind]struct{}, len(tests))

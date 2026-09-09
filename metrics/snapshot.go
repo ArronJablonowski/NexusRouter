@@ -13,7 +13,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 8
+const SnapshotVersion = 9
 
 type Count struct {
 	State string `json:"state"`
@@ -47,7 +47,7 @@ type definition struct {
 
 var definitions = []definition{
 	{"tasks", 1, []string{"running", "completed", "failed", "canceled"}},
-	{"runtime_events", 1, []string{"task.started", "task.completed", "task.failed", "task.canceled", "turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed", "worker.started", "worker.heartbeat", "worker.completed", "route.selected", "evaluation.recorded", "error.recorded", "steering.applied"}},
+	{"runtime_events", 1, []string{"task.started", "task.completed", "task.failed", "task.canceled", "turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed", "worker.started", "worker.heartbeat", "worker.completed", "route.selected", "evaluation.recorded", "error.recorded", "steering.applied", "context.compacted"}},
 	{"runtime_operations", 1, []string{"fallback", "compaction", "skill_context", "exploration", "capacity_exclusion", "budget_exclusion", "privacy_exclusion", "health_exclusion"}},
 	{"submissions", 12, []string{"queued", "running", "succeeded", "failed", "canceled"}},
 	{"queue_age", 12, []string{"lt_1s", "lt_10s", "lt_1m", "lt_5m", "lt_30m", "lt_1h", "gte_1h", "invalid_time"}},

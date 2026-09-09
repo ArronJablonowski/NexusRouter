@@ -71,7 +71,10 @@ selection and checkpoint. It must still be reviewed before use. Applying an
 approved draft bypasses re-planning and validates the frozen checkpoint exactly;
 replacing the engine cannot reinterpret the approved artifact. Changing the
 summary or retention requires a new draft/review. These hooks do not enable
-automatic compaction, background inference or automatic summary approval.
+background inference or automatic summary approval. The stock history-first
+engine may activate an already approved replacement at a later safe turn
+boundary, but a custom engine fails closed because the current contract does
+not expose durable stable-tier proof for prefix replacement.
 
 ## SDK example
 

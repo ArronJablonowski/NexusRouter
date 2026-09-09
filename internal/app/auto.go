@@ -504,6 +504,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	draw := s.draw()
 	s.mu.Unlock()
 	var selected routing.Selection
+	var model config.Model
 	var release func()
 	capacityDenied := false
 	for {
@@ -518,19 +519,26 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if err != nil {
 			break
 		}
-		var model config.Model
+		model = config.Model{}
 		for _, m := range cfg.Models {
 			if m.Model == selected.Primary.Model && m.Provider == selected.Primary.Provider {
 				model = m
 				break
 			}
 		}
-		r.ModelID = model.ID
+		candidateRequest := r
+		candidateRequest.ModelID = model.ID
+		candidateRequest, err = s.prepareExplicitApprovedCompaction(ctx, candidateRequest, model)
+		if err != nil {
+			return Result{}, ErrAdmission
+		}
 		if model.Locality != "local" {
+			r = candidateRequest
 			break
 		}
 		release, err = s.reserveExplicit(ctx, model)
 		if err == nil {
+			r = candidateRequest
 			for _, provider := range cfg.Providers {
 				if provider.ID == model.Provider && provider.ManageResidency {
 					// Never attach a pre-unload observation to a managed route.

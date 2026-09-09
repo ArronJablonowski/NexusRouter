@@ -69,7 +69,8 @@ func planInterruptedModel(histories [][]runtime.Event, now time.Time, canceled, 
 			}
 		}
 		budget -= len(body)
-		if event.Data.Accepted != nil || (event.Kind != runtime.TaskStarted && (len(event.Data.Messages) != 0 || event.Data.ParentTaskID != "" || event.Data.RetryOfTaskID != "")) {
+		contextCompaction := event.Kind == runtime.ContextCompacted
+		if event.Data.Accepted != nil || (!contextCompaction && event.Kind != runtime.TaskStarted && (len(event.Data.Messages) != 0 || event.Data.ParentTaskID != "" || event.Data.RetryOfTaskID != "")) {
 			return bad()
 		}
 		if (event.TurnID != "" && !ValidEventPageID(event.TurnID)) || (event.AttemptID != "" && !ValidEventPageID(event.AttemptID)) {
@@ -77,6 +78,8 @@ func planInterruptedModel(histories [][]runtime.Event, now time.Time, canceled, 
 		}
 		switch event.Kind {
 		case runtime.TaskStarted, runtime.ModelDelta, runtime.RouteSelected, runtime.SteeringApplied:
+		case runtime.ContextCompacted:
+			active = event
 		case runtime.TurnStarted:
 			active = event
 		case runtime.TurnCompleted:

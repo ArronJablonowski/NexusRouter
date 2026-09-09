@@ -35,7 +35,7 @@ func (r terminalReader) Read(_ context.Context, task string, after int64, limit 
 // bounded durable facts. It neither runs models nor recreates audit outcomes.
 func ProjectTerminalSubmission(events []runtime.Event) (TerminalOutcome, error) {
 	bad := func() (TerminalOutcome, error) { return TerminalOutcome{}, ErrHistory }
-	if len(events) < 2 || len(events) > 10000 {
+	if len(events) < 2 || len(events) > MaxTaskEvents {
 		return bad()
 	}
 	total := 0

@@ -5366,3 +5366,49 @@ limit, `go vet`, the complete repository under the race detector, and
 326.344s, telemetry 232.778s, CLI 48.018s, SDK 37.220s, toolgate 20.777s,
 sessions 17.422s, runtime 13.327s, and workers 6.521s. The final opaque-ID
 compatibility adjustment was included in that run.
+
+Approved mid-task compaction checkpoint: when `auto_use_approved_summary` is
+enabled and a built-in history-first continuation initially fits, admission now
+freezes both the exact full request prefix and the smaller currently approved
+replacement before resource or managed-residency mutation. Turn one receives
+the full history. If a later completed model/tool turn or queued steering would
+overflow, the runtime commits a typed `context.compacted` event before changing
+its in-memory request or dispatching again. Activation is one-shot and retains
+the entire live suffix, including complete parallel tool pairs and steering.
+It never drafts, validates, or approves a summary.
+
+SQLite revalidates the current review head, canonical source checkpoint, exact
+initial prefix/replacement, safe completed-turn boundary and one-shot state in
+the same writer transaction. Activation retains a six-MiB journal reserve;
+subsequent nonterminal appends are cumulatively bounded while preserving a
+64-KiB terminal-recovery reserve and the final slot in the 10,000-event task
+ceiling. A definitive post-activation journal limit commits `task.failed`
+immediately instead of being misclassified as ambiguous persistence. Replay
+applies the prefix replacement with message provenance, reserves removed and
+replacement tool-call identities, and
+terminal/interruption projection recognizes the durable boundary. Metrics,
+traces, event pages and the global committed-event log include the new event.
+Tests cover approval races/revocation, acknowledgement retry, storage rollback,
+source/replacement drift, later tool-call identity reuse, steering order,
+estimator/persistence/cancellation failures, resource-capacity reranking,
+managed-residency ordering, journal limits, full terminal projection and crash
+recovery.
+
+This slice deliberately excludes delegated tasks, custom context engines,
+already-compacted continuations and `codex_app_server`; each fails closed until
+its stable-tier or stateful continuation semantics can be proven. Automatic
+summary generation/approval and a stock semantic validator remain open. Linear
+tools are visible, but the authenticated workspace call still returns an
+unknown-tool error, so no issue state is inferred or changed.
+
+Verification for this checkpoint: the expanded `make qualify-mvp` target passed,
+including the new activation, replay, real-store, byte-budget and event-count
+boundaries. The full `make check` gate passed formatting and the 1,000-line
+limit, `go vet`, every repository package under the race detector, and the
+production build. The longest race-tested packages were releasepack 480.908s,
+application 343.752s, telemetry 255.165s, CLI 50.083s, SDK 42.129s, toolgate
+24.988s, sessions 18.139s and runtime 16.888s. A final adversarial review found
+and drove corrections for auto-route residency ordering, metric/trace event
+vocabularies, cumulative journal bytes, replay tool identities, event-count
+recovery capacity and definitive journal-limit terminalization; its closing
+review reported no remaining concrete P0/P1/P2 issue in this slice.

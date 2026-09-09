@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -56,6 +57,7 @@ type RunRequest struct {
 	SkillContext       *SkillContextUse
 	SubmissionID       string
 	Compaction         *ContextCompaction
+	ApprovedCompaction *ApprovedCompaction
 	Validation         string
 	RetryOfTaskID      string
 	RouteEstimatedCost *float64
@@ -101,6 +103,7 @@ var (
 	ErrEmptyOutput     = errors.New("required final text is empty")
 	ErrInvalidOutput   = errors.New("final output failed requested validation")
 	ErrTool            = errors.New("tool execution failed or denied")
+	ErrJournalLimit    = errors.New("durable task journal budget exhausted")
 	ErrPersistence     = errors.New("runtime persistence failed; inspect durable state before retry")
 )
 
@@ -112,6 +115,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	}
 	skillContext := r.SkillContext.Clone()
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
+		return Result{}, ErrInvalidRun
+	}
+	if r.ApprovedCompaction != nil && (r.Compaction != nil || r.MaxContextTokens < 1 || r.ApprovedCompaction.validate(r.ParentTaskID, r.Inference.Messages) != nil) {
 		return Result{}, ErrInvalidRun
 	}
 	if r.MaxContextTokens < 0 || (l.ContextEstimator != nil && r.MaxContextTokens == 0) || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) {
@@ -144,6 +150,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if len(r.Inference.JSONSchema) == 0 {
 		inference.JSONSchema = nil
 	}
+	pendingCompaction, err := cloneApprovedCompaction(r.ApprovedCompaction)
+	if err != nil || pendingCompaction != nil && pendingCompaction.validate(r.ParentTaskID, inference.Messages) != nil {
+		return Result{}, ErrInvalidRun
+	}
 	seq := int64(0)
 	turn := ""
 	attempt := ""
@@ -152,7 +162,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
 		}
-		if k == SteeringApplied {
+		if k == SteeringApplied || k == ContextCompacted {
 			e.TurnID, e.AttemptID = "", ""
 		}
 		if err := invokeJournalAppend(ctx, l.Journal, seq, e); err != nil {
@@ -164,6 +174,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			}
 			if errors.Is(err, ErrCancellationRequested) {
 				return ErrCancellationRequested
+			}
+			if errors.Is(err, ErrJournalLimit) {
+				return ErrJournalLimit
 			}
 			return ErrPersistence
 		}
@@ -179,6 +192,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		return Result{}, err
 	}
 	result := Result{}
+	compactionActivated := false
 	appliedSteering := 0
 	// The cancellation gate guarantees no append occurred. Unlike an ambiguous
 	// storage failure, it is safe to append one bounded cancellation terminal.
@@ -213,6 +227,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if errors.Is(cause, ErrLimit) {
 			code = "budget_exhausted"
 		}
+		if errors.Is(cause, ErrJournalLimit) {
+			code = "journal_exhausted"
+		}
 		if errors.Is(cause, providers.ErrContextEstimate) {
 			code = "context_estimation_failed"
 		}
@@ -245,6 +262,61 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		return result, cause
 	}
+	terminalizeJournalLimit := func(err error) (Result, error) {
+		if errors.Is(err, ErrJournalLimit) {
+			return fail(err)
+		}
+		return result, err
+	}
+	// fitForDispatch may shorten only the frozen initial prefix. The additional
+	// messages argument represents prospective, not-yet-durable steering and is
+	// never installed until its own event commits. Live task messages are always
+	// retained as an indivisible suffix.
+	fitForDispatch := func(base providers.Request, additional []providers.Message) (providers.Request, providers.Request, error) {
+		prospective := base
+		prospective.Messages = append(append([]providers.Message(nil), base.Messages...), additional...)
+		estimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, prospective)
+		if estimateErr != nil {
+			return base, prospective, providers.ErrContextEstimate
+		}
+		if estimate <= r.MaxContextTokens {
+			return base, prospective, nil
+		}
+		if pendingCompaction == nil || compactionActivated || result.Turns == 0 || len(base.Messages) < len(pendingCompaction.OriginalPrefix) {
+			return base, prospective, ErrContextOverflow
+		}
+		prefix, encodeErr := json.Marshal(base.Messages[:len(pendingCompaction.OriginalPrefix)])
+		original, originalErr := json.Marshal(pendingCompaction.OriginalPrefix)
+		if encodeErr != nil || originalErr != nil || !bytes.Equal(prefix, original) {
+			return base, prospective, ErrProtocol
+		}
+		compacted := base
+		compacted.Messages = append(append([]providers.Message(nil), pendingCompaction.ReplacementPrefix...), base.Messages[len(pendingCompaction.OriginalPrefix):]...)
+		compactedProspective := compacted
+		compactedProspective.Messages = append(append([]providers.Message(nil), compacted.Messages...), additional...)
+		if providers.ValidateMessages(compactedProspective.Messages) != nil {
+			return base, prospective, ErrProtocol
+		}
+		body, encodeErr := json.Marshal(compactedProspective.Messages)
+		if encodeErr != nil || len(body) > 4<<20 {
+			return base, prospective, ErrLimit
+		}
+		compactEstimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, compactedProspective)
+		if estimateErr != nil {
+			return base, prospective, providers.ErrContextEstimate
+		}
+		if compactEstimate > r.MaxContextTokens || compactEstimate >= estimate {
+			return base, prospective, ErrContextOverflow
+		}
+		if persistErr := persist(ctx, ContextCompacted, Data{Compaction: pendingCompaction.Compaction, ParentTaskID: r.ParentTaskID, Messages: pendingCompaction.ReplacementPrefix, ReplacedMessages: len(pendingCompaction.OriginalPrefix)}); persistErr != nil {
+			return base, prospective, persistErr
+		}
+		compactionActivated = true
+		if ctx.Err() != nil {
+			return base, prospective, ctx.Err()
+		}
+		return compacted, compactedProspective, nil
+	}
 	drain := func() (applied bool, err error) {
 		if l.Steering == nil {
 			return false, nil
@@ -274,19 +346,18 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if appliedSteering >= MaxSteeringMessages {
 				return applied, ErrLimit
 			}
+			guidance := []providers.Message{{Role: "user", Content: message.Text}}
 			candidate := inference
-			candidate.Messages = append(append([]providers.Message(nil), inference.Messages...), providers.Message{Role: "user", Content: message.Text})
+			candidate.Messages = append(append([]providers.Message(nil), inference.Messages...), guidance...)
 			body, encodeErr := json.Marshal(candidate.Messages)
 			if encodeErr != nil || len(body) > 4<<20 {
 				return applied, ErrLimit
 			}
 			if r.MaxContextTokens > 0 {
-				estimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, candidate)
-				if estimateErr != nil {
-					return applied, providers.ErrContextEstimate
-				}
-				if estimate > r.MaxContextTokens {
-					return applied, ErrContextOverflow
+				var fitErr error
+				inference, candidate, fitErr = fitForDispatch(inference, guidance)
+				if fitErr != nil {
+					return applied, fitErr
 				}
 			}
 			if persistErr := persist(ctx, SteeringApplied, Data{SteeringID: message.ID, Text: message.Text}); persistErr != nil {
@@ -332,19 +403,17 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			return fail(ErrLimit)
 		}
 		if r.MaxContextTokens > 0 {
-			estimate, err := providers.EstimateWith(ctx, l.ContextEstimator, inference)
-			if err != nil {
-				return fail(providers.ErrContextEstimate)
-			}
-			if estimate > r.MaxContextTokens {
-				return fail(ErrContextOverflow)
+			var fitErr error
+			inference, _, fitErr = fitForDispatch(inference, nil)
+			if fitErr != nil {
+				return fail(fitErr)
 			}
 		}
 		turn = rand.Text()
 		attempt = rand.Text()
 		result.Turns++
 		if err := persist(ctx, TurnStarted, Data{ModelID: inference.Model, ProviderID: r.ProviderID}); err != nil {
-			return result, err
+			return terminalizeJournalLimit(err)
 		}
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
@@ -440,7 +509,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			return fail(ctx.Err())
 		}
 		if err := persist(ctx, TurnCompleted, Data{Text: text.String(), ToolCalls: calls, Usage: usage, FinishReason: reason}); err != nil {
-			return result, err
+			return terminalizeJournalLimit(err)
 		}
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
@@ -468,7 +537,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if r.RequireText {
 				accepted := strings.TrimSpace(validationText) != ""
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.nonempty_text.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
-					return result, err
+					return terminalizeJournalLimit(err)
 				}
 				if ctx.Err() != nil {
 					return fail(ctx.Err())
@@ -480,7 +549,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if r.Validation == "go_source" {
 				accepted := evaluation.GoSourceValid(validationText)
 				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.go_syntax.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
-					return result, err
+					return terminalizeJournalLimit(err)
 				}
 				if ctx.Err() != nil {
 					return fail(ctx.Err())
@@ -530,7 +599,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				return fail(ErrTool)
 			}
 			if err := persist(ctx, ToolStarted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: UncertainEffect}); err != nil {
-				return result, err
+				return terminalizeJournalLimit(err)
 			}
 			out := ToolResult{Effect: NoEffect}
 			toolErr := ctx.Err()
@@ -562,7 +631,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			err := persist(terminal, ToolCompleted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: out.Effect, Text: out.Content, Code: code})
 			cancel()
 			if err != nil {
-				return result, err
+				return terminalizeJournalLimit(err)
 			}
 			if ctx.Err() != nil {
 				return fail(ctx.Err())

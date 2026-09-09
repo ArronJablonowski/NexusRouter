@@ -656,6 +656,20 @@ the terminal-tree attempt cap, and reruns all admission plus the transactional
 approval check. It never replays the failed provider call. Partial streams,
 delegated work, cancellation, ambiguous model identity and absent or stale
 approval remain terminal.
+For a built-in history-first continuation whose complete initial request still
+fits, the same off-by-default policy may freeze that currently approved summary
+as a one-shot later-turn alternative. The first turn receives full history. If
+completed-turn/tool growth or queued steering would overflow a subsequent
+request, `context.compacted` is committed before the frozen prefix is replaced
+and before provider redispatch. Durable admission revalidates the exact current
+review, canonical source replacement, safe boundary, one-shot state and journal
+budget; replay preserves all live suffix messages and tool pairs. The journal
+budget reserves both terminal bytes and the final event slot, and definitive
+exhaustion terminalizes without another provider dispatch. Revocation,
+redaction drift, estimator/persistence failure, or an insufficient compact form
+fails closed. This implemented slice excludes delegated work, custom context
+engines, already-compacted continuations and the stateful Codex app-server
+adapter pending provider-specific continuation semantics.
 Trusted Go hosts can opt into a named deterministic semantic validator after
 drafting. Version-two review evidence binds the exact source sequence and
 digest, complete draft digest, validator identity and previous review head;
@@ -663,8 +677,8 @@ lost-ack retries use a caller-supplied operation ID and do not re-invoke the
 validator. Only approval authorizes continuation, while rejection and
 abstention remain inactive and append-only. The stock runtime does not infer a
 validator or treat an LLM self-review as deterministic approval. Configured
-unattended validation, a stock semantic validator and mid-task compaction remain
-required work; see [native summary drafting](docs/codex-session-summaries.md)
+unattended validation, a stock semantic validator and broader provider/context-engine
+mid-task compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
 ### 10.4 Memory

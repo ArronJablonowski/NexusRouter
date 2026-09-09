@@ -1,20 +1,24 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 // prepareExplicitApprovedCompaction freezes the complete initial context before
-// local resource or managed-residency mutation. It changes the continuation
-// only when the built-in conservative floor proves full history cannot fit and
-// a currently approved replacement does fit. Trusted custom estimators still
-// run once inside the durable runtime and may reject the compacted request.
+// local resource or managed-residency mutation. An initial overflow may select
+// a currently approved replacement immediately. When full history still fits,
+// the built-in history-first path instead retains full context for turn one and
+// gives the runtime one exact approved alternative for later growth. Trusted
+// custom estimators still run only inside the durable runtime.
 func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Request, model config.Model) (Request, error) {
 	if !s.settings.Runtime.AutoApprovedCompaction || r.delegatedParent != "" || r.ContinueTaskID == "" || r.Compaction != nil || r.SummaryAttemptID != "" || model.ContextTokens < 1 {
 		return r, nil
@@ -29,9 +33,16 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if err != nil {
 		return r, err
 	}
-	estimate, err := providers.EstimateContext(inference)
-	if err != nil || estimate <= model.ContextTokens {
+	fullEstimate, err := providers.EstimateContext(inference)
+	if err != nil {
 		return full, err
+	}
+	// Mid-task prefix replacement currently requires the built-in history-first
+	// assembly and a stateless request adapter. Explicit initial compaction keeps
+	// its existing broader provider/context-engine support.
+	pendingEligible := fullEstimate <= model.ContextTokens && s.contextEngine == nil && midTaskCompactionProvider(s.settings, model)
+	if fullEstimate <= model.ContextTokens && !pendingEligible {
+		return full, nil
 	}
 	attempt, _, err := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -44,18 +55,54 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	compact.SummaryAttemptID = attempt.ID
 	compact.continuation = nil
 	compact.preparedContext = nil
-	compact, inference, err = s.prepareExplicitInference(ctx, db, compact, model, secrets)
+	compact, compactInference, err := s.prepareExplicitInference(ctx, db, compact, model, secrets)
 	if err != nil {
 		return r, err
 	}
-	estimate, err = providers.EstimateContext(inference)
+	compactEstimate, err := providers.EstimateContext(compactInference)
 	if err != nil {
 		return r, err
 	}
-	if estimate > model.ContextTokens {
+	if compactEstimate > model.ContextTokens {
 		return full, nil
 	}
-	return compact, nil
+	if fullEstimate > model.ContextTokens {
+		return compact, nil
+	}
+	if compactEstimate >= fullEstimate || !exactMessagePrefix(inference.Messages, full.continuation.Messages) ||
+		!exactMessagePrefix(compactInference.Messages, compact.continuation.Messages) {
+		return full, nil
+	}
+	fullTail := inference.Messages[len(full.continuation.Messages):]
+	compactTail := compactInference.Messages[len(compact.continuation.Messages):]
+	if !sameMessages(fullTail, compactTail) {
+		return full, nil
+	}
+	full.approvedCompaction = &runtime.ApprovedCompaction{
+		Compaction:        compact.continuation.Compaction,
+		OriginalPrefix:    inference.Messages,
+		ReplacementPrefix: compactInference.Messages,
+	}
+	return full, nil
+}
+
+func midTaskCompactionProvider(settings config.Settings, model config.Model) bool {
+	for _, provider := range settings.Providers {
+		if provider.ID == model.Provider {
+			return provider.Kind != "codex_app_server"
+		}
+	}
+	return false
+}
+
+func exactMessagePrefix(all, prefix []providers.Message) bool {
+	return len(prefix) > 0 && len(all) >= len(prefix) && sameMessages(all[:len(prefix)], prefix)
+}
+
+func sameMessages(a, b []providers.Message) bool {
+	left, leftErr := json.Marshal(a)
+	right, rightErr := json.Marshal(b)
+	return leftErr == nil && rightErr == nil && bytes.Equal(left, right)
 }
 
 func (s *Service) prepareExplicitInference(ctx context.Context, db *telemetry.Store, r Request, model config.Model, secrets []string) (Request, providers.Request, error) {

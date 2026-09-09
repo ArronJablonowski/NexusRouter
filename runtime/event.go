@@ -32,6 +32,7 @@ const (
 	EvaluationRecorded Kind = "evaluation.recorded"
 	ErrorRecorded      Kind = "error.recorded"
 	SteeringApplied    Kind = "steering.applied"
+	ContextCompacted   Kind = "context.compacted"
 )
 
 type Effect string
@@ -92,6 +93,7 @@ type Data struct {
 	Code                  string                 `json:"code,omitempty"`
 	Accepted              *bool                  `json:"accepted,omitempty"`
 	Messages              []providers.Message    `json:"messages,omitempty"`
+	ReplacedMessages      int                    `json:"replaced_messages,omitempty"`
 	ToolCalls             []providers.ToolCall   `json:"tool_calls,omitempty"`
 	Usage                 *providers.Usage       `json:"usage,omitempty"`
 	FinishReason          string                 `json:"finish_reason,omitempty"`
@@ -137,10 +139,17 @@ func (e Event) Validate() error {
 	if e.Version != 1 || e.ID == "" || e.TaskID == "" || e.SessionID == "" || e.CorrelationID == "" || e.Sequence < 1 || e.Time.IsZero() {
 		return errors.New("invalid event envelope")
 	}
-	if e.Data.Compaction != nil && (e.Kind != TaskStarted || e.Data.Compaction.Validate(e.Data.ParentTaskID) != nil) {
+	if e.Data.Compaction != nil && ((e.Kind != TaskStarted && e.Kind != ContextCompacted) || e.Data.Compaction.Validate(e.Data.ParentTaskID) != nil) {
 		return errors.New("invalid context compaction")
 	}
+	if e.Data.ReplacedMessages != 0 && e.Kind != ContextCompacted {
+		return errors.New("invalid replaced message count")
+	}
 	switch e.Kind {
+	case ContextCompacted:
+		if e.Data.Compaction == nil || e.Data.Compaction.SummaryAttemptID == "" || e.Data.Compaction.SummaryReviewID == "" || e.Data.ParentTaskID == "" || e.Data.ReplacedMessages < 1 || len(e.Data.Messages) == 0 || providers.ValidateMessages(e.Data.Messages) != nil || e.TurnID != "" || e.AttemptID != "" {
+			return errors.New("invalid context compaction event")
+		}
 	case SteeringApplied:
 		if !validSteeringID(e.Data.SteeringID) || !ValidSteeringText(e.Data.Text) || e.TurnID != "" || e.AttemptID != "" {
 			return errors.New("invalid steering event")

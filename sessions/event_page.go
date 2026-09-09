@@ -11,6 +11,14 @@ import (
 )
 
 const MaxEventPageBytes = 8 << 20
+const MaxTaskEvents = 10000
+
+// MaxContextCompactionActivationBytes leaves six MiB for the bounded app
+// runtime's remaining output, duplicated completed-turn text, tool lifecycle
+// evidence, evaluations, and terminal fact. Activation is optional and must
+// fail closed when the existing journal plus replacement cannot retain this
+// recovery budget.
+const MaxContextCompactionActivationBytes = 2 << 20
 
 var ErrEventCursor = errors.New("invalid event cursor")
 var ErrEventPage = errors.New("invalid event page")
@@ -43,7 +51,7 @@ func EventPageStateMatches(state string, kind runtime.Kind) bool {
 		return kind == runtime.TaskCanceled
 	case "running":
 		switch kind {
-		case runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.ModelDelta, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.RouteSelected, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.SteeringApplied:
+		case runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.ModelDelta, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.RouteSelected, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.SteeringApplied, runtime.ContextCompacted:
 			return true
 		}
 		return false

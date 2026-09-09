@@ -427,8 +427,9 @@ honor cancellation and concurrency, and keep task data private. They are not
 serialized in durable submissions: a restarting host supplies its current engine.
 Canonical compaction checkpoints still use built-in estimates for reproducible
 provenance; custom measurement controls actual inference admission, not those
-stored values. This is the estimation component of the planned ContextEngine, not custom
-context assembly or automatic semantic compaction, and is not a tokenizer-accuracy
+stored values. Custom estimation intentionally excludes one-shot automatic
+activation of an already approved mid-task replacement because its stable tier
+cannot be proven. This is not a tokenizer-accuracy
 or OS-isolation guarantee.
 
 ### Replaceable context planning
@@ -1077,7 +1078,8 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Automatic semantic context compaction, broader extension hooks,
+qualification. Automatic summary generation/approval, custom-engine mid-task
+compaction, broader extension hooks,
 a signed release, and full PRD SDK contract coverage remain unfinished. Existing
 low-level packages are not a
 substitute for those future application-level extension contracts.

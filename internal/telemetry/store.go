@@ -458,6 +458,14 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	if seq != expected || session != e.SessionID || state != "running" || (seq > 0 && e.Kind == runtime.TaskStarted) {
 		return ErrConflict
 	}
+	if e.Kind == runtime.ContextCompacted {
+		if err := validateContextCompactionGate(ctx, tx, e); err != nil {
+			return err
+		}
+	}
+	if err := validatePostCompactionJournalBudget(ctx, tx, e, body); err != nil {
+		return err
+	}
 	if err := submissionAppendGate(ctx, tx, e, id, token); err != nil {
 		return err
 	}

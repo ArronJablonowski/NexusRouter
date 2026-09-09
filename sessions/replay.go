@@ -50,6 +50,8 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 	turnIDs := map[string]bool{}
 	attemptIDs := map[string]bool{}
 	steeringIDs := map[string]bool{}
+	initialMessages := 0
+	completedTurn := false
 	for {
 		events, err := r.Read(ctx, task, s.Sequence, 100)
 		if err != nil {
@@ -80,6 +82,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.Compaction = e.Data.Compaction
 				s.SkillContext = e.Data.SkillContext.Clone()
 				s.Messages = e.Data.Messages
+				initialMessages = len(e.Data.Messages)
 				s.MessageSequences = make([]int64, len(s.Messages))
 				for i := range s.MessageSequences {
 					s.MessageSequences[i] = e.Sequence
@@ -109,6 +112,34 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				steeringIDs[e.Data.SteeringID] = true
 				s.Messages = append(s.Messages, providers.Message{Role: "user", Content: e.Data.Text})
 				s.MessageSequences = append(s.MessageSequences, e.Sequence)
+			case runtime.ContextCompacted:
+				// Compaction is a one-shot replacement of the exact initial
+				// continuation prefix. Everything appended by this task remains
+				// in the suffix, including steering and complete tool batches.
+				if turn != "" || attempt != "" || !completedTurn || len(s.Pending) > 0 || s.UncertainEffects || s.Compaction != nil || e.TurnID != "" || e.AttemptID != "" || e.Data.Compaction == nil || e.Data.ParentTaskID != s.ParentTaskID || initialMessages < 1 || e.Data.ReplacedMessages != initialMessages || e.Data.ReplacedMessages > len(s.Messages) || len(e.Data.Messages) == 0 {
+					return s, ErrHistory
+				}
+				candidate := append([]providers.Message(nil), e.Data.Messages...)
+				candidate = append(candidate, s.Messages[e.Data.ReplacedMessages:]...)
+				if providers.ValidateMessages(candidate) != nil {
+					return s, ErrHistory
+				}
+				// Retain identities from the removed prefix and union identities
+				// introduced by the replacement. A corrupt journal must not be
+				// able to reuse either identity in a later completed turn even
+				// when the resulting duplicate would only become visible after
+				// activation.
+				for _, message := range e.Data.Messages {
+					for _, call := range message.ToolCalls {
+						toolIDs[call.ID] = true
+					}
+				}
+				sequences := make([]int64, len(e.Data.Messages))
+				for i := range sequences {
+					sequences[i] = e.Sequence
+				}
+				sequences = append(sequences, s.MessageSequences[e.Data.ReplacedMessages:]...)
+				s.Messages, s.MessageSequences, s.Compaction = candidate, sequences, e.Data.Compaction
 			case runtime.ModelDelta:
 				if turn == "" || turn != e.TurnID || attempt != e.AttemptID {
 					return s, ErrHistory
@@ -128,6 +159,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.MessageSequences = append(s.MessageSequences, e.Sequence)
 				turn = ""
 				attempt = ""
+				completedTurn = true
 			case runtime.ToolStarted, runtime.ToolCompleted:
 				pending, ok := s.Pending[e.Data.ToolCallID]
 				if !ok || pending.Call.Name != e.Data.ToolName || pending.TurnID != e.TurnID || pending.AttemptID != e.AttemptID {

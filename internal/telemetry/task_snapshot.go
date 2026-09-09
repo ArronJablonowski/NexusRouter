@@ -46,7 +46,7 @@ func taskSnapshotWithEvents(ctx context.Context, tx *sql.Tx, task string, captur
 	if err != nil {
 		return zero, err
 	}
-	if !session.Valid || !state.Valid || !sessions.ValidEventPageID(session.String) || head < 1 || head > 10000 {
+	if !session.Valid || !state.Valid || !sessions.ValidEventPageID(session.String) || head < 1 || head > sessions.MaxTaskEvents {
 		return zero, sessions.ErrHistory
 	}
 	switch state.String {
@@ -71,7 +71,7 @@ func taskSnapshotWithEvents(ctx context.Context, tx *sql.Tx, task string, captur
 			rows.Close()
 			return zero, err
 		}
-		if !id.Valid || id.String == "" || sequence != int64(len(entries)+1) || len(entries) >= 10000 || size < 1 || size > (8<<20)-total {
+		if !id.Valid || id.String == "" || sequence != int64(len(entries)+1) || len(entries) >= sessions.MaxTaskEvents || size < 1 || size > int64(sessions.MaxEventPageBytes)-total {
 			rows.Close()
 			return zero, sessions.ErrHistory
 		}

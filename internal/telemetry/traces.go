@@ -104,7 +104,7 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	 END
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
-	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied')
+	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied','context.compacted')
 	 ORDER BY sequence LIMIT 514`, task.id)
 	if err != nil {
 		return traces.Trace{}, errTraces
@@ -239,6 +239,8 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			children = append(children, traceInstant("error", "recorded", at))
 		case "steering.applied":
 			children = append(children, traceInstant("steering", "applied", at))
+		case "context.compacted":
+			children = append(children, traceInstant("compaction", "applied", at))
 		default:
 			return traces.Trace{}, errTraces
 		}

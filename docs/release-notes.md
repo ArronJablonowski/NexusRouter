@@ -122,7 +122,7 @@ decision or publication approval is claimed.
 - The same policy now covers explicit-model initial admission. It measures the
   frozen history, memory, skill and tool-schema assembly before resource or
   residency mutation, selects an approved checkpoint only when it fits, and
-  leaves custom-estimator and mid-task decisions fail closed.
+  leaves custom-estimator and custom-context-engine decisions fail closed.
 
 - Provider-reported first-turn context overflow can use that policy to start
   one separately linked same-model task with an approved summary. Durable
@@ -131,6 +131,14 @@ decision or publication approval is claimed.
   ceiling and aggregate configured cost are preserved across an earlier safe
   fallback and the compacted recovery. This does not guarantee that the failed
   provider attempt was unbilled.
+
+- Eligible built-in continuations can retain full history for turn one and
+  activate one frozen, currently approved summary only when later completed-turn,
+  tool, or steering growth would overflow. The durable `context.compacted`
+  boundary precedes mutation and redispatch, revalidates approval/source state,
+  preserves the complete live suffix, survives replay, and reserves terminal
+  recovery capacity. Custom context engines, delegated tasks, already-compacted
+  sources, and the Codex app-server remain fail-closed.
 
 - Explicit Sol continuation with manual or approved stored compaction, preserving
   canonical checkpoints, historical tool pairs and the durable-start approval

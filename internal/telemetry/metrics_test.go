@@ -228,7 +228,7 @@ func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
 		"task.started", "task.completed", "task.failed", "task.canceled",
 		"turn.started", "turn.completed", "model.delta", "tool.started", "tool.completed",
 		"worker.started", "worker.heartbeat", "worker.completed", "route.selected",
-		"evaluation.recorded", "error.recorded", "steering.applied",
+		"evaluation.recorded", "error.recorded", "steering.applied", "context.compacted",
 	}
 	for i, kind := range kinds {
 		data := map[string]any{"text": "private-payload"}
@@ -283,7 +283,11 @@ func TestMetricsCountsCanonicalRuntimeEvents(t *testing.T) {
 			t.Fatal(group)
 		}
 		for _, count := range group.Counts {
-			if count.Value != 1 {
+			expected := int64(1)
+			if count.State == "compaction" {
+				expected = 2
+			}
+			if count.Value != expected {
 				t.Fatal("derived operation missing", count)
 			}
 		}
