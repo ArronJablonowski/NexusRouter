@@ -181,7 +181,7 @@ func readEventLogByPosition(ctx context.Context, tx *sql.Tx, position int64, id 
 func validateEventLogCompleteness(ctx context.Context, tx *sql.Tx) error {
 	var schema int
 	var tableSQL string
-	if err := tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&schema); err != nil || schema != 33 {
+	if err := tx.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&schema); err != nil || schema != currentStorageSchema {
 		return sessions.ErrEventLog
 	}
 	if err := tx.QueryRowContext(ctx, `SELECT sql FROM sqlite_master WHERE type='table' AND name='event_log'`).Scan(&tableSQL); err != nil || strings.Join(strings.Fields(tableSQL), " ") != strings.Join(strings.Fields(eventLogTableSQL), " ") {

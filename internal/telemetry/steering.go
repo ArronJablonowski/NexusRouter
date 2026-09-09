@@ -33,8 +33,15 @@ func readSteering(ctx context.Context, tx *sql.Tx, task, id string) (runtime.Ste
 }
 
 func (s *Store) QueueSteering(ctx context.Context, task, keyHash, text string) (runtime.SteeringMessage, error) {
+	return s.QueueSteeringAtRevision(ctx, task, keyHash, text, 0)
+}
+
+// QueueSteeringAtRevision binds a new message to an observed task head. Exact
+// key retries are resolved first so later task progress cannot invalidate an
+// acknowledgement-loss replay.
+func (s *Store) QueueSteeringAtRevision(ctx context.Context, task, keyHash, text string, expected int64) (runtime.SteeringMessage, error) {
 	message := runtime.SteeringMessage{Version: 1, ID: rand.Text(), TaskID: task, Text: text, State: "pending", CreatedAt: time.Now().UTC()}
-	if !submissionDigest(keyHash) || message.Validate() != nil {
+	if !submissionDigest(keyHash) || message.Validate() != nil || expected < 0 || expected > sessions.MaxTaskEvents {
 		return runtime.SteeringMessage{}, sessions.ErrHistory
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -62,6 +69,15 @@ func (s *Store) QueueSteering(ctx context.Context, task, keyHash, text string) (
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return runtime.SteeringMessage{}, err
+	}
+	if expected > 0 {
+		var current int64
+		if err = tx.QueryRowContext(ctx, "SELECT sequence FROM task_heads WHERE task_id=?", task).Scan(&current); err != nil {
+			return runtime.SteeringMessage{}, err
+		}
+		if current != expected {
+			return runtime.SteeringMessage{}, ErrConflict
+		}
 	}
 	status, err := cancellationStatus(ctx, tx, task, false)
 	if err != nil {

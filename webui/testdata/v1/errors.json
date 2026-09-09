@@ -13,6 +13,17 @@
       "code": "admission_denied",
       "message": "The operation was not admitted.",
       "retryable": false
+    },
+    {
+      "version": 1,
+      "code": "revision_conflict",
+      "message": "The task changed; inspect its current state.",
+      "retryable": true,
+      "current_revision": 7,
+      "subject_type": "task",
+      "subject_id": "task-fixture",
+      "current_state": "running",
+      "operation_id": "operation-steer"
     }
   ]
 }

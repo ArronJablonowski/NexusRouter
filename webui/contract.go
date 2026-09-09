@@ -41,10 +41,11 @@ var (
 type ChatAction string
 
 const (
-	ChatSubmit ChatAction = "submit"
-	ChatResume ChatAction = "resume"
-	ChatSteer  ChatAction = "steer"
-	ChatCancel ChatAction = "cancel"
+	ChatSubmit           ChatAction = "submit"
+	ChatResume           ChatAction = "resume"
+	ChatSteer            ChatAction = "steer"
+	ChatCancel           ChatAction = "cancel"
+	ChatCancelSubmission ChatAction = "cancel_submission"
 )
 
 type ChatRequest struct {
@@ -53,6 +54,7 @@ type ChatRequest struct {
 	IdempotencyKey   string     `json:"idempotency_key"`
 	ChatID           string     `json:"chat_id,omitempty"`
 	TaskID           string     `json:"task_id,omitempty"`
+	SubmissionID     string     `json:"submission_id,omitempty"`
 	ModelID          string     `json:"model_id,omitempty"`
 	Text             string     `json:"text,omitempty"`
 	ExpectedRevision *int64     `json:"expected_revision,omitempty"`
@@ -60,25 +62,29 @@ type ChatRequest struct {
 
 func (r ChatRequest) Validate() error {
 	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) ||
-		!optionalID(r.ChatID) || !optionalID(r.TaskID) || !optionalModelID(r.ModelID) ||
+		!optionalID(r.ChatID) || !optionalID(r.TaskID) || !optionalID(r.SubmissionID) || !optionalModelID(r.ModelID) ||
 		!optionalRevision(r.ExpectedRevision) || !boundedText(r.Text, MaxRequestBytes, true) {
 		return ErrContract
 	}
 	switch r.Action {
 	case ChatSubmit:
-		if r.TaskID != "" || r.ExpectedRevision != nil || strings.TrimSpace(r.Text) == "" {
+		if r.ChatID != "" || r.TaskID != "" || r.SubmissionID != "" || r.ExpectedRevision != nil || strings.TrimSpace(r.Text) == "" {
 			return ErrContract
 		}
 	case ChatResume:
-		if r.ChatID == "" || r.TaskID == "" || strings.TrimSpace(r.Text) == "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 {
+		if r.ChatID == "" || r.TaskID == "" || r.SubmissionID != "" || strings.TrimSpace(r.Text) == "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 {
 			return ErrContract
 		}
 	case ChatSteer:
-		if r.TaskID == "" || strings.TrimSpace(r.Text) == "" || r.ModelID != "" || r.ChatID != "" {
+		if r.TaskID == "" || r.SubmissionID != "" || strings.TrimSpace(r.Text) == "" || r.ModelID != "" || r.ChatID != "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 {
 			return ErrContract
 		}
 	case ChatCancel:
-		if r.TaskID == "" || r.Text != "" || r.ModelID != "" || r.ChatID != "" {
+		if r.TaskID == "" || r.SubmissionID != "" || r.Text != "" || r.ModelID != "" || r.ChatID != "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 {
+			return ErrContract
+		}
+	case ChatCancelSubmission:
+		if r.SubmissionID == "" || r.TaskID != "" || r.Text != "" || r.ModelID != "" || r.ChatID != "" || r.ExpectedRevision != nil {
 			return ErrContract
 		}
 	default:
@@ -174,6 +180,10 @@ func (r ApprovalRequest) Validate() error {
 		(r.Action != ApprovalAllow && r.Action != ApprovalDeny && r.Action != ApprovalRevoke) {
 		return ErrContract
 	}
+	if (r.Action == ApprovalAllow || r.Action == ApprovalDeny) && r.ExpectedRevision != 1 ||
+		r.Action == ApprovalRevoke && r.ExpectedRevision != 2 {
+		return ErrContract
+	}
 	return encodedWithin(r, 16<<10)
 }
 
@@ -191,23 +201,23 @@ type FeedbackRequest struct {
 	FeedbackID       string         `json:"feedback_id,omitempty"`
 	Action           FeedbackAction `json:"action"`
 	Accepted         bool           `json:"accepted"`
-	AttemptCost      float64        `json:"attempt_cost"`
+	AttemptCost      *float64       `json:"attempt_cost,omitempty"`
 	ExpectedRevision *int64         `json:"expected_revision,omitempty"`
 }
 
 func (r FeedbackRequest) Validate() error {
 	if r.Version != ContractVersion || !validKey(r.IdempotencyKey) || !validID(r.TaskID) ||
-		!optionalID(r.FeedbackID) || math.IsNaN(r.AttemptCost) || math.IsInf(r.AttemptCost, 0) ||
-		r.AttemptCost < 0 || !optionalRevision(r.ExpectedRevision) {
+		!optionalID(r.FeedbackID) || (r.AttemptCost != nil && (math.IsNaN(*r.AttemptCost) || math.IsInf(*r.AttemptCost, 0) || *r.AttemptCost < 0)) ||
+		!optionalRevision(r.ExpectedRevision) {
 		return ErrContract
 	}
 	switch r.Action {
 	case FeedbackRecord:
-		if r.FeedbackID != "" || r.ExpectedRevision != nil {
+		if r.FeedbackID != "" || r.ExpectedRevision != nil || r.AttemptCost == nil {
 			return ErrContract
 		}
 	case FeedbackRevise:
-		if r.FeedbackID == "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 {
+		if r.FeedbackID == "" || r.ExpectedRevision == nil || *r.ExpectedRevision < 1 || r.AttemptCost != nil {
 			return ErrContract
 		}
 	default:
@@ -774,11 +784,20 @@ type Error struct {
 	Retryable       bool   `json:"retryable"`
 	CurrentRevision *int64 `json:"current_revision,omitempty"`
 	RetryAfterMS    *int64 `json:"retry_after_ms,omitempty"`
+	SubjectType     string `json:"subject_type,omitempty"`
+	SubjectID       string `json:"subject_id,omitempty"`
+	CurrentState    string `json:"current_state,omitempty"`
+	OperationID     string `json:"operation_id,omitempty"`
 }
 
 func (e Error) Validate() error {
 	if e.Version != ContractVersion || !validID(e.Code) || !boundedText(e.Message, 256, false) ||
-		!optionalRevision(e.CurrentRevision) || (e.RetryAfterMS != nil && (*e.RetryAfterMS < 1 || *e.RetryAfterMS > 60_000)) {
+		!optionalRevision(e.CurrentRevision) || (e.RetryAfterMS != nil && (*e.RetryAfterMS < 1 || *e.RetryAfterMS > 60_000)) ||
+		!optionalID(e.SubjectID) || !optionalID(e.CurrentState) || !optionalID(e.OperationID) ||
+		(e.SubjectType == "") != (e.SubjectID == "") {
+		return ErrContract
+	}
+	if e.SubjectType != "" && e.SubjectType != "chat" && e.SubjectType != "task" && e.SubjectType != "submission" && e.SubjectType != "feedback" && e.SubjectType != "approval" {
 		return ErrContract
 	}
 	return encodedWithin(e, 4096)
@@ -833,8 +852,13 @@ var operationSpecs = []OperationSpec{
 	{Operation: "chat.stream", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/events", ServicePrimitive: "presentation SSE over durable committed event reader", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "chat.steer", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/steering", ServicePrimitive: "POST /v1/tasks/{task}/steering", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
 	{Operation: "chat.cancel", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/cancel", ServicePrimitive: "POST /v1/tasks/{task}/cancel", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
+	{Operation: "chat.cancel_submission", Method: "POST", BrowserPath: "/app/api/v1/submissions/{submission}/cancel", ServicePrimitive: "POST /v1/submissions/{submission}/cancel", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
+	{Operation: "operation.list", Method: "GET", BrowserPath: "/app/api/v1/operations", ServicePrimitive: "new session-scoped browser operation projection", Security: SessionRead},
+	{Operation: "submission.inspect", Method: "GET", BrowserPath: "/app/api/v1/submissions/{submission}", ServicePrimitive: "GET /v1/submissions/{submission}", Security: SessionRead, PrimitiveExists: true},
+	{Operation: "task.controls", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/controls", ServicePrimitive: "new browser-safe task control projection", Security: SessionRead},
 	{Operation: "feedback.record", Method: "POST", BrowserPath: "/app/api/v1/feedback", ServicePrimitive: "new browser feedback facade over existing evidence service", Security: SessionCSRFMutation, Mutation: true},
 	{Operation: "feedback.revise", Method: "POST", BrowserPath: "/app/api/v1/feedback/revisions", ServicePrimitive: "new revision facade over immutable feedback evidence", Security: SessionCSRFMutation, Mutation: true},
+	{Operation: "feedback.inspect", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/feedback", ServicePrimitive: "new browser-safe objective and subjective evidence projection", Security: SessionRead},
 	{Operation: "approval.list", Method: "GET", BrowserPath: "/app/api/v1/tasks/{task}/approvals", ServicePrimitive: "GET /v1/tasks/{task}/approvals", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "approval.decide", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/approvals/{approval}/decision", ServicePrimitive: "new revision facade over existing approval command", Security: SessionCSRFMutation, Mutation: true},
 	{Operation: "model.list", Method: "GET", BrowserPath: "/app/api/v1/models", ServicePrimitive: "GET /v1/routing/models redacted catalog", Security: SessionRead, PrimitiveExists: true},

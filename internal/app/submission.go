@@ -208,6 +208,61 @@ func (s *Service) ResumeSubmission(ctx context.Context, key string, r Request) (
 	return status, submissionError(err)
 }
 
+// ExistingFollowUpSubmission reconciles an acknowledgement-lost branch/resume
+// without creating work. It derives the same exact source-bound envelope used by
+// admission, so a pending browser operation can distinguish a committed child
+// from a different task that merely advanced the chat head.
+func (s *Service) ExistingFollowUpSubmission(ctx context.Context, key string, source sessions.TaskHeadFence, recovered bool, r Request) (submissions.Status, error) {
+	if source.Validate() != nil || strings.TrimSpace(r.Prompt) == "" || len(r.Messages) != 0 || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" {
+		return submissions.Status{}, ErrAdmission
+	}
+	r.ContinueTaskID = source.TaskID
+	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return submissions.Status{}, sql.ErrNoRows
+		}
+		return submissions.Status{}, ErrSubmission
+	}
+	defer db.Close()
+	var envelope submissionEnvelope
+	if recovered {
+		fence, readErr := db.ResumeSource(ctx, source.TaskID)
+		if readErr != nil {
+			return submissions.Status{}, submissionError(readErr)
+		}
+		if fence.SessionID != source.SessionID || fence.HeadSequence != source.HeadSequence || fence.HeadEventID != source.HeadEventID {
+			return submissions.Status{}, ErrAdmission
+		}
+		if fence.SourcePrivacy != "cloud_allowed" || r.LocalRequired {
+			fence.EffectivePrivacy = "local_only"
+		} else {
+			fence.EffectivePrivacy = "cloud_allowed"
+		}
+		envelope = submissionEnvelope{Version: 1, Request: r, Resume: &fence}
+	} else {
+		fence, readErr := db.BranchSource(ctx, source.TaskID)
+		if readErr != nil {
+			return submissions.Status{}, submissionError(readErr)
+		}
+		if fence.SessionID != source.SessionID || fence.HeadSequence != source.HeadSequence || fence.HeadEventID != source.HeadEventID {
+			return submissions.Status{}, ErrAdmission
+		}
+		if fence.SourcePrivacy != "cloud_allowed" || r.LocalRequired {
+			fence.EffectivePrivacy = "local_only"
+		} else {
+			fence.EffectivePrivacy = "cloud_allowed"
+		}
+		envelope = submissionEnvelope{Version: 1, Request: r, Branch: &fence}
+	}
+	keyDigest, requestDigest, _, err := s.submissionEnvelopePayload(key, envelope)
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	status, err := db.SubmissionByKey(ctx, keyDigest, requestDigest, s.submissionConfigDigest())
+	return status, submissionError(err)
+}
+
 // RunSubmission durably admits one idempotent request and waits for its
 // detached execution to become terminal. Canceling the caller stops only the
 // wait: the submission remains owned by the daemon dispatcher and can be

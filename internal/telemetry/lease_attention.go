@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -37,7 +38,7 @@ func (s *Store) ListLeaseAttention(ctx context.Context, options workers.LeaseAtt
 	}
 	defer tx.Rollback()
 	var schema int
-	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema < 1 || schema > 33 {
+	if tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema) != nil || schema < 1 || schema > stateschema.Current {
 		return zero, workers.ErrLeaseAttention
 	}
 	page := workers.LeaseAttentionPage{Version: 1, StorageSchema: schema, Available: schema >= 24, Items: []workers.LeaseAttention{}}

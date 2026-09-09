@@ -66,6 +66,10 @@ func (s *Service) CancellationStatus(ctx context.Context, task string) (runtime.
 }
 
 func (s *Service) CancelTask(ctx context.Context, task string) (runtime.CancellationStatus, error) {
+	return s.CancelTaskAtRevision(ctx, task, 0)
+}
+
+func (s *Service) CancelTaskAtRevision(ctx context.Context, task string, expected int64) (runtime.CancellationStatus, error) {
 	// Confirm existence read-only before opening a writer (which may migrate).
 	if _, err := s.CancellationStatus(ctx, task); err != nil {
 		return runtime.CancellationStatus{}, err
@@ -75,7 +79,7 @@ func (s *Service) CancelTask(ctx context.Context, task string) (runtime.Cancella
 		return runtime.CancellationStatus{}, ErrCancellationControl
 	}
 	defer db.Close()
-	status, err := db.RequestCancellation(ctx, task)
+	status, err := db.RequestCancellationAtRevision(ctx, task, expected)
 	return status, cancellationError(err)
 }
 

@@ -31,16 +31,81 @@
         </aside>
         <section class="transcript-panel" aria-labelledby="chat-title">
           <header class="transcript-heading">
-            <div><p class="eyebrow">Read-only transcript</p><h2 id="chat-title">Select a chat</h2></div>
+            <div><p class="eyebrow">Conversation</p><h2 id="chat-title">New chat</h2></div>
             <output id="chat-state" class="state-pill"></output>
           </header>
           <div id="transcript-state" class="notice" role="status">Choose a session to inspect its committed history.</div>
           <ol id="transcript" class="transcript" aria-label="Committed chat transcript"></ol>
           <button id="load-more-messages" class="secondary transcript-more" type="button" hidden>Load more messages</button>
-          <div id="provisional" class="provisional-stack" aria-live="polite" aria-label="Provisional assistant output" hidden></div>
+          <div id="provisional" class="provisional-stack" aria-label="Provisional assistant output" hidden></div>
+          <output id="stream-announcement" class="visually-hidden" aria-live="polite"></output>
+          <section id="task-controls" class="task-controls" aria-labelledby="task-controls-title" hidden>
+            <h3 id="task-controls-title">Work controls</h3>
+            <div id="steering-control">
+              <label for="steering-text">Guidance for the running task</label>
+              <textarea id="steering-text" rows="2" maxlength="65536" aria-describedby="steering-help"></textarea>
+              <p id="steering-help" class="help">Steering is queued guidance, not a follow-up message or a permission change.</p>
+            </div>
+            <div class="button-row">
+              <button id="steer-task" class="secondary" type="button">Queue guidance</button>
+              <button id="cancel-task" class="danger" type="button">Cancel task</button>
+            </div>
+          </section>
+          <section id="approval-panel" class="approval-panel" aria-labelledby="approval-title" hidden>
+            <div class="control-heading"><h3 id="approval-title">Tool approvals</h3><output id="approval-count" class="count"></output></div>
+            <div id="approval-state" class="notice compact" role="status"></div>
+            <ul id="approval-list" class="approval-list" aria-label="Pending tool approvals"></ul>
+          </section>
+          <section id="feedback-panel" class="feedback-panel" aria-labelledby="feedback-title" hidden>
+            <h3 id="feedback-title">Outcome evidence</h3>
+            <p class="help">Your assessment is subjective evidence about the final attempt. It does not approve a tool or prove that every step was correct.</p>
+            <div id="feedback-summary" class="evidence-summary"></div>
+            <label id="attempt-cost-label" for="attempt-cost">Observed final-attempt cost</label>
+            <input id="attempt-cost" type="number" min="0" step="any" inputmode="decimal" aria-describedby="attempt-cost-help">
+            <p id="attempt-cost-help" class="help">Enter a nonnegative observed cost. Zero is valid; leave it blank when the cost is unknown.</p>
+            <div class="button-row" role="group" aria-label="Record outcome evidence">
+              <button id="feedback-accepted" class="secondary" type="button">Record accepted</button>
+              <button id="feedback-rejected" class="secondary" type="button">Record rejected</button>
+            </div>
+          </section>
+          <form id="composer" class="composer" novalidate>
+            <label id="composer-label" for="composer-text">Start a new chat</label>
+            <textarea id="composer-text" rows="3" maxlength="1048576" aria-describedby="composer-help composer-error"></textarea>
+            <div class="composer-meta">
+              <span id="composer-help" class="help">Enter sends. Shift+Enter adds a new line.</span>
+              <output id="composer-count" class="count">0</output>
+            </div>
+            <div id="composer-error" class="field-error" role="alert" hidden></div>
+            <div class="button-row">
+              <button id="send-message" type="submit">Start chat</button>
+              <button id="new-chat" class="secondary" type="button" hidden>New chat</button>
+            </div>
+          </form>
+          <div class="mutation-bar">
+            <output id="mutation-state" role="status" aria-live="polite"></output>
+            <button id="reconcile" class="secondary" type="button" hidden>Check current status</button>
+            <button id="acknowledge-unresolved" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
+          </div>
         </section>
       </section>
     </main>
+  </div>
+  <div id="approval-dialog" class="dialog-backdrop" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="approval-dialog-title" aria-describedby="approval-dialog-scope approval-dialog-prompt">
+      <p class="eyebrow">Tool permission</p>
+      <h2 id="approval-dialog-title">Review approval</h2>
+      <p id="approval-dialog-meta" class="help"></p>
+      <p id="approval-dialog-scope" class="approval-scope"></p>
+      <p id="approval-dialog-prompt" class="approval-prompt"></p>
+      <div class="button-row">
+        <button id="approval-deny" class="secondary" type="button">Deny</button>
+        <button id="approval-allow" type="button">Allow once</button>
+        <button id="approval-revoke" class="danger" type="button" hidden>Revoke</button>
+        <button id="approval-close" class="secondary" type="button">Close without deciding</button>
+        <button id="approval-reconcile" class="secondary" type="button" hidden>Check decision status</button>
+        <button id="approval-acknowledge" class="danger" type="button" hidden>Acknowledge unresolved decision</button>
+      </div>
+    </section>
   </div>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>

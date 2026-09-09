@@ -69,6 +69,25 @@ func TestCancellationRequestDurableIdempotentAndReadOnly(t *testing.T) {
 	}
 }
 
+func TestCancellationRevisionCASReplaysBeforeStaleCheck(t *testing.T) {
+	ctx := context.Background()
+	db, _, _ := cancellationStore(t)
+	if _, err := db.RequestCancellationAtRevision(ctx, "task", 2); !errors.Is(err, ErrConflict) {
+		t.Fatal("stale revision accepted", err)
+	}
+	first, err := db.RequestCancellationAtRevision(ctx, "task", 1)
+	if err != nil || !first.Requested {
+		t.Fatal(first, err)
+	}
+	if err = db.Append(ctx, 1, event("canceled", 2, runtime.TaskCanceled)); err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := db.RequestCancellationAtRevision(ctx, "task", 1)
+	if err != nil || replayed.RequestID != first.RequestID || replayed.State != "canceled" {
+		t.Fatal("acknowledgement retry did not converge", replayed, err)
+	}
+}
+
 func TestCancellationGateNoEffectAndCleanup(t *testing.T) {
 	ctx := context.Background()
 	db, _, start := cancellationStore(t)

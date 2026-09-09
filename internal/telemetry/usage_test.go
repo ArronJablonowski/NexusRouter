@@ -455,7 +455,7 @@ func TestUsageMigration29CoverageAndRejectsPartialSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	var version int
-	if s.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != 33 {
+	if s.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != 34 {
 		t.Fatal("migration version", version)
 	}
 	if _, err = s.db.Exec("DROP TABLE submission_stream_events; DROP TABLE IF EXISTS usage_heads; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=29"); err != nil {
@@ -643,7 +643,7 @@ func TestUsageMigrationConcurrent29To30(t *testing.T) {
 	}
 	defer final.Close()
 	var version, tables int
-	if final.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || final.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN('usage_metadata','usage_records','usage_heads','usage_corrections')`).Scan(&tables) != nil || version != 33 || tables != 4 {
+	if final.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || final.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN('usage_metadata','usage_records','usage_heads','usage_corrections')`).Scan(&tables) != nil || version != 34 || tables != 4 {
 		t.Fatalf("migration did not converge: version=%d tables=%d", version, tables)
 	}
 }

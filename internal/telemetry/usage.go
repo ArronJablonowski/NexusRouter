@@ -412,7 +412,7 @@ func usageTotals(ctx context.Context, q usageQueryer, scope accounting.Scope) (a
 		return accounting.Totals{}, accounting.ErrUsage
 	}
 	var schema int
-	if err := q.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || schema < 1 || schema > 33 {
+	if err := q.QueryRowContext(ctx, "PRAGMA user_version").Scan(&schema); err != nil || schema < 1 || schema > currentStorageSchema {
 		return accounting.Totals{}, errUsageSchema
 	}
 	if scope.TaskID != "" {

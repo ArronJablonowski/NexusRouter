@@ -34,6 +34,7 @@ type Options struct {
 	SecureCookies  bool
 	Store          *browserauth.Store
 	Reads          ReadServices
+	Mutations      MutationServices
 	LiveText       *LiveTextHub
 	CursorKey      []byte
 }
@@ -45,11 +46,14 @@ type Handler struct {
 	secureCookies bool
 	store         *browserauth.Store
 	reads         ReadServices
+	mutations     MutationServices
 	liveText      *LiveTextHub
 	shell         http.Handler
 	bootstrap     http.Handler
 	slots         chan struct{}
 	streamSlots   chan struct{}
+	mutationSlots chan struct{}
+	controlSlots  chan struct{}
 	cursorKey     [32]byte
 }
 
@@ -81,7 +85,7 @@ func New(options Options) (*Handler, error) {
 	} else {
 		copy(cursorKey[:], options.CursorKey)
 	}
-	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), cursorKey: cursorKey}
+	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -101,7 +105,7 @@ func New(options Options) (*Handler, error) {
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
 	chatListPath := h.basePath + "/api/v1/chats"
-	queryReadPath := request.URL != nil && (request.URL.Path == chatListPath || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "")
+	queryReadPath := request.URL != nil && (request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "")
 	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
@@ -112,6 +116,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 	if chat := chatEventsID(h.basePath, request.URL.Path); chat != "" {
 		h.serveChatEvents(writer, request, chat)
+		return
+	}
+	if h.serveMutationAPI(writer, request) {
 		return
 	}
 	select {
@@ -295,6 +302,14 @@ func (h *Handler) authenticatedAPINotFound(writer http.ResponseWriter, request *
 func (h *Handler) authenticated(request *http.Request) bool {
 	cookie, ok := exactCookie(request, sessionCookie)
 	return ok && h.store.Authenticate(cookie.Value)
+}
+
+func (h *Handler) browserSubject(request *http.Request) (string, bool) {
+	cookie, ok := exactCookie(request, sessionCookie)
+	if !ok {
+		return "", false
+	}
+	return h.store.Subject(cookie.Value)
 }
 
 func (h *Handler) authorizedMutation(request *http.Request) bool {

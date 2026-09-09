@@ -373,7 +373,31 @@ serves a versioned embedded shell through a terminal-approved, process-local
 browser session boundary with a narrow public bootstrap and bounded CSRF grants;
 it now includes bounded browser-safe chat/session projections, paginated
 history, provisional post-redaction text, and durable reconnectable lifecycle
-streaming. Chat mutations and the workboard store and feature views remain open.
+streaming. The implemented DAR-79 boundary adds direct in-process browser
+facades for submit/resume, steering, task and queued-submission cancellation,
+subjective feedback, and approval decisions. Browser mutations are protected by
+same-origin session/CSRF policy and a request-bound durable operation journal;
+bounded control, feedback, approval, recent-operation, and submission-status
+reads support refresh reconciliation without exposing native bearer tokens or
+raw runtime records. The workboard store, APIs, agent tools, and Kanban feature
+views remain open.
+
+The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
+backup, restore, and migration use one state store. Operations are bound to the
+authenticated browser-session subject and transition from `pending` to the
+terminal `committed` or `rejected` state. Exact retries replay the recorded
+result; reuse with a different request conflicts. Only definitive, sanitized
+domain failures become `rejected`; an interruption whose effect is ambiguous
+stays `pending` for explicit reconciliation. Pending rows are never silently
+pruned. Terminal rows have bounded age/count retention and the journal has a
+hard capacity limit. Browser sessions themselves remain process-local and are
+revoked by daemon restart, so a newly authenticated session does not inherit a
+prior session's authority even though its durable audit records survive.
+
+Subjective browser feedback is an additive immutable revision chain, separate
+from objective validator/tool evidence and advisory model-audit evidence.
+Revision conflicts and corrupt history fail closed; revising a user judgment
+does not overwrite either of the other evidence classes.
 
 Chat and board mutations use versioned native endpoints with idempotency keys.
 Streaming uses resumable Server-Sent Events with event IDs and bounded catch-up;

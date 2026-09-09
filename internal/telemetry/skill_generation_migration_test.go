@@ -44,7 +44,7 @@ func TestSkillGenerationMigrationFrom15PreservesExistingData(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = store.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 33 {
+		if err = store.db.QueryRow("PRAGMA user_version").Scan(&schema); err != nil || schema != 34 {
 			t.Fatalf("migration schema=%d %v", schema, err)
 		}
 		items, err := store.Read(ctx, "task", 0, 10)

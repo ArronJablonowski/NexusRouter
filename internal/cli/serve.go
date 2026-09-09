@@ -24,6 +24,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/api"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
+	"github.com/ArronJablonowski/DarwinRouter/internal/browserops"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/internal/webuiapp"
@@ -110,6 +111,17 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var traceExporter *app.TraceExporter
 	var browserHandler *webuiapp.Handler
 	if s.WebUI.Enabled {
+		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)
+		if operationErr != nil {
+			fmt.Fprintln(stderr, "cannot initialize Web UI operation journal")
+			return 1
+		}
+		defer operationStore.Close()
+		browserMutations, mutationErr := app.NewBrowserMutations(service, operationStore)
+		if mutationErr != nil {
+			fmt.Fprintln(stderr, "cannot initialize Web UI mutation service")
+			return 1
+		}
 		liveText := webuiapp.NewLiveTextHub()
 		if err := app.InstallPresentationTextSink(service, liveText.Publish); err != nil {
 			fmt.Fprintln(stderr, "cannot initialize Web UI presentation stream")
@@ -135,7 +147,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
-		browserHandler, err = webuiapp.New(webuiapp.Options{BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Reads: webuiapp.ReadServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
+			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
+			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
+			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
+		}, Reads: webuiapp.ReadServices{
 			Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)

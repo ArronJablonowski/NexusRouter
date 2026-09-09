@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"io"
 	"sync"
@@ -203,6 +204,24 @@ func (s *Store) Authenticate(token string) bool {
 	s.pruneLocked(now)
 	_, exists := s.sessions[sha256.Sum256([]byte(token))]
 	return exists
+}
+
+// Subject returns a stable, non-secret identity for the lifetime of an
+// authenticated browser session. Durable browser records bind to this digest;
+// the cookie bearer value itself is never exposed or persisted.
+func (s *Store) Subject(token string) (string, bool) {
+	if !validToken(token, 43) {
+		return "", false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now().UTC()
+	s.pruneLocked(now)
+	key := sha256.Sum256([]byte(token))
+	if _, exists := s.sessions[key]; !exists {
+		return "", false
+	}
+	return hex.EncodeToString(key[:]), true
 }
 
 func (s *Store) AuthorizeMutation(token, csrf string) bool {

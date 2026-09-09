@@ -40,7 +40,7 @@ func TestObservationIndexMigrationPreservesSchema30DataAndPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	set, err := db.ObservationSet(ctx, base.Key)
-	if err != nil || schema != 33 || indexes != 1 || len(set.Fitness) != 1 || set.Fitness[0].ID != base.ID {
+	if err != nil || schema != 34 || indexes != 1 || len(set.Fitness) != 1 || set.Fitness[0].ID != base.ID {
 		t.Fatal("schema30 observation migration changed evidence", schema, indexes, set, err)
 	}
 
@@ -135,7 +135,7 @@ func TestObservationIndexMigrationConcurrent30To31(t *testing.T) {
 	for opened := range stores {
 		defer opened.Close()
 		var schema, indexes int
-		if opened.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || opened.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='index' AND name='evaluations_routing_key'`).Scan(&indexes) != nil || schema != 33 || indexes != 1 {
+		if opened.db.QueryRow(`PRAGMA user_version`).Scan(&schema) != nil || opened.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='index' AND name='evaluations_routing_key'`).Scan(&indexes) != nil || schema != 34 || indexes != 1 {
 			t.Fatal("concurrent migration did not converge", schema, indexes)
 		}
 	}

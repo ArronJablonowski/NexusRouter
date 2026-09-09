@@ -4,7 +4,6 @@
     "version": 1,
     "action": "submit",
     "idempotency_key": "fixture-chat-key-0001",
-    "chat_id": "chat-fixture",
     "model_id": "auto",
     "text": "Review the current task."
   },

@@ -38,6 +38,10 @@ func (s *Service) ListSteering(ctx context.Context, task string) ([]runtime.Stee
 // SteerTask durably queues user guidance. Acceptance is not execution: the
 // runtime applies it at a safe boundary without changing tools/privacy/budgets.
 func (s *Service) SteerTask(ctx context.Context, task, key, text string) (runtime.SteeringMessage, error) {
+	return s.SteerTaskAtRevision(ctx, task, key, text, 0)
+}
+
+func (s *Service) SteerTaskAtRevision(ctx context.Context, task, key, text string, expected int64) (runtime.SteeringMessage, error) {
 	if !sessions.ValidEventPageID(task) || len(key) == 0 || len(key) > 128 || !utf8.ValidString(key) || strings.TrimSpace(key) == "" || !runtime.ValidSteeringText(text) {
 		return runtime.SteeringMessage{}, ErrAdmission
 	}
@@ -57,7 +61,7 @@ func (s *Service) SteerTask(ctx context.Context, task, key, text string) (runtim
 		return runtime.SteeringMessage{}, ErrSteeringControl
 	}
 	defer db.Close()
-	message, err := db.QueueSteering(ctx, task, hex.EncodeToString(hash[:]), text)
+	message, err := db.QueueSteeringAtRevision(ctx, task, hex.EncodeToString(hash[:]), text, expected)
 	return message, steeringError(err)
 }
 

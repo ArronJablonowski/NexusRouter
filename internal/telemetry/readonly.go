@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 // OpenReadOnly opens an existing database without migrations or creation.
@@ -43,7 +45,7 @@ func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
 	if err := db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return nil, err
 	}
-	if version < 1 || version > 33 {
+	if version < 1 || version > stateschema.Current {
 		return nil, errors.New("unsupported database version")
 	}
 	var check string

@@ -13,6 +13,44 @@
 	const transcriptState = document.querySelector("#transcript-state");
 	const loadMoreMessages = document.querySelector("#load-more-messages");
 	const provisional = document.querySelector("#provisional");
+	const streamAnnouncement = document.querySelector("#stream-announcement");
+	const taskControls = document.querySelector("#task-controls");
+	const steeringControl = document.querySelector("#steering-control");
+	const steeringText = document.querySelector("#steering-text");
+	const steerTask = document.querySelector("#steer-task");
+	const cancelTask = document.querySelector("#cancel-task");
+	const approvalPanel = document.querySelector("#approval-panel");
+	const approvalState = document.querySelector("#approval-state");
+	const approvalList = document.querySelector("#approval-list");
+	const approvalCount = document.querySelector("#approval-count");
+	const feedbackPanel = document.querySelector("#feedback-panel");
+	const feedbackSummary = document.querySelector("#feedback-summary");
+	const attemptCostLabel = document.querySelector("#attempt-cost-label");
+	const attemptCost = document.querySelector("#attempt-cost");
+	const attemptCostHelp = document.querySelector("#attempt-cost-help");
+	const feedbackAccepted = document.querySelector("#feedback-accepted");
+	const feedbackRejected = document.querySelector("#feedback-rejected");
+	const composer = document.querySelector("#composer");
+	const composerLabel = document.querySelector("#composer-label");
+	const composerText = document.querySelector("#composer-text");
+	const composerHelp = document.querySelector("#composer-help");
+	const composerCount = document.querySelector("#composer-count");
+	const composerError = document.querySelector("#composer-error");
+	const sendMessage = document.querySelector("#send-message");
+	const newChat = document.querySelector("#new-chat");
+	const mutationState = document.querySelector("#mutation-state");
+	const reconcile = document.querySelector("#reconcile");
+	const acknowledgeUnresolved = document.querySelector("#acknowledge-unresolved");
+	const approvalDialog = document.querySelector("#approval-dialog");
+	const approvalDialogMeta = document.querySelector("#approval-dialog-meta");
+	const approvalDialogScope = document.querySelector("#approval-dialog-scope");
+	const approvalDialogPrompt = document.querySelector("#approval-dialog-prompt");
+	const approvalDeny = document.querySelector("#approval-deny");
+	const approvalAllow = document.querySelector("#approval-allow");
+	const approvalRevoke = document.querySelector("#approval-revoke");
+	const approvalClose = document.querySelector("#approval-close");
+	const approvalReconcile = document.querySelector("#approval-reconcile");
+	const approvalAcknowledge = document.querySelector("#approval-acknowledge");
 	const pageLimit = 25;
 	const maxChats = 100;
 	const historyPageLimit = 100;
@@ -21,6 +59,12 @@
 	const maxProvisionalTasks = 16;
 	const maxProvisionalTaskText = 256 << 10;
 	const maxProvisionalText = 1 << 20;
+	const maxApprovals = 25;
+	const maxApprovalPrompt = 16 << 10;
+	const maxApprovalScope = 4096;
+	const maxOperationItems = 25;
+	const maxOperationScan = 100;
+	const maxSubmissionPolls = 60;
 	const presentationID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 	let csrfToken = "";
 	let nextCursor = "";
@@ -39,6 +83,23 @@
 	const messageIDs = new Set();
 	const provisionalTasks = new Map();
 	let provisionalTextSize = 0;
+	let selectedControls = null;
+	let selectedTaskID = "";
+	let feedbackContext = null;
+	let queuedSubmissionID = "";
+	let queuedSubmissionCanCancel = false;
+	let pendingIntent = null;
+	let unresolvedOperations = [];
+	let operationsReady = false;
+	let operationReadFailed = false;
+	let activeApproval = null;
+	let approvalOpener = null;
+	let composing = false;
+	let announcementTimer = 0;
+	let submissionPollTimer = 0;
+	let submissionPollCount = 0;
+	let submissionShouldNavigate = false;
+	let operationRequest = 0;
 
 	window.DarwinSession = Object.freeze({
 		csrfHeader: () => csrfToken ? {"X-Darwin-CSRF": csrfToken} : {}
@@ -55,6 +116,10 @@
 		return typeof value === "string" && value.length <= maxText ? value : "";
 	}
 
+	function textBytes(value) {
+		try { return new TextEncoder().encode(value).length; } catch (_) { return maxText + 1; }
+	}
+
 	function showNotice(node, message, failed) {
 		node.textContent = message;
 		node.classList.toggle("error", Boolean(failed));
@@ -65,6 +130,304 @@
 		return fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
+		});
+	}
+
+	function validControls(value) {
+		if (!value || value.version !== 1 || typeof value !== "object" || !presentationID.test(value.task_id) || !Number.isSafeInteger(value.revision) || value.revision < 1) return null;
+		for (const name of ["can_resume", "can_steer", "can_cancel", "can_feedback"]) if (typeof value[name] !== "boolean") return null;
+		return Object.freeze({
+			taskID: value.task_id, revision: value.revision, canResume: value.can_resume, canSteer: value.can_steer,
+			canCancel: value.can_cancel, canFeedback: value.can_feedback
+		});
+	}
+
+	function setBusy(value) {
+		for (const node of [composer, taskControls, feedbackPanel, approvalPanel]) node.setAttribute("aria-busy", value ? "true" : "false");
+		approvalDialog.setAttribute("aria-busy", value ? "true" : "false");
+		updateControls();
+	}
+
+	function updateControls() {
+		const blocked = Boolean(pendingIntent) || unresolvedOperations.length > 0 || !operationsReady || !csrfToken;
+		const followUp = selectedChat && selectedControls && selectedControls.canResume;
+		composerLabel.textContent = selectedChat ? "Follow up in this chat" : "Start a new chat";
+		sendMessage.textContent = selectedChat ? "Send follow-up" : "Start chat";
+		composerHelp.textContent = selectedChat && !followUp ? "The server has not marked this chat eligible for a follow-up." : "Enter sends. Shift+Enter adds a new line.";
+		composerText.disabled = blocked || Boolean(selectedChat && !followUp);
+		sendMessage.disabled = blocked || Boolean(selectedChat && !followUp);
+		newChat.hidden = !selectedChat;
+		newChat.disabled = blocked;
+		const task = selectedControls;
+		taskControls.hidden = !(queuedSubmissionID && queuedSubmissionCanCancel) && (!task || (!task.canSteer && !task.canCancel));
+		steeringControl.hidden = !task || !task.canSteer;
+		steeringText.disabled = blocked || !task || !task.canSteer;
+		steerTask.disabled = blocked || !task || !task.canSteer;
+		steerTask.hidden = !task || !task.canSteer;
+		cancelTask.hidden = !(queuedSubmissionID && queuedSubmissionCanCancel) && (!task || !task.canCancel);
+		cancelTask.textContent = queuedSubmissionID ? "Cancel queued submission" : "Cancel task";
+		cancelTask.disabled = blocked || (queuedSubmissionID ? !queuedSubmissionCanCancel : !task || !task.canCancel);
+		const mayFeedback = Boolean(task && task.canFeedback && feedbackContext && feedbackContext.feedbackAllowed);
+		feedbackPanel.hidden = !task || !feedbackContext;
+		attemptCost.disabled = blocked || !mayFeedback;
+		feedbackAccepted.disabled = blocked || !mayFeedback;
+		feedbackRejected.disabled = blocked || !mayFeedback;
+		approvalAllow.disabled = blocked;
+		approvalDeny.disabled = blocked;
+		approvalRevoke.disabled = blocked;
+		approvalClose.disabled = blocked;
+		approvalPanel.hidden = !task;
+	}
+
+	function idempotencyKey() {
+		const bytes = new Uint8Array(18);
+		window.crypto.getRandomValues(bytes);
+		return "web-" + Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+	}
+
+	function safeError(body) {
+		if (!body || body.version !== 1 || typeof body !== "object" || typeof body.code !== "string" || !presentationID.test(body.code) ||
+			typeof body.message !== "string" || body.message.length > 256 || typeof body.retryable !== "boolean" ||
+			(body.current_revision !== undefined && (!Number.isSafeInteger(body.current_revision) || body.current_revision < 0)) ||
+			(body.operation_id !== undefined && !presentationID.test(body.operation_id))) return null;
+		let message = body.message || stateLabel(body.code);
+		if (body.current_revision !== undefined) message += " Current revision: " + String(body.current_revision) + ".";
+		message += body.retryable ? " Reconcile before trying again." : " The request was not accepted.";
+		return Object.freeze({message, operationID: body.operation_id || "", retryable: body.retryable});
+	}
+
+	function validMutationReceipt(body, request) {
+		if (!body || body.version !== 1 || !presentationID.test(body.operation_id)) return false;
+		switch (request.action) {
+		case "submit":
+		case "resume":
+			return presentationID.test(body.submission_id) && ["queued", "running", "completed", "failed", "canceled"].includes(body.state) &&
+				(body.chat_id === undefined || presentationID.test(body.chat_id)) && (body.task_id === undefined || presentationID.test(body.task_id)) &&
+				Boolean(body.chat_id) === Boolean(body.task_id) && Boolean(body.revision) === Boolean(body.task_id) &&
+				(body.revision === undefined || Number.isSafeInteger(body.revision) && body.revision >= 1) &&
+				(!["running", "completed"].includes(body.state) || Boolean(body.task_id));
+		case "steer":
+			return presentationID.test(body.id) && body.task_id === request.task_id && ["pending", "applied"].includes(body.state) &&
+				!Number.isNaN(Date.parse(body.created_at)) && (body.applied_revision === undefined || Number.isSafeInteger(body.applied_revision) && body.applied_revision >= 1) &&
+				(body.state === "pending" ? body.applied_revision === undefined : body.applied_revision !== undefined);
+		case "cancel":
+			return body.target_kind === "task" && body.target_id === request.task_id && typeof body.requested === "boolean" &&
+			["running", "completed", "failed", "canceled"].includes(body.state) && Number.isSafeInteger(body.revision) && body.revision >= 1;
+		case "cancel_submission":
+			return body.target_kind === "submission" && body.target_id === request.submission_id && typeof body.requested === "boolean" &&
+			["queued", "running", "completed", "failed", "canceled"].includes(body.state);
+		case "record":
+		case "revise":
+			return body.task_id === request.task_id && presentationID.test(body.feedback_id) && Number.isSafeInteger(body.revision) && body.revision >= 1 &&
+			["recorded", "revised"].includes(body.state) && body.accepted === request.accepted && body.evidence_class === "subjective" && body.source === "user_feedback";
+		case "allow":
+		case "deny":
+		case "revoke":
+			return body.task_id === request.task_id && body.approval_id === request.approval_id && Number.isSafeInteger(body.revision) && body.revision >= 2 &&
+				["approved", "denied", "revoked", "consumed"].includes(body.state) && !Number.isNaN(Date.parse(body.decided_at));
+		default:
+			return false;
+		}
+	}
+
+	function showMutation(message, canReconcile, canAcknowledge) {
+		mutationState.textContent = message;
+		reconcile.hidden = !canReconcile;
+		acknowledgeUnresolved.hidden = !canAcknowledge;
+		approvalReconcile.hidden = !activeApproval || !canReconcile;
+		approvalAcknowledge.hidden = !activeApproval || !canAcknowledge;
+	}
+
+	function acknowledgeOutcome() {
+		if ((!pendingIntent && unresolvedOperations.length === 0 && !operationReadFailed) || !window.confirm("Acknowledge that this outcome is unresolved without retrying the request?")) return;
+		pendingIntent = null;
+		unresolvedOperations = [];
+		operationsReady = true;
+		operationReadFailed = false;
+		showMutation("Unresolved outcome acknowledged. No request was replayed.", false, false);
+		setBusy(false);
+		if (!approvalDialog.hidden) closeApproval();
+	}
+
+	function validOperation(item) {
+		const createdAt = Date.parse(item && item.created_at);
+		const updatedAt = Date.parse(item && item.updated_at);
+		if (!item || item.version !== 1 || !presentationID.test(item.operation_id) ||
+			!["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke"].includes(item.action) ||
+			!["pending", "committed", "rejected"].includes(item.state) || !Number.isFinite(createdAt) || !Number.isFinite(updatedAt) || updatedAt < createdAt) return null;
+		const hasSubject = item.subject_type !== undefined || item.subject_id !== undefined;
+		if (hasSubject && (!["chat", "task", "submission", "feedback", "approval"].includes(item.subject_type) || !presentationID.test(item.subject_id))) return null;
+		if (item.state === "committed" && !hasSubject) return null;
+		return Object.freeze({operationID: item.operation_id, action: item.action, state: item.state,
+			subjectType: hasSubject ? item.subject_type : "", subjectID: hasSubject ? item.subject_id : ""});
+	}
+
+	function validSubmissionStatus(body, submissionID) {
+		const createdAt = Date.parse(body && body.created_at);
+		const updatedAt = Date.parse(body && body.updated_at);
+		if (!body || body.version !== 1 || body.submission_id !== submissionID || !["queued", "running", "completed", "failed", "canceled"].includes(body.state) ||
+			typeof body.can_cancel !== "boolean" || !Number.isFinite(createdAt) || !Number.isFinite(updatedAt) || updatedAt < createdAt) return null;
+		const linked = body.chat_id !== undefined || body.task_id !== undefined || body.revision !== undefined;
+		if (linked && (!presentationID.test(body.chat_id) || !presentationID.test(body.task_id) || !Number.isSafeInteger(body.revision) || body.revision < 1)) return null;
+		if ((body.state === "completed" && !linked) || (["completed", "failed", "canceled"].includes(body.state) && body.can_cancel)) return null;
+		return Object.freeze({submissionID, state: body.state, chatID: linked ? body.chat_id : "", taskID: linked ? body.task_id : "", revision: linked ? body.revision : 0, canCancel: body.can_cancel});
+	}
+
+	function stopSubmissionPolling() {
+		if (submissionPollTimer) window.clearTimeout(submissionPollTimer);
+		submissionPollTimer = 0;
+	}
+
+	function observeSubmission(submissionID, resetCount, navigate) {
+		if (!presentationID.test(submissionID)) return;
+		stopSubmissionPolling();
+		if (resetCount) {
+			submissionPollCount = 0;
+			submissionShouldNavigate = Boolean(navigate);
+		}
+		queuedSubmissionID = submissionID;
+		queuedSubmissionCanCancel = false;
+		updateControls();
+		requestJSON("/api/v1/submissions/" + encodeURIComponent(submissionID)).then(body => {
+			if (queuedSubmissionID !== submissionID) return;
+			const status = validSubmissionStatus(body, submissionID);
+			if (!status) throw new Error("invalid submission status");
+			queuedSubmissionCanCancel = status.canCancel;
+			if (status.chatID) {
+				queuedSubmissionID = "";
+				queuedSubmissionCanCancel = false;
+				showMutation("Submission " + stateLabel(status.state) + ".", false, false);
+				if (!selectedChat && submissionShouldNavigate) selectChat(status.chatID, status.state);
+				else if (selectedChat === status.chatID) loadHistory(status.chatID, "", true, false);
+				refreshChats();
+				return;
+			}
+			if (["completed", "failed", "canceled"].includes(status.state)) {
+				queuedSubmissionID = "";
+				queuedSubmissionCanCancel = false;
+				showMutation("Submission " + stateLabel(status.state) + ".", false, false);
+				updateControls();
+				refreshChats();
+				return;
+			}
+			showMutation("Submission " + stateLabel(status.state) + ". Checking for a linked chat…", true, false);
+			updateControls();
+			if (++submissionPollCount < maxSubmissionPolls) submissionPollTimer = window.setTimeout(() => observeSubmission(submissionID, false, false), 2000);
+		}).catch(() => {
+			if (queuedSubmissionID === submissionID) {
+				showMutation("Submission status could not be read. Check current status before acting.", true, false);
+				updateControls();
+				if (++submissionPollCount < maxSubmissionPolls) submissionPollTimer = window.setTimeout(() => observeSubmission(submissionID, false, false), 2000);
+			}
+		});
+	}
+
+	function finishOperationScan(items, successMessage) {
+		unresolvedOperations = items.filter(item => item.state === "pending");
+		operationsReady = true;
+		const exact = pendingIntent && pendingIntent.operationID ? items.find(item => item.operationID === pendingIntent.operationID) : null;
+		const exactResolved = exact && ["committed", "rejected"].includes(exact.state);
+		const approvalResolved = exactResolved && exact.action.startsWith("approval.");
+		if (exactResolved) {
+			pendingIntent = null;
+			setBusy(false);
+		}
+		if (approvalResolved && activeApproval) {
+			closeApproval();
+			loadApprovals();
+		}
+		const submission = queuedSubmissionID ? items.find(item => item.state === "committed" && item.subjectType === "submission" && item.subjectID === queuedSubmissionID) : items.find(item => item.state === "committed" && item.subjectType === "submission");
+		if (submission) observeSubmission(submission.subjectID, true, false);
+		if (unresolvedOperations.length) showMutation("A recent operation has an unresolved outcome. Check status or explicitly acknowledge it before acting.", true, true);
+		else if (pendingIntent) showMutation("Outcome remains unknown. Check status or explicitly acknowledge it before acting.", true, true);
+		else if (exact && exact.state === "rejected") showMutation("The operation was rejected. No request was replayed.", false, false);
+		else if (!submission) showMutation(successMessage || "Committed operation status reconciled.", false, false);
+		updateControls();
+	}
+
+	function readOperationPage(after, items, operationIDs, requestID, successMessage) {
+		const pageLimit = Math.min(maxOperationItems, maxOperationScan - items.length);
+		if (pageLimit < 1) throw new Error("operation scan limit reached");
+		const query = new URLSearchParams({limit: String(pageLimit)});
+		if (after) query.set("after", after);
+		requestJSON("/api/v1/operations?" + query.toString()).then(body => {
+			if (requestID !== operationRequest) return;
+			if (!body || body.version !== 1 || !Array.isArray(body.items) || body.items.length > pageLimit ||
+				typeof body.has_more !== "boolean" || typeof body.next_cursor !== "string" ||
+				body.has_more !== Boolean(body.next_cursor) || body.has_more && body.items.length === 0 ||
+				body.next_cursor && !presentationID.test(body.next_cursor)) throw new Error("invalid operation page");
+			const page = body.items.map(validOperation);
+			if (page.some(item => !item || operationIDs.has(item.operationID))) throw new Error("invalid operation");
+			for (const item of page) {
+				operationIDs.add(item.operationID);
+				items.push(item);
+			}
+			if (body.has_more) {
+				if (items.length >= maxOperationScan) throw new Error("operation scan limit reached");
+				readOperationPage(body.next_cursor, items, operationIDs, requestID, successMessage);
+				return;
+			}
+			finishOperationScan(items, successMessage);
+		}).catch(() => {
+			if (requestID !== operationRequest) return;
+			operationsReady = false;
+			operationReadFailed = true;
+			showMutation(items.length >= maxOperationScan ? "Recent operation history exceeds the safe reconciliation limit. Actions remain blocked." : "Recent operation status could not be read. Actions remain blocked.", true, true);
+			updateControls();
+		});
+	}
+
+	function checkRecentOperations(successMessage) {
+		operationsReady = false;
+		operationReadFailed = false;
+		updateControls();
+		const requestID = ++operationRequest;
+		readOperationPage("", [], new Set(), requestID, successMessage);
+	}
+
+	function mutate(path, payload, onCommitted) {
+		if (pendingIntent || unresolvedOperations.length > 0 || !operationsReady || !csrfToken) return;
+		let key;
+		try { key = idempotencyKey(); } catch (_) {
+			showMutation("Secure request identity is unavailable.", false);
+			return;
+		}
+		const request = Object.freeze({...payload, idempotency_key: key});
+		const intent = Object.freeze({path, body: JSON.stringify(request), key});
+		pendingIntent = intent;
+		setBusy(true);
+		showMutation("Request in progress…", false);
+		fetch(base + path, {
+			method: "POST", credentials: "same-origin", cache: "no-store",
+			headers: {"Accept": "application/json", "Content-Type": "application/json", ...window.DarwinSession.csrfHeader()},
+			body: intent.body
+		}).then(async response => {
+			let body = null;
+			try { body = await response.json(); } catch (_) {
+				if (response.ok) throw new Error("ambiguous response");
+			}
+			if (!response.ok) {
+				const failure = safeError(body);
+				if (response.status >= 500 || response.status === 408) {
+					if (failure && failure.operationID) pendingIntent = Object.freeze({...intent, operationID: failure.operationID});
+					throw new Error("ambiguous response");
+				}
+				pendingIntent = null;
+				showMutation(failure ? failure.message : "The request was rejected.", response.status === 409, false);
+				setBusy(false);
+				if (activeApproval && intent.path.includes("/approvals/")) approvalClose.textContent = "Close without deciding";
+				if (response.status === 409) reconcileCurrent(failure ? failure.message : "The request conflicted with current state.");
+				return;
+			}
+			if (!validMutationReceipt(body, request)) throw new Error("ambiguous response");
+			pendingIntent = null;
+			showMutation("Request accepted. Checking committed state…", false);
+			setBusy(false);
+			onCommitted(body);
+		}).catch(() => {
+			if (!pendingIntent || pendingIntent.key !== intent.key) return;
+			showMutation("Outcome unknown. Check current status before taking another action.", true, true);
+			setBusy(true);
 		});
 	}
 
@@ -150,6 +513,10 @@
 		if (!reset && body.head_revision !== historyHead) throw new Error("transcript changed during pagination");
 		historyNeedsReset = false;
 		if (reset) historyHead = body.head_revision;
+		if (reset) {
+			selectedTaskID = body.task_id;
+			loadTaskContext(body.task_id);
+		}
 		let revision = reset ? 0 : lastMessageRevision;
 		const seen = reset ? new Set() : new Set(messageIDs);
 		for (const message of body.messages) {
@@ -218,6 +585,165 @@
 		chatState.className = "state-pill state-" + state.replaceAll(" ", "-");
 	}
 
+	function validEvidence(item, expectedClass) {
+		const sources = {objective: ["deterministic", "tool_result"], subjective: ["user_feedback"], advisory: ["llm_judge"]};
+		return item && typeof item === "object" && item.class === expectedClass && sources[expectedClass].includes(item.source) &&
+			["accepted", "rejected", "abstained"].includes(item.outcome) &&
+			Number.isSafeInteger(item.reference_count) && item.reference_count >= 1 && item.reference_count <= 1024;
+	}
+
+	function parseFeedbackContext(body, taskID) {
+		if (!body || body.version !== 1 || body.task_id !== taskID || !Number.isSafeInteger(body.revision) || body.revision < 1 ||
+			!Array.isArray(body.objective) || body.objective.length > 32 || typeof body.feedback_allowed !== "boolean" ||
+			(body.feedback_id !== undefined && typeof body.feedback_id !== "string") || (body.feedback_id && !presentationID.test(body.feedback_id)) ||
+			(body.denial_code !== undefined && (typeof body.denial_code !== "string" || body.denial_code && !presentationID.test(body.denial_code))) ||
+			body.feedback_allowed === Boolean(body.denial_code)) return null;
+		if (body.objective.some(item => !validEvidence(item, "objective"))) return null;
+		if (body.subjective !== undefined && !validEvidence(body.subjective, "subjective")) return null;
+		if (body.advisory !== undefined && !validEvidence(body.advisory, "advisory")) return null;
+		if (Boolean(body.feedback_id) !== Boolean(body.subjective)) return null;
+		return Object.freeze({taskID, revision: body.revision, objective: body.objective.slice(), subjective: body.subjective || null,
+			advisory: body.advisory || null, feedbackID: body.feedback_id || "", feedbackAllowed: body.feedback_allowed});
+	}
+
+	function renderFeedbackContext(context) {
+		feedbackSummary.replaceChildren();
+		const groups = [["Objective", context.objective], ["Subjective", context.subjective ? [context.subjective] : []], ["Advisory", context.advisory ? [context.advisory] : []]];
+		for (const [label, items] of groups) {
+			const row = element("p", "help", label + ": " + (items.length ? items.map(item => stateLabel(item.outcome) + " (" + item.source.replaceAll("_", " ") + ", " + String(item.reference_count) + " reference" + (item.reference_count === 1 ? "" : "s") + ")").join(", ") : "none recorded"));
+			feedbackSummary.append(row);
+		}
+		const revise = Boolean(context.feedbackID);
+		attemptCostLabel.hidden = revise;
+		attemptCost.hidden = revise;
+		attemptCostHelp.hidden = revise;
+		feedbackAccepted.textContent = revise ? "Revise as accepted" : "Record accepted";
+		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
+	}
+
+	function loadTaskContext(taskID) {
+		selectedControls = null;
+		feedbackContext = null;
+		updateControls();
+		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/controls").then(body => {
+			if (selectedTaskID !== taskID) return;
+			const controls = validControls(body);
+			if (!controls || controls.taskID !== taskID) throw new Error("invalid task controls");
+			selectedControls = controls;
+			updateControls();
+			loadApprovals();
+		}).catch(() => {
+			if (selectedTaskID === taskID) {
+				selectedControls = null;
+				updateControls();
+			}
+		});
+		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/feedback").then(body => {
+			if (selectedTaskID !== taskID) return;
+			const context = parseFeedbackContext(body, taskID);
+			if (!context) throw new Error("invalid feedback context");
+			feedbackContext = context;
+			renderFeedbackContext(context);
+			updateControls();
+		}).catch(() => {
+			if (selectedTaskID === taskID) {
+				feedbackContext = null;
+				updateControls();
+			}
+		});
+	}
+
+	function validApproval(item, taskID) {
+		if (!item || typeof item !== "object" || !presentationID.test(item.id) ||
+			!Number.isSafeInteger(item.revision) || item.revision < 1 || typeof item.state !== "string" ||
+			typeof item.prompt !== "string" || !item.prompt || textBytes(item.prompt) > maxApprovalPrompt ||
+			typeof item.scope_summary !== "string" || !item.scope_summary || textBytes(item.scope_summary) > maxApprovalScope ||
+			typeof item.tool_name !== "string" || !item.tool_name || item.tool_name.length > 64 || !["pending", "approved", "denied", "revoked", "consumed", "expired"].includes(item.state) ||
+			!["read_only", "idempotent_write", "non_idempotent_write"].includes(item.tool_behavior) || !Number.isFinite(Date.parse(item.expires_at))) return null;
+		for (const name of ["can_allow", "can_deny", "can_revoke"]) if (typeof item[name] !== "boolean") return null;
+		if (item.state === "pending" && (item.revision !== 1 || !item.can_allow || !item.can_deny || item.can_revoke) ||
+			item.state === "approved" && (item.revision !== 2 || item.can_allow || item.can_deny || !item.can_revoke) ||
+			item.state === "denied" && item.revision !== 2 || ["revoked", "consumed"].includes(item.state) && item.revision !== 3 ||
+			item.state === "expired" && ![1, 2].includes(item.revision) ||
+			!["pending", "approved"].includes(item.state) && (item.can_allow || item.can_deny || item.can_revoke)) return null;
+		return Object.freeze({id: item.id, taskID, revision: item.revision, state: item.state,
+			prompt: item.prompt, scopeSummary: item.scope_summary, toolName: item.tool_name, behavior: boundedText(item.tool_behavior) || "unspecified",
+			canAllow: item.can_allow, canDeny: item.can_deny, canRevoke: item.can_revoke});
+	}
+
+	function closeApproval() {
+		approvalDialog.hidden = true;
+		activeApproval = null;
+		approvalClose.textContent = "Close without deciding";
+		approvalReconcile.hidden = true;
+		approvalAcknowledge.hidden = true;
+		const opener = approvalOpener;
+		approvalOpener = null;
+		if (opener && opener.isConnected) opener.focus();
+	}
+
+	function openApproval(item, opener) {
+		activeApproval = item;
+		approvalOpener = opener;
+		approvalDialogMeta.textContent = item.toolName + " · " + stateLabel(item.behavior) + " · " + stateLabel(item.state);
+		approvalDialogScope.textContent = "Scope: " + item.scopeSummary;
+		approvalDialogPrompt.textContent = item.prompt;
+		approvalAllow.hidden = !item.canAllow;
+		approvalDeny.hidden = !item.canDeny;
+		approvalRevoke.hidden = !item.canRevoke;
+		approvalDialog.hidden = false;
+		approvalReconcile.hidden = true;
+		approvalAcknowledge.hidden = true;
+		(item.canDeny ? approvalDeny : approvalClose).focus();
+	}
+
+	function renderApproval(item) {
+		const row = element("li");
+		const button = element("button", "", item.toolName + " — " + stateLabel(item.state));
+		button.type = "button";
+		button.addEventListener("click", () => openApproval(item, button));
+		row.append(button);
+		approvalList.append(row);
+	}
+
+	function loadApprovals() {
+		const task = selectedControls;
+		approvalList.replaceChildren();
+		approvalCount.textContent = "";
+		if (!task || !selectedChat) {
+			approvalPanel.hidden = true;
+			return;
+		}
+		approvalPanel.hidden = false;
+		showNotice(approvalState, "Loading approvals…", false);
+		requestJSON("/api/v1/tasks/" + encodeURIComponent(task.taskID) + "/approvals?limit=" + String(maxApprovals)).then(body => {
+			if (selectedControls !== task) return;
+			if (!body || body.version !== 1 || body.task_id !== task.taskID || !Array.isArray(body.items) || body.items.length > maxApprovals ||
+				typeof body.has_more !== "boolean" || typeof body.next_cursor !== "string" || body.next_cursor.length > 512 || body.has_more !== Boolean(body.next_cursor)) throw new Error("invalid approvals");
+			const items = body.items.map(item => validApproval(item, task.taskID));
+			if (items.some(item => !item || item.taskID !== task.taskID)) throw new Error("invalid approval");
+			for (const item of items) renderApproval(item);
+			approvalCount.textContent = String(items.length);
+			if (body.has_more) showNotice(approvalState, "Showing the first " + String(items.length) + " approvals.", false);
+			else if (items.length) approvalState.hidden = true;
+			else showNotice(approvalState, "No approvals need attention.", false);
+		}).catch(() => {
+			if (selectedControls === task) showNotice(approvalState, "Approvals could not be loaded.", true);
+		});
+	}
+
+	function decideApproval(action) {
+		const item = activeApproval;
+		if (!item || pendingIntent) return;
+		approvalClose.textContent = "Decision in progress";
+		mutate("/api/v1/tasks/" + encodeURIComponent(item.taskID) + "/approvals/" + encodeURIComponent(item.id) + "/decision", {
+			version: 1, task_id: item.taskID, approval_id: item.id, action, expected_revision: item.revision
+		}, () => {
+			closeApproval();
+			loadApprovals();
+		});
+	}
+
 	function appendProvisional(taskID, text) {
 		if (!presentationID.test(taskID) || typeof text !== "string" || !text) return;
 		let item = provisionalTasks.get(taskID);
@@ -239,6 +765,10 @@
 		item.size += addition.length;
 		provisionalTextSize += addition.length;
 		provisional.hidden = provisionalTasks.size === 0;
+		if (!announcementTimer) announcementTimer = window.setTimeout(() => {
+			announcementTimer = 0;
+			streamAnnouncement.textContent = "Provisional assistant output updated for " + String(provisionalTasks.size) + " task" + (provisionalTasks.size === 1 ? "." : "s.");
+		}, 1000);
 	}
 
 	function clearProvisionalTask(taskID) {
@@ -255,6 +785,9 @@
 		provisionalTasks.clear();
 		provisionalTextSize = 0;
 		provisional.hidden = true;
+		if (announcementTimer) window.clearTimeout(announcementTimer);
+		announcementTimer = 0;
+		streamAnnouncement.textContent = "";
 	}
 
 	function validEnvelope(event) {
@@ -299,10 +832,17 @@
 			clearProvisionalTask(payload.data.task_id);
 			setTaskState(payload.data.state);
 			eventRevision = payload.revision;
+			if (payload.data.task_id === selectedTaskID && payload.data.state !== "completed") loadTaskContext(selectedTaskID);
 			if (payload.data.state === "completed") loadHistory(selectedChat, "", true, false);
-		} else if (["model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed"].includes(payload.kind)) {
-			eventRevision = payload.revision;
-		}
+			} else if (["model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed"].includes(payload.kind)) {
+				eventRevision = payload.revision;
+			} else if (payload.kind === "approval.changed" && payload.data.task_id === (selectedControls && selectedControls.taskID)) {
+				eventRevision = payload.revision;
+				loadApprovals();
+			} else if (payload.kind === "feedback.changed" && payload.data.task_id === (selectedControls && selectedControls.taskID)) {
+				eventRevision = payload.revision;
+				loadHistory(selectedChat, "", true, false);
+			}
 	}
 
 	function connect(chatID) {
@@ -318,7 +858,7 @@
 			try { applyPresentationEvent(JSON.parse(event.data)); } catch (_) { connection.textContent = "Invalid live update"; }
 		};
 		source.onmessage = receive;
-		for (const eventName of ["event", "chat.snapshot", "chat.delta", "chat.final", "lifecycle.event", "model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed", "task.terminal", "stream.error"]) source.addEventListener(eventName, receive);
+		for (const eventName of ["event", "chat.snapshot", "chat.delta", "chat.final", "lifecycle.event", "model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed", "task.terminal", "approval.changed", "feedback.changed", "stream.error"]) source.addEventListener(eventName, receive);
 		source.onerror = () => {
 			clearAllProvisional();
 			connection.textContent = "Reconnecting…";
@@ -332,6 +872,13 @@
 			source = null;
 		}
 		selectedChat = chatID;
+		approvalDialog.hidden = true;
+		activeApproval = null;
+		approvalOpener = null;
+		selectedControls = null;
+		selectedTaskID = "";
+		feedbackContext = null;
+		queuedSubmissionID = "";
 		eventRevision = 0;
 		historyCursor = "";
 		historyHead = 0;
@@ -342,6 +889,8 @@
 		historyRequest++;
 		loadingHistory = false;
 		loadMoreMessages.hidden = true;
+		approvalList.replaceChildren();
+		approvalPanel.hidden = true;
 		clearAllProvisional();
 		for (const button of list.querySelectorAll("button[data-chat-id]")) button.setAttribute("aria-current", button.dataset.chatId === chatID ? "true" : "false");
 		title.textContent = chatID;
@@ -350,8 +899,200 @@
 		transcript.replaceChildren();
 		window.history.replaceState(null, "", base + "/chats/" + encodeURIComponent(chatID));
 		loadHistory(chatID, "", true, true);
+		updateControls();
 	}
 
+	function startNewChat() {
+		if (pendingIntent) return;
+		if (source) {
+			source.close();
+			source = null;
+		}
+		selectedChat = "";
+		approvalDialog.hidden = true;
+		activeApproval = null;
+		approvalOpener = null;
+		selectedControls = null;
+		selectedTaskID = "";
+		feedbackContext = null;
+		queuedSubmissionID = "";
+		eventRevision = 0;
+		transcript.replaceChildren();
+		clearAllProvisional();
+		approvalList.replaceChildren();
+		approvalPanel.hidden = true;
+		taskControls.hidden = true;
+		feedbackPanel.hidden = true;
+		title.textContent = "New chat";
+		chatState.textContent = "";
+		showNotice(transcriptState, "Write a message to start a chat.", false);
+		for (const button of list.querySelectorAll("button[data-chat-id]")) button.setAttribute("aria-current", "false");
+		window.history.replaceState(null, "", base + "/chats");
+		updateControls();
+		composerText.focus();
+	}
+
+	function refreshChats() {
+		if (loadingPage) return;
+		list.replaceChildren();
+		chatTotal = 0;
+		nextCursor = "";
+		loadChats("");
+	}
+
+	function reconcileCurrent(successMessage) {
+		showMutation(successMessage || "Checking committed state…", Boolean(pendingIntent), false);
+		checkRecentOperations(successMessage);
+		if (queuedSubmissionID) observeSubmission(queuedSubmissionID, true, submissionShouldNavigate);
+		refreshChats();
+		if (selectedChat) loadHistory(selectedChat, "", true, false);
+	}
+
+	function submitComposer() {
+		const text = composerText.value;
+		composerError.hidden = true;
+		if (!text.trim()) {
+			showNotice(composerError, "Enter a message first.", true);
+			composerText.focus();
+			return;
+		}
+		if (textBytes(text) > maxText) {
+			showNotice(composerError, "The message is too large.", true);
+			return;
+		}
+		let path = "/api/v1/chats";
+		let payload = {version: 1, action: "submit", text};
+		if (selectedChat) {
+			const controls = selectedControls;
+			if (!controls || !controls.canResume) return;
+			path = "/api/v1/chats/" + encodeURIComponent(selectedChat) + "/resume";
+			payload = {version: 1, action: "resume", chat_id: selectedChat, task_id: controls.taskID, text, expected_revision: controls.revision};
+		}
+		mutate(path, payload, body => {
+			composerText.value = "";
+			composerCount.textContent = "0";
+			if (typeof body.chat_id === "string" && presentationID.test(body.chat_id)) selectChat(body.chat_id, body.state);
+			else {
+				queuedSubmissionID = typeof body.submission_id === "string" && presentationID.test(body.submission_id) ? body.submission_id : "";
+				if (queuedSubmissionID) observeSubmission(queuedSubmissionID, true, !selectedChat);
+				else reconcileCurrent();
+			}
+		});
+	}
+
+	function submitSteering() {
+		const controls = selectedControls;
+		const text = steeringText.value;
+		if (!controls || !controls.canSteer || !text.trim() || textBytes(text) > 65536) {
+			showMutation("Enter bounded guidance for an active task.", false);
+			return;
+		}
+		mutate("/api/v1/tasks/" + encodeURIComponent(controls.taskID) + "/steering", {
+			version: 1, action: "steer", task_id: controls.taskID, text, expected_revision: controls.revision
+		}, () => {
+			steeringText.value = "";
+			showMutation("Guidance queued. Application will be shown only after committed confirmation.", false);
+			reconcileCurrent();
+		});
+	}
+
+	function submitCancellation() {
+		const controls = selectedControls;
+		if (queuedSubmissionID) {
+			if (!window.confirm("Cancel this queued submission?")) return;
+			const submissionID = queuedSubmissionID;
+			mutate("/api/v1/submissions/" + encodeURIComponent(submissionID) + "/cancel", {
+				version: 1, action: "cancel_submission", submission_id: submissionID
+			}, body => {
+				if (["queued", "running"].includes(body.state)) {
+					showMutation(body.requested ? "Cancellation requested; submission is still " + stateLabel(body.state) + "." : "Submission remains " + stateLabel(body.state) + ".", true, false);
+					observeSubmission(submissionID, true, submissionShouldNavigate);
+				} else {
+					queuedSubmissionID = "";
+					queuedSubmissionCanCancel = false;
+					showMutation("Submission is " + stateLabel(body.state) + ".", false, false);
+					updateControls();
+					refreshChats();
+				}
+			});
+			return;
+		}
+		if (!controls || !controls.canCancel || !window.confirm("Request cancellation for this task?")) return;
+		mutate("/api/v1/tasks/" + encodeURIComponent(controls.taskID) + "/cancel", {
+			version: 1, action: "cancel", task_id: controls.taskID, expected_revision: controls.revision
+		}, body => {
+			showMutation(body.requested ? "Cancellation requested. Waiting for committed task state." : "Task is already " + stateLabel(body.state) + ".", false, false);
+			reconcileCurrent();
+		});
+	}
+
+	function submitFeedback(accepted) {
+		const controls = selectedControls;
+		const context = feedbackContext;
+		const revise = Boolean(context && context.feedbackID);
+		const cost = Number(attemptCost.value);
+		if (!controls || !controls.canFeedback || !context || !context.feedbackAllowed || (!revise && (attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0))) {
+			showMutation("Enter the observed final-attempt cost before recording evidence.", false);
+			return;
+		}
+		const payload = {version: 1, action: revise ? "revise" : "record", task_id: controls.taskID, accepted};
+		if (revise) {
+			payload.feedback_id = context.feedbackID;
+			payload.expected_revision = context.revision;
+		} else {
+			payload.attempt_cost = cost;
+		}
+		mutate(revise ? "/api/v1/feedback/revisions" : "/api/v1/feedback", payload, () => {
+			showMutation("Subjective outcome evidence recorded.", false);
+			loadHistory(selectedChat, "", true, false);
+		});
+	}
+
+	composer.addEventListener("submit", event => {
+		event.preventDefault();
+		if (!composing) submitComposer();
+	});
+	composerText.addEventListener("compositionstart", () => { composing = true; });
+	composerText.addEventListener("compositionend", () => { composing = false; });
+	composerText.addEventListener("input", () => { composerCount.textContent = String(textBytes(composerText.value)); });
+	composerText.addEventListener("keydown", event => {
+		if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !composing) {
+			event.preventDefault();
+			composer.requestSubmit();
+		}
+	});
+	newChat.addEventListener("click", startNewChat);
+	steerTask.addEventListener("click", submitSteering);
+	cancelTask.addEventListener("click", submitCancellation);
+	feedbackAccepted.addEventListener("click", () => submitFeedback(true));
+	feedbackRejected.addEventListener("click", () => submitFeedback(false));
+	reconcile.addEventListener("click", () => reconcileCurrent());
+	acknowledgeUnresolved.addEventListener("click", acknowledgeOutcome);
+	approvalReconcile.addEventListener("click", () => reconcileCurrent());
+	approvalAcknowledge.addEventListener("click", acknowledgeOutcome);
+	approvalAllow.addEventListener("click", () => decideApproval("allow"));
+	approvalDeny.addEventListener("click", () => decideApproval("deny"));
+	approvalRevoke.addEventListener("click", () => decideApproval("revoke"));
+	approvalClose.addEventListener("click", closeApproval);
+	approvalDialog.addEventListener("keydown", event => {
+		if (event.key === "Escape" && !pendingIntent && unresolvedOperations.length === 0 && operationsReady) {
+			event.preventDefault();
+			closeApproval();
+			return;
+		}
+		if (event.key !== "Tab") return;
+		const focusable = [approvalDeny, approvalAllow, approvalRevoke, approvalClose, approvalReconcile, approvalAcknowledge].filter(node => !node.hidden && !node.disabled);
+		if (!focusable.length) return;
+		const first = focusable[0];
+		const last = focusable[focusable.length - 1];
+		if (event.shiftKey && document.activeElement === first) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && document.activeElement === last) {
+			event.preventDefault();
+			first.focus();
+		}
+	});
 	loadMore.addEventListener("click", () => loadChats(nextCursor));
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
@@ -362,6 +1103,8 @@
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
 	loadChats("");
+	checkRecentOperations();
+	updateControls();
 
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
@@ -370,7 +1113,9 @@
 		if (!response.ok) throw new Error("session unavailable");
 		return response.json();
 	}).then(session => {
+		if (!session || session.version !== 1 || typeof session.csrf_token !== "string" || !session.csrf_token) throw new Error("invalid session");
 		csrfToken = session.csrf_token;
+		updateControls();
 		if (!selectedChat) connection.textContent = "Connected";
 	}).catch(() => { connection.textContent = "Session needs attention"; });
 

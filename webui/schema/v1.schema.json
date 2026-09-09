@@ -13,6 +13,36 @@
       "$ref": "#/$defs/feedback_request"
     },
     {
+      "$ref": "#/$defs/chat_mutation_receipt"
+    },
+    {
+      "$ref": "#/$defs/cancellation_receipt"
+    },
+    {
+      "$ref": "#/$defs/steering_receipt"
+    },
+    {
+      "$ref": "#/$defs/task_control_status"
+    },
+    {
+      "$ref": "#/$defs/feedback_context"
+    },
+    {
+      "$ref": "#/$defs/feedback_receipt"
+    },
+    {
+      "$ref": "#/$defs/approval_page"
+    },
+    {
+      "$ref": "#/$defs/approval_decision_receipt"
+    },
+    {
+      "$ref": "#/$defs/operation_page"
+    },
+    {
+      "$ref": "#/$defs/submission_status"
+    },
+    {
       "$ref": "#/$defs/board_request"
     },
     {
@@ -61,7 +91,8 @@
             "submit",
             "resume",
             "steer",
-            "cancel"
+            "cancel",
+            "cancel_submission"
           ]
         },
         "idempotency_key": {
@@ -71,6 +102,9 @@
           "$ref": "#/$defs/id"
         },
         "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "submission_id": {
           "$ref": "#/$defs/id"
         },
         "model_id": {
@@ -104,7 +138,17 @@
               "anyOf": [
                 {
                   "required": [
+                    "chat_id"
+                  ]
+                },
+                {
+                  "required": [
                     "task_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "submission_id"
                   ]
                 },
                 {
@@ -135,6 +179,11 @@
               "expected_revision": {
                 "minimum": 1
               }
+            },
+            "not": {
+              "required": [
+                "submission_id"
+              ]
             }
           }
         },
@@ -149,8 +198,14 @@
           "then": {
             "required": [
               "task_id",
-              "text"
+              "text",
+              "expected_revision"
             ],
+            "properties": {
+              "expected_revision": {
+                "minimum": 1
+              }
+            },
             "not": {
               "anyOf": [
                 {
@@ -161,6 +216,11 @@
                 {
                   "required": [
                     "chat_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "submission_id"
                   ]
                 }
               ]
@@ -177,8 +237,14 @@
           },
           "then": {
             "required": [
-              "task_id"
+              "task_id",
+              "expected_revision"
             ],
+            "properties": {
+              "expected_revision": {
+                "minimum": 1
+              }
+            },
             "not": {
               "anyOf": [
                 {
@@ -195,7 +261,35 @@
                   "required": [
                     "chat_id"
                   ]
+                },
+                {
+                  "required": [
+                    "submission_id"
+                  ]
                 }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "cancel_submission"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "submission_id"
+            ],
+            "not": {
+              "anyOf": [
+                {"required": ["chat_id"]},
+                {"required": ["task_id"]},
+                {"required": ["model_id"]},
+                {"required": ["text"]},
+                {"required": ["expected_revision"]}
               ]
             }
           }
@@ -237,7 +331,11 @@
           "type": "integer",
           "minimum": 1
         }
-      }
+      },
+      "allOf": [
+        {"if": {"properties": {"action": {"enum": ["allow", "deny"]}}}, "then": {"properties": {"expected_revision": {"const": 1}}}},
+        {"if": {"properties": {"action": {"const": "revoke"}}}, "then": {"properties": {"expected_revision": {"const": 2}}}}
+      ]
     },
     "feedback_request": {
       "type": "object",
@@ -247,8 +345,7 @@
         "idempotency_key",
         "task_id",
         "action",
-        "accepted",
-        "attempt_cost"
+        "accepted"
       ],
       "properties": {
         "version": {
@@ -291,20 +388,8 @@
             }
           },
           "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "feedback_id"
-                  ]
-                },
-                {
-                  "required": [
-                    "expected_revision"
-                  ]
-                }
-              ]
-            }
+            "required": ["attempt_cost"],
+            "not": {"anyOf": [{"required": ["feedback_id"]}, {"required": ["expected_revision"]}]}
           }
         },
         {
@@ -320,6 +405,7 @@
               "feedback_id",
               "expected_revision"
             ],
+            "not": {"required": ["attempt_cost"]},
             "properties": {
               "expected_revision": {
                 "minimum": 1
@@ -327,6 +413,205 @@
             }
           }
         }
+      ]
+    },
+    "chat_mutation_receipt": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "submission_id", "state"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
+        "submission_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["queued", "running", "completed", "failed", "canceled"]},
+        "chat_id": {"$ref": "#/$defs/id"}, "task_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"if": {"required": ["chat_id"]}, "then": {"required": ["task_id", "revision"]}},
+        {"if": {"required": ["task_id"]}, "then": {"required": ["chat_id", "revision"]}},
+        {"if": {"required": ["revision"]}, "then": {"required": ["chat_id", "task_id"]}},
+        {"if": {"properties": {"state": {"enum": ["running", "completed"]}}}, "then": {"required": ["chat_id", "task_id", "revision"]}}
+      ]
+    },
+    "cancellation_receipt": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "target_kind", "target_id", "state", "requested"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
+        "target_kind": {"enum": ["task", "submission"]}, "target_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["queued", "running", "completed", "failed", "canceled"]},
+        "requested": {"type": "boolean"}, "request_id": {"$ref": "#/$defs/id"},
+        "requested_at": {"type": "string", "format": "date-time"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"target_kind": {"const": "task"}}}, "then": {"required": ["revision"], "properties": {"state": {"enum": ["running", "completed", "failed", "canceled"]}}}},
+        {"if": {"properties": {"target_kind": {"const": "submission"}}}, "then": {"not": {"anyOf": [{"required": ["request_id"]}, {"required": ["requested_at"]}, {"required": ["revision"]}]}}},
+        {"if": {"properties": {"target_kind": {"const": "task"}, "requested": {"const": true}}}, "then": {"required": ["request_id", "requested_at"]}},
+        {"if": {"properties": {"target_kind": {"const": "task"}, "requested": {"const": false}}}, "then": {"not": {"anyOf": [{"required": ["request_id"]}, {"required": ["requested_at"]}]}}}
+      ]
+    },
+    "steering_receipt": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "id", "task_id", "state", "created_at"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"}, "id": {"$ref": "#/$defs/id"},
+        "task_id": {"$ref": "#/$defs/id"}, "state": {"enum": ["pending", "applied"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "applied_revision": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "pending"}}}, "then": {"not": {"required": ["applied_revision"]}}},
+        {"if": {"properties": {"state": {"const": "applied"}}}, "then": {"required": ["applied_revision"]}}
+      ]
+    },
+    "task_control_status": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 2048,
+      "required": ["version", "task_id", "revision", "can_resume", "can_steer", "can_cancel", "can_feedback"],
+      "properties": {
+        "version": {"const": 1}, "task_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1}, "can_resume": {"type": "boolean"},
+        "can_steer": {"type": "boolean"}, "can_cancel": {"type": "boolean"}, "can_feedback": {"type": "boolean"}
+      }
+    },
+    "operation_summary": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "action", "state", "created_at", "updated_at"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
+        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke"]},
+        "state": {"enum": ["pending", "committed", "rejected"]},
+        "subject_type": {"enum": ["chat", "task", "submission", "feedback", "approval"]},
+        "subject_id": {"$ref": "#/$defs/id"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {"if": {"required": ["subject_type"]}, "then": {"required": ["subject_id"]}},
+        {"if": {"required": ["subject_id"]}, "then": {"required": ["subject_type"]}},
+        {"if": {"properties": {"state": {"const": "committed"}}}, "then": {"required": ["subject_type", "subject_id"]}}
+      ]
+    },
+    "operation_page": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 1048576,
+      "required": ["version", "items", "next_cursor", "has_more"],
+      "properties": {
+        "version": {"const": 1},
+        "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/operation_summary"}},
+        "next_cursor": {"type": "string", "maxLength": 512, "x-maxBytes": 512},
+        "has_more": {"type": "boolean"}
+      },
+      "allOf": [
+        {"if": {"properties": {"has_more": {"const": true}}}, "then": {"properties": {"items": {"minItems": 1}, "next_cursor": {"minLength": 1}}}},
+        {"if": {"properties": {"has_more": {"const": false}}}, "then": {"properties": {"next_cursor": {"const": ""}}}}
+      ]
+    },
+    "submission_status": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "submission_id", "state", "created_at", "updated_at", "can_cancel"],
+      "properties": {
+        "version": {"const": 1}, "submission_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["queued", "running", "completed", "failed", "canceled"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "chat_id": {"$ref": "#/$defs/id"}, "task_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1}, "can_cancel": {"type": "boolean"}
+      },
+      "allOf": [
+        {"if": {"required": ["chat_id"]}, "then": {"required": ["task_id", "revision"]}},
+        {"if": {"required": ["task_id"]}, "then": {"required": ["chat_id", "revision"]}},
+        {"if": {"required": ["revision"]}, "then": {"required": ["chat_id", "task_id"]}},
+        {"if": {"properties": {"state": {"const": "completed"}}}, "then": {"required": ["chat_id", "task_id", "revision"], "properties": {"can_cancel": {"const": false}}}},
+        {"if": {"properties": {"state": {"enum": ["failed", "canceled"]}}}, "then": {"properties": {"can_cancel": {"const": false}}}}
+      ]
+    },
+    "evidence_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["class", "source", "outcome", "reference_count"],
+      "properties": {
+        "class": {"enum": ["objective", "subjective", "advisory"]},
+        "source": {"enum": ["deterministic", "tool_result", "user_feedback", "llm_judge"]},
+        "outcome": {"enum": ["accepted", "rejected", "abstained"]},
+        "reference_count": {"type": "integer", "minimum": 1, "maximum": 1024}
+      },
+      "allOf": [
+        {"if": {"properties": {"source": {"enum": ["deterministic", "tool_result"]}}}, "then": {"properties": {"class": {"const": "objective"}}}},
+        {"if": {"properties": {"source": {"const": "user_feedback"}}}, "then": {"properties": {"class": {"const": "subjective"}}}},
+        {"if": {"properties": {"source": {"const": "llm_judge"}}}, "then": {"properties": {"class": {"const": "advisory"}}}}
+      ]
+    },
+    "feedback_context": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 16384,
+      "required": ["version", "task_id", "revision", "objective", "feedback_allowed"],
+      "properties": {
+        "version": {"const": 1}, "task_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1},
+        "objective": {"type": "array", "maxItems": 32, "items": {"allOf": [{"$ref": "#/$defs/evidence_summary"}, {"properties": {"class": {"const": "objective"}}}]}},
+        "subjective": {"allOf": [{"$ref": "#/$defs/evidence_summary"}, {"properties": {"class": {"const": "subjective"}}}]},
+        "advisory": {"allOf": [{"$ref": "#/$defs/evidence_summary"}, {"properties": {"class": {"const": "advisory"}}}]},
+        "feedback_id": {"$ref": "#/$defs/id"}, "feedback_allowed": {"type": "boolean"}, "denial_code": {"$ref": "#/$defs/id"}
+      },
+      "allOf": [
+        {"if": {"required": ["subjective"]}, "then": {"required": ["feedback_id"]}},
+        {"if": {"required": ["feedback_id"]}, "then": {"required": ["subjective"]}},
+        {"if": {"properties": {"feedback_allowed": {"const": true}}}, "then": {"not": {"required": ["denial_code"]}}},
+        {"if": {"properties": {"feedback_allowed": {"const": false}}}, "then": {"required": ["denial_code"]}}
+      ]
+    },
+    "feedback_receipt": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "task_id", "feedback_id", "revision", "state", "accepted", "evidence_class", "source"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"}, "task_id": {"$ref": "#/$defs/id"},
+        "feedback_id": {"$ref": "#/$defs/id"}, "revision": {"type": "integer", "minimum": 1},
+        "state": {"enum": ["recorded", "revised"]}, "accepted": {"type": "boolean"},
+        "evidence_class": {"const": "subjective"}, "source": {"const": "user_feedback"}
+      }
+    },
+    "approval_summary": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 22528,
+      "required": ["id", "state", "revision", "prompt", "scope_summary", "tool_name", "tool_behavior", "expires_at", "can_allow", "can_deny", "can_revoke"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"}, "state": {"enum": ["pending", "approved", "denied", "revoked", "consumed", "expired"]},
+        "revision": {"type": "integer", "minimum": 1},
+        "prompt": {"type": "string", "minLength": 1, "maxLength": 16384, "x-maxBytes": 16384},
+        "scope_summary": {"type": "string", "minLength": 1, "maxLength": 4096, "x-maxBytes": 4096},
+        "tool_name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$", "x-maxBytes": 64},
+        "tool_behavior": {"enum": ["read_only", "idempotent_write", "non_idempotent_write"]},
+        "expires_at": {"type": "string", "format": "date-time"},
+        "can_allow": {"type": "boolean"}, "can_deny": {"type": "boolean"}, "can_revoke": {"type": "boolean"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "pending"}}}, "then": {"properties": {"revision": {"const": 1}, "can_allow": {"const": true}, "can_deny": {"const": true}, "can_revoke": {"const": false}}}},
+        {"if": {"properties": {"state": {"const": "approved"}}}, "then": {"properties": {"revision": {"const": 2}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": true}}}},
+        {"if": {"properties": {"state": {"const": "denied"}}}, "then": {"properties": {"revision": {"const": 2}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
+        {"if": {"properties": {"state": {"enum": ["revoked", "consumed"]}}}, "then": {"properties": {"revision": {"const": 3}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}},
+        {"if": {"properties": {"state": {"const": "expired"}}}, "then": {"properties": {"revision": {"enum": [1, 2]}, "can_allow": {"const": false}, "can_deny": {"const": false}, "can_revoke": {"const": false}}}}
+      ]
+    },
+    "approval_page": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 1048576,
+      "required": ["version", "task_id", "items", "next_cursor", "has_more"],
+      "properties": {
+        "version": {"const": 1}, "task_id": {"$ref": "#/$defs/id"},
+        "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/approval_summary"}},
+        "next_cursor": {"type": "string", "maxLength": 512, "x-maxBytes": 512}, "has_more": {"type": "boolean"}
+      },
+      "allOf": [
+        {"if": {"properties": {"has_more": {"const": true}}}, "then": {"properties": {"next_cursor": {"minLength": 1}}}},
+        {"if": {"properties": {"has_more": {"const": false}}}, "then": {"properties": {"next_cursor": {"const": ""}}}}
+      ]
+    },
+    "approval_decision_receipt": {
+      "type": "object", "additionalProperties": false, "x-maxBytes": 4096,
+      "required": ["version", "operation_id", "task_id", "approval_id", "state", "revision", "decided_at"],
+      "properties": {
+        "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"}, "task_id": {"$ref": "#/$defs/id"},
+        "approval_id": {"$ref": "#/$defs/id"}, "state": {"enum": ["approved", "denied", "revoked", "consumed"]},
+        "revision": {"type": "integer", "minimum": 2, "maximum": 3}, "decided_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"enum": ["approved", "denied"]}}}, "then": {"properties": {"revision": {"const": 2}}}},
+        {"if": {"properties": {"state": {"enum": ["revoked", "consumed"]}}}, "then": {"properties": {"revision": {"const": 3}}}}
       ]
     },
     "work_budget": {
@@ -2509,8 +2794,24 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 60000
+        },
+        "subject_type": {
+          "enum": ["chat", "task", "submission", "feedback", "approval"]
+        },
+        "subject_id": {
+          "$ref": "#/$defs/id"
+        },
+        "current_state": {
+          "$ref": "#/$defs/id"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/id"
         }
-      }
+      },
+      "allOf": [
+        {"if": {"required": ["subject_type"]}, "then": {"required": ["subject_id"]}},
+        {"if": {"required": ["subject_id"]}, "then": {"required": ["subject_type"]}}
+      ]
     }
   }
 }

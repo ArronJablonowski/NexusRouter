@@ -91,7 +91,7 @@ func appendTaskTiming(ctx context.Context, tx *sql.Tx, e runtime.Event) error {
 	if schema < 29 {
 		return nil
 	} // Legacy fixture/writer: instrumentation is unavailable.
-	if schema > 33 {
+	if schema > currentStorageSchema {
 		return errTaskTiming
 	}
 	var old taskTiming

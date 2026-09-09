@@ -40,7 +40,17 @@ func cancellationStatus(ctx context.Context, tx *sql.Tx, task string, legacy boo
 }
 
 func (s *Store) RequestCancellation(ctx context.Context, task string) (runtime.CancellationStatus, error) {
+	return s.RequestCancellationAtRevision(ctx, task, 0)
+}
+
+// RequestCancellationAtRevision binds a new cancellation to an observed task
+// head. An exact already-recorded cancellation is returned before the stale-head
+// check so acknowledgement-loss retries remain safe after the runtime advances.
+func (s *Store) RequestCancellationAtRevision(ctx context.Context, task string, expected int64) (runtime.CancellationStatus, error) {
 	if !sessions.ValidEventPageID(task) {
+		return runtime.CancellationStatus{}, sessions.ErrHistory
+	}
+	if expected < 0 || expected > sessions.MaxTaskEvents {
 		return runtime.CancellationStatus{}, sessions.ErrHistory
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -54,6 +64,21 @@ func (s *Store) RequestCancellation(ctx context.Context, task string) (runtime.C
 	status, err := cancellationStatus(ctx, tx, task, false)
 	if err != nil {
 		return status, err
+	}
+	if status.Requested {
+		if err := tx.Commit(); err != nil {
+			return runtime.CancellationStatus{}, err
+		}
+		return status, nil
+	}
+	if expected > 0 {
+		var current int64
+		if err = tx.QueryRowContext(ctx, "SELECT sequence FROM task_heads WHERE task_id=?", task).Scan(&current); err != nil {
+			return runtime.CancellationStatus{}, err
+		}
+		if current != expected {
+			return runtime.CancellationStatus{}, ErrConflict
+		}
 	}
 	if !status.Requested && status.State == "running" {
 		at := time.Now().UTC()

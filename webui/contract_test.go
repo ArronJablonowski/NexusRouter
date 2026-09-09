@@ -110,12 +110,12 @@ func TestOperationMappingIsClosedOwnedAndBrowserScoped(t *testing.T) {
 		seen[spec.Operation] = true
 		existing[spec.Operation] = spec.PrimitiveExists
 	}
-	for _, operation := range []string{"chat.submit", "chat.stream", "chat.steer", "chat.cancel", "approval.list", "model.list", "route.inspect", "health.inspect"} {
+	for _, operation := range []string{"chat.submit", "chat.stream", "chat.steer", "chat.cancel", "chat.cancel_submission", "submission.inspect", "approval.list", "model.list", "route.inspect", "health.inspect"} {
 		if !existing[operation] {
 			t.Fatal("existing application primitive mislabeled", operation)
 		}
 	}
-	for _, operation := range []string{"session.challenge", "chat.history", "feedback.record", "approval.decide", "board.list", "board.create", "board.read", "board.mutate", "board.stream"} {
+	for _, operation := range []string{"session.challenge", "chat.history", "operation.list", "task.controls", "feedback.record", "feedback.inspect", "approval.decide", "board.list", "board.create", "board.read", "board.mutate", "board.stream"} {
 		if existing[operation] {
 			t.Fatal("future application primitive mislabeled", operation)
 		}
@@ -145,7 +145,7 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	validFeedback := FeedbackRequest{Version: 1, IdempotencyKey: key, TaskID: "task", Action: FeedbackRevise, FeedbackID: "feedback", Accepted: true, ExpectedRevision: &revision}
 	validBoard := BoardRequest{Version: 1, Action: ClaimHeartbeat, IdempotencyKey: key, BoardID: "board", CardID: "card", ClaimID: "claim", AttemptID: "attempt", ExpectedClaimRevision: &revision}
 	validEvent := Event{Version: 1, Kind: ChatDelta, Durability: Provisional, Subject: "subject", Data: json.RawMessage(`{"task_id":"task","text":"partial"}`)}
-	validError := Error{Version: 1, Code: "conflict", Message: "Refresh and retry.", Retryable: true, CurrentRevision: &revision}
+	validError := Error{Version: 1, Code: "conflict", Message: "Refresh and retry.", Retryable: true, CurrentRevision: &revision, SubjectType: "task", SubjectID: "task", CurrentState: "running", OperationID: "operation"}
 	for name, validate := range map[string]func() error{
 		"chat": validChat.Validate, "approval": validApproval.Validate,
 		"feedback": validFeedback.Validate, "board": validBoard.Validate,
@@ -161,7 +161,8 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	badApproval := validApproval
 	badApproval.ExpectedRevision = 0
 	badFeedback := validFeedback
-	badFeedback.AttemptCost = math.NaN()
+	badCost := math.NaN()
+	badFeedback.AttemptCost = &badCost
 	badBoard := validBoard
 	badBoard.ClaimID = ""
 	title := "card"
@@ -176,12 +177,14 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	badEventDuplicate.Data = json.RawMessage(`{"text":"first","text":"second"}`)
 	badError := validError
 	badError.Message = "private\x00detail"
+	badErrorSubject := validError
+	badErrorSubject.SubjectID = ""
 	for name, validate := range map[string]func() error{
 		"chat": badChat.Validate, "approval": badApproval.Validate,
 		"feedback": badFeedback.Validate, "board": badBoard.Validate,
 		"card create without CAS": badCreate.Validate, "event": badEvent.Validate,
 		"event data is not object": badEventData.Validate, "event unknown field": badEventField.Validate,
-		"event duplicate field": badEventDuplicate.Validate, "error": badError.Validate,
+		"event duplicate field": badEventDuplicate.Validate, "error": badError.Validate, "error subject pair": badErrorSubject.Validate,
 	} {
 		if !errors.Is(validate(), ErrContract) {
 			t.Fatal("invalid contract accepted", name)
@@ -200,7 +203,11 @@ func TestPublishedSchemaHasEveryContractDefinition(t *testing.T) {
 	if err := json.Unmarshal(body, &schema); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"chat_request", "approval_request", "feedback_request", "board_request", "event", "error"} {
+	for _, name := range []string{
+		"chat_request", "approval_request", "feedback_request", "chat_mutation_receipt", "cancellation_receipt",
+		"steering_receipt", "task_control_status", "evidence_summary", "feedback_context", "feedback_receipt",
+		"approval_summary", "approval_page", "approval_decision_receipt", "operation_summary", "operation_page", "submission_status", "board_request", "event", "error",
+	} {
 		if len(schema.Definitions[name]) == 0 {
 			t.Fatal("missing schema definition", name)
 		}
@@ -281,14 +288,23 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		definition string
 		body       string
 	}{
-		"empty submit":           {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture-key-0001"}`},
-		"space in key":           {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture key 0001","text":"hello"}`},
-		"incomplete heartbeat":   {"board_request", `{"version":1,"action":"claim.heartbeat","idempotency_key":"fixture-key-0001","board_id":"board"}`},
-		"cursor on provisional":  {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial"}}`},
-		"committed delta":        {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
-		"raw prompt escape":      {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
-		"move with title":        {"board_request", `{"version":1,"action":"card.move","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"target_state":"ready","title":"irrelevant"}`},
-		"zero feedback revision": {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":0}`},
+		"empty submit":                {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture-key-0001"}`},
+		"space in key":                {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture key 0001","text":"hello"}`},
+		"submit with chat":            {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture-key-0001","chat_id":"chat","text":"hello"}`},
+		"steer without fence":         {"chat_request", `{"version":1,"action":"steer","idempotency_key":"fixture-key-0001","task_id":"task","text":"adjust"}`},
+		"cancel without fence":        {"chat_request", `{"version":1,"action":"cancel","idempotency_key":"fixture-key-0001","task_id":"task"}`},
+		"mixed queued cancel":         {"chat_request", `{"version":1,"action":"cancel_submission","idempotency_key":"fixture-key-0001","submission_id":"submission","task_id":"task"}`},
+		"incomplete heartbeat":        {"board_request", `{"version":1,"action":"claim.heartbeat","idempotency_key":"fixture-key-0001","board_id":"board"}`},
+		"cursor on provisional":       {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial"}}`},
+		"committed delta":             {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
+		"raw prompt escape":           {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
+		"move with title":             {"board_request", `{"version":1,"action":"card.move","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"target_state":"ready","title":"irrelevant"}`},
+		"zero feedback revision":      {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":0}`},
+		"revision changes cost":       {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0.01,"expected_revision":1}`},
+		"revision includes zero cost": {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":1}`},
+		"record omits cost":           {"feedback_request", `{"version":1,"action":"record","idempotency_key":"fixture-key-0001","task_id":"task","accepted":true}`},
+		"error subject unpaired":      {"error", `{"version":1,"code":"revision_conflict","message":"Refresh.","retryable":true,"subject_type":"task"}`},
+		"error raw detail":            {"error", `{"version":1,"code":"revision_conflict","message":"Refresh.","retryable":true,"detail":"private"}`},
 	}
 	for name, item := range negative {
 		t.Run(name, func(t *testing.T) {

@@ -142,6 +142,30 @@ steering are separate idempotent POST operations. Clients reconcile optimistic
 updates from committed revisions rather than interpreting connection state as
 task state.
 
+DAR-79 implements mutation reconciliation in the primary SQLite/WAL store at
+schema 34. Each browser operation is bound to a one-way browser-session subject,
+idempotency-key digest, operation kind, and canonical request digest. Its state
+is `pending`, `committed`, or `rejected`: an exact retry replays the recorded
+terminal result, different-body key reuse conflicts, and replay is evaluated
+before a revision-staleness response. Only a definitive domain rejection is
+terminalized as a bounded sanitized `rejected` response. A crash or response
+ambiguity remains `pending`; the daemon does not infer that effects did or did
+not occur. Authenticated recent-operation and submission-status projections let
+the current browser session reconcile without resubmitting work.
+
+Pending records are never removed by retention. Committed and rejected records
+may be pruned after 30 days and are bounded to the most recent 5,000; all states
+share a hard 10,000-record admission cap. Browser sessions and CSRF grants remain
+process-local and are revoked on restart, while the operation records survive
+normal database backup, restore, and migration. Reauthentication deliberately
+does not grant access to another session subject's records.
+
+Subjective feedback uses a separate immutable revision chain in the same
+database. It is additive to objective deterministic/tool evidence and advisory
+model-audit evidence; revision cannot overwrite those classes, and malformed or
+inconsistent feedback history fails closed. Approval projections freshly redact
+and bound the requested scope before returning `scope_summary`.
+
 Event kind selects a closed typed payload schema. Unknown or duplicate fields
 fail, and no generic raw-payload escape hatch exists. Events carry a maximum 1
 MiB JSON-object payload and responses are bounded by
@@ -253,20 +277,25 @@ and projection work.
 
 | UI operation | Browser route | Application/native primitive | Status |
 | --- | --- | --- | --- |
-| Create challenge | `POST /app/api/v1/session/challenges` | Browser-session challenge | New |
-| Complete login | `POST /app/api/v1/session` | Approved challenge consumption | New |
-| Logout | `POST /app/api/v1/session/logout` | Browser-session revocation | New |
-| List chats | `GET /app/api/v1/chats` | Task list plus session projection | New projection |
-| Read chat | `GET /app/api/v1/chats/{chat}/messages` | Bounded redacted presentation history | New |
-| Submit chat | `POST /app/api/v1/chats` | Submission application service (`POST /v1/submissions`) | Existing primitive |
-| Resume chat | `POST /app/api/v1/chats/{chat}/resume` | Revision-fenced task-continuation facade | New facade |
-| Follow chat | `GET /app/api/v1/chats/{chat}/events` | Presentation SSE over durable readers | New |
-| Steer task | `POST /app/api/v1/tasks/{task}/steering` | `POST /v1/tasks/{task}/steering` | Existing |
-| Cancel task | `POST /app/api/v1/tasks/{task}/cancel` | `POST /v1/tasks/{task}/cancel` | Existing |
-| Record feedback | `POST /app/api/v1/feedback` | Browser revision facade over feedback evidence | New facade |
-| Revise feedback | `POST /app/api/v1/feedback/revisions` | Browser revision facade over immutable evidence | New facade |
-| List approvals | `GET /app/api/v1/tasks/{task}/approvals` | `GET /v1/tasks/{task}/approvals` | Existing |
-| Decide approval | `POST /app/api/v1/tasks/{task}/approvals/{approval}/decision` | Browser revision facade over native approval command | New facade |
+| Create challenge | `POST /app/api/v1/session/challenges` | Browser-session challenge | Implemented |
+| Complete login | `POST /app/api/v1/session` | Approved challenge consumption | Implemented |
+| Logout | `POST /app/api/v1/session/logout` | Browser-session revocation | Implemented |
+| List chats | `GET /app/api/v1/chats` | Task list plus session projection | Implemented projection |
+| Read chat | `GET /app/api/v1/chats/{chat}/messages` | Bounded redacted presentation history | Implemented projection |
+| Submit chat | `POST /app/api/v1/chats` | Submission application service | Implemented BFF facade |
+| Resume chat | `POST /app/api/v1/chats/{chat}/resume` | Revision-fenced task continuation | Implemented BFF facade |
+| Follow chat | `GET /app/api/v1/chats/{chat}/events` | Presentation SSE over durable readers | Implemented projection |
+| Steer task | `POST /app/api/v1/tasks/{task}/steering` | Durable task steering | Implemented BFF facade |
+| Cancel task | `POST /app/api/v1/tasks/{task}/cancel` | Durable task cancellation | Implemented BFF facade |
+| Cancel submission | `POST /app/api/v1/submissions/{submission}/cancel` | Queued-submission cancellation | Implemented BFF facade |
+| Inspect task controls | `GET /app/api/v1/tasks/{task}/controls` | Server-derived task capabilities | Implemented projection |
+| Inspect feedback | `GET /app/api/v1/tasks/{task}/feedback` | Additive evidence/feedback projection | Implemented projection |
+| Record feedback | `POST /app/api/v1/feedback` | Browser revision facade over additive subjective evidence | Implemented BFF facade |
+| Revise feedback | `POST /app/api/v1/feedback/revisions` | Browser CAS facade over immutable subjective revisions | Implemented BFF facade |
+| List approvals | `GET /app/api/v1/tasks/{task}/approvals` | Redacted bounded approval projection | Implemented projection |
+| Decide approval | `POST /app/api/v1/tasks/{task}/approvals/{approval}/decision` | Browser revision facade over native approval command | Implemented BFF facade |
+| List recent operations | `GET /app/api/v1/operations` | Session-bound operation journal projection | Implemented projection |
+| Inspect submission | `GET /app/api/v1/submissions/{submission}` | Session-bound submission status | Implemented projection |
 | List models | `GET /app/api/v1/models` | `GET /v1/routing/models` redacted catalog | Existing |
 | Inspect route | `GET /app/api/v1/tasks/{task}/route` | `GET /v1/tasks/{task}/route` | Existing |
 | Inspect health | `GET /app/api/v1/health` | `GET /v1/health` | Existing |

@@ -125,7 +125,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "d376d62bd6b7f770a37467634d0909e67434df4345c9c3b15fc2e796d089825e" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "d67d3aa0062bb872d265f6ee3f011d22b8358cc026f433e186e3ee01cfef5173" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -158,7 +158,7 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	}
 }
 
-func TestEmbeddedChatPresentationIsBoundedReadOnlyAndXSSSafe(t *testing.T) {
+func TestEmbeddedChatPresentationIsBoundedAndXSSSafe(t *testing.T) {
 	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
 	if err != nil {
 		t.Fatal(err)
@@ -191,15 +191,111 @@ func TestEmbeddedChatPresentationIsBoundedReadOnlyAndXSSSafe(t *testing.T) {
 		t.Fatal(err)
 	}
 	markup := strings.ToLower(string(index))
-	for _, forbidden := range []string{"<form", "<textarea", "contenteditable", "send message", "cancel task", "steer"} {
+	for _, forbidden := range []string{"contenteditable", "onsubmit=", "onclick=", "onkeydown="} {
 		if strings.Contains(markup, forbidden) {
-			t.Fatalf("read-only chat shell exposes action %q", forbidden)
+			t.Fatalf("chat shell exposes unsafe action markup %q", forbidden)
 		}
 	}
-	for _, required := range []string{`id="chat-list-state"`, `id="load-more"`, `id="transcript-state"`, `id="load-more-messages"`, `id="provisional"`} {
+	for _, required := range []string{`id="chat-list-state"`, `id="load-more"`, `id="transcript-state"`, `id="load-more-messages"`, `id="provisional"`,
+		`id="composer"`, `id="composer-text"`, `id="send-message"`, `id="steering-text"`, `id="steer-task"`, `id="cancel-task"`,
+		`id="feedback-panel"`, `id="approval-dialog"`, `role="dialog"`, `aria-modal="true"`, `id="approval-dialog-scope"`,
+		`id="mutation-state"`, `id="reconcile"`, `id="acknowledge-unresolved"`, `id="approval-reconcile"`, `id="approval-acknowledge"`} {
 		if !strings.Contains(markup, required) {
-			t.Fatalf("chat shell lost presentation state %q", required)
+			t.Fatalf("chat shell lost interaction or presentation state %q", required)
 		}
+	}
+}
+
+func TestEmbeddedChatMutationsAreExplicitFencedAndAccessible(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		"window.crypto.getRandomValues(bytes)", "Object.freeze({...payload, idempotency_key: key})", "Object.freeze({path, body: JSON.stringify(request), key})",
+		"if (pendingIntent || unresolvedOperations.length > 0 || !operationsReady || !csrfToken) return", `"X-Darwin-CSRF"`, `credentials: "same-origin"`, `cache: "no-store"`,
+		"Outcome unknown. Check current status before taking another action.", "reconcile.hidden = !canReconcile", "response.status >= 500", "pendingIntent.key !== intent.key",
+		`action: "submit"`, `action: "resume"`, `action: "steer"`, `action: "cancel"`, `action: "cancel_submission"`,
+		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "payload.attempt_cost = cost",
+		`attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0`,
+		`/controls`, `/feedback`, `/approvals?limit=`, "const maxApprovals = 25", "const maxApprovalPrompt = 16 << 10",
+		`approvalDialogScope.textContent = "Scope: " + item.scopeSummary`, `approvalDialogPrompt.textContent = item.prompt`, `item.canDeny ? approvalDeny : approvalClose`, `event.key === "Escape"`,
+		`event.key !== "Tab"`, `event.isComposing`, `!event.shiftKey`, "composer.requestSubmit()", `aria-busy`,
+		"window.setTimeout", "window.clearTimeout", "selectedControls.canResume",
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("chat mutation safety/accessibility guard missing %q", required)
+		}
+	}
+	for _, functionName := range []string{"function loadChats", "function loadHistory", "function connect"} {
+		start := strings.Index(body, functionName)
+		if start < 0 {
+			t.Fatal("missing observation function", functionName)
+		}
+		rest := body[start+len(functionName):]
+		end := strings.Index(rest, "\n\tfunction ")
+		if end < 0 {
+			end = len(rest)
+		}
+		if strings.Contains(rest[:end], "mutate(") {
+			t.Fatalf("observation function can replay a mutation: %s", functionName)
+		}
+	}
+	if strings.Contains(body, "pendingIntent.body") || strings.Contains(body, "fetch(base + pendingIntent") {
+		t.Fatal("ambiguous intent has an automatic replay path")
+	}
+}
+
+func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`requestJSON("/api/v1/operations?" + query.toString())`, "const maxOperationItems = 25", "const maxOperationScan = 100", `item.state === "committed" && !hasSubject`,
+		`const pageLimit = Math.min(maxOperationItems, maxOperationScan - items.length)`, `readOperationPage(body.next_cursor, items, operationIDs, requestID, successMessage)`,
+		`if (items.length >= maxOperationScan) throw new Error("operation scan limit reached")`,
+		`!["pending", "committed", "rejected"].includes(item.state)`, `const exactResolved = exact && ["committed", "rejected"].includes(exact.state)`,
+		`requestJSON("/api/v1/submissions/" + encodeURIComponent(submissionID))`, "const maxSubmissionPolls = 60", "++submissionPollCount < maxSubmissionPolls",
+		`unresolvedOperations = items.filter(item => item.state === "pending")`, "Actions remain blocked.", "Acknowledge that this outcome is unresolved without retrying the request?",
+		`acknowledgeUnresolved.addEventListener("click", acknowledgeOutcome)`, `approvalAcknowledge.addEventListener("click", acknowledgeOutcome)`,
+		`if (approvalResolved && activeApproval)`, "closeApproval();", "loadApprovals();", "The operation was rejected. No request was replayed.",
+		`body.current_revision`, `body.retryable`, `body.operation_id`, `body.requested ? "Cancellation requested; submission is still "`,
+		`Number.isSafeInteger(item.reference_count)`, `String(item.reference_count)`, `textBytes(item.scope_summary) > maxApprovalScope`,
+		`event.key === "Escape" && !pendingIntent && unresolvedOperations.length === 0 && operationsReady`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("mutation reconciliation or contract guard missing %q", required)
+		}
+	}
+	if strings.Contains(body, "body.error") || strings.Contains(body, "pendingIntent.body") || strings.Contains(body, "fetch(base + pendingIntent") {
+		t.Fatal("client uses nested error shape or can replay an unresolved mutation")
+	}
+	feedbackStart := strings.Index(body, "function submitFeedback")
+	feedbackEnd := strings.Index(body[feedbackStart:], "\n\tcomposer.addEventListener")
+	if feedbackStart < 0 || feedbackEnd < 0 {
+		t.Fatal("feedback submission boundary missing")
+	}
+	feedback := body[feedbackStart : feedbackStart+feedbackEnd]
+	reviseStart := strings.Index(feedback, "if (revise)")
+	reviseEnd := strings.Index(feedback[reviseStart:], "} else {")
+	if reviseStart < 0 || reviseEnd < 0 || strings.Contains(feedback[reviseStart:reviseStart+reviseEnd], "attempt_cost") {
+		t.Fatal("feedback revision includes attempt_cost")
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(index)
+	if !strings.Contains(markup, "Zero is valid; leave it blank when the cost is unknown.") {
+		t.Fatal("feedback cost guidance does not distinguish zero from unknown")
+	}
+	scope := strings.Index(markup, `id="approval-dialog-scope"`)
+	allow := strings.Index(markup, `id="approval-allow"`)
+	if scope < 0 || allow < 0 || scope > allow {
+		t.Fatal("approval scope is not presented before decision actions")
 	}
 }
 

@@ -212,7 +212,7 @@ func TestLearningActivationIntentMigrationPreservesState(t *testing.T) {
 		t.Fatal("migration changed draft", err)
 	}
 	var version, count int
-	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 33 || s.db.QueryRow(`SELECT count(*) FROM learning_activation_intents`).Scan(&count) != nil || count != 0 {
+	if s.db.QueryRow(`PRAGMA user_version`).Scan(&version) != nil || version != 34 || s.db.QueryRow(`SELECT count(*) FROM learning_activation_intents`).Scan(&count) != nil || count != 0 {
 		t.Fatal(version, count)
 	}
 	if _, err := s.db.Exec(`INSERT INTO learning_activation_intents VALUES('missing','missing','selection','{}')`); err == nil {
@@ -221,7 +221,7 @@ func TestLearningActivationIntentMigrationPreservesState(t *testing.T) {
 }
 
 func TestLearningActivationIntentSchemaAndIgnoredInsert(t *testing.T) {
-	for _, version := range []int{25, 34} {
+	for _, version := range []int{25, 35} {
 		s, _, i := activationIntentFixture(t)
 		if _, err := s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", version)); err != nil {
 			t.Fatal(err)

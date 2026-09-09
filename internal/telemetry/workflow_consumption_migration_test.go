@@ -56,7 +56,7 @@ func TestWorkflowConsumptionMigrationPreservesScanAndEvidence(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 33 {
+		if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 34 {
 			t.Fatal(version, err)
 		}
 		if !reflect.DeepEqual(before, workflowSourceRawBodies(t, s)) {

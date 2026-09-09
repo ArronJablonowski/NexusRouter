@@ -5603,3 +5603,52 @@ reviews reported no remaining P0/P1/P2 finding. The final integrated
 repository race suite, and production build. The longest rebuilt packages were
 releasepack 458.320s, application 342.603s, telemetry 257.734s, CLI 48.867s,
 SDK 41.671s, toolgate 24.215s, skills 23.668s, and runtime 16.544s.
+
+## 2026-09-09 — DAR-79 browser mutations and durable reconciliation
+
+The authenticated browser BFF now calls narrow in-process application facades
+for chat submission and completed-task continuation, steering, task and queued-
+submission cancellation, subjective feedback record/revision, and approval
+allow/deny/revoke. The corresponding bounded task-control, feedback, approval,
+recent-operation, and submission-status projections allow refresh and ambiguous-
+acknowledgement reconciliation without looping through `/v1`, exposing bearer
+tokens, or returning raw prompts, tool arguments/results, or runtime records.
+The embedded client uses these projections for composer and task controls,
+approval review, feedback revision, pending-operation recovery, and queued-
+submission observation.
+
+Schema 34 places `browser_operations` and `browser_feedback` in the existing
+primary SQLite/WAL database, so migration, backup, and restore retain one state
+boundary. Operations bind the browser-session subject, idempotency-key digest,
+operation kind, and request digest. Exact matching retries replay the stored
+result before stale-revision checks; different request content conflicts.
+Definitive domain failures persist a bounded sanitized `rejected` result,
+whereas an interruption with unknown effect remains `pending`. Terminal rows
+are prunable after 30 days and bounded to the newest 5,000; pending rows are not
+silently pruned, and the journal fails closed at 10,000 total rows.
+
+User feedback now forms an immutable additive revision chain separate from
+objective deterministic/tool evidence and advisory model-audit evidence.
+Record and revise paths preserve the other evidence classes, use CAS revisions,
+and fail closed if feedback history is corrupt. Approval list responses freshly
+redact and byte-bound request scope. Published browser errors are typed and
+sanitized, include the durable operation ID for recorded rejections, and include
+the current revision when it can be derived safely.
+
+Focused implementation evidence includes passing telemetry migration,
+restart/restore/capacity, operation replay/rejection, feedback coexistence, BFF,
+application, browser-auth, CLI composition, and race-focused tests. The tests
+cover exact rejected replay, different-body conflicts, ambiguous pending state,
+terminal retention, partial-schema migration failure, successful feedback
+record-to-revise replay, approval scope redaction, operation/submission reads,
+and session isolation.
+
+Final verification passed on the integrated tree with `make check`: source
+formatting and the 1,000-line limit, `go vet ./...`, the repository-wide race
+suite, and `go build ./...` all succeeded. The longest rebuilt packages were
+releasepack 479.054s, application 348.671s, telemetry 282.161s, CLI 50.231s,
+SDK 41.204s, toolgate 22.860s, runtime 15.957s, and workers 8.490s. A separate
+focused race run also passed for the browser contract, auth, operation journal,
+BFF, application, telemetry, and CLI packages; independent security and UI
+reviews reported no remaining P0/P1/P2 DAR-79 finding. The reviewed commit and
+remote checkpoint are tracked in Git and the corresponding Linear issue.

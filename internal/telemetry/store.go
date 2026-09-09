@@ -18,6 +18,8 @@ import (
 
 var ErrConflict = errors.New("event sequence or identity conflict")
 
+const currentStorageSchema = stateschema.Current
+
 type Store struct{ db *sql.DB }
 
 // Open creates a private on-disk database. Callers must use a dedicated data
@@ -350,6 +352,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 33 {
 		if err = migrateEventLog(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 34 {
+		if err = migrateBrowserOperations(ctx, conn); err != nil {
 			return err
 		}
 	}

@@ -168,7 +168,7 @@ func TestAuditMigrationAndMissingCompletedTurn(t *testing.T) {
 	}
 	defer s.Close()
 	var version int
-	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 33 {
+	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != 34 {
 		t.Fatal(version, err)
 	}
 	if audits, err := s.Audits(ctx, "task", "", 100); err != nil || len(audits) != 0 {

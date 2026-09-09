@@ -47,11 +47,29 @@ supported-platform decision or publication approval is claimed.
   stop-proof recovery, and independently evidenced acceptance. A minimal
   versioned shell is embedded and served through one-time CLI-approved browser
   challenges, bounded process-local sessions, same-origin CSRF grants, and
-  strict security headers. The read-only chat/session surface now adds bounded
+  strict security headers. The browser-safe chat/session surface now adds bounded
   paginated chat and history projections, text-only rendering,
   provisional post-commit redacted model text, and HMAC-bound durable SSE
   replay for typed model, tool, route, worker, error, and terminal state. Chat
-  mutations and Kanban persistence/UI remain open.
+  mutations are now available through direct in-process browser facades:
+  submit/resume, steering, task and queued-submission cancellation, subjective
+  feedback record/revision, and tool-approval allow/deny/revoke. The embedded
+  client reconciles task controls, feedback context, approvals, recent
+  operations, and submission status after refresh or ambiguous acknowledgement.
+  Kanban persistence/UI remain open.
+
+- Schema 34 adds the session-subject-bound browser operation journal and
+  additive browser feedback revision chain to the primary SQLite/WAL database;
+  there is no browser sidecar database. Request digests and idempotency keys
+  make exact retries replayable and different-body reuse conflicting.
+  Definitive sanitized failures are durable `rejected` results, while ambiguous
+  interruptions remain `pending`. Pending operations are never silently
+  discarded; terminal rows have bounded age/count retention and the entire
+  journal has a hard capacity limit. Authenticated, bounded recent-operation
+  and submission-status reads support reload reconciliation. Subjective user
+  revisions coexist with objective and advisory evaluation evidence rather
+  than replacing it. Approval scope is freshly redacted and bounded before it
+  enters the browser projection.
 
 - An explicitly selected stock summary-integrity validator now emits bounded,
   deterministic advisory evidence without ever approving a model-authored
@@ -313,13 +331,17 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 33. Schema 30 added the immutable
+The current durable store uses SQLite schema 34. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
 digests for reconnect-safe native task streaming, schema 33 adds the globally
 ordered committed-runtime-event ledger used for restart-safe SDK catch-up, and
-schema-29-and-newer stores
+schema 34 adds browser-session-bound operation and additive subjective-feedback
+records in the same SQLite/WAL store. Browser authority remains process-local
+and is revoked on restart even though these durable records survive migration,
+backup, and restore. Schema-34 migration validates exact table shape and rules
+and fails closed on inconsistent partial objects. Schema-29-and-newer stores
 retain the existing task-duration epoch.
 Schema-22-and-newer resource
 leases carry private

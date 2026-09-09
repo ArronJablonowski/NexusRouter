@@ -86,6 +86,31 @@ func TestSteeringAtomicApplyAndIdempotence(t *testing.T) {
 	}
 }
 
+func TestSteeringRevisionCASReplaysBeforeStaleCheck(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	if err := db.Append(ctx, 0, event("start", 1, runtime.TaskStarted)); err != nil {
+		t.Fatal(err)
+	}
+	key := submitDigest("revision-key")
+	if _, err := db.QueueSteeringAtRevision(ctx, "task", key, "guide", 2); !errors.Is(err, ErrConflict) {
+		t.Fatal("stale revision accepted", err)
+	}
+	message, err := db.QueueSteeringAtRevision(ctx, "task", key, "guide", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	applied := event("applied-revision", 2, runtime.SteeringApplied)
+	applied.Data.SteeringID, applied.Data.Text = message.ID, message.Text
+	if err = db.Append(ctx, 1, applied); err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := db.QueueSteeringAtRevision(ctx, "task", key, "guide", 1)
+	if err != nil || replayed.State != "applied" {
+		t.Fatal("acknowledgement retry did not converge", replayed, err)
+	}
+}
+
 func TestSteeringLimitCancellationAndRollback(t *testing.T) {
 	db, _ := submissionStore(t)
 	ctx := context.Background()
