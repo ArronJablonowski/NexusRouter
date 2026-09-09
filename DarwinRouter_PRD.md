@@ -379,7 +379,16 @@ subjective feedback, and approval decisions. Browser mutations are protected by
 same-origin session/CSRF policy and a request-bound durable operation journal;
 bounded control, feedback, approval, recent-operation, and submission-status
 reads support refresh reconciliation without exposing native bearer tokens or
-raw runtime records. The workboard store, APIs, agent tools, and Kanban feature
+raw runtime records. The implemented DAR-80 inspector adds bounded,
+authenticated GET projections for the configured model catalog, per-task route
+candidates and usage, normalized paired tool lifecycles, redacted audit
+provenance, health, and host resources. The UI distinguishes a projection that
+is unavailable from an optional measurement that is unknown, keeps routed
+execution accounting separate from auxiliary classifier, summarizer,
+orchestrator-audit, and optional-judge accounting, and never exposes raw
+prompts, tool arguments, tool results, or provider responses. These views are
+observational: they cannot change routing policy, configured models, approvals,
+or task execution. The workboard store, APIs, agent tools, and Kanban feature
 views remain open.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so

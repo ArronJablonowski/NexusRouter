@@ -35,6 +35,7 @@ type Options struct {
 	Store          *browserauth.Store
 	Reads          ReadServices
 	Mutations      MutationServices
+	Inspections    InspectionServices
 	LiveText       *LiveTextHub
 	CursorKey      []byte
 }
@@ -47,6 +48,7 @@ type Handler struct {
 	store         *browserauth.Store
 	reads         ReadServices
 	mutations     MutationServices
+	inspections   InspectionServices
 	liveText      *LiveTextHub
 	shell         http.Handler
 	bootstrap     http.Handler
@@ -85,7 +87,7 @@ func New(options Options) (*Handler, error) {
 	} else {
 		copy(cursorKey[:], options.CursorKey)
 	}
-	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey}
+	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -105,7 +107,7 @@ func New(options Options) (*Handler, error) {
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
 	chatListPath := h.basePath + "/api/v1/chats"
-	queryReadPath := request.URL != nil && (request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "")
+	queryReadPath := request.URL != nil && (request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
 	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
@@ -149,6 +151,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	case chatListPath:
 		h.serveChatList(writer, request)
 	default:
+		if h.serveInspectionAPI(writer, request) {
+			return
+		}
 		if chat := chatMessagesID(h.basePath, request.URL.Path); chat != "" {
 			h.serveTranscript(writer, request, chat)
 			return

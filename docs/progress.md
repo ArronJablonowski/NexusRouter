@@ -5652,3 +5652,50 @@ focused race run also passed for the browser contract, auth, operation journal,
 BFF, application, telemetry, and CLI packages; independent security and UI
 reviews reported no remaining P0/P1/P2 DAR-79 finding. The reviewed commit and
 remote checkpoint are tracked in Git and the corresponding Linear issue.
+
+## 2026-09-09 — DAR-80 responsive read-only inspector
+
+The authenticated embedded Web UI now exposes a responsive inspector backed by
+seven browser-session reads: the configured model catalog; per-task route,
+usage, paired tool activity, and audit history; daemon health; and host
+resources. All routes remain under the configured Web UI base path. The model
+catalog is capped at 256 entries, route projections at 256 candidates, and
+health at 512 checks. Tool and audit histories use opaque cursor pages of at
+most 100 server items; the client requests smaller pages, rejects duplicate
+items or cursors, and stops at its aggregate 100-item/eight-page bound.
+
+Availability is explicit. An unavailable source renders `Unavailable`, while a
+missing optional measurement renders `Unknown` and is never inferred as zero.
+Usage presents primary/fallback routed execution separately from auxiliary
+classifier, summarizer, orchestrator-audit, and optional-judge work, alongside
+the server's overall and coverage projections. Historical route selection and
+candidate dispositions remain distinct from current health and resource
+observations.
+
+Tool activity is a normalized, paired lifecycle projection containing bounded
+identity, behavior, permission, state, effect, code, time, and sequence
+metadata; raw arguments and results cannot enter the contract. Audit history
+contains bounded reviewer/model/provider/domain provenance, sanitized finding
+summaries and evidence references, rubric version, ordered evidence precedence,
+and optional auxiliary usage. The client renders all values as inert text and
+does not render prompts, provider responses, tool payloads, or raw runtime
+events.
+
+DAR-80 adds no policy or lifecycle mutation. Inspection uses GET only and cannot
+change configured models, route policy, approvals, tasks, or submissions; the
+DAR-79 mutation and reconciliation controls remain separate. Focused contract,
+schema, BFF, shell/source-behavior, syntax, and asset-digest tests cover valid,
+unknown, unavailable, malformed, paginated, bounded, responsive, and redacted
+states. Workboard persistence, APIs, agent tools, and Kanban views remain open
+for DAR-81 onward.
+
+Final verification passed on the integrated tree with `make check`: the source
+format/1,000-line gate, `go vet ./...`, the repository-wide race suite, and
+`go build ./...` all succeeded. The longest rebuilt packages were releasepack
+474.827s, application 345.643s, telemetry 282.222s, CLI 49.545s, SDK 39.579s,
+toolgate 23.383s, workers 7.172s, Web UI 3.458s, and browser BFF 2.825s. A
+separate focused race run passed for the Web UI contract, BFF, application, and
+CLI. Cross-lane review caught and closed stale schema bounds, route-corruption
+classification, health/usage/provenance validation, and a JavaScript module
+size violation before release. The final first-party JavaScript sources are
+997, 427, and 55 lines; shell tests enforce that each remains below 1,000.

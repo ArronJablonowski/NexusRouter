@@ -87,6 +87,55 @@
             <button id="acknowledge-unresolved" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
           </div>
         </section>
+        <aside id="inspector" class="inspector" aria-labelledby="inspector-title">
+          <div class="inspector-heading">
+            <div><p class="eyebrow">Read-only</p><h2 id="inspector-title">Inspector</h2></div>
+            <button id="refresh-inspector" class="secondary" type="button">Refresh</button>
+          </div>
+          <section class="inspector-section" aria-labelledby="health-title">
+            <h3 id="health-title">Health</h3>
+            <div id="health-state" class="notice compact" role="status">Loading health…</div>
+            <dl id="health-details" class="inspector-details"></dl>
+          </section>
+          <section class="inspector-section" aria-labelledby="resources-title">
+            <h3 id="resources-title">Resources</h3>
+            <div id="resources-state" class="notice compact" role="status">Loading resources…</div>
+            <dl id="resources-details" class="inspector-details"></dl>
+          </section>
+          <section class="inspector-section" aria-labelledby="models-title">
+            <div class="control-heading"><h3 id="models-title">Models</h3><output id="model-count" class="count"></output></div>
+            <div id="models-state" class="notice compact" role="status">Loading models…</div>
+            <ul id="model-list" class="inspector-list" aria-label="Configured models"></ul>
+          </section>
+          <div id="task-inspector" hidden>
+            <section class="inspector-section" aria-labelledby="route-title">
+              <h3 id="route-title">Route</h3>
+              <div id="route-state" class="notice compact" role="status">Choose a chat to inspect its route.</div>
+              <dl id="route-details" class="inspector-details"></dl>
+              <ol id="route-candidates" class="inspector-list" aria-label="Route candidates"></ol>
+            </section>
+            <section class="inspector-section" aria-labelledby="usage-title">
+              <h3 id="usage-title">Usage</h3>
+              <p class="help">Routed execution and auxiliary evaluation are accounted separately.</p>
+              <div id="usage-state" class="notice compact" role="status">Choose a chat to inspect usage.</div>
+              <dl id="usage-details" class="inspector-details"></dl>
+            </section>
+            <section class="inspector-section" aria-labelledby="tools-title">
+              <div class="control-heading"><h3 id="tools-title">Tool lifecycle</h3><output id="tool-count" class="count"></output></div>
+              <p class="help">Normalized start and completion state only. Arguments and results are not displayed.</p>
+              <div id="tools-state" class="notice compact" role="status">Choose a chat to inspect tools.</div>
+              <ol id="tool-list" class="inspector-list" aria-label="Paired normalized tool lifecycle"></ol>
+              <button id="load-more-tools" class="secondary" type="button" hidden>Load more tool activity</button>
+            </section>
+            <section class="inspector-section" aria-labelledby="audits-title">
+              <div class="control-heading"><h3 id="audits-title">Audits</h3><output id="audit-count" class="count"></output></div>
+              <p class="help">Auxiliary review evidence is not routed model output.</p>
+              <div id="audits-state" class="notice compact" role="status">Choose a chat to inspect audits.</div>
+              <ol id="audit-list" class="inspector-list" aria-label="Sanitized audit evidence"></ol>
+              <button id="load-more-audits" class="secondary" type="button" hidden>Load more audits</button>
+            </section>
+          </div>
+        </aside>
       </section>
     </main>
   </div>
@@ -107,6 +156,7 @@
       </div>
     </section>
   </div>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/inspector.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

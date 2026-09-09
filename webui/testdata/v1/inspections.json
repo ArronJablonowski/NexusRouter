@@ -1,0 +1,79 @@
+{
+  "models": {
+    "version": 1,
+    "availability": "available",
+    "config_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "models": [
+      {"id":"local-fast","provider":"ollama","model":"qwen:latest","locality":"local","capabilities":["chat","code"],"context_tokens":8192,"ram_bytes":4294967296,"vram_bytes":2147483648,"failure_domain":"host-local","health":"healthy"},
+      {"id":"cloud-deep","provider":"openai","model":"gpt-5.6-sol","locality":"cloud","capabilities":["chat","reasoning"],"estimated_cost":0.01,"failure_domain":"cloud-a","health":"unknown"}
+    ]
+  },
+  "route": {
+    "version": 1,
+    "task_id": "task-hybrid",
+    "availability": "available",
+    "route_id": "route-1",
+    "domain": "code",
+    "profile": "hybrid",
+    "explored": false,
+    "candidates": [
+      {"model":"qwen:latest","provider":"ollama","failure_domain":"host-local","disposition":"selected","score":0.91,"confidence":0.8,"samples":20,"constraint_codes":[]},
+      {"model":"gpt-5.6-sol","provider":"openai","failure_domain":"cloud-a","disposition":"fallback","score":0.88,"confidence":0.9,"samples":30,"constraint_codes":[]},
+      {"model":"offline","provider":"ollama","disposition":"excluded","constraint_codes":["health"]}
+    ],
+    "usage": {
+      "coverage":"complete","unaccounted_routed_operations":0,
+      "primary":{"records":1,"known_usage_records":1,"unknown_usage_records":0,"input_tokens":100,"output_tokens":50,"known_cost_records":1,"unknown_cost_records":0,"normalized_cost":0},
+      "fallback":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "classifier":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "summarizer":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "orchestrator_audit":{"records":1,"known_usage_records":1,"unknown_usage_records":0,"input_tokens":40,"output_tokens":10,"known_cost_records":1,"unknown_cost_records":0,"normalized_cost":0.002},
+      "optional_judge":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "routed":{"records":1,"known_usage_records":1,"unknown_usage_records":0,"input_tokens":100,"output_tokens":50,"known_cost_records":1,"unknown_cost_records":0,"normalized_cost":0},
+      "auxiliary":{"records":1,"known_usage_records":1,"unknown_usage_records":0,"input_tokens":40,"output_tokens":10,"known_cost_records":1,"unknown_cost_records":0,"normalized_cost":0.002},
+      "overall":{"records":2,"known_usage_records":2,"unknown_usage_records":0,"input_tokens":140,"output_tokens":60,"known_cost_records":2,"unknown_cost_records":0,"normalized_cost":0.002},
+      "calculated_at":"2026-09-09T12:00:02Z"
+    }
+  },
+  "task_usage": {
+    "version":1,"task_id":"task-hybrid","availability":"available","usage":{
+      "coverage":"complete","unaccounted_routed_operations":0,
+      "primary":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "fallback":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "classifier":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "summarizer":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "orchestrator_audit":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "optional_judge":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "routed":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "auxiliary":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "overall":{"records":0,"known_usage_records":0,"unknown_usage_records":0,"known_cost_records":0,"unknown_cost_records":0},
+      "calculated_at":"2026-09-09T12:00:02Z"
+    }
+  },
+  "task_usage_unavailable": {"version":1,"task_id":"task-hybrid","availability":"unavailable"},
+  "tools": {
+    "version":1,"task_id":"task-hybrid","tools":[
+      {"call_id":"call-read","name":"read_file","behavior":"read_only","permission":"not_required","state":"completed","effect":"none","started_at":"2026-09-09T12:00:00Z","completed_at":"2026-09-09T12:00:01Z","start_sequence":4,"completion_sequence":5},
+      {"call_id":"call-write","name":"write_file","behavior":"non_idempotent_write","permission":"approved","state":"failed","effect":"uncertain","code":"tool_failed","started_at":"2026-09-09T12:00:02Z","completed_at":"2026-09-09T12:00:03Z","start_sequence":7,"completion_sequence":8}
+    ],"next_cursor":"tools-page-2"
+  },
+  "audits": {
+    "version":1,"task_id":"task-hybrid","audits":[
+      {"id":"audit-1","status":"completed","reviewer_id":"orchestrator","evaluator_model":"gpt-5.6-sol","evaluator_provider":"openai","rubric_version":"code-v1","domain":"code","findings":[{"summary":"Deterministic checks passed; one maintainability concern remains.","evidence_refs":["test-run-1"]}],"evidence_precedence":["deterministic","tool_result","user_feedback","llm_judge"],"usage":{"records":1,"known_usage_records":1,"unknown_usage_records":0,"input_tokens":40,"output_tokens":10,"known_cost_records":1,"unknown_cost_records":0,"normalized_cost":0.002},"started_at":"2026-09-09T12:00:00Z","finished_at":"2026-09-09T12:00:01Z"}
+    ]
+  },
+  "health": {
+    "version":1,"availability":"available","status":"degraded","ready":true,"checked_at":"2026-09-09T12:00:00Z","checks":[
+      {"component":"daemon","status":"healthy","code":"serving"},
+      {"component":"database","status":"healthy","code":"available"},
+      {"component":"supervisor","status":"healthy","code":"supervisor_ok"},
+      {"component":"resources","id":"host","status":"healthy","code":"capacity_available"},
+      {"component":"model","id":"local-fast","status":"healthy","code":"available"},
+      {"component":"model","id":"cloud-deep","status":"unknown","code":"metrics_unknown"}
+    ]
+  },
+  "resources": {
+    "version":1,"availability":"available","observed_at":"2026-09-09T12:00:00Z","cpus":12,"total_ram_bytes":34359738368,"available_ram_bytes":17179869184,"unified_memory":true
+  },
+  "resources_unavailable": {"version":1,"availability":"unavailable"}
+}

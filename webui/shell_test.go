@@ -38,6 +38,7 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 		{"/console", "text/html", "/console/assets/v1/app.js"},
 		{"/console/chats/chat-a", "text/html", "DarwinRouter"},
 		{"/console/assets/v1/app.css", "text/css", "color-scheme"},
+		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
 		response := shellRequest(t, handler, http.MethodGet, test.target, true)
@@ -125,10 +126,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "d67d3aa0062bb872d265f6ee3f011d22b8358cc026f433e186e3ee01cfef5173" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "d6497164f8cc163b3deb6d78ab47481036f8f253cdaa9d5c95c7658e011a2199" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/inspector.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -202,6 +203,61 @@ func TestEmbeddedChatPresentationIsBoundedAndXSSSafe(t *testing.T) {
 		`id="mutation-state"`, `id="reconcile"`, `id="acknowledge-unresolved"`, `id="approval-reconcile"`, `id="approval-acknowledge"`} {
 		if !strings.Contains(markup, required) {
 			t.Fatalf("chat shell lost interaction or presentation state %q", required)
+		}
+	}
+}
+
+func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/inspector.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`requestJSON("/api/v1/models")`, `requestJSON("/api/v1/health")`, `requestJSON("/api/v1/resources")`,
+		`+ "/route")`, `+ "/usage")`, `+ "/tools?" + query.toString())`, `+ "/audits?" + query.toString())`,
+		"const maxInspectedModels = 256", "const maxRouteCandidates = 256", "const maxHealthChecks = 512", "const maxInspectionItems = 100", "const maxInspectionPages = 8",
+		`toolIDs.has(item.call_id)`, `auditIDs.has(item.id)`, `toolCursors.has(body.next_cursor)`, `auditCursors.has(body.next_cursor)`,
+		`["Routed total", "routed"]`, `["Auxiliary total", "auxiliary"]`, `["Orchestrator audit (auxiliary)", "orchestrator_audit"]`,
+		`"Completion: pending / unknown"`, `Rubric version: " + (item.rubric_version || "Unknown")`,
+		`"Evidence precedence: " + (item.evidence_precedence.length ? item.evidence_precedence.join(" → ") : "None")`,
+		`body.availability === "unavailable"`, `? "Unknown"`, `node.textContent = value`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("inspector presentation guard missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"innerHTML", ".arguments", ".result", ".prompt", "mutate("} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("inspector consumes active or raw field %q", forbidden)
+		}
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(index)
+	for _, required := range []string{"Arguments and results are not displayed.", "Auxiliary review evidence is not routed model output."} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("inspector safety label missing %q", required)
+		}
+	}
+	for _, required := range []string{`id="inspector"`, `id="refresh-inspector"`, `id="health-state"`, `id="resources-state"`, `id="model-list"`,
+		`id="task-inspector"`, `id="route-candidates"`, `id="usage-details"`, `id="tool-list"`, `id="load-more-tools"`, `id="audit-list"`, `id="load-more-audits"`} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("inspector markup missing %q", required)
+		}
+	}
+}
+
+func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/inspector.js", "assets/v1/bootstrap.js"} {
+		body, err := embeddedShellAssets.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if lines := strings.Count(string(body), "\n") + 1; lines >= 1000 {
+			t.Fatalf("%s has %d lines; source files must remain below 1,000", name, lines)
 		}
 	}
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/webuiapp"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -110,6 +111,24 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
 	var browserHandler *webuiapp.Handler
+	healthReport := func(ctx context.Context) (health.Report, error) {
+		if dispatcher == nil {
+			return health.Report{}, errors.New("supervisor unavailable")
+		}
+		report, err := service.HealthReport(ctx, dispatcher.Health())
+		if err != nil {
+			return health.Report{}, err
+		}
+		report, err = withConfiguredLearningHealth(report, learner.Health())
+		if err != nil {
+			return health.Report{}, err
+		}
+		report, err = withMetricsExportHealth(report, exporter.Health())
+		if err != nil {
+			return health.Report{}, err
+		}
+		return withTraceExportHealth(report, traceExporter.Health())
+	}
 	if s.WebUI.Enabled {
 		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)
 		if operationErr != nil {
@@ -156,6 +175,22 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
 				return db.ReadCommittedEventPage(ctx, options)
+			},
+		}, Inspections: webuiapp.InspectionServices{
+			Models: func(ctx context.Context) (webui.ModelInspectionPage, error) {
+				report, _ := healthReport(ctx)
+				return service.BrowserModels(ctx, report)
+			},
+			Route:  service.BrowserRoute,
+			Usage:  service.BrowserTaskUsage,
+			Tools:  service.BrowserTools,
+			Audits: service.BrowserAudits,
+			Health: func(ctx context.Context) (webui.HealthInspection, error) {
+				report, reportErr := healthReport(ctx)
+				return app.BrowserHealth(report, reportErr), nil
+			},
+			Resources: func(ctx context.Context) (webui.ResourceInspection, error) {
+				return service.BrowserResources(ctx), nil
 			},
 		}})
 		if err != nil {
@@ -279,24 +314,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			_, err := db.Read(ctx, "__health__", 0, 1)
 			return err
 		},
-		HealthReport: func(ctx context.Context) (health.Report, error) {
-			if dispatcher == nil {
-				return health.Report{}, errors.New("supervisor unavailable")
-			}
-			report, err := service.HealthReport(ctx, dispatcher.Health())
-			if err != nil {
-				return health.Report{}, err
-			}
-			report, err = withConfiguredLearningHealth(report, learner.Health())
-			if err != nil {
-				return health.Report{}, err
-			}
-			report, err = withMetricsExportHealth(report, exporter.Health())
-			if err != nil {
-				return health.Report{}, err
-			}
-			return withTraceExportHealth(report, traceExporter.Health())
-		},
+		HealthReport: healthReport,
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
 		},

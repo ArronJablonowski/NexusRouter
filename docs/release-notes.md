@@ -71,6 +71,21 @@ supported-platform decision or publication approval is claimed.
   than replacing it. Approval scope is freshly redacted and bounded before it
   enters the browser projection.
 
+- DAR-80 adds a responsive, authenticated inspection surface to the embedded
+  Web UI. Bounded GET-only projections show the configured model catalog,
+  selected route and candidate dispositions, task usage, paired normalized tool
+  lifecycles, redacted audit provenance, daemon health, and host resources. A
+  whole projection that cannot be observed is labeled `Unavailable`; an absent
+  optional measurement is labeled `Unknown` rather than zero. Usage preserves
+  separate routed execution and auxiliary classifier, summarizer,
+  orchestrator-audit, and optional-judge totals. Tool rows omit arguments and
+  results, while audit rows expose only sanitized findings, bounded evidence
+  references, reviewer/model provenance, rubric version, and ordered evidence
+  precedence. Model/route/health snapshots and cursor-paged tool/audit reads
+  are independently bounded, and the browser applies an aggregate display cap.
+  The inspector performs no POST, does not redispatch work, and grants no model,
+  routing-policy, approval, or runtime mutation authority.
+
 - An explicitly selected stock summary-integrity validator now emits bounded,
   deterministic advisory evidence without ever approving a model-authored
   summary. It rejects provenance/checkpoint drift, unsafe display controls,

@@ -42,8 +42,15 @@ shell now serves a browser-safe chat/session view with bounded history and
 reconnect-safe presentation streaming. The DAR-79 browser surface now adds
 idempotent submit/resume, steering, task and queued-submission cancellation,
 subjective feedback revision, tool-approval controls, and refresh-safe task,
-submission, and operation reconciliation. Workboard storage, APIs, agent tools,
-and Kanban views remain assigned to DAR-81 onward.
+submission, and operation reconciliation. DAR-80 adds a responsive, read-only
+inspector for the configured model catalog, selected route and candidates, task
+usage, normalized tool lifecycles, redacted audit provenance, daemon health,
+and host resources. It explicitly distinguishes unavailable projections from
+unknown measurements and separates routed execution usage from auxiliary
+classifier, summarizer, audit, and optional-judge usage. Inspection is bounded
+and GET-only: it does not change models, routing policy, approvals, or runtime
+state. Workboard storage, APIs, agent tools, and Kanban views remain assigned to
+DAR-81 onward.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -53,8 +60,12 @@ Kanban ownership rules. Closed presentation schemas include board/card/claim/
 attempt/evidence/candidate snapshots and acceptance/recovery receipts. This
 contract now backs an embedded shell, one-time terminal-approved browser login,
 process-local sessions, CSRF recovery, browser-safe chat/session projections,
-and the bounded DAR-79 mutation/control surface. Workboard persistence and
-Kanban feature views remain open.
+the bounded DAR-79 mutation/control surface, and DAR-80 read-only inspection
+projections. Tool inspection exposes paired lifecycle metadata without
+arguments or results; audit inspection exposes sanitized findings, evidence
+references, rubric provenance, and ordered evidence precedence without raw
+prompts or provider responses. Workboard persistence and Kanban feature views
+remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
@@ -1674,9 +1685,8 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Complete remaining chat inspection/presentation work in DAR-80.
-2. Build durable Kanban storage, APIs, Web UI, and agent tools in DAR-81 through DAR-85.
-3. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Build durable Kanban storage, APIs, Web UI, and agent tools in DAR-81 through DAR-85.
+2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

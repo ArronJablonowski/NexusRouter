@@ -4,6 +4,7 @@
 - Date: 2026-09-09
 - Linear issue: DAR-76
 - Contract version: `webui.v1`
+- Refined by: DAR-77 through DAR-80
 
 ## Context
 
@@ -166,6 +167,36 @@ model-audit evidence; revision cannot overwrite those classes, and malformed or
 inconsistent feedback history fails closed. Approval projections freshly redact
 and bound the requested scope before returning `scope_summary`.
 
+### Read-only inspection
+
+DAR-80 keeps operational inspection behind authenticated `session_read` BFF
+routes under the configured app base path. It exposes bounded projections for
+configured models, per-task route selection and candidates, per-task usage,
+normalized paired tool lifecycles, redacted audit provenance, daemon health,
+and host resources. These are GET-only observations. They do not change model
+configuration, routing policy, task state, approval state, or any other runtime
+authority.
+
+Projection `availability` is explicit. `unavailable` means the source could not
+provide the projection. Within an available projection, an omitted optional
+measurement means unknown and must be displayed as unknown, not zero.
+Historical route selection is not a live health assertion; current health and
+resources remain separate projections.
+
+Usage preserves the ledger distinction between routed primary/fallback
+execution and auxiliary classifier, summarizer, orchestrator-audit, and
+optional-judge operations. Tool rows expose only normalized paired lifecycle
+metadata and never arguments or results. Audit rows expose bounded reviewer,
+model, provider, domain, rubric, ordered evidence-precedence, sanitized finding,
+evidence-reference, and optional auxiliary-usage fields; prompts, provider
+responses, tool payloads, and raw runtime records are not representable.
+
+Model catalogs are capped at 256 entries, route snapshots at 256 candidates,
+and health snapshots at 512 checks. Tool and audit histories are opaque-cursor
+pages of at most 100 items and one MiB; the browser additionally caps aggregate
+retention and page traversal. A bound or validation failure closes the view
+without turning a partial result into authoritative state.
+
 Event kind selects a closed typed payload schema. Unknown or duplicate fields
 fail, and no generic raw-payload escape hatch exists. Events carry a maximum 1
 MiB JSON-object payload and responses are bounded by
@@ -296,10 +327,13 @@ and projection work.
 | Decide approval | `POST /app/api/v1/tasks/{task}/approvals/{approval}/decision` | Browser revision facade over native approval command | Implemented BFF facade |
 | List recent operations | `GET /app/api/v1/operations` | Session-bound operation journal projection | Implemented projection |
 | Inspect submission | `GET /app/api/v1/submissions/{submission}` | Session-bound submission status | Implemented projection |
-| List models | `GET /app/api/v1/models` | `GET /v1/routing/models` redacted catalog | Existing |
-| Inspect route | `GET /app/api/v1/tasks/{task}/route` | `GET /v1/tasks/{task}/route` | Existing |
-| Inspect health | `GET /app/api/v1/health` | `GET /v1/health` | Existing |
-| Inspect resources | `GET /app/api/v1/resources` | Bounded resource/pressure projection | New |
+| List models | `GET /app/api/v1/models` | Configured-model redacted catalog | Implemented projection |
+| Inspect route | `GET /app/api/v1/tasks/{task}/route` | Historical route selection and candidates | Implemented projection |
+| Inspect task usage | `GET /app/api/v1/tasks/{task}/usage` | Routed and auxiliary usage accounting | Implemented projection |
+| List task tools | `GET /app/api/v1/tasks/{task}/tools` | Normalized paired tool lifecycle | Implemented projection |
+| List task audits | `GET /app/api/v1/tasks/{task}/audits` | Redacted audit provenance | Implemented projection |
+| Inspect health | `GET /app/api/v1/health` | Bounded daemon/provider health projection | Implemented projection |
+| Inspect resources | `GET /app/api/v1/resources` | Bounded resource/pressure projection | Implemented projection |
 | List boards | `GET /app/api/v1/workboards` | `GET /v1/workboards` | New |
 | Create board | `POST /app/api/v1/workboards` | `POST /v1/workboards` | New |
 | Read/reconcile board | `GET /app/api/v1/workboards/{board}` | Bounded workboard snapshot | New |
@@ -340,8 +374,9 @@ exposure, presentation-driven retries, sensitive event leakage, and split-brain
 board state. Contract fixtures can be consumed by Go and front-end tests before
 the server or UI exists.
 
-DAR-76 does not implement the app shell, authentication handlers, presentation
-SSE, workboard storage, workboard endpoints, or feature UI. Those remain in
-DAR-77 through DAR-87. The `web_ui` and `workboard` PRD configuration blocks are
-requirements only and are not accepted by the current strict configuration
-loader until their implementation sprints land.
+DAR-77 through DAR-80 implement the app shell, authentication boundary, chat
+presentation and reconciliation, bounded chat mutations, and the read-only
+operational inspector described above. They do not implement workboard storage,
+workboard endpoints, agent board tools, or Kanban feature UI; those remain in
+DAR-81 through DAR-87. Inspection projections do not grant policy mutation or
+work-dispatch authority.

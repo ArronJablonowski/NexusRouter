@@ -1,56 +1,25 @@
 "use strict";
-
 (() => {
 	const base = document.body.dataset.basePath || "";
-	const connection = document.querySelector("#connection-state");
-	const list = document.querySelector("#chat-list");
-	const listState = document.querySelector("#chat-list-state");
-	const chatCount = document.querySelector("#chat-count");
-	const loadMore = document.querySelector("#load-more");
-	const title = document.querySelector("#chat-title");
-	const chatState = document.querySelector("#chat-state");
-	const transcript = document.querySelector("#transcript");
-	const transcriptState = document.querySelector("#transcript-state");
-	const loadMoreMessages = document.querySelector("#load-more-messages");
-	const provisional = document.querySelector("#provisional");
-	const streamAnnouncement = document.querySelector("#stream-announcement");
-	const taskControls = document.querySelector("#task-controls");
-	const steeringControl = document.querySelector("#steering-control");
-	const steeringText = document.querySelector("#steering-text");
-	const steerTask = document.querySelector("#steer-task");
-	const cancelTask = document.querySelector("#cancel-task");
-	const approvalPanel = document.querySelector("#approval-panel");
-	const approvalState = document.querySelector("#approval-state");
-	const approvalList = document.querySelector("#approval-list");
-	const approvalCount = document.querySelector("#approval-count");
-	const feedbackPanel = document.querySelector("#feedback-panel");
-	const feedbackSummary = document.querySelector("#feedback-summary");
-	const attemptCostLabel = document.querySelector("#attempt-cost-label");
-	const attemptCost = document.querySelector("#attempt-cost");
-	const attemptCostHelp = document.querySelector("#attempt-cost-help");
-	const feedbackAccepted = document.querySelector("#feedback-accepted");
-	const feedbackRejected = document.querySelector("#feedback-rejected");
-	const composer = document.querySelector("#composer");
-	const composerLabel = document.querySelector("#composer-label");
-	const composerText = document.querySelector("#composer-text");
-	const composerHelp = document.querySelector("#composer-help");
-	const composerCount = document.querySelector("#composer-count");
-	const composerError = document.querySelector("#composer-error");
-	const sendMessage = document.querySelector("#send-message");
-	const newChat = document.querySelector("#new-chat");
-	const mutationState = document.querySelector("#mutation-state");
-	const reconcile = document.querySelector("#reconcile");
-	const acknowledgeUnresolved = document.querySelector("#acknowledge-unresolved");
-	const approvalDialog = document.querySelector("#approval-dialog");
-	const approvalDialogMeta = document.querySelector("#approval-dialog-meta");
-	const approvalDialogScope = document.querySelector("#approval-dialog-scope");
-	const approvalDialogPrompt = document.querySelector("#approval-dialog-prompt");
-	const approvalDeny = document.querySelector("#approval-deny");
-	const approvalAllow = document.querySelector("#approval-allow");
-	const approvalRevoke = document.querySelector("#approval-revoke");
-	const approvalClose = document.querySelector("#approval-close");
-	const approvalReconcile = document.querySelector("#approval-reconcile");
-	const approvalAcknowledge = document.querySelector("#approval-acknowledge");
+	const connection = document.querySelector("#connection-state"), list = document.querySelector("#chat-list");
+	const listState = document.querySelector("#chat-list-state"), chatCount = document.querySelector("#chat-count"), loadMore = document.querySelector("#load-more");
+	const title = document.querySelector("#chat-title"), chatState = document.querySelector("#chat-state"), transcript = document.querySelector("#transcript");
+	const transcriptState = document.querySelector("#transcript-state"), loadMoreMessages = document.querySelector("#load-more-messages");
+	const provisional = document.querySelector("#provisional"), streamAnnouncement = document.querySelector("#stream-announcement");
+	const taskControls = document.querySelector("#task-controls"), steeringControl = document.querySelector("#steering-control"), steeringText = document.querySelector("#steering-text");
+	const steerTask = document.querySelector("#steer-task"), cancelTask = document.querySelector("#cancel-task"), approvalPanel = document.querySelector("#approval-panel");
+	const approvalState = document.querySelector("#approval-state"), approvalList = document.querySelector("#approval-list"), approvalCount = document.querySelector("#approval-count");
+	const feedbackPanel = document.querySelector("#feedback-panel"), feedbackSummary = document.querySelector("#feedback-summary");
+	const attemptCostLabel = document.querySelector("#attempt-cost-label"), attemptCost = document.querySelector("#attempt-cost"), attemptCostHelp = document.querySelector("#attempt-cost-help");
+	const feedbackAccepted = document.querySelector("#feedback-accepted"), feedbackRejected = document.querySelector("#feedback-rejected");
+	const composer = document.querySelector("#composer"), composerLabel = document.querySelector("#composer-label"), composerText = document.querySelector("#composer-text");
+	const composerHelp = document.querySelector("#composer-help"), composerCount = document.querySelector("#composer-count"), composerError = document.querySelector("#composer-error");
+	const sendMessage = document.querySelector("#send-message"), newChat = document.querySelector("#new-chat"), mutationState = document.querySelector("#mutation-state");
+	const reconcile = document.querySelector("#reconcile"), acknowledgeUnresolved = document.querySelector("#acknowledge-unresolved");
+	const approvalDialog = document.querySelector("#approval-dialog"), approvalDialogMeta = document.querySelector("#approval-dialog-meta");
+	const approvalDialogScope = document.querySelector("#approval-dialog-scope"), approvalDialogPrompt = document.querySelector("#approval-dialog-prompt");
+	const approvalDeny = document.querySelector("#approval-deny"), approvalAllow = document.querySelector("#approval-allow"), approvalRevoke = document.querySelector("#approval-revoke");
+	const approvalClose = document.querySelector("#approval-close"), approvalReconcile = document.querySelector("#approval-reconcile"), approvalAcknowledge = document.querySelector("#approval-acknowledge");
 	const pageLimit = 25;
 	const maxChats = 100;
 	const historyPageLimit = 100;
@@ -66,73 +35,29 @@
 	const maxOperationScan = 100;
 	const maxSubmissionPolls = 60;
 	const presentationID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-	let csrfToken = "";
-	let nextCursor = "";
-	let selectedChat = "";
-	let eventRevision = 0;
-	let source = null;
-	let loadingPage = false;
-	let loadingHistory = false;
-	let pendingHistoryReconcile = false;
-	let historyRequest = 0;
-	let chatTotal = 0;
-	let historyCursor = "";
-	let historyHead = 0;
-	let lastMessageRevision = 0;
-	let historyNeedsReset = false;
+	let csrfToken = "", nextCursor = "", selectedChat = "", eventRevision = 0, source = null;
+	let loadingPage = false, loadingHistory = false, pendingHistoryReconcile = false, historyRequest = 0;
+	let chatTotal = 0, historyCursor = "", historyHead = 0, lastMessageRevision = 0, historyNeedsReset = false;
 	const messageIDs = new Set();
 	const provisionalTasks = new Map();
-	let provisionalTextSize = 0;
-	let selectedControls = null;
-	let selectedTaskID = "";
-	let feedbackContext = null;
-	let queuedSubmissionID = "";
-	let queuedSubmissionCanCancel = false;
-	let pendingIntent = null;
-	let unresolvedOperations = [];
-	let operationsReady = false;
-	let operationReadFailed = false;
-	let activeApproval = null;
-	let approvalOpener = null;
-	let composing = false;
-	let announcementTimer = 0;
-	let submissionPollTimer = 0;
-	let submissionPollCount = 0;
-	let submissionShouldNavigate = false;
-	let operationRequest = 0;
-
+	let provisionalTextSize = 0, selectedControls = null, selectedTaskID = "", feedbackContext = null;
+	let queuedSubmissionID = "", queuedSubmissionCanCancel = false, pendingIntent = null, unresolvedOperations = [];
+	let operationsReady = false, operationReadFailed = false, activeApproval = null, approvalOpener = null;
+	let composing = false, announcementTimer = 0, submissionPollTimer = 0, submissionPollCount = 0;
+	let submissionShouldNavigate = false, operationRequest = 0;
 	window.DarwinSession = Object.freeze({
 		csrfHeader: () => csrfToken ? {"X-Darwin-CSRF": csrfToken} : {}
 	});
-
-	function element(name, className, value) {
-		const node = document.createElement(name);
-		if (className) node.className = className;
-		if (value !== undefined) node.textContent = value;
-		return node;
-	}
-
-	function boundedText(value) {
-		return typeof value === "string" && value.length <= maxText ? value : "";
-	}
-
-	function textBytes(value) {
-		try { return new TextEncoder().encode(value).length; } catch (_) { return maxText + 1; }
-	}
-
-	function showNotice(node, message, failed) {
-		node.textContent = message;
-		node.classList.toggle("error", Boolean(failed));
-		node.hidden = false;
-	}
-
+	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
+	function boundedText(value) { return typeof value === "string" && value.length <= maxText ? value : ""; }
+	function textBytes(value) { try { return new TextEncoder().encode(value).length; } catch (_) { return maxText + 1; } }
+	function showNotice(node, message, failed) { node.textContent = message; node.classList.toggle("error", Boolean(failed)); node.hidden = false; }
 	function requestJSON(path) {
 		return fetch(base + path, {credentials: "same-origin", cache: "no-store", headers: {"Accept": "application/json"}}).then(response => {
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
 		});
 	}
-
 	function validControls(value) {
 		if (!value || value.version !== 1 || typeof value !== "object" || !presentationID.test(value.task_id) || !Number.isSafeInteger(value.revision) || value.revision < 1) return null;
 		for (const name of ["can_resume", "can_steer", "can_cancel", "can_feedback"]) if (typeof value[name] !== "boolean") return null;
@@ -141,13 +66,11 @@
 			canCancel: value.can_cancel, canFeedback: value.can_feedback
 		});
 	}
-
 	function setBusy(value) {
 		for (const node of [composer, taskControls, feedbackPanel, approvalPanel]) node.setAttribute("aria-busy", value ? "true" : "false");
 		approvalDialog.setAttribute("aria-busy", value ? "true" : "false");
 		updateControls();
 	}
-
 	function updateControls() {
 		const blocked = Boolean(pendingIntent) || unresolvedOperations.length > 0 || !operationsReady || !csrfToken;
 		const followUp = selectedChat && selectedControls && selectedControls.canResume;
@@ -178,13 +101,11 @@
 		approvalClose.disabled = blocked;
 		approvalPanel.hidden = !task;
 	}
-
 	function idempotencyKey() {
 		const bytes = new Uint8Array(18);
 		window.crypto.getRandomValues(bytes);
 		return "web-" + Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
 	}
-
 	function safeError(body) {
 		if (!body || body.version !== 1 || typeof body !== "object" || typeof body.code !== "string" || !presentationID.test(body.code) ||
 			typeof body.message !== "string" || body.message.length > 256 || typeof body.retryable !== "boolean" ||
@@ -195,7 +116,6 @@
 		message += body.retryable ? " Reconcile before trying again." : " The request was not accepted.";
 		return Object.freeze({message, operationID: body.operation_id || "", retryable: body.retryable});
 	}
-
 	function validMutationReceipt(body, request) {
 		if (!body || body.version !== 1 || !presentationID.test(body.operation_id)) return false;
 		switch (request.action) {
@@ -229,7 +149,6 @@
 			return false;
 		}
 	}
-
 	function showMutation(message, canReconcile, canAcknowledge) {
 		mutationState.textContent = message;
 		reconcile.hidden = !canReconcile;
@@ -237,7 +156,6 @@
 		approvalReconcile.hidden = !activeApproval || !canReconcile;
 		approvalAcknowledge.hidden = !activeApproval || !canAcknowledge;
 	}
-
 	function acknowledgeOutcome() {
 		if ((!pendingIntent && unresolvedOperations.length === 0 && !operationReadFailed) || !window.confirm("Acknowledge that this outcome is unresolved without retrying the request?")) return;
 		pendingIntent = null;
@@ -248,7 +166,6 @@
 		setBusy(false);
 		if (!approvalDialog.hidden) closeApproval();
 	}
-
 	function validOperation(item) {
 		const createdAt = Date.parse(item && item.created_at);
 		const updatedAt = Date.parse(item && item.updated_at);
@@ -261,7 +178,6 @@
 		return Object.freeze({operationID: item.operation_id, action: item.action, state: item.state,
 			subjectType: hasSubject ? item.subject_type : "", subjectID: hasSubject ? item.subject_id : ""});
 	}
-
 	function validSubmissionStatus(body, submissionID) {
 		const createdAt = Date.parse(body && body.created_at);
 		const updatedAt = Date.parse(body && body.updated_at);
@@ -272,12 +188,7 @@
 		if ((body.state === "completed" && !linked) || (["completed", "failed", "canceled"].includes(body.state) && body.can_cancel)) return null;
 		return Object.freeze({submissionID, state: body.state, chatID: linked ? body.chat_id : "", taskID: linked ? body.task_id : "", revision: linked ? body.revision : 0, canCancel: body.can_cancel});
 	}
-
-	function stopSubmissionPolling() {
-		if (submissionPollTimer) window.clearTimeout(submissionPollTimer);
-		submissionPollTimer = 0;
-	}
-
+	function stopSubmissionPolling() { if (submissionPollTimer) window.clearTimeout(submissionPollTimer); submissionPollTimer = 0; }
 	function observeSubmission(submissionID, resetCount, navigate) {
 		if (!presentationID.test(submissionID)) return;
 		stopSubmissionPolling();
@@ -321,7 +232,6 @@
 			}
 		});
 	}
-
 	function finishOperationScan(items, successMessage) {
 		unresolvedOperations = items.filter(item => item.state === "pending");
 		operationsReady = true;
@@ -344,7 +254,6 @@
 		else if (!submission) showMutation(successMessage || "Committed operation status reconciled.", false, false);
 		updateControls();
 	}
-
 	function readOperationPage(after, items, operationIDs, requestID, successMessage) {
 		const pageLimit = Math.min(maxOperationItems, maxOperationScan - items.length);
 		if (pageLimit < 1) throw new Error("operation scan limit reached");
@@ -376,7 +285,6 @@
 			updateControls();
 		});
 	}
-
 	function checkRecentOperations(successMessage) {
 		operationsReady = false;
 		operationReadFailed = false;
@@ -384,7 +292,6 @@
 		const requestID = ++operationRequest;
 		readOperationPage("", [], new Set(), requestID, successMessage);
 	}
-
 	function mutate(path, payload, onCommitted) {
 		if (pendingIntent || unresolvedOperations.length > 0 || !operationsReady || !csrfToken) return;
 		let key;
@@ -430,16 +337,8 @@
 			setBusy(true);
 		});
 	}
-
-	function formatTime(value) {
-		const date = new Date(value);
-		return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
-	}
-
-	function stateLabel(value) {
-		return typeof value === "string" && value ? value.replaceAll("_", " ") : "unknown";
-	}
-
+	function formatTime(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString(); }
+	function stateLabel(value) { return typeof value === "string" && value ? value.replaceAll("_", " ") : "unknown"; }
 	function renderChat(item) {
 		if (!item || item.version !== 1 || typeof item.chat_id !== "string" || !item.chat_id || item.chat_id.length > 512) return false;
 		const row = element("li");
@@ -457,7 +356,6 @@
 		list.append(row);
 		return true;
 	}
-
 	function loadChats(after) {
 		if (loadingPage || chatTotal >= maxChats) return;
 		loadingPage = true;
@@ -482,19 +380,13 @@
 			loadMore.disabled = false;
 		});
 	}
-
-	function messageText(message) {
-		if (!message || typeof message !== "object") return "";
-		return boundedText(message.text);
-	}
-
+	function messageText(message) { return !message || typeof message !== "object" ? "" : boundedText(message.text); }
 	function validHistoryMessage(message, afterRevision, seen) {
 		return message && typeof message === "object" && typeof message.id === "string" && message.id && message.id.length <= 512 &&
 			(message.role === "user" || message.role === "assistant") && typeof message.text === "string" && message.text && message.text.length <= maxText &&
 			Number.isSafeInteger(message.revision) && message.revision > afterRevision && Number.isSafeInteger(message.source_revision) &&
 			message.source_revision > 0 && message.source_revision <= historyHead && !seen.has(message.id);
 	}
-
 	function appendMessage(message) {
 		if (!message || typeof message !== "object" || transcript.children.length >= maxMessages) return;
 		const role = message.role;
@@ -505,7 +397,6 @@
 		if (content) row.append(element("p", "", content));
 		transcript.append(row);
 	}
-
 	function applyHistoryPage(body, reset) {
 		if (!body || body.version !== 1 || body.chat_id !== selectedChat || typeof body.task_id !== "string" || !body.task_id || !Array.isArray(body.messages) || body.messages.length > historyPageLimit ||
 			!Number.isSafeInteger(body.head_revision) || body.head_revision < 1 || typeof body.has_more !== "boolean" ||
@@ -543,7 +434,6 @@
 		else if (capped) showNotice(transcriptState, "Transcript display limit reached.", false);
 		else transcriptState.hidden = true;
 	}
-
 	function loadHistory(chatID, after, reset, reconnect) {
 		if (!chatID) return;
 		if (loadingHistory) {
@@ -578,20 +468,13 @@
 			}
 		});
 	}
-
-	function setTaskState(value) {
-		const state = stateLabel(value);
-		chatState.textContent = state;
-		chatState.className = "state-pill state-" + state.replaceAll(" ", "-");
-	}
-
+	function setTaskState(value) { const state = stateLabel(value); chatState.textContent = state; chatState.className = "state-pill state-" + state.replaceAll(" ", "-"); }
 	function validEvidence(item, expectedClass) {
 		const sources = {objective: ["deterministic", "tool_result"], subjective: ["user_feedback"], advisory: ["llm_judge"]};
 		return item && typeof item === "object" && item.class === expectedClass && sources[expectedClass].includes(item.source) &&
 			["accepted", "rejected", "abstained"].includes(item.outcome) &&
 			Number.isSafeInteger(item.reference_count) && item.reference_count >= 1 && item.reference_count <= 1024;
 	}
-
 	function parseFeedbackContext(body, taskID) {
 		if (!body || body.version !== 1 || body.task_id !== taskID || !Number.isSafeInteger(body.revision) || body.revision < 1 ||
 			!Array.isArray(body.objective) || body.objective.length > 32 || typeof body.feedback_allowed !== "boolean" ||
@@ -605,7 +488,6 @@
 		return Object.freeze({taskID, revision: body.revision, objective: body.objective.slice(), subjective: body.subjective || null,
 			advisory: body.advisory || null, feedbackID: body.feedback_id || "", feedbackAllowed: body.feedback_allowed});
 	}
-
 	function renderFeedbackContext(context) {
 		feedbackSummary.replaceChildren();
 		const groups = [["Objective", context.objective], ["Subjective", context.subjective ? [context.subjective] : []], ["Advisory", context.advisory ? [context.advisory] : []]];
@@ -620,11 +502,11 @@
 		feedbackAccepted.textContent = revise ? "Revise as accepted" : "Record accepted";
 		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
 	}
-
 	function loadTaskContext(taskID) {
 		selectedControls = null;
 		feedbackContext = null;
 		updateControls();
+		window.DarwinInspector.loadTask(taskID);
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/controls").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const controls = validControls(body);
@@ -652,7 +534,6 @@
 			}
 		});
 	}
-
 	function validApproval(item, taskID) {
 		if (!item || typeof item !== "object" || !presentationID.test(item.id) ||
 			!Number.isSafeInteger(item.revision) || item.revision < 1 || typeof item.state !== "string" ||
@@ -670,7 +551,6 @@
 			prompt: item.prompt, scopeSummary: item.scope_summary, toolName: item.tool_name, behavior: boundedText(item.tool_behavior) || "unspecified",
 			canAllow: item.can_allow, canDeny: item.can_deny, canRevoke: item.can_revoke});
 	}
-
 	function closeApproval() {
 		approvalDialog.hidden = true;
 		activeApproval = null;
@@ -681,7 +561,6 @@
 		approvalOpener = null;
 		if (opener && opener.isConnected) opener.focus();
 	}
-
 	function openApproval(item, opener) {
 		activeApproval = item;
 		approvalOpener = opener;
@@ -696,7 +575,6 @@
 		approvalAcknowledge.hidden = true;
 		(item.canDeny ? approvalDeny : approvalClose).focus();
 	}
-
 	function renderApproval(item) {
 		const row = element("li");
 		const button = element("button", "", item.toolName + " — " + stateLabel(item.state));
@@ -705,7 +583,6 @@
 		row.append(button);
 		approvalList.append(row);
 	}
-
 	function loadApprovals() {
 		const task = selectedControls;
 		approvalList.replaceChildren();
@@ -731,7 +608,6 @@
 			if (selectedControls === task) showNotice(approvalState, "Approvals could not be loaded.", true);
 		});
 	}
-
 	function decideApproval(action) {
 		const item = activeApproval;
 		if (!item || pendingIntent) return;
@@ -743,7 +619,6 @@
 			loadApprovals();
 		});
 	}
-
 	function appendProvisional(taskID, text) {
 		if (!presentationID.test(taskID) || typeof text !== "string" || !text) return;
 		let item = provisionalTasks.get(taskID);
@@ -770,7 +645,6 @@
 			streamAnnouncement.textContent = "Provisional assistant output updated for " + String(provisionalTasks.size) + " task" + (provisionalTasks.size === 1 ? "." : "s.");
 		}, 1000);
 	}
-
 	function clearProvisionalTask(taskID) {
 		const item = provisionalTasks.get(taskID);
 		if (!item) return;
@@ -779,7 +653,6 @@
 		provisionalTextSize -= item.size;
 		provisional.hidden = provisionalTasks.size === 0;
 	}
-
 	function clearAllProvisional() {
 		provisional.replaceChildren();
 		provisionalTasks.clear();
@@ -789,13 +662,11 @@
 		announcementTimer = 0;
 		streamAnnouncement.textContent = "";
 	}
-
 	function validEnvelope(event) {
 		return event && event.version === 1 && typeof event.kind === "string" &&
 			(event.durability === "provisional" || event.durability === "committed") &&
 			typeof event.data === "object" && event.data !== null;
 	}
-
 	function applyPresentationEvent(payload) {
 		if (!validEnvelope(payload) || payload.subject !== selectedChat) return;
 		if (payload.kind === "chat.delta" && payload.durability === "provisional" && payload.revision === 0) {
@@ -834,7 +705,16 @@
 			eventRevision = payload.revision;
 			if (payload.data.task_id === selectedTaskID && payload.data.state !== "completed") loadTaskContext(selectedTaskID);
 			if (payload.data.state === "completed") loadHistory(selectedChat, "", true, false);
-			} else if (["model.changed", "tool.changed", "route.changed", "worker.changed", "error.changed"].includes(payload.kind)) {
+			} else if (payload.kind === "model.changed") {
+				eventRevision = payload.revision;
+				window.DarwinInspector.modelChanged();
+			} else if (payload.kind === "tool.changed") {
+				eventRevision = payload.revision;
+				window.DarwinInspector.toolChanged(payload.data.task_id);
+			} else if (payload.kind === "route.changed") {
+				eventRevision = payload.revision;
+				window.DarwinInspector.routeChanged(payload.data.task_id);
+			} else if (["worker.changed", "error.changed"].includes(payload.kind)) {
 				eventRevision = payload.revision;
 			} else if (payload.kind === "approval.changed" && payload.data.task_id === (selectedControls && selectedControls.taskID)) {
 				eventRevision = payload.revision;
@@ -844,7 +724,6 @@
 				loadHistory(selectedChat, "", true, false);
 			}
 	}
-
 	function connect(chatID) {
 		if (source) source.close();
 		clearAllProvisional();
@@ -864,7 +743,6 @@
 			connection.textContent = "Reconnecting…";
 		};
 	}
-
 	function selectChat(chatID, state) {
 		if (typeof chatID !== "string" || !chatID || chatID.length > 512) return;
 		if (source) {
@@ -878,6 +756,7 @@
 		selectedControls = null;
 		selectedTaskID = "";
 		feedbackContext = null;
+		window.DarwinInspector.clearTask();
 		queuedSubmissionID = "";
 		eventRevision = 0;
 		historyCursor = "";
@@ -901,7 +780,6 @@
 		loadHistory(chatID, "", true, true);
 		updateControls();
 	}
-
 	function startNewChat() {
 		if (pendingIntent) return;
 		if (source) {
@@ -915,6 +793,7 @@
 		selectedControls = null;
 		selectedTaskID = "";
 		feedbackContext = null;
+		window.DarwinInspector.clearTask();
 		queuedSubmissionID = "";
 		eventRevision = 0;
 		transcript.replaceChildren();
@@ -931,7 +810,6 @@
 		updateControls();
 		composerText.focus();
 	}
-
 	function refreshChats() {
 		if (loadingPage) return;
 		list.replaceChildren();
@@ -939,7 +817,6 @@
 		nextCursor = "";
 		loadChats("");
 	}
-
 	function reconcileCurrent(successMessage) {
 		showMutation(successMessage || "Checking committed state…", Boolean(pendingIntent), false);
 		checkRecentOperations(successMessage);
@@ -947,7 +824,6 @@
 		refreshChats();
 		if (selectedChat) loadHistory(selectedChat, "", true, false);
 	}
-
 	function submitComposer() {
 		const text = composerText.value;
 		composerError.hidden = true;
@@ -979,7 +855,6 @@
 			}
 		});
 	}
-
 	function submitSteering() {
 		const controls = selectedControls;
 		const text = steeringText.value;
@@ -995,7 +870,6 @@
 			reconcileCurrent();
 		});
 	}
-
 	function submitCancellation() {
 		const controls = selectedControls;
 		if (queuedSubmissionID) {
@@ -1025,7 +899,6 @@
 			reconcileCurrent();
 		});
 	}
-
 	function submitFeedback(accepted) {
 		const controls = selectedControls;
 		const context = feedbackContext;
@@ -1047,7 +920,6 @@
 			loadHistory(selectedChat, "", true, false);
 		});
 	}
-
 	composer.addEventListener("submit", event => {
 		event.preventDefault();
 		if (!composing) submitComposer();
@@ -1096,7 +968,6 @@
 	loadMore.addEventListener("click", () => loadChats(nextCursor));
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
-
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
@@ -1104,8 +975,8 @@
 	}
 	loadChats("");
 	checkRecentOperations();
+	window.DarwinInspector.loadGlobals();
 	updateControls();
-
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"
@@ -1118,7 +989,6 @@
 		updateControls();
 		if (!selectedChat) connection.textContent = "Connected";
 	}).catch(() => { connection.textContent = "Session needs attention"; });
-
 	for (const link of document.querySelectorAll("[data-view]")) {
 		const selected = window.location.pathname.startsWith(link.pathname);
 		if (selected) link.setAttribute("aria-current", "page");

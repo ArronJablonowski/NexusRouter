@@ -43,6 +43,27 @@
       "$ref": "#/$defs/submission_status"
     },
     {
+      "$ref": "#/$defs/model_inspection_page"
+    },
+    {
+      "$ref": "#/$defs/route_inspection"
+    },
+    {
+      "$ref": "#/$defs/task_usage_inspection"
+    },
+    {
+      "$ref": "#/$defs/tool_inspection_page"
+    },
+    {
+      "$ref": "#/$defs/audit_inspection_page"
+    },
+    {
+      "$ref": "#/$defs/health_inspection"
+    },
+    {
+      "$ref": "#/$defs/resource_inspection"
+    },
+    {
       "$ref": "#/$defs/board_request"
     },
     {
@@ -2759,6 +2780,299 @@
             ]
           }
         }
+      ]
+    },
+    "availability": {
+      "enum": ["available", "unavailable"]
+    },
+    "inspection_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "x-maxBytes": 4096
+    },
+    "model_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "provider", "model", "locality", "capabilities", "health"],
+      "properties": {
+        "id": {"$ref": "#/$defs/model_id"},
+        "provider": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
+        "locality": {"enum": ["local", "cloud"]},
+        "capabilities": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128}},
+        "context_tokens": {"type": "integer", "minimum": 0},
+        "estimated_cost": {"type": "number", "minimum": 0},
+        "ram_bytes": {"type": "integer", "minimum": 0},
+        "vram_bytes": {"type": "integer", "minimum": 0},
+        "failure_domain": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
+        "health": {"enum": ["healthy", "degraded", "unavailable", "unknown"]}
+      }
+    },
+    "model_inspection_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "availability", "models"],
+      "properties": {
+        "version": {"const": 1},
+        "availability": {"$ref": "#/$defs/availability"},
+        "config_id": {"type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64, "x-maxBytes": 64},
+        "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id"]}, "else": {"properties": {"config_id": false, "models": {"maxItems": 0}}}}
+      ]
+    },
+    "usage_total_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["records", "known_usage_records", "unknown_usage_records", "known_cost_records", "unknown_cost_records"],
+      "properties": {
+        "records": {"type": "integer", "minimum": 0},
+        "known_usage_records": {"type": "integer", "minimum": 0},
+        "unknown_usage_records": {"type": "integer", "minimum": 0},
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0},
+        "known_cost_records": {"type": "integer", "minimum": 0},
+        "unknown_cost_records": {"type": "integer", "minimum": 0},
+        "normalized_cost": {"type": "number", "minimum": 0}
+      },
+      "allOf": [
+        {"if": {"required": ["input_tokens"]}, "then": {"required": ["output_tokens"]}},
+        {"if": {"required": ["output_tokens"]}, "then": {"required": ["input_tokens"]}},
+        {"if": {"properties": {"records": {"const": 0}}}, "then": {"properties": {"input_tokens": false, "output_tokens": false, "normalized_cost": false}}},
+        {"if": {"properties": {"unknown_usage_records": {"minimum": 1}}}, "then": {"properties": {"input_tokens": false, "output_tokens": false}}},
+        {"if": {"properties": {"unknown_cost_records": {"minimum": 1}}}, "then": {"properties": {"normalized_cost": false}}}
+      ]
+    },
+    "usage_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage", "unaccounted_routed_operations", "primary", "fallback", "classifier", "summarizer", "orchestrator_audit", "optional_judge", "routed", "auxiliary", "overall", "calculated_at"],
+      "properties": {
+        "coverage": {"enum": ["complete", "partial", "legacy_unavailable"]},
+        "unaccounted_routed_operations": {"type": "integer", "minimum": 0},
+        "primary": {"$ref": "#/$defs/usage_total_inspection"},
+        "fallback": {"$ref": "#/$defs/usage_total_inspection"},
+        "classifier": {"$ref": "#/$defs/usage_total_inspection"},
+        "summarizer": {"$ref": "#/$defs/usage_total_inspection"},
+        "orchestrator_audit": {"$ref": "#/$defs/usage_total_inspection"},
+        "optional_judge": {"$ref": "#/$defs/usage_total_inspection"},
+        "routed": {"$ref": "#/$defs/usage_total_inspection"},
+        "auxiliary": {"$ref": "#/$defs/usage_total_inspection"},
+        "overall": {"$ref": "#/$defs/usage_total_inspection"},
+        "calculated_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {"if": {"properties": {"coverage": {"const": "complete"}}}, "then": {"properties": {"unaccounted_routed_operations": {"const": 0}}}, "else": {"properties": {"unaccounted_routed_operations": {"minimum": 1}}}}
+      ]
+    },
+    "task_usage_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "task_id", "availability"],
+      "properties": {
+        "version": {"const": 1},
+        "task_id": {"$ref": "#/$defs/id"},
+        "availability": {"$ref": "#/$defs/availability"},
+        "usage": {"$ref": "#/$defs/usage_inspection"}
+      },
+      "allOf": [
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["usage"]}, "else": {"properties": {"usage": false}}}
+      ]
+    },
+    "route_candidate_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "provider", "disposition", "constraint_codes"],
+      "properties": {
+        "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
+        "provider": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "failure_domain": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
+        "disposition": {"enum": ["selected", "fallback", "eligible", "excluded"]},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "samples": {"type": "integer", "minimum": 0},
+        "constraint_codes": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64, "x-maxBytes": 64}}
+      },
+      "allOf": [
+        {"if": {"properties": {"disposition": {"const": "excluded"}}}, "then": {"properties": {"score": false, "confidence": false, "samples": false}, "minProperties": 4}, "else": {"required": ["score", "confidence", "samples"], "properties": {"constraint_codes": {"maxItems": 0}}}}
+      ]
+    },
+    "route_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "task_id", "availability", "explored", "candidates"],
+      "properties": {
+        "version": {"const": 1},
+        "task_id": {"$ref": "#/$defs/id"},
+        "availability": {"$ref": "#/$defs/availability"},
+        "route_id": {"$ref": "#/$defs/id"},
+        "domain": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "profile": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "explored": {"type": "boolean"},
+        "candidates": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/route_candidate_inspection"}},
+        "usage": {"$ref": "#/$defs/usage_inspection"}
+      },
+      "allOf": [
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["route_id", "domain", "profile", "usage"], "properties": {"candidates": {"minItems": 1, "contains": {"properties": {"disposition": {"const": "selected"}}}, "minContains": 1, "maxContains": 1}}}, "else": {"properties": {"route_id": false, "domain": false, "profile": false, "usage": false, "explored": {"const": false}, "candidates": {"maxItems": 0}}}}
+      ]
+    },
+    "tool_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "name", "behavior", "permission", "state", "effect", "started_at", "start_sequence"],
+      "properties": {
+        "call_id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "behavior": {"enum": ["read_only", "idempotent_write", "non_idempotent_write", "unknown"]},
+        "permission": {"enum": ["not_required", "pending", "approved", "denied", "revoked", "unknown"]},
+        "state": {"enum": ["pending", "completed", "failed"]},
+        "effect": {"enum": ["none", "confirmed", "uncertain"]},
+        "code": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "started_at": {"type": "string", "format": "date-time"},
+        "completed_at": {"type": "string", "format": "date-time"},
+        "start_sequence": {"type": "integer", "minimum": 1},
+        "completion_sequence": {"type": "integer", "minimum": 2}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "pending"}}}, "then": {"properties": {"completed_at": false, "completion_sequence": false, "code": false, "effect": {"const": "uncertain"}}}, "else": {"required": ["completed_at", "completion_sequence"]}},
+        {"if": {"properties": {"state": {"const": "failed"}}}, "then": {"required": ["code"]}},
+        {"if": {"properties": {"state": {"const": "completed"}}}, "then": {"properties": {"code": false}}}
+      ]
+    },
+    "tool_inspection_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "task_id", "tools"],
+      "properties": {
+        "version": {"const": 1},
+        "task_id": {"$ref": "#/$defs/id"},
+        "tools": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/tool_inspection"}},
+        "next_cursor": {"$ref": "#/$defs/cursor"}
+      }
+    },
+    "audit_finding_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "evidence_refs"],
+      "properties": {
+        "summary": {"$ref": "#/$defs/inspection_text"},
+        "evidence_refs": {"type": "array", "maxItems": 64, "items": {"type": "string", "minLength": 1, "maxLength": 256, "x-maxBytes": 256}}
+      }
+    },
+    "audit_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "reviewer_id", "evaluator_model", "evaluator_provider", "findings", "evidence_precedence", "started_at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "status": {"enum": ["pending", "completed", "rejected", "abstained", "failed", "canceled"]},
+        "reviewer_id": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "evaluator_model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
+        "evaluator_provider": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "rubric_version": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "domain": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "findings": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/audit_finding_inspection"}},
+        "evidence_precedence": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"const": "deterministic"}, {"const": "tool_result"}, {"const": "user_feedback"}, {"const": "llm_judge"}], "items": false},
+        "usage": {"$ref": "#/$defs/usage_total_inspection"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "pending"}}}, "then": {"properties": {"finished_at": false, "rubric_version": false, "domain": false, "usage": false, "findings": {"maxItems": 0}}}},
+        {"if": {"properties": {"status": {"enum": ["completed", "rejected", "abstained"]}}}, "then": {"required": ["finished_at", "rubric_version", "domain"]}},
+        {"if": {"properties": {"status": {"enum": ["failed", "canceled"]}}}, "then": {"required": ["finished_at"], "properties": {"rubric_version": false, "domain": false, "usage": false, "findings": {"maxItems": 0}}}}
+      ]
+    },
+    "audit_inspection_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "task_id", "audits"],
+      "properties": {
+        "version": {"const": 1},
+        "task_id": {"$ref": "#/$defs/id"},
+        "audits": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/audit_inspection"}},
+        "next_cursor": {"$ref": "#/$defs/cursor"}
+      }
+    },
+    "health_check_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "status", "code"],
+      "properties": {
+        "component": {"enum": ["daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "trace_export", "resources", "provider", "model"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "status": {"enum": ["healthy", "degraded", "unavailable", "disabled", "unknown"]},
+        "code": {"enum": ["learning_budget_wait", "serving", "available", "unavailable", "configuration_limit", "disabled_by_policy", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "capacity_available", "capacity_exhausted", "metrics_unknown", "supervisor_unavailable", "supervisor_ok", "supervisor_starting", "supervisor_stopping", "supervisor_stopped", "supervisor_error", "supervisor_stalled"]}
+      },
+      "allOf": [
+        {"if": {"properties": {"component": {"enum": ["provider", "model"]}}}, "then": {"required": ["id"]}},
+        {"if": {"properties": {"component": {"enum": ["daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "trace_export"]}}}, "then": {"properties": {"id": false}}},
+        {"if": {"properties": {"code": {"const": "learning_budget_wait"}}}, "then": {"properties": {"component": {"const": "learning"}, "status": {"const": "healthy"}}}},
+        {"if": {"properties": {"code": {"enum": ["serving", "available", "capacity_available", "supervisor_ok"]}}}, "then": {"properties": {"status": {"const": "healthy"}}}},
+        {"if": {"properties": {"code": {"enum": ["configuration_limit", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "supervisor_stopping", "supervisor_stopped"]}}}, "then": {"properties": {"status": {"const": "unavailable"}}}},
+        {"if": {"properties": {"code": {"const": "disabled_by_policy"}}}, "then": {"properties": {"status": {"const": "disabled"}}}},
+        {"if": {"properties": {"code": {"enum": ["metrics_unknown", "supervisor_starting"]}}}, "then": {"properties": {"status": {"const": "unknown"}}}},
+        {"if": {"properties": {"code": {"const": "capacity_exhausted"}}}, "then": {"properties": {"status": {"enum": ["degraded", "unavailable"]}}}},
+        {"if": {"properties": {"code": {"enum": ["supervisor_error", "supervisor_stalled"]}}}, "then": {"properties": {"status": {"const": "degraded"}}}},
+        {"if": {"properties": {"code": {"enum": ["unavailable", "supervisor_unavailable"]}}}, "then": {"properties": {"status": {"enum": ["unavailable", "unknown"]}}}}
+      ]
+    },
+    "health_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "availability", "status", "checks"],
+      "properties": {
+        "version": {"const": 1},
+        "availability": {"$ref": "#/$defs/availability"},
+        "status": {"enum": ["healthy", "degraded", "unavailable"]},
+        "ready": {"type": "boolean"},
+        "checked_at": {"type": "string", "format": "date-time"},
+        "checks": {"type": "array", "maxItems": 512, "items": {"$ref": "#/$defs/health_check_inspection"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["ready", "checked_at"], "properties": {"checks": {"minItems": 4, "allOf": [
+          {"contains": {"properties": {"component": {"const": "daemon"}}}, "minContains": 1},
+          {"contains": {"properties": {"component": {"const": "database"}}}, "minContains": 1},
+          {"contains": {"properties": {"component": {"const": "supervisor"}}}, "minContains": 1},
+          {"contains": {"properties": {"component": {"const": "resources"}}}, "minContains": 1}
+        ]}}}, "else": {"properties": {"status": {"const": "unavailable"}, "ready": false, "checked_at": false, "checks": {"maxItems": 0}}}},
+        {"if": {"properties": {"availability": {"const": "available"}, "ready": {"const": true}}, "required": ["ready"]}, "then": {"properties": {"status": {"enum": ["healthy", "degraded"]}, "checks": {
+          "contains": {"properties": {"component": {"const": "model"}, "status": {"const": "healthy"}}}, "minContains": 1,
+          "items": {"allOf": [
+            {"if": {"properties": {"component": {"enum": ["daemon", "database", "supervisor"]}}}, "then": {"properties": {"status": {"const": "healthy"}}}},
+            {"if": {"properties": {"component": {"enum": ["learning", "skill_regression"]}}}, "then": {"properties": {"status": {"enum": ["healthy", "disabled"]}}}}
+          ]}
+        }}}},
+        {"if": {"properties": {"availability": {"const": "available"}, "status": {"const": "healthy"}}}, "then": {"properties": {"checks": {"items": {"properties": {"status": {"enum": ["healthy", "disabled"]}}}}}}},
+        {"if": {"properties": {"availability": {"const": "available"}, "status": {"const": "degraded"}}}, "then": {"properties": {"checks": {"contains": {"properties": {"status": {"enum": ["degraded", "unavailable", "unknown"]}}}, "minContains": 1}}}},
+        {"if": {"properties": {"availability": {"const": "available"}, "ready": {"const": false}}, "required": ["ready"]}, "then": {"properties": {"status": {"const": "unavailable"}}}}
+      ]
+    },
+    "resource_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "availability"],
+      "properties": {
+        "version": {"const": 1},
+        "availability": {"$ref": "#/$defs/availability"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "cpus": {"type": "integer", "minimum": 1},
+        "total_ram_bytes": {"type": "integer", "minimum": 0},
+        "available_ram_bytes": {"type": "integer", "minimum": 0},
+        "swap_used_bytes": {"type": "integer", "minimum": 0},
+        "vram_total_bytes": {"type": "integer", "minimum": 0},
+        "vram_available_bytes": {"type": "integer", "minimum": 0},
+        "unified_memory": {"type": "boolean"},
+        "thermal_pressure": {"type": "boolean"}
+      },
+      "allOf": [
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["observed_at"]}, "else": {"properties": {"observed_at": false, "cpus": false, "total_ram_bytes": false, "available_ram_bytes": false, "swap_used_bytes": false, "vram_total_bytes": false, "vram_available_bytes": false, "unified_memory": false, "thermal_pressure": false}}},
+        {"if": {"required": ["total_ram_bytes"]}, "then": {"required": ["available_ram_bytes"]}},
+        {"if": {"required": ["available_ram_bytes"]}, "then": {"required": ["total_ram_bytes"]}},
+        {"if": {"required": ["vram_total_bytes"]}, "then": {"required": ["vram_available_bytes"]}},
+        {"if": {"required": ["vram_available_bytes"]}, "then": {"required": ["vram_total_bytes"]}}
       ]
     },
     "error": {
