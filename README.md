@@ -240,6 +240,7 @@ make build
 - `memory`: factual-memory contracts backed by SQLite, with provenance and scoped privacy-aware queries.
 - `skills`: private local versioned procedural workflows with validation-gated activation and rollback.
 - `evaluation`: deterministic evidence, advisory audits, and a versioned provider-neutral evaluator extension contract.
+- `resources`: host profiling, pressure-aware shared budgets, and non-mutating capacity plans.
 - `internal/telemetry`: SQLite migration, atomic event append, and paginated replay.
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.

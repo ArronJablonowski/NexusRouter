@@ -95,6 +95,10 @@ func MeasureSnapshot(ctx context.Context, profiler Profiler) (snapshot Snapshot,
 		return &value
 	}
 	snapshot.SwapUsed = cloneUint(snapshot.SwapUsed)
+	if snapshot.SwapPressure != nil {
+		value := *snapshot.SwapPressure
+		snapshot.SwapPressure = &value
+	}
 	snapshot.VRAMTotal = cloneUint(snapshot.VRAMTotal)
 	snapshot.VRAMAvailable = cloneUint(snapshot.VRAMAvailable)
 	if snapshot.ThermalPressure != nil {

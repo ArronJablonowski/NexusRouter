@@ -17,8 +17,9 @@ func TestMeasureSnapshotDetachedAndUnknownFactsPreserved(t *testing.T) {
 	source := deviceSnapshot(time.Now())
 	source.Source = "private profiler marker"
 	swap, ram, free := uint64(2), uint64(100), uint64(50)
-	thermal := false
+	swapPressure, thermal := false, false
 	source.SwapUsed = &swap
+	source.SwapPressure = &swapPressure
 	source.VRAMTotal = &ram
 	source.VRAMAvailable = &free
 	source.ThermalPressure = &thermal
@@ -27,12 +28,13 @@ func TestMeasureSnapshotDetachedAndUnknownFactsPreserved(t *testing.T) {
 		t.Fatal(out, err)
 	}
 	*out.SwapUsed = 99
+	*out.SwapPressure = true
 	*out.VRAMTotal = 99
 	*out.VRAMAvailable = 99
 	*out.ThermalPressure = true
 	out.GPUs.Sources[0].Devices[0].AvailableBytes = 0
 	out.GPUs.Sources[0].Status = "changed"
-	if swap != 2 || ram != 100 || free != 50 || thermal || source.GPUs.Sources[0].Devices[0].AvailableBytes != 100 || source.GPUs.Sources[0].Status != "observed" {
+	if swap != 2 || swapPressure || ram != 100 || free != 50 || thermal || source.GPUs.Sources[0].Devices[0].AvailableBytes != 100 || source.GPUs.Sources[0].Status != "observed" {
 		t.Fatal("aliased original")
 	}
 	empty, err := MeasureSnapshot(context.Background(), engineProfiler(func(context.Context) (Measurement, error) { return Measurement{Version: 1}, nil }))

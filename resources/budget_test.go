@@ -30,7 +30,7 @@ func TestReservationsAndPressure(t *testing.T) {
 	a()
 	a()
 	c()
-	for _, name := range []string{"stale", "thermal", "gpu_unknown", "unified_double_count", "future"} {
+	for _, name := range []string{"stale", "thermal", "swap", "gpu_unknown", "unified_double_count", "future"} {
 		t.Run(name, func(t *testing.T) {
 			copy := s
 			n := Need{RAM: 1}
@@ -42,6 +42,9 @@ func TestReservationsAndPressure(t *testing.T) {
 			case "thermal":
 				v := true
 				copy.ThermalPressure = &v
+			case "swap":
+				v := true
+				copy.SwapPressure = &v
 			case "gpu_unknown":
 				copy.UnifiedMemory = false
 				n.VRAM = 1

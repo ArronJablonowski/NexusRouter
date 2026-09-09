@@ -173,6 +173,14 @@ The versioned SDK exposes stable interfaces for:
 
 Interfaces accept `context.Context`; implementations must honor cancellation. Public records include schema versions and reject unknown incompatible major versions.
 
+Current implementation note: the version-one Go SDK accepts a replaceable
+`ResourceProfiler` and exposes a read-only `ResourcePlan` operation. Planning
+uses configured hard limits and the same live in-process budget as execution to
+recommend local execution, queueing, cloud offload, or rejection without
+reserving capacity or invoking a provider. Its result is an instantaneous,
+conservative recommendation; execution must remeasure and reserve atomically.
+The `EventSink` application-level extension remains a separate required sprint.
+
 The SDK must expose explicit session-summary drafting, bounded inspection and
 listing, operator review/history, and approved-summary continuation through the
 same application service as the CLI/API. Current implementation and limits are

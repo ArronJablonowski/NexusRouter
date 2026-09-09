@@ -14,11 +14,14 @@ import (
 )
 
 type Snapshot struct {
-	GPUs                     *GPUInventory `json:"gpu_inventory,omitempty"`
-	Time                     time.Time     `json:"time"`
-	CPUs                     int           `json:"cpu_threads"`
-	TotalRAM, AvailableRAM   uint64
-	SwapUsed                 *uint64
+	GPUs                   *GPUInventory `json:"gpu_inventory,omitempty"`
+	Time                   time.Time     `json:"time"`
+	CPUs                   int           `json:"cpu_threads"`
+	TotalRAM, AvailableRAM uint64
+	SwapUsed               *uint64
+	// SwapPressure is an explicit active-pressure observation. SwapUsed alone
+	// may contain cold historical pages and must not be interpreted as pressure.
+	SwapPressure             *bool `json:"swap_pressure,omitempty"`
 	UnifiedMemory            bool
 	VRAMTotal, VRAMAvailable *uint64
 	ThermalPressure          *bool

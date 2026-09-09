@@ -141,7 +141,7 @@ import (
 func check(ok bool, label string) { if !ok { panic(label) } }
 type fixtureProfiler struct{}
 func (fixtureProfiler) Measure(ctx context.Context)(resources.Measurement,error){
- return resources.Measurement{Version:1,Snapshot:resources.Snapshot{Time:time.Now(),CPUs:2,TotalRAM:8<<30,AvailableRAM:8<<30}},ctx.Err()
+ return resources.Measurement{Version:1,Snapshot:resources.Snapshot{Time:time.Now().UTC(),CPUs:2,TotalRAM:8<<30,AvailableRAM:8<<30}},ctx.Err()
 }
 type fixtureEvaluator struct{}
 func (fixtureEvaluator) Descriptor() sdk.EvaluatorDescriptor {
@@ -154,6 +154,8 @@ func main() {
  ctx,cancel:=context.WithTimeout(context.Background(),20*time.Second);defer cancel()
  client,err:=sdk.New(sdk.ConfigOptions{ProjectFile:os.Args[1],ResourceProfiler:fixtureProfiler{},Evaluator:fixtureEvaluator{},LookupSecret:func(name string)string{if name=="SDK_FIXTURE_SECRET" {return "fake-sdk-private-marker"};return ""}})
  check(err==nil,"construction failed")
+ plan,err:=client.ResourcePlan(ctx,sdk.ResourcePlanRequest{Version:1,RAMBytes:1,LocalRequired:true})
+ check(err==nil&&plan.Validate()==nil&&plan.Version==1&&plan.Action==sdk.ResourcePlanExecuteLocal&&plan.MaxAdditionalLocal==1&&!plan.Pressure,"resource plan failed")
  var seq int64
  var task string
  var terminal bool

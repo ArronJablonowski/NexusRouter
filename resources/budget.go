@@ -107,7 +107,7 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	if n.VRAM > 0 && ((n.Device != "" && b.used.VRAM > 0) || (n.Device == "" && len(b.deviceVRAM) > 0)) {
 		return nil, ErrCapacity
 	}
-	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) {
+	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) || (s.SwapPressure != nil && *s.SwapPressure) {
 		return nil, ErrCapacity
 	}
 	ramRoom, ok := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)

@@ -267,7 +267,7 @@ func healthResources(s resources.Snapshot, err error, ram, vram float64) (string
 		return "unknown", "metrics_unknown", "unknown", "metrics_unknown"
 	}
 	host, code := "healthy", "capacity_available"
-	if float64(s.TotalRAM-s.AvailableRAM) > float64(s.TotalRAM)*ram/100 || s.ThermalPressure != nil && *s.ThermalPressure {
+	if float64(s.TotalRAM-s.AvailableRAM) > float64(s.TotalRAM)*ram/100 || s.ThermalPressure != nil && *s.ThermalPressure || s.SwapPressure != nil && *s.SwapPressure {
 		host, code = "degraded", "capacity_exhausted"
 	}
 	if s.VRAMTotal == nil || s.VRAMAvailable == nil {

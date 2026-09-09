@@ -151,8 +151,27 @@ support concurrent calls, avoid unauthorized network access, and return data the
 do not mutate concurrently. A noncooperative callback cannot be forcibly stopped
 without leaving work behind. Engines are not serialized into queued requests;
 daemon execution uses the daemon's configured measurement source, not an SDK
-callback. This interface replaces measurement only; the wider extension and
-budget-recommendation contracts remain unfinished.
+callback.
+
+`Client.ResourcePlan(ctx, ResourcePlanRequest{Version: 1, ...})` takes one
+prospective local RAM/VRAM requirement and returns a validated advisory action:
+`execute_local`, `queue`, `offload`, or `reject`. It uses the same configured or
+injected profiler, RAM/VRAM ceilings, adaptive-concurrency rule, and live
+in-process reservations as execution. Hybrid pressure offloads work unless the
+request is local-required; local-required and local-only work instead follows the
+configured wait/reject policy. Cloud-only planning does not profile the host.
+
+The result includes bounded observation times, remaining RAM/VRAM headroom,
+device binding, pressure status, and the maximum number of additional identical
+local workloads visible at that instant. An explicit swap-pressure signal is
+treated like thermal pressure; historical swap allocation alone is not evidence
+of current pressure. Unknown, stale, future, malformed, or impossible facts
+fail closed. DarwinRouter planning creates no reservation, provider, model call,
+database, durable event, or network operation beyond invoking the configured
+trusted profiler. It cannot override mode or privacy policy,
+and a positive result is not execution authorization: callers must still run the
+task, which remeasures and reserves atomically. Separate SDK clients do not share
+their in-memory budgets.
 
 ### Replaceable provider construction
 
@@ -927,7 +946,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. Automatic semantic context compaction, resource-budget
-recommendations, broader extension hooks, a signed release, and full PRD SDK
-contract coverage remain unfinished. Existing low-level packages are not a
+qualification. Automatic semantic context compaction, broader extension hooks
+including `EventSink`, a signed release, and full PRD SDK contract coverage remain
+unfinished. Existing low-level packages are not a
 substitute for those future application-level extension contracts.

@@ -4954,3 +4954,39 @@ application 303.452s, telemetry 202.699s, CLI 44.591s, SDK 30.974s, toolgate
 20.055s, API 17.622s, and workers 4.672s. These fixtures
 qualify the trusted in-process SDK boundary, not arbitrary third-party evaluator
 quality, forced termination of non-cooperative callbacks, or process isolation.
+
+DAR-75 resource-planning checkpoint: the public version-one Go SDK now exposes
+`ResourcePlan` for a prospective local RAM/VRAM requirement. It invokes the same
+configured or injected profiler and observes the same live in-process `Budget`
+reservations, configured percentage ceilings, adaptive concurrency tiers, CPU
+limit, unified-memory rule, and per-device accounting used by execution. The
+operation is advisory and non-mutating: it does not reserve resources, construct
+a provider, run inference, open task storage, or append an event. A subsequent
+execution must still remeasure and reserve atomically.
+
+The application maps measured capacity through deployment and privacy policy.
+Available capacity recommends local execution. Hybrid pressure recommends cloud
+offload unless the request is local-required; local-required and local-only work
+uses the configured queue/reject policy. Cloud-only decisions do not invoke the
+profiler. Thermal pressure and a new explicit swap-pressure observation deny both
+planning and actual reservation consistently. Historical `SwapUsed` allocation
+alone is not treated as active pressure. Fresh timezone-equivalent profiler times
+are normalized to canonical UTC results, while stale, future, malformed,
+impossible, unknown-device, missing-VRAM, typed-nil, panicking, failed, oversized,
+and canceled measurements fail closed without private error disclosure.
+
+Direct tests cover unified and discrete memory, aggregate and device VRAM,
+configured percentage boundaries, live reservations, caller/result detachment,
+configuration immutability, provider/database absence, cooperative cancellation,
+and the public external-module boundary. A deterministic 300-case property matrix
+proves that every advertised RAM/VRAM/device slot can be reserved and the next
+slot is denied; concurrent `Plan`, `Reserve`, and release activity runs under the
+race detector. Independent architecture, persistence, and adversarial-test
+reviews found and closed cold-swap, timezone, impossible-result, and
+unknown-VRAM-plus-pressure defects. The expanded `make qualify-mvp` passed. On
+the frozen integrated tree, final `make check` passed formatting/LOC, vet, the
+complete repository-wide race suite, and `go build ./...` in 8:02.59. Longest
+packages were releasepack 475.594s, application 303.879s, telemetry 203.613s,
+CLI 45.466s, SDK 34.204s, toolgate 22.305s, sessions 18.429s, and runtime
+12.794s. This checkpoint does not claim the remaining `EventSink`, release, or
+full PRD work complete.
