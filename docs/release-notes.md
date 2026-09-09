@@ -44,9 +44,11 @@ supported-platform decision or publication approval is claimed.
   native bearer APIs, requires a same-origin cookie/CSRF BFF, separates
   provisional chat text from committed state, and makes the workboard a durable
   CAS/idempotent domain with typed projections, bounded graph operations,
-  stop-proof recovery, and independently evidenced acceptance. No Web UI
-  handler, assets, browser session store, or Kanban persistence is implemented
-  yet.
+  stop-proof recovery, and independently evidenced acceptance. A minimal
+  versioned shell is embedded and served through one-time CLI-approved browser
+  challenges, bounded process-local sessions, same-origin CSRF grants, and
+  strict security headers. Chat/session projections and Kanban persistence/UI
+  are not implemented yet.
 
 - An explicitly selected stock summary-integrity validator now emits bounded,
   deterministic advisory evidence without ever approving a model-authored

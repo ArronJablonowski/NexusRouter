@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Connect to DarwinRouter</title>
+  <link rel="stylesheet" href="__DARWIN_BASE_PATH__/bootstrap/v1/bootstrap.css">
+</head>
+<body data-base-path="__DARWIN_BASE_PATH__">
+  <main>
+    <section aria-labelledby="connect-title">
+      <p>DarwinRouter local access</p>
+      <h1 id="connect-title">Connect this browser</h1>
+      <p>Approve the one-time code in a trusted terminal. No API token is sent to this page.</p>
+      <output id="approval-code" aria-live="polite">Creating a one-time code…</output>
+      <p id="command" hidden>Run <code></code></p>
+      <p id="status" role="status">Waiting for a secure challenge.</p>
+      <button id="retry" type="button" hidden>Try again</button>
+    </section>
+  </main>
+  <script src="__DARWIN_BASE_PATH__/bootstrap/v1/bootstrap.js" defer></script>
+</body>
+</html>

@@ -23,6 +23,7 @@ type Settings struct {
 	Version    int        `yaml:"version" json:"version"`
 	Mode       string     `yaml:"mode" json:"mode"`
 	Daemon     Daemon     `yaml:"daemon" json:"daemon"`
+	WebUI      WebUI      `yaml:"web_ui" json:"web_ui"`
 	Hardware   Hardware   `yaml:"hardware" json:"hardware"`
 	Workers    Workers    `yaml:"workers" json:"workers"`
 	Providers  []Provider `yaml:"providers" json:"providers"`
@@ -38,6 +39,12 @@ type Settings struct {
 }
 type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
+}
+type WebUI struct {
+	Enabled           bool     `yaml:"enabled" json:"enabled"`
+	PathPrefix        string   `yaml:"path_prefix" json:"path_prefix"`
+	AllowedOrigins    []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
+	BrowserSessionTTL string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
 }
 type Hardware struct {
 	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`
@@ -150,7 +157,7 @@ type Runtime struct {
 }
 
 func Defaults() Settings {
-	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"},
+	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h"},
 		Hardware: Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
@@ -200,6 +207,9 @@ func (s Settings) Validate() error {
 	n, pe := strconv.Atoi(port)
 	if err != nil || pe != nil || n < 1 || n > 65535 || host == "" {
 		return errors.New("invalid daemon listen address")
+	}
+	if err := s.WebUI.Validate(s.Daemon.Listen); err != nil {
+		return err
 	}
 	for _, p := range []float64{s.Hardware.MaxRAM, s.Hardware.MaxVRAM} {
 		if !finite(p) || p <= 0 || p > 100 {

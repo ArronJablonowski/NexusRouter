@@ -9,8 +9,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,8 +22,10 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/api"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/internal/webuiapp"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
@@ -102,6 +106,33 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var learner *app.ConfiguredLearning
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
+	var browserHandler *webuiapp.Handler
+	if s.WebUI.Enabled {
+		sessionTTL, durationErr := config.Duration(s.WebUI.BrowserSessionTTL)
+		if durationErr != nil {
+			fmt.Fprintln(stderr, "invalid Web UI configuration")
+			return 1
+		}
+		browserStore, storeErr := browserauth.New(browserauth.Options{SessionTTL: sessionTTL})
+		if storeErr != nil {
+			fmt.Fprintln(stderr, "cannot initialize Web UI authority")
+			return 1
+		}
+		allowedHosts := []string{listener.Addr().String()}
+		seenHosts := map[string]bool{listener.Addr().String(): true}
+		for _, origin := range s.WebUI.AllowedOrigins {
+			parsed, _ := url.Parse(origin)
+			if parsed != nil && !seenHosts[parsed.Host] {
+				allowedHosts = append(allowedHosts, parsed.Host)
+				seenHosts[parsed.Host] = true
+			}
+		}
+		browserHandler, err = webuiapp.New(webuiapp.Options{BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore})
+		if err != nil {
+			fmt.Fprintln(stderr, "invalid Web UI configuration")
+			return 1
+		}
+	}
 	handler, err := api.New(token, s.Workers.Max, api.Services{
 		Models: func(ctx context.Context) ([]string, error) {
 			if ctx == nil {
@@ -239,6 +270,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
 			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
 		},
+		ApproveBrowserChallenge: func(ctx context.Context, id, code string) error {
+			if browserHandler == nil || ctx == nil || ctx.Err() != nil {
+				return browserauth.ErrInvalid
+			}
+			return browserHandler.ApproveChallenge(id, code)
+		},
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon configuration")
@@ -268,7 +305,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer traceExporter.Close()
-	if err := serveHTTP(ctx, listener, handler, stdout); err != nil {
+	rootHandler := composeServeHandler(handler, browserHandler, s.WebUI.PathPrefix)
+	if err := serveHTTP(ctx, listener, rootHandler, stdout); err != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
 		return 1
 	}
@@ -289,6 +327,27 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	return 0
+}
+
+type browserMount struct {
+	basePath string
+	browser  http.Handler
+	native   http.Handler
+}
+
+func composeServeHandler(native, browser http.Handler, basePath string) http.Handler {
+	if browser == nil {
+		return native
+	}
+	return browserMount{basePath: basePath, browser: browser, native: native}
+}
+
+func (m browserMount) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	if request.URL != nil && (request.URL.Path == m.basePath || strings.HasPrefix(request.URL.Path, m.basePath+"/")) {
+		m.browser.ServeHTTP(writer, request)
+		return
+	}
+	m.native.ServeHTTP(writer, request)
 }
 
 func serveHTTP(ctx context.Context, listener net.Listener, handler http.Handler, stdout io.Writer) error {

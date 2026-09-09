@@ -670,6 +670,12 @@ func rejectDuplicateObjectKeys(body []byte) error {
 	return nil
 }
 
+// RejectDuplicateJSONFields validates one complete JSON value and rejects
+// duplicate object members at every nesting level.
+func RejectDuplicateJSONFields(body []byte) error {
+	return rejectDuplicateObjectKeys(body)
+}
+
 func rejectDuplicateValue(decoder *json.Decoder) error {
 	token, err := decoder.Token()
 	if err != nil {
@@ -754,6 +760,7 @@ type SecurityClass string
 const (
 	BootstrapChallenge  SecurityClass = "bootstrap_challenge"
 	ChallengeBound      SecurityClass = "challenge_bound"
+	SessionCSRFRefresh  SecurityClass = "session_csrf_refresh"
 	SessionRead         SecurityClass = "session_read"
 	SessionCSRFMutation SecurityClass = "session_csrf_mutation"
 )
@@ -764,9 +771,24 @@ func Operations() []OperationSpec {
 	return append([]OperationSpec(nil), operationSpecs...)
 }
 
+// OperationsAtBase rebases the canonical operation map for a configured shell
+// mount without changing operation identities or application primitives.
+func OperationsAtBase(basePath string) ([]OperationSpec, error) {
+	basePath, ok := normalizeShellBasePath(basePath)
+	if !ok {
+		return nil, ErrContract
+	}
+	operations := Operations()
+	for index := range operations {
+		operations[index].BrowserPath = basePath + strings.TrimPrefix(operations[index].BrowserPath, DefaultShellBasePath)
+	}
+	return operations, nil
+}
+
 var operationSpecs = []OperationSpec{
 	{Operation: "session.challenge", Method: "POST", BrowserPath: "/app/api/v1/session/challenges", ServicePrimitive: "new browser-session challenge", Security: BootstrapChallenge, Mutation: true},
 	{Operation: "session.complete", Method: "POST", BrowserPath: "/app/api/v1/session", ServicePrimitive: "new approved challenge consumption", Security: ChallengeBound, Mutation: true},
+	{Operation: "session.csrf", Method: "POST", BrowserPath: "/app/api/v1/session/csrf", ServicePrimitive: "new same-origin session CSRF rotation", Security: SessionCSRFRefresh, Mutation: true},
 	{Operation: "session.logout", Method: "POST", BrowserPath: "/app/api/v1/session/logout", ServicePrimitive: "new browser-session revocation", Security: SessionCSRFMutation, Mutation: true},
 	{Operation: "chat.list", Method: "GET", BrowserPath: "/app/api/v1/chats", ServicePrimitive: "new task/session presentation projection", Security: SessionRead},
 	{Operation: "chat.history", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/messages", ServicePrimitive: "new bounded presentation projection", Security: SessionRead},

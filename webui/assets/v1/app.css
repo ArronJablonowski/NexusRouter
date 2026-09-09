@@ -1,0 +1,34 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0b1020;
+  color: #e8edf8;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 20rem; min-height: 100vh; background: radial-gradient(circle at top, #172544, #0b1020 42rem); }
+a { color: inherit; }
+.skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 2; padding: .7rem 1rem; background: #fff; color: #111; }
+.skip-link:focus { top: 1rem; }
+.shell { display: grid; grid-template: 4rem 1fr / 12rem 1fr; min-height: 100vh; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 1.4rem; border-bottom: 1px solid #2a3550; background: #0b1020e8; }
+.mark { display: inline-grid; place-items: center; width: 2rem; height: 2rem; margin-right: .5rem; border-radius: .6rem; background: #73e6b1; color: #08130f; font-weight: 800; }
+.status, .eyebrow { color: #9fb0ce; font-size: .84rem; letter-spacing: .03em; }
+.rail { padding: 1rem; border-right: 1px solid #2a3550; }
+.rail a { display: block; margin-bottom: .35rem; padding: .7rem .8rem; border-radius: .55rem; text-decoration: none; }
+.rail a:hover, .rail a:focus-visible, .rail a[aria-current="page"] { outline: none; background: #263758; }
+main { display: grid; place-items: center; padding: 2rem; }
+.welcome { width: min(42rem, 100%); padding: clamp(1.5rem, 5vw, 3.5rem); border: 1px solid #34415d; border-radius: 1.2rem; background: #111a2ddd; box-shadow: 0 1.5rem 4rem #0005; }
+.welcome h1 { margin: .25rem 0 1rem; font-size: clamp(2.2rem, 8vw, 4.8rem); letter-spacing: -.055em; }
+.welcome p:last-child { max-width: 36rem; color: #bdc9de; font-size: 1.05rem; line-height: 1.65; }
+:focus-visible { outline: 3px solid #73e6b1; outline-offset: 3px; }
+
+@media (max-width: 42rem) {
+  .shell { grid-template: 4rem auto 1fr / 1fr; }
+  .rail { display: flex; gap: .4rem; border-right: 0; border-bottom: 1px solid #2a3550; }
+  .rail a { margin: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

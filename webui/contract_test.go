@@ -122,6 +122,21 @@ func TestOperationMappingIsClosedOwnedAndBrowserScoped(t *testing.T) {
 	}
 }
 
+func TestOperationMappingRebasesToConfiguredShellPath(t *testing.T) {
+	operations, err := OperationsAtBase("/darwin")
+	if err != nil || len(operations) != len(Operations()) {
+		t.Fatal("operation map rebase failed", err)
+	}
+	for _, operation := range operations {
+		if !strings.HasPrefix(operation.BrowserPath, "/darwin/api/v1/") || strings.HasPrefix(operation.BrowserPath, "/app/") {
+			t.Fatal("operation path not rebased", operation.BrowserPath)
+		}
+	}
+	if _, err := OperationsAtBase("/bad/"); err == nil {
+		t.Fatal("invalid operation base accepted")
+	}
+}
+
 func TestContractValidationFailsClosed(t *testing.T) {
 	key := "contract-key-0001"
 	revision := int64(1)

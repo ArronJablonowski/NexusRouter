@@ -1,0 +1,19 @@
+{
+  "challenge_request": {"version": 1},
+  "challenge_response": {
+    "version": 1,
+    "challenge_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "display_code": "12345678",
+    "approval_code": "aaaaaaaaaaaaaaaaaaaaaaaa.12345678",
+    "expires_at": "2026-09-09T17:00:00Z"
+  },
+  "session_request": {"version": 1, "challenge_id": "aaaaaaaaaaaaaaaaaaaaaaaa"},
+  "session_response": {
+    "version": 1,
+    "csrf_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expires_at": "2026-09-09T18:00:00Z"
+  },
+  "logout_request": {"version": 1},
+  "csrf_request": {"version": 1},
+  "approval_request": {"version": 1, "display_code": "12345678"}
+}

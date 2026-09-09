@@ -1,7 +1,7 @@
 .PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-release qualify-license-evidence qualify-codex-repair
 
 build:
-	go build -trimpath -o bin/darwin ./cmd/darwin
+	go build -trimpath -buildvcs=false -o bin/darwin ./cmd/darwin
 
 check:
 	go run ./cmd/check

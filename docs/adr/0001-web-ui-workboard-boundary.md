@@ -57,14 +57,22 @@ creates a random browser session and invalidates the challenge. The host bearer
 token and bootstrap secret never enter a URL, HTML, JavaScript, local storage,
 session storage, IndexedDB, logs, or telemetry.
 
+A fixed, non-sensitive bootstrap document and its versioned local assets are
+the presentation portion of the `bootstrap_challenge` exception. An
+unauthenticated navigation to the exact app root redirects there; no full shell,
+application asset, data projection, or native API becomes public. The bootstrap
+document can only create and consume a challenge under the controls below.
+
 The approval operation is a new authenticated native command,
 `POST /v1/browser-session/challenges/{challenge}/approve`, exposed by
-`darwin web approve CODE`. It accepts only the opaque challenge identifier and
+`darwin web approve --config path/to/config.yaml CHALLENGE_ID.DISPLAY_CODE`.
+It accepts only the opaque challenge identifier and
 display-code proof, is rate limited, and never returns a browser session or host
 token to the CLI.
 
-Strict `Host` validation applies to every `/app` request, including static files
-and bootstrap. The session cookie is `HttpOnly`, `Path=/app`, `SameSite=Strict`, has an explicit
+Strict `Host` validation applies to every configured app-path request, including
+static files and bootstrap. The session cookie is `HttpOnly`, scoped to that
+path, `SameSite=Strict`, and has an explicit
 expiry, and is `Secure` whenever TLS is used. Logout revokes the server-side
 session. Normal mutating BFF requests require a session-bound CSRF token delivered in a
 non-cookie response field and echoed in a custom header. They also require an
@@ -76,6 +84,21 @@ plus that original HttpOnly cookie and an atomically approved challenge. Neither
 accepts ambient bearer authentication or a normal session CSRF token.
 `Access-Control-Allow-Origin` is never emitted. Forwarded host/protocol headers
 are rejected until an explicitly configured trusted-proxy mode exists.
+
+Challenge creation and native approval have bounded global rate windows, wrong
+proofs have a per-challenge attempt limit, live challenges/sessions are capped,
+and the browser handler has a fixed in-flight limit. Capacity responses are
+sanitized and include a bounded retry hint. Challenges and browser sessions are
+deliberately process-local in version 1: restarting the daemon revokes them.
+
+The CSRF token returned at session completion is held only in JavaScript memory.
+After navigation or refresh, an authenticated exact-origin POST rotates it and
+returns a replacement. To support multiple open tabs, a session retains at most
+eight current page grants and evicts the oldest; every grant remains random,
+session-bound, process-local, and memory-only.
+This recovery operation cannot create a session and still requires the
+HttpOnly/SameSite session cookie, strict Host, exact Origin, same-origin fetch
+metadata, and a closed bounded body.
 
 The BFF sets, at minimum:
 
@@ -259,7 +282,7 @@ operation requires adding or naming its application primitive and contract test;
 the front end may not invent private persistence or bypass the BFF.
 
 The operation map assigns one security class to each route:
-`bootstrap_challenge`, `challenge_bound`, `session_read`, or
+`bootstrap_challenge`, `challenge_bound`, `session_csrf_refresh`, `session_read`, or
 `session_csrf_mutation`. This makes the two bootstrap exceptions explicit and
 prevents their controls from becoming a general CSRF bypass.
 

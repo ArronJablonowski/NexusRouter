@@ -368,8 +368,11 @@ service-worker escape is permitted.
 The accepted implementation boundary, operation map, streaming semantics,
 workboard state ownership, and concrete browser controls are recorded in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md). Its versioned Go types,
-JSON Schema, and reusable fixtures live under `webui/`; the contract does not by
-itself implement the browser server or workboard store.
+JSON Schema, and reusable fixtures live under `webui/`. The first implementation
+serves a versioned embedded shell through a terminal-approved, process-local
+browser session boundary with a narrow public bootstrap and bounded CSRF grants;
+it does not yet implement chat projections or the workboard store and feature
+views.
 
 Chat and board mutations use versioned native endpoints with idempotency keys.
 Streaming uses resumable Server-Sent Events with event IDs and bounded catch-up;

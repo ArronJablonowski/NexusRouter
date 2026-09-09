@@ -54,6 +54,7 @@ Usage:
   darwin approvals show --db path --task id --id approval-id
   darwin approvals execution --db path --task id --id approval-id
   darwin approval-decision --config path < decision.json
+  darwin web approve --config path CHALLENGE_ID.DISPLAY_CODE
   darwin serve --config path  Run the authenticated loopback HTTP service
   darwin daemon start|status|stop --config path  Control an authenticated local daemon
   darwin memory list|show|put|delete --config path
@@ -106,6 +107,9 @@ func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, vers
 	}
 	if len(args) > 0 && args[0] == "approval-decision" {
 		return runApprovalDecision(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "web" {
+		return runWeb(args[1:], stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "approvals" {
 		return runApprovals(args[1:], stdout, stderr)

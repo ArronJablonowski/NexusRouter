@@ -5512,3 +5512,48 @@ contract sprint: the app shell, browser auth handlers, presentation projection,
 workboard store, API, agent tools, and chat/Kanban feature UI remain open in
 DAR-77 through DAR-87. The PRD's `web_ui` and `workboard` examples are still
 requirements, not currently accepted configuration fields.
+
+## 2026-09-09 — DAR-77 embedded authenticated Web UI shell
+
+The daemon now embeds deterministic version-1 HTML, CSS, and JavaScript assets
+and mounts them at the validated `web_ui.path_prefix` without changing native
+bearer API semantics. A narrow public bootstrap document creates a short-lived
+challenge; `darwin web approve --config PATH CHALLENGE.CODE` approves it over
+the existing bearer-only loopback transport, and atomic challenge consumption
+creates an HttpOnly, SameSite=Strict browser session. Full shell/application
+assets remain authenticated. Browser credentials are stored only as hashes in a
+bounded process-local authority store and are revoked on daemon restart.
+
+Every browser path validates the exact Host and rejects forwarded authority,
+ambiguous cookies, encoded or malformed paths, queries, unsupported bodies, and
+cross-origin mutation attempts. Normal mutations require exact Origin,
+same-origin fetch metadata, and a session-bound CSRF grant. An authenticated
+page can recover a grant after refresh; up to eight active page grants prevent
+tabs from fencing each other and the oldest grant is evicted. Challenge and
+approval fixed windows, wrong-proof limits, live-object caps, request-body
+bounds, and a 32-request in-flight cap fail closed with sanitized retry hints.
+No CORS header is emitted. CSP, referrer, frame, opener, content-type, and
+no-store headers cover successes and errors, and embedded assets contain no
+external URL, CDN, font, analytics, service-worker, or browser-storage access.
+
+The configuration loader now accepts and validates the PRD `web_ui` block,
+including enabled state, a bounded non-reserved base path, loopback same-port
+HTTP origins, and a five-minute-to-24-hour session lifetime. The machine-readable
+operation map rebases to the configured path. Browser-auth request/response
+types, JSON Schema, fixtures, and a stable asset-manifest digest are published
+for later UI sprints.
+
+Focused race tests cover the store, handler, shell, config, native API, and CLI.
+A real built-daemon process test exercises custom-base root/bootstrap,
+challenge creation, bearer-only CLI approval, cookie session completion,
+authenticated shell serving, browser-cookie rejection by `/v1`, restart
+revocation, and disabled-handler composition. Two adversarial reviews drove the
+bootstrap, refresh, rate, concurrency, multi-tab, and restart corrections; their
+final bounded reviews reported no remaining P0/P1/P2. Chat functionality and
+Kanban persistence/UI remain assigned to DAR-78 onward.
+
+The final integrated `make check` passed source formatting and the 1,000-line
+limit, `go vet`, the complete repository-wide race suite, and `go build ./...`.
+The longest rebuilt packages were releasepack 487.324s, application 344.259s,
+telemetry 260.392s, CLI 49.209s, SDK 38.328s, toolgate 22.891s, and native API
+19.179s.

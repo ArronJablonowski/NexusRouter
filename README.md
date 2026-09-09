@@ -26,7 +26,7 @@ alongside the candidate, checksum set, authorization, active trust record, key
 identity and clean source checkout.
 The deterministic testable-MVP
 gate passes and 41 of the original 42 MVP issues are complete. DAR-46 remains
-open, and the newly required Web UI/Kanban milestone is not implemented: no
+open, and the newly required Web UI/Kanban milestone is only partially implemented: no
 release has been published, and
 dependency-notice review, supported platforms, production signing trust, release approval
 and publication authority remain operator gates.
@@ -37,8 +37,8 @@ DarwinRouter 1.0 now requires an authenticated embedded Web UI with streaming
 chat and a native durable Kanban board that operators and policy-constrained
 agents can use for long-running work. The PRD defines the browser security,
 dependency, claim/lease, checkpoint, acceptance, and restart invariants. Linear
-issues DAR-76 through DAR-87 track implementation; this checkpoint does not yet
-serve the Web UI or expose workboard storage.
+issues DAR-76 through DAR-87 track implementation. The authenticated embedded
+shell is now served, but chat views and workboard storage/UI are not yet present.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -46,9 +46,9 @@ types, JSON Schema, fixtures, hard payload bounds, a complete UI-operation map,
 same-origin session rules, resumable presentation-event semantics, and durable
 Kanban ownership rules. Closed presentation schemas include board/card/claim/
 attempt/evidence/candidate snapshots and acceptance/recovery receipts. This
-contract is testable scaffolding only; Web UI
-serving, browser authentication, workboard persistence, and feature views remain
-open.
+contract now backs a minimal embedded shell, one-time terminal-approved browser
+login, process-local sessions, and CSRF recovery. Chat/session projections,
+workboard persistence, and feature views remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
@@ -1668,10 +1668,9 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Implement the Web UI architecture and browser security boundary in DAR-76.
-2. Add embedded authenticated serving and streaming chat in DAR-77 through DAR-80.
-3. Build durable Kanban storage, APIs, UI, and agent tools in DAR-81 through DAR-85.
-4. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Add resumable streaming chat and chat/session controls in DAR-78 through DAR-80.
+2. Build durable Kanban storage, APIs, Web UI, and agent tools in DAR-81 through DAR-85.
+3. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

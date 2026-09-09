@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/daemon"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -60,7 +62,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 		_, _ = io.WriteString(w, "{}")
 	}))
 	defer collector.Close()
-	if err := os.WriteFile(configuration, []byte(fmt.Sprintf("daemon:\n  listen: %q\ntelemetry:\n  database: %q\n  metrics_export:\n    enabled: true\n    endpoint: %q\n    interval: 1s\n", address, filepath.Join(dir, "tasks.db"), collector.URL+"/v1/metrics")), 0600); err != nil {
+	if err := os.WriteFile(configuration, []byte(fmt.Sprintf("daemon:\n  listen: %q\nweb_ui:\n  path_prefix: /console\ntelemetry:\n  database: %q\n  metrics_export:\n    enabled: true\n    endpoint: %q\n    interval: 1s\n", address, filepath.Join(dir, "tasks.db"), collector.URL+"/v1/metrics")), 0600); err != nil {
 		t.Fatal(err)
 	}
 	token := strings.Repeat("lifecycle-fixture-", 3)
@@ -114,6 +116,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	transport := &http.Transport{Proxy: nil}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	browserClient := qualifyDaemonWebUI(t, ctx, binary, configuration, address, token)
 	qualifyDaemonMetricsFailure(t, ctx, client, address, token, &collectorFail, run)
 	response, err := client.Do(request)
 	if err != nil {
@@ -272,4 +275,87 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	if err != nil || second.InstanceID == first.InstanceID || second.State != "ready" {
 		t.Fatal("restart failed", second, err)
 	}
+	staleResponse, err := browserClient.Get("http://" + address + "/console")
+	if err != nil {
+		t.Fatal("restarted browser request failed", err)
+	}
+	_ = staleResponse.Body.Close()
+	if staleResponse.StatusCode != http.StatusFound || staleResponse.Header.Get("Location") != "/console/bootstrap" {
+		t.Fatal("restart retained process-local browser authority", staleResponse.StatusCode)
+	}
+}
+
+func qualifyDaemonWebUI(t *testing.T, ctx context.Context, binary, configuration, address, token string) *http.Client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := &http.Transport{Proxy: nil}
+	t.Cleanup(transport.CloseIdleConnections)
+	client := &http.Client{Transport: transport, Jar: jar, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	request := func(method, path, body string) (*http.Response, []byte) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, method, "http://"+address+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		req.Header.Set("Origin", "http://"+address)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		response, err := client.Do(req)
+		if err != nil {
+			t.Fatal("browser request failed", err)
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 65537))
+		closeErr := response.Body.Close()
+		if readErr != nil || closeErr != nil || len(raw) > 65536 {
+			t.Fatal("browser response unreadable", readErr, closeErr)
+		}
+		return response, raw
+	}
+	response, _ := request(http.MethodGet, "/console", "")
+	if response.StatusCode != http.StatusFound || response.Header.Get("Location") != "/console/bootstrap" {
+		t.Fatal("fresh browser did not enter bootstrap", response.StatusCode)
+	}
+	response, bootstrap := request(http.MethodGet, "/console/bootstrap", "")
+	if response.StatusCode != http.StatusOK || !bytes.Contains(bootstrap, []byte("Connect this browser")) || bytes.Contains(bootstrap, []byte(token)) {
+		t.Fatal("bootstrap document unavailable or unsafe", response.StatusCode)
+	}
+	response, raw := request(http.MethodPost, "/console/api/v1/session/challenges", `{"version":1}`)
+	var challenge contract.BrowserChallengeResponse
+	if response.StatusCode != http.StatusCreated || json.Unmarshal(raw, &challenge) != nil || challenge.Validate() != nil {
+		t.Fatal("real daemon challenge failed", response.StatusCode, string(raw))
+	}
+	command := exec.CommandContext(ctx, binary, "web", "approve", "--config", configuration, challenge.ApprovalCode)
+	command.Env = append(os.Environ(), "DARWIN_API_TOKEN="+token)
+	var output, diagnostic bytes.Buffer
+	command.Stdout, command.Stderr = &output, &diagnostic
+	if err := command.Run(); err != nil || !bytes.Contains(output.Bytes(), []byte(`"approved":true`)) || diagnostic.Len() != 0 || bytes.Contains(output.Bytes(), []byte(token)) {
+		t.Fatal("real daemon CLI browser approval failed", err, output.String(), diagnostic.String())
+	}
+	response, raw = request(http.MethodPost, "/console/api/v1/session", `{"version":1,"challenge_id":"`+challenge.ChallengeID+`"}`)
+	var session contract.BrowserSessionResponse
+	if response.StatusCode != http.StatusCreated || json.Unmarshal(raw, &session) != nil || session.Validate() != nil {
+		t.Fatal("real daemon browser session failed", response.StatusCode, string(raw))
+	}
+	response, shell := request(http.MethodGet, "/console/workboards", "")
+	if response.StatusCode != http.StatusOK || !bytes.Contains(shell, []byte("DarwinRouter")) || bytes.Contains(shell, []byte(token)) {
+		t.Fatal("authenticated embedded shell unavailable", response.StatusCode)
+	}
+	native, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/v1/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nativeResponse, err := client.Do(native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = nativeResponse.Body.Close()
+	if nativeResponse.StatusCode != http.StatusUnauthorized {
+		t.Fatal("browser cookie authenticated native API", nativeResponse.StatusCode)
+	}
+	return client
 }

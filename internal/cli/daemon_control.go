@@ -65,6 +65,29 @@ func (c *daemonControlClient) Stop(ctx context.Context, id string) (daemon.Statu
 	return c.request(ctx, http.MethodPost, "/v1/daemon/stop", body, id)
 }
 
+func (c *daemonControlClient) ApproveBrowserChallenge(ctx context.Context, id, code string) error {
+	body, err := json.Marshal(map[string]any{"version": 1, "display_code": code})
+	if err != nil {
+		return errDaemonControl
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/v1/browser-session/challenges/"+id+"/approve", bytes.NewReader(body))
+	if err != nil {
+		return errDaemonControl
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	response, err := c.client.Do(req)
+	if err != nil {
+		return errDaemonControl
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 1025))
+	if err != nil || len(raw) > 1024 || response.StatusCode != http.StatusNoContent || len(raw) != 0 {
+		return errDaemonControl
+	}
+	return nil
+}
+
 func (c *daemonControlClient) request(ctx context.Context, method, path string, body []byte, expected string) (daemon.Status, error) {
 	bad := func() (daemon.Status, error) { return daemon.Status{}, errDaemonControl }
 	req, err := http.NewRequestWithContext(ctx, method, c.base+path, bytes.NewReader(body))

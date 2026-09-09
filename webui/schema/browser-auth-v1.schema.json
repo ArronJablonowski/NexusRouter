@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darwinrouter.local/schema/webui/browser-auth-v1",
+  "title": "DarwinRouter browser authentication contract v1",
+  "$defs": {
+    "challenge_id": {
+      "type": "string",
+      "minLength": 24,
+      "maxLength": 24,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "display_code": {
+      "type": "string",
+      "pattern": "^[0-9]{8}$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "challenge_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {"version": {"const": 1}}
+    },
+    "challenge_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "challenge_id", "display_code", "approval_code", "expires_at"],
+      "properties": {
+        "version": {"const": 1},
+        "challenge_id": {"$ref": "#/$defs/challenge_id"},
+        "display_code": {"$ref": "#/$defs/display_code"},
+        "approval_code": {"type": "string", "minLength": 33, "maxLength": 33, "pattern": "^[A-Za-z0-9_-]{24}\\.[0-9]{8}$"},
+        "expires_at": {"$ref": "#/$defs/time"}
+      },
+      "x-invariants": ["approval_code == challenge_id + '.' + display_code"]
+    },
+    "session_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "challenge_id"],
+      "properties": {
+        "version": {"const": 1},
+        "challenge_id": {"$ref": "#/$defs/challenge_id"}
+      }
+    },
+    "session_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "csrf_token", "expires_at"],
+      "properties": {
+        "version": {"const": 1},
+        "csrf_token": {"$ref": "#/$defs/token"},
+        "expires_at": {"$ref": "#/$defs/time"}
+      }
+    },
+    "logout_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {"version": {"const": 1}}
+    },
+    "csrf_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {"version": {"const": 1}}
+    },
+    "approval_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "display_code"],
+      "properties": {
+        "version": {"const": 1},
+        "display_code": {"$ref": "#/$defs/display_code"}
+      }
+    }
+  },
+  "anyOf": [
+    {"$ref": "#/$defs/challenge_request"},
+    {"$ref": "#/$defs/challenge_response"},
+    {"$ref": "#/$defs/session_request"},
+    {"$ref": "#/$defs/session_response"},
+    {"$ref": "#/$defs/logout_request"},
+    {"$ref": "#/$defs/csrf_request"},
+    {"$ref": "#/$defs/approval_request"}
+  ]
+}
