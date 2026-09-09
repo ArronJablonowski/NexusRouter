@@ -1009,6 +1009,112 @@
           "$ref": "#/$defs/time"
         }
       }
+    },
+    "board_list_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        "state": {"enum": ["active", "archived"]}
+      }
+    },
+    "board_snapshot_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        "state": {"enum": ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"]},
+        "assignee_id": {"anyOf": [{"$ref": "v1#/$defs/id"}, {"const": "unassigned"}]},
+        "owner_id": {"anyOf": [{"$ref": "v1#/$defs/id"}, {"const": "unassigned"}]},
+        "claim_state": {"enum": ["unclaimed", "active", "attention"]}
+      }
+    },
+    "dependency_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit", "direction"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        "direction": {"enum": ["prerequisites", "dependents"]}
+      }
+    },
+    "dependency_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "board_id", "card_id", "dependency_id"],
+      "properties": {
+        "version": {"const": 1},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "dependency_id": {"$ref": "v1#/$defs/id"}
+      },
+      "x-invariants": ["card_id != dependency_id"]
+    },
+    "dependency_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "board_id", "card_id", "direction", "graph_revision", "graph_digest", "items", "has_more"],
+      "properties": {
+        "version": {"const": 1},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "direction": {"enum": ["prerequisites", "dependents"]},
+        "graph_revision": {"type": "integer", "minimum": 1},
+        "graph_digest": {"$ref": "#/$defs/digest"},
+        "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/dependency_link"}},
+        "next_cursor": {"$ref": "v1#/$defs/cursor"},
+        "has_more": {"type": "boolean"}
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"items": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}],
+      "x-invariants": ["links bind page board and selected card according to direction", "links are unique"]
+    },
+    "board_event_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "board_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "id", "board_id", "sequence", "operation_id", "kind", "actor_id", "actor_type", "created_at"],
+      "properties": {
+        "version": {"const": 1},
+        "id": {"$ref": "v1#/$defs/id"},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "operation_id": {"$ref": "v1#/$defs/key"},
+        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
+        "actor_id": {"$ref": "v1#/$defs/id"},
+        "actor_type": {"enum": ["operator", "worker", "validator", "model", "system"]},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "claim_id": {"$ref": "v1#/$defs/id"},
+        "created_at": {"$ref": "#/$defs/time"}
+      },
+      "allOf": [{"if": {"required": ["claim_id"]}, "then": {"required": ["card_id"]}}]
+    },
+    "board_event_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "board_id", "items", "has_more", "high_water_sequence"],
+      "properties": {
+        "version": {"const": 1},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/board_event"}},
+        "next_cursor": {"$ref": "v1#/$defs/cursor"},
+        "has_more": {"type": "boolean"},
+        "high_water_sequence": {"type": "integer", "minimum": 0}
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"items": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}],
+      "x-invariants": ["event board ids match the page", "event ids are unique", "event sequences strictly ascend and do not exceed high_water_sequence"]
     }
   }
 }

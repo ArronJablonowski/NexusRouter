@@ -93,70 +93,6 @@ func (r ChatRequest) Validate() error {
 	return encodedWithin(r, MaxRequestBytes)
 }
 
-func allowedBoardFields(action BoardAction) []string {
-	switch action {
-	case BoardCreate:
-		return []string{"title", "description"}
-	case CardCreate:
-		return []string{"board_id", "title", "description", "priority", "labels", "dependencies", "criteria", "parent_id", "assignee_id", "budget", "expected_board_revision"}
-	case CardRevise:
-		return []string{"board_id", "card_id", "title", "description", "priority", "labels", "parent_id", "assignee_id", "budget", "expected_card_revision"}
-	case CardMove:
-		return []string{"board_id", "card_id", "target_state", "before_card_id", "after_card_id", "expected_board_revision", "expected_layout_revision", "expected_card_revision"}
-	case DependencyAdd, DependencyRemove:
-		return []string{"board_id", "card_id", "dependency_id", "expected_card_revision"}
-	case CardClaim:
-		return []string{"board_id", "card_id", "expected_card_revision"}
-	case ClaimHeartbeat:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "expected_claim_revision"}
-	case ClaimRecover:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "expected_card_revision", "expected_claim_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"}
-	case CriteriaRevise:
-		return []string{"board_id", "card_id", "criteria", "expected_card_revision", "expected_criteria_revision"}
-	case CheckpointAppend, CandidateSubmit:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "criteria_revision", "expected_card_revision", "expected_claim_revision", "evidence"}
-	case AcceptanceAccept, AcceptanceReject:
-		return []string{"board_id", "card_id", "attempt_id", "candidate_id", "criteria_revision", "expected_card_revision", "evidence", "candidate_digest", "criteria_digest", "evidence_head_revision", "evidence_set_digest", "policy_digest"}
-	case CardPauseRequest, CardCancelRequest:
-		return []string{"board_id", "card_id", "reason_code", "expected_card_revision"}
-	case CardBlock, CardUnblock:
-		return []string{"board_id", "card_id", "claim_id", "reason_code", "expected_card_revision", "expected_claim_revision"}
-	default:
-		return nil
-	}
-}
-
-func (r BoardRequest) hasOnlyBoardFields(fields ...string) bool {
-	allowed := make(map[string]bool, len(fields))
-	for _, field := range fields {
-		allowed[field] = true
-	}
-	present := map[string]bool{
-		"board_id": r.BoardID != "", "card_id": r.CardID != "", "dependency_id": r.DependencyID != "",
-		"claim_id": r.ClaimID != "", "attempt_id": r.AttemptID != "", "candidate_id": r.CandidateID != "",
-		"criteria_revision": r.CriteriaRevision != nil, "expected_board_revision": r.ExpectedBoardRevision != nil,
-		"expected_card_revision": r.ExpectedCardRevision != nil, "expected_claim_revision": r.ExpectedClaimRevision != nil,
-		"title": r.Title != nil, "description": r.Description != nil, "target_state": r.TargetState != "",
-		"reason_code": r.ReasonCode != "", "evidence": r.Evidence != "", "labels": r.Labels != nil,
-		"dependencies": r.Dependencies != nil,
-		"criteria":     r.Criteria != nil, "expected_criteria_revision": r.ExpectedCriteriaRevision != nil,
-		"candidate_digest": r.CandidateDigest != "", "criteria_digest": r.CriteriaDigest != "",
-		"evidence_head_revision": r.EvidenceHeadRevision != nil, "evidence_set_digest": r.EvidenceSetDigest != "",
-		"policy_digest": r.PolicyDigest != "", "stop_proof_id": r.StopProofID != "",
-		"effect_resolution": r.EffectResolution != "", "task_head_digest": r.TaskHeadDigest != "",
-		"process_proof_digest": r.ProcessProofDigest != "", "effect_evidence_digest": r.EffectEvidenceDigest != "",
-		"priority": r.Priority != "", "parent_id": r.ParentID != "", "assignee_id": r.AssigneeID != "",
-		"budget": r.Budget != nil, "before_card_id": r.BeforeCardID != "", "after_card_id": r.AfterCardID != "",
-		"expected_layout_revision": r.ExpectedLayoutRevision != nil,
-	}
-	for field, exists := range present {
-		if exists && !allowed[field] {
-			return false
-		}
-	}
-	return true
-}
-
 type ApprovalAction string
 
 const (
@@ -229,24 +165,27 @@ func (r FeedbackRequest) Validate() error {
 type BoardAction string
 
 const (
-	BoardCreate       BoardAction = "board.create"
-	CardCreate        BoardAction = "card.create"
-	CardRevise        BoardAction = "card.revise"
-	CardMove          BoardAction = "card.move"
-	DependencyAdd     BoardAction = "dependency.add"
-	DependencyRemove  BoardAction = "dependency.remove"
-	CardClaim         BoardAction = "card.claim"
-	ClaimHeartbeat    BoardAction = "claim.heartbeat"
-	CheckpointAppend  BoardAction = "checkpoint.append"
-	CandidateSubmit   BoardAction = "candidate.submit"
-	AcceptanceAccept  BoardAction = "acceptance.accept"
-	AcceptanceReject  BoardAction = "acceptance.reject"
-	CardPauseRequest  BoardAction = "card.pause_request"
-	CardCancelRequest BoardAction = "card.cancel_request"
-	CardBlock         BoardAction = "card.block"
-	CardUnblock       BoardAction = "card.unblock"
-	CriteriaRevise    BoardAction = "criteria.revise"
-	ClaimRecover      BoardAction = "claim.recover"
+	BoardCreate        BoardAction = "board.create"
+	BoardRevise        BoardAction = "board.revise"
+	BoardArchive       BoardAction = "board.archive"
+	CardCreate         BoardAction = "card.create"
+	CardRevise         BoardAction = "card.revise"
+	CardMove           BoardAction = "card.move"
+	DependencyAdd      BoardAction = "dependency.add"
+	DependencyRemove   BoardAction = "dependency.remove"
+	CardClaim          BoardAction = "card.claim"
+	ClaimHeartbeat     BoardAction = "claim.heartbeat"
+	CheckpointAppend   BoardAction = "checkpoint.append"
+	CandidateSubmit    BoardAction = "candidate.submit"
+	AcceptanceAccept   BoardAction = "acceptance.accept"
+	AcceptanceReject   BoardAction = "acceptance.reject"
+	CardPauseRequest   BoardAction = "card.pause_request"
+	CardCancelRequest  BoardAction = "card.cancel_request"
+	CardCancelFinalize BoardAction = "card.cancel_finalize"
+	CardBlock          BoardAction = "card.block"
+	CardUnblock        BoardAction = "card.unblock"
+	CriteriaRevise     BoardAction = "criteria.revise"
+	ClaimRecover       BoardAction = "claim.recover"
 )
 
 type BoardRequest struct {
@@ -263,6 +202,7 @@ type BoardRequest struct {
 	ExpectedCriteriaRevision *int64                `json:"expected_criteria_revision,omitempty"`
 	EvidenceHeadRevision     *int64                `json:"evidence_head_revision,omitempty"`
 	ExpectedLayoutRevision   *int64                `json:"expected_layout_revision,omitempty"`
+	ExpectedGraphRevision    *int64                `json:"expected_graph_revision,omitempty"`
 	ExpectedBoardRevision    *int64                `json:"expected_board_revision,omitempty"`
 	ExpectedCardRevision     *int64                `json:"expected_card_revision,omitempty"`
 	ExpectedClaimRevision    *int64                `json:"expected_claim_revision,omitempty"`
@@ -283,6 +223,8 @@ type BoardRequest struct {
 	Priority                 string                `json:"priority,omitempty"`
 	ParentID                 string                `json:"parent_id,omitempty"`
 	AssigneeID               string                `json:"assignee_id,omitempty"`
+	ClearParent              *bool                 `json:"clear_parent,omitempty"`
+	ClearAssignee            *bool                 `json:"clear_assignee,omitempty"`
 	BeforeCardID             string                `json:"before_card_id,omitempty"`
 	AfterCardID              string                `json:"after_card_id,omitempty"`
 	Budget                   *WorkBudget           `json:"budget,omitempty"`
@@ -296,7 +238,7 @@ func (r BoardRequest) Validate() error {
 		!optionalID(r.CardID) || !optionalID(r.DependencyID) || !optionalID(r.ClaimID) ||
 		!optionalID(r.AttemptID) || !optionalID(r.CandidateID) || !optionalRevision(r.CriteriaRevision) ||
 		!optionalRevision(r.ExpectedCriteriaRevision) || !optionalRevision(r.EvidenceHeadRevision) ||
-		!optionalRevision(r.ExpectedLayoutRevision) ||
+		!optionalRevision(r.ExpectedLayoutRevision) || !optionalRevision(r.ExpectedGraphRevision) ||
 		!optionalRevision(r.ExpectedBoardRevision) || !optionalRevision(r.ExpectedCardRevision) ||
 		!optionalRevision(r.ExpectedClaimRevision) || !optionalBoundedText(r.Title, MaxTitleBytes) ||
 		!optionalBoundedText(r.Description, MaxDescriptionBytes) || !boundedText(r.Evidence, MaxEvidenceBytes, true) ||
@@ -318,8 +260,16 @@ func (r BoardRequest) Validate() error {
 	}
 	switch r.Action {
 	case BoardCreate:
+	case BoardRevise:
+		if revisionBelowOne(r.ExpectedBoardRevision) || r.Title == nil && r.Description == nil {
+			return ErrContract
+		}
+	case BoardArchive:
+		if revisionBelowOne(r.ExpectedBoardRevision) {
+			return ErrContract
+		}
 	case CardCreate:
-		if r.Title == nil || strings.TrimSpace(*r.Title) == "" || r.CardID != "" || revisionBelowOne(r.ExpectedBoardRevision) || validateCriteria(r.Criteria, 1) != nil {
+		if r.Title == nil || strings.TrimSpace(*r.Title) == "" || r.CardID != "" || revisionBelowOne(r.ExpectedBoardRevision) || revisionBelowOne(r.ExpectedGraphRevision) || validateCriteria(r.Criteria, 1) != nil {
 			return ErrContract
 		}
 	case CardRevise, CardMove, DependencyAdd, DependencyRemove, CardClaim,
@@ -327,8 +277,15 @@ func (r BoardRequest) Validate() error {
 		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) {
 			return ErrContract
 		}
+		if r.Action == CardRevise && (!optionalTrue(r.ClearParent) || !optionalTrue(r.ClearAssignee)) {
+			return ErrContract
+		}
 		if r.Action == CardRevise && r.Title == nil && r.Description == nil && r.Labels == nil &&
-			r.Priority == "" && r.ParentID == "" && r.AssigneeID == "" && r.Budget == nil {
+			r.Priority == "" && r.ParentID == "" && r.AssigneeID == "" && r.ClearParent == nil && r.ClearAssignee == nil && r.Budget == nil {
+			return ErrContract
+		}
+		if r.Action == CardRevise && (r.ParentID != "" || r.ClearParent != nil) != (r.ExpectedGraphRevision != nil) ||
+			r.Action == CardRevise && (r.ParentID != "" && r.ClearParent != nil || r.AssigneeID != "" && r.ClearAssignee != nil) {
 			return ErrContract
 		}
 		if r.Action == CardMove && (!validMoveTarget(r.TargetState) || revisionBelowOne(r.ExpectedBoardRevision) ||
@@ -346,6 +303,13 @@ func (r BoardRequest) Validate() error {
 		if r.CardID == "" || r.ClaimID == "" || r.AttemptID == "" || revisionBelowOne(r.ExpectedCardRevision) || revisionBelowOne(r.ExpectedClaimRevision) ||
 			r.StopProofID == "" || !validWorkboardDigest(r.TaskHeadDigest) || !validWorkboardDigest(r.ProcessProofDigest) ||
 			!validWorkboardDigest(r.EffectEvidenceDigest) || (r.EffectResolution != "effect_free" && r.EffectResolution != "resolved_no_replay") {
+			return ErrContract
+		}
+	case CardCancelFinalize:
+		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) || r.StopProofID == "" ||
+			!validWorkboardDigest(r.TaskHeadDigest) || !validWorkboardDigest(r.ProcessProofDigest) ||
+			!validWorkboardDigest(r.EffectEvidenceDigest) || (r.EffectResolution != "effect_free" && r.EffectResolution != "resolved_no_replay") ||
+			(r.ClaimID == "") != (r.AttemptID == "") || (r.ClaimID == "") != (r.ExpectedClaimRevision == nil) {
 			return ErrContract
 		}
 	case CriteriaRevise:
@@ -370,6 +334,9 @@ func (r BoardRequest) Validate() error {
 	if (r.Action == DependencyAdd || r.Action == DependencyRemove) && r.DependencyID == "" {
 		return ErrContract
 	}
+	if (r.Action == DependencyAdd || r.Action == DependencyRemove) && revisionBelowOne(r.ExpectedGraphRevision) {
+		return ErrContract
+	}
 	if !r.hasOnlyBoardFields(allowedBoardFields(r.Action)...) {
 		return ErrContract
 	}
@@ -386,6 +353,8 @@ func validMoveTarget(value string) bool {
 }
 
 func revisionBelowOne(value *int64) bool { return value == nil || *value < 1 }
+
+func optionalTrue(value *bool) bool { return value == nil || *value }
 
 func validOptionalDigest(value string) bool { return value == "" || validWorkboardDigest(value) }
 
@@ -797,7 +766,7 @@ func (e Error) Validate() error {
 		(e.SubjectType == "") != (e.SubjectID == "") {
 		return ErrContract
 	}
-	if e.SubjectType != "" && e.SubjectType != "chat" && e.SubjectType != "task" && e.SubjectType != "submission" && e.SubjectType != "feedback" && e.SubjectType != "approval" {
+	if e.SubjectType != "" && e.SubjectType != "chat" && e.SubjectType != "task" && e.SubjectType != "submission" && e.SubjectType != "feedback" && e.SubjectType != "approval" && e.SubjectType != "board" && e.SubjectType != "card" && e.SubjectType != "claim" {
 		return ErrContract
 	}
 	return encodedWithin(e, 4096)

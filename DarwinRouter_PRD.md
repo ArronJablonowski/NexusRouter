@@ -393,7 +393,16 @@ inside the primary SQLite/WAL database: normalized bounded records for boards,
 canonical columns, cards, dependency edges, events, attempts, claims,
 heartbeats and checkpoints, candidates, evidence, acceptance, recovery proofs, and scoped
 idempotency receipts. It does not expose workboard mutations. The command APIs,
-agent tools, and Kanban feature views remain DAR-82, DAR-83, and DAR-84 work.
+agent tools, and Kanban feature views remain DAR-82, DAR-83, and DAR-84 work. A
+partial DAR-82 checkpoint now adds authority-gated board domain/service
+contracts and an authority-neutral transactional repository for create, list,
+read, and archive. It atomically maintains canonical columns, attributed
+immutable events, optimistic revision fences, exact committed replay, aggregate
+transaction-byte limits, and bounded authenticated pagination. Versioned Web UI
+board-query and redacted event contracts are defined but not wired. Card
+persistence, native/BFF HTTP routes, workboard SSE, authenticated daemon
+composition, agent tools, and Kanban rendering remain unfinished, so DAR-82
+remains In Progress.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

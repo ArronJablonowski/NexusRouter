@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
@@ -20,7 +21,13 @@ var ErrConflict = errors.New("event sequence or identity conflict")
 
 const currentStorageSchema = stateschema.Current
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db *sql.DB
+
+	workboardCursorOnce sync.Once
+	workboardCursorKey  [32]byte
+	workboardCursorErr  error
+}
 
 // Open creates a private on-disk database. Callers must use a dedicated data
 // directory; application configuration must never point into shared scratch.

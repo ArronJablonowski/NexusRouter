@@ -49,8 +49,13 @@ and host resources. It explicitly distinguishes unavailable projections from
 unknown measurements and separates routed execution usage from auxiliary
 classifier, summarizer, audit, and optional-judge usage. Inspection is bounded
 and GET-only: it does not change models, routing policy, approvals, or runtime
-state. DAR-81 now provides the schema-35 durable workboard foundation; command
-APIs, agent tools, and Kanban views remain assigned to DAR-82 through DAR-84.
+state. DAR-81 provides the schema-35 durable workboard foundation. A partial
+DAR-82 checkpoint now adds board domain/service contracts and a transactional
+repository for create, list, read, and archive with canonical columns,
+immutable events, revision fencing, exact replay, and bounded authenticated
+cursors. Card persistence, native/BFF routes, workboard SSE, authenticated
+daemon wiring, agent tools, and Kanban rendering remain unfinished, so DAR-82
+remains In Progress.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -65,7 +70,9 @@ projections. Tool inspection exposes paired lifecycle metadata without
 arguments or results; audit inspection exposes sanitized findings, evidence
 references, rubric provenance, and ordered evidence precedence without raw
 prompts or provider responses. Schema 35 now reserves normalized, bounded
-workboard storage in the primary SQLite/WAL database. Workboard command APIs,
+workboard storage in the primary SQLite/WAL database. Versioned Web UI board
+query and redacted event contracts also exist, but are not yet served. Card
+persistence, native/BFF HTTP routes, workboard SSE, authentication wiring,
 agent tools, and Kanban feature views remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
@@ -1686,7 +1693,7 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Build workboard command APIs, agent tools, and the Kanban Web UI in DAR-82 through DAR-85.
+1. Complete DAR-82 card persistence and workboard route/SSE/auth wiring, then build agent tools and the Kanban Web UI through DAR-85.
 2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

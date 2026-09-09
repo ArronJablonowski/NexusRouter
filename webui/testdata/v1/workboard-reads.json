@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "board_list_options": {
+    "limit": 25,
+    "state": "active"
+  },
+  "board_snapshot_options": {
+    "limit": 50,
+    "state": "ready",
+    "assignee_id": "unassigned",
+    "claim_state": "unclaimed"
+  },
+  "dependency_options": {
+    "limit": 25,
+    "direction": "prerequisites"
+  },
+  "dependency_page": {
+    "version": 1,
+    "board_id": "board-a",
+    "card_id": "card-a",
+    "direction": "prerequisites",
+    "graph_revision": 2,
+    "graph_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "items": [
+      {
+        "version": 1,
+        "board_id": "board-a",
+        "card_id": "card-a",
+        "dependency_id": "card-b"
+      }
+    ],
+    "has_more": false
+  },
+  "board_event_options": {
+    "limit": 100
+  },
+  "board_event_page": {
+    "version": 1,
+    "board_id": "board-a",
+    "items": [
+      {
+        "version": 1,
+        "id": "event-a",
+        "board_id": "board-a",
+        "sequence": 4,
+        "operation_id": "operation-key-01",
+        "kind": "card.revise",
+        "actor_id": "operator-a",
+        "actor_type": "operator",
+        "card_id": "card-a",
+        "created_at": "2026-09-09T12:00:00Z"
+      }
+    ],
+    "has_more": false,
+    "high_water_sequence": 4
+  }
+}

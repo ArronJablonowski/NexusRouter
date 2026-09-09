@@ -56,8 +56,14 @@ supported-platform decision or publication approval is claimed.
   feedback record/revision, and tool-approval allow/deny/revoke. The embedded
   client reconciles task controls, feedback context, approvals, recent
   operations, and submission status after refresh or ambiguous acknowledgement.
-  Schema-35 Kanban persistence now exists; command APIs, agent tools, and the
-  Kanban feature UI remain open.
+  Schema-35 Kanban persistence now exists. A partial DAR-82 checkpoint adds
+  authority-gated board domain/service contracts and transactional create,
+  list, read, and archive repository behavior. Canonical-column seeding,
+  immutable events, revision fencing, exact replay, aggregate transaction-byte
+  checks, and authenticated bounded cursors are covered. Versioned Web UI query
+  and event contracts exist, but card persistence, workboard HTTP/SSE/auth
+  wiring, agent tools, and the Kanban feature UI remain open; DAR-82 is still In
+  Progress.
 
 - Schema 35 adds the native workboard storage foundation to the primary
   SQLite/WAL database. Normalized bounded tables cover boards, seven canonical
@@ -68,8 +74,10 @@ supported-platform decision or publication approval is claimed.
   limits where SQLite can do so; cycle, depth, and transaction-wide graph
   checks remain application-service responsibilities. Migration is serialized,
   restart-safe, and fails atomically on partial or forged retained objects.
-  This is storage only: DAR-82, DAR-83, and DAR-84 still own command APIs, agent
-  tools, and the integrated Kanban UI.
+  DAR-81 itself is storage only. The subsequent partial DAR-82 checkpoint covers
+  board lifecycle persistence but not card persistence or any workboard
+  transport; DAR-82, DAR-83, and DAR-84 still own the remaining command/API,
+  agent-tool, and integrated Kanban UI work.
 
 - Schema 34 adds the session-subject-bound browser operation journal and
   additive browser feedback revision chain to the primary SQLite/WAL database;

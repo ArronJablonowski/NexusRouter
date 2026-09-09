@@ -5736,3 +5736,42 @@ toolgate 30.665s, runtime 24.906s, workers 12.088s, Web UI 5.116s, and browser
 BFF 4.361s. Focused workboard, Web UI, migration, restart, and race tests also
 passed. DAR-82, DAR-83, and DAR-84 still own the workboard command service/API,
 policy-constrained agent tools, and integrated Kanban UI.
+
+## 2026-09-09 — DAR-82 partial board repository checkpoint
+
+DAR-82 remains In Progress. This checkpoint adds presentation-independent board
+domain records and validation, a repository interface, and an application
+authority interface. Every board service operation derives and validates its
+actor and creation-scope authority before reaching the authority-neutral
+repository; presentation requests cannot supply those values directly.
+
+The primary SQLite/WAL repository now creates, lists, reads, and archives boards
+transactionally. Creation atomically persists the board, seven canonical
+columns, one attributed immutable event, and its committed idempotency receipt.
+Archive replays an exact request before checking the optimistic revision fence
+and rolls projection, event, and receipt changes back together on failure.
+Semantic request digests exclude the raw idempotency key; only its digest is
+stored. Receipt replay validates normalized storage against the canonical
+stored response. Transaction-byte preflight accounts for the serialized board,
+canonical columns where applicable, immutable event, and stored response.
+
+Board-list cursors use a frozen SQLite insertion high-water mark. Card-page
+cursors bind the board, filters, board/layout/graph revisions, and ordering
+position. Both envelopes are HMAC-authenticated. Their process-epoch key means a
+daemon restart fails an old cursor closed and the client begins a fresh bounded
+traversal rather than silently skipping records.
+
+Focused verification passed with
+`go test -race ./workboard ./internal/telemetry -run '^Test(Board|Workboard)' -count=1`,
+`go test ./internal/telemetry -count=1`, and `go test ./... -run '^$'`.
+Tests cover authority denial before repository reads, restart replay, same-key
+conflict, concurrent exact retries, semantic digest stability, revision
+conflicts, immutable event/receipt counts, injected rollback, bounded
+pagination, cursor filter binding and forgery rejection, canonical columns, and
+fail-closed body corruption. No final `make check` is claimed for this partial
+checkpoint.
+
+Card persistence and lifecycle commands, native and browser-facing HTTP routes,
+workboard SSE, authenticated daemon composition, policy-constrained agent tools,
+and Kanban rendering remain unfinished. Versioned Web UI board-query and
+redacted board-event contracts exist but are not yet wired to this repository.

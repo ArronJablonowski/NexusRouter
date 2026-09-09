@@ -228,9 +228,9 @@ func TestSchemaBoardFieldMatrixMatchesGoValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 	allowed := schema.Definitions["board_request"].Allowed
-	actions := []BoardAction{BoardCreate, CardCreate, CardRevise, CardMove, DependencyAdd, DependencyRemove,
+	actions := []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, DependencyAdd, DependencyRemove,
 		CardClaim, ClaimHeartbeat, ClaimRecover, CriteriaRevise, CheckpointAppend, CandidateSubmit,
-		AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardBlock, CardUnblock}
+		AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock}
 	if len(allowed) != len(actions) {
 		t.Fatal("schema action matrix is incomplete", len(allowed), len(actions))
 	}
@@ -299,6 +299,8 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		"committed delta":             {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
 		"raw prompt escape":           {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
 		"move with title":             {"board_request", `{"version":1,"action":"card.move","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"target_state":"ready","title":"irrelevant"}`},
+		"false parent clear":          {"board_request", `{"version":1,"action":"card.revise","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"clear_parent":false}`},
+		"false assignee clear":        {"board_request", `{"version":1,"action":"card.revise","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"clear_assignee":false}`},
 		"zero feedback revision":      {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":0}`},
 		"revision changes cost":       {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0.01,"expected_revision":1}`},
 		"revision includes zero cost": {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":1}`},
@@ -309,6 +311,15 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 	for name, item := range negative {
 		t.Run(name, func(t *testing.T) {
 			validateSchemaValue(t, compiler, location+"#/$defs/"+item.definition, json.RawMessage(item.body), false)
+		})
+	}
+	for name, body := range map[string]string{
+		"board revise":    `{"version":1,"action":"board.revise","idempotency_key":"fixture-key-0001","board_id":"board","expected_board_revision":1,"title":"Updated"}`,
+		"board archive":   `{"version":1,"action":"board.archive","idempotency_key":"fixture-key-0002","board_id":"board","expected_board_revision":1}`,
+		"cancel finalize": `{"version":1,"action":"card.cancel_finalize","idempotency_key":"fixture-key-0003","board_id":"board","card_id":"card","expected_card_revision":1,"stop_proof_id":"stop-proof","task_head_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","process_proof_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","effect_evidence_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","effect_resolution":"resolved_no_replay"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			validateSchemaValue(t, compiler, location+"#/$defs/board_request", json.RawMessage(body), true)
 		})
 	}
 }

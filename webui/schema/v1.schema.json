@@ -731,6 +731,16 @@
           "title",
           "description"
         ],
+		"board.revise": [
+		  "board_id",
+		  "title",
+		  "description",
+		  "expected_board_revision"
+		],
+		"board.archive": [
+		  "board_id",
+		  "expected_board_revision"
+		],
         "card.create": [
           "board_id",
           "title",
@@ -742,7 +752,8 @@
           "parent_id",
           "assignee_id",
           "budget",
-          "expected_board_revision"
+          "expected_board_revision",
+		  "expected_graph_revision"
         ],
         "card.revise": [
           "board_id",
@@ -753,8 +764,11 @@
           "labels",
           "parent_id",
           "assignee_id",
+		  "clear_parent",
+		  "clear_assignee",
           "budget",
-          "expected_card_revision"
+          "expected_card_revision",
+		  "expected_graph_revision"
         ],
         "card.move": [
           "board_id",
@@ -770,13 +784,15 @@
           "board_id",
           "card_id",
           "dependency_id",
-          "expected_card_revision"
+          "expected_card_revision",
+		  "expected_graph_revision"
         ],
         "dependency.remove": [
           "board_id",
           "card_id",
           "dependency_id",
-          "expected_card_revision"
+          "expected_card_revision",
+          "expected_graph_revision"
         ],
         "card.claim": [
           "board_id",
@@ -870,6 +886,19 @@
           "reason_code",
           "expected_card_revision"
         ],
+		"card.cancel_finalize": [
+		  "board_id",
+		  "card_id",
+		  "claim_id",
+		  "attempt_id",
+		  "expected_card_revision",
+		  "expected_claim_revision",
+		  "stop_proof_id",
+		  "task_head_digest",
+		  "process_proof_digest",
+		  "effect_evidence_digest",
+		  "effect_resolution"
+		],
         "card.block": [
           "board_id",
           "card_id",
@@ -894,6 +923,8 @@
         "action": {
           "enum": [
             "board.create",
+			"board.revise",
+			"board.archive",
             "card.create",
             "card.revise",
             "card.move",
@@ -909,6 +940,7 @@
             "acceptance.reject",
             "card.pause_request",
             "card.cancel_request",
+			"card.cancel_finalize",
             "card.block",
             "card.unblock"
           ]
@@ -959,6 +991,7 @@
           "minimum": 1
         },
         "expected_layout_revision": {"type": "integer", "minimum": 1},
+		"expected_graph_revision": {"type": "integer", "minimum": 1},
         "title": {
           "type": "string",
           "minLength": 1,
@@ -979,6 +1012,8 @@
         "priority": {"enum": ["urgent", "high", "normal", "low"]},
         "parent_id": {"$ref": "#/$defs/id"},
         "assignee_id": {"$ref": "#/$defs/id"},
+		"clear_parent": {"const": true},
+		"clear_assignee": {"const": true},
         "before_card_id": {"$ref": "#/$defs/id"},
         "after_card_id": {"$ref": "#/$defs/id"},
         "budget": {"$ref": "#/$defs/work_budget"},
@@ -1153,6 +1188,7 @@
             "required": [
               "title",
               "expected_board_revision",
+			  "expected_graph_revision",
               "criteria"
             ],
             "not": {
@@ -1280,8 +1316,19 @@
                 "required": [
                   "labels"
                 ]
-              }
+              },
+              {"required": ["priority"]},
+              {"required": ["parent_id"]},
+              {"required": ["assignee_id"]},
+              {"required": ["clear_parent"]},
+              {"required": ["clear_assignee"]},
+              {"required": ["budget"]}
             ],
+			"allOf": [
+			  {"if": {"anyOf": [{"required": ["parent_id"]}, {"required": ["clear_parent"]}]}, "then": {"required": ["expected_graph_revision"]}, "else": {"not": {"required": ["expected_graph_revision"]}}},
+			  {"not": {"required": ["parent_id", "clear_parent"]}},
+			  {"not": {"required": ["assignee_id", "clear_assignee"]}}
+			],
             "not": {
               "anyOf": [
                 {
@@ -1456,7 +1503,8 @@
           },
           "then": {
             "required": [
-              "dependency_id"
+              "dependency_id",
+			  "expected_graph_revision"
             ],
             "not": {
               "anyOf": [
@@ -2013,7 +2061,34 @@
               ]
             }
           }
-        }
+        },
+		{
+		  "if": {"properties": {"action": {"const": "board.revise"}}},
+		  "then": {
+			"propertyNames": {"enum": ["version", "action", "idempotency_key", "board_id", "title", "description", "expected_board_revision"]},
+			"required": ["board_id", "expected_board_revision"],
+			"anyOf": [{"required": ["title"]}, {"required": ["description"]}]
+		  }
+		},
+		{
+		  "if": {"properties": {"action": {"const": "board.archive"}}},
+		  "then": {
+			"propertyNames": {"enum": ["version", "action", "idempotency_key", "board_id", "expected_board_revision"]},
+			"required": ["board_id", "expected_board_revision"]
+		  }
+		},
+		{
+		  "if": {"properties": {"action": {"const": "card.cancel_finalize"}}},
+		  "then": {
+			"propertyNames": {"enum": ["version", "action", "idempotency_key", "board_id", "card_id", "claim_id", "attempt_id", "expected_card_revision", "expected_claim_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"]},
+			"required": ["board_id", "card_id", "expected_card_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"],
+			"allOf": [
+			  {"if": {"required": ["claim_id"]}, "then": {"required": ["attempt_id", "expected_claim_revision"]}},
+			  {"if": {"required": ["attempt_id"]}, "then": {"required": ["claim_id", "expected_claim_revision"]}},
+			  {"if": {"required": ["expected_claim_revision"]}, "then": {"required": ["claim_id", "attempt_id"]}}
+			]
+		  }
+		}
       ]
     },
     "presentation_message": {
@@ -3110,7 +3185,7 @@
           "maximum": 60000
         },
         "subject_type": {
-          "enum": ["chat", "task", "submission", "feedback", "approval"]
+          "enum": ["chat", "task", "submission", "feedback", "approval", "board", "card", "claim"]
         },
         "subject_id": {
           "$ref": "#/$defs/id"

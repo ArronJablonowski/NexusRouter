@@ -222,6 +222,16 @@ keys before advancing the schema, and rolls back atomically on an inconsistent
 partial object set. Schema availability alone grants no mutation authority;
 the transactional command service remains DAR-82.
 
+The current partial DAR-82 checkpoint implements board create/list/read/archive
+domain and repository behavior only. Creation atomically seeds the seven
+canonical columns, event, and committed idempotency receipt. Archive uses an
+optimistic board-revision fence and replays an exact retry before evaluating the
+now-stale fence. Semantic request digests exclude the raw idempotency key.
+Bounded list and snapshot cursors are HMAC-authenticated and bind their frozen
+insertion or board/filter/revision context. Every service operation derives and
+validates actor and creation-scope authority outside presentation input before
+the authority-neutral repository is called.
+
 The service enforces this transition table; generic movement cannot bypass it:
 
 | From | Command | To | Required fence |
@@ -386,7 +396,10 @@ the server or UI exists.
 DAR-77 through DAR-80 implement the app shell, authentication boundary, chat
 presentation and reconciliation, bounded chat mutations, and the read-only
 operational inspector described above. DAR-81 adds only the schema-35 durable
-workboard foundation. Workboard command endpoints, agent board tools, and the
-Kanban feature UI remain DAR-82 through DAR-84, with later qualification in
-DAR-85 through DAR-87. Inspection projections and storage availability do not
-grant policy mutation or work-dispatch authority.
+workboard foundation. The partial DAR-82 repository checkpoint adds board
+create/list/read/archive plus domain/service and Web UI query/event contracts,
+but no workboard transport. Card persistence, native/BFF endpoints, workboard
+SSE, authenticated composition, agent board tools, and the Kanban feature UI
+remain DAR-82 through DAR-84, with later qualification in DAR-85 through
+DAR-87. Inspection projections and storage availability do not grant policy
+mutation or work-dispatch authority.
