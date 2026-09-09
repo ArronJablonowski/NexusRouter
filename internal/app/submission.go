@@ -21,8 +21,9 @@ import (
 var ErrSubmission = errors.New("submission unavailable")
 
 type submissionEnvelope struct {
-	Version int     `json:"version"`
-	Request Request `json:"request"`
+	Version int                            `json:"version"`
+	Request Request                        `json:"request"`
+	Branch  *submissions.BranchSourceFence `json:"branch,omitempty"`
 }
 
 func submissionDigest(body []byte) string {
@@ -36,13 +37,21 @@ func (s *Service) submissionConfigDigest() string {
 }
 
 func (s *Service) submissionPayload(key string, r Request) (string, string, []byte, error) {
+	return s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r})
+}
+
+func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
+	r := envelope.Request
 	if len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled {
 		return "", "", nil, ErrAdmission
 	}
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {
 		return "", "", nil, ErrAdmission
 	}
-	body, err := json.Marshal(submissionEnvelope{1, r})
+	if envelope.Version != 1 || envelope.Branch != nil && envelope.Branch.Validate() != nil {
+		return "", "", nil, ErrAdmission
+	}
+	body, err := json.Marshal(envelope)
 	if err != nil || len(body) > 8<<20 {
 		return "", "", nil, ErrAdmission
 	}
@@ -73,6 +82,45 @@ func (s *Service) submissionPayload(key string, r Request) (string, string, []by
 		}
 	}
 	return submissionDigest([]byte(key)), submissionDigest(body), body, nil
+}
+
+// SubmitBranch admits a new direct child of an exact, already-completed task
+// head. Unlike generic continuations, a branch never waits for or recovers a
+// source: the supplied content-free fence must match replayed durable history.
+func (s *Service) SubmitBranch(ctx context.Context, key string, source sessions.TaskHeadFence, r Request) (submissions.Status, error) {
+	if source.Validate() != nil || r.Compaction != nil || r.SummaryAttemptID != "" || r.ContinueTaskID != "" && r.ContinueTaskID != source.TaskID {
+		return submissions.Status{}, ErrAdmission
+	}
+	r.ContinueTaskID = source.TaskID
+	// Validate the complete public intent, including key, secret redaction and
+	// request bounds, before opening or creating storage. The authoritative
+	// branch envelope is assembled only after its source has been replayed.
+	if _, _, _, err := s.submissionPayload(key, r); err != nil {
+		return submissions.Status{}, err
+	}
+	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	if err != nil {
+		return submissions.Status{}, ErrSubmission
+	}
+	defer db.Close()
+	fence, err := db.BranchSource(ctx, source.TaskID)
+	if err != nil {
+		return submissions.Status{}, submissionError(err)
+	}
+	if fence.TaskID != source.TaskID || fence.SessionID != source.SessionID || fence.HeadSequence != source.HeadSequence || fence.HeadEventID != source.HeadEventID {
+		return submissions.Status{}, ErrAdmission
+	}
+	if fence.SourcePrivacy != "cloud_allowed" || r.LocalRequired {
+		fence.EffectivePrivacy = "local_only"
+	} else {
+		fence.EffectivePrivacy = "cloud_allowed"
+	}
+	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r, Branch: &fence})
+	if err != nil {
+		return submissions.Status{}, err
+	}
+	status, err := db.CreateBranchSubmission(ctx, keyDigest, requestDigest, s.submissionConfigDigest(), body)
+	return status, submissionError(err)
 }
 
 func (s *Service) Submit(ctx context.Context, key string, r Request) (submissions.Status, error) {
@@ -179,20 +227,31 @@ func submissionError(err error) error {
 }
 
 func decodeSubmission(body []byte) (Request, error) {
+	envelope, err := decodeSubmissionEnvelope(body)
+	if err != nil {
+		return Request{}, err
+	}
+	return envelope.Request, nil
+}
+
+func decodeSubmissionEnvelope(body []byte) (submissionEnvelope, error) {
 	var envelope submissionEnvelope
 	if len(body) > 8<<20 {
-		return Request{}, ErrAdmission
+		return submissionEnvelope{}, ErrAdmission
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || validateInput(envelope.Request) != nil {
-		return Request{}, ErrAdmission
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || validateInput(envelope.Request) != nil || envelope.Branch != nil && envelope.Branch.Validate() != nil {
+		return submissionEnvelope{}, ErrAdmission
 	}
 	// Only the intake's canonical representation is accepted: this additionally
 	// rejects duplicate keys and differently cased aliases accepted by encoding/json.
 	canonical, err := json.Marshal(envelope)
 	if err != nil || !bytes.Equal(body, canonical) {
-		return Request{}, ErrAdmission
+		return submissionEnvelope{}, ErrAdmission
 	}
-	return envelope.Request, nil
+	if envelope.Branch != nil && (envelope.Request.ContinueTaskID != envelope.Branch.TaskID || envelope.Request.Compaction != nil || envelope.Request.SummaryAttemptID != "") {
+		return submissionEnvelope{}, ErrAdmission
+	}
+	return envelope, nil
 }

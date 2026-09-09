@@ -8,7 +8,9 @@ durable session. It is available through:
 - authenticated HTTP: `GET /v1/sessions/{session_id}/tasks`
 
 Each item contains only the version, task and session IDs, optional parent and
-retry task IDs, current durable state, head sequence, and start time. Prompts,
+retry task IDs, current durable state, head sequence, start time, and a
+content-free exact-head fence containing those task/session identities plus the
+canonical head event ID. Prompts,
 answers, tool arguments/results, route payloads, provider endpoints, summaries,
 and credentials are not part of this projection.
 
@@ -34,7 +36,10 @@ the read boundary. It does not establish that the identifier has never existed
 elsewhere. Listing does not replay or repair work, select a latest leaf, prove
 owner liveness, authorize continuation, or bypass provider, privacy, resource,
 budget, or tool policy. Inspect a selected task's continuation status separately
-before requesting new execution.
+before requesting an ordinary continuation. A completed task's exact-head fence
+can instead be presented to the strict branch operation described in
+[durable session branching](session-branching.md); the writer still replays and
+revalidates the source transactionally, so listing alone grants no authority.
 
 The raw CLI opens only an existing database and has no configured credential
 resolver, so operators should still handle its identifiers as sensitive. The

@@ -151,7 +151,14 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 			}
 		}
 	}()
-	r, err := decodeSubmission(claim.Request)
+	envelope, err := decodeSubmissionEnvelope(claim.Request)
+	r := envelope.Request
+	if err == nil && envelope.Branch != nil {
+		err = d.db.ValidateBranchSubmission(job, claim.Status.ID)
+		if errors.Is(err, submissions.ErrInvalid) || errors.Is(err, sql.ErrNoRows) || errors.Is(err, sessions.ErrHistory) {
+			err = ErrAdmission
+		}
+	}
 	var out Result
 	if err == nil {
 		err = d.awaitContinuation(job, r.ContinueTaskID)

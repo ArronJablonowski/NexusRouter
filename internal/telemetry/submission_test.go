@@ -36,7 +36,11 @@ func submissionStore(t *testing.T) (*Store, string) {
 }
 func queuedSubmission(t *testing.T, db *Store, key string) submissions.Status {
 	t.Helper()
-	out, err := db.CreateSubmission(context.Background(), submitDigest(key), submitDigest(`{"prompt":"private-request"}`), submitDigest("config"), []byte(`{"prompt":"private-request"}`))
+	return queuedSubmissionBody(t, db, key, []byte(`{"prompt":"private-request"}`))
+}
+func queuedSubmissionBody(t *testing.T, db *Store, key string, body []byte) submissions.Status {
+	t.Helper()
+	out, err := db.CreateSubmission(context.Background(), submitDigest(key), submitDigest(string(body)), submitDigest("config"), body)
 	if err != nil {
 		t.Fatal(err)
 	}

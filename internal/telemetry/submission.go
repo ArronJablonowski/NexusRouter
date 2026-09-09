@@ -117,6 +117,9 @@ func (s *Store) CreateSubmission(ctx context.Context, keyDigest, requestDigest, 
 	if !submissionDigest(keyDigest) || !submissionDigest(requestDigest) || !submissionDigest(configDigest) || len(body) < 1 || len(body) > submissions.MaxRequestBytes || !utf8.Valid(body) || !json.Valid(body) {
 		return submissions.Status{}, submissions.ErrInvalid
 	}
+	if submissionDeclaresBranch(body) {
+		return submissions.Status{}, submissions.ErrInvalid
+	}
 	digest := sha256.Sum256(body)
 	if requestDigest != hex.EncodeToString(digest[:]) {
 		return submissions.Status{}, submissions.ErrInvalid
@@ -325,6 +328,11 @@ func submissionAppendGate(ctx context.Context, tx *sql.Tx, event runtime.Event, 
 	at, err := time.Parse(time.RFC3339Nano, expires)
 	if err != nil || !time.Now().Before(at) {
 		return runtime.ErrExecutionLeaseLost
+	}
+	if event.Kind == runtime.TaskStarted {
+		if err := validateBranchTaskStart(ctx, tx, id, event); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -65,6 +65,9 @@ func TestSessionTasksExactTopologyContentFreeAndInsertionFenced(t *testing.T) {
 	if page.Items[0].TaskID != "fallback" || page.Items[0].ParentTaskID != "root" || page.Items[0].RetryOfTaskID != "prior" || page.Items[1].TaskID != "branch-a" || page.Items[1].ParentTaskID != "root" {
 		t.Fatal("lineage projection mismatch", page.Items)
 	}
+	if page.Items[0].Fence != (sessions.TaskHeadFence{Version: 1, TaskID: "fallback", SessionID: "session", HeadSequence: 2, HeadEventID: "fallback-terminal"}) || page.Items[1].Fence.HeadEventID != "branch-a-terminal" {
+		t.Fatal("exact head fence projection mismatch", page.Items)
+	}
 	body, err := json.Marshal(page)
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +139,8 @@ func TestSessionTasksRejectCorruptLineageAndEnvelopeWithoutPartialPage(t *testin
 		`UPDATE events SET body=json_set(body,'$.data.parent_task_id',?) WHERE task_id='corrupt' AND sequence=1`,
 		`UPDATE task_heads SET sequence=3 WHERE task_id='corrupt'`,
 		`UPDATE events SET body=json_set(body,'$.data.parent_task_id','foreign') WHERE task_id='corrupt' AND sequence=1`,
+		`UPDATE events SET id='different-head-id' WHERE task_id='corrupt' AND sequence=2`,
+		`UPDATE events SET body=json_set(body,'$.id','different-body-head-id') WHERE task_id='corrupt' AND sequence=2`,
 	}
 	for i, mutation := range mutations {
 		t.Run(string(rune('a'+i)), func(t *testing.T) {

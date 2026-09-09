@@ -11,17 +11,36 @@ const MaxSessionTaskPageBytes = 1 << 20
 
 var ErrSessionTasks = errors.New("session tasks unavailable or invalid")
 
+// TaskHeadFence identifies one exact durable task head. Callers may present a
+// fence when requesting an operation based on completed history; the receiving
+// store must still re-read and validate the source atomically.
+type TaskHeadFence struct {
+	Version      int    `json:"version"`
+	TaskID       string `json:"task_id"`
+	SessionID    string `json:"session_id"`
+	HeadSequence int64  `json:"head_sequence"`
+	HeadEventID  string `json:"head_event_id"`
+}
+
+func (f TaskHeadFence) Validate() error {
+	if f.Version != 1 || !ValidEventPageID(f.TaskID) || !ValidEventPageID(f.SessionID) || f.HeadSequence < 1 || f.HeadSequence > 10000 || !ValidEventPageID(f.HeadEventID) {
+		return ErrSessionTasks
+	}
+	return nil
+}
+
 // SessionTask is content-free task-head and lineage metadata derived from a
 // task's immutable start plus its current durable head.
 type SessionTask struct {
-	Version       int       `json:"version"`
-	TaskID        string    `json:"task_id"`
-	SessionID     string    `json:"session_id"`
-	ParentTaskID  string    `json:"parent_task_id,omitempty"`
-	RetryOfTaskID string    `json:"retry_of_task_id,omitempty"`
-	State         string    `json:"state"`
-	Sequence      int64     `json:"sequence"`
-	StartedAt     time.Time `json:"started_at"`
+	Version       int           `json:"version"`
+	TaskID        string        `json:"task_id"`
+	SessionID     string        `json:"session_id"`
+	ParentTaskID  string        `json:"parent_task_id,omitempty"`
+	RetryOfTaskID string        `json:"retry_of_task_id,omitempty"`
+	State         string        `json:"state"`
+	Sequence      int64         `json:"sequence"`
+	StartedAt     time.Time     `json:"started_at"`
+	Fence         TaskHeadFence `json:"fence"`
 }
 
 type SessionTaskPage struct {
@@ -94,7 +113,7 @@ func (o SessionTaskListOptions) Validate(session string) error {
 }
 
 func (t SessionTask) Validate() error {
-	if t.Version != 1 || !ValidEventPageID(t.TaskID) || !ValidEventPageID(t.SessionID) || !ValidTaskState(t.State) || t.Sequence < 1 || t.Sequence > 10000 || t.StartedAt.IsZero() {
+	if t.Version != 1 || !ValidEventPageID(t.TaskID) || !ValidEventPageID(t.SessionID) || !ValidTaskState(t.State) || t.Sequence < 1 || t.Sequence > 10000 || t.StartedAt.IsZero() || t.Fence.Validate() != nil || t.Fence.TaskID != t.TaskID || t.Fence.SessionID != t.SessionID || t.Fence.HeadSequence != t.Sequence {
 		return ErrSessionTasks
 	}
 	for _, related := range []string{t.ParentTaskID, t.RetryOfTaskID} {

@@ -5117,3 +5117,45 @@ attempt, and reuses the safe retry validator. Adversarial tests cover unsafe,
 cyclic/nonchronological, cross-session, duplicate-key, noncanonical-head, and
 misbound retry histories. The reviewer reported no remaining P0/P1/P2 findings,
 and the expanded `make qualify-mvp` passed on the integrated tree.
+
+Completed-history branch checkpoint: a caller can now submit one idempotent,
+direct child of an exact completed task head through the Go SDK, authenticated
+HTTP, daemon wiring, or `darwin branch`. Admission binds the source task,
+session, canonical physical head event and sequence, full replayed history
+digest, source privacy, and effective privacy ceiling inside the immutable
+submission envelope. The source is replayed and revalidated transactionally at
+creation, exact-key replay, claim, every root or fallback task start, and each
+undispatched, terminal, or interrupted recovery path. Completed sources only
+are accepted; recovered, running, canceled, pending-tool, uncertain-effect,
+worker, and delegated-child histories fail before execution construction.
+
+Branch roots retain the exact source parent, fallback roots retain that source
+while adding only a validated retry predecessor, and delegated descendants must
+remain inside the admitted branch lineage. Parallel or repeated callers with
+the same key and exact envelope receive one durable submission; changed intent
+conflicts. Local-only history can never widen to cloud, while cloud-allowed
+history may execute more strictly on a local route. Generic submission bytes
+remain unchanged and cannot smuggle a branch declaration. No schema or table
+was added.
+
+Recovery now verifies every stored submission request digest before deciding
+whether branch validation applies. This deliberately invalidated two old
+positive fixtures that mutated continuation bytes after creation; the fixtures
+now create their canonical request and digest initially. New recovery tests
+cover successful branch recovery after interrupted model and delegation work,
+plus removed and semantically mutated branch fences with a recomputed request
+digest. Every corruption case leaves the task journal, submission state, and
+recovery receipts unchanged. The full telemetry race suite passed in 187.581
+seconds, and the expanded `make qualify-mvp` passed with the branch gate. The
+final `make check` then passed formatting and LOC enforcement, vet, the complete
+repository-wide race suite, and `go build ./...`; the longest packages were
+releasepack 451.790s, application 305.591s, telemetry 205.117s, CLI 45.364s,
+SDK 34.546s, toolgate 19.897s, runtime 10.327s, and workers 5.629s.
+
+First-class recovered-history resume remains separate unfinished work: the
+existing `ResumeSubmission` only reconnects to an already admitted idempotent
+request, and branch admission intentionally rejects interrupted histories.
+Branch merge/latest-leaf selection, automatic resume, and generic-start request
+parsing overhead qualification also remain open. The Linear connector is now
+registered in Codex, but its live workspace read still returns an unknown-tool
+error; no Linear issue status or comment was changed in this checkpoint.

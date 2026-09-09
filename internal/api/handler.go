@@ -58,6 +58,7 @@ type Services struct {
 	SubmissionRecoveries   func(context.Context, string) ([]submissions.Recovery, error)
 	Submissions            func(context.Context, submissions.ListOptions) (submissions.Page, error)
 	Submit                 func(context.Context, string, app.Request) (submissions.Status, error)
+	SubmitBranch           func(context.Context, string, sessions.TaskHeadFence, app.Request) (submissions.Status, error)
 	ResumeSubmission       func(context.Context, string, app.Request) (submissions.Status, error)
 	RunSubmission          func(context.Context, string, app.Request) (submissions.Status, error)
 	Submission             func(context.Context, string) (submissions.Status, error)
@@ -243,6 +244,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveTaskList(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks" && r.Method == http.MethodPost:
 		h.serveTask(w, r.WithContext(ctx))
+	case branchTaskID(r.URL.Path) != "":
+		h.serveTaskBranch(w, r.WithContext(ctx), branchTaskID(r.URL.Path))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && strings.HasSuffix(r.URL.Path, "/events") && r.URL.Path != "/v1/tasks/events" && r.Method == http.MethodGet:
 		h.serveEventReplay(w, r.WithContext(ctx))
 	case strings.HasPrefix(r.URL.Path, "/v1/tasks/") && r.Method == http.MethodGet:

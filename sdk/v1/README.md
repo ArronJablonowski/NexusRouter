@@ -894,6 +894,18 @@ pages. Read methods never create or migrate missing storage. Cancellation of
 running work remains cooperative and does not prove side effects have stopped.
 No SDK method silently starts a dispatcher; use the daemon for background work.
 
+`SubmitBranch(ctx, key, TaskHeadFence, Request{Version: 1, ...})` queues a new
+direct child of an exact completed task head. Obtain the content-free fence from
+`ListSessionTasks`; it binds the source task, session, sequence, and terminal
+event. The source history is re-read at admission, so a stale, mismatched,
+running, failed, canceled, uncertain, or corrupt source is rejected without
+provider construction. Branch requests cannot supply `ContinueTaskID`, a
+compaction, or a summary attempt. Retry uncertain admission only with the same
+idempotency key, fence, and request. The authenticated HTTP equivalent is
+`POST /v1/tasks/{source_task}/branches` with `Idempotency-Key` and the strict
+JSON object `{version, source, request}`; the path task must equal
+`source.task_id`.
+
 `InspectTask` returns a versioned `TaskSnapshot` with messages, sequence, task
 state, pending tool calls and uncertainty flags. It reads one coherent SQLite
 snapshot, bounded to10,000 events and8MiB of serialized history, with a ten-second
@@ -948,7 +960,8 @@ inference, repairs a journal or establishes continuation eligibility; call
 `ListSessionTasks(ctx, sessionID, SessionTaskListOptions)` returns a bounded,
 newest-first metadata projection for one durable session. Each item contains
 only its task/session IDs, parent and retry links, current state, head sequence
-and start time. Opaque cursors are canonical and bound to the requested session
+and start time, plus a content-free exact-head fence used by `SubmitBranch`.
+Opaque cursors are canonical and bound to the requested session
 and insertion high-water mark. The method never loads conversation or tool
 content, mutates storage, chooses a branch leaf, or establishes continuation
 eligibility. See [session task inspection](../../docs/session-task-inspection.md).

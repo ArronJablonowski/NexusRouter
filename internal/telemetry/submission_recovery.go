@@ -14,6 +14,22 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
+func validateBranchRecoveryTx(ctx context.Context, tx *sql.Tx, id string) error {
+	var requestDigest string
+	var body []byte
+	if err := tx.QueryRowContext(ctx, `SELECT request_digest,request FROM submissions WHERE id=?`, id).Scan(&requestDigest, &body); err != nil {
+		return err
+	}
+	digest := sha256.Sum256(body)
+	if !submissionDigest(requestDigest) || requestDigest != hex.EncodeToString(digest[:]) {
+		return submissions.ErrInvalid
+	}
+	if !submissionDeclaresBranch(body) {
+		return nil
+	}
+	return validateBranchSubmissionTx(ctx, tx, id)
+}
+
 // RecoverUndispatched never reclaims a submission with a durable task start.
 func (s *Store) RecoverUndispatched(ctx context.Context, id, configDigest string, now time.Time) (bool, error) {
 	if !sessions.ValidEventPageID(id) || !submissionDigest(configDigest) || now.IsZero() {
@@ -39,6 +55,9 @@ func (s *Store) RecoverUndispatched(ctx context.Context, id, configDigest string
 	}
 	if now.Before(at) {
 		return false, nil
+	}
+	if err = validateBranchRecoveryTx(ctx, tx, id); err != nil {
+		return false, err
 	}
 	var started bool
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.submission_id')=?)`, id).Scan(&started); err != nil {

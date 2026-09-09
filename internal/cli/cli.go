@@ -21,6 +21,8 @@ Usage:
     Rate the latest answer with /feedback accepted|rejected COST
   darwin submit --config path --key idempotency-key --model id < prompt.txt
     Store queued work only; an independently running daemon executes it
+  darwin branch --config path --key idempotency-key --task id --session id --sequence n --event id --model id < prompt.txt
+    Queue a direct child from an exact completed task head; does not run inference
   darwin submissions list --db path [--state state --after cursor --limit 25]
   darwin submissions show|cancel|recoveries --db path --id submission-id
   darwin resources  Inspect current host memory and CPU capacity
@@ -123,6 +125,9 @@ func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, vers
 	}
 	if len(args) > 0 && args[0] == "submit" {
 		return runSubmit(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "branch" {
+		return runBranch(args[1:], stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "submissions" {
 		return runSubmissions(args[1:], stdout, stderr)

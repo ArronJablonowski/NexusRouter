@@ -30,7 +30,7 @@ func TestSessionTaskCursorCanonicalAndSessionBound(t *testing.T) {
 
 func TestSessionTaskPageValidationAndContentFreeShape(t *testing.T) {
 	cursor, _ := EncodeSessionTaskCursor(SessionTaskCursor{Version: 1, SessionID: "session", Last: 1, HighWater: 2})
-	item := SessionTask{Version: 1, TaskID: "child", SessionID: "session", ParentTaskID: "root", RetryOfTaskID: "prior", State: "completed", Sequence: 4, StartedAt: time.Unix(100, 0).UTC()}
+	item := SessionTask{Version: 1, TaskID: "child", SessionID: "session", ParentTaskID: "root", RetryOfTaskID: "prior", State: "completed", Sequence: 4, StartedAt: time.Unix(100, 0).UTC(), Fence: TaskHeadFence{Version: 1, TaskID: "child", SessionID: "session", HeadSequence: 4, HeadEventID: "child-head"}}
 	page := SessionTaskPage{Version: 1, SessionID: "session", Items: []SessionTask{item}, NextCursor: cursor, HasMore: true}
 	if err := page.Validate(); err != nil {
 		t.Fatal(err)
@@ -55,9 +55,33 @@ func TestSessionTaskPageValidationAndContentFreeShape(t *testing.T) {
 	wrongSession := item
 	wrongSession.SessionID = "other"
 	invalid = append(invalid, SessionTaskPage{Version: 1, SessionID: "session", Items: []SessionTask{wrongSession}})
+	wrongFence := item
+	wrongFence.Fence.HeadEventID = ""
+	invalid = append(invalid, SessionTaskPage{Version: 1, SessionID: "session", Items: []SessionTask{wrongFence}})
+	wrongFence = item
+	wrongFence.Fence.HeadSequence--
+	invalid = append(invalid, SessionTaskPage{Version: 1, SessionID: "session", Items: []SessionTask{wrongFence}})
 	for _, candidate := range invalid {
 		if candidate.Validate() == nil {
 			t.Fatal("invalid page admitted", candidate)
+		}
+	}
+}
+
+func TestTaskHeadFenceValidation(t *testing.T) {
+	valid := TaskHeadFence{Version: 1, TaskID: "task", SessionID: "session", HeadSequence: 2, HeadEventID: "terminal-event"}
+	if valid.Validate() != nil {
+		t.Fatal("valid fence rejected")
+	}
+	invalid := []TaskHeadFence{
+		{},
+		{Version: 1, TaskID: "task", SessionID: "session", HeadEventID: "terminal-event"},
+		{Version: 1, TaskID: "bad:task", SessionID: "session", HeadSequence: 2, HeadEventID: "terminal-event"},
+		{Version: 1, TaskID: "task", SessionID: "session", HeadSequence: 2, HeadEventID: "bad:event"},
+	}
+	for _, fence := range invalid {
+		if fence.Validate() == nil {
+			t.Fatal("invalid fence admitted", fence)
 		}
 	}
 }

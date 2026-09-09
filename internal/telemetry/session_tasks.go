@@ -104,11 +104,11 @@ func (s *Store) ListSessionTasks(ctx context.Context, session string, options se
 }
 
 func readSessionTask(ctx context.Context, tx *sql.Tx, rowid int64, session string) (sessions.SessionTask, error) {
-	summary, start, err := readCanonicalSessionTask(ctx, tx, rowid)
+	summary, start, head, err := readCanonicalSessionTask(ctx, tx, rowid)
 	if err != nil || summary.SessionID != session {
 		return sessions.SessionTask{}, sessions.ErrSessionTasks
 	}
-	item := sessions.SessionTask{Version: 1, TaskID: summary.TaskID, SessionID: summary.SessionID, State: summary.State, Sequence: summary.Sequence, StartedAt: summary.StartedAt}
+	item := sessions.SessionTask{Version: 1, TaskID: summary.TaskID, SessionID: summary.SessionID, State: summary.State, Sequence: summary.Sequence, StartedAt: summary.StartedAt, Fence: sessions.TaskHeadFence{Version: 1, TaskID: summary.TaskID, SessionID: summary.SessionID, HeadSequence: summary.Sequence, HeadEventID: head.ID}}
 	item.ParentTaskID, item.RetryOfTaskID = start.Data.ParentTaskID, start.Data.RetryOfTaskID
 	if item.Validate() != nil || !sessionTaskParentExists(ctx, tx, item.ParentTaskID, session, rowid) || !sessionTaskRetryValid(ctx, tx, item.TaskID, item.RetryOfTaskID, rowid) {
 		return sessions.SessionTask{}, sessions.ErrSessionTasks
@@ -124,7 +124,7 @@ func sessionTaskParentExists(ctx context.Context, tx *sql.Tx, task, session stri
 	if tx.QueryRowContext(ctx, `SELECT rowid FROM task_heads WHERE task_id=? AND session_id=?`, task, session).Scan(&rowid) != nil || rowid < 1 || rowid >= childRowID {
 		return false
 	}
-	related, _, err := readCanonicalSessionTask(ctx, tx, rowid)
+	related, _, _, err := readCanonicalSessionTask(ctx, tx, rowid)
 	return err == nil && related.TaskID == task && related.SessionID == session
 }
 
@@ -135,27 +135,31 @@ func sessionTaskRetryValid(ctx context.Context, tx *sql.Tx, task, predecessor st
 	return validateRetryChainBefore(ctx, tx, task, predecessor, childRowID) == nil
 }
 
-func readCanonicalSessionTask(ctx context.Context, tx *sql.Tx, rowid int64) (sessions.TaskSummary, runtime.Event, error) {
+func readCanonicalSessionTask(ctx context.Context, tx *sql.Tx, rowid int64) (sessions.TaskSummary, runtime.Event, runtime.Event, error) {
 	summary, err := readTaskSummary(ctx, tx, rowid)
 	if err != nil {
-		return sessions.TaskSummary{}, runtime.Event{}, err
+		return sessions.TaskSummary{}, runtime.Event{}, runtime.Event{}, err
 	}
+	var startID, headID string
 	var startRaw, headRaw []byte
-	err = tx.QueryRowContext(ctx, `SELECT s.body,z.body FROM events s JOIN events z ON z.task_id=s.task_id
+	err = tx.QueryRowContext(ctx, `SELECT
+	 CASE WHEN length(CAST(s.id AS BLOB)) BETWEEN 1 AND 128 THEN s.id END,s.body,
+	 CASE WHEN length(CAST(z.id AS BLOB)) BETWEEN 1 AND 128 THEN z.id END,z.body
+	 FROM events s JOIN events z ON z.task_id=s.task_id
 	 WHERE s.task_id=? AND s.sequence=1 AND z.sequence=?
-	 AND length(CAST(s.body AS BLOB))<=? AND length(CAST(z.body AS BLOB))<=?`, summary.TaskID, summary.Sequence, sessions.MaxEventPageBytes, sessions.MaxEventPageBytes).Scan(&startRaw, &headRaw)
+	 AND length(CAST(s.body AS BLOB))<=? AND length(CAST(z.body AS BLOB))<=?`, summary.TaskID, summary.Sequence, sessions.MaxEventPageBytes, sessions.MaxEventPageBytes).Scan(&startID, &startRaw, &headID, &headRaw)
 	if err != nil {
-		return sessions.TaskSummary{}, runtime.Event{}, sessions.ErrSessionTasks
+		return sessions.TaskSummary{}, runtime.Event{}, runtime.Event{}, sessions.ErrSessionTasks
 	}
 	start, ok := canonicalSessionTaskEvent(startRaw, summary.TaskID, summary.SessionID, 1)
-	if !ok || start.Kind != runtime.TaskStarted || !start.Time.Equal(summary.StartedAt) {
-		return sessions.TaskSummary{}, runtime.Event{}, sessions.ErrSessionTasks
+	if !ok || start.ID != startID || start.Kind != runtime.TaskStarted || !start.Time.Equal(summary.StartedAt) {
+		return sessions.TaskSummary{}, runtime.Event{}, runtime.Event{}, sessions.ErrSessionTasks
 	}
 	head, ok := canonicalSessionTaskEvent(headRaw, summary.TaskID, summary.SessionID, summary.Sequence)
-	if !ok || !sessions.EventPageStateMatches(summary.State, head.Kind) {
-		return sessions.TaskSummary{}, runtime.Event{}, sessions.ErrSessionTasks
+	if !ok || head.ID != headID || !sessions.EventPageStateMatches(summary.State, head.Kind) {
+		return sessions.TaskSummary{}, runtime.Event{}, runtime.Event{}, sessions.ErrSessionTasks
 	}
-	return summary, start, nil
+	return summary, start, head, nil
 }
 
 func canonicalSessionTaskEvent(raw []byte, task, session string, sequence int64) (runtime.Event, bool) {

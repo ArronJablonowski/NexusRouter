@@ -332,6 +332,9 @@ DARWIN__MODE=local_only ./bin/darwin config validate
 # Inspect content-free lineage for one durable session.
 ./bin/darwin session tasks --db ./data/darwin.db --session SESSION_ID --limit 25
 
+# Queue a child from one exact completed head returned by that inspection.
+./bin/darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+
 # Query the authenticated health report of the running daemon.
 DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
@@ -818,6 +821,7 @@ All endpoints require `Authorization: Bearer <token>`:
 - `POST /v1/tasks`: supply exactly one `Idempotency-Key` header containing 16–128 printable non-space ASCII bytes and JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. The request is first bound to the durable submission journal, then this synchronous adapter waits for the detached dispatcher to reach a terminal state. HTTP 201 includes `submission_id`, `task_id`, `text`, `turns`, and the optional `route_estimated_cost`; if the server-side wait budget expires first, HTTP 202 includes `submission_id`, `state`, and `task_ids` with `Retry-After`. Repeating the exact key and request waits for or returns the same work without redispatch; a changed request or configuration conflicts. Disconnecting stops only the HTTP wait, not the durable task. Inspect `GET /v1/submissions/{submission_id}` or retry the exact key and body rather than inventing a new key after an uncertain response.
 - `GET /v1/tasks?state=completed&limit=25`: newest-first, content-free task discovery with an optional opaque `after` cursor. The insertion boundary is frozen across pages, while state membership may change. Listing performs no inference or continuation check; configured credential collisions fail closed. See [task discovery](docs/task-discovery.md).
 - `GET /v1/sessions/{session_id}/tasks?limit=25`: bounded, content-free task lineage for one session. Parent links resolve to an earlier task in that session; automatic fallback retry links may cross sessions but must match the bounded output-free retry lifecycle. An opaque `after` cursor is bound to both the session and insertion fence. This read performs no inference and grants no continuation authority. See [session task inspection](docs/session-task-inspection.md).
+- `POST /v1/tasks/{id}/branches`: queue a direct child of an exact completed task head. Supply an `Idempotency-Key` and strict `{version, source, request}` body, where the content-free source fence comes from session-task inspection and matches the path. Admission, claim, and `task.started` each revalidate the immutable source; unsafe, stale, worker-derived, or recovered failed history is rejected before execution-provider construction. See [durable session branching](docs/session-branching.md).
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, exploration flag, and point-in-time routed/auxiliary usage totals. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
 - `GET /v1/tasks/{id}/usage`: read-only versioned task/session accounting with separate primary, fallback, classifier, summarizer, orchestrator-audit, optional-judge, routed, auxiliary, and overall totals. Missing token usage and cost remain explicit; configured estimates are not presented as provider billing. The bodyless/queryless route performs no inference, correction, migration, or retry. See [durable usage and cost accounting](docs/usage-accounting.md).
@@ -962,6 +966,7 @@ The CLI can operate on the same private SQLite store:
 
 ```sh
 darwin submit --config examples/local.yaml --key unique-request-key-001 --model local-fast < prompt.txt
+darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
 darwin submissions list --db /absolute/path/tasks.db --state running --limit 25
 darwin submissions show --db /absolute/path/tasks.db --id SUBMISSION_ID
 darwin submissions cancel --db /absolute/path/tasks.db --id SUBMISSION_ID
@@ -974,6 +979,11 @@ but not `--json`: submission output is already a single JSON status. Preserve
 the exact key, input and configuration for an idempotent retry. Do not place
 credentials in the key or prompt. Input is bounded to1MiB nonblank UTF-8 under
 the30-second submission deadline; pipe/terminal reads support cancellation.
+
+`branch` has the same queue-only behavior but requires the exact content-free
+task-head fence returned by session-task inspection. The source must already be
+completed and safe; see [durable session branching](docs/session-branching.md).
+
 Regular files and custom readers remain cooperative. Show/list are read-only; cancel
 requires local access to the configured database. An expired running lease is
 an inspection signal, not proof that all effects have stopped, and these

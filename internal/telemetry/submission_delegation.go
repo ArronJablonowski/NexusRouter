@@ -54,6 +54,9 @@ func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDige
 	if now.Before(at) {
 		return false, nil
 	}
+	if err = validateBranchRecoveryTx(ctx, tx, id); err != nil {
+		return false, err
+	}
 	histories, err := interruptedSubmissionHistories(ctx, tx, id)
 	if err != nil {
 		return false, err

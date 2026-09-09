@@ -18,7 +18,7 @@ func sessionTaskPageFixture(t *testing.T) sessions.SessionTaskPage {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return sessions.SessionTaskPage{Version: 1, SessionID: "session", Items: []sessions.SessionTask{{Version: 1, TaskID: "task", SessionID: "session", ParentTaskID: "parent", State: "completed", Sequence: 4, StartedAt: time.Unix(100, 0)}}, HasMore: true, NextCursor: cursor}
+	return sessions.SessionTaskPage{Version: 1, SessionID: "session", Items: []sessions.SessionTask{{Version: 1, TaskID: "task", SessionID: "session", ParentTaskID: "parent", State: "completed", Sequence: 4, StartedAt: time.Unix(100, 0), Fence: sessions.TaskHeadFence{Version: 1, TaskID: "task", SessionID: "session", HeadSequence: 4, HeadEventID: "task-terminal"}}}, HasMore: true, NextCursor: cursor}
 }
 
 func sessionTaskListRequest(path string) *http.Request {

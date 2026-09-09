@@ -52,20 +52,17 @@ func TestTerminalTreeOriginalContinuationBinding(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
-			job := queuedSubmission(t, db, "continuation")
+			request := []byte(`{"request":{"ContinueTaskID":"prior-task"}}`)
+			if mode == "mismatch" {
+				request = []byte(`{"request":{"ContinueTaskID":"different-task"}}`)
+			}
+			if mode == "non_string" {
+				request = []byte(`{"request":{"ContinueTaskID":123}}`)
+			}
+			job := queuedSubmissionBody(t, db, "continuation", request)
 			claim := claimSubmission(t, db)
 			terminalFixture(t, db, claim, "task", "", "success")
 			if _, err := db.db.ExecContext(ctx, `UPDATE events SET body=json_set(body,'$.data.parent_task_id','prior-task') WHERE sequence=1`); err != nil {
-				t.Fatal(err)
-			}
-			value := any("prior-task")
-			if mode == "mismatch" {
-				value = "different-task"
-			}
-			if mode == "non_string" {
-				value = 123
-			}
-			if _, err := db.db.ExecContext(ctx, `UPDATE submissions SET request=json_set(request,'$.request.ContinueTaskID',?) WHERE id=?`, value, job.ID); err != nil {
 				t.Fatal(err)
 			}
 			recovered, err := db.RecoverTerminalSubmission(ctx, job.ID, submitDigest("config"), time.Now().Add(2*time.Minute))

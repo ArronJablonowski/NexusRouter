@@ -41,6 +41,9 @@ func (s *Store) RecoverTerminalSubmission(ctx context.Context, id, configDigest 
 	if now.Before(at) {
 		return false, nil
 	}
+	if err = validateBranchRecoveryTx(ctx, tx, id); err != nil {
+		return false, err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(task_id AS BLOB))<=128 THEN task_id END FROM events WHERE json_extract(body,'$.kind')='task.started' AND json_extract(body,'$.data.submission_id')=? ORDER BY rowid LIMIT 67`, id)
 	if err != nil {
 		return false, err

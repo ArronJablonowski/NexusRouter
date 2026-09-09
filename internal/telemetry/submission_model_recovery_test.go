@@ -43,15 +43,16 @@ func TestInterruptedModelRecoveryAtomicAndFenced(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			db, _ := submissionStore(t)
 			ctx := context.Background()
-			job := queuedSubmission(t, db, "model-job")
-			claim := claimSubmission(t, db)
 			parent := ""
 			if mode == "continuation" {
 				parent = "prior-task"
-				if _, err := db.db.Exec(`UPDATE submissions SET request=json_set(request,'$.request.ContinueTaskID','prior-task')`); err != nil {
-					t.Fatal(err)
-				}
 			}
+			requestBody := []byte(`{"prompt":"private-request"}`)
+			if parent != "" {
+				requestBody = []byte(`{"request":{"ContinueTaskID":"prior-task"}}`)
+			}
+			job := queuedSubmissionBody(t, db, "model-job", requestBody)
+			claim := claimSubmission(t, db)
 			before := interruptedModelFixture(t, db, claim, parent)
 			if mode == "submission_cancel" {
 				if _, err := db.CancelSubmission(ctx, job.ID); err != nil {
