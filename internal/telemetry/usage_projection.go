@@ -1,11 +1,13 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math"
 	"strconv"
 
@@ -80,6 +82,20 @@ func appendRoutedUsage(ctx context.Context, tx *sql.Tx, terminal runtime.Event) 
 }
 
 func validateRetryChain(ctx context.Context, tx *sql.Tx, task, predecessor string) error {
+	var before int64
+	if err := tx.QueryRowContext(ctx, `SELECT rowid FROM task_heads WHERE task_id=?`, task).Scan(&before); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return accounting.ErrUsage
+		}
+		before = math.MaxInt64
+	}
+	return validateRetryChainBefore(ctx, tx, task, predecessor, before)
+}
+
+func validateRetryChainBefore(ctx context.Context, tx *sql.Tx, task, predecessor string, before int64) error {
+	if before < 1 {
+		return accounting.ErrUsage
+	}
 	seen := map[string]bool{task: true}
 	// The runtime admits at most 32 route attempts for one automatic fallback
 	// lineage. The task being validated is already one of those attempts, so it
@@ -89,6 +105,11 @@ func validateRetryChain(ctx context.Context, tx *sql.Tx, task, predecessor strin
 			return accounting.ErrUsage
 		}
 		seen[predecessor] = true
+		var predecessorRowID int64
+		if err := tx.QueryRowContext(ctx, `SELECT rowid FROM task_heads WHERE task_id=?`, predecessor).Scan(&predecessorRowID); err != nil || predecessorRowID < 1 || predecessorRowID >= before {
+			return accounting.ErrUsage
+		}
+		before = predecessorRowID
 		next, err := safeRetryPredecessor(ctx, tx, predecessor)
 		if err != nil {
 			return accounting.ErrUsage
@@ -113,16 +134,22 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 	if err := tx.QueryRowContext(ctx, `SELECT session_id,sequence,state FROM task_heads WHERE task_id=?`, task).Scan(&session, &head, &state); err != nil || state != "failed" || head < 3 || head > 4 {
 		return "", accounting.ErrUsage
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT body FROM events WHERE task_id=? ORDER BY sequence`, task)
+	rows, err := tx.QueryContext(ctx, `SELECT id,sequence,body FROM events WHERE task_id=? ORDER BY sequence`, task)
 	if err != nil {
 		return "", err
 	}
 	defer rows.Close()
 	events := make([]runtime.Event, 0, head)
 	for rows.Next() {
+		var storedID string
+		var storedSequence int64
 		var raw []byte
 		var event runtime.Event
-		if rows.Scan(&raw) != nil || json.Unmarshal(raw, &event) != nil || event.Validate() != nil || event.TaskID != task || event.SessionID != session || event.Sequence != int64(len(events)+1) {
+		if rows.Scan(&storedID, &storedSequence, &raw) != nil || json.Unmarshal(raw, &event) != nil || event.Validate() != nil || event.ID != storedID || event.TaskID != task || event.SessionID != session || event.CorrelationID != task || event.Sequence != storedSequence || event.Sequence != int64(len(events)+1) {
+			return "", accounting.ErrUsage
+		}
+		canonical, encodeErr := event.Encode()
+		if encodeErr != nil || !bytes.Equal(canonical, raw) {
 			return "", accounting.ErrUsage
 		}
 		// These fields would be evidence of emitted output, a proposed tool, a
@@ -151,7 +178,7 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 		return "", accounting.ErrUsage
 	}
 	terminal := events[i+1]
-	if terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "provider_retryable_no_output" {
+	if terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "provider_retryable_no_output" || terminal.TurnID != events[i].TurnID || terminal.AttemptID != events[i].AttemptID {
 		return "", accounting.ErrUsage
 	}
 	return start.Data.RetryOfTaskID, nil

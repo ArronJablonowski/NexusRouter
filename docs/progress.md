@@ -5079,3 +5079,41 @@ repository package under the race detector, and `go build ./...` in 7:49.40.
 Longest packages were releasepack 461.604s, application 304.284s, telemetry
 198.919s, CLI 44.810s, SDK 33.850s, toolgate 19.989s, API 17.550s, and workers
 4.574s.
+
+Session-task inspection checkpoint: DarwinRouter now exposes one bounded,
+content-free view of the durable task graph for an exact session through the Go
+SDK, authenticated HTTP, daemon wiring, and `darwin session tasks`. A separate
+version-one contract keeps established global task-list cursors unchanged. Its
+canonical cursor binds the session and insertion high-water mark; pages return
+only task/session IDs, parent/retry lineage, state, head sequence, and start
+time. Every returned task revalidates its canonical immutable start and current
+head. Parent links resolve to earlier, independently validated tasks in the same
+session. Automatic fallback retry links may cross sessions, but every
+predecessor must be earlier and reproduce the bounded, output-free retryable
+provider-failure lifecycle. Corruption fails the whole page without partial
+data.
+
+Application and daemon adapters open storage read-only, recheck configured
+credential collisions after reading, and perform no inference, continuation,
+repair, migration, or provider construction. HTTP retains authentication,
+browser-origin denial, strict body/query parsing, bounded control capacity,
+timeout, callback validation, and panic containment. The raw CLI requires an
+existing database and handles output failure without creating storage. Focused
+session-task race tests passed three repetitions across sessions, telemetry,
+application, SDK, API, and CLI. The deterministic MVP gate now includes this
+slice. Listing is observation, not a mutable session head or branch authority;
+first-class idempotent branch admission and interrupted-task resume remain
+separate unfinished PRD work. No Linear issue status was changed because the
+Linear connector was unavailable.
+
+Independent durability/privacy review found and closed three lineage defects
+before qualification: production automatic retries can cross session IDs;
+retry attribution must reproduce the entire bounded output-free provider
+failure chain in strictly decreasing insertion order; and SQL JSON projection
+alone cannot distinguish duplicate/noncanonical event bytes. The final reader
+canonicalizes returned and directly referenced start/head events, binds every
+retry event to its stored ID, sequence, task/session/correlation, and turn
+attempt, and reuses the safe retry validator. Adversarial tests cover unsafe,
+cyclic/nonchronological, cross-session, duplicate-key, noncanonical-head, and
+misbound retry histories. The reviewer reported no remaining P0/P1/P2 findings,
+and the expanded `make qualify-mvp` passed on the integrated tree.

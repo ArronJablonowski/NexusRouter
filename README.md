@@ -329,6 +329,9 @@ DARWIN__MODE=local_only ./bin/darwin config validate
 # Discover newest durable task IDs without loading conversation content.
 ./bin/darwin task list --db ./data/darwin.db --limit 25
 
+# Inspect content-free lineage for one durable session.
+./bin/darwin session tasks --db ./data/darwin.db --session SESSION_ID --limit 25
+
 # Query the authenticated health report of the running daemon.
 DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
 ```
@@ -395,6 +398,16 @@ insertion-fenced cursor; state filters remain live observations between pages.
 Listing does not inspect continuation eligibility, dispatch inference or repair
 history. The raw database command has no configured credential resolver, so
 treat its metadata as sensitive. See [task discovery](docs/task-discovery.md).
+
+`session tasks` derives one session's newest-first task lineage from the same
+durable journals. It returns task/session IDs, parent and retry links, state,
+head sequence and start time without conversation or tool content. Cursors are
+bound to the requested session and freeze only the insertion boundary. Listing
+does not choose a leaf, authorize continuation or imply that a provider may use
+the history. Parent links remain within the session; automatic fallback retry
+links may cross sessions and are accepted only after the predecessor chain
+matches the bounded output-free retry lifecycle. See
+[session task inspection](docs/session-task-inspection.md).
 
 On macOS, the profiler also reads Foundation's reported thermal state. Serious
 or critical readings block new local reservations; failed or unknown readings
@@ -804,6 +817,7 @@ All endpoints require `Authorization: Bearer <token>`:
   optional `after_sequence` and `limit`, with defaults `0` and `25`.
 - `POST /v1/tasks`: supply exactly one `Idempotency-Key` header containing 16–128 printable non-space ASCII bytes and JSON `{"model_id":"local-fast","prompt":"Hello"}` with optional `continue_task_id`. With a continuation, use either `summary_attempt_id` for a currently approved stored draft or `compaction` with `{"keep":6,"summary":{"decisions":["Retain existing API"]}}` for a manual summary, not both. The same admission rules apply as in the CLI. The request is first bound to the durable submission journal, then this synchronous adapter waits for the detached dispatcher to reach a terminal state. HTTP 201 includes `submission_id`, `task_id`, `text`, `turns`, and the optional `route_estimated_cost`; if the server-side wait budget expires first, HTTP 202 includes `submission_id`, `state`, and `task_ids` with `Retry-After`. Repeating the exact key and request waits for or returns the same work without redispatch; a changed request or configuration conflicts. Disconnecting stops only the HTTP wait, not the durable task. Inspect `GET /v1/submissions/{submission_id}` or retry the exact key and body rather than inventing a new key after an uncertain response.
 - `GET /v1/tasks?state=completed&limit=25`: newest-first, content-free task discovery with an optional opaque `after` cursor. The insertion boundary is frozen across pages, while state membership may change. Listing performs no inference or continuation check; configured credential collisions fail closed. See [task discovery](docs/task-discovery.md).
+- `GET /v1/sessions/{session_id}/tasks?limit=25`: bounded, content-free task lineage for one session. Parent links resolve to an earlier task in that session; automatic fallback retry links may cross sessions but must match the bounded output-free retry lifecycle. An opaque `after` cursor is bound to both the session and insertion fence. This read performs no inference and grants no continuation authority. See [session task inspection](docs/session-task-inspection.md).
 - `GET /v1/tasks/{id}`: reconstructed task/session state.
 - `GET /v1/tasks/{id}/route`: metadata-only explanation for an automatic task's initial route selection, including its configuration fingerprint, routing policy, candidate constraint snapshots, normalized ranking, excluded reason classes, fallback order, exploration flag, and point-in-time routed/auxiliary usage totals. It omits messages, prompts, model output, endpoints, credential values/references, and tool payloads. Explicit tasks have no `route.selected` record and return 404. The bounded reader validates the complete stored decision before returning any data; this is historical evidence, not current health or permission to repeat execution. See [route explanation inspection](docs/route-explanation.md).
 - `GET /v1/tasks/{id}/usage`: read-only versioned task/session accounting with separate primary, fallback, classifier, summarizer, orchestrator-audit, optional-judge, routed, auxiliary, and overall totals. Missing token usage and cost remain explicit; configured estimates are not presented as provider billing. The bodyless/queryless route performs no inference, correction, migration, or retry. See [durable usage and cost accounting](docs/usage-accounting.md).

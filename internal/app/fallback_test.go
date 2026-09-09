@@ -85,6 +85,13 @@ func TestAutomaticSafeFallbackPreservesFailedHistory(t *testing.T) {
 			if err != nil || second.RetryOfTaskID != first.TaskID {
 				t.Fatal("replayed retry lineage missing", err)
 			}
+			if first.SessionID == second.SessionID {
+				t.Fatal("independent automatic attempts unexpectedly shared a session")
+			}
+			page, err := db.ListSessionTasks(context.Background(), second.SessionID, sessions.SessionTaskListOptions{Limit: 25})
+			if err != nil || page.Validate() != nil || len(page.Items) != 1 || page.Items[0].TaskID != second.TaskID || page.Items[0].RetryOfTaskID != first.TaskID {
+				t.Fatal("session projection rejected production fallback lineage", page, err)
+			}
 		})
 	}
 }

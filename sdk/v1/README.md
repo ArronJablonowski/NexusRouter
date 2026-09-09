@@ -945,6 +945,14 @@ inference, repairs a journal or establishes continuation eligibility; call
 `InspectTaskContinuation` for the selected task. See
 [task discovery](../../docs/task-discovery.md).
 
+`ListSessionTasks(ctx, sessionID, SessionTaskListOptions)` returns a bounded,
+newest-first metadata projection for one durable session. Each item contains
+only its task/session IDs, parent and retry links, current state, head sequence
+and start time. Opaque cursors are canonical and bound to the requested session
+and insertion high-water mark. The method never loads conversation or tool
+content, mutates storage, chooses a branch leaf, or establishes continuation
+eligibility. See [session task inspection](../../docs/session-task-inspection.md).
+
 This is not model readiness or execution authorization. Normal provider,
 privacy, resource, budget and tool policy checks still apply; no method silently
 replays old tool calls. Codex CLI now supports explicit `Request.ContinueTaskID`
