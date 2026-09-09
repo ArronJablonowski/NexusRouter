@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -102,7 +103,13 @@ func TestConfigurationReconciliationRecoversOldInterruptedHistoryWithoutExecutio
 		t.Fatal(err)
 	}
 	expireRecoveryClaim(t, s, claim.Status.ID)
-	d := &Dispatcher{db: db}
+	var delivered []runtime.Event
+	d := &Dispatcher{
+		db:                 db,
+		eventSink:          runtime.EventSinkFunc(func(_ context.Context, event runtime.Event) error { delivered = append(delivered, event); return nil }),
+		eventSinkSequencer: &configuredSinkSequencer{},
+		lifecycle:          context.Background(),
+	}
 	current := submissionDigest([]byte(s.submissionConfigDigest() + "-new"))
 	if after, err := d.reconcileConfigurationPage(ctx, current, ""); err != nil || after == "" {
 		t.Fatal(after, err)
@@ -110,6 +117,10 @@ func TestConfigurationReconciliationRecoversOldInterruptedHistoryWithoutExecutio
 	status, err := s.SubmissionStatus(ctx, claim.Status.ID)
 	if err != nil || status.State != "failed" || status.ErrorCode != "execution_failed" || status.Result == nil || status.Result.TaskID != started.TaskID || calls.Load() != 0 {
 		t.Fatal(status, err, calls.Load())
+	}
+	page, err := db.ReadEventPage(ctx, started.TaskID, 1, 10)
+	if err != nil || len(delivered) != 1 || len(page.Events) != 1 || !reflect.DeepEqual(delivered[0], page.Events[0]) {
+		t.Fatal("obsolete-configuration recovery did not deliver its exact durable terminal", delivered, page, err)
 	}
 	history, err := s.SubmissionRecoveries(ctx, claim.Status.ID)
 	if err != nil || len(history) != 1 || history[0].Reason != "interrupted_model" {

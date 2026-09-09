@@ -5290,3 +5290,34 @@ fence, unbounded historical scan, corrupt-row cursor pinning, later lease
 expiry, and repaired-corruption reconsideration; its final production review
 found no remaining P0/P1/P2 issue in this slice. Linear MCP remains noncallable,
 so no Linear issue status is inferred or changed.
+
+Recovery EventSink checkpoint: interrupted-model and interrupted-delegation
+reconciliation now returns the exact newly committed terminal events for
+process-local configured-sink delivery. Commit plus delivery shares the same
+per-task sequencer as live execution, while unrelated tasks remain concurrent.
+Current credentials are canonicalized to nonempty unique values before bounded
+screening; a synthesized delegation result containing a rotated credential is
+left fenced before any event or receipt write rather than rewriting proven
+child-result provenance. Secret-resolver panics are contained and later
+candidates remain reachable.
+
+Focused race fixtures cover exact durable delivery order, obsolete-configuration
+model and real delegated recovery, rotated-secret no-write behavior, callback
+failure/panic isolation, later-candidate progress, lifecycle-derived callback
+contexts, and live-only no-redelivery semantics. A failed recovery callback can
+leave a consumer checkpoint gap because the recovery already terminalized the
+task; bounded `ReadEvents` catch-up is authoritative and no second recovery
+append is generated. Configuration retirement and terminal-history projection
+emit no runtime event. This checkpoint does not claim a durable subscription or
+the separate audit-operation event stream.
+
+Final recovery-EventSink verification passed the expanded `make qualify-mvp`
+gate and the complete `make check` gate on the integrated tree: formatting and
+the 1,000-line limit, `go vet`, every repository package under the race
+detector, and `go build ./...`. The longest packages were releasepack 451.545s,
+application 313.836s, telemetry 215.908s, CLI 47.501s, SDK 34.367s, toolgate
+20.103s, runtime 12.247s, and workers 5.628s. An independent closure review
+found no remaining P0/P1/P2 defect after correcting duplicate/empty credential
+capacity handling and adding direct dispatcher qualification. Linear tools are
+advertised by the connector but its live workspace call still returns an
+unknown-tool error, so no Linear issue status is inferred or changed.

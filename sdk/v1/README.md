@@ -798,7 +798,9 @@ committed version-one runtime events. The sink receives an owned, deeply
 detached copy only after the corresponding SQLite transaction commits and all
 storage locks are released. It observes plain `Run`, `RunTextStream`,
 `RunStream`, `RunLiveStream`, durable worker lifecycle, and delegated child
-execution. Per-call `RunStream` and `RunLiveStream` lifecycle callbacks remain
+execution, plus the narrow runtime terminals newly committed while recovering
+a provably interrupted model or delegation. Per-call `RunStream` and
+`RunLiveStream` lifecycle callbacks remain
 top-level route-chain scoped: they include fallback-attempt task IDs but exclude
 worker/work and delegated-child journals. When both are present, the configured
 sink runs first and each receives a separate copy of the current committed event
@@ -817,7 +819,11 @@ Ordering is strict within each task's `Sequence`; parent, work, child, and
 fallback task IDs retain independent sequence spaces. Separate concurrent SDK
 operations may call the same sink concurrently, so implementations must be
 concurrency-safe, return promptly, honor the supplied context, and avoid
-synchronously waiting for the observed task. Synchronous delivery applies
+re-entering this client or synchronously waiting for work that requires it.
+Commit plus configured-sink delivery is serialized per task, including newly
+committed interrupted-model and interrupted-delegation recovery terminals;
+unrelated tasks remain concurrent. A recovery spanning a delegation tree locks
+its validated task identities in canonical order. Synchronous delivery applies
 backpressure to subsequent parent, worker, and child commits in that execution
 graph; a noncooperative callback cannot be forcibly interrupted. Cancellation
 terminals use the runtime's bounded cleanup context, so `Emit` must treat its
@@ -832,9 +838,14 @@ secrets are redacted and `model.delta` text is omitted.
 The sink is not a durable subscription and construction never replays history.
 After uncertain delivery or restart, checkpoint `(TaskID, Sequence)` only once
 `Emit` returns nil, then use `ReadEvents` for explicit bounded catch-up and
-deduplication. Reconciliation-generated records, the distinct audit-operation
-event stream, forced interruption of noncooperative callbacks, and a global
-cross-task cursor remain outside this contract. Direct qualification of
+deduplication. A failed recovery callback can therefore leave a checkpoint gap:
+the recovery has already terminalized that task and will neither append a
+second terminal nor redeliver the first, so `ReadEvents` is required for
+catch-up. Configuration retirement, terminal-history projection, lease and
+reader housekeeping, and other reconciliation paths that append no runtime
+event emit nothing. The distinct audit-operation event stream, forced
+interruption of noncooperative callbacks, and a global cross-task cursor remain
+outside this contract. Direct qualification of
 daemon-dispatched and automatic-compaction delivery is also deferred.
 
 `RunTextStream` accepts a synchronous callback for provisional, incrementally

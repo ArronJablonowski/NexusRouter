@@ -19,17 +19,51 @@ import (
 // and fails its interrupted parent. It never dispatches work or releases leases.
 // Journal repair, submission fencing and its receipt share one writer transaction.
 func (s *Store) RecoverInterruptedDelegation(ctx context.Context, id, configDigest string, now time.Time) (bool, error) {
-	return s.recoverInterruptedSubmission(ctx, id, configDigest, now, "interrupted_delegation", 2, sessions.PlanInterruptedDelegation)
+	commit, err := s.RecoverInterruptedDelegationCommit(ctx, id, configDigest, now)
+	return commit.Changed, err
 }
 
 // RecoverInterruptedModel resolves expired model-only execution as failed or
 // canceled. It preserves partial stream events without publishing an answer,
 // retrying generation, or granting continuation of an incomplete turn.
 func (s *Store) RecoverInterruptedModel(ctx context.Context, id, configDigest string, now time.Time) (bool, error) {
-	return s.recoverInterruptedSubmission(ctx, id, configDigest, now, "interrupted_model", 1, sessions.PlanInterruptedModel)
+	commit, err := s.RecoverInterruptedModelCommit(ctx, id, configDigest, now)
+	return commit.Changed, err
 }
 
-func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDigest string, now time.Time, reason string, appended int64, planner func([][]runtime.Event, time.Time, bool) (sessions.InterruptionRecovery, error)) (bool, error) {
+// SubmissionRecoveryCommit describes only runtime events newly committed by
+// this invocation. A false Changed result always has an empty event set.
+type SubmissionRecoveryCommit struct {
+	Changed bool
+	Events  []runtime.Event
+}
+
+func (s *Store) RecoverInterruptedDelegationCommit(ctx context.Context, id, configDigest string, now time.Time) (SubmissionRecoveryCommit, error) {
+	return s.RecoverInterruptedDelegationCommitScreened(ctx, id, configDigest, now, nil)
+}
+
+func (s *Store) RecoverInterruptedModelCommit(ctx context.Context, id, configDigest string, now time.Time) (SubmissionRecoveryCommit, error) {
+	return s.RecoverInterruptedModelCommitScreened(ctx, id, configDigest, now, nil)
+}
+
+func (s *Store) RecoverInterruptedDelegationCommitScreened(ctx context.Context, id, configDigest string, now time.Time, secrets []string) (SubmissionRecoveryCommit, error) {
+	return s.recoverInterruptedSubmissionCommit(ctx, id, configDigest, now, "interrupted_delegation", 2, sessions.PlanInterruptedDelegation, secrets)
+}
+
+func (s *Store) RecoverInterruptedModelCommitScreened(ctx context.Context, id, configDigest string, now time.Time, secrets []string) (SubmissionRecoveryCommit, error) {
+	return s.recoverInterruptedSubmissionCommit(ctx, id, configDigest, now, "interrupted_model", 1, sessions.PlanInterruptedModel, secrets)
+}
+
+func (s *Store) recoverInterruptedSubmissionCommit(ctx context.Context, id, configDigest string, now time.Time, reason string, appended int64, planner func([][]runtime.Event, time.Time, bool) (sessions.InterruptionRecovery, error), secrets []string) (SubmissionRecoveryCommit, error) {
+	var committed []runtime.Event
+	changed, err := s.recoverInterruptedSubmission(ctx, id, configDigest, now, reason, appended, planner, secrets, &committed)
+	if err != nil || !changed {
+		return SubmissionRecoveryCommit{}, err
+	}
+	return SubmissionRecoveryCommit{Changed: true, Events: committed}, nil
+}
+
+func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDigest string, now time.Time, reason string, appended int64, planner func([][]runtime.Event, time.Time, bool) (sessions.InterruptionRecovery, error), secrets []string, committed *[]runtime.Event) (bool, error) {
 	if !sessions.ValidEventPageID(id) || !submissionDigest(configDigest) || now.IsZero() {
 		return false, submissions.ErrInvalid
 	}
@@ -104,6 +138,9 @@ func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDige
 	}
 	if !continuation.Valid || (continuation.String != "" && !sessions.ValidEventPageID(continuation.String)) || parent[0].Data.ParentTaskID != continuation.String {
 		return false, submissions.ErrInvalid
+	}
+	if recoveryEventsContainSecrets(plan.Events, secrets) {
+		return false, ErrRecoveryRedaction
 	}
 	// Validate the proposed journal through the same replay path as ordinary reads.
 	combined := append(append(snapshotEvents(nil), parent...), plan.Events...)
@@ -183,9 +220,17 @@ func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDige
 	if n, err := changed.RowsAffected(); err != nil || n != 1 {
 		return false, submissions.ErrLeaseLost
 	}
+	detached := make([]runtime.Event, len(plan.Events))
+	for i := range plan.Events {
+		detached[i], err = plan.Events[i].Clone()
+		if err != nil {
+			return false, submissions.ErrInvalid
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return false, err
 	}
+	*committed = detached
 	return true, nil
 }
 

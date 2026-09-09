@@ -17,23 +17,27 @@ import (
 // projects already-terminal histories without reexecution. Partial work is
 // never replayed automatically.
 type Dispatcher struct {
-	cancel            context.CancelFunc
-	done              chan struct{}
-	db                *telemetry.Store
-	once              sync.Once
-	mu                sync.Mutex
-	err               error
-	configuredWorkers int
-	startedWorkers    int
-	workerAlive       map[int]bool
-	workerBeats       map[int]time.Time
-	reconcilerStarted bool
-	reconcilerAlive   bool
-	reconcilerBeat    time.Time
-	closing           bool
-	closed            bool
-	healthNow         func() time.Time
-	renewInterval     time.Duration
+	cancel             context.CancelFunc
+	done               chan struct{}
+	db                 *telemetry.Store
+	eventSink          runtime.EventSink
+	eventSinkSequencer *configuredSinkSequencer
+	lifecycle          context.Context
+	recoverySecrets    func() []string
+	once               sync.Once
+	mu                 sync.Mutex
+	err                error
+	configuredWorkers  int
+	startedWorkers     int
+	workerAlive        map[int]bool
+	workerBeats        map[int]time.Time
+	reconcilerStarted  bool
+	reconcilerAlive    bool
+	reconcilerBeat     time.Time
+	closing            bool
+	closed             bool
+	healthNow          func() time.Time
+	renewInterval      time.Duration
 }
 
 func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
@@ -45,7 +49,7 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 		return nil, ErrSubmission
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
+	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, eventSink: s.eventSink, eventSinkSequencer: s.eventSinkSequencer, lifecycle: ctx, recoverySecrets: func() []string { return memorySecrets(s.settings, s.secret) }, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
 	var workers sync.WaitGroup
 	workers.Add(1)
 	go func() {

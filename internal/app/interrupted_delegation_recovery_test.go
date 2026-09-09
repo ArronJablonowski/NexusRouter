@@ -156,8 +156,15 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 				t.Fatalf("runtime history not planned: %v", err)
 			}
 			expireRecoveryClaim(t, svc, status.ID)
-			d := &Dispatcher{db: db}
-			if _, err := d.recoverPage(ctx, svc.submissionConfigDigest(), ""); err != nil {
+			var delivered []runtime.Event
+			d := &Dispatcher{
+				db:                 db,
+				eventSink:          runtime.EventSinkFunc(func(_ context.Context, event runtime.Event) error { delivered = append(delivered, event); return nil }),
+				eventSinkSequencer: &configuredSinkSequencer{},
+				lifecycle:          context.Background(),
+			}
+			currentDigest := submissionDigest([]byte(svc.submissionConfigDigest() + "-new"))
+			if _, err := d.reconcileConfigurationPage(ctx, currentDigest, ""); err != nil {
 				t.Fatal(err)
 			}
 			status, err = svc.SubmissionStatus(ctx, status.ID)
@@ -171,6 +178,9 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 			tool, terminal := after.Events[len(after.Events)-2], after.Events[len(after.Events)-1]
 			if tool.Kind != runtime.ToolCompleted || tool.Data.Effect != runtime.NoEffect || tool.Data.Code != "delegation_recovered" || !strings.Contains(tool.Data.Text, "durable child answer") || terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "interrupted_after_delegation" || terminal.CausationID != tool.ID {
 				t.Fatal("incorrect recovery checkpoint", tool, terminal)
+			}
+			if len(delivered) != 2 || !reflect.DeepEqual(delivered, after.Events[len(after.Events)-2:]) {
+				t.Fatal("configured sink did not receive exact durable recovery order", delivered)
 			}
 			readiness, err = InspectTaskContinuation(ctx, cfg.Telemetry.Database, result.TaskID)
 			if err != nil || !readiness.HistoryEligible || readiness.Reason != "recovered_delegation" || readiness.Sequence != after.HeadSequence {
@@ -189,11 +199,11 @@ func TestInterruptedDelegationRestoresResultAndExplicitlyContinues(t *testing.T)
 			if err != nil || len(history) != 1 {
 				t.Fatal("missing recovery receipt", err)
 			}
-			if _, err := d.recoverPage(ctx, svc.submissionConfigDigest(), ""); err != nil {
+			if _, err := d.reconcileConfigurationPage(ctx, currentDigest, ""); err != nil {
 				t.Fatal(err)
 			}
 			again, err := db.ReadEventPage(ctx, result.TaskID, 0, 100)
-			if err != nil || !reflect.DeepEqual(after, again) {
+			if err != nil || !reflect.DeepEqual(after, again) || len(delivered) != 2 {
 				t.Fatal("recovery was not idempotent", err)
 			}
 			fresh, err := NewService(cfg, nil)

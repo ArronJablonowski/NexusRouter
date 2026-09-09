@@ -190,6 +190,20 @@ must be constructed only after its task and turn starts are durably committed
 and accepted; pre-route discovery and managed-residency maintenance remain
 bounded control-plane preflight rather than task execution.
 
+Configured event delivery serializes commit plus callback per task while
+allowing unrelated task identities to remain concurrent. Submission recovery
+delivers only runtime events newly committed while closing a provable
+interrupted-model or interrupted-delegation history; terminal projection and
+pre-start configuration retirement emit nothing. Delivery is live-only and a
+failure never rolls back or authorizes recovery replay. A failed callback may
+leave a checkpoint gap because each successful recovery terminalizes its task;
+consumers must use explicit journal reads rather than expect a second append or
+automatic redelivery. Current credential screening occurs before recovery
+commit; a delegation batch that would require
+changing its already-proven child-result provenance remains fenced rather than
+persisting or emitting the synthesized parent events. Sink callbacks must not
+re-enter the same service synchronously.
+
 The SDK must expose explicit session-summary drafting, bounded inspection and
 listing, operator review/history, and approved-summary continuation through the
 same application service as the CLI/API. Current implementation and limits are

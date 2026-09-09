@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"reflect"
+	"sort"
 	"sync"
 
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -15,13 +16,79 @@ type eventDelivery struct {
 	mu         sync.Mutex
 	cancel     context.CancelFunc
 	configured runtime.EventSink
+	sequencer  *configuredSinkSequencer
 	perCall    func(runtime.Event)
 	failed     bool
 	err        error
 }
 
-func newEventDelivery(cancel context.CancelFunc, configured runtime.EventSink, perCall func(runtime.Event)) *eventDelivery {
-	return &eventDelivery{cancel: cancel, configured: configured, perCall: perCall}
+type configuredSinkSequence struct {
+	mu   sync.Mutex
+	refs int
+}
+
+// configuredSinkSequencer orders commit plus delivery per task while retaining
+// the public contract that unrelated tasks may invoke the configured sink
+// concurrently.
+type configuredSinkSequencer struct {
+	mu    sync.Mutex
+	tasks map[string]*configuredSinkSequence
+}
+
+func (s *configuredSinkSequencer) acquire(taskIDs []string) func() {
+	if s == nil {
+		return func() {}
+	}
+	unique := map[string]bool{}
+	ids := make([]string, 0, len(taskIDs))
+	for _, id := range taskIDs {
+		if id != "" && !unique[id] {
+			unique[id] = true
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	entries := make([]*configuredSinkSequence, len(ids))
+	s.mu.Lock()
+	if s.tasks == nil {
+		s.tasks = map[string]*configuredSinkSequence{}
+	}
+	for i, id := range ids {
+		entry := s.tasks[id]
+		if entry == nil {
+			entry = &configuredSinkSequence{}
+			s.tasks[id] = entry
+		}
+		entry.refs++
+		entries[i] = entry
+	}
+	s.mu.Unlock()
+	for _, entry := range entries {
+		entry.mu.Lock()
+	}
+	return func() {
+		for i := len(entries) - 1; i >= 0; i-- {
+			entries[i].mu.Unlock()
+		}
+		s.mu.Lock()
+		for i, entry := range entries {
+			entry.refs--
+			if entry.refs == 0 {
+				delete(s.tasks, ids[i])
+			}
+		}
+		s.mu.Unlock()
+	}
+}
+
+func newEventDelivery(cancel context.CancelFunc, configured runtime.EventSink, perCall func(runtime.Event), sequencers ...*configuredSinkSequencer) *eventDelivery {
+	var sequencer *configuredSinkSequencer
+	if len(sequencers) > 0 {
+		sequencer = sequencers[0]
+	} else if configured != nil {
+		sequencer = &configuredSinkSequencer{tasks: map[string]*configuredSinkSequence{}}
+	}
+	return &eventDelivery{cancel: cancel, configured: configured, sequencer: sequencer, perCall: perCall}
 }
 
 // CommitAndDeliver never turns a post-commit callback failure into a journal
@@ -29,6 +96,10 @@ func newEventDelivery(cancel context.CancelFunc, configured runtime.EventSink, p
 func (d *eventDelivery) CommitAndDeliver(ctx context.Context, event runtime.Event, includePerCall bool, commit func() error) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.sequencer != nil {
+		release := d.sequencer.acquire([]string{event.TaskID})
+		defer release()
+	}
 	if err := commit(); err != nil {
 		return err
 	}
@@ -104,5 +175,10 @@ func installEventSink(service *Service, sink runtime.EventSink) error {
 		return ErrAdmission
 	}
 	service.eventSink = sink
+	if sink != nil {
+		service.eventSinkSequencer = &configuredSinkSequencer{tasks: map[string]*configuredSinkSequence{}}
+	} else {
+		service.eventSinkSequencer = nil
+	}
 	return nil
 }

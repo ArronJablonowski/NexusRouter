@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
@@ -100,27 +101,29 @@ func (d *Dispatcher) reconcileConfigurationPage(ctx context.Context, currentDige
 		if item.State == "running" {
 			recovered, recoverErr := d.db.RecoverTerminalSubmission(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
 			if recoverErr != nil {
-				if errors.Is(recoverErr, submissions.ErrInvalid) {
+				if permanentReconciliationError(recoverErr) {
 					permanentErr = recoverErr
 					continue
 				}
 				return after, recoverErr
 			}
 			if !recovered {
-				recovered, recoverErr = d.db.RecoverInterruptedModel(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
+				commit, commitErr := d.recoverInterruptedModel(ctx, item, item.ConfigDigest)
+				recovered, recoverErr = commit.Changed, commitErr
 			}
 			if recoverErr != nil {
-				if errors.Is(recoverErr, submissions.ErrInvalid) {
+				if permanentReconciliationError(recoverErr) {
 					permanentErr = recoverErr
 					continue
 				}
 				return after, recoverErr
 			}
 			if !recovered {
-				recovered, recoverErr = d.db.RecoverInterruptedDelegation(ctx, item.ID, item.ConfigDigest, time.Now().UTC())
+				commit, commitErr := d.recoverInterruptedDelegation(ctx, item, item.ConfigDigest)
+				recovered, recoverErr = commit.Changed, commitErr
 			}
 			if recoverErr != nil {
-				if errors.Is(recoverErr, submissions.ErrInvalid) {
+				if permanentReconciliationError(recoverErr) {
 					permanentErr = recoverErr
 					continue
 				}
@@ -159,10 +162,16 @@ func (d *Dispatcher) recoverPage(ctx context.Context, configDigest, after string
 			var recovered bool
 			recovered, err = d.db.RecoverTerminalSubmission(ctx, item.ID, configDigest, time.Now().UTC())
 			if err == nil && !recovered {
-				recovered, err = d.db.RecoverInterruptedModel(ctx, item.ID, configDigest, time.Now().UTC())
+				commit, commitErr := d.recoverInterruptedModel(ctx, item, configDigest)
+				recovered, err = commit.Changed, commitErr
 			}
 			if err == nil && !recovered {
-				_, err = d.db.RecoverInterruptedDelegation(ctx, item.ID, configDigest, time.Now().UTC())
+				_, commitErr := d.recoverInterruptedDelegation(ctx, item, configDigest)
+				err = commitErr
+			}
+			if permanentReconciliationError(err) {
+				d.recordError()
+				err = nil
 			}
 		}
 		if err != nil {
@@ -173,4 +182,8 @@ func (d *Dispatcher) recoverPage(ctx context.Context, configDigest, after string
 		return page.NextCursor, nil
 	}
 	return "", nil
+}
+
+func permanentReconciliationError(err error) bool {
+	return errors.Is(err, submissions.ErrInvalid) || errors.Is(err, telemetry.ErrRecoveryRedaction) || errors.Is(err, errRecoverySecretResolution)
 }

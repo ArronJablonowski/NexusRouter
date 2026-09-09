@@ -33,28 +33,29 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	toolExtension    *tools.Extension
-	toolReviewer     tools.ApprovalReviewer
-	toolPresenter    tools.ApprovalPresenter
-	providerFactory  providers.Factory
-	codexLauncher    codexLaunch
-	contextEstimator providers.ContextEstimator
-	contextEngine    contextengine.Engine
-	evaluator        evaluation.Evaluator
-	eventSink        runtime.EventSink
-	memoryStore      memory.Store
-	skillStore       skills.Store
-	execution        chan struct{}
-	discovery        *modelHealthCache
-	settings         config.Settings
-	secret           func(string) string
-	budget           *resources.Budget
-	residencyMu      sync.Mutex
-	residencies      map[string]*residencyEndpoint
-	profile          func(context.Context) (resources.Snapshot, error)
-	draw             func() float64
-	now              func() time.Time
-	mu               sync.Mutex
+	toolExtension      *tools.Extension
+	toolReviewer       tools.ApprovalReviewer
+	toolPresenter      tools.ApprovalPresenter
+	providerFactory    providers.Factory
+	codexLauncher      codexLaunch
+	contextEstimator   providers.ContextEstimator
+	contextEngine      contextengine.Engine
+	evaluator          evaluation.Evaluator
+	eventSink          runtime.EventSink
+	eventSinkSequencer *configuredSinkSequencer
+	memoryStore        memory.Store
+	skillStore         skills.Store
+	execution          chan struct{}
+	discovery          *modelHealthCache
+	settings           config.Settings
+	secret             func(string) string
+	budget             *resources.Budget
+	residencyMu        sync.Mutex
+	residencies        map[string]*residencyEndpoint
+	profile            func(context.Context) (resources.Snapshot, error)
+	draw               func() float64
+	now                func() time.Time
+	mu                 sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -122,7 +123,7 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	if r.eventDelivery == nil && (s.eventSink != nil || r.eventSink != nil) {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
-		r.eventDelivery = newEventDelivery(cancel, s.eventSink, r.eventSink)
+		r.eventDelivery = newEventDelivery(cancel, s.eventSink, r.eventSink, s.eventSinkSequencer)
 		r.deliverPerCall = true
 		r.eventSink = nil
 		defer func() {
