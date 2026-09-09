@@ -5,6 +5,7 @@ package webuiapp
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"io"
@@ -21,6 +22,7 @@ const (
 	sessionCookie      = "darwin_browser_session"
 	maxBrowserBody     = 4 << 10
 	maxBrowserInFlight = 32
+	maxBrowserStreams  = 8
 )
 
 var ErrConfiguration = errors.New("invalid browser application configuration")
@@ -31,6 +33,9 @@ type Options struct {
 	AllowedOrigins []string
 	SecureCookies  bool
 	Store          *browserauth.Store
+	Reads          ReadServices
+	LiveText       *LiveTextHub
+	CursorKey      []byte
 }
 
 type Handler struct {
@@ -39,9 +44,13 @@ type Handler struct {
 	origins       map[string]bool
 	secureCookies bool
 	store         *browserauth.Store
+	reads         ReadServices
+	liveText      *LiveTextHub
 	shell         http.Handler
 	bootstrap     http.Handler
 	slots         chan struct{}
+	streamSlots   chan struct{}
+	cursorKey     [32]byte
 }
 
 func New(options Options) (*Handler, error) {
@@ -62,7 +71,17 @@ func New(options Options) (*Handler, error) {
 		}
 		origins[origin] = true
 	}
-	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, slots: make(chan struct{}, maxBrowserInFlight)}
+	var cursorKey [32]byte
+	if len(options.CursorKey) == 0 {
+		if _, err := rand.Read(cursorKey[:]); err != nil {
+			return nil, ErrConfiguration
+		}
+	} else if len(options.CursorKey) != len(cursorKey) {
+		return nil, ErrConfiguration
+	} else {
+		copy(cursorKey[:], options.CursorKey)
+	}
+	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), cursorKey: cursorKey}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -81,20 +100,26 @@ func New(options Options) (*Handler, error) {
 
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
+	chatListPath := h.basePath + "/api/v1/chats"
+	queryReadPath := request.URL != nil && (request.URL.Path == chatListPath || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "")
+	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
+		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	if request.URL.Path != h.basePath && !strings.HasPrefix(request.URL.Path, h.basePath+"/") {
+		h.writeError(writer, request, http.StatusNotFound, "not_found")
+		return
+	}
+	if chat := chatEventsID(h.basePath, request.URL.Path); chat != "" {
+		h.serveChatEvents(writer, request, chat)
+		return
+	}
 	select {
 	case h.slots <- struct{}{}:
 		defer func() { <-h.slots }()
 	default:
 		writer.Header().Set("Retry-After", "1")
 		h.writeError(writer, request, http.StatusServiceUnavailable, "browser_capacity")
-		return
-	}
-	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || request.URL.RawQuery != "" || request.URL.RawPath != "" {
-		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
-		return
-	}
-	if request.URL.Path != h.basePath && !strings.HasPrefix(request.URL.Path, h.basePath+"/") {
-		h.writeError(writer, request, http.StatusNotFound, "not_found")
 		return
 	}
 	challengePath := h.basePath + "/api/v1/session/challenges"
@@ -114,7 +139,13 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.rotateCSRF(writer, request)
 	case logoutPath:
 		h.logout(writer, request)
+	case chatListPath:
+		h.serveChatList(writer, request)
 	default:
+		if chat := chatMessagesID(h.basePath, request.URL.Path); chat != "" {
+			h.serveTranscript(writer, request, chat)
+			return
+		}
 		if request.URL.Path == h.basePath+"/api" || strings.HasPrefix(request.URL.Path, h.basePath+"/api/") {
 			h.authenticatedAPINotFound(writer, request)
 			return

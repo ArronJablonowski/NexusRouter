@@ -104,7 +104,7 @@ func TestTextStreamSinkFailureCancels(t *testing.T) {
 
 func TestTextDeliveryUTF8AndFailedTail(t *testing.T) {
 	var got strings.Builder
-	d := &textDelivery{emit: func(s string) { got.WriteString(s) }}
+	d := &textDelivery{emit: func(s string, _ bool) { got.WriteString(s) }}
 	d.accept(runtime.TurnStarted, "")
 	d.accept(runtime.ModelDelta, "\xe2")
 	if got.Len() != 0 {
@@ -117,7 +117,7 @@ func TestTextDeliveryUTF8AndFailedTail(t *testing.T) {
 		t.Fatal(got.String())
 	}
 	got.Reset()
-	d = &textDelivery{secrets: []string{"secret"}, emit: func(s string) { got.WriteString(s) }}
+	d = &textDelivery{secrets: []string{"secret"}, emit: func(s string, _ bool) { got.WriteString(s) }}
 	d.accept(runtime.TurnStarted, "")
 	d.accept(runtime.ModelDelta, "secr")
 	d.accept(runtime.TaskFailed, "")
@@ -155,7 +155,7 @@ func TestTextStreamDoesNotDeliverUncommittedText(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	delivery := &textDelivery{emit: func(string) { t.Fatal("uncommitted text delivered") }}
+	delivery := &textDelivery{emit: func(string, bool) { t.Fatal("uncommitted text delivered") }}
 	delivery.accept(runtime.TurnStarted, "")
 	j := redactingJournal{db: db, textDelivery: delivery}
 	e.ID, e.Sequence, e.Kind, e.Data.Text = "delta", 3, runtime.ModelDelta, "private provisional text"

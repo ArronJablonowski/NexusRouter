@@ -33,29 +33,30 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	toolExtension      *tools.Extension
-	toolReviewer       tools.ApprovalReviewer
-	toolPresenter      tools.ApprovalPresenter
-	providerFactory    providers.Factory
-	codexLauncher      codexLaunch
-	contextEstimator   providers.ContextEstimator
-	contextEngine      contextengine.Engine
-	evaluator          evaluation.Evaluator
-	eventSink          runtime.EventSink
-	eventSinkSequencer *configuredSinkSequencer
-	memoryStore        memory.Store
-	skillStore         skills.Store
-	execution          chan struct{}
-	discovery          *modelHealthCache
-	settings           config.Settings
-	secret             func(string) string
-	budget             *resources.Budget
-	residencyMu        sync.Mutex
-	residencies        map[string]*residencyEndpoint
-	profile            func(context.Context) (resources.Snapshot, error)
-	draw               func() float64
-	now                func() time.Time
-	mu                 sync.Mutex
+	toolExtension        *tools.Extension
+	toolReviewer         tools.ApprovalReviewer
+	toolPresenter        tools.ApprovalPresenter
+	providerFactory      providers.Factory
+	codexLauncher        codexLaunch
+	contextEstimator     providers.ContextEstimator
+	contextEngine        contextengine.Engine
+	evaluator            evaluation.Evaluator
+	eventSink            runtime.EventSink
+	eventSinkSequencer   *configuredSinkSequencer
+	presentationTextSink PresentationTextSink
+	memoryStore          memory.Store
+	skillStore           skills.Store
+	execution            chan struct{}
+	discovery            *modelHealthCache
+	settings             config.Settings
+	secret               func(string) string
+	budget               *resources.Budget
+	residencyMu          sync.Mutex
+	residencies          map[string]*residencyEndpoint
+	profile              func(context.Context) (resources.Snapshot, error)
+	draw                 func() float64
+	now                  func() time.Time
+	mu                   sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -114,6 +115,9 @@ func (s *Service) routingNow() time.Time {
 func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr error) {
 	if s == nil || ctx == nil {
 		return Result{}, ErrAdmission
+	}
+	if r.delegatedParent == "" {
+		r.presentationTextSink = s.presentationTextSink
 	}
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)

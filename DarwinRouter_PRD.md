@@ -371,8 +371,9 @@ workboard state ownership, and concrete browser controls are recorded in
 JSON Schema, and reusable fixtures live under `webui/`. The first implementation
 serves a versioned embedded shell through a terminal-approved, process-local
 browser session boundary with a narrow public bootstrap and bounded CSRF grants;
-it does not yet implement chat projections or the workboard store and feature
-views.
+it now includes bounded browser-safe chat/session projections, paginated
+history, provisional post-redaction text, and durable reconnectable lifecycle
+streaming. Chat mutations and the workboard store and feature views remain open.
 
 Chat and board mutations use versioned native endpoints with idempotency keys.
 Streaming uses resumable Server-Sent Events with event IDs and bounded catch-up;

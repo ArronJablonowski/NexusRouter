@@ -47,8 +47,11 @@ supported-platform decision or publication approval is claimed.
   stop-proof recovery, and independently evidenced acceptance. A minimal
   versioned shell is embedded and served through one-time CLI-approved browser
   challenges, bounded process-local sessions, same-origin CSRF grants, and
-  strict security headers. Chat/session projections and Kanban persistence/UI
-  are not implemented yet.
+  strict security headers. The read-only chat/session surface now adds bounded
+  paginated chat and history projections, text-only rendering,
+  provisional post-commit redacted model text, and HMAC-bound durable SSE
+  replay for typed model, tool, route, worker, error, and terminal state. Chat
+  mutations and Kanban persistence/UI remain open.
 
 - An explicitly selected stock summary-integrity validator now emits bounded,
   deterministic advisory evidence without ever approving a model-authored

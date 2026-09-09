@@ -125,7 +125,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "666f33ee52b72162e1d9029961b803e2549a611607df91079b7e53708800bb10" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "d376d62bd6b7f770a37467634d0909e67434df4345c9c3b15fc2e796d089825e" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -155,6 +155,87 @@ func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 		if !strings.Contains(string(bootstrapScript), required) {
 			t.Fatal("bootstrap expiry cannot reach retry state", required)
 		}
+	}
+}
+
+func TestEmbeddedChatPresentationIsBoundedReadOnlyAndXSSSafe(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, forbidden := range []string{"innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "localStorage", "sessionStorage"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("unsafe browser rendering primitive %q is present", forbidden)
+		}
+	}
+	for _, forbidden := range []string{"message.content", "tool_calls", "tool_call_id", `role !== "system"`, `role !== "tool"`} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("browser consumed non-presentation transcript field %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		"document.createElement", "node.textContent = value", "const pageLimit = 25", "const maxChats = 100",
+		"const historyPageLimit = 100", "const maxMessages = 500", "new URLSearchParams", "page.items.length > pageLimit",
+		"new EventSource(base +", "source.onerror", "clearAllProvisional()", `payload.durability === "provisional"`,
+		`payload.durability !== "committed"`, "payload.revision <= eventRevision", "payload.subject !== selectedChat", "encodeURIComponent(chatID)",
+		"source.close()", "source = null", "body.next_cursor", "messageIDs", "lastMessageRevision", `loadHistory(selectedChat, "", true, false)`,
+		"body.messages.length > remaining", "body.head_revision !== historyHead", "message.revision > afterRevision",
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("chat client lost bounded presentation/reconnect guard %q", required)
+		}
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := strings.ToLower(string(index))
+	for _, forbidden := range []string{"<form", "<textarea", "contenteditable", "send message", "cancel task", "steer"} {
+		if strings.Contains(markup, forbidden) {
+			t.Fatalf("read-only chat shell exposes action %q", forbidden)
+		}
+	}
+	for _, required := range []string{`id="chat-list-state"`, `id="load-more"`, `id="transcript-state"`, `id="load-more-messages"`, `id="provisional"`} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("chat shell lost presentation state %q", required)
+		}
+	}
+}
+
+func TestEmbeddedChatKeepsConcurrentProvisionalTasksIsolated(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		"const maxProvisionalTasks = 16", "const maxProvisionalTaskText = 256 << 10", "const maxProvisionalText = 1 << 20",
+		"const provisionalTasks = new Map()", "provisionalTasks.get(taskID)", "provisionalTasks.set(taskID, item)",
+		"maxProvisionalTaskText - item.size", "maxProvisionalText - provisionalTextSize", "node.textContent = value",
+		"appendProvisional(payload.data.task_id", "clearProvisionalTask(payload.data.task_id)",
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("concurrent provisional isolation guard missing %q", required)
+		}
+	}
+	eventStart := strings.Index(body, "function applyPresentationEvent")
+	eventEnd := strings.Index(body[eventStart:], "function connect")
+	if eventStart < 0 || eventEnd < 0 {
+		t.Fatal("event application boundary missing")
+	}
+	events := body[eventStart : eventStart+eventEnd]
+	if strings.Count(events, "clearProvisionalTask(payload.data.task_id)") != 2 || !strings.Contains(events, `payload.data.state === "completed"`) {
+		t.Fatal("final and out-of-order task terminals do not clear only their matching provisional buffers")
+	}
+	historyStart := strings.Index(body, "function applyHistoryPage")
+	historyEnd := strings.Index(body[historyStart:], "function setTaskState")
+	if historyStart < 0 || historyEnd < 0 {
+		t.Fatal("history reconciliation boundary missing")
+	}
+	history := body[historyStart : historyStart+historyEnd]
+	if strings.Contains(history, "clearProvisionalTask") || strings.Contains(history, "clearAllProvisional") || strings.Contains(history, "provisionalTasks.clear") {
+		t.Fatal("history reconciliation erases another active task's provisional buffer")
 	}
 }
 

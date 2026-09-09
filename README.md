@@ -38,7 +38,9 @@ chat and a native durable Kanban board that operators and policy-constrained
 agents can use for long-running work. The PRD defines the browser security,
 dependency, claim/lease, checkpoint, acceptance, and restart invariants. Linear
 issues DAR-76 through DAR-87 track implementation. The authenticated embedded
-shell is now served, but chat views and workboard storage/UI are not yet present.
+shell now serves a read-only chat/session view with bounded history and
+reconnect-safe presentation streaming. Chat mutations and workboard storage/UI
+remain assigned to DAR-79 onward.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire

@@ -393,6 +393,12 @@ const (
 	ChatDelta       EventKind = "chat.delta"
 	ChatFinal       EventKind = "chat.final"
 	LifecycleEvent  EventKind = "lifecycle.event"
+	ModelChanged    EventKind = "model.changed"
+	ToolChanged     EventKind = "tool.changed"
+	RouteChanged    EventKind = "route.changed"
+	WorkerChanged   EventKind = "worker.changed"
+	ErrorChanged    EventKind = "error.changed"
+	TaskTerminal    EventKind = "task.terminal"
 	ApprovalChanged EventKind = "approval.changed"
 	FeedbackChanged EventKind = "feedback.changed"
 	BoardChanged    EventKind = "board.changed"
@@ -435,6 +441,30 @@ func (e Event) Validate() error {
 		if !e.validCommitted() || validateEventData[LifecycleData](e.Data) != nil {
 			return ErrContract
 		}
+	case ModelChanged:
+		if !e.validCommitted() || validateEventData[ModelChangedData](e.Data) != nil {
+			return ErrContract
+		}
+	case ToolChanged:
+		if !e.validCommitted() || validateEventData[ToolChangedData](e.Data) != nil {
+			return ErrContract
+		}
+	case RouteChanged:
+		if !e.validCommitted() || validateEventData[RouteChangedData](e.Data) != nil {
+			return ErrContract
+		}
+	case WorkerChanged:
+		if !e.validCommitted() || validateEventData[WorkerChangedData](e.Data) != nil {
+			return ErrContract
+		}
+	case ErrorChanged:
+		if !e.validCommitted() || validateEventData[ErrorChangedData](e.Data) != nil {
+			return ErrContract
+		}
+	case TaskTerminal:
+		if !e.validCommitted() || validateEventData[TaskTerminalData](e.Data) != nil {
+			return ErrContract
+		}
 	case ApprovalChanged:
 		if !e.validCommitted() || validateEventData[ApprovalChangedData](e.Data) != nil {
 			return ErrContract
@@ -472,10 +502,16 @@ func (e Event) validCommitted() bool {
 }
 
 type ChatDeltaData struct {
-	Text string `json:"text"`
+	TaskID string `json:"task_id"`
+	Text   string `json:"text"`
 }
 
-func (d ChatDeltaData) Validate() error { return requireText(d.Text, MaxEventBytes) }
+func (d ChatDeltaData) Validate() error {
+	if !validID(d.TaskID) {
+		return ErrContract
+	}
+	return requireText(d.Text, MaxEventBytes)
+}
 
 type PresentationMessage struct {
 	ID       string `json:"id"`
@@ -794,7 +830,7 @@ var operationSpecs = []OperationSpec{
 	{Operation: "chat.history", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/messages", ServicePrimitive: "new bounded presentation projection", Security: SessionRead},
 	{Operation: "chat.submit", Method: "POST", BrowserPath: "/app/api/v1/chats", ServicePrimitive: "POST /v1/submissions application primitive", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
 	{Operation: "chat.resume", Method: "POST", BrowserPath: "/app/api/v1/chats/{chat}/resume", ServicePrimitive: "new revision-fenced facade over task continuation", Security: SessionCSRFMutation, Mutation: true},
-	{Operation: "chat.stream", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/events", ServicePrimitive: "new presentation SSE over durable submission/event readers", Security: SessionRead},
+	{Operation: "chat.stream", Method: "GET", BrowserPath: "/app/api/v1/chats/{chat}/events", ServicePrimitive: "presentation SSE over durable committed event reader", Security: SessionRead, PrimitiveExists: true},
 	{Operation: "chat.steer", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/steering", ServicePrimitive: "POST /v1/tasks/{task}/steering", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
 	{Operation: "chat.cancel", Method: "POST", BrowserPath: "/app/api/v1/tasks/{task}/cancel", ServicePrimitive: "POST /v1/tasks/{task}/cancel", Security: SessionCSRFMutation, PrimitiveExists: true, Mutation: true},
 	{Operation: "feedback.record", Method: "POST", BrowserPath: "/app/api/v1/feedback", ServicePrimitive: "new browser feedback facade over existing evidence service", Security: SessionCSRFMutation, Mutation: true},

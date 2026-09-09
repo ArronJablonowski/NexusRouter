@@ -45,7 +45,7 @@ func (s *Service) RunTextStream(ctx context.Context, r Request, emit func(string
 // their text; a secret split across two turns must not leak after concatenation.
 type textDelivery struct {
 	secrets  []string
-	emit     func(string)
+	emit     func(string, bool)
 	redactor *textRedactor
 	utf8Tail string
 }
@@ -89,6 +89,6 @@ func (d *textDelivery) deliver(text string, final bool) {
 		d.utf8Tail = text[end:]
 	}
 	if end > 0 {
-		d.emit(text[:end])
+		d.emit(text[:end], final)
 	}
 }

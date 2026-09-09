@@ -110,12 +110,12 @@ func TestOperationMappingIsClosedOwnedAndBrowserScoped(t *testing.T) {
 		seen[spec.Operation] = true
 		existing[spec.Operation] = spec.PrimitiveExists
 	}
-	for _, operation := range []string{"chat.submit", "chat.steer", "chat.cancel", "approval.list", "model.list", "route.inspect", "health.inspect"} {
+	for _, operation := range []string{"chat.submit", "chat.stream", "chat.steer", "chat.cancel", "approval.list", "model.list", "route.inspect", "health.inspect"} {
 		if !existing[operation] {
 			t.Fatal("existing application primitive mislabeled", operation)
 		}
 	}
-	for _, operation := range []string{"session.challenge", "chat.history", "chat.stream", "feedback.record", "approval.decide", "board.list", "board.create", "board.read", "board.mutate", "board.stream"} {
+	for _, operation := range []string{"session.challenge", "chat.history", "feedback.record", "approval.decide", "board.list", "board.create", "board.read", "board.mutate", "board.stream"} {
 		if existing[operation] {
 			t.Fatal("future application primitive mislabeled", operation)
 		}
@@ -144,7 +144,7 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	validApproval := ApprovalRequest{Version: 1, IdempotencyKey: key, TaskID: "task", ApprovalID: "approval", Action: ApprovalAllow, ExpectedRevision: 1}
 	validFeedback := FeedbackRequest{Version: 1, IdempotencyKey: key, TaskID: "task", Action: FeedbackRevise, FeedbackID: "feedback", Accepted: true, ExpectedRevision: &revision}
 	validBoard := BoardRequest{Version: 1, Action: ClaimHeartbeat, IdempotencyKey: key, BoardID: "board", CardID: "card", ClaimID: "claim", AttemptID: "attempt", ExpectedClaimRevision: &revision}
-	validEvent := Event{Version: 1, Kind: ChatDelta, Durability: Provisional, Subject: "subject", Data: json.RawMessage(`{"text":"partial"}`)}
+	validEvent := Event{Version: 1, Kind: ChatDelta, Durability: Provisional, Subject: "subject", Data: json.RawMessage(`{"task_id":"task","text":"partial"}`)}
 	validError := Error{Version: 1, Code: "conflict", Message: "Refresh and retry.", Retryable: true, CurrentRevision: &revision}
 	for name, validate := range map[string]func() error{
 		"chat": validChat.Validate, "approval": validApproval.Validate,
@@ -284,9 +284,9 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		"empty submit":           {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture-key-0001"}`},
 		"space in key":           {"chat_request", `{"version":1,"action":"submit","idempotency_key":"fixture key 0001","text":"hello"}`},
 		"incomplete heartbeat":   {"board_request", `{"version":1,"action":"claim.heartbeat","idempotency_key":"fixture-key-0001","board_id":"board"}`},
-		"cursor on provisional":  {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"text":"partial"}}`},
-		"committed delta":        {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"text":"partial"}}`},
-		"raw prompt escape":      {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"text":"partial","prompt":"secret"}}`},
+		"cursor on provisional":  {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial"}}`},
+		"committed delta":        {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
+		"raw prompt escape":      {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
 		"move with title":        {"board_request", `{"version":1,"action":"card.move","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"target_state":"ready","title":"irrelevant"}`},
 		"zero feedback revision": {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":0}`},
 	}

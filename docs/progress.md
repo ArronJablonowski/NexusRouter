@@ -5557,3 +5557,49 @@ limit, `go vet`, the complete repository-wide race suite, and `go build ./...`.
 The longest rebuilt packages were releasepack 487.324s, application 344.259s,
 telemetry 260.392s, CLI 49.209s, SDK 38.328s, toolgate 22.891s, and native API
 19.179s.
+
+## 2026-09-09 — DAR-78 read-only chat and durable presentation streaming
+
+The authenticated Web UI now lists durable chats through insertion-fenced,
+newest-first pagination and renders canonical history through an allowlisted
+browser projection. History exposes only user/assistant text with stable
+logical and source revisions; system prompts, provider metadata, tool calls,
+tool results, raw runtime events, and internal error detail cannot be represented
+on that wire. Pages are capped at 100 messages and one MiB, and opaque cursors
+bind the chat, latest task, exact durable head, and offset. The application
+re-resolves configured secrets and validates the final redacted page before it
+crosses the BFF.
+
+Cookie-authenticated SSE projects closed model, tool, route, worker, lifecycle,
+error, checkpoint, and terminal records from the committed event ledger. Its
+compact cursor is HMAC-bound to the chat and exact ledger anchors with a
+daemon-stable domain-separated key; catch-up is bounded by page, event, byte,
+scan, and observation-time limits. Separate stream admission preserves normal
+BFF capacity. Browser disconnect, backpressure, write failure, and observer
+panic end observation only and cannot cancel, retry, or stall task execution.
+Tool completion records retain task, turn, call, and tool identity across page
+boundaries without exposing arguments or results.
+
+Live assistant text uses a daemon-owned bounded fan-out attached after the
+durable delta marker commits and after incremental secret redaction. These
+`chat.delta` events are explicitly provisional and carry no resume ID. Slow
+subscribers are detached; after reconnect or daemon restart the UI discards
+provisional text and reconciles from durable history. A committed terminal
+event triggers an authoritative history refresh instead of inventing a second
+durable final event at the same ledger position.
+
+The embedded client uses only DOM text nodes, caps retained history, supports
+bounded pagination, immediately closes an old stream during chat selection,
+rejects cross-chat events, and presents empty, loading, truncation, reconnect,
+and error states. Composer actions, steering, cancellation, approvals, feedback,
+route analytics, and Kanban functionality remain excluded from DAR-78.
+
+Two final adversarial reviews found and drove corrections for provider/tool
+record leakage, unfenced history pages, malformed browser reads, cross-chat
+stream races, missing live text, replay-cursor forgery, split-page tool identity,
+completion-tail ordering, and concurrent task interleaving. Their closing
+reviews reported no remaining P0/P1/P2 finding. The final integrated
+`make check` passed formatting and the 1,000-line limit, vet, the complete
+repository race suite, and production build. The longest rebuilt packages were
+releasepack 458.320s, application 342.603s, telemetry 257.734s, CLI 48.867s,
+SDK 41.671s, toolgate 24.215s, skills 23.668s, and runtime 16.544s.

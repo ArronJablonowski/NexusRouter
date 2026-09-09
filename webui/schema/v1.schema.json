@@ -1744,9 +1744,13 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "task_id",
         "text"
       ],
       "properties": {
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
         "text": {
           "type": "string",
           "minLength": 1,
@@ -1842,6 +1846,78 @@
           "$ref": "#/$defs/id"
         }
       }
+    },
+    "model_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "turn_id", "state"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "turn_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["started", "completed"]}
+      }
+    },
+    "tool_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "turn_id", "tool_call_id", "tool_name", "state"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "turn_id": {"$ref": "#/$defs/id"},
+        "tool_call_id": {"$ref": "#/$defs/id"},
+        "tool_name": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["started", "completed"]},
+        "effect": {"enum": ["none", "confirmed", "uncertain"]},
+        "code": {"$ref": "#/$defs/id"}
+      },
+      "allOf": [{
+        "if": {"properties": {"state": {"const": "started"}}},
+        "then": {"not": {"anyOf": [{"required": ["effect"]}, {"required": ["code"]}]}},
+        "else": {"required": ["effect"]}
+      }]
+    },
+    "route_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "route_id", "state"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "route_id": {"$ref": "#/$defs/id"},
+        "state": {"const": "selected"}
+      }
+    },
+    "worker_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "worker_id", "state"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "worker_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["started", "heartbeat", "completed"]}
+      }
+    },
+    "error_changed_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "code"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "code": {"$ref": "#/$defs/id"}
+      }
+    },
+    "task_terminal_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "state"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/id"},
+        "state": {"enum": ["completed", "failed", "canceled"]},
+        "code": {"$ref": "#/$defs/id"}
+      },
+      "allOf": [{
+        "if": {"properties": {"state": {"const": "completed"}}},
+        "then": {"not": {"required": ["code"]}}
+      }]
     },
     "approval_changed_data": {
       "type": "object",
@@ -2045,6 +2121,12 @@
             "chat.delta",
             "chat.final",
             "lifecycle.event",
+            "model.changed",
+            "tool.changed",
+            "route.changed",
+            "worker.changed",
+            "error.changed",
+            "task.terminal",
             "approval.changed",
             "feedback.changed",
             "board.changed",
@@ -2196,6 +2278,48 @@
             "required": [
               "cursor"
             ]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "model.changed"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/model_changed_data"}},
+            "required": ["cursor"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "tool.changed"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/tool_changed_data"}},
+            "required": ["cursor"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "route.changed"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/route_changed_data"}},
+            "required": ["cursor"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "worker.changed"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/worker_changed_data"}},
+            "required": ["cursor"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "error.changed"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/error_changed_data"}},
+            "required": ["cursor"]
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "task.terminal"}}},
+          "then": {
+            "properties": {"durability": {"const": "committed"}, "revision": {"minimum": 1}, "data": {"$ref": "#/$defs/task_terminal_data"}},
+            "required": ["cursor"]
           }
         },
         {

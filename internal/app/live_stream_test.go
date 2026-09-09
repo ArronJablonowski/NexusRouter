@@ -120,7 +120,7 @@ func TestLiveStreamSharedFailureGate(t *testing.T) {
 
 func TestLiveTextIgnoresToolAndWorkerPayloads(t *testing.T) {
 	var text strings.Builder
-	d := textDelivery{emit: func(s string) { text.WriteString(s) }}
+	d := textDelivery{emit: func(s string, _ bool) { text.WriteString(s) }}
 	d.accept(runtime.TurnStarted, "")
 	for _, kind := range []runtime.Kind{runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerCompleted} {
 		d.accept(kind, "private tool or child payload")

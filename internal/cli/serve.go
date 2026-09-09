@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/internal/webuiapp"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
@@ -108,6 +110,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var traceExporter *app.TraceExporter
 	var browserHandler *webuiapp.Handler
 	if s.WebUI.Enabled {
+		liveText := webuiapp.NewLiveTextHub()
+		if err := app.InstallPresentationTextSink(service, liveText.Publish); err != nil {
+			fmt.Fprintln(stderr, "cannot initialize Web UI presentation stream")
+			return 1
+		}
 		sessionTTL, durationErr := config.Duration(s.WebUI.BrowserSessionTTL)
 		if durationErr != nil {
 			fmt.Fprintln(stderr, "invalid Web UI configuration")
@@ -127,7 +134,13 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				seenHosts[parsed.Host] = true
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore})
+		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
+		browserHandler, err = webuiapp.New(webuiapp.Options{BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Reads: webuiapp.ReadServices{
+			Chats: service.ListChats, History: service.ChatHistory,
+			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
+				return db.ReadCommittedEventPage(ctx, options)
+			},
+		}})
 		if err != nil {
 			fmt.Fprintln(stderr, "invalid Web UI configuration")
 			return 1

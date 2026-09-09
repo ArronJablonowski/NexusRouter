@@ -43,6 +43,7 @@ type Request struct {
 	eventDelivery                   *eventDelivery
 	deliverPerCall                  bool
 	textSink                        func(string)
+	presentationTextSink            PresentationTextSink
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
 	approvedCompaction              *runtime.ApprovedCompaction
@@ -310,8 +311,15 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		sessionID = result.TaskID
 	}
 	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken}
-	if r.textSink != nil {
-		j.textDelivery = &textDelivery{secrets: secrets, emit: r.textSink}
+	if r.textSink != nil || r.presentationTextSink != nil {
+		j.textDelivery = &textDelivery{secrets: secrets, emit: func(text string, final bool) {
+			if !final {
+				deliverPresentationText(r.presentationTextSink, result.TaskID, sessionID, text)
+			}
+			if r.textSink != nil {
+				r.textSink(text)
+			}
+		}}
 	}
 	if s.Workers.DelegateModel != "" && r.delegate != nil {
 		if registry == nil {
