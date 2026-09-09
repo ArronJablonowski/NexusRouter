@@ -927,7 +927,7 @@ content can include sensitive prompts/tool output; render and store it safely.
 For a compilable program, see `examples/sdk/main.go`. The SDK integration test
 builds a separate temporary Go module using only public imports and a local
 provider fixture. This establishes external consumption, not production-provider
-qualification. General context/evaluator engines, automatic skill learning,
-resource-budget recommendations, extension hooks, a signed release and full PRD SDK contract coverage
-remain unfinished. Existing low-level packages are not a substitute for those
-future application-level extension contracts.
+qualification. Automatic semantic context compaction, resource-budget
+recommendations, broader extension hooks, a signed release, and full PRD SDK
+contract coverage remain unfinished. Existing low-level packages are not a
+substitute for those future application-level extension contracts.
