@@ -21,10 +21,10 @@
 	let selectedID = "", boardCursor = "", cardCursor = "", boardTotal = 0, cardTotal = 0, boardRequestVersion = 0, cardRequestVersion = 0, snapshotFence = null;
 	let boardSource = null, streamBoard = "", streamRevision = 0, streamFailures = 0, invalidationTimer = 0, snapshotGraphRevision = 0, snapshotGraphDigest = "";
 	let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active", appliedFilters = Object.freeze({state: "", assignee: "", owner: "", claim: ""});
-	let currentBoard = null, selectedCard = null, selectedCardAnchor = null;
+	let currentBoard = null, selectedCard = null, selectedCardAnchor = null, pendingPosition = null;
 	let pendingFocusAnchor = null, pendingFocusVersion = 0;
 	const contextObservers = new Set();
-	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map();
+	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map(), lifecycleByCard = new Map();
 	chat.hidden = true;
 	view.hidden = false;
 	function element(name, className, text) {
@@ -191,6 +191,52 @@
 			Number.isSafeInteger(item.claim_revision) && item.claim_revision >= 1 && Number.isSafeInteger(item.criteria_revision) && item.criteria_revision >= 1 && validTime(item.created_at); previous = item.revision; return valid; }) &&
 			(value.has_more || !value.checkpoints.length || previous === 1);
 	}
+	function validAcceptance(acceptance, attempt) {
+		if (!acceptance || acceptance.version !== 1 || !idPattern.test(acceptance.id) || acceptance.id !== attempt.acceptance_id || acceptance.board_id !== attempt.board_id || acceptance.card_id !== attempt.card_id || acceptance.attempt_id !== attempt.id ||
+			!attempt.candidate || acceptance.candidate_id !== attempt.candidate.id || acceptance.candidate_digest !== attempt.candidate.digest || acceptance.criteria_revision !== attempt.criteria_revision || acceptance.criteria_digest !== attempt.criteria_digest ||
+			!Number.isSafeInteger(acceptance.prior_evidence_head_revision) || acceptance.prior_evidence_head_revision < 1 || !digestPattern.test(acceptance.prior_evidence_set_digest) ||
+			!Number.isSafeInteger(acceptance.evidence_head_revision) || acceptance.evidence_head_revision < acceptance.prior_evidence_head_revision || !digestPattern.test(acceptance.evidence_set_digest) || acceptance.evidence_set_digest !== attempt.acceptance_evidence_digest ||
+			acceptance.policy_digest !== attempt.policy_digest || !["accepted", "rejected"].includes(acceptance.decision) || acceptance.decision !== attempt.state || acceptance.decided_by !== attempt.decision_by || acceptance.decided_by === attempt.worker_id ||
+			acceptance.decided_by_type !== attempt.decision_by_type || !["operator", "validator"].includes(acceptance.decided_by_type) || acceptance.decision_authority_id !== attempt.decision_authority_id ||
+			!boundedText(acceptance.rationale, 65536, false) || !validTime(acceptance.decided_at) || acceptance.decided_at !== attempt.ended_at || !attempt.evidence.length) return false;
+		const last = attempt.evidence[attempt.evidence.length - 1];
+		return acceptance.evidence_head_revision === last.revision && acceptance.prior_evidence_head_revision <= attempt.evidence.length;
+	}
+	function validLifecycle(item, boardID, card) {
+		if (!item || item.version !== 1 || item.card_id !== card.id || !validAttempt(item.attempt, boardID, card.id) || item.attempt.id !== card.current_attempt_id || item.attempt.ordinal !== card.attempt_count ||
+			!Array.isArray(item.checkpoints) || item.checkpoints.length > 100 || !Number.isSafeInteger(item.checkpoint_count) || item.checkpoint_count < item.checkpoints.length || item.checkpoint_count > 10000 ||
+			typeof item.checkpoints_has_more !== "boolean" || item.checkpoints_has_more !== (item.checkpoint_count > item.checkpoints.length) || item.acceptance === null) return false;
+		const acceptanceExpected = item.attempt.state === "accepted" || item.attempt.state === "rejected";
+		if (acceptanceExpected !== (item.acceptance !== undefined) || item.acceptance && !validAcceptance(item.acceptance, item.attempt)) return false;
+		if (card.current_claim_id && (!item.attempt.claim || item.attempt.claim.id !== card.current_claim_id || item.attempt.claim.state === "released") ||
+			!card.current_claim_id && item.attempt.claim && item.attempt.claim.state !== "released" || card.acceptance_id && card.acceptance_id !== item.attempt.acceptance_id ||
+			["in_progress", "blocked"].includes(card.state) && item.attempt.state !== "running" || card.state === "review" && item.attempt.state !== "review" || card.state === "done" && item.attempt.state !== "accepted") return false;
+		let previousRevision = 0;
+		return item.checkpoints.every(checkpoint => { const valid = checkpoint && checkpoint.version === 1 && checkpoint.board_id === boardID && checkpoint.card_id === card.id && checkpoint.attempt_id === item.attempt.id && item.attempt.claim && checkpoint.claim_id === item.attempt.claim.id &&
+			idPattern.test(checkpoint.id) && Number.isSafeInteger(checkpoint.revision) && checkpoint.revision > previousRevision && checkpoint.revision <= 10000 && Number.isSafeInteger(checkpoint.claim_revision) && checkpoint.claim_revision >= 1 &&
+			checkpoint.criteria_revision === item.attempt.criteria_revision && checkpoint.criteria_digest === item.attempt.criteria_digest && checkpoint.policy_digest === item.attempt.policy_digest && boundedText(checkpoint.evidence, 65536, false) &&
+			digestPattern.test(checkpoint.evidence_digest) && checkpoint.actor_id === item.attempt.worker_id && checkpoint.actor_type === "worker" && validTime(checkpoint.created_at); previousRevision = checkpoint && checkpoint.revision; return valid; });
+	}
+	function validLifecycleBatch(snapshot, reset) {
+		const items = snapshot.lifecycle === undefined ? [] : snapshot.lifecycle;
+		if (!Array.isArray(items) || items.length > snapshot.cards.length) return null;
+		const cards = new Map(snapshot.cards.map(card => [card.id, card])), incoming = new Map();
+		for (const item of items) {
+			const card = item && cards.get(item.card_id);
+			if (!card || incoming.has(item.card_id) || !reset && lifecycleByCard.has(item.card_id) || !validLifecycle(item, snapshot.board.id, card)) return null;
+			incoming.set(item.card_id, item);
+		}
+		return incoming;
+	}
+	function cardLifecycleSummary(card, lifecycle) {
+		const required = card.criteria.filter(criterion => criterion.required);
+		const result = {criteria: "Criteria revision " + String(card.criteria_revision) + " · " + String(required.length) + " required of " + String(card.criteria.length), required: required.map(criterion => criterion.description), attempt: "No current attempt lifecycle in this page.", acceptance: "Acceptance not recorded.", claim: "No claim recorded.", attention: false};
+		if (!lifecycle) return result;
+		const attempt = lifecycle.attempt; result.attempt = "Attempt " + String(attempt.ordinal) + " · " + attempt.state + " · criteria revision " + String(attempt.criteria_revision);
+		if (lifecycle.acceptance) result.acceptance = "Acceptance " + lifecycle.acceptance.decision + " · decided by " + lifecycle.acceptance.decided_by;
+		if (attempt.claim) { result.attention = attempt.claim.state === "attention"; result.claim = "Claim owner " + attempt.claim.owner_id + " · " + attempt.claim.state + " · heartbeat " + attempt.claim.last_heartbeat + " · expires " + attempt.claim.expires_at + (result.attention ? " · stale/orphan attention required" : ""); }
+		return result;
+	}
 	function boardLink(board) {
 		const item = element("li");
 		const link = element("a");
@@ -252,17 +298,19 @@
 	function renderPresentation() {
 		const listMode = presentation === "list";
 		const focused = document.activeElement;
+		const cards = pendingPosition ? client.provisionalPosition(loadedCards, pendingPosition) : loadedCards;
 		showKanban.setAttribute("aria-pressed", listMode ? "false" : "true"); showList.setAttribute("aria-pressed", listMode ? "true" : "false");
 		showKanban.classList.toggle("secondary", listMode); showList.classList.toggle("secondary", !listMode);
 		if (!selectedID || visibleColumns.length !== states.length) { kanban.hidden = true; cardList.hidden = true; return; }
 		if (listMode) {
-			cardList.replaceChildren(); client.reparent(loadedCards, cardNodes, () => cardList, focused); cardList.hidden = false; kanban.hidden = true;
+			cardList.replaceChildren(); client.reparent(cards, cardNodes, () => cardList, focused); cardList.hidden = false; kanban.hidden = true;
 		} else {
 			renderColumns(visibleColumns);
-			client.reparent(loadedCards, cardNodes, card => laneLists.get(card.state), focused);
+			client.reparent(cards, cardNodes, card => laneLists.get(card.state), focused);
 			for (const state of states) laneCounts.get(state).textContent = String(laneLists.get(state).children.length);
 			cardList.hidden = true; kanban.hidden = false;
 		}
+		for (const card of cards) { const node = cardNodes.get(card.id), badge = node && node.querySelector(".card-provisional"); if (node) node.classList.toggle("provisional-position", Boolean(card.provisional)); if (badge) badge.hidden = !card.provisional; }
 	}
 	function detailList(title) {
 		const section = element("section", "card-detail-section"); section.append(element("h5", "", title));
@@ -328,6 +376,11 @@
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "/cards/" + encodeURIComponent(cardID) + "/attempts/" + encodeURIComponent(attempt.id) + "?" + query.toString()).then(page => {
 			if (!validAttemptDetail(page, boardID, cardID, attempt.id)) throw new Error("invalid attempt detail");
 			target.replaceChildren(element("p", "", "Bounded preview: worker " + page.attempt.worker_id + " · " + page.attempt.state + " · revision " + String(page.attempt.revision) + "."));
+			const claim = page.attempt.claim;
+			if (claim) {
+				const attention = claim.state === "attention" ? " · stale/orphan attention required" : "";
+				target.append(element("p", claim.state === "attention" ? "card-alert" : "", "Lease owner " + claim.owner_id + " · " + claim.state + " · expires " + claim.expires_at + " · heartbeat " + claim.last_heartbeat + attention + "."));
+			} else target.append(element("p", "detail-empty", "No lease is recorded for this attempt."));
 			const checkpoints = element("ol", "checkpoint-list");
 			for (const checkpoint of page.checkpoints) checkpoints.append(element("li", "", "Checkpoint " + String(checkpoint.revision) + " · " + checkpoint.created_at));
 			if (!page.checkpoints.length) checkpoints.append(element("li", "detail-empty", "No checkpoints."));
@@ -363,7 +416,7 @@
 			target.append(before.section, after.section, history.section);
 		}).catch(() => { delete target.dataset.loaded; notice(status, "Card previews could not be loaded. Close and reopen the card to retry.", true); });
 	}
-	function cardNode(card) {
+	function cardNode(card, lifecycleRecord) {
 		const item = element("li", "kanban-card");
 		item.dataset.cardId = card.id;
 		const article = element("article");
@@ -373,10 +426,16 @@
 		meta.append(element("span", "", card.priority + " priority"));
 		meta.append(element("span", "", card.state.replace("_", " ") + " state"));
 		meta.append(element("span", "", "revision " + String(card.revision)));
+		const lifecycleSummary = cardLifecycleSummary(card, lifecycleRecord);
+		meta.append(element("span", "", lifecycleSummary.criteria));
+		if (lifecycleRecord) meta.append(element("span", "", lifecycleSummary.attempt));
 		if (card.remaining_dependencies > 0) meta.append(element("span", "card-alert", String(card.remaining_dependencies) + " dependencies remaining"));
+		if (card.block_reason) meta.append(element("span", "card-alert", "blocked: " + card.block_reason));
 		if (card.assignee_id && idPattern.test(card.assignee_id)) meta.append(element("span", "", "assigned " + card.assignee_id));
+		if (lifecycleSummary.attention) meta.append(element("span", "card-alert", "stale/orphan claim attention"));
 		if (card.pause_requested) meta.append(element("span", "card-alert", "pause requested"));
 		if (card.cancel_requested) meta.append(element("span", "card-alert", "cancel requested"));
+		const provisional = element("span", "card-alert card-provisional", "Pending position — not saved"); provisional.hidden = true; meta.append(provisional);
 		const position = element("div", "card-position-controls"); position.setAttribute("role", "group"); position.setAttribute("aria-label", "Position " + card.title);
 		for (const [direction, label] of [["up", "Move up"], ["down", "Move down"], ["ready", "Move to Ready"], ["backlog", "Move to Backlog"]]) {
 			const button = element("button", "secondary card-position", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.position = direction;
@@ -384,24 +443,30 @@
 			button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-position", {detail: Object.freeze({cardID: card.id, direction})})));
 			position.append(button);
 		}
-		const lifecycle = element("div", "card-lifecycle-controls"); lifecycle.setAttribute("role", "group"); lifecycle.setAttribute("aria-label", "Control " + card.title);
+		const lifecycleControls = element("div", "card-lifecycle-controls"); lifecycleControls.setAttribute("role", "group"); lifecycleControls.setAttribute("aria-label", "Control " + card.title);
 		for (const [action, label] of [["card.pause_request", "Request pause"], ["card.cancel_request", "Request cancellation"]]) {
 			const button = element("button", action === "card.cancel_request" ? "danger card-control" : "secondary card-control", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.control = action;
-			button.setAttribute("aria-label", label + ": " + card.title); button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-control", {detail: Object.freeze({cardID: card.id, action})}))); lifecycle.append(button);
+			button.setAttribute("aria-label", label + ": " + card.title); button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-control", {detail: Object.freeze({cardID: card.id, action})}))); lifecycleControls.append(button);
 		}
 		const review = element("div", "candidate-review"); review.hidden = true; review.setAttribute("role", "region"); review.setAttribute("aria-label", "Candidate review for " + card.title);
 		if (card.state === "review") {
 			let reviewDetail = null;
 			const button = element("button", "secondary card-review", "Review candidate"); button.type = "button"; button.dataset.cardId = card.id; button.setAttribute("aria-label", "Review candidate: " + card.title); button.setAttribute("aria-expanded", "false");
-			button.addEventListener("click", () => { if (reviewDetail) window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail: reviewDetail})); else if (!review.dataset.loaded) { review.dataset.loaded = "true"; loadCandidateReview(card, review, button, detail => { reviewDetail = detail; window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail})); }); } }); lifecycle.append(button);
+			button.addEventListener("click", () => { if (reviewDetail) window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail: reviewDetail})); else if (!review.dataset.loaded) { review.dataset.loaded = "true"; loadCandidateReview(card, review, button, detail => { reviewDetail = detail; window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail})); }); } }); lifecycleControls.append(button);
 		}
 		const details = element("div", "card-details"); details.hidden = true;
 		if (card.description) details.append(element("p", "", card.description));
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
+		if (card.block_reason) details.append(element("p", "card-alert", "Block reason: " + card.block_reason));
+		details.append(element("p", "", lifecycleSummary.criteria));
+		const requiredCriteria = element("ul", "card-detail-list");
+		for (const criterion of lifecycleSummary.required) requiredCriteria.append(element("li", "", "Required: " + criterion));
+		if (!lifecycleSummary.required.length) requiredCriteria.append(element("li", "detail-empty", "No required criteria."));
+		details.append(requiredCriteria, element("p", "", lifecycleSummary.attempt), element("p", "", lifecycleSummary.acceptance), element("p", lifecycleSummary.attention ? "card-alert" : "", lifecycleSummary.claim));
 		details.append(element("p", "", card.labels.length ? "Labels: " + card.labels.join(", ") : "No labels"));
 		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } const expanded = toggle.getAttribute("aria-expanded") === "true"; selectedCardAnchor = client.cardViewAnchor(card.board_id, card.id, !expanded); item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; selectedCard = cardContext(card); for (const observer of contextObservers) observer(); if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
-		article.append(toggle, meta, position, lifecycle, review, details); item.append(article);
+		article.append(toggle, meta, position, lifecycleControls, review, details); item.append(article);
 		return item;
 	}
 	function validateCardBatch(cards, reset) {
@@ -410,12 +475,13 @@
 		return result && result.ranks;
 	}
 	function clearCardState() {
-		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
+		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; pendingPosition = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
 		kanban.replaceChildren(); cardList.replaceChildren(); laneLists.clear(); laneCounts.clear(); cardNodes.clear(); kanban.hidden = true; cardList.hidden = true; loadMoreCards.hidden = true;
 		for (const observer of contextObservers) observer();
 	}
-	function appendCards(cards, ranks) {
-		const nodes = cards.map(cardNode);
+	function appendCards(cards, ranks, lifecycle) {
+		const nodes = cards.map(card => cardNode(card, lifecycle.get(card.id)));
+		for (const [cardID, item] of lifecycle) lifecycleByCard.set(cardID, item);
 		for (let index = 0; index < cards.length; index++) { cardIDs.add(cards[index].id); cardNodes.set(cards[index].id, nodes[index]); }
 		for (const state of states) if (ranks.has(state)) laneRanks.set(state, ranks.get(state));
 		loadedCards.push(...cards); renderPresentation();
@@ -441,6 +507,7 @@
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "?" + query.toString()).then(snapshot => {
 			if (!client.current(current, cardRequestVersion, boardID, selectedID)) return;
 			if (!validSnapshot(snapshot, boardID) || cardTotal + snapshot.cards.length > maxCards || after && cardCursors.has(after) || snapshot.has_more && (snapshot.next_cursor === after || cardCursors.has(snapshot.next_cursor))) throw new Error("invalid workboard snapshot");
+			const lifecycle = validLifecycleBatch(snapshot, reset); if (!lifecycle) throw new Error("invalid workboard lifecycle");
 			const ranks = validateCardBatch(snapshot.cards, reset); if (!ranks) throw new Error("invalid card order");
 			const columnSignature = snapshot.columns.map(column => [column.id, column.state, column.title, column.rank].join("\u0000")).join("\u0001");
 			const filterSignature = [appliedFilters.state, appliedFilters.assignee, appliedFilters.owner, appliedFilters.claim].join("\u0000");
@@ -451,7 +518,7 @@
 			streamRevision = Math.max(streamRevision, snapshot.board.event_sequence);
 			if (after) cardCursors.add(after);
 			if (reset) visibleColumns = snapshot.columns.slice();
-			appendCards(snapshot.cards, ranks);
+			appendCards(snapshot.cards, ranks, lifecycle);
 			cardTotal += snapshot.cards.length; cardCursor = snapshot.next_cursor || "";
 			selectedTitle.textContent = snapshot.board.title;
 			currentBoard = Object.freeze({...snapshot.board});
@@ -477,10 +544,11 @@
 	window.DarwinWorkboards = Object.freeze({
 		context: () => Object.freeze({
 			board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision,
-			cards: Object.freeze(loadedCards.map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested}))),
+			cards: Object.freeze((pendingPosition ? client.provisionalPosition(loadedCards, pendingPosition) : loadedCards).map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested, provisional: Boolean(card.provisional)}))),
 			complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count),
 			unfiltered: !appliedFilters.state && !appliedFilters.assignee && !appliedFilters.owner && !appliedFilters.claim
 		}),
+		previewPosition: plan => { const projected = client.provisionalPosition(loadedCards, plan); if (!projected) return false; pendingPosition = plan; renderPresentation(); return true; },
 		refresh: () => { loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); },
 		subscribe: observer => { if (typeof observer !== "function") return () => {}; contextObservers.add(observer); return () => contextObservers.delete(observer); }
 	});
@@ -506,11 +574,16 @@
 		if (!idPattern.test(boardID)) { notice(stateNode, "The workboard address is invalid.", true); return; }
 		if (streamBoard === boardID && boardSource) return;
 		closeBoardStream(); streamBoard = boardID; streamRevision = 0; streamFailures = 0;
-		const source = new EventSource(base + "/api/v1/workboards/" + encodeURIComponent(boardID) + "/events"); boardSource = source;
+		if (typeof EventSource !== "function") { streamBoard = ""; liveStatus.textContent = "Live updates are unavailable in this browser. Use Refresh to retry."; return; }
+		let source;
+		try { source = new EventSource(base + "/api/v1/workboards/" + encodeURIComponent(boardID) + "/events"); }
+		catch (_) { streamBoard = ""; liveStatus.textContent = "Live updates could not connect. Use Refresh to retry."; return; }
+		boardSource = source;
 		source.addEventListener("board.changed", event => {
+			if (boardSource !== source) return;
 			let payload;
 			try { payload = JSON.parse(event.data); } catch (_) { closeBoardStream(); notice(stateNode, "Live updates returned invalid data. Refresh the board to reconnect.", true); return; }
-			if (!validBoardEvent(payload, boardID) || event.lastEventId !== payload.cursor || boardSource !== source) { closeBoardStream(); notice(stateNode, "Live updates could not be validated. Refresh the board to reconnect.", true); return; }
+			if (!validBoardEvent(payload, boardID) || event.lastEventId !== payload.cursor) { closeBoardStream(); notice(stateNode, "Live updates could not be validated. Refresh the board to reconnect.", true); return; }
 			if (payload.revision <= streamRevision) return;
 			streamRevision = payload.revision; queueInvalidation("Updating after a committed change…");
 		});

@@ -148,6 +148,7 @@ input { padding: .55rem .7rem; }
 .workboard-card-list { margin: 0; padding: 1rem 1.4rem; overflow: auto; list-style: none; }
 .workboard-card-list[hidden] { display: none; }
 .workboard-card-list .kanban-card { max-width: 56rem; }
+.kanban-card.provisional-position { border-style: dashed; }
 .workboard-mutation-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
 .workboard-mutation-controls[hidden], .workboard-dialog-backdrop[hidden] { display: none; }
 .workboard-dialog-backdrop { position: fixed; inset: 0; z-index: 12; display: grid; place-items: center; padding: 1rem; background: #050813dd; }

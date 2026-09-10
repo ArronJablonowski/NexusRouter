@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "039032d884b19b88627dd4095cbb3ebf413be50e4059afd2f152cc68823222e8" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "166cc1510a022356614a47704740b429239a38f8afb54c01cbb7dd6c5d21dd48" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -289,7 +289,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
 		`position.setAttribute("role", "group")`, `button.dataset.position = direction`, `new CustomEvent("darwin:card-position"`, `complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count)`,
-		`lifecycle.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
+		`lifecycleControls.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
 		`"Review candidate"`, `"darwin:acceptance-review"`, `renderCandidateReview`, `"Advisory model audits"`, `"Model-audit evidence is advisory and does not independently authorize acceptance."`,
 		`card.current_attempt_id`, `page.attempt.state !== "review"`, `evidenceIDs.has(evidence.id)`, `criterionIDs.has(evidence.criterion_id)`,
 		`client.captureFocusAnchor(activeFocus, focusBoardID, cardNodes)`, `client.refreshFocusAnchor(capturedFocus, pendingFocusAnchor, boardID, activeFocus, document.body)`, `pendingFocusVersion === current`, `client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body)`,
@@ -308,7 +308,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		t.Fatal("authoritative refresh does not capture the focused card control")
 	}
 	clearedCards := strings.Index(body[capturedFocus:], `clearCardState()`)
-	appendedCards := strings.Index(body[capturedFocus:], `appendCards(snapshot.cards, ranks)`)
+	appendedCards := strings.Index(body[capturedFocus:], `appendCards(snapshot.cards, ranks, lifecycle)`)
 	restoredFocus := strings.Index(body[capturedFocus:], `client.restoreFocusAnchor(focusAnchor`)
 	if clearedCards < 0 || appendedCards < 0 || restoredFocus <= appendedCards || clearedCards >= appendedCards || strings.Count(body, `client.restoreFocusAnchor(focusAnchor`) != 2 {
 		t.Fatal("authoritative refresh does not capture focus before teardown and restore it after success or failure")
@@ -341,14 +341,15 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 	for _, required := range []string{
 		`value === "" || value === "unassigned" || idPattern.test(value)`, `["", "unclaimed", "active", "attention"].includes(filters.claim)`,
 		`query.set("state", appliedFilters.state)`, `query.set("assignee_id", appliedFilters.assignee)`, `query.set("owner_id", appliedFilters.owner)`, `query.set("claim_state", appliedFilters.claim)`,
-		`function clearCardState()`, `snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
-		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(loadedCards, cardNodes`, `const filterSignature = [appliedFilters.state`,
+		`function clearCardState()`, `cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); snapshotFence = null`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
+		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(cards, cardNodes`, `const filterSignature = [appliedFilters.state`,
 		`filterForm.requestSubmit()`, `aria-invalid`, `presentation = "kanban"`, `presentation = "list"`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120)`,
 		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · "`, `" matching cards loaded · "`, `position controls require all cards loaded and filters clear`,
 		`let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active"`, `const boardState = appliedBoardState`, `appliedBoardState = boardStateFilter.value`,
-		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(loadedCards, cardNodes`,
+		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(cards, cardNodes`,
 		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
 		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `candidate.evidence_count >= 1`, `validEvidence`,
+		`"Lease owner " + claim.owner_id`, `claim.state === "attention" ? " · stale/orphan attention required"`, `" · expires " + claim.expires_at`, `" · heartbeat " + claim.last_heartbeat`,
 		`selectedCardAnchor = client.cardViewAnchor(card.board_id, card.id, !expanded)`, `client.cardViewTransition(selectedCardAnchor, focusBoardID, boardID, [], false)`, `restoreCardView(cardView && cardView.card)`,
 		`selectedCardAnchor = viewTransition ? viewTransition.anchor : null`, `!filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count`,
 	} {

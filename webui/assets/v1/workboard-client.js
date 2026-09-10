@@ -130,6 +130,25 @@
 		if (index < 0 || !anchor || anchor.id === card.id) return null;
 		return Object.freeze({...common, action: "card.reorder", anchorID: anchor.id, anchorRank: anchor.rank, beforeCardID: direction === "up" ? anchor.id : "", afterCardID: direction === "down" ? anchor.id : ""});
 	}
+	function provisionalPosition(cards, plan) {
+		if (!Array.isArray(cards) || cards.length > 10000 || !plan || !["card.move", "card.reorder"].includes(plan.action) || !id(plan.cardID)) return null;
+		const ids = new Set();
+		for (const card of cards) { if (!card || !id(card.id) || ids.has(card.id)) return null; ids.add(card.id); }
+		const card = cards.find(item => item.id === plan.cardID);
+		if (!card || card.state !== plan.sourceState || card.revision !== plan.cardRevision) return null;
+		const remaining = cards.filter(item => item.id !== card.id), projected = Object.freeze({...card, state: plan.action === "card.move" ? plan.targetState : card.state, provisional: true});
+		if (plan.action === "card.reorder") {
+			const anchor = remaining.find(item => item.id === plan.anchorID);
+			if (!anchor || anchor.state !== card.state || anchor.rank !== plan.anchorRank || Boolean(plan.beforeCardID) === Boolean(plan.afterCardID) || (plan.beforeCardID || plan.afterCardID) !== anchor.id) return null;
+			const index = remaining.indexOf(anchor) + (plan.afterCardID ? 1 : 0); remaining.splice(index, 0, projected);
+		} else {
+			if (!([card.state, plan.targetState].includes("backlog") && [card.state, plan.targetState].includes("ready")) || plan.anchorID) return null;
+			let index = plan.targetState === "backlog" ? 0 : remaining.findIndex(item => item.state !== "backlog" && item.state !== "ready");
+			for (let cursor = remaining.length - 1; cursor >= 0; cursor--) if (remaining[cursor].state === plan.targetState) { index = cursor + 1; break; }
+			if (index < 0) index = remaining.length; remaining.splice(index, 0, projected);
+		}
+		return Object.freeze(remaining);
+	}
 	function dependencyPlan(context, capture, mode, dependencyID) {
 		if (!captureCurrent(capture, context) || capture.action !== "dependency.change" || !id(dependencyID) || dependencyID === capture.cardID || !Array.isArray(context.cards) || !context.cards.some(card => card.id === dependencyID)) return null;
 		const current = capture.dependencies.includes(dependencyID), target = context.cards.find(card => card.id === dependencyID);
@@ -179,5 +198,5 @@
 		return Object.freeze({body, definitive: Boolean(expected && body.code === expected[0] && body.retryable === expected[1]), operationID: body.operation_id || ""});
 	}
 	function acknowledgeAllowed(intent, operationsReady, operationReadFailed, unresolvedCount) { return Boolean(intent && !intent.operationID && intent.reconciledClean && operationsReady && !operationReadFailed && unresolvedCount === 0); }
-	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, captureFocusAnchor, cardViewAnchor, cardViewTransition, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent, refreshFocusAnchor, restoreFocusAnchor});
+	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, captureFocusAnchor, cardViewAnchor, cardViewTransition, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, provisionalPosition, receiptMatches, reparent, refreshFocusAnchor, restoreFocusAnchor});
 });

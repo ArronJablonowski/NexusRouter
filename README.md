@@ -83,9 +83,10 @@ satisfy the durable decision, and each request freezes the exact card, attempt,
 candidate, evidence head, and configuration digests. Running workers now
 consume a durable cancellation request after an exact heartbeat, cancel and
 join the supervisor-owned callback, persist runtime cancellation, and retain
-the workboard claim for independently proven finalization. Pause consumption,
-same-daemon stop acknowledgement, selected/expanded-card restoration, and
-browser end-to-end qualification remain open. Authoritative refetches now
+the workboard claim for independently proven finalization. Durable pause and
+resume acknowledgement at explicit worker safe boundaries remains DAR-85
+supervision work; full browser end-to-end qualification remains DAR-86 work.
+Authoritative refetches now
 preserve a validated keyboard-focus identity across same-board and superseding
 refreshes, restoring the exact replacement control, its card toggle, or the
 stable Refresh control without retaining stale DOM or stealing newer focus.
@@ -1785,8 +1786,8 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Finish DAR-83 pause semantics and browser qualification, then add proposal-gated criteria revision, acceptance, and durable daemon approval presentation after DAR-84's core acceptance reconciliation.
-2. Connect durable board consumption/orchestration through DAR-85, then qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Finish the remaining DAR-83 conflict, dependency-cycle, and populated-board browser cases now that lifecycle presentation, optimistic reconciliation, and the first real-Chrome qualification are in place.
+2. Connect durable board consumption/orchestration—including safe-boundary pause/resume acknowledgement—through DAR-85, then qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

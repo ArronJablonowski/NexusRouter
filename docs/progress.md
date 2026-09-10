@@ -6326,8 +6326,9 @@ of the provider-neutral tool execution identity.
 This remains a partial DAR-84 delivery. Board revise/archive, card reorder,
 criteria revision, acceptance, pause/cancel and other lifecycle tools, plus a
 durable daemon/headless approval presenter and real-provider approval UX test,
-remain open. DAR-83 still requires pause acknowledgement semantics and broader
-browser qualification. Repository-wide verification for this checkpoint is
+remain open. Safe-boundary pause/resume acknowledgement belongs to DAR-85's
+worker-supervision protocol; DAR-83 still requires broader browser
+qualification. Repository-wide verification for this checkpoint is
 complete: `make check` passed the source-format/1,000-line gate, `go vet ./...`,
 the full race-enabled repository suite, and `go build ./...` on the exact
 integrated tree. The longest rebuilt packages were application 569.506s,
@@ -6371,8 +6372,9 @@ acceptance gate or falsely attribute the edit. The required follow-up is a
 durable two-stage `criteria.propose`/operator-apply protocol (or an equivalent
 approval-grant context) that records both identities and binds the exact proposal
 digest. Candidate decision tools, durable daemon/headless approval
-presentation, real-provider approval UX, pause acknowledgement, and broader
-browser qualification remain open.
+presentation, and real-provider approval UX remain open. Safe-boundary
+pause/resume acknowledgement is assigned to DAR-85; broader browser
+qualification remains open under DAR-83/DAR-86.
 
 The completed same-lane reorder path is revision-fenced, approval-backed,
 single-writer scoped, task-attributed, and domain-idempotent; exact replay
@@ -6383,3 +6385,47 @@ final `make check` passed source formatting and the 1,000-line limit, `go vet
 ./...`, the complete race-enabled suite, and `go build ./...`; the longest
 rebuilt packages were application 578.941s, releasepack 504.639s, telemetry
 482.674s, SDK 66.622s, CLI 65.154s, and toolgate 32.250s.
+
+## 2026-09-10 — DAR-83 lifecycle, optimistic reconciliation, and Chrome checkpoint
+
+DAR-83 remains in progress, and the Kanban remains an integrated route inside
+the authenticated DarwinRouter Web UI rather than a separate operator service.
+The browser now validates the server's bounded latest-attempt lifecycle
+projection before indexing it across card pages. Cross-board, cross-card,
+duplicate, stale-attempt, mismatched-claim, malformed acceptance, and malformed
+checkpoint records fail closed. Cards display their block reason, criteria and
+required evidence sources, current attempt and acceptance state, and claim
+owner/state/heartbeat/expiry; attention claims are explicitly identified as
+stale/orphan recovery work.
+
+Card moves and same-lane reorders now project a clearly labelled provisional
+position without mutating authoritative cards or revisions. The existing polite
+live region says the position is not saved. A committed receipt, definitive
+conflict, malformed response, network failure, or ambiguous outcome removes the
+projection through authoritative refetch; ambiguous requests retain the
+operation intent and remain ineligible for automatic replay.
+
+A dependency-free real-browser qualification now launches Chrome for Testing
+against an authenticated same-origin `httptest` fixture and drives the checked-in
+shell through the Chrome DevTools Protocol. It verifies keyboard navigation from
+Chats to Workboards and into a board, accessible loading and empty states, Enter
+activation of Refresh, a second authoritative fetch, and stable focus
+restoration. Separate executable browser-model tests cover unavailable and
+throwing EventSource construction, duplicate events, bounded reconnect failure,
+stale-source isolation, malformed events, lifecycle fencing, and optimistic
+projection behavior. Focused normal and race-enabled Web UI, adapter, and
+workboard tests pass on the integrated tree. The final `make check` passed the
+source-format/1,000-line gate, `go vet ./...`, the complete race-enabled suite,
+and `go build ./...`; the longest rebuilt packages were application 574.769s,
+releasepack 505.458s, telemetry 487.935s, SDK 66.564s, CLI 65.411s, and toolgate
+31.409s. Populated-board conflict,
+dependency-cycle, and deeper accessibility browser scenarios remain before
+DAR-83 is marked Done; release-wide qualification remains DAR-86 work.
+
+Safe pause acknowledgement was re-scoped after reading the live Linear
+acceptance boundary: it belongs to DAR-85's worker-supervision protocol, not
+the visual-board issue. The correct follow-up requires durable
+requested/acknowledged/resume-requested phases, acknowledgement only at an
+explicit callback safe boundary, exact revision fences, continued heartbeat,
+cancellation precedence, restart and lease-loss tests, and distinct paused and
+resume UI states.
