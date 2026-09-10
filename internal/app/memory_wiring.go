@@ -56,6 +56,11 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 	if cfg.Tools.WorkboardReadEnabled {
 		names = append(names, "workboard_list", "workboard_read")
 	}
+	if cfg.Tools.WorkboardWriteEnabled {
+		for _, spec := range workboardMutationSpecs() {
+			names = append(names, spec.Name)
+		}
+	}
 	if cfg.Tools.CreateEnabled {
 		names = append(names, "create_file")
 	}

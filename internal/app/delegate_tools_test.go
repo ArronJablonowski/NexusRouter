@@ -118,3 +118,32 @@ func TestDelegateToolsMissingCapabilityRejectsBeforeAdmission(t *testing.T) {
 		t.Fatal("missing capability created database", err)
 	}
 }
+
+func TestApplicationToolPolicyUsesConfiguredWriteDecision(t *testing.T) {
+	for _, test := range []struct {
+		configured string
+		want       tools.Decision
+	}{
+		{"deny", tools.Deny},
+		{"ask", tools.Ask},
+		{"allow", tools.Allow},
+		{"invalid", tools.Deny},
+	} {
+		policy := applicationToolPolicyFor(test.configured)
+		for _, target := range []struct{ tool, scope string }{
+			{"workboard_create_board", "workboards"},
+			{"workboard_create_card", "workboard:board_a"},
+			{"workboard_update_card", "workboard:board_a"},
+			{"workboard_transition_card", "workboard:board_a"},
+			{"workboard_add_dependency", "workboard:board_a"},
+			{"workboard_remove_dependency", "workboard:board_a"},
+		} {
+			if got := policy.Decide(target.tool, target.scope); got != test.want {
+				t.Fatalf("configured=%q tool=%q scope=%q got=%q want=%q", test.configured, target.tool, target.scope, got, test.want)
+			}
+		}
+		if got := policy.Decide("workboard_read", "workboard:board_a"); got != tools.Allow {
+			t.Fatalf("configured=%q changed read decision to %q", test.configured, got)
+		}
+	}
+}

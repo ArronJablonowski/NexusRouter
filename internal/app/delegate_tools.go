@@ -25,10 +25,27 @@ func inheritDelegateTools(ctx context.Context, registry *tools.Registry, parent 
 }
 
 func applicationToolPolicy() *tools.Policy {
+	return applicationToolPolicyFor("ask")
+}
+
+func applicationToolPolicyFor(configured string) *tools.Policy {
+	writeDecision := tools.Deny
+	switch configured {
+	case "allow":
+		writeDecision = tools.Allow
+	case "ask":
+		writeDecision = tools.Ask
+	}
 	return &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{
 		{Tool: "read_file", Scope: "workspace", Decision: tools.Allow},
 		{Tool: "workboard_list", Scope: "workboards", Decision: tools.Allow},
-		{Tool: "workboard_read", Scope: "workboards", Decision: tools.Allow},
+		{Tool: "workboard_read", Scope: "*", Decision: tools.Allow},
+		{Tool: "workboard_create_board", Scope: "workboards", Decision: writeDecision},
+		{Tool: "workboard_create_card", Scope: "*", Decision: writeDecision},
+		{Tool: "workboard_update_card", Scope: "*", Decision: writeDecision},
+		{Tool: "workboard_transition_card", Scope: "*", Decision: writeDecision},
+		{Tool: "workboard_add_dependency", Scope: "*", Decision: writeDecision},
+		{Tool: "workboard_remove_dependency", Scope: "*", Decision: writeDecision},
 		{Tool: "delegate", Scope: "delegation", Decision: tools.Allow},
 		{Tool: "delegate_batch", Scope: "delegation", Decision: tools.Allow},
 	}}

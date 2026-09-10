@@ -98,9 +98,11 @@ attention. Bounded in-process workers are atomically bound to claims and runtime
 tasks; stop-proof recovery is independently derived from durable task, process,
 and effect evidence; lifecycle and dependency history is paginated; and exact
 browser recovery survives restart and credential rotation through a persistent
-workspace identity. Local root coordinators may opt into the read-only
-`workboard_list` and `workboard_read` tools; agent mutations remain DAR-84 work,
-while the remaining interactive Kanban behavior remains DAR-83 work.
+workspace identity. Local root coordinators may opt into read-only board tools
+and separately enable approval-backed board/card creation, rich card updates,
+backlog/ready transitions, and dependency changes. Additional lifecycle and
+acceptance tools remain DAR-84 work, while the remaining interactive Kanban
+behavior remains DAR-83 work.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -1203,6 +1205,7 @@ tools:
   enabled: true
   read_root: /absolute/path/to/workspace
   workboard_read_enabled: true
+  workboard_write_enabled: false
   max_turns: 8
 ```
 
@@ -1210,10 +1213,20 @@ This allows local models to read UTF-8 regular files up to 64 KiB within that di
 
 `workboard_read_enabled` independently opts the root coordinator into the
 read-only `workboard_list` and `workboard_read` Kanban tools. Both use bounded
-pages, strict closed argument schemas, the runtime's durable read lifecycle and
-shared `workboards` lease. They are available only to local root execution and
-are never inherited by delegated workers. Board mutations remain unavailable to
-models. Returned board/card content becomes sensitive durable session content.
+pages, strict closed argument schemas, and the runtime's durable read lifecycle.
+Board listing uses the global `workboards` reader scope; a board read uses the
+same exact `workboard:<board_id>` scope as writes so same-board readers and the
+single writer cannot overlap. They are available only to local root execution and
+are never inherited by delegated workers. Setting `workboard_write_enabled`
+also requires reads and exposes six local-root-only mutation tools for board and
+card creation, rich card updates, backlog/ready transitions, and dependency
+add/remove. Every write requires durable approval authority, obeys
+`security.default_tool_policy`, binds the approval and single-writer lease to
+`workboards` or the exact argument-derived `workboard:<board_id>` scope, and
+uses a caller-supplied idempotency key without authorizing automatic retry.
+Mutation events carry a deterministic task-bound model actor; the task journal
+retains the selected provider/model provenance without placing it in tool input.
+Returned board/card content becomes sensitive durable session content.
 
 Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Current immutable evaluation and advisory-audit observations are decayed individually by source time before aggregation. `routing.decay_half_life` supplies the default and exact `routing.decay_overrides` domain/profile entries may replace it. Persisted route explanations report raw/effective samples, average decay contribution and source-time windows without prompts or outputs; see [fitness observation decay](docs/fitness-decay.md). Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Successful model discovery is cached for up to five seconds per provider/endpoint/credential/privacy identity; execution failures invalidate it. Failed discovery is not cached. Explicit and automatic local reservations share one application service; discovery caches are also service-local. Neither is shared across separate processes.
 
@@ -1760,8 +1773,8 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Complete DAR-82 browser workboard SSE, CLI/daemon service composition, and the remaining claim/attempt/evaluation commands, then build agent tools and the Kanban Web UI through DAR-85.
-2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Finish DAR-83 pause semantics and browser qualification, then complete the remaining policy-gated board lifecycle and acceptance tools in DAR-84.
+2. Connect durable board consumption/orchestration through DAR-85, then qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

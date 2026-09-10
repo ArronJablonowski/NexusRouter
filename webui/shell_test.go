@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "1459b3a3f43a64bfd6d5c61c3c26b062e4ee9bf4b2cfaa30cba8a633e04dedbf" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "039032d884b19b88627dd4095cbb3ebf413be50e4059afd2f152cc68823222e8" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -349,6 +349,8 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(loadedCards, cardNodes`,
 		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
 		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `candidate.evidence_count >= 1`, `validEvidence`,
+		`selectedCardAnchor = client.cardViewAnchor(card.board_id, card.id, !expanded)`, `client.cardViewTransition(selectedCardAnchor, focusBoardID, boardID, [], false)`, `restoreCardView(cardView && cardView.card)`,
+		`selectedCardAnchor = viewTransition ? viewTransition.anchor : null`, `!filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard filter/presentation guard missing %q", required)

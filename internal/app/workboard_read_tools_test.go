@@ -161,6 +161,7 @@ func TestWorkboardListToolSanitizesValidOversizedProjection(t *testing.T) {
 type workboardCatalogProvider struct {
 	t       *testing.T
 	streams *atomic.Int32
+	writes  bool
 }
 
 func (p workboardCatalogProvider) Models(context.Context) ([]string, error) {
@@ -179,6 +180,9 @@ func (p workboardCatalogProvider) Stream(_ context.Context, request providers.Re
 		return emit(providers.Chunk{Text: "child complete", Done: true, FinishReason: "stop"})
 	}
 	want := []string{"delegate", "delegate_batch", "workboard_list", "workboard_read"}
+	if p.writes {
+		want = []string{"delegate", "delegate_batch", "workboard_add_dependency", "workboard_create_board", "workboard_create_card", "workboard_list", "workboard_read", "workboard_remove_dependency", "workboard_transition_card", "workboard_update_card"}
+	}
 	if !slices.Equal(names, want) {
 		p.t.Errorf("root catalog = %v, want %v", names, want)
 	}
@@ -194,10 +198,15 @@ func (p workboardCatalogProvider) Stream(_ context.Context, request providers.Re
 func TestConfiguredWorkboardToolsReachRootRuntimeButNotChild(t *testing.T) {
 	svc, _ := autoFixture(t)
 	svc.settings.Tools.WorkboardReadEnabled = true
+	svc.settings.Tools.WorkboardWriteEnabled = true
+	svc.toolReviewer = func(context.Context, tools.ApprovalPrompt) (string, bool, error) { return "operator", true, nil }
 	svc.settings.Workers.DelegateModel = "z"
+	for index := range svc.settings.Models {
+		svc.settings.Models[index].ContextTokens = 200_000
+	}
 	var streams atomic.Int32
 	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
-		return workboardCatalogProvider{t: t, streams: &streams}, nil
+		return workboardCatalogProvider{t: t, streams: &streams, writes: true}, nil
 	})
 	root, err := svc.Run(context.Background(), Request{ModelID: "a", Prompt: "inspect the board"})
 	if err != nil || root.Text != "root complete" || streams.Load() != 2 {
@@ -218,6 +227,10 @@ func TestConfiguredWorkboardToolsReachRootRuntimeButNotChild(t *testing.T) {
 	defer store.Close()
 	if err := registerWorkboardReadTools(registry, store); err != nil {
 		t.Fatal(err)
+	}
+	bridge, err := NewWorkboardBridge(store, store, defaultWorkboardNow)
+	if err != nil || registerWorkboardMutationTools(registry, bridge) != nil {
+		t.Fatalf("register workboard mutation tools: %v", err)
 	}
 	childContext, err := inheritDelegateTools(context.Background(), registry, applicationToolPolicy())
 	if err != nil {

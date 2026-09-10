@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 	"github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
@@ -159,6 +160,21 @@ func rootAgentWorkboardContext(ctx context.Context) context.Context {
 	})
 }
 
+func rootAgentMutationWorkboardContext(ctx context.Context) (context.Context, error) {
+	identity, ok := tools.ExecutionIdentityFromContext(ctx)
+	if !ok {
+		return nil, errors.New("workboard mutation identity unavailable")
+	}
+	// Model identity is not part of the provider-neutral execution context yet.
+	// Bind durable attribution to the trusted task origin; the task journal binds
+	// that origin to its selected provider and model without exposing either here.
+	actor := sha256.Sum256(append([]byte("darwin.workboard.root-agent-task.v1\x00"), []byte(identity.TaskID)...))
+	return context.WithValue(ctx, workboardAuthorityKey{}, workboard.Authority{
+		CreationScope: "root-agent-tools",
+		Actor:         workboard.Actor{ID: hex.EncodeToString(actor[:]), Type: "model"},
+	}), nil
+}
+
 func browserWorkboardContext(ctx context.Context, subject string, authority workboard.Authority) (context.Context, error) {
 	if ctx == nil || !validBrowserSubject(subject) || authority.Validate() != nil || authority.Actor.Type != "operator" {
 		return nil, errors.New("workboard authority unavailable")
@@ -217,6 +233,14 @@ func (b *WorkboardBridge) RootAgentRead(ctx context.Context, boardID string, opt
 		}
 	}
 	return webui.BoardSnapshot{}, errors.New("workboard snapshot changed during read")
+}
+
+func (b *WorkboardBridge) RootAgentMutate(ctx context.Context, request webui.BoardRequest) (webui.OperationReceipt, error) {
+	trusted, err := rootAgentMutationWorkboardContext(ctx)
+	if err != nil {
+		return webui.OperationReceipt{}, err
+	}
+	return b.mutate(trusted, request)
 }
 
 func (b *WorkboardBridge) BrowserRead(ctx context.Context, subject, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {

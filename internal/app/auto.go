@@ -135,7 +135,7 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 			runErr = errors.Join(runErr, r.eventDelivery.Err())
 		}()
 	}
-	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled) && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
+	if (s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Tools.WorkboardWriteEnabled) && r.delegatedParent == "" && (s.toolReviewer == nil && s.toolPresenter == nil || r.submissionID != "") {
 		return Result{}, ErrAdmission
 	}
 	// Process-local handlers have no durable identity yet. Never attach changed

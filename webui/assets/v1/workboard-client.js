@@ -83,6 +83,19 @@
 		if (!target) return false;
 		try { target.focus({preventScroll: true}); return true; } catch (_) { return false; }
 	}
+	function cardViewAnchor(boardID, cardID, expanded) {
+		return id(boardID) && id(cardID) && typeof expanded === "boolean" ? Object.freeze({boardID, cardID, expanded}) : null;
+	}
+	function cardViewTransition(anchor, previousBoardID, boardID, cards, completeUnfiltered) {
+		if ((previousBoardID !== "" && !id(previousBoardID)) || !id(boardID) || !Array.isArray(cards) || cards.length > 10000 || typeof completeUnfiltered !== "boolean") return null;
+		const ids = new Set(); let match = null;
+		for (const card of cards) { if (!card || card.board_id !== boardID || !id(card.id) || ids.has(card.id)) return null; ids.add(card.id); if (anchor && card.id === anchor.cardID) match = card; }
+		if (!anchor) return Object.freeze({anchor: null, card: null});
+		if (!exact(anchor, ["boardID", "cardID", "expanded"], []) || anchor.boardID !== previousBoardID || !id(anchor.cardID) || typeof anchor.expanded !== "boolean") return null;
+		if (previousBoardID !== boardID || completeUnfiltered && !match) return Object.freeze({anchor: null, card: null});
+		const retained = cardViewAnchor(anchor.boardID, anchor.cardID, anchor.expanded);
+		return Object.freeze({anchor: retained, card: match});
+	}
 	function freezeIntent(path, body) {
 		const freeze = value => { if (value && typeof value === "object" && !Object.isFrozen(value)) { for (const item of Object.values(value)) freeze(item); Object.freeze(value); } return value; };
 		return Object.freeze({path, body: freeze(body), encoded: JSON.stringify(body)});
@@ -166,5 +179,5 @@
 		return Object.freeze({body, definitive: Boolean(expected && body.code === expected[0] && body.retryable === expected[1]), operationID: body.operation_id || ""});
 	}
 	function acknowledgeAllowed(intent, operationsReady, operationReadFailed, unresolvedCount) { return Boolean(intent && !intent.operationID && intent.reconciledClean && operationsReady && !operationReadFailed && unresolvedCount === 0); }
-	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, captureFocusAnchor, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent, refreshFocusAnchor, restoreFocusAnchor});
+	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, captureFocusAnchor, cardViewAnchor, cardViewTransition, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent, refreshFocusAnchor, restoreFocusAnchor});
 });

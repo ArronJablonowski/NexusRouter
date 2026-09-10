@@ -49,11 +49,13 @@ func newExtension(definitions []Definition, policy *Policy, reviewed bool) (*Ext
 	registry := &Registry{}
 	total := 0
 	for _, d := range definitions {
-		if !extensionName(d.Tool.Name) || !extensionScope(d.Scope) || (!reviewed && !d.ReadOnly) || d.Handler == nil || !utf8.ValidString(d.Tool.Description) || len(d.Tool.Description) > 4096 || !utf8.Valid(d.Tool.Parameters) || len(d.Tool.Parameters) > 64<<10 {
+		if !extensionName(d.Tool.Name) || !extensionScope(d.Scope) || d.ResolveScope != nil || (!reviewed && !d.ReadOnly) || d.Handler == nil || !utf8.ValidString(d.Tool.Description) || len(d.Tool.Description) > 4096 || !utf8.Valid(d.Tool.Parameters) || len(d.Tool.Parameters) > 64<<10 {
 			return nil, ErrDefinition
 		}
 		switch d.Tool.Name {
-		case "read_file", "create_file", "replace_file", "workboard_list", "workboard_read", "delegate", "delegate_batch":
+		case "read_file", "create_file", "replace_file", "workboard_list", "workboard_read",
+			"workboard_create_board", "workboard_create_card", "workboard_update_card", "workboard_transition_card",
+			"workboard_add_dependency", "workboard_remove_dependency", "delegate", "delegate_batch":
 			return nil, ErrDefinition
 		}
 		body, err := json.Marshal(d.Tool)

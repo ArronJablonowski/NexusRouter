@@ -448,14 +448,29 @@ exclude overlapping modal state, and restore focus to a live opener or Refresh.
 Running workers now consume durable cancellation requests after a heartbeat,
 cancel and join the supervisor-owned callback, persist runtime cancellation,
 and preserve the workboard claim for independent finalization. Pause
-consumption, trusted same-daemon stop acknowledgement, selected/expanded-card
-context restoration, and broader browser qualification remain open.
+consumption, trusted same-daemon stop acknowledgement, and broader browser
+qualification remain open. Same-board authoritative refreshes now preserve one
+bounded selected/expanded-card anchor, reload fresh details when the card
+reappears, and discard the anchor on board changes or confirmed deletion without
+moving focus or weakening modal isolation.
 DAR-84 now provides an explicitly enabled, local-root-only read slice through
 the provider-neutral `workboard_list` and `workboard_read` tools. They use
-bounded projections, closed schemas, durable read events and shared leases,
-and are excluded from child catalogs. Agent mutation tools remain DAR-84 work;
-they require trusted argument-derived scopes and approval policy rather than
-the fixed read scope.
+bounded projections, closed schemas, durable read events, a global list scope,
+and exact per-board reader scopes shared with writers; they are excluded from
+child catalogs. An additional
+`tools.workboard_write_enabled` gate, which requires reads, exposes approval-
+backed board/card creation, rich card updates, backlog/ready transitions, and
+dependency add/remove tools. Mutations use closed schemas, caller idempotency
+keys, trusted model attribution, configured allow/deny/ask policy, and exact
+argument-derived `workboard:<board_id>` writer leases; board creation uses the
+global `workboards` writer scope. Only proven pre-commit conflicts are returned
+as recoverable no-effect results. Invalid durable replay receipts and ambiguous
+storage acknowledgements remain uncertain and are never automatically retried.
+Mutation events use a deterministic task-bound model actor while the task
+journal retains selected provider/model provenance. Child workers cannot
+inherit these tools. Board revise/archive, card reorder,
+criteria revision, acceptance, lifecycle control, and durable headless approval
+presentation remain DAR-84 work.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

@@ -6277,3 +6277,61 @@ suite, and `go build ./...`. The longest rebuilt packages were application
 573.003s, releasepack 503.227s, telemetry 481.439s, SDK 67.343s, CLI 66.412s,
 toolgate 32.029s, runtime 27.081s, workers 9.079s, browser BFF 5.316s, Web UI
 5.013s, process guard 4.601s, tools 4.174s, and workboard 1.215s.
+
+## 2026-09-10 — DAR-83/DAR-84 card-context and policy-gated mutation checkpoint
+
+The integrated Web UI now retains one bounded, immutable selected-card anchor
+through same-board authoritative and superseding refreshes. When the exact card
+reappears, selection, `aria-pressed`, expanded/collapsed state, and fresh detail
+loading are restored from the new snapshot without moving focus. Board changes
+clear the anchor; complete unfiltered snapshots clear a confirmed deletion;
+filtered or partial pages preserve it until the card may reappear. Executable
+DOM tests cover expanded, collapsed, missing, duplicate, malformed, filtered,
+and board-switch behavior while the existing body-level modal isolation remains
+in force.
+
+DAR-84 now adds six explicitly gated local-root mutation tools alongside the
+existing board reads: create board, create card, update card, transition a card
+between backlog and ready, and add/remove a dependency. Create and update expose
+the full bounded decomposition fields needed by the current workboard contract,
+including parent, assignee, labels, dependencies, budget, and acceptance
+criteria. Closed schemas reject malformed or surplus model arguments before
+scope resolution or approval. Trusted application code derives the model actor
+and an exact `workboard:<board_id>` scope only after schema validation; board
+creation uses the global `workboards` scope. Namespace confinement prevents a
+resolver from escaping to a sibling resource class, and untrusted extensions
+cannot install scope resolvers or shadow built-in names.
+
+The resolved scope now drives configured allow/deny/ask policy, the digest-bound
+durable approval, and the single-writer lease. Mutation behavior is explicitly
+idempotent because every command carries a caller key, but a spent model tool
+call is never replayed automatically. Proven pre-commit revision, graph, limit,
+and transition rejections become recoverable no-effect results. `CodeInvalid`,
+invalid/corrupt replay receipts, resolver failures, closed storage, and ambiguous
+acknowledgements remain uncertain execution failures. Tests cover exact scope
+allow/deny/ask decisions, resolver panic/escape and argument isolation, durable
+writer ownership, replay, all six operations, rich card round trips, model
+attribution, child-catalog isolation, and effect classification.
+
+Per-board reads now resolve into that same `workboard:<board_id>` namespace;
+the global `workboards` scope remains only for listing and board creation. A
+real SQLite gate test holds a board-A reader, proves a board-A writer is denied,
+and proves a board-B writer may proceed concurrently. Mutation authority also
+requires trusted scoped execution identity and hashes its task ID into a bounded
+non-secret model actor, so separate runtime tasks no longer collapse into one
+workboard actor. The corresponding task journal remains the authoritative link
+to the selected provider/model because provider/model identity is not yet part
+of the provider-neutral tool execution identity.
+
+This remains a partial DAR-84 delivery. Board revise/archive, card reorder,
+criteria revision, acceptance, pause/cancel and other lifecycle tools, plus a
+durable daemon/headless approval presenter and real-provider approval UX test,
+remain open. DAR-83 still requires pause acknowledgement semantics and broader
+browser qualification. Repository-wide verification for this checkpoint is
+complete: `make check` passed the source-format/1,000-line gate, `go vet ./...`,
+the full race-enabled repository suite, and `go build ./...` on the exact
+integrated tree. The longest rebuilt packages were application 569.506s,
+telemetry 485.657s, releasepack 481.899s, SDK 65.383s, CLI 64.670s, toolgate
+31.152s, workers 11.039s, Web UI 4.030s, process guard 4.071s, and browser BFF
+3.468s. A separate final `go build ./...`, source/LOC check, and diff check also
+passed after recording these timings.

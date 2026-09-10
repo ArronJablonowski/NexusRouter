@@ -30,7 +30,8 @@ const (
 )
 
 // Rules use exact tool and resource-scope identities; '*' matches everything.
-// Scope is registered by trusted code, never selected by model arguments.
+// Scope is registered by trusted code. ResolveScope may derive only a
+// namespaced child scope from already schema-valid model arguments.
 type Rule struct {
 	Tool, Scope string
 	Decision    Decision
@@ -76,9 +77,13 @@ func (p *Policy) Decide(tool, scope string) Decision {
 }
 
 type Definition struct {
-	Tool     providers.Tool
-	Scope    string
-	ReadOnly bool
+	Tool  providers.Tool
+	Scope string
+	// ResolveScope may narrow a built-in tool to an exact resource after its
+	// arguments pass the compiled schema. The result must equal Scope or begin
+	// with Scope + ":". Extensions cannot install resolvers.
+	ResolveScope func(json.RawMessage) (string, error)
+	ReadOnly     bool
 	// Behavior defaults from ReadOnly. Explicit read_only still requires
 	// ReadOnly=true; contradictory declarations fail registration.
 	Behavior runtime.ToolBehavior
@@ -190,11 +195,6 @@ func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, 
 	if !ok || policyErr != nil {
 		return out, ErrDenied
 	}
-	decision := policy.Decide(call.Name, t.Scope)
-	needsApproval := !t.ReadOnly || decision == Ask
-	if decision == Deny || (needsApproval && (!scoped || e.Authority == nil)) {
-		return out, ErrDenied
-	}
 	arguments := append(json.RawMessage(nil), call.Arguments...)
 	v, decodeErr := decode(arguments)
 	if decodeErr != nil {
@@ -205,6 +205,16 @@ func (e Executor) execute(ctx context.Context, execution runtime.ToolExecution, 
 	}
 	if t.schema.Validate(v) != nil {
 		return out, ErrArguments
+	}
+	resolved, resolveErr := resolveToolScope(t.Scope, t.ResolveScope, arguments)
+	if resolveErr != nil {
+		return out, ErrDenied
+	}
+	t.Scope = resolved
+	decision := policy.Decide(call.Name, resolved)
+	needsApproval := !t.ReadOnly || decision == Ask
+	if decision == Deny || (needsApproval && (!scoped || e.Authority == nil)) {
+		return out, ErrDenied
 	}
 	if ctx.Err() != nil {
 		return out, ctx.Err()

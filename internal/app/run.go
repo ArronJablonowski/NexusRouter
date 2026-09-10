@@ -95,13 +95,13 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		r.toolPresenter = nil
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
-		s.Tools.Enabled, s.Tools.WorkboardReadEnabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false, false
+		s.Tools.Enabled, s.Tools.WorkboardReadEnabled, s.Tools.WorkboardWriteEnabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false, false, false
 		s.Tools.CreateEnabled = false
 		s.Tools.ReplaceEnabled = false
 		s.Workers.DelegateModel = ""
 		s.Workers.DelegateReadTools = false
 	}
-	if (s.Tools.CreateEnabled || s.Tools.ReplaceEnabled) && r.toolReviewer == nil && r.toolPresenter == nil {
+	if (s.Tools.CreateEnabled || s.Tools.ReplaceEnabled || s.Tools.WorkboardWriteEnabled) && r.toolReviewer == nil && r.toolPresenter == nil {
 		return result, ErrAdmission
 	}
 	var model config.Model
@@ -148,7 +148,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	var registry *tools.Registry
-	toolPolicy := applicationToolPolicy()
+	toolPolicy := applicationToolPolicyFor(s.Security.ToolPolicy)
 	if r.delegatedTools != nil {
 		registry, toolPolicy = r.delegatedTools.Registry, r.delegatedTools.Policy
 	} else if s.Tools.Enabled {
@@ -233,6 +233,12 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			registry = &tools.Registry{}
 		}
 		if registerWorkboardReadTools(registry, db) != nil {
+			return result, ErrAdmission
+		}
+	}
+	if s.Tools.WorkboardWriteEnabled {
+		bridge, bridgeErr := NewWorkboardBridge(db, db, defaultWorkboardNow)
+		if bridgeErr != nil || registerWorkboardMutationTools(registry, bridge) != nil {
 			return result, ErrAdmission
 		}
 	}

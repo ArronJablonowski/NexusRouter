@@ -30,6 +30,10 @@ func registerWorkboardReadTools(registry *tools.Registry, store *telemetry.Store
 	if err != nil {
 		return err
 	}
+	boardScope, err := tools.IdentifierScope("workboard", "board_id")
+	if err != nil {
+		return err
+	}
 	failure := runtime.ToolResult{Content: `{"error":"workboard_unavailable"}`, Effect: runtime.NoEffect, Failed: true, Recoverable: true}
 	definitions := []tools.Definition{
 		{Tool: workboardListSpec(), Scope: "workboards", ReadOnly: true, Behavior: runtime.BehaviorReadOnly, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
@@ -40,7 +44,7 @@ func registerWorkboardReadTools(registry *tools.Registry, store *telemetry.Store
 			page, err := bridge.RootAgentList(ctx, options)
 			return workboardToolResult(page, err, failure)
 		}},
-		{Tool: workboardReadSpec(), Scope: "workboards", ReadOnly: true, Behavior: runtime.BehaviorReadOnly, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
+		{Tool: workboardReadSpec(), Scope: "workboard", ResolveScope: boardScope, ReadOnly: true, Behavior: runtime.BehaviorReadOnly, Handler: func(ctx context.Context, raw json.RawMessage) (runtime.ToolResult, error) {
 			var args struct {
 				BoardID string `json:"board_id"`
 				webui.BoardSnapshotOptions

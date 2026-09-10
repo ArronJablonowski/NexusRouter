@@ -142,14 +142,15 @@ type Telemetry struct {
 	TraceExport   *TraceExport   `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
-	CreateEnabled        bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
-	CreateRoot           string `yaml:"create_root" json:"create_root,omitempty"`
-	ReplaceEnabled       bool   `yaml:"replace_enabled" json:"replace_enabled,omitempty"`
-	ReplaceRoot          string `yaml:"replace_root" json:"replace_root,omitempty"`
-	WorkboardReadEnabled bool   `yaml:"workboard_read_enabled" json:"workboard_read_enabled,omitempty"`
-	Enabled              bool   `yaml:"enabled" json:"enabled"`
-	ReadRoot             string `yaml:"read_root" json:"read_root"`
-	MaxTurns             int    `yaml:"max_turns" json:"max_turns"`
+	CreateEnabled         bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
+	CreateRoot            string `yaml:"create_root" json:"create_root,omitempty"`
+	ReplaceEnabled        bool   `yaml:"replace_enabled" json:"replace_enabled,omitempty"`
+	ReplaceRoot           string `yaml:"replace_root" json:"replace_root,omitempty"`
+	WorkboardReadEnabled  bool   `yaml:"workboard_read_enabled" json:"workboard_read_enabled,omitempty"`
+	WorkboardWriteEnabled bool   `yaml:"workboard_write_enabled" json:"workboard_write_enabled,omitempty"`
+	Enabled               bool   `yaml:"enabled" json:"enabled"`
+	ReadRoot              string `yaml:"read_root" json:"read_root"`
+	MaxTurns              int    `yaml:"max_turns" json:"max_turns"`
 }
 
 type Runtime struct {
@@ -333,6 +334,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Tools.ReplaceEnabled && (!s.Tools.Enabled || !filepath.IsAbs(s.Tools.ReplaceRoot)) {
 		return errors.New("replace tool requires enabled local tools and an absolute root")
+	}
+	if s.Tools.WorkboardWriteEnabled && !s.Tools.WorkboardReadEnabled {
+		return errors.New("workboard write tools require workboard reads")
 	}
 	if (s.Memory.Scope != "" && !memory.ValidKey(s.Memory.Scope)) || s.Memory.MaxFacts < 1 || s.Memory.MaxFacts > 64 || s.Memory.MaxBytes < 256 || s.Memory.MaxBytes > 65536 {
 		return errors.New("invalid memory context settings")

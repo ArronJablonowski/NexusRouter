@@ -21,7 +21,7 @@
 	let selectedID = "", boardCursor = "", cardCursor = "", boardTotal = 0, cardTotal = 0, boardRequestVersion = 0, cardRequestVersion = 0, snapshotFence = null;
 	let boardSource = null, streamBoard = "", streamRevision = 0, streamFailures = 0, invalidationTimer = 0, snapshotGraphRevision = 0, snapshotGraphDigest = "";
 	let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active", appliedFilters = Object.freeze({state: "", assignee: "", owner: "", claim: ""});
-	let currentBoard = null, selectedCard = null;
+	let currentBoard = null, selectedCard = null, selectedCardAnchor = null;
 	let pendingFocusAnchor = null, pendingFocusVersion = 0;
 	const contextObservers = new Set();
 	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map();
@@ -278,6 +278,17 @@
 		if (!value || typeof value !== "object") return value;
 		const result = {}; for (const [key, item] of Object.entries(value)) result[key] = immutable(item); return Object.freeze(result);
 	}
+	function cardContext(card) { return Object.freeze({...card, labels: Object.freeze(card.labels.slice()), dependencies: Object.freeze(card.dependencies.slice()), criteria: Object.freeze(card.criteria.map(item => Object.freeze({...item}))), budget: Object.freeze({...card.budget})}); }
+	function restoreCardView(card) {
+		selectedCard = null;
+		if (!card) return null;
+		const item = cardNodes.get(card.id), toggle = item && item.querySelector(".card-toggle"), details = item && item.querySelector(".card-details");
+		if (!item || !toggle || !details) return null;
+		item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); toggle.setAttribute("aria-expanded", selectedCardAnchor.expanded ? "true" : "false"); details.hidden = !selectedCardAnchor.expanded;
+		if (selectedCardAnchor.expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); }
+		selectedCard = cardContext(card);
+		return selectedCard;
+	}
 	function renderCandidateReview(target, card, attempt) {
 		const candidate = attempt.candidate;
 		const candidateSection = detailList("Candidate output");
@@ -389,7 +400,7 @@
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
 		details.append(element("p", "", card.labels.length ? "Labels: " + card.labels.join(", ") : "No labels"));
-		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); selectedCard = Object.freeze({...card, labels: Object.freeze(card.labels.slice()), dependencies: Object.freeze(card.dependencies.slice()), criteria: Object.freeze(card.criteria.map(item => Object.freeze({...item}))), budget: Object.freeze({...card.budget})}); for (const observer of contextObservers) observer(); const expanded = toggle.getAttribute("aria-expanded") === "true"; toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
+		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } const expanded = toggle.getAttribute("aria-expanded") === "true"; selectedCardAnchor = client.cardViewAnchor(card.board_id, card.id, !expanded); item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; selectedCard = cardContext(card); for (const observer of contextObservers) observer(); if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
 		article.append(toggle, meta, position, lifecycle, review, details); item.append(article);
 		return item;
 	}
@@ -414,11 +425,12 @@
 		const activeFocus = document.activeElement, focusBoardID = currentBoard && currentBoard.id || selectedID;
 		const capturedFocus = reset ? client.captureFocusAnchor(activeFocus, focusBoardID, cardNodes) : null;
 		const focusAnchor = reset ? client.refreshFocusAnchor(capturedFocus, pendingFocusAnchor, boardID, activeFocus, document.body) : null;
+		const viewTransition = reset ? client.cardViewTransition(selectedCardAnchor, focusBoardID, boardID, [], false) : null;
 		selectedID = boardID;
 		const current = ++cardRequestVersion;
 		if (reset) {
 			pendingFocusAnchor = focusAnchor; pendingFocusVersion = current;
-			clearCardState();
+			selectedCardAnchor = viewTransition ? viewTransition.anchor : null; clearCardState();
 			selectedTitle.textContent = "Loading workboard…"; selectedMeta.textContent = "";
 			notice(stateNode, "Loading cards and lanes…", false);
 		}
@@ -443,9 +455,11 @@
 			cardTotal += snapshot.cards.length; cardCursor = snapshot.next_cursor || "";
 			selectedTitle.textContent = snapshot.board.title;
 			currentBoard = Object.freeze({...snapshot.board});
+			const filtered = appliedFilters.state || appliedFilters.assignee || appliedFilters.owner || appliedFilters.claim;
+			const cardView = client.cardViewTransition(selectedCardAnchor, boardID, boardID, loadedCards, !filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count);
+			selectedCardAnchor = cardView ? cardView.anchor : null; restoreCardView(cardView && cardView.card);
 			for (const observer of contextObservers) observer();
 			if (reset && pendingFocusVersion === current) { client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body); pendingFocusAnchor = null; pendingFocusVersion = 0; }
-			const filtered = appliedFilters.state || appliedFilters.assignee || appliedFilters.owner || appliedFilters.claim;
 			const positionState = !filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count ? " · position controls ready" : " · position controls require all cards loaded and filters clear";
 			selectedMeta.textContent = snapshot.board.state + " board · " + String(cardTotal) + " matching cards loaded · " + String(snapshot.board.card_count) + " total on board" + (snapshot.has_more ? " · more matching available" : "") + positionState;
 			stateNode.hidden = true; kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false");

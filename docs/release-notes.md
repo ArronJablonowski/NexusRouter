@@ -37,18 +37,29 @@ supported-platform decision or publication approval is claimed.
   Running workers consume exact durable cancellation after a successful
   heartbeat, cancel and join the supervisor callback, persist runtime
   cancellation, and preserve the workboard claim for independent finalization.
-  Pause consumption, trusted same-daemon stop acknowledgement,
-  selected/expanded-card restoration, and browser end-to-end qualification
-  remain open.
+  Pause consumption, trusted same-daemon stop acknowledgement, and browser
+  end-to-end qualification remain open. Same-board authoritative refresh now
+  restores one validated selected/expanded-card anchor and fresh detail state
+  without moving focus; board switches and confirmed deletion clear it.
 
 - DAR-84 now has its first provider-neutral agent-facing Kanban slice. An
   explicit `tools.workboard_read_enabled` gate exposes bounded
   `workboard_list` and `workboard_read` projections to local root execution.
-  The tools use closed schemas, normal durable tool events, shared read leases,
-  a model identity distinct from operator authority, sanitized failures, and
+  The tools use closed schemas, normal durable tool events, a global list scope,
+  and exact per-board read scopes shared with writers. A model identity remains
+  distinct from operator authority; failures are sanitized and
   existing context/turn limits. Delegated children receive neither tool, and
-  extension code cannot shadow their reserved names. Agent mutations, dynamic
-  write scopes, and approval-backed board operations remain open.
+  extension code cannot shadow their reserved names. A separate
+  `tools.workboard_write_enabled` gate adds approval-backed board/card creation,
+  rich card updates, backlog/ready transitions, and dependency changes. Exact
+  argument-derived board scopes drive configured policy, approvals, and writer
+  leases; caller keys make domain replay idempotent without permitting tool-call
+  retries. Proven pre-commit conflicts are recoverable no-effect results, while
+  invalid replay receipts and storage ambiguity remain uncertain. Workboard
+  events distinguish deterministic task-bound model actors, with selected-model
+  provenance retained in the corresponding task journal. Additional
+  board lifecycle, criteria, acceptance, and durable headless approval tools
+  remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
