@@ -6467,3 +6467,28 @@ releasepack 516.037s, telemetry 480.882s, SDK 65.548s, CLI 64.688s, and toolgate
 31.509s. Safe-boundary pause/resume remains DAR-85; release-wide restart,
 security, lease-expiry, content-injection, zero-egress, and packaging browser
 qualification remains DAR-86/DAR-87.
+
+## 2026-09-10 — DAR-85 durable supervision and cooperative pause checkpoint
+
+DAR-85 is in progress. The daemon can now derive bounded ready, running,
+stalled, and orphaned workboard projections from durable boards, claims,
+heartbeats, leases, and linked task journals. Signed pagination freezes the
+observation time and board revision; recovery remains a proof-check action and
+never becomes dispatch authority merely because a claim appears stale.
+
+Schema 39 adds requested, worker-acknowledged, and resume-requested pause phases
+while preserving the version-1 boolean projection. Legacy true flags migrate
+only to requested. Exact card, attempt, claim, worker, task, and revision fences
+guard worker acknowledgements; cancellation dominates every pause phase.
+Callbacks acknowledge only through `SafeBoundary`, keep their supervisor slot
+and heartbeats while paused, deny other worker mutations, and cannot release a
+candidate until a final host-owned safe boundary passes.
+
+The same authenticated Web UI Kanban now renders authoritative supervision
+reasons and distinct pause states, and issues a revision-fenced Resume request
+without claiming that execution resumed. Focused domain, migration, restart,
+replay, cancellation, runner, Web UI, browser-adapter, and real-Chrome tests
+pass normally; the domain/telemetry and Web UI suites also pass under the race
+detector. Production ready-card scheduling, explicit reassignment linkage,
+configured independent judging, and broader crash/security qualification remain
+open before DAR-85 can be marked Done.

@@ -24,7 +24,7 @@
 	let currentBoard = null, selectedCard = null, selectedCardAnchor = null, pendingPosition = null;
 	let pendingFocusAnchor = null, pendingFocusVersion = 0;
 	const contextObservers = new Set();
-	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map(), lifecycleByCard = new Map();
+	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map(), lifecycleByCard = new Map(), supervisionByCard = new Map();
 	chat.hidden = true;
 	view.hidden = false;
 	function element(name, className, text) {
@@ -89,7 +89,7 @@
 			Number.isSafeInteger(value.remaining_dependencies) && value.remaining_dependencies >= 0 && value.remaining_dependencies <= value.dependencies.length &&
 			(!value.assignee_id || idPattern.test(value.assignee_id)) && Number.isSafeInteger(value.attempt_count) && value.attempt_count >= 0 && value.attempt_count <= 32 &&
 			(!value.current_attempt_id || idPattern.test(value.current_attempt_id)) && (!value.current_claim_id || idPattern.test(value.current_claim_id)) && (!value.acceptance_id || idPattern.test(value.acceptance_id)) &&
-			(!value.block_reason || idPattern.test(value.block_reason)) && typeof value.cancel_requested === "boolean" && typeof value.pause_requested === "boolean" && validBudget(value.budget) &&
+			(!value.block_reason || idPattern.test(value.block_reason)) && typeof value.cancel_requested === "boolean" && typeof value.pause_requested === "boolean" && ["", "requested", "acknowledged", "resume_requested"].includes(value.pause_phase || "") && value.pause_requested === Boolean(value.pause_phase) && validBudget(value.budget) &&
 			validCriteria(value.criteria, value.criteria_revision) && validTime(value.created_at) && validTime(value.updated_at) && Date.parse(value.updated_at) >= Date.parse(value.created_at) &&
 			(value.remaining_dependencies === 0 || value.state !== "ready") && (value.state === "in_progress" ? value.current_attempt_id && value.current_claim_id && !value.acceptance_id : true) &&
 			(value.state === "blocked" ? value.current_attempt_id && value.current_claim_id && !value.acceptance_id && value.block_reason : !value.block_reason) &&
@@ -98,11 +98,26 @@
 			(!["in_progress", "blocked", "review", "done"].includes(value.state) ? !value.current_claim_id && !value.acceptance_id : true) &&
 			(!(value.cancel_requested || value.pause_requested) || value.state === "in_progress" || value.state === "blocked");
 	}
+	function validSupervision(item, boardID, card) {
+		if (!item || item.version !== 1 || item.board_id !== boardID || item.card_id !== card.id || item.card_revision !== card.revision ||
+			!["ready", "running", "stalled", "orphaned"].includes(item.state) || !item.actions ||
+			!["claim", "pause_request", "resume_request", "cancel_request", "recovery_check"].every(key => typeof item.actions[key] === "boolean") || Object.keys(item.actions).length !== 5) return false;
+		if (item.state === "ready") return card.state === "ready" && item.reason === "dependencies_satisfied" && item.actions.claim && !item.actions.pause_request && !item.actions.cancel_request && !item.actions.recovery_check &&
+			!item.actions.resume_request && !item.attempt_id && !item.claim_id && !item.claim_revision && !item.pause_phase && !item.worker_id && !item.task_id && !item.last_heartbeat && !item.expires_at;
+		if (!idPattern.test(item.attempt_id) || !idPattern.test(item.claim_id) || !Number.isSafeInteger(item.claim_revision) || item.claim_revision < 1 || !idPattern.test(item.worker_id) ||
+			item.task_id && !idPattern.test(item.task_id) || !validTime(item.last_heartbeat) || !validTime(item.expires_at) || Date.parse(item.last_heartbeat) >= Date.parse(item.expires_at) || item.actions.claim ||
+			!["", "requested", "acknowledged", "resume_requested"].includes(item.pause_phase || "") || !["in_progress", "blocked"].includes(card.state) || item.attempt_id !== card.current_attempt_id || item.claim_id !== card.current_claim_id || (item.pause_phase || "") !== (card.pause_phase || "") || item.actions.pause_request !== (item.state === "running" && !card.pause_phase) || item.actions.resume_request !== (item.state === "running" && card.pause_phase === "acknowledged") || item.actions.cancel_request !== !card.cancel_requested) return false;
+		if (item.state === "running") return item.reason === "lease_healthy" && !item.actions.recovery_check;
+		if (item.state === "stalled") return ["heartbeat_stale", "lease_expired"].includes(item.reason) && !item.actions.pause_request && !item.actions.resume_request && item.actions.recovery_check;
+		return ["task_completed_with_claim", "task_failed_with_claim", "task_canceled_with_claim"].includes(item.reason) && idPattern.test(item.task_id) && !item.actions.pause_request && !item.actions.resume_request && item.actions.recovery_check;
+	}
 	function validSnapshot(value, boardID) {
 		if (!value || value.version !== 1 || !validBoard(value.board) || value.board.id !== boardID || !Array.isArray(value.columns) || value.columns.length !== states.length ||
 			!Array.isArray(value.cards) || value.cards.length > cardPageLimit || typeof value.has_more !== "boolean" || (value.next_cursor !== undefined && typeof value.next_cursor !== "string") ||
 			value.has_more !== Boolean(value.next_cursor) || value.next_cursor && !boundedPrintable(value.next_cursor, 1, 512) || value.has_more && value.cards.length === 0 || !Number.isSafeInteger(value.graph_revision) || value.graph_revision < 1 || !digestPattern.test(value.graph_digest) ||
-			!value.cards.every(card => validCard(card, boardID))) return false;
+			!value.cards.every(card => validCard(card, boardID)) || value.supervision !== undefined && (!Array.isArray(value.supervision) || value.supervision.length > value.cards.length)) return false;
+		const cardMap = new Map(value.cards.map(card => [card.id, card])), supervisionIDs = new Set();
+		for (const item of value.supervision || []) { const card = item && cardMap.get(item.card_id); if (!card || supervisionIDs.has(item.card_id) || !validSupervision(item, boardID, card)) return false; supervisionIDs.add(item.card_id); }
 		let previousRank = "";
 		return value.columns.every((column, index) => {
 			const valid = column && column.version === 1 && column.board_id === boardID && column.id === column.state && column.state === states[index] && boundedText(column.title, 256, false) && boundedPrintable(column.rank, 1, 128) && (!index || client.compareText(column.rank, previousRank) > 0);
@@ -226,6 +241,12 @@
 			if (!card || incoming.has(item.card_id) || !reset && lifecycleByCard.has(item.card_id) || !validLifecycle(item, snapshot.board.id, card)) return null;
 			incoming.set(item.card_id, item);
 		}
+		return incoming;
+	}
+	function validSupervisionBatch(snapshot, reset) {
+		const items = snapshot.supervision === undefined ? [] : snapshot.supervision, cards = new Map(snapshot.cards.map(card => [card.id, card])), incoming = new Map();
+		if (!Array.isArray(items) || items.length > snapshot.cards.length) return null;
+		for (const item of items) { const card = item && cards.get(item.card_id); if (!card || incoming.has(item.card_id) || !reset && supervisionByCard.has(item.card_id) || !validSupervision(item, snapshot.board.id, card)) return null; incoming.set(item.card_id, item); }
 		return incoming;
 	}
 	function cardLifecycleSummary(card, lifecycle) {
@@ -416,7 +437,7 @@
 			target.append(before.section, after.section, history.section);
 		}).catch(() => { delete target.dataset.loaded; notice(status, "Card previews could not be loaded. Close and reopen the card to retry.", true); });
 	}
-	function cardNode(card, lifecycleRecord) {
+	function cardNode(card, lifecycleRecord, supervision) {
 		const item = element("li", "kanban-card");
 		item.dataset.cardId = card.id;
 		const article = element("article");
@@ -432,8 +453,11 @@
 		if (card.remaining_dependencies > 0) meta.append(element("span", "card-alert", String(card.remaining_dependencies) + " dependencies remaining"));
 		if (card.block_reason) meta.append(element("span", "card-alert", "blocked: " + card.block_reason));
 		if (card.assignee_id && idPattern.test(card.assignee_id)) meta.append(element("span", "", "assigned " + card.assignee_id));
-		if (lifecycleSummary.attention) meta.append(element("span", "card-alert", "stale/orphan claim attention"));
-		if (card.pause_requested) meta.append(element("span", "card-alert", "pause requested"));
+		if (supervision) meta.append(element("span", supervision.state === "stalled" || supervision.state === "orphaned" ? "card-alert" : "", "supervision " + supervision.state + " · " + supervision.reason.replaceAll("_", " ")));
+		else if (lifecycleSummary.attention) meta.append(element("span", "card-alert", "stale/orphan claim attention"));
+		if (card.pause_phase === "requested") meta.append(element("span", "card-alert", "pause requested · awaiting safe boundary"));
+		if (card.pause_phase === "acknowledged") meta.append(element("span", "card-alert", "paused · worker acknowledged"));
+		if (card.pause_phase === "resume_requested") meta.append(element("span", "card-alert", "resume requested · awaiting worker acknowledgement"));
 		if (card.cancel_requested) meta.append(element("span", "card-alert", "cancel requested"));
 		const provisional = element("span", "card-alert card-provisional", "Pending position — not saved"); provisional.hidden = true; meta.append(provisional);
 		const position = element("div", "card-position-controls"); position.setAttribute("role", "group"); position.setAttribute("aria-label", "Position " + card.title);
@@ -444,7 +468,7 @@
 			position.append(button);
 		}
 		const lifecycleControls = element("div", "card-lifecycle-controls"); lifecycleControls.setAttribute("role", "group"); lifecycleControls.setAttribute("aria-label", "Control " + card.title);
-		for (const [action, label] of [["card.pause_request", "Request pause"], ["card.cancel_request", "Request cancellation"]]) {
+		for (const [action, label] of [["card.pause_request", "Request pause"], ["card.resume_request", "Resume"], ["card.cancel_request", "Request cancellation"]]) {
 			const button = element("button", action === "card.cancel_request" ? "danger card-control" : "secondary card-control", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.control = action;
 			button.setAttribute("aria-label", label + ": " + card.title); button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-control", {detail: Object.freeze({cardID: card.id, action})}))); lifecycleControls.append(button);
 		}
@@ -458,6 +482,7 @@
 		if (card.description) details.append(element("p", "", card.description));
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
+		if (supervision) details.append(element("p", supervision.state === "stalled" || supervision.state === "orphaned" ? "card-alert" : "", "Supervisor: " + supervision.state + " · " + supervision.reason.replaceAll("_", " ") + (supervision.worker_id ? " · worker " + supervision.worker_id : "") + (supervision.expires_at ? " · lease expires " + supervision.expires_at : "")));
 		if (card.block_reason) details.append(element("p", "card-alert", "Block reason: " + card.block_reason));
 		details.append(element("p", "", lifecycleSummary.criteria));
 		const requiredCriteria = element("ul", "card-detail-list");
@@ -475,13 +500,14 @@
 		return result && result.ranks;
 	}
 	function clearCardState() {
-		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; pendingPosition = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
+		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; pendingPosition = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); supervisionByCard.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
 		kanban.replaceChildren(); cardList.replaceChildren(); laneLists.clear(); laneCounts.clear(); cardNodes.clear(); kanban.hidden = true; cardList.hidden = true; loadMoreCards.hidden = true;
 		for (const observer of contextObservers) observer();
 	}
-	function appendCards(cards, ranks, lifecycle) {
-		const nodes = cards.map(card => cardNode(card, lifecycle.get(card.id)));
+	function appendCards(cards, ranks, lifecycle, supervision) {
+		const nodes = cards.map(card => cardNode(card, lifecycle.get(card.id), supervision.get(card.id)));
 		for (const [cardID, item] of lifecycle) lifecycleByCard.set(cardID, item);
+		for (const [cardID, item] of supervision) supervisionByCard.set(cardID, item);
 		for (let index = 0; index < cards.length; index++) { cardIDs.add(cards[index].id); cardNodes.set(cards[index].id, nodes[index]); }
 		for (const state of states) if (ranks.has(state)) laneRanks.set(state, ranks.get(state));
 		loadedCards.push(...cards); renderPresentation();
@@ -507,7 +533,7 @@
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "?" + query.toString()).then(snapshot => {
 			if (!client.current(current, cardRequestVersion, boardID, selectedID)) return;
 			if (!validSnapshot(snapshot, boardID) || cardTotal + snapshot.cards.length > maxCards || after && cardCursors.has(after) || snapshot.has_more && (snapshot.next_cursor === after || cardCursors.has(snapshot.next_cursor))) throw new Error("invalid workboard snapshot");
-			const lifecycle = validLifecycleBatch(snapshot, reset); if (!lifecycle) throw new Error("invalid workboard lifecycle");
+			const lifecycle = validLifecycleBatch(snapshot, reset), supervision = validSupervisionBatch(snapshot, reset); if (!lifecycle || !supervision) throw new Error("invalid workboard lifecycle");
 			const ranks = validateCardBatch(snapshot.cards, reset); if (!ranks) throw new Error("invalid card order");
 			const columnSignature = snapshot.columns.map(column => [column.id, column.state, column.title, column.rank].join("\u0000")).join("\u0001");
 			const filterSignature = [appliedFilters.state, appliedFilters.assignee, appliedFilters.owner, appliedFilters.claim].join("\u0000");
@@ -518,7 +544,7 @@
 			streamRevision = Math.max(streamRevision, snapshot.board.event_sequence);
 			if (after) cardCursors.add(after);
 			if (reset) visibleColumns = snapshot.columns.slice();
-			appendCards(snapshot.cards, ranks, lifecycle);
+			appendCards(snapshot.cards, ranks, lifecycle, supervision);
 			cardTotal += snapshot.cards.length; cardCursor = snapshot.next_cursor || "";
 			selectedTitle.textContent = snapshot.board.title;
 			currentBoard = Object.freeze({...snapshot.board});
@@ -544,7 +570,7 @@
 	window.DarwinWorkboards = Object.freeze({
 		context: () => Object.freeze({
 			board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision,
-			cards: Object.freeze((pendingPosition ? client.provisionalPosition(loadedCards, pendingPosition) : loadedCards).map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested, provisional: Boolean(card.provisional)}))),
+			cards: Object.freeze((pendingPosition ? client.provisionalPosition(loadedCards, pendingPosition) : loadedCards).map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, pause_phase: card.pause_phase || "", cancel_requested: card.cancel_requested, supervision: supervisionByCard.get(card.id) || null, provisional: Boolean(card.provisional)}))),
 			complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count),
 			unfiltered: !appliedFilters.state && !appliedFilters.assignee && !appliedFilters.owner && !appliedFilters.claim
 		}),

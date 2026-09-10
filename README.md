@@ -128,7 +128,9 @@ controls. Schema 36 adds normalized card identity to workboard events; existing
 schema-35 board events upgrade transactionally with a `NULL` card ID. Schema 37
 adds a non-secret persistent workspace identity, and schema 38 records exact
 cross-session browser reconciliation while preserving legacy pending-operation
-attribution. The integrated Kanban now includes bounded filters, an alternate
+attribution. Schema 39 adds revision-fenced requested, worker-acknowledged, and
+resume-requested pause phases without interpreting a legacy request as proof of
+pause. The integrated Kanban now includes bounded filters, an alternate
 canonical list presentation, card selection, and the first operator mutation
 slice for board and card creation/revision plus confirmed board archival. Cards
 also have accessible move-up, move-down, and legal Backlog/Ready controls using

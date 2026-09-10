@@ -127,11 +127,12 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 	handle := &WorkboardWorkerHandle{dispatch: dispatch, controls: r.repository, boardID: task.BoardID, cardID: task.CardID,
 		attemptID: attempt.ID, claimID: durableClaim.ID, cardRevision: *claim.CardRevision,
 		claimRevision: *claim.ClaimRevision, criteriaRevision: attempt.CriteriaRevision, workerID: workerID,
-		taskID: task.TaskID, active: true}
+		taskID: task.TaskID, active: true, controlChanged: make(chan struct{}, 1)}
 	defer handle.revoke()
 	run, cancel := context.WithCancel(ctx)
+	handle.bindCancellation(cancel, stopSupervisor)
 	heartbeats := make(chan error, 1)
-	go handle.heartbeat(run, r.heartbeat, cancel, stopSupervisor, heartbeats)
+	go handle.heartbeat(run, r.heartbeat, heartbeats)
 	joined := false
 	joinHeartbeat := func() error {
 		if joined {
@@ -145,6 +146,12 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 	// cannot return and release ownership while the board heartbeat still runs.
 	defer func() { runErr = errors.Join(runErr, joinHeartbeat()) }()
 	candidate, runErr = executeWorkboardCallback(run, handle, task)
+	if runErr == nil {
+		// Candidate release is a host-owned safe boundary too. A pause
+		// committed after validation must be acknowledged before review state
+		// can become visible, while the independent heartbeat remains live.
+		runErr = handle.SafeBoundary(run)
+	}
 	heartbeatErr := joinHeartbeat()
 	runErr = errors.Join(runErr, heartbeatErr, ctx.Err())
 	if runErr != nil {
@@ -174,7 +181,9 @@ func executeWorkboardCallback(ctx context.Context, handle *WorkboardWorkerHandle
 	}()
 	candidate, err = task.Execute(ctx, handle)
 	if err == nil {
-		err = task.Validate(ctx, candidate)
+		if err = handle.SafeBoundary(ctx); err == nil {
+			err = task.Validate(ctx, candidate)
+		}
 	}
 	return candidate, err
 }
@@ -202,12 +211,164 @@ type WorkboardWorkerHandle struct {
 	cardRevision, claimRevision, criteriaRevision int64
 	active                                        bool
 	blocked                                       bool
+	paused                                        bool
+	controlChanged                                chan struct{}
+	cancelCallback, stopSupervisor                context.CancelFunc
+}
+
+// SafeBoundary is the only point at which a cooperative callback acknowledges
+// a durable pause request. It keeps the claim and supervisor slot while paused;
+// the independent heartbeat continues renewing the lease and observing an
+// exact-fenced resume or cancellation. All other handle capabilities are
+// denied between pause acknowledgement and resume acknowledgement.
+func (h *WorkboardWorkerHandle) SafeBoundary(ctx context.Context) error {
+	if ctx == nil {
+		return ErrAdmission
+	}
+	for {
+		h.mu.Lock()
+		if !h.active {
+			err := ctx.Err()
+			h.mu.Unlock()
+			if err != nil {
+				return err
+			}
+			return ErrAdmission
+		}
+		// Refreshing through the worker-owned heartbeat reconciles a card
+		// revision advanced by an operator control request while preserving
+		// the exact attempt/claim/owner fence used by the observation.
+		observed, err := h.refreshControlLocked(ctx)
+		if err != nil {
+			h.revokeAndCancelLocked()
+			h.mu.Unlock()
+			return err
+		}
+		if observed.CancelRequested {
+			h.revokeAndCancelLocked()
+			h.mu.Unlock()
+			return context.Canceled
+		}
+		switch observed.PausePhase {
+		case workboard.PauseNone:
+			h.paused = false
+			h.mu.Unlock()
+			return nil
+		case workboard.PauseRequested:
+			err = h.acknowledgePauseLocked(ctx, true)
+			if err == nil {
+				h.paused = true
+			}
+		case workboard.PauseAcknowledged:
+			h.paused = true
+		case workboard.ResumeRequested:
+			h.paused = true
+			err = h.acknowledgePauseLocked(ctx, false)
+			if err == nil {
+				h.paused = false
+				h.mu.Unlock()
+				return nil
+			}
+		}
+		if err != nil {
+			// A cancellation may have committed concurrently with the worker's
+			// pause/resume acknowledgement. Reconcile once through a fresh
+			// heartbeat so cancellation wins over a stale phase error without
+			// weakening any identity or revision fence.
+			if after, observeErr := h.refreshControlLocked(ctx); observeErr == nil && after.CancelRequested {
+				h.revokeAndCancelLocked()
+				h.mu.Unlock()
+				return context.Canceled
+			}
+			h.revokeAndCancelLocked()
+			h.mu.Unlock()
+			return err
+		}
+		changed := h.controlChanged
+		h.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-changed:
+		}
+	}
+}
+
+func (h *WorkboardWorkerHandle) refreshControlLocked(ctx context.Context) (workboard.WorkerControlObservation, error) {
+	var observed workboard.WorkerControlObservation
+	var err error
+	for attempt := 0; attempt < 2; attempt++ {
+		receipt, heartbeatErr := h.dispatch.Heartbeat(ctx, workboard.HeartbeatRequest{BoardID: h.boardID, CardID: h.cardID,
+			AttemptID: h.attemptID, ClaimID: h.claimID, IdempotencyKey: workboardOperationKey("boundary-heartbeat"),
+			ExpectedClaimRevision: h.claimRevision})
+		if err = h.advance(receipt, heartbeatErr); err != nil {
+			return workboard.WorkerControlObservation{}, err
+		}
+		if observed, err = h.readControlLocked(ctx); err == nil {
+			return observed, nil
+		}
+		// An operator mutation can advance only the card revision between the
+		// heartbeat transaction and the read snapshot. One more exact-fenced
+		// heartbeat reconciles that benign race; replacement ownership still
+		// fails at the heartbeat claim fence.
+	}
+	return workboard.WorkerControlObservation{}, err
+}
+
+func (h *WorkboardWorkerHandle) acknowledgePauseLocked(ctx context.Context, pause bool) error {
+	request := workboard.ClaimPauseControl{BoardID: h.boardID, CardID: h.cardID, AttemptID: h.attemptID,
+		ClaimID: h.claimID, IdempotencyKey: workboardOperationKey("pause-control"),
+		ExpectedCardRevision: h.cardRevision, ExpectedClaimRevision: h.claimRevision}
+	var receipt workboard.OperationReceipt
+	var err error
+	if pause {
+		receipt, err = h.dispatch.AcknowledgePause(ctx, request)
+	} else {
+		receipt, err = h.dispatch.AcknowledgeResume(ctx, request)
+	}
+	return h.advance(receipt, err)
+}
+
+func (h *WorkboardWorkerHandle) readControlLocked(ctx context.Context) (workboard.WorkerControlObservation, error) {
+	target := workboard.WorkerControlTarget{BoardID: h.boardID, CardID: h.cardID, AttemptID: h.attemptID,
+		ClaimID: h.claimID, WorkerID: h.workerID, TaskID: h.taskID,
+		CardRevision: h.cardRevision, ClaimRevision: h.claimRevision}
+	observed, err := h.controls.ReadWorkerControl(ctx, target)
+	if err == nil && observed.Validate(target) != nil {
+		err = workers.ErrDurability
+	}
+	return observed, err
+}
+
+func (h *WorkboardWorkerHandle) bindCancellation(cancelCallback, stopSupervisor context.CancelFunc) {
+	h.mu.Lock()
+	h.cancelCallback, h.stopSupervisor = cancelCallback, stopSupervisor
+	h.mu.Unlock()
+}
+
+func (h *WorkboardWorkerHandle) revokeAndCancelLocked() {
+	h.active = false
+	h.paused = false
+	if h.stopSupervisor != nil {
+		h.stopSupervisor()
+	}
+	if h.cancelCallback != nil {
+		h.cancelCallback()
+	}
+	h.signalControlLocked()
+}
+
+func (h *WorkboardWorkerHandle) signalControlLocked() {
+	select {
+	case h.controlChanged <- struct{}{}:
+	default:
+	}
 }
 
 func (h *WorkboardWorkerHandle) AppendCheckpoint(ctx context.Context, evidence string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.active {
+	if !h.active || h.paused {
 		return ErrAdmission
 	}
 	receipt, err := h.dispatch.AppendCheckpoint(ctx, workboard.AppendCheckpointRequest{BoardID: h.boardID, CardID: h.cardID,
@@ -228,7 +389,7 @@ func (h *WorkboardWorkerHandle) Unblock(ctx context.Context, reason string) erro
 func (h *WorkboardWorkerHandle) control(ctx context.Context, block bool, reason string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.active {
+	if !h.active || h.paused {
 		return ErrAdmission
 	}
 	request := workboard.ClaimCardControl{BoardID: h.boardID, CardID: h.cardID, AttemptID: h.attemptID,
@@ -249,7 +410,7 @@ func (h *WorkboardWorkerHandle) control(ctx context.Context, block bool, reason 
 
 func (h *WorkboardWorkerHandle) ensureBlocked(ctx context.Context, reason string) error {
 	h.mu.Lock()
-	if !h.active {
+	if !h.active || h.paused {
 		h.mu.Unlock()
 		return ErrAdmission
 	}
@@ -271,7 +432,7 @@ func (h *WorkboardWorkerHandle) ensureBlocked(ctx context.Context, reason string
 func (h *WorkboardWorkerHandle) fail(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.active {
+	if !h.active || h.paused {
 		return ErrAdmission
 	}
 	receipt, err := h.dispatch.Fail(ctx, workboard.FailClaimRequest{BoardID: h.boardID, CardID: h.cardID,
@@ -284,7 +445,7 @@ func (h *WorkboardWorkerHandle) fail(ctx context.Context) error {
 	return nil
 }
 
-func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, cancel, stopSupervisor context.CancelFunc, done chan<- error) {
+func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, done chan<- error) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -304,40 +465,38 @@ func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Dur
 			done <- nil
 			return
 		}
-		receipt, err := h.dispatch.Heartbeat(ctx, workboard.HeartbeatRequest{BoardID: h.boardID, CardID: h.cardID,
-			AttemptID: h.attemptID, ClaimID: h.claimID, IdempotencyKey: workboardOperationKey("heartbeat"),
-			ExpectedClaimRevision: h.claimRevision})
-		err = h.advance(receipt, err)
+		observed, err := h.refreshControlLocked(ctx)
 		if err == nil {
-			target := workboard.WorkerControlTarget{BoardID: h.boardID, CardID: h.cardID, AttemptID: h.attemptID,
-				ClaimID: h.claimID, WorkerID: h.workerID, TaskID: h.taskID, CardRevision: h.cardRevision, ClaimRevision: h.claimRevision}
-			var observed workboard.WorkerControlObservation
-			observed, err = h.controls.ReadWorkerControl(ctx, target)
-			if err == nil && observed.Validate(target) != nil {
-				err = workers.ErrDurability
-			}
-			if err == nil && observed.CancelRequested {
+			if observed.CancelRequested {
 				// Revoke the board mutation capability before waking callback
 				// cleanup. A callback may use a fresh context while unwinding;
 				// cancellation must not leave that escaped capability usable.
-				h.active = false
-				stopSupervisor()
-				cancel()
+				h.revokeAndCancelLocked()
 				h.mu.Unlock()
 				done <- context.Canceled
 				return
 			}
+			h.paused = observed.PausePhase == workboard.PauseAcknowledged || observed.PausePhase == workboard.ResumeRequested
+			h.signalControlLocked()
 		}
 		if err != nil {
+			// execute joins this goroutine by canceling ctx. If cancellation
+			// arrives after a heartbeat dispatch but before its observation
+			// finishes, that is an orderly join rather than evidence that the
+			// durable claim fence was lost.
+			if ctx.Err() != nil {
+				h.mu.Unlock()
+				done <- nil
+				return
+			}
 			// Any loss of the durable heartbeat/control fence revokes this
 			// capability before callback cleanup is awakened. A callback may
 			// replace the canceled context while unwinding, but it must not be
 			// able to mutate a claim whose ownership can no longer be proven.
-			h.active = false
+			h.revokeAndCancelLocked()
 		}
 		h.mu.Unlock()
 		if err != nil {
-			cancel()
 			done <- err
 			return
 		}
@@ -347,7 +506,7 @@ func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Dur
 func (h *WorkboardWorkerHandle) submit(ctx context.Context, candidate WorkboardCandidate) (workboard.OperationReceipt, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.active {
+	if !h.active || h.paused {
 		return workboard.OperationReceipt{}, ErrAdmission
 	}
 	receipt, err := h.dispatch.SubmitCandidate(ctx, workboard.SubmitCandidateRequest{BoardID: h.boardID, CardID: h.cardID,
@@ -381,5 +540,7 @@ func (h *WorkboardWorkerHandle) advance(receipt workboard.OperationReceipt, err 
 func (h *WorkboardWorkerHandle) revoke() {
 	h.mu.Lock()
 	h.active = false
+	h.paused = false
+	h.signalControlLocked()
 	h.mu.Unlock()
 }

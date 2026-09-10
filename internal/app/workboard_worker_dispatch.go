@@ -111,3 +111,17 @@ func (d *WorkboardWorkerDispatch) Unblock(ctx context.Context, request workboard
 	}
 	return d.control.Unblock(ctx, request)
 }
+
+func (d *WorkboardWorkerDispatch) AcknowledgePause(ctx context.Context, request workboard.ClaimPauseControl) (workboard.OperationReceipt, error) {
+	if d == nil || d.control == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.control.AcknowledgePause(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) AcknowledgeResume(ctx context.Context, request workboard.ClaimPauseControl) (workboard.OperationReceipt, error) {
+	if d == nil || d.control == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.control.AcknowledgeResume(ctx, request)
+}

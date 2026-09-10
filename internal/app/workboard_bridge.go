@@ -25,6 +25,7 @@ type WorkboardBridge struct {
 	lifecycle        workboard.LifecycleSnapshotRepository
 	history          workboard.LifecycleHistoryRepository
 	dependencies     *workboard.DependencyReadService
+	supervision      *workboard.SupervisionService
 	browserAuthority workboard.Authority
 }
 
@@ -133,8 +134,15 @@ func NewWorkboardBridgeWithBrowserAuthority(repository workboard.BoardRepository
 	if err != nil {
 		return nil, err
 	}
+	var supervision *workboard.SupervisionService
+	if repository, available := cards.(workboard.SupervisionRepository); available {
+		supervision, err = workboard.NewSupervisionService(repository, contextWorkboardAuthority{}, now, 30*time.Second)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &WorkboardBridge{boards: boards, cards: cardService, progress: progress, control: control, evaluation: evaluation,
-		lifecycle: lifecycle, history: history, dependencies: dependencies, browserAuthority: browserAuthority}, nil
+		lifecycle: lifecycle, history: history, dependencies: dependencies, supervision: supervision, browserAuthority: browserAuthority}, nil
 }
 
 func nativeWorkboardContext(ctx context.Context) context.Context {
@@ -310,6 +318,10 @@ func (b *WorkboardBridge) read(ctx context.Context, boardID string, options webu
 	if err := b.attachLifecycle(ctx, boardID, cardIDs, &result); err != nil {
 		return webui.BoardSnapshot{}, err
 	}
+	// Supervision is an independently re-derived, advisory projection. An old
+	// or partially populated task binding must not make the canonical board
+	// unreadable; omission fails closed by disabling supervision actions.
+	_ = b.attachSupervision(ctx, boardID, cardIDs, &result)
 	if result.Validate() != nil {
 		return webui.BoardSnapshot{}, errors.New("invalid workboard snapshot projection")
 	}
@@ -358,6 +370,40 @@ func (b *WorkboardBridge) attachLifecycle(ctx context.Context, boardID string, c
 		}
 	}
 	return nil
+}
+
+func (b *WorkboardBridge) attachSupervision(ctx context.Context, boardID string, cardIDs []string, result *webui.BoardSnapshot) error {
+	if b.supervision == nil || len(cardIDs) == 0 {
+		return nil
+	}
+	wanted := make(map[string]bool, len(cardIDs))
+	for _, cardID := range cardIDs {
+		wanted[cardID] = true
+	}
+	for after := ""; ; {
+		page, err := b.supervision.Read(ctx, boardID, workboard.SupervisionOptions{After: after, Limit: workboard.MaxSupervisionPageItems})
+		if err != nil {
+			return err
+		}
+		if page.BoardRevision != result.Board.Revision {
+			return errors.New("workboard supervision changed during read")
+		}
+		for _, item := range page.Items {
+			if !wanted[item.CardID] {
+				continue
+			}
+			result.Supervision = append(result.Supervision, webui.SupervisionItem{Version: webui.ContractVersion, BoardID: item.BoardID,
+				CardID: item.CardID, CardRevision: item.CardRevision, State: string(item.State), Reason: string(item.Reason), AttemptID: item.AttemptID,
+				ClaimID: item.ClaimID, ClaimRevision: item.ClaimRevision, PausePhase: string(item.PausePhase), WorkerID: item.WorkerID, TaskID: item.TaskID,
+				LastHeartbeat: item.LastHeartbeat, ExpiresAt: item.ExpiresAt, Actions: webui.SupervisionActions{Claim: item.Actions.Claim,
+					PauseRequest: item.Actions.PauseRequest, ResumeRequest: item.Actions.ResumeRequest, CancelRequest: item.Actions.CancelRequest, RecoveryCheck: item.Actions.RecoveryCheck}})
+			delete(wanted, item.CardID)
+		}
+		if !page.HasMore || len(wanted) == 0 {
+			return nil
+		}
+		after = page.NextCursor
+	}
 }
 
 func (b *WorkboardBridge) NativeMutate(ctx context.Context, request webui.BoardRequest) (webui.OperationReceipt, error) {
@@ -442,11 +488,13 @@ func (b *WorkboardBridge) mutate(ctx context.Context, request webui.BoardRequest
 		receipt, err = b.progress.ReviseCriteria(ctx, workboard.ReviseCriteriaRequest{BoardID: request.BoardID, CardID: request.CardID,
 			IdempotencyKey: request.IdempotencyKey, ExpectedCardRevision: *request.ExpectedCardRevision,
 			ExpectedCriteriaRevision: *request.ExpectedCriteriaRevision, Criteria: domainCriteria(request.Criteria)})
-	case webui.CardPauseRequest, webui.CardCancelRequest:
+	case webui.CardPauseRequest, webui.CardResumeRequest, webui.CardCancelRequest:
 		command := workboard.RequestCardControl{BoardID: request.BoardID, CardID: request.CardID,
 			IdempotencyKey: request.IdempotencyKey, ExpectedCardRevision: *request.ExpectedCardRevision}
 		if request.Action == webui.CardPauseRequest {
 			receipt, err = b.control.RequestPause(ctx, command)
+		} else if request.Action == webui.CardResumeRequest {
+			receipt, err = b.control.RequestResume(ctx, command)
 		} else {
 			receipt, err = b.control.RequestCancel(ctx, command)
 		}
@@ -544,7 +592,7 @@ func workboardCard(card workboard.Card) webui.Card {
 		Dependencies: nonnilStrings(card.Dependencies), RemainingDependencies: card.RemainingDependencies, AssigneeID: card.AssigneeID,
 		AttemptCount: card.AttemptCount, CurrentAttemptID: card.CurrentAttemptID, CurrentClaimID: card.CurrentClaimID,
 		AcceptanceID: card.AcceptanceID, BlockReason: card.BlockReason, CancelRequested: card.CancelRequested,
-		PauseRequested: card.PauseRequested, Budget: webui.WorkBudget{AttemptLimit: card.Budget.AttemptLimit,
+		PauseRequested: card.PauseRequested, PausePhase: string(card.PausePhase), Budget: webui.WorkBudget{AttemptLimit: card.Budget.AttemptLimit,
 			TimeLimitMS: card.Budget.TimeLimitMS, TokenLimit: card.Budget.TokenLimit, CostMicros: card.Budget.CostMicros},
 		Criteria: criteria, CreatedAt: card.CreatedAt, UpdatedAt: card.UpdatedAt}
 }

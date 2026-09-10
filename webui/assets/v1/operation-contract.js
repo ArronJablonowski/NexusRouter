@@ -6,7 +6,7 @@
 		"board.create", "board.revise", "board.archive",
 		"card.create", "card.revise", "card.move", "card.reorder",
 		"dependency.add", "dependency.remove", "criteria.revise",
-		"acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request"
+		"acceptance.accept", "acceptance.reject", "card.pause_request", "card.resume_request", "card.cancel_request"
 	]);
 	const subjects = new Set(["chat", "task", "submission", "feedback", "approval", "board", "card"]);
 	window.DarwinOperationContract = Object.freeze({

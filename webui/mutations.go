@@ -449,7 +449,7 @@ func validOperationAction(value string) bool {
 		return true
 	case string(BoardCreate), string(BoardRevise), string(BoardArchive), string(CardCreate), string(CardRevise),
 		string(CardMove), string(CardReorder), string(DependencyAdd), string(DependencyRemove), string(CriteriaRevise),
-		string(AcceptanceAccept), string(AcceptanceReject), string(CardPauseRequest), string(CardCancelRequest):
+		string(AcceptanceAccept), string(AcceptanceReject), string(CardPauseRequest), string(CardResumeRequest), string(CardCancelRequest):
 		return true
 	default:
 		return false

@@ -81,12 +81,12 @@ func insertWorkboardFixture(t *testing.T, db *sql.DB) {
 	}
 	if _, err = tx.Exec(`INSERT INTO workboard_cards
 		(id,board_id,revision,criteria_revision,state,rank,title,description,priority,assignee_id,remaining_dependencies,attempt_count,attempt_limit,time_limit_ms,token_limit,cost_micros,current_attempt_id,current_claim_id,cancel_requested,pause_requested,created_at,updated_at,body)
-		VALUES('card','board',1,1,'in_progress','a','Running card','','high','worker',0,1,3,60000,1000,1000,'attempt','claim',0,0,1,1,'{}')`); err != nil {
+		VALUES('card','board',1,1,'in_progress','a','Running card','','high','worker',0,1,3,60000,1000,1000,'attempt','claim',0,0,1,1,'{"pause_requested":false}')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(`INSERT INTO workboard_cards
 		(id,board_id,revision,criteria_revision,state,rank,title,description,priority,remaining_dependencies,attempt_count,attempt_limit,time_limit_ms,token_limit,cost_micros,cancel_requested,pause_requested,created_at,updated_at,body)
-		VALUES('successor','board',1,1,'backlog','b','Successor','','normal',1,0,3,60000,1000,1000,0,0,1,1,'{}')`); err != nil {
+		VALUES('successor','board',1,1,'backlog','b','Successor','','normal',1,0,3,60000,1000,1000,0,0,1,1,'{"pause_requested":false}')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(`INSERT INTO workboard_dependencies(board_id,card_id,dependency_id,created_sequence) VALUES('board','successor','card',1)`); err != nil {
@@ -221,7 +221,7 @@ func TestWorkboardMigrationCreatesDurableBoundedSchema(t *testing.T) {
 	}
 	if err = restarted.db.QueryRow(`SELECT c.body,l.body FROM workboard_cards c JOIN workboard_claims l
 		ON l.board_id=c.board_id AND l.card_id=c.id WHERE c.id='card' AND c.current_attempt_id=l.attempt_id AND c.current_claim_id=l.id`).
-		Scan(&cardBody, &claimBody); err != nil || string(cardBody) != "{}" || string(claimBody) != "{}" {
+		Scan(&cardBody, &claimBody); err != nil || string(cardBody) != `{"pause_requested":false}` || string(claimBody) != "{}" {
 		t.Fatal("restart changed lifecycle bindings/bodies", string(cardBody), string(claimBody), err)
 	}
 	var assignee string

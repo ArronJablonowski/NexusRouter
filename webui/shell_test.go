@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "fdda36043d01e9b807c942caf96b038296527b94bb488b1e5f5a5b056421d554" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "c6037a7dafa5edea69caaf3a51a90f319c03c07072b288dca6fb30ccc52b3ad6" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -289,7 +289,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
 		`position.setAttribute("role", "group")`, `button.dataset.position = direction`, `new CustomEvent("darwin:card-position"`, `complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count)`,
-		`lifecycleControls.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
+		`lifecycleControls.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested · awaiting safe boundary"`, `"paused · worker acknowledged"`, `"resume requested · awaiting worker acknowledgement"`, `"cancel requested"`,
 		`"Review candidate"`, `"darwin:acceptance-review"`, `renderCandidateReview`, `"Advisory model audits"`, `"Model-audit evidence is advisory and does not independently authorize acceptance."`,
 		`card.current_attempt_id`, `page.attempt.state !== "review"`, `evidenceIDs.has(evidence.id)`, `criterionIDs.has(evidence.criterion_id)`,
 		`client.captureFocusAnchor(activeFocus, focusBoardID, cardNodes)`, `client.refreshFocusAnchor(capturedFocus, pendingFocusAnchor, boardID, activeFocus, document.body)`, `pendingFocusVersion === current`, `client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body)`,
@@ -308,7 +308,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		t.Fatal("authoritative refresh does not capture the focused card control")
 	}
 	clearedCards := strings.Index(body[capturedFocus:], `clearCardState()`)
-	appendedCards := strings.Index(body[capturedFocus:], `appendCards(snapshot.cards, ranks, lifecycle)`)
+	appendedCards := strings.Index(body[capturedFocus:], `appendCards(snapshot.cards, ranks, lifecycle, supervision)`)
 	restoredFocus := strings.Index(body[capturedFocus:], `client.restoreFocusAnchor(focusAnchor`)
 	if clearedCards < 0 || appendedCards < 0 || restoredFocus <= appendedCards || clearedCards >= appendedCards || strings.Count(body, `client.restoreFocusAnchor(focusAnchor`) != 2 {
 		t.Fatal("authoritative refresh does not capture focus before teardown and restore it after success or failure")
@@ -341,7 +341,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 	for _, required := range []string{
 		`value === "" || value === "unassigned" || idPattern.test(value)`, `["", "unclaimed", "active", "attention"].includes(filters.claim)`,
 		`query.set("state", appliedFilters.state)`, `query.set("assignee_id", appliedFilters.assignee)`, `query.set("owner_id", appliedFilters.owner)`, `query.set("claim_state", appliedFilters.claim)`,
-		`function clearCardState()`, `cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); snapshotFence = null`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
+		`function clearCardState()`, `cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); lifecycleByCard.clear(); supervisionByCard.clear(); snapshotFence = null`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
 		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(cards, cardNodes`, `const filterSignature = [appliedFilters.state`,
 		`filterForm.requestSubmit()`, `aria-invalid`, `presentation = "kanban"`, `presentation = "list"`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120)`,
 		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · "`, `" matching cards loaded · "`, `position controls require all cards loaded and filters clear`,
@@ -551,9 +551,9 @@ const dependencyIntent = {body:{action:"dependency.add",board_id:"board-a",card_
 const dependencyReceipt = {...receipt,card_id:"card-a",card_revision:5};
 if (!client.receiptMatches(dependencyReceipt,dependencyIntent) || !client.receiptMatches({...dependencyReceipt,board_revision:8},dependencyIntent) || client.receiptMatches({...dependencyReceipt,board_revision:2},dependencyIntent) || client.receiptMatches({...dependencyReceipt,card_revision:6},dependencyIntent) || client.receiptMatches({...dependencyReceipt,claim_revision:1},dependencyIntent)) process.exit(17);
 if (client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-b").action !== "dependency.add" || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-c").action !== "dependency.remove" || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-c") || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-b") || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-a")) process.exit(18);
-const controlContext = {board:{id:"board-a",state:"active",revision:11},cards:[{id:"card-run",state:"in_progress",rank:"a",revision:4,current_claim_id:"claim-a",pause_requested:false,cancel_requested:false}]};
-const pause = client.controlPlan(controlContext,"card-run","card.pause_request"), cancel = client.controlPlan(controlContext,"card-run","card.cancel_request");
-if (!pause || !cancel || pause.cardRevision !== 4 || client.controlPlan({...controlContext,board:{...controlContext.board,state:"archived"}},"card-run","card.pause_request") || client.controlPlan({...controlContext,cards:[{...controlContext.cards[0],pause_requested:true}]},"card-run","card.pause_request") || !client.controlPlan({...controlContext,cards:[{...controlContext.cards[0],pause_requested:true}]},"card-run","card.cancel_request")) process.exit(19);
+const controlContext = {board:{id:"board-a",state:"active",revision:11},cards:[{id:"card-run",state:"in_progress",rank:"a",revision:4,current_claim_id:"claim-a",pause_requested:false,pause_phase:"",cancel_requested:false,supervision:{state:"running",actions:{pause_request:true,resume_request:false,cancel_request:true}}}]};
+const pause = client.controlPlan(controlContext,"card-run","card.pause_request"), cancel = client.controlPlan(controlContext,"card-run","card.cancel_request"), pausedContext = {...controlContext,cards:[{...controlContext.cards[0],pause_requested:true,pause_phase:"acknowledged",supervision:{state:"running",actions:{pause_request:false,resume_request:true,cancel_request:true}}}]}, resume = client.controlPlan(pausedContext,"card-run","card.resume_request");
+if (!pause || !cancel || !resume || pause.cardRevision !== 4 || client.controlPlan({...controlContext,board:{...controlContext.board,state:"archived"}},"card-run","card.pause_request") || client.controlPlan(pausedContext,"card-run","card.pause_request") || !client.controlPlan(pausedContext,"card-run","card.cancel_request") || client.controlPlan({...pausedContext,cards:[{...pausedContext.cards[0],pause_phase:"resume_requested"}]},"card-run","card.resume_request")) process.exit(19);
 if (!client.captureCurrent(pause,controlContext) || client.captureCurrent(pause,{...controlContext,board:{...controlContext.board,revision:12}}) || client.captureCurrent(pause,{...controlContext,cards:[{...controlContext.cards[0],cancel_requested:true}]})) process.exit(20);
 const controlIntent = {body:{action:"card.pause_request",board_id:"board-a",card_id:"card-run"},capture:pause}, controlReceipt = {...receipt,board_revision:12,card_id:"card-run",card_revision:5};
 if (!client.receiptMatches(controlReceipt,controlIntent) || !client.receiptMatches({...controlReceipt,board_revision:20},controlIntent) || client.receiptMatches({...controlReceipt,board_revision:11},controlIntent) || client.receiptMatches({...controlReceipt,card_revision:6},controlIntent) || client.receiptMatches({...controlReceipt,claim_revision:2},controlIntent)) process.exit(21);
@@ -795,7 +795,7 @@ func TestEmbeddedOperationContractCoversWorkboardReconciliation(t *testing.T) {
 	}
 	body := string(script)
 	for _, action := range []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
-		DependencyAdd, DependencyRemove, CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest} {
+		DependencyAdd, DependencyRemove, CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardResumeRequest, CardCancelRequest} {
 		if !strings.Contains(body, `"`+string(action)+`"`) {
 			t.Fatal("browser operation contract omitted action", action)
 		}

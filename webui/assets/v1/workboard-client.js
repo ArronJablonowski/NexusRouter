@@ -34,13 +34,13 @@
 		if (!node || !node.classList || typeof node.classList.contains !== "function") return null;
 		if (node.classList.contains("card-toggle") || node.classList.contains("attempt-toggle")) return Object.freeze({kind: "toggle", action: ""});
 		if (node.classList.contains("card-position") && ["up", "down", "ready", "backlog"].includes(node.dataset && node.dataset.position)) return Object.freeze({kind: "position", action: node.dataset.position});
-		if (node.classList.contains("card-control") && ["card.pause_request", "card.cancel_request"].includes(node.dataset && node.dataset.control)) return Object.freeze({kind: "control", action: node.dataset.control});
+		if (node.classList.contains("card-control") && ["card.pause_request", "card.resume_request", "card.cancel_request"].includes(node.dataset && node.dataset.control)) return Object.freeze({kind: "control", action: node.dataset.control});
 		if (node.classList.contains("card-review")) return Object.freeze({kind: "review", action: ""});
 		return null;
 	}
 	function validFocusAnchor(anchor, boardID) {
 		return Boolean(anchor && exact(anchor, ["boardID", "cardID", "kind", "action"], []) && anchor.boardID === boardID && id(boardID) && id(anchor.cardID) &&
-			(anchor.kind === "toggle" && anchor.action === "" || anchor.kind === "review" && anchor.action === "" || anchor.kind === "position" && ["up", "down", "ready", "backlog"].includes(anchor.action) || anchor.kind === "control" && ["card.pause_request", "card.cancel_request"].includes(anchor.action)));
+			(anchor.kind === "toggle" && anchor.action === "" || anchor.kind === "review" && anchor.action === "" || anchor.kind === "position" && ["up", "down", "ready", "backlog"].includes(anchor.action) || anchor.kind === "control" && ["card.pause_request", "card.resume_request", "card.cancel_request"].includes(anchor.action)));
 	}
 	function refreshFocusAnchor(captured, pending, boardID, currentFocus, body) {
 		if (validFocusAnchor(captured, boardID)) return captured;
@@ -106,13 +106,13 @@
 	}
 	function captureCurrent(capture, context) {
 		if (!capture || capture.action === "board.create") return true;
-		const position = capture.action === "card.move" || capture.action === "card.reorder", dependency = capture.action === "dependency.change", control = capture.action === "card.pause_request" || capture.action === "card.cancel_request", acceptance = capture.action === "acceptance.accept" || capture.action === "acceptance.reject";
+		const position = capture.action === "card.move" || capture.action === "card.reorder", dependency = capture.action === "dependency.change", control = ["card.pause_request", "card.resume_request", "card.cancel_request"].includes(capture.action), acceptance = capture.action === "acceptance.accept" || capture.action === "acceptance.reject";
 		if (!context || !context.board || context.board.id !== capture.boardID || context.board.revision !== capture.boardRevision || position && context.board.layout_revision !== capture.layoutRevision) return false;
 		if (position) {
 			const card = context.cards && context.cards.find(item => item.id === capture.cardID), anchor = capture.anchorID && context.cards.find(item => item.id === capture.anchorID);
 			return Boolean(card && card.revision === capture.cardRevision && card.state === capture.sourceState && (!capture.anchorID || anchor && anchor.state === capture.sourceState && anchor.rank === capture.anchorRank));
 		}
-		if (control) { const card = context.cards && context.cards.find(item => item.id === capture.cardID); return Boolean(card && card.revision === capture.cardRevision && card.state === capture.sourceState && card.current_claim_id === capture.claimID && card.pause_requested === capture.pauseRequested && card.cancel_requested === capture.cancelRequested); }
+		if (control) { const card = context.cards && context.cards.find(item => item.id === capture.cardID); return Boolean(card && card.revision === capture.cardRevision && card.state === capture.sourceState && card.current_claim_id === capture.claimID && card.pause_requested === capture.pauseRequested && card.pause_phase === capture.pausePhase && card.cancel_requested === capture.cancelRequested); }
 		if (acceptance) { const card = context.cards && context.cards.find(item => item.id === capture.cardID); return Boolean(card && card.revision === capture.cardRevision && card.state === "review" && card.current_attempt_id === capture.attemptID && !card.current_claim_id && !card.acceptance_id && card.criteria_revision === capture.criteriaRevision); }
 		return context.graphRevision === capture.graphRevision && ((!dependency && capture.action !== "card.revise") || context.card && context.card.id === capture.cardID && context.card.revision === capture.cardRevision) &&
 			(!dependency || context.complete && context.unfiltered && JSON.stringify(context.card.dependencies) === JSON.stringify(capture.dependencies));
@@ -157,9 +157,11 @@
 		return null;
 	}
 	function controlPlan(context, cardID, action) {
-		if (!context || !context.board || context.board.state !== "active" || !Array.isArray(context.cards) || !id(cardID) || !["card.pause_request", "card.cancel_request"].includes(action)) return null;
-		const card = context.cards.find(item => item.id === cardID); if (!card || !["in_progress", "blocked"].includes(card.state) || !id(card.current_claim_id) || action === "card.pause_request" && (card.pause_requested || card.cancel_requested) || action === "card.cancel_request" && card.cancel_requested) return null;
-		return Object.freeze({action, boardID: context.board.id, boardRevision: context.board.revision, cardID, cardRevision: card.revision, sourceState: card.state, claimID: card.current_claim_id, pauseRequested: card.pause_requested, cancelRequested: card.cancel_requested});
+		if (!context || !context.board || context.board.state !== "active" || !Array.isArray(context.cards) || !id(cardID) || !["card.pause_request", "card.resume_request", "card.cancel_request"].includes(action)) return null;
+		const card = context.cards.find(item => item.id === cardID), phase = card && card.pause_phase || "", supervision = card && card.supervision;
+		const allowed = supervision && supervision.state === "running" && (action === "card.pause_request" ? supervision.actions.pause_request : action === "card.resume_request" ? supervision.actions.resume_request : supervision.actions.cancel_request);
+		if (!card || !allowed || card.pause_requested !== Boolean(phase) || !["in_progress", "blocked"].includes(card.state) || !id(card.current_claim_id) || action === "card.pause_request" && (phase !== "" || card.cancel_requested) || action === "card.resume_request" && (phase !== "acknowledged" || card.cancel_requested) || action === "card.cancel_request" && card.cancel_requested) return null;
+		return Object.freeze({action, boardID: context.board.id, boardRevision: context.board.revision, cardID, cardRevision: card.revision, sourceState: card.state, claimID: card.current_claim_id, pauseRequested: card.pause_requested, pausePhase: phase, cancelRequested: card.cancel_requested});
 	}
 	function acceptancePlan(context, cardID, attempt, action) {
 		const digest = value => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
@@ -184,7 +186,7 @@
 		if (!intent || !intent.body || !exact(body, required, ["card_id", "card_revision", "claim_revision"]) || body.version !== 1 || !id(body.board_id) || !printableKey(body.operation_id) || !digest.test(body.request_digest) || !digest.test(body.response_digest) ||
 			!Number.isSafeInteger(body.first_sequence) || body.first_sequence < 1 || !Number.isSafeInteger(body.last_sequence) || body.last_sequence < body.first_sequence || !Number.isSafeInteger(body.event_count) || body.event_count < 1 || body.event_count > 128 || body.last_sequence - body.first_sequence + 1 !== body.event_count ||
 			!Number.isSafeInteger(body.transaction_bytes) || body.transaction_bytes < 1 || body.transaction_bytes > 1048576 || !Number.isSafeInteger(body.board_revision) || body.board_revision < 1 || body.outcome !== "committed" || !time(body.created_at)) return false;
-		const action = intent.body.action, cardAction = ["card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.pause_request", "card.cancel_request", "acceptance.accept", "acceptance.reject"].includes(action), positioned = action === "card.move" || action === "card.reorder", graphChange = action === "dependency.add" || action === "dependency.remove", control = action === "card.pause_request" || action === "card.cancel_request", acceptance = action === "acceptance.accept" || action === "acceptance.reject", captured = intent.capture || {};
+		const action = intent.body.action, cardAction = ["card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.pause_request", "card.resume_request", "card.cancel_request", "acceptance.accept", "acceptance.reject"].includes(action), positioned = action === "card.move" || action === "card.reorder", graphChange = action === "dependency.add" || action === "dependency.remove", control = ["card.pause_request", "card.resume_request", "card.cancel_request"].includes(action), acceptance = action === "acceptance.accept" || action === "acceptance.reject", captured = intent.capture || {};
 		const expectedBoard = action === "board.create" ? 1 : captured.boardRevision + 1;
 		if ((action === "card.revise" || graphChange || control || acceptance ? body.board_revision < expectedBoard : body.board_revision !== expectedBoard) || action !== "board.create" && body.board_id !== intent.body.board_id || cardAction !== Object.hasOwn(body, "card_id") || !cardAction && (body.card_revision !== undefined || body.claim_revision !== undefined) || body.claim_revision !== undefined) return false;
 		if (!cardAction || !id(body.card_id) || !Number.isSafeInteger(body.card_revision)) return !cardAction;

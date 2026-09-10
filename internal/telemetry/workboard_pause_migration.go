@@ -21,7 +21,7 @@ func migrateWorkboardPausePhase(ctx context.Context, conn *sql.Conn) error {
 	var invalid int
 	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM workboard_cards
 		WHERE json_valid(body)=0 OR json_type(body,'$.pause_phase') IS NOT NULL OR
-		json_type(body,'$.pause_requested') NOT IN('true','false') OR
+		json_type(body,'$.pause_requested') IS NULL OR json_type(body,'$.pause_requested') NOT IN('true','false') OR
 		CAST(json_extract(body,'$.pause_requested') AS INTEGER)!=pause_requested`).Scan(&invalid); err != nil {
 		return err
 	}

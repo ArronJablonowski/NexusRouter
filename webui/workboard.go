@@ -157,6 +157,7 @@ type Card struct {
 	BlockReason           string                `json:"block_reason,omitempty"`
 	CancelRequested       bool                  `json:"cancel_requested"`
 	PauseRequested        bool                  `json:"pause_requested"`
+	PausePhase            string                `json:"pause_phase,omitempty"`
 	Budget                WorkBudget            `json:"budget"`
 	Criteria              []AcceptanceCriterion `json:"criteria"`
 	CreatedAt             time.Time             `json:"created_at"`
@@ -173,7 +174,7 @@ func (c Card) Validate() error {
 		c.RemainingDependencies < 0 || c.RemainingDependencies > len(c.Dependencies) ||
 		!optionalID(c.AssigneeID) || c.AttemptCount < 0 || c.AttemptCount > MaxAttemptsPerCard ||
 		!optionalID(c.CurrentAttemptID) || !optionalID(c.CurrentClaimID) || !optionalID(c.AcceptanceID) ||
-		!optionalID(c.BlockReason) || c.Budget.Validate() != nil ||
+		!optionalID(c.BlockReason) || !validPausePhase(c.PausePhase) || c.PauseRequested != (c.PausePhase != "") || c.Budget.Validate() != nil ||
 		validateCriteria(c.Criteria, c.CriteriaRevision) != nil ||
 		!validWorkboardTime(c.CreatedAt) || !validWorkboardTime(c.UpdatedAt) || c.UpdatedAt.Before(c.CreatedAt) {
 		return ErrContract
@@ -208,6 +209,70 @@ func (c Card) Validate() error {
 		return ErrContract
 	}
 	return encodedWithin(c, MaxTransactionBytes)
+}
+
+func validPausePhase(value string) bool {
+	return value == "" || value == "requested" || value == "acknowledged" || value == "resume_requested"
+}
+
+type SupervisionActions struct {
+	Claim         bool `json:"claim"`
+	PauseRequest  bool `json:"pause_request"`
+	ResumeRequest bool `json:"resume_request"`
+	CancelRequest bool `json:"cancel_request"`
+	RecoveryCheck bool `json:"recovery_check"`
+}
+
+type SupervisionItem struct {
+	Version       int                `json:"version"`
+	BoardID       string             `json:"board_id"`
+	CardID        string             `json:"card_id"`
+	CardRevision  int64              `json:"card_revision"`
+	State         string             `json:"state"`
+	Reason        string             `json:"reason"`
+	AttemptID     string             `json:"attempt_id,omitempty"`
+	ClaimID       string             `json:"claim_id,omitempty"`
+	ClaimRevision int64              `json:"claim_revision,omitempty"`
+	PausePhase    string             `json:"pause_phase,omitempty"`
+	WorkerID      string             `json:"worker_id,omitempty"`
+	TaskID        string             `json:"task_id,omitempty"`
+	LastHeartbeat time.Time          `json:"last_heartbeat,omitzero"`
+	ExpiresAt     time.Time          `json:"expires_at,omitzero"`
+	Actions       SupervisionActions `json:"actions"`
+}
+
+func (i SupervisionItem) Validate() error {
+	if i.Version != ContractVersion || !validID(i.BoardID) || !validID(i.CardID) || i.CardRevision < 1 {
+		return ErrContract
+	}
+	if i.State == "ready" {
+		if i.Reason != "dependencies_satisfied" || i.AttemptID != "" || i.ClaimID != "" || i.ClaimRevision != 0 || i.WorkerID != "" || i.TaskID != "" ||
+			i.PausePhase != "" || !i.LastHeartbeat.IsZero() || !i.ExpiresAt.IsZero() || i.Actions != (SupervisionActions{Claim: true}) {
+			return ErrContract
+		}
+		return nil
+	}
+	if (i.State != "running" && i.State != "stalled" && i.State != "orphaned") || !validID(i.AttemptID) || !validID(i.ClaimID) ||
+		!validID(i.WorkerID) || !optionalID(i.TaskID) || i.ClaimRevision < 1 || !validPausePhase(i.PausePhase) || !validWorkboardTime(i.LastHeartbeat) || !validWorkboardTime(i.ExpiresAt) ||
+		!i.LastHeartbeat.Before(i.ExpiresAt) || i.Actions.Claim {
+		return ErrContract
+	}
+	switch i.State {
+	case "running":
+		if i.Reason != "lease_healthy" || i.Actions.PauseRequest != (i.PausePhase == "") || i.Actions.ResumeRequest != (i.PausePhase == "acknowledged") || i.Actions.RecoveryCheck {
+			return ErrContract
+		}
+	case "stalled":
+		if (i.Reason != "heartbeat_stale" && i.Reason != "lease_expired") || i.Actions.PauseRequest || i.Actions.ResumeRequest || !i.Actions.RecoveryCheck {
+			return ErrContract
+		}
+	case "orphaned":
+		if (i.Reason != "task_completed_with_claim" && i.Reason != "task_failed_with_claim" && i.Reason != "task_canceled_with_claim") ||
+			i.TaskID == "" || i.Actions.PauseRequest || i.Actions.ResumeRequest || !i.Actions.RecoveryCheck {
+			return ErrContract
+		}
+	}
+	return nil
 }
 
 type Claim struct {
@@ -452,20 +517,21 @@ func (a Attempt) Validate() error {
 }
 
 type BoardSnapshot struct {
-	Version       int             `json:"version"`
-	Board         Board           `json:"board"`
-	Columns       []Column        `json:"columns"`
-	Cards         []Card          `json:"cards"`
-	Lifecycle     []CardLifecycle `json:"lifecycle,omitempty"`
-	NextCursor    string          `json:"next_cursor,omitempty"`
-	HasMore       bool            `json:"has_more"`
-	GraphRevision int64           `json:"graph_revision"`
-	GraphDigest   string          `json:"graph_digest"`
+	Version       int               `json:"version"`
+	Board         Board             `json:"board"`
+	Columns       []Column          `json:"columns"`
+	Cards         []Card            `json:"cards"`
+	Lifecycle     []CardLifecycle   `json:"lifecycle,omitempty"`
+	Supervision   []SupervisionItem `json:"supervision,omitempty"`
+	NextCursor    string            `json:"next_cursor,omitempty"`
+	HasMore       bool              `json:"has_more"`
+	GraphRevision int64             `json:"graph_revision"`
+	GraphDigest   string            `json:"graph_digest"`
 }
 
 func (s BoardSnapshot) Validate() error {
 	if s.Version != ContractVersion || s.Board.Validate() != nil || len(s.Cards) > MaxCardPageItems ||
-		len(s.Lifecycle) > len(s.Cards) ||
+		len(s.Lifecycle) > len(s.Cards) || len(s.Supervision) > len(s.Cards) ||
 		s.HasMore != (s.NextCursor != "") || s.GraphRevision < 1 || !validWorkboardDigest(s.GraphDigest) ||
 		(s.NextCursor != "" && !boundedPrintable(s.NextCursor, 1, MaxCursorBytes)) ||
 		validateColumns(s.Board.ID, s.Columns) != nil {
@@ -484,6 +550,25 @@ func (s BoardSnapshot) Validate() error {
 			return ErrContract
 		}
 		lifecycleSeen[lifecycle.CardID] = true
+	}
+	supervisionSeen := map[string]bool{}
+	for _, item := range s.Supervision {
+		if item.Validate() != nil || item.BoardID != s.Board.ID || !seen[item.CardID] || supervisionSeen[item.CardID] {
+			return ErrContract
+		}
+		for _, card := range s.Cards {
+			if card.ID != item.CardID {
+				continue
+			}
+			if card.Revision != item.CardRevision || item.State == "ready" && card.State != "ready" || item.State != "ready" &&
+				(card.State != "in_progress" && card.State != "blocked" || item.AttemptID != card.CurrentAttemptID || item.ClaimID != card.CurrentClaimID) ||
+				item.PausePhase != card.PausePhase || item.Actions.PauseRequest != (item.State == "running" && card.PausePhase == "") ||
+				item.Actions.ResumeRequest != (item.State == "running" && card.PausePhase == "acknowledged") ||
+				item.Actions.CancelRequest != (item.State != "ready" && !card.CancelRequested) {
+				return ErrContract
+			}
+		}
+		supervisionSeen[item.CardID] = true
 	}
 	if len(s.Cards) == 0 && s.HasMore {
 		return ErrContract

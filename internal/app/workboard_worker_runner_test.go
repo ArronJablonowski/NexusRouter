@@ -384,6 +384,10 @@ func TestWorkboardWorkerRunnerDoesNotConsumePauseAsCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
+	card, err = store.GetCard(ctx, boardID, cardID)
+	if err != nil || card.PausePhase != workboard.PauseRequested {
+		t.Fatalf("pause was acknowledged away from a safe boundary: card=%+v err=%v", card, err)
+	}
 	select {
 	case <-callbackCanceled:
 		t.Fatal("pause request was incorrectly consumed as cancellation")

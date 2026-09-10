@@ -233,7 +233,7 @@ func TestSchemaBoardFieldMatrixMatchesGoValidator(t *testing.T) {
 		t.Fatal("schema omits the move/reorder self-anchor invariant")
 	}
 	actions := []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove,
-		CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest}
+		CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardResumeRequest, CardCancelRequest}
 	if len(allowed) != len(actions) {
 		t.Fatal("schema action matrix is incomplete", len(allowed), len(actions))
 	}
@@ -366,6 +366,7 @@ func TestWorkboardCommandsRequireLifecycleAndAuthorityFences(t *testing.T) {
 		{Version: 1, Action: CardReorder, IdempotencyKey: key, BoardID: "board", CardID: "card", BeforeCardID: "anchor", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
 		{Version: 1, Action: CriteriaRevise, IdempotencyKey: key, BoardID: "board", CardID: "card", Criteria: criteria, ExpectedCardRevision: &revision, ExpectedCriteriaRevision: &revision},
 		{Version: 1, Action: CardPauseRequest, IdempotencyKey: key, BoardID: "board", CardID: "card", ExpectedCardRevision: &revision},
+		{Version: 1, Action: CardResumeRequest, IdempotencyKey: key, BoardID: "board", CardID: "card", ExpectedCardRevision: &revision},
 	}
 	for _, command := range commands {
 		if err := command.Validate(); err != nil {

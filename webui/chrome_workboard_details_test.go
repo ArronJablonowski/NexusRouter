@@ -72,7 +72,7 @@ func TestChromeWorkboardFiltersAndDetails(t *testing.T) {
 			case "compound":
 				compoundSnapshots.Add(1)
 			}
-			writeChromeJSON(writer, BoardSnapshot{Version: 1, Board: fixture.board, Columns: chromeWorkboardColumns(fixture.board.ID), Cards: cards, Lifecycle: lifecycle, GraphRevision: fixture.graphRevision, GraphDigest: fixture.graphDigest})
+			writeChromeJSON(writer, BoardSnapshot{Version: 1, Board: fixture.board, Columns: chromeWorkboardColumns(fixture.board.ID), Cards: cards, Lifecycle: lifecycle, Supervision: fixture.supervisionFor(cards), GraphRevision: fixture.graphRevision, GraphDigest: fixture.graphDigest})
 		case "/app/api/v1/workboards/board-a/events":
 			writer.WriteHeader(http.StatusNoContent)
 		case "/app/api/v1/workboards/board-a/cards/card-blocked/dependencies":
@@ -139,6 +139,7 @@ type chromeDetailFixture struct {
 	blockedHistory AttemptHistoryPage
 	blockedDetail  AttemptDetailPage
 	reviewDetail   AttemptDetailPage
+	blockedWatch   SupervisionItem
 }
 
 func newChromeDetailFixture() chromeDetailFixture {
@@ -157,6 +158,10 @@ func newChromeDetailFixture() chromeDetailFixture {
 	blockedAttempt := Attempt{Version: 1, ID: blocked.CurrentAttemptID, BoardID: board.ID, CardID: blocked.ID, Ordinal: 1, Revision: 3, State: "running", WorkerID: "worker-a", CriteriaRevision: 1, CriteriaDigest: blockedDigest, PolicyDigest: strings.Repeat("b", 64), Budget: budget, Criteria: blocked.Criteria, TaskIDs: []string{"task-blocked"}, SessionIDs: []string{"session-blocked"}, Claim: &blockedClaim, Evidence: []EvidenceRecord{}, StartedAt: now}
 	checkpoint := WorkCheckpoint{Version: 1, ID: "checkpoint-one", BoardID: board.ID, CardID: blocked.ID, AttemptID: blockedAttempt.ID, ClaimID: blockedClaim.ID, Revision: 1, ClaimRevision: blockedClaim.Revision, CriteriaRevision: blockedAttempt.CriteriaRevision, CriteriaDigest: blockedAttempt.CriteriaDigest, PolicyDigest: blockedAttempt.PolicyDigest, Evidence: "Deployment plan captured before requesting operator input.", EvidenceDigest: strings.Repeat("f", 64), ActorID: blockedAttempt.WorkerID, ActorType: "worker", CreatedAt: now.Add(10 * time.Second)}
 	blockedLifecycle := CardLifecycle{Version: 1, CardID: blocked.ID, Attempt: blockedAttempt, Checkpoints: []WorkCheckpoint{checkpoint}, CheckpointCount: 1}
+	blockedWatch := SupervisionItem{Version: 1, BoardID: board.ID, CardID: blocked.ID, CardRevision: blocked.Revision,
+		State: "stalled", Reason: "heartbeat_stale", AttemptID: blockedAttempt.ID, ClaimID: blockedClaim.ID, ClaimRevision: blockedClaim.Revision,
+		WorkerID: blockedAttempt.WorkerID, TaskID: blockedClaim.TaskID, LastHeartbeat: blockedClaim.LastHeartbeat, ExpiresAt: blockedClaim.ExpiresAt,
+		Actions: SupervisionActions{CancelRequest: true, RecoveryCheck: true}}
 	blockedHistory := AttemptHistoryPage{Version: 1, BoardID: board.ID, CardID: blocked.ID, HighWaterOrdinal: 1, Items: []AttemptHistoryRecord{{Version: 1, ID: blockedAttempt.ID, BoardID: board.ID, CardID: blocked.ID, Ordinal: 1, Revision: blockedAttempt.Revision, State: blockedAttempt.State, WorkerID: blockedAttempt.WorkerID, CriteriaRevision: blockedAttempt.CriteriaRevision, CheckpointCount: 1, StartedAt: blockedAttempt.StartedAt}}}
 	blockedDetail := AttemptDetailPage{Version: 1, Attempt: blockedAttempt, CheckpointHighWaterRevision: 1, Checkpoints: []WorkCheckpoint{checkpoint}}
 
@@ -175,11 +180,20 @@ func newChromeDetailFixture() chromeDetailFixture {
 	reviewLifecycle := CardLifecycle{Version: 1, CardID: review.ID, Attempt: reviewAttempt, Checkpoints: []WorkCheckpoint{}, CheckpointCount: 0}
 	reviewDetail := AttemptDetailPage{Version: 1, Attempt: reviewAttempt, Checkpoints: []WorkCheckpoint{}}
 
-	result := chromeDetailFixture{board: board, cards: []Card{dependent, ready, blocked, review}, lifecycle: []CardLifecycle{blockedLifecycle, reviewLifecycle}, graphRevision: 6, graphDigest: strings.Repeat("a", 64), blockedHistory: blockedHistory, blockedDetail: blockedDetail, reviewDetail: reviewDetail}
-	if board.Validate() != nil || result.snapshot(result.cards, result.lifecycle).Validate() != nil || blockedHistory.Validate() != nil || blockedDetail.Validate() != nil || reviewDetail.Validate() != nil {
+	result := chromeDetailFixture{board: board, cards: []Card{dependent, ready, blocked, review}, lifecycle: []CardLifecycle{blockedLifecycle, reviewLifecycle}, graphRevision: 6, graphDigest: strings.Repeat("a", 64), blockedHistory: blockedHistory, blockedDetail: blockedDetail, reviewDetail: reviewDetail, blockedWatch: blockedWatch}
+	if board.Validate() != nil || result.snapshot(result.cards, result.lifecycle).Validate() != nil || blockedWatch.Validate() != nil || blockedHistory.Validate() != nil || blockedDetail.Validate() != nil || reviewDetail.Validate() != nil {
 		panic("invalid Chrome detail fixture")
 	}
 	return result
+}
+
+func (f chromeDetailFixture) supervisionFor(cards []Card) []SupervisionItem {
+	for _, card := range cards {
+		if card.ID == f.blockedWatch.CardID {
+			return []SupervisionItem{f.blockedWatch}
+		}
+	}
+	return nil
 }
 
 func (f chromeDetailFixture) snapshot(cards []Card, lifecycle []CardLifecycle) BoardSnapshot {
@@ -224,7 +238,7 @@ await eventually('document.readyState === "complete" && document.querySelector("
 await evaluate('(() => { const control = document.querySelector("#card-state-filter"); control.value = "blocked"; control.dispatchEvent(new Event("change", {bubbles:true})); return true; })()');
 await eventually('document.querySelectorAll(".kanban-card").length === 1 && document.querySelector(".kanban-card").dataset.cardId === "card-blocked" && document.querySelector("#selected-board-meta").textContent.includes("1 matching cards loaded · 4 total on board") && document.querySelector("#selected-board-meta").textContent.includes("filters clear")', 'state filter did not produce a bounded populated board');
 await evaluate('(() => { document.querySelector("#assignee-filter").value = "worker-a"; document.querySelector("#owner-filter").value = "worker-a"; document.querySelector("#claim-state-filter").value = "attention"; document.querySelector("#card-filters").requestSubmit(); return true; })()');
-await eventually('document.querySelector("#workboard-filter-status").textContent === "Filters applied." && document.querySelectorAll(".kanban-card").length === 1 && document.querySelector("[data-card-id=card-blocked]").textContent.includes("stale/orphan claim attention")', 'compound ownership and claim filter did not render');
+await eventually('document.querySelector("#workboard-filter-status").textContent === "Filters applied." && document.querySelectorAll(".kanban-card").length === 1 && document.querySelector("[data-card-id=card-blocked]").textContent.includes("supervision stalled · heartbeat stale")', 'compound ownership and supervision projection did not render');
 await evaluate('document.querySelector("#reset-card-filters").click()');
 await eventually('document.querySelectorAll(".kanban-card").length === 4 && document.activeElement.id === "assignee-filter" && document.querySelector("#selected-board-meta").textContent.includes("position controls ready")', 'filter reset did not restore the complete board and focus');
 await evaluate('document.querySelector("[data-card-id=card-blocked] .card-toggle").click()');

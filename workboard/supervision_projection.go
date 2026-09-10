@@ -34,6 +34,7 @@ const (
 type SupervisionActions struct {
 	Claim         bool `json:"claim"`
 	PauseRequest  bool `json:"pause_request"`
+	ResumeRequest bool `json:"resume_request"`
 	CancelRequest bool `json:"cancel_request"`
 	RecoveryCheck bool `json:"recovery_check"`
 }
@@ -48,6 +49,7 @@ type SupervisionItem struct {
 	AttemptID     string             `json:"attempt_id,omitempty"`
 	ClaimID       string             `json:"claim_id,omitempty"`
 	ClaimRevision int64              `json:"claim_revision,omitempty"`
+	PausePhase    PausePhase         `json:"pause_phase,omitempty"`
 	WorkerID      string             `json:"worker_id,omitempty"`
 	TaskID        string             `json:"task_id,omitempty"`
 	LastHeartbeat time.Time          `json:"last_heartbeat,omitempty"`
@@ -61,7 +63,7 @@ func (i SupervisionItem) Validate() error {
 	}
 	if i.State == SupervisionReady {
 		if i.Reason != SupervisionDependenciesSatisfied || i.AttemptID != "" || i.ClaimID != "" || i.ClaimRevision != 0 ||
-			i.WorkerID != "" || i.TaskID != "" || !i.LastHeartbeat.IsZero() || !i.ExpiresAt.IsZero() ||
+			i.WorkerID != "" || i.TaskID != "" || i.PausePhase != PauseNone || !i.LastHeartbeat.IsZero() || !i.ExpiresAt.IsZero() ||
 			i.Actions != (SupervisionActions{Claim: true}) {
 			return fail(CodeInvalid, "supervision_item")
 		}
@@ -69,21 +71,23 @@ func (i SupervisionItem) Validate() error {
 	}
 	if i.State != SupervisionRunning && i.State != SupervisionStalled && i.State != SupervisionOrphaned ||
 		!validLifecycleIDs(i.AttemptID, i.ClaimID, i.WorkerID) || !optionalID(i.TaskID) || i.ClaimRevision < 1 || !validTime(i.LastHeartbeat) || !validTime(i.ExpiresAt) ||
-		!i.LastHeartbeat.Before(i.ExpiresAt) || i.Actions.Claim {
+		!i.LastHeartbeat.Before(i.ExpiresAt) || !validPausePhase(i.PausePhase) || i.Actions.Claim {
 		return fail(CodeInvalid, "supervision_item")
 	}
 	switch i.State {
 	case SupervisionRunning:
-		if i.Reason != SupervisionLeaseHealthy || !i.Actions.PauseRequest || i.Actions.RecoveryCheck {
+		canPause := i.PausePhase == PauseNone
+		canResume := i.PausePhase == PauseAcknowledged
+		if i.Reason != SupervisionLeaseHealthy || i.Actions.PauseRequest != canPause || i.Actions.ResumeRequest != canResume || i.Actions.RecoveryCheck {
 			return fail(CodeInvalid, "supervision_item")
 		}
 	case SupervisionStalled:
-		if i.Reason != SupervisionHeartbeatStale && i.Reason != SupervisionLeaseExpired || i.Actions.PauseRequest || !i.Actions.RecoveryCheck {
+		if i.Reason != SupervisionHeartbeatStale && i.Reason != SupervisionLeaseExpired || i.Actions.PauseRequest || i.Actions.ResumeRequest || !i.Actions.RecoveryCheck {
 			return fail(CodeInvalid, "supervision_item")
 		}
 	case SupervisionOrphaned:
 		if i.Reason != SupervisionTaskCompleted && i.Reason != SupervisionTaskFailed && i.Reason != SupervisionTaskCanceled ||
-			i.TaskID == "" || i.Actions.PauseRequest || !i.Actions.RecoveryCheck {
+			i.TaskID == "" || i.Actions.PauseRequest || i.Actions.ResumeRequest || !i.Actions.RecoveryCheck {
 			return fail(CodeInvalid, "supervision_item")
 		}
 	}

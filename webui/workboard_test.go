@@ -355,6 +355,9 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 			CandidateID: attempt.Candidate.ID, AcceptanceID: attempt.AcceptanceID, StartedAt: attempt.StartedAt, EndedAt: attempt.EndedAt}}}
 	detail := AttemptDetailPage{Version: 1, Attempt: attempt, Checkpoints: []WorkCheckpoint{}}
 	receipt := OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "operation-key-01", RequestDigest: strings.Repeat("d", 64), ResponseDigest: strings.Repeat("e", 64), FirstSequence: 2, LastSequence: 3, EventCount: 2, TransactionBytes: 2048, BoardRevision: 2, CardID: "card-a", CardRevision: int64ptr(3), Outcome: "committed", CreatedAt: workboardTime()}
+	supervision := SupervisionItem{Version: 1, BoardID: board.ID, CardID: card.ID, CardRevision: card.Revision, State: "running", Reason: "lease_healthy",
+		AttemptID: card.CurrentAttemptID, ClaimID: card.CurrentClaimID, ClaimRevision: 2, WorkerID: "worker-a", TaskID: "task-a",
+		LastHeartbeat: workboardTime(), ExpiresAt: workboardTime().Add(time.Minute), Actions: SupervisionActions{PauseRequest: true, CancelRequest: true}}
 	values := []struct {
 		definition string
 		value      any
@@ -364,9 +367,10 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"card", card},
 		{"attempt", attempt},
 		{"card_lifecycle", lifecycle},
+		{"supervision_item", supervision},
 		{"attempt_history_page", history},
 		{"attempt_detail_page", detail},
-		{"snapshot", BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
+		{"snapshot", BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, Supervision: []SupervisionItem{supervision}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
 		{"page", Page{Version: 1, Items: []Board{board}}},
 		{"operation_receipt", receipt},
 		{"acceptance_decision", acceptanceFixture(attempt)},
@@ -393,6 +397,35 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 }
 
 func ptrAcceptance(value AcceptanceDecisionRecord) *AcceptanceDecisionRecord { return &value }
+
+func TestSupervisionProjectionValidatesActionableStates(t *testing.T) {
+	now, later := workboardTime(), workboardTime().Add(time.Minute)
+	ready := SupervisionItem{Version: 1, BoardID: "board-a", CardID: "card-a", CardRevision: 2,
+		State: "ready", Reason: "dependencies_satisfied", Actions: SupervisionActions{Claim: true}}
+	running := SupervisionItem{Version: 1, BoardID: "board-a", CardID: "card-b", CardRevision: 3, State: "running", Reason: "lease_healthy",
+		AttemptID: "attempt-a", ClaimID: "claim-a", ClaimRevision: 4, WorkerID: "worker-a", LastHeartbeat: now, ExpiresAt: later,
+		Actions: SupervisionActions{PauseRequest: true, CancelRequest: true}}
+	if ready.Validate() != nil || running.Validate() != nil {
+		t.Fatal("valid supervision state rejected", ready.Validate(), running.Validate())
+	}
+	paused := running
+	paused.PausePhase, paused.Actions.PauseRequest, paused.Actions.ResumeRequest = "acknowledged", false, true
+	if paused.Validate() != nil {
+		t.Fatal("acknowledged pause projection rejected", paused.Validate())
+	}
+	stalled := running
+	stalled.State, stalled.Reason, stalled.Actions = "stalled", "heartbeat_stale", SupervisionActions{CancelRequest: true, RecoveryCheck: true}
+	orphaned := stalled
+	orphaned.State, orphaned.Reason, orphaned.TaskID = "orphaned", "task_failed_with_claim", "task-a"
+	if stalled.Validate() != nil || orphaned.Validate() != nil {
+		t.Fatal("attention supervision state rejected", stalled.Validate(), orphaned.Validate())
+	}
+	stale := running
+	stale.CardRevision = 0
+	if stale.Validate() == nil {
+		t.Fatal("unfenced supervision projection accepted")
+	}
+}
 
 func int64ptr(value int64) *int64 { return &value }
 

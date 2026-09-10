@@ -681,6 +681,9 @@
         "pause_requested": {
           "type": "boolean"
         },
+		"pause_phase": {
+		  "enum": ["", "requested", "acknowledged", "resume_requested"]
+		},
         "budget": {
           "$ref": "#/$defs/budget"
         },
@@ -705,9 +708,45 @@
         {"if": {"properties": {"state": {"const": "review"}}}, "then": {"required": ["current_attempt_id"], "not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["acceptance_id"]}, {"required": ["block_reason"]}]}}},
         {"if": {"properties": {"state": {"const": "done"}}}, "then": {"required": ["current_attempt_id", "acceptance_id"], "properties": {"remaining_dependencies": {"const": 0}}, "not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["block_reason"]}]}}},
         {"if": {"properties": {"state": {"enum": ["backlog", "ready", "canceled"]}}}, "then": {"not": {"anyOf": [{"required": ["current_claim_id"]}, {"required": ["acceptance_id"]}, {"required": ["block_reason"]}]}}},
+		{"if": {"properties": {"pause_requested": {"const": true}}}, "then": {"required": ["pause_phase"], "properties": {"pause_phase": {"enum": ["requested", "acknowledged", "resume_requested"]}}}, "else": {"properties": {"pause_phase": {"const": ""}}}},
         {"if": {"properties": {"state": {"const": "ready"}}}, "then": {"properties": {"remaining_dependencies": {"const": 0}}}}
       ]
     },
+	"supervision_actions": {
+	  "type": "object",
+	  "additionalProperties": false,
+	  "required": ["claim", "pause_request", "resume_request", "cancel_request", "recovery_check"],
+	  "properties": {
+		"claim": {"type": "boolean"},
+		"pause_request": {"type": "boolean"},
+		"resume_request": {"type": "boolean"},
+		"cancel_request": {"type": "boolean"},
+		"recovery_check": {"type": "boolean"}
+	  }
+	},
+	"supervision_item": {
+	  "type": "object",
+	  "additionalProperties": false,
+	  "required": ["version", "board_id", "card_id", "card_revision", "state", "reason", "actions"],
+	  "properties": {
+		"version": {"const": 1},
+		"board_id": {"$ref": "v1#/$defs/id"},
+		"card_id": {"$ref": "v1#/$defs/id"},
+		"card_revision": {"type": "integer", "minimum": 1},
+		"state": {"enum": ["ready", "running", "stalled", "orphaned"]},
+		"reason": {"enum": ["dependencies_satisfied", "lease_healthy", "heartbeat_stale", "lease_expired", "task_completed_with_claim", "task_failed_with_claim", "task_canceled_with_claim"]},
+		"attempt_id": {"$ref": "v1#/$defs/id"},
+		"claim_id": {"$ref": "v1#/$defs/id"},
+		"claim_revision": {"type": "integer", "minimum": 1},
+		"pause_phase": {"enum": ["", "requested", "acknowledged", "resume_requested"]},
+		"worker_id": {"$ref": "v1#/$defs/id"},
+		"task_id": {"$ref": "v1#/$defs/id"},
+		"last_heartbeat": {"$ref": "#/$defs/time"},
+		"expires_at": {"$ref": "#/$defs/time"},
+		"actions": {"$ref": "#/$defs/supervision_actions"}
+	  },
+	  "x-invariants": ["ready has only claim action and no lease identity", "running has healthy lease and may expose a pause action", "stalled and orphaned require recovery check", "orphaned binds a terminal task"]
+	},
     "snapshot": {
       "type": "object",
       "additionalProperties": false,
@@ -757,6 +796,11 @@
           "maxItems": 100,
           "items": {"$ref": "#/$defs/card_lifecycle"}
         },
+		"supervision": {
+		  "type": "array",
+		  "maxItems": 100,
+		  "items": {"$ref": "#/$defs/supervision_item"}
+		},
         "next_cursor": {
           "$ref": "v1#/$defs/cursor"
         },
@@ -1225,7 +1269,7 @@
         "board_id": {"$ref": "v1#/$defs/id"},
         "sequence": {"type": "integer", "minimum": 1},
         "operation_id": {"$ref": "v1#/$defs/key"},
-        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "claim.fail", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
+		"kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "claim.fail", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.pause_acknowledge", "card.resume_request", "card.resume_acknowledge", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
         "actor_id": {"$ref": "v1#/$defs/id"},
         "actor_type": {"enum": ["operator", "worker", "validator", "model", "system"]},
         "card_id": {"$ref": "v1#/$defs/id"},

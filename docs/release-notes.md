@@ -435,7 +435,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 38. Schema 30 added the immutable
+The current durable store uses SQLite schema 39. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -451,7 +451,9 @@ forged retained schema fails without advancing. Schema 37 adds a non-secret
 persistent workspace identity that survives database backup and restore.
 Schema 38 adds exact cross-session browser-operation reconciliation while
 preserving the initiating subject and safely isolating legacy pending workboard
-operations. Browser sessions remain process-local and are revoked on restart
+operations. Schema 39 adds a durable workboard pause phase while retaining the
+version-1 `pause_requested` compatibility bit; legacy true values migrate only
+to requested, never to an unproven worker acknowledgement. Browser sessions remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores

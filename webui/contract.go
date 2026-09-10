@@ -182,6 +182,9 @@ const (
 	AcceptanceAccept   BoardAction = "acceptance.accept"
 	AcceptanceReject   BoardAction = "acceptance.reject"
 	CardPauseRequest   BoardAction = "card.pause_request"
+	CardPauseAck       BoardAction = "card.pause_acknowledge"
+	CardResumeRequest  BoardAction = "card.resume_request"
+	CardResumeAck      BoardAction = "card.resume_acknowledge"
 	CardCancelRequest  BoardAction = "card.cancel_request"
 	CardCancelFinalize BoardAction = "card.cancel_finalize"
 	CardBlock          BoardAction = "card.block"
@@ -275,7 +278,7 @@ func (r BoardRequest) Validate() error {
 		if r.Title == nil || strings.TrimSpace(*r.Title) == "" || r.CardID != "" || revisionBelowOne(r.ExpectedBoardRevision) || revisionBelowOne(r.ExpectedGraphRevision) || validateCriteria(r.Criteria, 1) != nil {
 			return ErrContract
 		}
-	case CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove, CardPauseRequest, CardCancelRequest:
+	case CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove, CardPauseRequest, CardResumeRequest, CardCancelRequest:
 		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) {
 			return ErrContract
 		}

@@ -414,7 +414,9 @@ identity. Independently derived stop proof gates automatic recovery and cancel
 finalization; proof-ineligible attention claims remain visible without starving
 later recoverable work. Schema 37 persists a non-secret workspace identity and
 schema 38 preserves initiating and recovery-session attribution for exact
-browser reconciliation, including legacy pending operations. DAR-83 owns the
+browser reconciliation, including legacy pending operations. Schema 39 adds a
+durable cooperative pause lifecycle whose worker acknowledgement is accepted
+only at an exact-fenced safe boundary. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,

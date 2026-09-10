@@ -24,7 +24,7 @@ func allowedBoardFields(action BoardAction) []string {
 		return []string{"board_id", "card_id", "criteria", "expected_card_revision", "expected_criteria_revision"}
 	case AcceptanceAccept, AcceptanceReject:
 		return []string{"board_id", "card_id", "attempt_id", "candidate_id", "criteria_revision", "expected_card_revision", "evidence", "candidate_digest", "criteria_digest", "evidence_head_revision", "evidence_set_digest", "policy_digest"}
-	case CardPauseRequest, CardCancelRequest:
+	case CardPauseRequest, CardResumeRequest, CardCancelRequest:
 		return []string{"board_id", "card_id", "expected_card_revision"}
 	default:
 		return nil
@@ -260,7 +260,7 @@ func validBoardAction(value BoardAction) bool {
 	switch value {
 	case BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
 		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, ClaimAttention, CheckpointAppend,
-		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest,
+		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardPauseAck, CardResumeRequest, CardResumeAck,
 		CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock, CriteriaRevise,
 		ClaimRecover, ClaimFail:
 		return true

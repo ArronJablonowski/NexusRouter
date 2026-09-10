@@ -206,6 +206,12 @@ func TestWorkboardBridgeComposesOnlyOperatorControlAndAcceptanceAuthority(t *tes
 	if _, err = bridge.NativeMutate(context.Background(), pause); err == nil || repository.control.Actor.Type != "operator" || repository.control.Actor.ID != "api_operator" {
 		t.Fatalf("pause authority=%+v err=%v", repository.control.Actor, err)
 	}
+	resume := pause
+	resume.Action, resume.IdempotencyKey = webui.CardResumeRequest, "resume-operation-key-01"
+	if _, err = bridge.NativeMutate(context.Background(), resume); err == nil || repository.control.Kind != workboard.ControlResumeRequest ||
+		repository.control.Actor.Type != "operator" || repository.control.ExpectedCardRevision != revision {
+		t.Fatalf("resume control=%+v err=%v", repository.control, err)
+	}
 	digest := strings.Repeat("a", 64)
 	accept := webui.BoardRequest{Version: 1, Action: webui.AcceptanceAccept, IdempotencyKey: "accept-operation-key-1",
 		BoardID: "board-a", CardID: "card-a", AttemptID: "attempt-a", CandidateID: "candidate-a",

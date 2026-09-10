@@ -499,7 +499,7 @@
       "required": ["version", "operation_id", "action", "state", "created_at", "updated_at"],
       "properties": {
         "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
-        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke", "board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "criteria.revise", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request"]},
+		"action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke", "board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "criteria.revise", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.resume_request", "card.cancel_request"]},
         "state": {"enum": ["pending", "committed", "rejected"]},
         "subject_type": {"enum": ["chat", "task", "submission", "feedback", "approval", "board", "card"]},
         "subject_id": {"$ref": "#/$defs/id"},
@@ -846,6 +846,11 @@
           "card_id",
           "expected_card_revision"
         ],
+		"card.resume_request": [
+		  "board_id",
+		  "card_id",
+		  "expected_card_revision"
+		],
         "card.cancel_request": [
           "board_id",
           "card_id",
@@ -871,6 +876,7 @@
             "acceptance.accept",
             "acceptance.reject",
             "card.pause_request",
+			"card.resume_request",
             "card.cancel_request"
           ]
         },
@@ -1326,6 +1332,7 @@
                   "dependency.remove",
                   "card.claim",
                   "card.pause_request",
+				  "card.resume_request",
                   "card.cancel_request",
                   "card.block",
                   "card.unblock"
@@ -1624,6 +1631,7 @@
               "action": {
                 "enum": [
                   "card.pause_request",
+				  "card.resume_request",
                   "card.cancel_request",
                   "card.block",
                   "card.unblock"

@@ -114,8 +114,13 @@ func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {
 		t.Fatalf("checkpoint=%+v err=%v", checkpoint, err)
 	}
 	projected, err := bridge.BrowserRead(ctx, strings.Repeat("b", 64), board.BoardID, webui.BoardSnapshotOptions{Limit: 100})
-	if err != nil || projected.Validate() != nil || len(projected.Lifecycle) != 1 {
-		t.Fatalf("lifecycle projection=%+v err=%v", projected.Lifecycle, err)
+	if err != nil || projected.Validate() != nil || len(projected.Lifecycle) != 1 || len(projected.Supervision) != 1 {
+		t.Fatalf("lifecycle=%+v supervision=%+v err=%v", projected.Lifecycle, projected.Supervision, err)
+	}
+	supervision := projected.Supervision[0]
+	if supervision.CardID != current.ID || supervision.State != "running" || supervision.Reason != "lease_healthy" ||
+		supervision.PausePhase != "" || !supervision.Actions.PauseRequest || supervision.Actions.ResumeRequest || !supervision.Actions.CancelRequest {
+		t.Fatalf("incorrect supervision projection: %+v", supervision)
 	}
 	lifecycle := projected.Lifecycle[0]
 	if lifecycle.CardID != current.ID || lifecycle.Attempt.ID != current.CurrentAttemptID || lifecycle.Attempt.Claim == nil ||

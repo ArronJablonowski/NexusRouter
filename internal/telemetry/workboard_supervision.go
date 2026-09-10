@@ -128,6 +128,7 @@ func readSupervisionItem(ctx context.Context, tx *sql.Tx, boardID, cardID string
 	}
 	claim := attempt.Claim
 	base.AttemptID, base.ClaimID, base.ClaimRevision = attempt.ID, claim.ID, claim.Revision
+	base.PausePhase = card.PausePhase
 	base.WorkerID, base.TaskID = attempt.WorkerID, claim.TaskID
 	base.LastHeartbeat, base.ExpiresAt = claim.LastHeartbeat, claim.ExpiresAt
 	base.Actions.CancelRequest = !card.CancelRequested
@@ -156,7 +157,8 @@ func readSupervisionItem(ctx context.Context, tx *sql.Tx, boardID, cardID string
 		return base, nil
 	}
 	base.State, base.Reason = workboard.SupervisionRunning, workboard.SupervisionLeaseHealthy
-	base.Actions.PauseRequest = !card.PauseRequested
+	base.Actions.PauseRequest = card.PausePhase == workboard.PauseNone
+	base.Actions.ResumeRequest = card.PausePhase == workboard.PauseAcknowledged
 	return base, nil
 }
 
