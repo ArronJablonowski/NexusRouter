@@ -26,6 +26,7 @@ type Card struct {
 	ID                    string
 	BoardID               string
 	Revision              int64
+	CriteriaRevision      int64
 	State                 State
 	Rank                  string
 	Title                 string
@@ -36,61 +37,100 @@ type Card struct {
 	ParentID              string
 	Dependencies          []string
 	RemainingDependencies int
+	AttemptCount          int
+	CurrentAttemptID      string
 	CurrentClaimID        string
-	HasCandidate          bool
+	AcceptanceID          string
+	BlockReason           string
+	CancelRequested       bool
+	PauseRequested        bool
+	Budget                WorkBudget
+	Criteria              []AcceptanceCriterion
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
 
 func (c Card) Validate() error {
-	if !validID(c.ID) || !validID(c.BoardID) || c.Revision < 1 || !validState(c.State) ||
+	if !validID(c.ID) || !validID(c.BoardID) || c.Revision < 1 || c.CriteriaRevision < 1 || !validState(c.State) ||
 		!boundedPrintable(c.Rank, 1, MaxRankBytes) || !boundedText(c.Title, MaxTitleBytes, false) || !boundedText(c.Description, MaxDescriptionBytes, true) ||
 		!validPriority(c.Priority) || !validStrings(c.Labels, MaxLabels, MaxLabelBytes) || !optionalID(c.AssigneeID) || !optionalID(c.ParentID) ||
 		!validIDs(c.Dependencies, MaxDependencies) || c.ParentID == c.ID || contains(c.Dependencies, c.ID) ||
-		c.RemainingDependencies < 0 || c.RemainingDependencies > len(c.Dependencies) || !optionalID(c.CurrentClaimID) ||
+		c.RemainingDependencies < 0 || c.RemainingDependencies > len(c.Dependencies) || c.AttemptCount < 0 || c.AttemptCount > MaxAttemptsPerCard ||
+		!optionalID(c.CurrentAttemptID) || !optionalID(c.CurrentClaimID) || !optionalID(c.AcceptanceID) || !optionalID(c.BlockReason) ||
+		c.Budget.Validate() != nil || validateAcceptanceCriteria(c.Criteria, c.CriteriaRevision) != nil ||
 		!validTime(c.CreatedAt) || !validTime(c.UpdatedAt) || c.UpdatedAt.Before(c.CreatedAt) {
 		return fail(CodeInvalid, "card")
+	}
+	if c.RemainingDependencies > 0 && c.State == Ready || c.State != Blocked && c.BlockReason != "" ||
+		(c.CancelRequested || c.PauseRequested) && c.State != InProgress && c.State != Blocked {
+		return fail(CodeInvalid, "card_lifecycle")
+	}
+	switch c.State {
+	case InProgress:
+		if c.CurrentAttemptID == "" || c.CurrentClaimID == "" || c.AcceptanceID != "" {
+			return fail(CodeInvalid, "card_lifecycle")
+		}
+	case Blocked:
+		if c.CurrentAttemptID == "" || c.CurrentClaimID == "" || c.AcceptanceID != "" || c.BlockReason == "" {
+			return fail(CodeInvalid, "card_lifecycle")
+		}
+	case Review:
+		if c.CurrentAttemptID == "" || c.CurrentClaimID != "" || c.AcceptanceID != "" {
+			return fail(CodeInvalid, "card_lifecycle")
+		}
+	case Done:
+		if c.CurrentAttemptID == "" || c.CurrentClaimID != "" || c.AcceptanceID == "" || c.RemainingDependencies != 0 {
+			return fail(CodeInvalid, "card_lifecycle")
+		}
+	default:
+		if c.CurrentClaimID != "" || c.AcceptanceID != "" {
+			return fail(CodeInvalid, "card_lifecycle")
+		}
 	}
 	return nil
 }
 
 type CardPatch struct {
-	Title       *string   `json:"title"`
-	Description *string   `json:"description"`
-	Priority    *string   `json:"priority"`
-	Labels      *[]string `json:"labels"`
-	AssigneeID  *string   `json:"assignee_id"`
-	ParentID    *string   `json:"parent_id"`
+	Title       *string     `json:"title"`
+	Description *string     `json:"description"`
+	Priority    *string     `json:"priority"`
+	Labels      *[]string   `json:"labels"`
+	Budget      *WorkBudget `json:"budget"`
+	AssigneeID  *string     `json:"assignee_id"`
+	ParentID    *string     `json:"parent_id"`
 }
 
 // NewCard is immutable creation intent. Identity, revisions and timestamps are
 // allocated by the durable store in the same transaction as the replay receipt.
 type NewCard struct {
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	Priority     string   `json:"priority"`
-	Labels       []string `json:"labels"`
-	AssigneeID   string   `json:"assignee_id"`
-	ParentID     string   `json:"parent_id"`
-	Dependencies []string `json:"dependencies"`
+	Title        string                `json:"title"`
+	Description  string                `json:"description"`
+	Priority     string                `json:"priority"`
+	Labels       []string              `json:"labels"`
+	AssigneeID   string                `json:"assignee_id"`
+	ParentID     string                `json:"parent_id"`
+	Dependencies []string              `json:"dependencies"`
+	Budget       WorkBudget            `json:"budget"`
+	Criteria     []AcceptanceCriterion `json:"criteria"`
 }
 
 func (c NewCard) validate() error {
 	if !boundedText(c.Title, MaxTitleBytes, false) || !boundedText(c.Description, MaxDescriptionBytes, true) ||
 		!validPriority(c.Priority) || !validStrings(c.Labels, MaxLabels, MaxLabelBytes) || !optionalID(c.AssigneeID) ||
-		!optionalID(c.ParentID) || !validIDs(c.Dependencies, MaxDependencies) {
+		!optionalID(c.ParentID) || !validIDs(c.Dependencies, MaxDependencies) || c.Budget.Validate() != nil ||
+		validateAcceptanceCriteria(c.Criteria, 1) != nil {
 		return fail(CodeInvalid, "create")
 	}
 	return nil
 }
 
 func (p CardPatch) validate() error {
-	if p.Title == nil && p.Description == nil && p.Priority == nil && p.Labels == nil && p.AssigneeID == nil && p.ParentID == nil {
+	if p.Title == nil && p.Description == nil && p.Priority == nil && p.Labels == nil && p.AssigneeID == nil && p.ParentID == nil && p.Budget == nil {
 		return fail(CodeInvalid, "patch")
 	}
 	if p.Title != nil && !boundedText(*p.Title, MaxTitleBytes, false) || p.Description != nil && !boundedText(*p.Description, MaxDescriptionBytes, true) ||
 		p.Priority != nil && !validPriority(*p.Priority) || p.Labels != nil && !validStrings(*p.Labels, MaxLabels, MaxLabelBytes) ||
-		p.AssigneeID != nil && !optionalID(*p.AssigneeID) || p.ParentID != nil && !optionalID(*p.ParentID) {
+		p.AssigneeID != nil && !optionalID(*p.AssigneeID) || p.ParentID != nil && !optionalID(*p.ParentID) || p.Budget != nil && p.Budget.Validate() != nil {
 		return fail(CodeInvalid, "patch")
 	}
 	return nil
@@ -117,6 +157,22 @@ type CardPage struct {
 	Items      []Card
 	NextCursor string
 	HasMore    bool
+}
+
+// CardMutationResult is the committed domain response for a card command.
+// Returning the receipt with the resulting projection prevents adapters from
+// acknowledging a mutation whose durable operation identity was discarded.
+type CardMutationResult struct {
+	Card
+	Receipt OperationReceipt
+}
+
+func (r CardMutationResult) Validate() error {
+	if r.Card.Validate() != nil || r.Receipt.Validate() != nil || r.Card.BoardID != r.Receipt.BoardID ||
+		r.Card.ID != r.Receipt.CardID || r.Receipt.CardRevision == nil || r.Card.Revision != *r.Receipt.CardRevision {
+		return fail(CodeInvalid, "card_result")
+	}
+	return nil
 }
 
 type MutationKind string
@@ -157,14 +213,14 @@ type CardStore interface {
 	GetCard(context.Context, string, string) (Card, error)
 	ListCards(context.Context, string, CardFilter) (CardPage, error)
 	LoadGraph(context.Context, string) (Graph, error)
-	ApplyCardMutation(context.Context, CardMutation) (Card, error)
+	ApplyCardMutation(context.Context, CardMutation) (CardMutationResult, error)
 }
 
 // CardReplayStore lets a durable store resolve an exact committed retry before
 // CardService performs current-state validation. Implementations must return
 // found=false without changing state when the key has not been committed.
 type CardReplayStore interface {
-	ReplayCardMutation(context.Context, CardMutation) (card Card, found bool, err error)
+	ReplayCardMutation(context.Context, CardMutation) (result CardMutationResult, found bool, err error)
 }
 
 // CardService is the authenticated domain transaction coordinator. It derives
@@ -240,14 +296,14 @@ type DependencyTraversal struct {
 	Cards               []Node
 }
 
-func (s *CardService) CreateCard(ctx context.Context, request CreateCardRequest) (Card, error) {
+func (s *CardService) CreateCard(ctx context.Context, request CreateCardRequest) (CardMutationResult, error) {
 	if !validID(request.BoardID) || request.Card.validate() != nil ||
 		!validMutation(request.IdempotencyKey, request.ExpectedBoardRevision, request.ExpectedGraphRevision) {
-		return Card{}, fail(CodeInvalid, "create")
+		return CardMutationResult{}, fail(CodeInvalid, "create")
 	}
 	actor, err := s.authorize(ctx)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationCreate, BoardID: request.BoardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedBoardRevision: request.ExpectedBoardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision, Create: copyNewCardPtr(request.Card)}
@@ -259,17 +315,17 @@ func (s *CardService) CreateCard(ctx context.Context, request CreateCardRequest)
 	}
 	graph, err := s.store.LoadGraph(ctx, request.BoardID)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	if _, err = ValidateGraph(graph, request.ExpectedGraphRevision); err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	if request.Card.ParentID != "" && !graphContains(graph, request.Card.ParentID) {
-		return Card{}, fail(CodeMissingNode, "parent")
+		return CardMutationResult{}, fail(CodeMissingNode, "parent")
 	}
 	for _, dependencyID := range request.Card.Dependencies {
 		if !graphContains(graph, dependencyID) {
-			return Card{}, fail(CodeMissingNode, "dependency")
+			return CardMutationResult{}, fail(CodeMissingNode, "dependency")
 		}
 	}
 	return s.apply(ctx, mutation)
@@ -318,13 +374,13 @@ func (s *CardService) ListCards(ctx context.Context, boardID string, filter Card
 	return page, nil
 }
 
-func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest) (Card, error) {
+func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest) (CardMutationResult, error) {
 	if !validCardMutation(request.BoardID, request.CardID, request.IdempotencyKey, request.ExpectedCardRevision) || request.Patch.validate() != nil {
-		return Card{}, fail(CodeInvalid, "revise")
+		return CardMutationResult{}, fail(CodeInvalid, "revise")
 	}
 	actor, err := s.authorize(ctx)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationRevise, BoardID: request.BoardID, CardID: request.CardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedCardRevision: request.ExpectedCardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision, Patch: copyPatch(request.Patch)}
@@ -336,11 +392,11 @@ func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest)
 	}
 	if request.Patch.ParentID != nil {
 		if request.ExpectedGraphRevision < 1 {
-			return Card{}, fail(CodeInvalid, "graph_revision")
+			return CardMutationResult{}, fail(CodeInvalid, "graph_revision")
 		}
 		graph, err := s.store.LoadGraph(ctx, request.BoardID)
 		if err != nil {
-			return Card{}, err
+			return CardMutationResult{}, err
 		}
 		found := false
 		for index := range graph.Nodes {
@@ -350,24 +406,24 @@ func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest)
 			}
 		}
 		if !found {
-			return Card{}, fail(CodeMissingNode, "card")
+			return CardMutationResult{}, fail(CodeMissingNode, "card")
 		}
 		if _, err = ValidateGraph(graph, request.ExpectedGraphRevision); err != nil {
-			return Card{}, err
+			return CardMutationResult{}, err
 		}
 	}
 	return s.apply(ctx, mutation)
 }
 
-func (s *CardService) MoveCard(ctx context.Context, request MoveCardRequest) (Card, error) {
+func (s *CardService) MoveCard(ctx context.Context, request MoveCardRequest) (CardMutationResult, error) {
 	if !validBoardCardMutation(request.BoardID, request.CardID, request.IdempotencyKey, request.ExpectedBoardRevision, request.ExpectedCardRevision) ||
 		request.ExpectedLayoutRevision < 1 || !validState(request.TargetState) || !optionalID(request.BeforeCardID) || !optionalID(request.AfterCardID) ||
 		request.BeforeCardID != "" && request.AfterCardID != "" || request.BeforeCardID == request.CardID || request.AfterCardID == request.CardID {
-		return Card{}, fail(CodeInvalid, "move")
+		return CardMutationResult{}, fail(CodeInvalid, "move")
 	}
 	actor, err := s.authorize(ctx)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationMove, BoardID: request.BoardID, CardID: request.CardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedBoardRevision: request.ExpectedBoardRevision, ExpectedCardRevision: request.ExpectedCardRevision,
@@ -381,7 +437,7 @@ func (s *CardService) MoveCard(ctx context.Context, request MoveCardRequest) (Ca
 	}
 	card, err := s.store.GetCard(ctx, request.BoardID, request.CardID)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	anchorID := request.BeforeCardID
 	if anchorID == "" {
@@ -390,30 +446,30 @@ func (s *CardService) MoveCard(ctx context.Context, request MoveCardRequest) (Ca
 	if anchorID != "" {
 		anchor, anchorErr := s.store.GetCard(ctx, request.BoardID, anchorID)
 		if anchorErr != nil {
-			return Card{}, anchorErr
+			return CardMutationResult{}, anchorErr
 		}
 		if anchor.State != request.TargetState {
-			return Card{}, fail(CodeInvalid, "move_anchor_state")
+			return CardMutationResult{}, fail(CodeInvalid, "move_anchor_state")
 		}
 	}
 	_, err = ValidateTransition(Transition{BoardID: request.BoardID, CardID: request.CardID, Command: Move, From: card.State, To: request.TargetState,
 		CurrentCardRevision: card.Revision, ExpectedCardRevision: request.ExpectedCardRevision, CurrentGraphRevision: 1,
 		ExpectedGraphRevision: 1, DependenciesSatisfied: card.RemainingDependencies == 0, HasLiveClaim: card.CurrentClaimID != ""})
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	return s.apply(ctx, mutation)
 }
 
-func (s *CardService) ReorderCard(ctx context.Context, request ReorderCardRequest) (Card, error) {
+func (s *CardService) ReorderCard(ctx context.Context, request ReorderCardRequest) (CardMutationResult, error) {
 	if !validBoardCardMutation(request.BoardID, request.CardID, request.IdempotencyKey, request.ExpectedBoardRevision, request.ExpectedCardRevision) ||
 		request.ExpectedLayoutRevision < 1 || !optionalID(request.BeforeCardID) || !optionalID(request.AfterCardID) ||
 		(request.BeforeCardID == "") == (request.AfterCardID == "") || request.BeforeCardID == request.CardID || request.AfterCardID == request.CardID {
-		return Card{}, fail(CodeInvalid, "reorder")
+		return CardMutationResult{}, fail(CodeInvalid, "reorder")
 	}
 	actor, err := s.authorize(ctx)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationReorder, BoardID: request.BoardID, CardID: request.CardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedBoardRevision: request.ExpectedBoardRevision, ExpectedCardRevision: request.ExpectedCardRevision,
@@ -426,7 +482,7 @@ func (s *CardService) ReorderCard(ctx context.Context, request ReorderCardReques
 	}
 	card, err := s.store.GetCard(ctx, request.BoardID, request.CardID)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	anchorID := request.BeforeCardID
 	if anchorID == "" {
@@ -434,26 +490,26 @@ func (s *CardService) ReorderCard(ctx context.Context, request ReorderCardReques
 	}
 	anchor, err := s.store.GetCard(ctx, request.BoardID, anchorID)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	if card.State != anchor.State {
-		return Card{}, fail(CodeInvalid, "reorder_state")
+		return CardMutationResult{}, fail(CodeInvalid, "reorder_state")
 	}
 	return s.apply(ctx, mutation)
 }
 
-func (s *CardService) AddDependency(ctx context.Context, request DependencyRequest) (Card, error) {
+func (s *CardService) AddDependency(ctx context.Context, request DependencyRequest) (CardMutationResult, error) {
 	return s.changeDependency(ctx, request, true)
 }
 
-func (s *CardService) RemoveDependency(ctx context.Context, request DependencyRequest) (Card, error) {
+func (s *CardService) RemoveDependency(ctx context.Context, request DependencyRequest) (CardMutationResult, error) {
 	return s.changeDependency(ctx, request, false)
 }
 
-func (s *CardService) changeDependency(ctx context.Context, request DependencyRequest, add bool) (Card, error) {
+func (s *CardService) changeDependency(ctx context.Context, request DependencyRequest, add bool) (CardMutationResult, error) {
 	if !validCardMutation(request.BoardID, request.CardID, request.IdempotencyKey, request.ExpectedCardRevision) ||
 		!validID(request.DependencyID) || request.DependencyID == request.CardID || request.ExpectedGraphRevision < 1 {
-		return Card{}, fail(CodeInvalid, "dependency")
+		return CardMutationResult{}, fail(CodeInvalid, "dependency")
 	}
 	kind := MutationDependencyRemove
 	if add {
@@ -461,7 +517,7 @@ func (s *CardService) changeDependency(ctx context.Context, request DependencyRe
 	}
 	actor, err := s.authorize(ctx)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: kind, BoardID: request.BoardID, CardID: request.CardID, DependencyID: request.DependencyID,
 		IdempotencyKey: request.IdempotencyKey, Actor: actor, ExpectedCardRevision: request.ExpectedCardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision}
@@ -473,10 +529,10 @@ func (s *CardService) changeDependency(ctx context.Context, request DependencyRe
 	}
 	graph, err := s.store.LoadGraph(ctx, request.BoardID)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	if _, err = ValidateGraph(graph, request.ExpectedGraphRevision); err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	found := false
 	for index := range graph.Nodes {
@@ -486,7 +542,7 @@ func (s *CardService) changeDependency(ctx context.Context, request DependencyRe
 		found = true
 		has := contains(graph.Nodes[index].Dependencies, request.DependencyID)
 		if add == has {
-			return Card{}, fail(CodeInvalid, "dependency")
+			return CardMutationResult{}, fail(CodeInvalid, "dependency")
 		}
 		if add {
 			graph.Nodes[index].Dependencies = append(append([]string(nil), graph.Nodes[index].Dependencies...), request.DependencyID)
@@ -495,10 +551,10 @@ func (s *CardService) changeDependency(ctx context.Context, request DependencyRe
 		}
 	}
 	if !found {
-		return Card{}, fail(CodeMissingNode, "card")
+		return CardMutationResult{}, fail(CodeMissingNode, "card")
 	}
 	if _, err = ValidateGraph(graph, request.ExpectedGraphRevision); err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	return s.apply(ctx, mutation)
 }
@@ -559,40 +615,44 @@ func (s *CardService) TraverseDependencies(ctx context.Context, request Traverse
 	return DependencyTraversal{BoardID: request.BoardID, RootCardID: request.CardID, GraphRevision: graph.GraphRevision, Cards: result}, nil
 }
 
-func (s *CardService) apply(ctx context.Context, mutation CardMutation) (Card, error) {
+func (s *CardService) apply(ctx context.Context, mutation CardMutation) (CardMutationResult, error) {
 	digest, err := mutationDigest(mutation)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
 	mutation.RequestDigest = digest
-	card, err := s.store.ApplyCardMutation(ctx, mutation)
+	result, err := s.store.ApplyCardMutation(ctx, mutation)
 	if err != nil {
-		return Card{}, err
+		return CardMutationResult{}, err
 	}
-	if card.Validate() != nil || card.BoardID != mutation.BoardID || mutation.CardID != "" && card.ID != mutation.CardID {
-		return Card{}, fail(CodeInvalid, "stored_card")
+	if result.Validate() != nil || result.Receipt.RequestDigest != mutation.RequestDigest || result.Card.BoardID != mutation.BoardID ||
+		mutation.CardID != "" && result.Card.ID != mutation.CardID {
+		return CardMutationResult{}, fail(CodeInvalid, "stored_card")
 	}
-	return copyCard(card), nil
+	result.Card = copyCard(result.Card)
+	return result, nil
 }
 
-func (s *CardService) replay(ctx context.Context, mutation CardMutation) (Card, bool, error) {
+func (s *CardService) replay(ctx context.Context, mutation CardMutation) (CardMutationResult, bool, error) {
 	store, ok := s.store.(CardReplayStore)
 	if !ok {
-		return Card{}, false, nil
+		return CardMutationResult{}, false, nil
 	}
 	digest, err := mutationDigest(mutation)
 	if err != nil {
-		return Card{}, false, err
+		return CardMutationResult{}, false, err
 	}
 	mutation.RequestDigest = digest
-	card, found, err := store.ReplayCardMutation(ctx, mutation)
+	result, found, err := store.ReplayCardMutation(ctx, mutation)
 	if err != nil || !found {
-		return Card{}, found, err
+		return CardMutationResult{}, found, err
 	}
-	if card.Validate() != nil || card.BoardID != mutation.BoardID || mutation.CardID != "" && card.ID != mutation.CardID {
-		return Card{}, true, fail(CodeInvalid, "stored_card")
+	if result.Validate() != nil || result.Receipt.RequestDigest != mutation.RequestDigest || result.Card.BoardID != mutation.BoardID ||
+		mutation.CardID != "" && result.Card.ID != mutation.CardID {
+		return CardMutationResult{}, true, fail(CodeInvalid, "stored_card")
 	}
-	return copyCard(card), true, nil
+	result.Card = copyCard(result.Card)
+	return result, true, nil
 }
 
 func (s *CardService) authorize(ctx context.Context) (Actor, error) {
@@ -758,11 +818,13 @@ func copyNode(node Node) Node {
 func copyCard(card Card) Card {
 	card.Labels = append([]string{}, card.Labels...)
 	card.Dependencies = append([]string{}, card.Dependencies...)
+	card.Criteria = copyCriteria(card.Criteria)
 	return card
 }
 func copyNewCardPtr(card NewCard) *NewCard {
 	card.Labels = append([]string{}, card.Labels...)
 	card.Dependencies = append([]string{}, card.Dependencies...)
+	card.Criteria = copyCriteria(card.Criteria)
 	return &card
 }
 func copyPatch(patch CardPatch) CardPatch {
@@ -775,6 +837,10 @@ func copyPatch(patch CardPatch) CardPatch {
 	if patch.Labels != nil {
 		labels := append([]string{}, (*patch.Labels)...)
 		copied.Labels = &labels
+	}
+	if patch.Budget != nil {
+		budget := *patch.Budget
+		copied.Budget = &budget
 	}
 	return copied
 }

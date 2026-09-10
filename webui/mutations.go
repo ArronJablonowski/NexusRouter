@@ -371,7 +371,7 @@ func (s OperationSummary) Validate() error {
 		!optionalID(s.SubjectID) || !validBrowserTime(s.CreatedAt) || !validBrowserTime(s.UpdatedAt) || s.UpdatedAt.Before(s.CreatedAt) {
 		return ErrContract
 	}
-	if s.SubjectType != "" && s.SubjectType != "chat" && s.SubjectType != "task" && s.SubjectType != "submission" && s.SubjectType != "feedback" && s.SubjectType != "approval" {
+	if s.SubjectType != "" && s.SubjectType != "chat" && s.SubjectType != "task" && s.SubjectType != "submission" && s.SubjectType != "feedback" && s.SubjectType != "approval" && s.SubjectType != "board" && s.SubjectType != "card" {
 		return ErrContract
 	}
 	if s.State == "committed" && s.SubjectID == "" {
@@ -446,6 +446,12 @@ func (s SubmissionStatus) Validate() error {
 func validOperationAction(value string) bool {
 	switch value {
 	case "submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke":
+		return true
+	case string(BoardCreate), string(BoardRevise), string(BoardArchive), string(CardCreate), string(CardRevise),
+		string(CardMove), string(CardReorder), string(DependencyAdd), string(DependencyRemove), string(CardClaim),
+		string(ClaimHeartbeat), string(ClaimRecover), string(CriteriaRevise), string(CheckpointAppend), string(CandidateSubmit),
+		string(AcceptanceAccept), string(AcceptanceReject), string(CardPauseRequest), string(CardCancelRequest),
+		string(CardCancelFinalize), string(CardBlock), string(CardUnblock):
 		return true
 	default:
 		return false

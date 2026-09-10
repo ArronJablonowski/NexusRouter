@@ -182,6 +182,12 @@ func TestWorkboardReadSchemaParity(t *testing.T) {
 		body, _ := json.Marshal(value)
 		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+definition, body, true)
 	}
+	invalidation := BoardChangedData{BoardID: "board-a", CardID: "card-a", Change: "card_changed"}
+	if invalidation.Validate() != nil {
+		t.Fatal("state-free durable card invalidation rejected")
+	}
+	invalidationBody, _ := json.Marshal(invalidation)
+	validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/v1#/$defs/board_changed_data", invalidationBody, true)
 	for definition, body := range map[string]string{
 		"board_snapshot_options": `{"limit":1,"state":"active"}`,
 		"dependency_page":        `{"version":1,"board_id":"board-a","card_id":"card-a","direction":"prerequisites","graph_revision":1,"graph_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","items":[],"has_more":true}`,

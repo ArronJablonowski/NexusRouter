@@ -21,6 +21,11 @@ const (
 	CardReorderAction          BoardAction = "card.reorder"
 	CardDependencyAddAction    BoardAction = "dependency.add"
 	CardDependencyRemoveAction BoardAction = "dependency.remove"
+	CardClaimAction            BoardAction = "card.claim"
+	ClaimHeartbeatAction       BoardAction = "claim.heartbeat"
+	ClaimRecoverAction         BoardAction = "claim.recover"
+	CriteriaReviseAction       BoardAction = "criteria.revise"
+	CheckpointAppendAction     BoardAction = "checkpoint.append"
 )
 
 type Actor struct {
@@ -252,7 +257,8 @@ func (e BoardEvent) Validate() error {
 
 func boardActionRequiresCard(action BoardAction) bool {
 	switch action {
-	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction:
+	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, CriteriaReviseAction, CheckpointAppendAction:
 		return true
 	default:
 		return false
@@ -306,7 +312,8 @@ func (p BoardEventPage) Validate() error {
 func validBoardAction(action BoardAction) bool {
 	switch action {
 	case BoardCreateAction, BoardReviseAction, BoardArchiveAction, CardCreateAction, CardReviseAction,
-		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction:
+		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, CriteriaReviseAction, CheckpointAppendAction:
 		return true
 	default:
 		return false

@@ -16,6 +16,7 @@ import (
 type WorkboardServices struct {
 	List   func(context.Context, string, contract.BoardListOptions) (contract.Page, error)
 	Read   func(context.Context, string, string, contract.BoardSnapshotOptions) (contract.BoardSnapshot, error)
+	Events func(context.Context, string, string, contract.BoardEventOptions) (contract.BoardEventPage, error)
 	Mutate func(context.Context, string, contract.BoardRequest) (contract.OperationReceipt, error)
 }
 
@@ -208,6 +209,10 @@ func browserWorkboardReadID(base, path string) string {
 
 func browserWorkboardOperationID(base, path string) string {
 	return exactBrowserWorkboardMiddle(path, base+"/api/v1/workboards/", "/operations")
+}
+
+func boardEventsID(base, path string) string {
+	return exactBrowserWorkboardMiddle(path, base+"/api/v1/workboards/", "/events")
 }
 
 func exactBrowserWorkboardMiddle(path, prefix, suffix string) string {

@@ -612,7 +612,10 @@ func (d BoardChangedData) Validate() error {
 			return ErrContract
 		}
 	case "card_changed":
-		if d.CardID == "" || !validBoardState(d.State) {
+		// State is an optional optimization. Durable workboard journal events
+		// deliberately omit command bodies, so clients must be able to treat a
+		// card change as an invalidation and reconcile the board snapshot.
+		if d.CardID == "" || d.State != "" && !validBoardState(d.State) {
 			return ErrContract
 		}
 	case "dependency_changed", "claim_changed", "evidence_changed", "acceptance_changed":

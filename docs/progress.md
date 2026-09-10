@@ -5815,3 +5815,41 @@ composition, the remaining claim/attempt/evaluation lifecycle commands,
 policy-constrained agent tools, and visual Kanban rendering are still
 unfinished. This is therefore a partial DAR-82 checkpoint, not a completed
 issue or a usable Kanban surface.
+
+## 2026-09-09 — DAR-82 third partial live workboard and lifecycle checkpoint
+
+DAR-82 remains In Progress. The daemon now composes the authority-gated board
+and card services into both the bearer-authenticated native API and the
+session/CSRF browser BFF. Rich card projections persist and return acceptance
+criteria, work budgets, attempt/claim pointers, lifecycle requests, labels, and
+dependencies. Exact card-operation replay authenticates the full canonical
+receipt-and-card envelope; tests prove that a separately valid but altered
+title or budget fails closed.
+
+The browser exposes a bounded reconnectable workboard event stream with
+principal-, board-, filter-, and high-water-bound cursors. Board mutations are
+written to the same session-scoped durable browser operation journal used by
+chat controls before execution, so refresh reconciliation can distinguish
+pending, committed, and definitively rejected outcomes without blindly
+replaying an ambiguous write. Browser operation projections now recognize
+board/card subjects and the closed workboard action vocabulary.
+
+The durable lifecycle layer now implements worker-authorized claim and
+heartbeat, independently verified operator/system recovery, operator-only
+future criteria revision, and worker checkpoint append under an active matching
+lease. These commands use revision fences, immutable attempts/checkpoints,
+frozen criteria and policy digests, attributed events, exact idempotent replay,
+and transactional rollback. They are not yet exposed through a transport:
+worker identity and recovery proof must come from trusted runtime observations,
+not browser-supplied fields.
+
+Final repository-wide verification passed with `make check`: source formatting
+and the 1,000-line limit, `go vet ./...`, the full race suite, and
+`go build ./...` all succeeded. The longest rebuilt packages were application
+548.291s, releasepack 477.516s, telemetry 434.518s, SDK 65.730s, CLI 65.289s,
+toolgate 30.311s, runtime 26.364s, workers 12.081s, Web UI 5.258s, workboard
+4.593s, and browser BFF 3.433s. Candidate submission, acceptance/rejection,
+pause/cancel/finalize, block/unblock, stall/attention supervision, lifecycle
+read projections and trusted transport dispatch remain open, as do agent tools
+and the integrated visual Kanban in DAR-83/DAR-84. This checkpoint is therefore
+not a completed issue or a usable visual board.

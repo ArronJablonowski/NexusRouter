@@ -15,60 +15,60 @@ import (
 // ApplyCardMutation applies one projection mutation, immutable event and
 // replay receipt in a single SQLite transaction. Exact retries are resolved
 // before any current revision is inspected.
-func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMutation) (workboard.Card, error) {
+func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMutation) (workboard.CardMutationResult, error) {
 	if err := validateStoreMutation(mutation); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	requestDigest, err := cardMutationDigest(mutation)
 	if err != nil || mutation.RequestDigest != requestDigest {
-		return workboard.Card{}, invalidWorkboard("request_digest")
+		return workboard.CardMutationResult{}, invalidWorkboard("request_digest")
 	}
 	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	defer tx.Rollback()
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
-	if replayCard, found, replayErr := readCardMutationReplay(ctx, tx, mutation.BoardID, keyDigest, requestDigest); found || replayErr != nil {
+	if replayResult, found, replayErr := readCardMutationReplay(ctx, tx, mutation.BoardID, keyDigest, requestDigest); found || replayErr != nil {
 		if replayErr != nil {
-			return workboard.Card{}, replayErr
+			return workboard.CardMutationResult{}, replayErr
 		}
-		return replayCard, nil
+		return replayResult, nil
 	}
 	board, graphRevision, graphDigest, err := readBoardRow(ctx, tx, mutation.BoardID)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if board.State != "active" {
-		return workboard.Card{}, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "board_state"}
+		return workboard.CardMutationResult{}, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "board_state"}
 	}
 	if err = compareMutationFences(board, graphRevision, mutation); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	graph, actualDigest, err := loadGraphTx(ctx, tx, board.ID, graphRevision)
 	if err != nil || actualDigest != graphDigest {
 		if err == nil {
 			err = ErrWorkboardCorrupt
 		}
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	card, body, exists, err := mutationCard(ctx, tx, mutation)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if mutation.Kind == workboard.MutationCreate {
 		card, body, err = newStoredCard(ctx, tx, mutation, board, graph)
 		if err != nil {
-			return workboard.Card{}, err
+			return workboard.CardMutationResult{}, err
 		}
 	} else if !exists {
-		return workboard.Card{}, ErrWorkboardNotFound
+		return workboard.CardMutationResult{}, ErrWorkboardNotFound
 	}
 	if err = mutateStoredCard(ctx, tx, mutation, &card, &body, graph); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	graphChanged, layoutChanged := mutationChanges(mutation)
 	proposedGraph := applyMutationToGraph(graph, mutation, card)
@@ -79,15 +79,15 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 		proposedGraph.LayoutRevision++
 	}
 	if _, err = workboard.ValidateGraph(proposedGraph, proposedGraph.GraphRevision); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	newGraphDigest, err := graphDigestFor(proposedGraph)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	now := time.Now().UTC()
 	if now.Year() < 1970 || now.Year() >= 2261 {
-		return workboard.Card{}, invalidWorkboard("updated_at")
+		return workboard.CardMutationResult{}, invalidWorkboard("updated_at")
 	}
 	card.Revision++
 	if mutation.Kind == workboard.MutationCreate {
@@ -98,11 +98,11 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	body = updateStoredBody(body, card)
 	bodyBytes, err := json.Marshal(body)
 	if err != nil || card.Validate() != nil || !validStoredCardReferences(body) {
-		return workboard.Card{}, invalidWorkboard("card")
+		return workboard.CardMutationResult{}, invalidWorkboard("card")
 	}
 	operationID, eventID := newWorkboardID(), newWorkboardID()
 	if operationID == "" || eventID == "" {
-		return workboard.Card{}, errors.New("secure identifier generation failed")
+		return workboard.CardMutationResult{}, errors.New("secure identifier generation failed")
 	}
 	board.Revision++
 	board.EventSequence++
@@ -115,16 +115,16 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	}
 	boardBody, err := json.Marshal(board)
 	if err != nil || board.Validate() != nil {
-		return workboard.Card{}, ErrWorkboardCorrupt
+		return workboard.CardMutationResult{}, ErrWorkboardCorrupt
 	}
 	event := workboard.BoardEvent{Version: 1, ID: eventID, BoardID: board.ID, Sequence: board.EventSequence,
 		OperationID: operationID, Kind: mutationBoardAction(mutation.Kind), ActorID: mutation.Actor.ID, ActorType: mutation.Actor.Type, CardID: card.ID, CreatedAt: now}
 	eventBody, err := json.Marshal(event)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if event.Validate() != nil {
-		return workboard.Card{}, invalidWorkboard("event")
+		return workboard.CardMutationResult{}, invalidWorkboard("event")
 	}
 	cardRevision := card.Revision
 	receipt := workboard.OperationReceipt{Version: 1, BoardID: board.ID, OperationID: operationID, RequestDigest: requestDigest,
@@ -132,31 +132,31 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 		CardID: card.ID, CardRevision: &cardRevision, Outcome: "committed", CreatedAt: now}
 	response, err := finalizeCardMutationReceipt(&receipt, card, len(boardBody)+len(bodyBytes)+len(eventBody))
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if err = writeCardProjection(ctx, tx, mutation, card, body, bodyBytes, board.EventSequence); err != nil {
-		return workboard.Card{}, normalizeCardWriteError(err)
+		return workboard.CardMutationResult{}, normalizeCardWriteError(err)
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE workboard_boards SET revision=?,layout_revision=?,event_sequence=?,graph_revision=?,graph_digest=?,card_count=?,updated_at=?,body=? WHERE id=? AND revision=? AND layout_revision=? AND graph_revision=?`,
 		board.Revision, board.LayoutRevision, board.EventSequence, proposedGraph.GraphRevision, newGraphDigest, board.CardCount, now.UnixNano(), boardBody,
 		board.ID, board.Revision-1, board.LayoutRevision-boolDelta(layoutChanged), graphRevision)
 	if err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if changed, _ := result.RowsAffected(); changed != 1 {
-		return workboard.Card{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "board_revision"}
+		return workboard.CardMutationResult{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "board_revision"}
 	}
 	if err = insertWorkboardOperation(ctx, tx, "board", board.ID, keyDigest, receipt, response); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	actor := workboard.Actor{ID: event.ActorID, Type: event.ActorType}
 	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, actor, now, eventBody); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
 	if err = tx.Commit(); err != nil {
-		return workboard.Card{}, err
+		return workboard.CardMutationResult{}, err
 	}
-	return card, nil
+	return workboard.CardMutationResult{Card: card, Receipt: receipt}, nil
 }
 
 func mutationBoardAction(kind workboard.MutationKind) workboard.BoardAction {
@@ -282,11 +282,12 @@ func newStoredCard(ctx context.Context, tx *sql.Tx, m workboard.CardMutation, bo
 	}
 	card := workboard.Card{ID: id, BoardID: board.ID, State: workboard.Backlog, Rank: rank, Title: m.Create.Title, Description: m.Create.Description,
 		Priority: m.Create.Priority, Labels: append([]string{}, m.Create.Labels...), AssigneeID: m.Create.AssigneeID, ParentID: m.Create.ParentID,
-		Dependencies: dependencies, RemainingDependencies: remaining}
+		Dependencies: dependencies, RemainingDependencies: remaining, CriteriaRevision: 1, Budget: m.Create.Budget,
+		Criteria: append([]workboard.AcceptanceCriterion{}, m.Create.Criteria...)}
 	body := storedWorkboardCard{Version: 1, ID: id, BoardID: board.ID, CriteriaRevision: 1, State: string(workboard.Backlog), Rank: rank,
 		Title: card.Title, Description: card.Description, Priority: card.Priority, Labels: append([]string{}, card.Labels...), ParentID: card.ParentID,
-		Dependencies: dependencies, RemainingDependencies: remaining, AssigneeID: card.AssigneeID, Budget: storedWorkboardBudget{AttemptLimit: 1},
-		Criteria: []storedWorkboardCriterion{}}
+		Dependencies: dependencies, RemainingDependencies: remaining, AssigneeID: card.AssigneeID, Budget: storedCardBudget(m.Create.Budget),
+		Criteria: storedCardCriteria(m.Create.Criteria)}
 	return card, body, nil
 }
 
@@ -406,7 +407,11 @@ func updateStoredBody(body storedWorkboardCard, card workboard.Card) storedWorkb
 	body.State, body.Rank, body.Title, body.Description, body.Priority = string(card.State), card.Rank, card.Title, card.Description, card.Priority
 	body.Labels, body.AssigneeID, body.ParentID = append([]string{}, card.Labels...), card.AssigneeID, card.ParentID
 	body.Dependencies, body.RemainingDependencies = append([]string{}, card.Dependencies...), card.RemainingDependencies
-	body.CurrentClaimID, body.CreatedAt, body.UpdatedAt = card.CurrentClaimID, card.CreatedAt, card.UpdatedAt
+	body.CriteriaRevision, body.AttemptCount = card.CriteriaRevision, card.AttemptCount
+	body.CurrentAttemptID, body.CurrentClaimID, body.AcceptanceID = card.CurrentAttemptID, card.CurrentClaimID, card.AcceptanceID
+	body.BlockReason, body.CancelRequested, body.PauseRequested = card.BlockReason, card.CancelRequested, card.PauseRequested
+	body.Budget, body.Criteria = storedCardBudget(card.Budget), storedCardCriteria(card.Criteria)
+	body.CreatedAt, body.UpdatedAt = card.CreatedAt, card.UpdatedAt
 	return body
 }
 
@@ -423,6 +428,10 @@ func applyPatch(card *workboard.Card, body *storedWorkboardCard, patch workboard
 	if patch.Labels != nil {
 		card.Labels = append([]string{}, (*patch.Labels)...)
 		body.Labels = append([]string{}, card.Labels...)
+	}
+	if patch.Budget != nil {
+		card.Budget = *patch.Budget
+		body.Budget = storedCardBudget(card.Budget)
 	}
 	if patch.AssigneeID != nil {
 		card.AssigneeID, body.AssigneeID = *patch.AssigneeID, *patch.AssigneeID
@@ -445,8 +454,9 @@ func writeCardProjection(ctx context.Context, tx *sql.Tx, m workboard.CardMutati
 		}
 	} else {
 		result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,rank=?,title=?,description=?,priority=?,parent_id=?,assignee_id=?,
-			remaining_dependencies=?,updated_at=?,body=? WHERE board_id=? AND id=? AND revision=?`, card.Revision, card.State, card.Rank, card.Title,
-			card.Description, card.Priority, nullable(card.ParentID), nullable(card.AssigneeID), card.RemainingDependencies, card.UpdatedAt.UnixNano(), bodyBytes,
+			remaining_dependencies=?,attempt_limit=?,time_limit_ms=?,token_limit=?,cost_micros=?,updated_at=?,body=? WHERE board_id=? AND id=? AND revision=?`,
+			card.Revision, card.State, card.Rank, card.Title, card.Description, card.Priority, nullable(card.ParentID), nullable(card.AssigneeID),
+			card.RemainingDependencies, card.Budget.AttemptLimit, card.Budget.TimeLimitMS, card.Budget.TokenLimit, card.Budget.CostMicros, card.UpdatedAt.UnixNano(), bodyBytes,
 			card.BoardID, card.ID, card.Revision-1)
 		if err != nil {
 			return err
@@ -471,6 +481,19 @@ func writeCardProjection(ctx context.Context, tx *sql.Tx, m workboard.CardMutati
 		}
 		for _, dependencyID := range card.Dependencies {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO workboard_dependencies(board_id,card_id,dependency_id,created_sequence) VALUES(?,?,?,?)`, card.BoardID, card.ID, dependencyID, sequence); err != nil {
+				return err
+			}
+		}
+	}
+	if m.Kind == workboard.MutationCreate {
+		for ordinal, criterion := range body.Criteria {
+			criterionBody, err := json.Marshal(criterion)
+			if err != nil {
+				return err
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO workboard_criteria(board_id,card_id,criteria_revision,ordinal,id,kind,required_source,validator_id,description,required,body)
+				VALUES(?,?,?,?,?,?,?,?,?,?,?)`, card.BoardID, card.ID, body.CriteriaRevision, ordinal, criterion.ID, criterion.Kind,
+				criterion.RequiredSource, criterion.ValidatorID, criterion.Description, boolInt(criterion.Required), criterionBody); err != nil {
 				return err
 			}
 		}

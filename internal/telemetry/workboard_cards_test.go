@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"reflect"
@@ -31,18 +32,32 @@ func TestWorkboardCardMutationsReplayRestartAndGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 	dependency, err := service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: created.BoardID, IdempotencyKey: "create-dependency", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-		Card: workboard.NewCard{Title: "Dependency", Priority: "normal", Labels: []string{"Core"}, Dependencies: []string{}}})
+		Card: workboard.NewCard{Title: "Dependency", Priority: "normal", Labels: []string{"Core"}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	cardRequest := workboard.CreateCardRequest{BoardID: created.BoardID, IdempotencyKey: "create-card-key01", ExpectedBoardRevision: 2, ExpectedGraphRevision: 2,
-		Card: workboard.NewCard{Title: "Implement", Description: "Durable card", Priority: "high", Labels: []string{"API", "MVP"}, AssigneeID: "worker-1", ParentID: dependency.ID, Dependencies: []string{dependency.ID}}}
+		Card: workboard.NewCard{Title: "Implement", Description: "Durable card", Priority: "high", Labels: []string{"API", "MVP"}, AssigneeID: "worker-1", ParentID: dependency.ID,
+			Dependencies: []string{dependency.ID}, Budget: workboard.WorkBudget{AttemptLimit: 4, TimeLimitMS: 60_000, TokenLimit: 50_000, CostMicros: 7_500}, Criteria: workboardTestCriteria()}}
 	card, err := service.CreateCard(ctx, cardRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if card.Revision != 1 || card.State != workboard.Backlog || card.RemainingDependencies != 1 || len(card.Dependencies) != 1 {
+	if card.Revision != 1 || card.CriteriaRevision != 1 || card.State != workboard.Backlog || card.RemainingDependencies != 1 || len(card.Dependencies) != 1 ||
+		card.Budget != cardRequest.Card.Budget || !reflect.DeepEqual(card.Criteria, cardRequest.Card.Criteria) || card.Receipt.Validate() != nil {
 		t.Fatalf("created card = %+v", card)
+	}
+	var committedResponse []byte
+	if err = store.db.QueryRow(`SELECT response FROM workboard_operations WHERE operation_id=?`, card.Receipt.OperationID).Scan(&committedResponse); err != nil {
+		t.Fatal(err)
+	}
+	var committed cardMutationResponse
+	if strictJSON(committedResponse, &committed) != nil {
+		t.Fatalf("invalid committed response: %s", committedResponse)
+	}
+	committedDigest, digestErr := cardMutationResponseDigest(committed)
+	if digestErr != nil || committed.Receipt.ResponseDigest != committedDigest || !reflect.DeepEqual(committed.Receipt, card.Receipt) || !reflect.DeepEqual(committed.Card, card.Card) {
+		t.Fatalf("committed response=%+v result=%+v", committed, card)
 	}
 	graph, err := store.LoadGraph(ctx, created.BoardID)
 	if err != nil || graph.GraphRevision != 3 || graph.LayoutRevision != 3 || len(graph.Nodes) != 2 {
@@ -83,9 +98,10 @@ func TestWorkboardCardMutationsReplayRestartAndGraph(t *testing.T) {
 		t.Fatalf("same key changed request error=%v", err)
 	}
 	newTitle := "Implemented"
+	newBudget := workboard.WorkBudget{AttemptLimit: 5, TimeLimitMS: 120_000, TokenLimit: 75_000, CostMicros: 9_000}
 	revised, err := service.ReviseCard(ctx, workboard.ReviseCardRequest{BoardID: created.BoardID, CardID: card.ID, IdempotencyKey: "revise-card-key01", ExpectedCardRevision: 1,
-		Patch: workboard.CardPatch{Title: &newTitle}})
-	if err != nil || revised.Title != newTitle || revised.Revision != 2 {
+		Patch: workboard.CardPatch{Title: &newTitle, Budget: &newBudget}})
+	if err != nil || revised.Title != newTitle || revised.Revision != 2 || revised.Budget != newBudget || revised.Receipt.Validate() != nil {
 		t.Fatalf("revised=%+v err=%v", revised, err)
 	}
 	if err = store.Close(); err != nil {
@@ -102,7 +118,7 @@ func TestWorkboardCardMutationsReplayRestartAndGraph(t *testing.T) {
 		t.Fatalf("restart replay lost original response: %+v err=%v", replay, err)
 	}
 	stored, err := store.GetCard(ctx, created.BoardID, card.ID)
-	if err != nil || stored.Title != newTitle {
+	if err != nil || stored.Title != newTitle || stored.Budget != newBudget || !reflect.DeepEqual(stored.Criteria, cardRequest.Card.Criteria) {
 		t.Fatalf("current projection=%+v err=%v", stored, err)
 	}
 }
@@ -142,11 +158,12 @@ func TestWorkboardAnchoredCrossColumnMoveAndReplay(t *testing.T) {
 	_, service, boardID := cardTestStore(t, ctx)
 	anchor := createCardForTest(t, ctx, service, boardID, "anchor-card-key1", "Anchor", 1, 1, nil)
 	source := createCardForTest(t, ctx, service, boardID, "source-card-key1", "Source", 2, 2, nil)
-	anchor, err := service.MoveCard(ctx, workboard.MoveCardRequest{BoardID: boardID, CardID: anchor.ID, IdempotencyKey: "move-anchor-key01",
+	anchorResult, err := service.MoveCard(ctx, workboard.MoveCardRequest{BoardID: boardID, CardID: anchor.ID, IdempotencyKey: "move-anchor-key01",
 		TargetState: workboard.Ready, ExpectedBoardRevision: 3, ExpectedCardRevision: 1, ExpectedLayoutRevision: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
+	anchor = anchorResult.Card
 	request := workboard.MoveCardRequest{BoardID: boardID, CardID: source.ID, IdempotencyKey: "move-before-key01", TargetState: workboard.Ready,
 		BeforeCardID: anchor.ID, ExpectedBoardRevision: 4, ExpectedCardRevision: 1, ExpectedLayoutRevision: 4}
 	moved, err := service.MoveCard(ctx, request)
@@ -166,7 +183,7 @@ func TestWorkboardCardMutationRollbackAndConcurrentReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "rollback-card-key", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-		Card: workboard.NewCard{Title: "Rollback", Priority: "normal", Labels: []string{}, Dependencies: []string{}}}
+		Card: workboard.NewCard{Title: "Rollback", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}}
 	if _, err := service.CreateCard(ctx, request); err == nil || !strings.Contains(err.Error(), "injected card event failure") {
 		t.Fatalf("rollback error=%v", err)
 	}
@@ -178,7 +195,7 @@ func TestWorkboardCardMutationRollbackAndConcurrentReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	const callers = 8
-	results := make([]workboard.Card, callers)
+	results := make([]workboard.CardMutationResult, callers)
 	errs := make([]error, callers)
 	var group sync.WaitGroup
 	for index := range results {
@@ -204,7 +221,7 @@ func TestWorkboardCardNormalizedCorruptionFailsClosed(t *testing.T) {
 	ctx := context.Background()
 	store, service, boardID := cardTestStore(t, ctx)
 	card, err := service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "corrupt-card-key", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-		Card: workboard.NewCard{Title: "Card", Priority: "normal", Labels: []string{"Original"}, Dependencies: []string{}}})
+		Card: workboard.NewCard{Title: "Card", Priority: "normal", Labels: []string{"Original"}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,6 +233,47 @@ func TestWorkboardCardNormalizedCorruptionFailsClosed(t *testing.T) {
 	}
 	if _, err := store.ReadWorkboard(ctx, boardID, workboard.BoardSnapshotOptions{Limit: 100}); !errors.Is(err, ErrWorkboardCorrupt) {
 		t.Fatalf("snapshot corruption error=%v", err)
+	}
+}
+
+func TestWorkboardCardCriteriaCorruptionFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	store, service, boardID := cardTestStore(t, ctx)
+	card := createCardForTest(t, ctx, service, boardID, "criteria-card-key", "Criteria", 1, 1, nil)
+	var count int
+	if err := store.db.QueryRow(`SELECT count(*) FROM workboard_criteria WHERE board_id=? AND card_id=? AND criteria_revision=1`, boardID, card.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("criteria count=%d err=%v", count, err)
+	}
+	if _, err := store.db.Exec(`UPDATE workboard_criteria SET description='tampered' WHERE board_id=? AND card_id=?`, boardID, card.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetCard(ctx, boardID, card.ID); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("criteria corruption error=%v", err)
+	}
+}
+
+func TestWorkboardCardMutationLeavesBoardProjectionConsistent(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	card, boardID := readyLifecycleCard(t, ctx, store, time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC))
+	board, graphRevision, _, err := readBoardRow(ctx, store.db, boardID)
+	if err != nil || board.Revision != 3 || board.LayoutRevision != 3 || graphRevision != 2 || card.Revision != 2 {
+		t.Fatalf("board=%+v graph_revision=%d card=%+v err=%v", board, graphRevision, card, err)
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if err = reserveWorkboardWriter(ctx, tx); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err = readBoardRow(ctx, tx, boardID); err != nil {
+		t.Fatalf("writer transaction board projection err=%v", err)
 	}
 }
 
@@ -239,7 +297,7 @@ func TestWorkboardCardReplayRequiresImmutableEvent(t *testing.T) {
 			ctx := context.Background()
 			store, service, boardID := cardTestStore(t, ctx)
 			request := workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "journal-replay-key", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-				Card: workboard.NewCard{Title: "Journal", Priority: "normal", Labels: []string{}, Dependencies: []string{}}}
+				Card: workboard.NewCard{Title: "Journal", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}}
 			if _, err := service.CreateCard(ctx, request); err != nil {
 				t.Fatal(err)
 			}
@@ -250,6 +308,49 @@ func TestWorkboardCardReplayRequiresImmutableEvent(t *testing.T) {
 			test.mutate(t, store, operationID)
 			if _, err := service.CreateCard(ctx, request); !errors.Is(err, ErrWorkboardCorrupt) {
 				t.Fatalf("replay with %s event = %v", test.name, err)
+			}
+		})
+	}
+}
+
+func TestWorkboardCardReplayRejectsValidResponseCardTampering(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*workboard.Card)
+	}{
+		{"title", func(card *workboard.Card) { card.Title = "Changed" }},
+		{"budget", func(card *workboard.Card) { card.Budget.TokenLimit++ }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			store, service, boardID := cardTestStore(t, ctx)
+			request := workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "response-replay-key", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
+				Card: workboard.NewCard{Title: "Journal", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}}
+			created, err := service.CreateCard(ctx, request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response []byte
+			if err = store.db.QueryRow(`SELECT response FROM workboard_operations WHERE operation_id=?`, created.Receipt.OperationID).Scan(&response); err != nil {
+				t.Fatal(err)
+			}
+			var envelope cardMutationResponse
+			if strictJSON(response, &envelope) != nil {
+				t.Fatal("invalid committed response fixture")
+			}
+			test.mutate(&envelope.Card)
+			if envelope.Card.Validate() != nil {
+				t.Fatal("tamper fixture must remain a valid card")
+			}
+			response, err = json.Marshal(envelope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = store.db.Exec(`UPDATE workboard_operations SET response=? WHERE operation_id=?`, response, created.Receipt.OperationID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = service.CreateCard(ctx, request); !errors.Is(err, ErrWorkboardCorrupt) {
+				t.Fatalf("valid %s tamper replay error = %v", test.name, err)
 			}
 		})
 	}
@@ -334,9 +435,17 @@ func createCardForTest(t *testing.T, ctx context.Context, service *workboard.Car
 		deps = []string{}
 	}
 	card, err := service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: key, ExpectedBoardRevision: boardRevision, ExpectedGraphRevision: graphRevision,
-		Card: workboard.NewCard{Title: title, Priority: "normal", Labels: []string{}, Dependencies: deps}})
+		Card: workboard.NewCard{Title: title, Priority: "normal", Labels: []string{}, Dependencies: deps, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return card
+	return card.Card
+}
+
+func workboardTestBudget() workboard.WorkBudget {
+	return workboard.WorkBudget{AttemptLimit: 3, TimeLimitMS: 30_000, TokenLimit: 10_000, CostMicros: 1_000}
+}
+
+func workboardTestCriteria() []workboard.AcceptanceCriterion {
+	return []workboard.AcceptanceCriterion{{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Tests pass.", Required: true}}
 }

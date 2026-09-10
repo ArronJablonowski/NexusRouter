@@ -77,6 +77,8 @@ func TestMutationProjectionRejectsAuthorityAndInvalidState(t *testing.T) {
 		(CancellationReceipt{Version: 1, OperationID: "operation", TargetKind: "submission", TargetID: "submission", State: "queued", Requested: true}).Validate,
 		(SteeringReceipt{Version: 1, OperationID: "operation", ID: "steering", TaskID: "task", State: "applied", CreatedAt: now, AppliedRevision: &revision}).Validate,
 		validApproval.Validate,
+		(OperationSummary{Version: 1, OperationID: "board-operation", Action: string(BoardCreate), State: "committed", SubjectType: "board", SubjectID: "board-a", CreatedAt: now, UpdatedAt: now}).Validate,
+		(OperationSummary{Version: 1, OperationID: "card-operation", Action: string(CardMove), State: "committed", SubjectType: "card", SubjectID: "card-a", CreatedAt: now, UpdatedAt: now}).Validate,
 	}
 	for _, validate := range valid {
 		if err := validate(); err != nil {

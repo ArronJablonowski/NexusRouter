@@ -499,9 +499,9 @@
       "required": ["version", "operation_id", "action", "state", "created_at", "updated_at"],
       "properties": {
         "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
-        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke"]},
+        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke", "board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
         "state": {"enum": ["pending", "committed", "rejected"]},
-        "subject_type": {"enum": ["chat", "task", "submission", "feedback", "approval"]},
+        "subject_type": {"enum": ["chat", "task", "submission", "feedback", "approval", "board", "card"]},
         "subject_id": {"$ref": "#/$defs/id"},
         "created_at": {"type": "string", "format": "date-time"},
         "updated_at": {"type": "string", "format": "date-time"}
@@ -2460,9 +2460,7 @@
             }
           },
           "then": {
-            "required": [
-              "state"
-            ]
+            "properties": {}
           },
           "else": {
             "not": {

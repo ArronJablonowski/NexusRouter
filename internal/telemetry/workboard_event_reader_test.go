@@ -149,7 +149,7 @@ func TestWorkboardCardEventRoundTripAndIndexCorruption(t *testing.T) {
 	ctx := context.Background()
 	store, service, boardID := cardTestStore(t, ctx)
 	card, err := service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "card-event-roundtrip", ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-		Card: workboard.NewCard{Title: "Event card", Priority: "normal", Labels: []string{}, Dependencies: []string{}}})
+		Card: workboard.NewCard{Title: "Event card", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: workboardTestBudget(), Criteria: workboardTestCriteria()}})
 	if err != nil {
 		t.Fatal(err)
 	}

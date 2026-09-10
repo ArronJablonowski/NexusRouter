@@ -106,6 +106,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer db.Close()
+	workboards, err := app.NewWorkboardBridge(db, db, time.Now)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot initialize workboard services")
+		return 1
+	}
 	var dispatcher *app.Dispatcher
 	var learner *app.ConfiguredLearning
 	var exporter *app.MetricsExporter
@@ -139,6 +144,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		browserMutations, mutationErr := app.NewBrowserMutations(service, operationStore)
 		if mutationErr != nil {
 			fmt.Fprintln(stderr, "cannot initialize Web UI mutation service")
+			return 1
+		}
+		browserWorkboards, mutationErr := app.NewBrowserWorkboardMutations(workboards, operationStore)
+		if mutationErr != nil {
+			fmt.Fprintln(stderr, "cannot initialize Web UI workboard mutation service")
 			return 1
 		}
 		liveText := webuiapp.NewLiveTextHub()
@@ -192,6 +202,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Resources: func(ctx context.Context) (webui.ResourceInspection, error) {
 				return service.BrowserResources(ctx), nil
 			},
+		}, Workboards: webuiapp.WorkboardServices{
+			List: workboards.BrowserList, Read: workboards.BrowserRead,
+			Events: workboards.BrowserEvents, Mutate: browserWorkboards.Mutate,
 		}})
 		if err != nil {
 			fmt.Fprintln(stderr, "invalid Web UI configuration")
@@ -324,6 +337,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 			return browserHandler.ApproveChallenge(id, code)
 		},
+		WorkboardList:   workboards.NativeList,
+		WorkboardRead:   workboards.NativeRead,
+		WorkboardMutate: workboards.NativeMutate,
+		WorkboardEvents: workboards.NativeEvents,
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon configuration")

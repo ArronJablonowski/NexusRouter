@@ -23,6 +23,7 @@ const (
 	maxBrowserBody     = 4 << 10
 	maxBrowserInFlight = 32
 	maxBrowserStreams  = 8
+	maxBoardStreams    = 8
 )
 
 var ErrConfiguration = errors.New("invalid browser application configuration")
@@ -42,23 +43,25 @@ type Options struct {
 }
 
 type Handler struct {
-	basePath      string
-	hosts         map[string]bool
-	origins       map[string]bool
-	secureCookies bool
-	store         *browserauth.Store
-	reads         ReadServices
-	mutations     MutationServices
-	inspections   InspectionServices
-	workboards    WorkboardServices
-	liveText      *LiveTextHub
-	shell         http.Handler
-	bootstrap     http.Handler
-	slots         chan struct{}
-	streamSlots   chan struct{}
-	mutationSlots chan struct{}
-	controlSlots  chan struct{}
-	cursorKey     [32]byte
+	basePath         string
+	hosts            map[string]bool
+	origins          map[string]bool
+	secureCookies    bool
+	store            *browserauth.Store
+	reads            ReadServices
+	mutations        MutationServices
+	inspections      InspectionServices
+	workboards       WorkboardServices
+	liveText         *LiveTextHub
+	shell            http.Handler
+	bootstrap        http.Handler
+	slots            chan struct{}
+	streamSlots      chan struct{}
+	boardStreamSlots chan struct{}
+	mutationSlots    chan struct{}
+	controlSlots     chan struct{}
+	cursorKey        [32]byte
+	boardStreamLife  time.Duration
 }
 
 func New(options Options) (*Handler, error) {
@@ -89,7 +92,7 @@ func New(options Options) (*Handler, error) {
 	} else {
 		copy(cursorKey[:], options.CursorKey)
 	}
-	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey}
+	handler := &Handler{basePath: options.BasePath, hosts: hosts, origins: origins, secureCookies: options.SecureCookies, store: options.Store, reads: options.Reads, mutations: options.Mutations, inspections: options.Inspections, workboards: options.Workboards, liveText: options.LiveText, slots: make(chan struct{}, maxBrowserInFlight), streamSlots: make(chan struct{}, maxBrowserStreams), boardStreamSlots: make(chan struct{}, maxBoardStreams), mutationSlots: make(chan struct{}, 8), controlSlots: make(chan struct{}, 4), cursorKey: cursorKey, boardStreamLife: 30 * time.Second}
 	shell, err := contract.NewShellHandler(contract.ShellOptions{BasePath: options.BasePath, HostAllowed: handler.hostAllowed, Authenticated: handler.authenticated})
 	if err != nil {
 		return nil, ErrConfiguration
@@ -109,7 +112,7 @@ func New(options Options) (*Handler, error) {
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	contract.ApplyBrowserSecurityHeaders(writer.Header())
 	chatListPath := h.basePath + "/api/v1/chats"
-	queryReadPath := request.URL != nil && (workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
+	queryReadPath := request.URL != nil && (workboardBrowserQueryPath(h.basePath, request.URL.Path, request.Method) || request.URL.Path == chatListPath || request.URL.Path == h.basePath+"/api/v1/operations" || chatMessagesID(h.basePath, request.URL.Path) != "" || chatEventsID(h.basePath, request.URL.Path) != "" || boardEventsID(h.basePath, request.URL.Path) != "" || approvalListTaskID(h.basePath, request.URL.Path) != "" || inspectionQueryPath(h.basePath, request.URL.Path))
 	if !h.hostAllowed(request.Host) || hasForwardedAuthority(request) || request.URL == nil || (request.URL.RawQuery != "" && !queryReadPath) || request.URL.RawPath != "" {
 		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
 		return
@@ -120,6 +123,10 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 	if chat := chatEventsID(h.basePath, request.URL.Path); chat != "" {
 		h.serveChatEvents(writer, request, chat)
+		return
+	}
+	if board := boardEventsID(h.basePath, request.URL.Path); board != "" {
+		h.serveBoardEvents(writer, request, board)
 		return
 	}
 	if h.serveMutationAPI(writer, request) {

@@ -339,9 +339,10 @@ func TestWorkboardCardProjectionRejectsIndexedBodyDivergence(t *testing.T) {
 	if _, err = store.db.Exec(`UPDATE workboard_boards SET card_count=1,updated_at=?,body=? WHERE id=?`, board.UpdatedAt.UnixNano(), boardBody, board.ID); err != nil {
 		t.Fatal(err)
 	}
+	criterion := storedWorkboardCriterion{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Tests pass.", Required: true}
 	body := storedWorkboardCard{Version: 1, ID: "card", BoardID: board.ID, Revision: 1, CriteriaRevision: 1, State: "backlog", Rank: "a",
 		Title: "Card", Description: "description", Priority: "normal", Labels: []string{}, Dependencies: []string{},
-		Budget: storedWorkboardBudget{AttemptLimit: 1}, Criteria: []storedWorkboardCriterion{}, CreatedAt: now, UpdatedAt: now}
+		Budget: storedWorkboardBudget{AttemptLimit: 1}, Criteria: []storedWorkboardCriterion{criterion}, CreatedAt: now, UpdatedAt: now}
 	expectedIndex := workboardCardIndex{Ordinal: 0, ColumnState: "backlog", ID: "card", Revision: 1, CriteriaRevision: 1, State: "backlog", Rank: "a",
 		Title: "Card", Description: "description", Priority: "normal", AttemptLimit: 1, CreatedAt: now.UnixNano(), UpdatedAt: now.UnixNano()}
 	if !storedCardMatches(expectedIndex, body, board.ID) {
@@ -352,6 +353,11 @@ func TestWorkboardCardProjectionRejectsIndexedBodyDivergence(t *testing.T) {
 		(id,board_id,revision,criteria_revision,state,rank,title,description,priority,parent_id,assignee_id,block_reason,remaining_dependencies,attempt_count,
 		attempt_limit,time_limit_ms,token_limit,cost_micros,current_attempt_id,current_claim_id,acceptance_id,cancel_requested,pause_requested,created_at,updated_at,body)
 		VALUES(?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,0,0,1,0,0,0,NULL,NULL,NULL,0,0,?,?,?)`, body.ID, body.BoardID, 1, 1, body.State, body.Rank, body.Title, body.Description, body.Priority, now.UnixNano(), now.UnixNano(), encoded); err != nil {
+		t.Fatal(err)
+	}
+	criterionBody, _ := json.Marshal(criterion)
+	if _, err = store.db.Exec(`INSERT INTO workboard_criteria(board_id,card_id,criteria_revision,ordinal,id,kind,required_source,validator_id,description,required,body)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?)`, body.BoardID, body.ID, 1, 0, criterion.ID, criterion.Kind, criterion.RequiredSource, criterion.ValidatorID, criterion.Description, 1, criterionBody); err != nil {
 		t.Fatal(err)
 	}
 	if snapshot, readErr := store.ReadWorkboard(ctx, board.ID, workboard.BoardSnapshotOptions{Limit: 10}); readErr != nil || len(snapshot.Cards) != 1 {

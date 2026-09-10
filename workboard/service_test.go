@@ -15,7 +15,7 @@ type fakeCardStore struct {
 	page        CardPage
 	listed      CardFilter
 	mutations   []CardMutation
-	applyResult Card
+	applyResult CardMutationResult
 	getCalls    int
 	graphCalls  int
 }
@@ -49,19 +49,38 @@ func (f *fakeCardStore) LoadGraph(_ context.Context, boardID string) (Graph, err
 	return graph, nil
 }
 
-func (f *fakeCardStore) ApplyCardMutation(_ context.Context, mutation CardMutation) (Card, error) {
+func (f *fakeCardStore) ApplyCardMutation(_ context.Context, mutation CardMutation) (CardMutationResult, error) {
 	if mutation.Create != nil {
 		mutation.Create = copyNewCardPtr(*mutation.Create)
 	}
 	mutation.Patch = copyPatch(mutation.Patch)
 	f.mutations = append(f.mutations, mutation)
-	return copyCard(f.applyResult), nil
+	result := f.applyResult
+	result.Card = copyCard(result.Card)
+	result.Receipt.RequestDigest = mutation.RequestDigest
+	return result, nil
+}
+
+func serviceCriterion() AcceptanceCriterion {
+	return AcceptanceCriterion{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Tests pass.", Required: true}
 }
 
 func serviceCard(id string, state State) Card {
 	created := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
-	return Card{ID: id, BoardID: "board-a", Revision: 1, State: state, Rank: "rank-1", Title: "A card",
-		Description: "description", Priority: "normal", Labels: []string{}, Dependencies: []string{}, CreatedAt: created, UpdatedAt: created}
+	card := Card{ID: id, BoardID: "board-a", Revision: 1, CriteriaRevision: 1, State: state, Rank: "rank-1", Title: "A card",
+		Description: "description", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: WorkBudget{AttemptLimit: 1},
+		Criteria: []AcceptanceCriterion{serviceCriterion()}, CreatedAt: created, UpdatedAt: created}
+	if state == Done {
+		card.AttemptCount, card.CurrentAttemptID, card.AcceptanceID = 1, "attempt-1", "acceptance-1"
+	}
+	return card
+}
+
+func serviceMutationResult(card Card) CardMutationResult {
+	revision := card.Revision
+	return CardMutationResult{Card: card, Receipt: OperationReceipt{Version: 1, BoardID: card.BoardID, OperationID: serviceKey,
+		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
+		EventCount: 1, TransactionBytes: 1, BoardRevision: 1, CardID: card.ID, CardRevision: &revision, Outcome: "committed", CreatedAt: card.UpdatedAt}}
 }
 
 func serviceGraph(cards ...Card) Graph {
@@ -89,9 +108,9 @@ func TestCardServiceCreateBindsReplayIdentityAndOwnsInput(t *testing.T) {
 	created := serviceCard("created", Backlog)
 	created.ParentID, created.Dependencies, created.Labels = parent.ID, []string{dependency.ID}, []string{"backend"}
 	created.RemainingDependencies = 1
-	store := &fakeCardStore{graph: serviceGraph(parent, dependency), applyResult: copyCard(created)}
+	store := &fakeCardStore{graph: serviceGraph(parent, dependency), applyResult: serviceMutationResult(copyCard(created))}
 	intent := NewCard{Title: created.Title, Description: created.Description, Priority: created.Priority, Labels: created.Labels,
-		ParentID: created.ParentID, Dependencies: created.Dependencies}
+		ParentID: created.ParentID, Dependencies: created.Dependencies, Budget: created.Budget, Criteria: copyCriteria(created.Criteria)}
 	request := CreateCardRequest{BoardID: "board-a", Card: intent, IdempotencyKey: serviceKey, ExpectedBoardRevision: 7, ExpectedGraphRevision: 3}
 
 	result, err := serviceFor(t, store).CreateCard(context.Background(), request)
@@ -109,10 +128,15 @@ func TestCardServiceCreateBindsReplayIdentityAndOwnsInput(t *testing.T) {
 	if mutation.Actor != (Actor{ID: "operator", Type: "operator"}) {
 		t.Fatalf("trusted actor=%+v", mutation.Actor)
 	}
-	intent.Labels[0], intent.Dependencies[0] = "changed", "changed"
-	result.Labels[0] = "caller-change"
-	if mutation.Create.Labels[0] != "backend" || mutation.Create.Dependencies[0] != dependency.ID || store.applyResult.Labels[0] != "backend" {
+	intent.Labels[0], intent.Dependencies[0], intent.Criteria[0].Description = "changed", "changed", "changed"
+	result.Card.Labels[0] = "caller-change"
+	result.Card.Criteria[0].Description = "caller-change"
+	if mutation.Create.Labels[0] != "backend" || mutation.Create.Dependencies[0] != dependency.ID || mutation.Create.Criteria[0].Description != "Tests pass." ||
+		store.applyResult.Card.Labels[0] != "backend" || store.applyResult.Card.Criteria[0].Description != "Tests pass." {
 		t.Fatal("card slices alias caller or store state")
+	}
+	if result.Receipt.OperationID == "" || result.Receipt.CardRevision == nil || *result.Receipt.CardRevision != result.Card.Revision {
+		t.Fatalf("committed receipt=%+v", result.Receipt)
 	}
 }
 
@@ -124,7 +148,8 @@ func TestCardServiceDeniesBeforeStoreAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := CreateCardRequest{BoardID: "board-a", IdempotencyKey: serviceKey, ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
-		Card: NewCard{Title: "Card", Priority: "normal", Labels: []string{}, Dependencies: []string{}}}
+		Card: NewCard{Title: "Card", Priority: "normal", Labels: []string{}, Dependencies: []string{}, Budget: WorkBudget{AttemptLimit: 1},
+			Criteria: []AcceptanceCriterion{serviceCriterion()}}}
 	if _, err = service.CreateCard(context.Background(), request); !errors.Is(err, denied) {
 		t.Fatalf("denial error=%v", err)
 	}
@@ -160,7 +185,7 @@ func TestCardServiceListEnforcesOpaqueBoundedPages(t *testing.T) {
 func TestCardServiceReviseParentValidatesCompleteGraph(t *testing.T) {
 	a, b := serviceCard("a", Backlog), serviceCard("b", Backlog)
 	b.ParentID = "a"
-	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b}, graph: serviceGraph(a, b), applyResult: a}
+	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b}, graph: serviceGraph(a, b), applyResult: serviceMutationResult(a)}
 	parent := "b"
 	request := ReviseCardRequest{BoardID: "board-a", CardID: "a", IdempotencyKey: serviceKey, Patch: CardPatch{ParentID: &parent},
 		ExpectedCardRevision: 1, ExpectedGraphRevision: 3}
@@ -182,14 +207,14 @@ func TestCardServiceReviseParentValidatesCompleteGraph(t *testing.T) {
 
 func TestCardServiceMoveAndReorderUseDomainState(t *testing.T) {
 	a, b, done := serviceCard("a", Backlog), serviceCard("b", Backlog), serviceCard("done", Done)
-	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b, "done": done}, graph: serviceGraph(a, b, done), applyResult: a}
+	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b, "done": done}, graph: serviceGraph(a, b, done), applyResult: serviceMutationResult(a)}
 	service := serviceFor(t, store)
 	move := MoveCardRequest{BoardID: "board-a", CardID: "a", IdempotencyKey: serviceKey, TargetState: Done,
 		ExpectedBoardRevision: 7, ExpectedCardRevision: 1, ExpectedLayoutRevision: 4}
 	if _, err := service.MoveCard(context.Background(), move); !errors.Is(err, &Violation{Code: CodeIllegalTransition}) {
 		t.Fatalf("illegal move error=%v", err)
 	}
-	move.TargetState, store.applyResult.State = Ready, Ready
+	move.TargetState, store.applyResult.Card.State = Ready, Ready
 	if _, err := service.MoveCard(context.Background(), move); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +228,7 @@ func TestCardServiceMoveAndReorderUseDomainState(t *testing.T) {
 	if _, err := service.ReorderCard(context.Background(), reorder); !errors.Is(err, &Violation{Code: CodeInvalid}) {
 		t.Fatalf("cross-state reorder error=%v", err)
 	}
-	reorder.BeforeCardID, store.applyResult = "b", a
+	reorder.BeforeCardID, store.applyResult = "b", serviceMutationResult(a)
 	if _, err := service.ReorderCard(context.Background(), reorder); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +236,7 @@ func TestCardServiceMoveAndReorderUseDomainState(t *testing.T) {
 
 func TestCardServiceMoveRejectsAnchorOutsideTargetColumn(t *testing.T) {
 	source, anchor := serviceCard("source", Backlog), serviceCard("anchor", Backlog)
-	store := &fakeCardStore{cards: map[string]Card{"source": source, "anchor": anchor}, graph: serviceGraph(source, anchor), applyResult: source}
+	store := &fakeCardStore{cards: map[string]Card{"source": source, "anchor": anchor}, graph: serviceGraph(source, anchor), applyResult: serviceMutationResult(source)}
 	request := MoveCardRequest{BoardID: "board-a", CardID: source.ID, BeforeCardID: anchor.ID, IdempotencyKey: serviceKey,
 		TargetState: Ready, ExpectedBoardRevision: 7, ExpectedCardRevision: 1, ExpectedLayoutRevision: 4}
 	if _, err := serviceFor(t, store).MoveCard(context.Background(), request); !errors.Is(err, &Violation{Code: CodeInvalid}) {
@@ -226,7 +251,7 @@ func TestCardServiceDependencyMutationAndTraversal(t *testing.T) {
 	a, b, c, d := serviceCard("a", Backlog), serviceCard("b", Backlog), serviceCard("c", Backlog), serviceCard("d", Backlog)
 	a.Dependencies, b.Dependencies = []string{"b", "c"}, []string{"d"}
 	a.RemainingDependencies, b.RemainingDependencies = 2, 1
-	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b, "c": c, "d": d}, graph: serviceGraph(a, b, c, d), applyResult: c}
+	store := &fakeCardStore{cards: map[string]Card{"a": a, "b": b, "c": c, "d": d}, graph: serviceGraph(a, b, c, d), applyResult: serviceMutationResult(c)}
 	service := serviceFor(t, store)
 	request := DependencyRequest{BoardID: "board-a", CardID: "c", DependencyID: "a", IdempotencyKey: serviceKey,
 		ExpectedCardRevision: 1, ExpectedGraphRevision: 3}
@@ -276,7 +301,7 @@ func TestCardMutationDigestIsStableAndIntentBound(t *testing.T) {
 		if index == 3 {
 			request.IdempotencyKey = "request-key-0002"
 		}
-		store := &fakeCardStore{applyResult: card}
+		store := &fakeCardStore{applyResult: serviceMutationResult(card)}
 		if _, err := serviceFor(t, store).ReviseCard(context.Background(), request); err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +314,7 @@ func TestCardMutationDigestIsStableAndIntentBound(t *testing.T) {
 
 func TestCardServiceUsesOnlyActionSpecificRevisionFences(t *testing.T) {
 	card := serviceCard("a", Backlog)
-	store := &fakeCardStore{cards: map[string]Card{"a": card}, graph: serviceGraph(card), applyResult: card}
+	store := &fakeCardStore{cards: map[string]Card{"a": card}, graph: serviceGraph(card), applyResult: serviceMutationResult(card)}
 	service := serviceFor(t, store)
 	title := "revised"
 	if _, err := service.ReviseCard(context.Background(), ReviseCardRequest{BoardID: "board-a", CardID: "a", IdempotencyKey: serviceKey,
@@ -332,7 +357,7 @@ func TestCardServiceUsesOnlyActionSpecificRevisionFences(t *testing.T) {
 
 func TestCardServiceRejectsInvalidMutationIdentity(t *testing.T) {
 	card := serviceCard("a", Backlog)
-	store := &fakeCardStore{graph: serviceGraph(), applyResult: card}
+	store := &fakeCardStore{graph: serviceGraph(), applyResult: serviceMutationResult(card)}
 	request := CreateCardRequest{BoardID: "board-a", Card: NewCard{Title: card.Title, Description: card.Description, Priority: card.Priority,
 		Labels: []string{}, Dependencies: []string{}}, IdempotencyKey: "has whitespace key", ExpectedBoardRevision: 1, ExpectedGraphRevision: 3}
 	if _, err := serviceFor(t, store).CreateCard(context.Background(), request); !errors.Is(err, &Violation{Code: CodeInvalid}) {
@@ -340,6 +365,29 @@ func TestCardServiceRejectsInvalidMutationIdentity(t *testing.T) {
 	}
 	if len(store.mutations) != 0 || store.graphCalls != 0 || store.getCalls != 0 {
 		t.Fatal("invalid mutation reached store")
+	}
+}
+
+func TestCardServiceRejectsLossyMutationResult(t *testing.T) {
+	card := serviceCard("a", Backlog)
+	store := &fakeCardStore{applyResult: CardMutationResult{Card: card}}
+	title := "revised"
+	_, err := serviceFor(t, store).ReviseCard(context.Background(), ReviseCardRequest{BoardID: card.BoardID, CardID: card.ID,
+		IdempotencyKey: serviceKey, ExpectedCardRevision: card.Revision, Patch: CardPatch{Title: &title}})
+	if !errors.Is(err, &Violation{Code: CodeInvalid}) {
+		t.Fatalf("missing durable receipt error=%v", err)
+	}
+}
+
+func TestCardServiceRejectsCreateWithoutBudgetOrCriteria(t *testing.T) {
+	store := &fakeCardStore{}
+	request := CreateCardRequest{BoardID: "board-a", IdempotencyKey: serviceKey, ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
+		Card: NewCard{Title: "Card", Priority: "normal", Labels: []string{}, Dependencies: []string{}}}
+	if _, err := serviceFor(t, store).CreateCard(context.Background(), request); !errors.Is(err, &Violation{Code: CodeInvalid}) {
+		t.Fatalf("incomplete create error=%v", err)
+	}
+	if len(store.mutations) != 0 || store.graphCalls != 0 {
+		t.Fatal("incomplete create reached store")
 	}
 }
 

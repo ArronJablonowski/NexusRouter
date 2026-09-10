@@ -106,8 +106,8 @@ func TestBrowserWorkboardReadsRequireSessionAndUseClosedQueries(t *testing.T) {
 	request.AddCookie(cookie)
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusNotFound {
-		t.Fatal("non-SSE event route was exposed", response.Code, response.Body.String())
+	if response.Code != http.StatusServiceUnavailable || response.Header().Get("Content-Type") != "application/json" {
+		t.Fatal("unconfigured SSE route did not fail before stream headers", response.Code, response.Header(), response.Body.String())
 	}
 }
 

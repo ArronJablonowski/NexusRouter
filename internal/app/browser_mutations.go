@@ -19,6 +19,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
 var ErrBrowserMutation = errors.New("browser mutation unavailable")
@@ -604,6 +605,7 @@ type browserRejection struct {
 	Code        string `json:"code"`
 	SubjectType string `json:"subject_type,omitempty"`
 	SubjectID   string `json:"subject_id,omitempty"`
+	Field       string `json:"field,omitempty"`
 }
 
 type BrowserOperationError struct {
@@ -622,7 +624,12 @@ func (b *BrowserMutations) reject(ctx context.Context, subject string, record br
 	if !validBrowserRejectionSubject(subjectType, subjectID) {
 		return ErrBrowserMutation
 	}
-	body, err := json.Marshal(browserRejection{Version: 1, Code: code, SubjectType: subjectType, SubjectID: subjectID})
+	field := ""
+	var violation *workboard.Violation
+	if errors.As(cause, &violation) {
+		field = violation.Field
+	}
+	body, err := json.Marshal(browserRejection{Version: 1, Code: code, SubjectType: subjectType, SubjectID: subjectID, Field: field})
 	if err != nil {
 		return ErrBrowserMutation
 	}
@@ -633,7 +640,16 @@ func (b *BrowserMutations) reject(ctx context.Context, subject string, record br
 }
 
 func browserRejectionCode(err error) (string, bool) {
+	var violation *workboard.Violation
 	switch {
+	case errors.As(err, &violation) && violation.Code == workboard.CodeStaleRevision:
+		return "workboard_stale", true
+	case errors.As(err, &violation) && violation.Code == workboard.CodeMissingNode:
+		return "workboard_missing", true
+	case errors.As(err, &violation):
+		return "workboard_rejected", true
+	case errors.Is(err, telemetry.ErrWorkboardNotFound):
+		return "workboard_missing", true
 	case errors.Is(err, browserops.ErrConflict), errors.Is(err, telemetry.ErrConflict), errors.Is(err, submissions.ErrConflict), errors.Is(err, approvals.ErrConflict), errors.Is(err, runtime.ErrSteeringClosed):
 		return "conflict", true
 	case errors.Is(err, sql.ErrNoRows):
@@ -649,17 +665,36 @@ func browserRejectionCode(err error) (string, bool) {
 
 func decodeBrowserRejection(operationID string, body []byte) error {
 	var rejected browserRejection
-	if json.Unmarshal(body, &rejected) != nil || rejected.Version != 1 || !validBrowserRejectionSubject(rejected.SubjectType, rejected.SubjectID) {
+	if json.Unmarshal(body, &rejected) != nil || rejected.Version != 1 || !validBrowserRejectionSubject(rejected.SubjectType, rejected.SubjectID) ||
+		(rejected.Field != "" && !contract.ValidID(rejected.Field)) {
 		return ErrBrowserMutation
 	}
 	switch rejected.Code {
+	case "workboard_stale":
+		return &BrowserOperationError{OperationID: operationID, Cause: &workboard.Violation{Code: workboard.CodeStaleRevision, Field: rejected.Field}}
+	case "workboard_missing":
+		return &BrowserOperationError{OperationID: operationID, Cause: &workboard.Violation{Code: workboard.CodeMissingNode, Field: rejected.Field}}
+	case "workboard_rejected":
+		return &BrowserOperationError{OperationID: operationID, Cause: &workboard.Violation{Code: workboard.CodeInvalid, Field: rejected.Field}}
 	case "conflict":
+		if rejected.Field != "" {
+			return ErrBrowserMutation
+		}
 		return &BrowserOperationError{OperationID: operationID, Cause: browserops.ErrConflict}
 	case "not_found":
+		if rejected.Field != "" {
+			return ErrBrowserMutation
+		}
 		return &BrowserOperationError{OperationID: operationID, Cause: sql.ErrNoRows}
 	case "capacity":
+		if rejected.Field != "" {
+			return ErrBrowserMutation
+		}
 		return &BrowserOperationError{OperationID: operationID, Cause: browserops.ErrCapacity}
 	case "admission":
+		if rejected.Field != "" {
+			return ErrBrowserMutation
+		}
 		return &BrowserOperationError{OperationID: operationID, Cause: ErrAdmission}
 	default:
 		return ErrBrowserMutation
@@ -674,7 +709,7 @@ func validBrowserRejectionSubject(subjectType, subjectID string) bool {
 		return false
 	}
 	switch subjectType {
-	case "chat", "task", "submission", "feedback", "approval":
+	case "chat", "task", "submission", "feedback", "approval", "board", "card":
 		return true
 	default:
 		return false
@@ -759,6 +794,19 @@ func operationSubject(action string, body []byte) (string, string) {
 		var receipt contract.ApprovalDecisionReceipt
 		if decodeReceipt(body, &receipt) == nil {
 			return "approval", receipt.ApprovalID
+		}
+	case string(contract.BoardCreate), string(contract.BoardRevise), string(contract.BoardArchive),
+		string(contract.CardCreate), string(contract.CardRevise), string(contract.CardMove), string(contract.CardReorder),
+		string(contract.DependencyAdd), string(contract.DependencyRemove), string(contract.CardClaim), string(contract.ClaimHeartbeat),
+		string(contract.ClaimRecover), string(contract.CriteriaRevise), string(contract.CheckpointAppend), string(contract.CandidateSubmit),
+		string(contract.AcceptanceAccept), string(contract.AcceptanceReject), string(contract.CardPauseRequest), string(contract.CardCancelRequest),
+		string(contract.CardCancelFinalize), string(contract.CardBlock), string(contract.CardUnblock):
+		var receipt contract.OperationReceipt
+		if decodeReceipt(body, &receipt) == nil {
+			if receipt.CardID != "" {
+				return "card", receipt.CardID
+			}
+			return "board", receipt.BoardID
 		}
 	}
 	return "", ""

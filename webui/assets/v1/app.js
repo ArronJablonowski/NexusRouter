@@ -170,10 +170,10 @@
 		const createdAt = Date.parse(item && item.created_at);
 		const updatedAt = Date.parse(item && item.updated_at);
 		if (!item || item.version !== 1 || !presentationID.test(item.operation_id) ||
-			!["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke"].includes(item.action) ||
+			!window.DarwinOperationContract.validAction(item.action) ||
 			!["pending", "committed", "rejected"].includes(item.state) || !Number.isFinite(createdAt) || !Number.isFinite(updatedAt) || updatedAt < createdAt) return null;
 		const hasSubject = item.subject_type !== undefined || item.subject_id !== undefined;
-		if (hasSubject && (!["chat", "task", "submission", "feedback", "approval"].includes(item.subject_type) || !presentationID.test(item.subject_id))) return null;
+		if (hasSubject && (!window.DarwinOperationContract.validSubject(item.subject_type) || !presentationID.test(item.subject_id))) return null;
 		if (item.state === "committed" && !hasSubject) return null;
 		return Object.freeze({operationID: item.operation_id, action: item.action, state: item.state,
 			subjectType: hasSubject ? item.subject_type : "", subjectID: hasSubject ? item.subject_id : ""});

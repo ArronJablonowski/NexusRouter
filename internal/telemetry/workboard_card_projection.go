@@ -100,14 +100,44 @@ func scanWorkboardCard(row rowScanner, boardID string) (workboard.Card, cardPage
 		return workboard.Card{}, cardPageCursor{}, ErrWorkboardCorrupt
 	}
 	card := workboard.Card{ID: body.ID, BoardID: body.BoardID, Revision: body.Revision, State: workboard.State(body.State), Rank: body.Rank,
-		Title: body.Title, Description: body.Description, Priority: body.Priority, Labels: append([]string{}, body.Labels...),
+		CriteriaRevision: body.CriteriaRevision,
+		Title:            body.Title, Description: body.Description, Priority: body.Priority, Labels: append([]string{}, body.Labels...),
 		AssigneeID: body.AssigneeID, ParentID: body.ParentID, Dependencies: append([]string{}, body.Dependencies...),
-		RemainingDependencies: body.RemainingDependencies, CurrentClaimID: body.CurrentClaimID,
+		RemainingDependencies: body.RemainingDependencies, AttemptCount: body.AttemptCount, CurrentAttemptID: body.CurrentAttemptID,
+		CurrentClaimID: body.CurrentClaimID, AcceptanceID: body.AcceptanceID, BlockReason: body.BlockReason,
+		CancelRequested: body.CancelRequested, PauseRequested: body.PauseRequested, Budget: domainWorkboardBudget(body.Budget),
+		Criteria:  domainWorkboardCriteria(body.Criteria),
 		CreatedAt: body.CreatedAt, UpdatedAt: body.UpdatedAt}
 	if card.Validate() != nil {
 		return workboard.Card{}, cardPageCursor{}, ErrWorkboardCorrupt
 	}
 	return card, cardPageCursor{Column: index.Ordinal, Rank: index.Rank, ID: index.ID}, nil
+}
+
+func domainWorkboardBudget(b storedWorkboardBudget) workboard.WorkBudget {
+	return workboard.WorkBudget{AttemptLimit: b.AttemptLimit, TimeLimitMS: b.TimeLimitMS, TokenLimit: b.TokenLimit, CostMicros: b.CostMicros}
+}
+
+func storedCardBudget(b workboard.WorkBudget) storedWorkboardBudget {
+	return storedWorkboardBudget{AttemptLimit: b.AttemptLimit, TimeLimitMS: b.TimeLimitMS, TokenLimit: b.TokenLimit, CostMicros: b.CostMicros}
+}
+
+func domainWorkboardCriteria(criteria []storedWorkboardCriterion) []workboard.AcceptanceCriterion {
+	result := make([]workboard.AcceptanceCriterion, len(criteria))
+	for index, criterion := range criteria {
+		result[index] = workboard.AcceptanceCriterion{Version: criterion.Version, ID: criterion.ID, Kind: criterion.Kind,
+			RequiredSource: criterion.RequiredSource, ValidatorID: criterion.ValidatorID, Description: criterion.Description, Required: criterion.Required}
+	}
+	return result
+}
+
+func storedCardCriteria(criteria []workboard.AcceptanceCriterion) []storedWorkboardCriterion {
+	result := make([]storedWorkboardCriterion, len(criteria))
+	for index, criterion := range criteria {
+		result[index] = storedWorkboardCriterion{Version: criterion.Version, ID: criterion.ID, Kind: criterion.Kind,
+			RequiredSource: criterion.RequiredSource, ValidatorID: criterion.ValidatorID, Description: criterion.Description, Required: criterion.Required}
+	}
+	return result
 }
 
 func storedCardMatches(index workboardCardIndex, body storedWorkboardCard, boardID string) bool {

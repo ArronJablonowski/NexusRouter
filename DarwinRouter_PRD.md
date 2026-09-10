@@ -402,11 +402,13 @@ events, optimistic revision fences, exact committed replay, graph/layout
 revisions, aggregate transaction-byte limits, and bounded authenticated
 pagination. Schema 36 adds normalized card identity to immutable events and
 transactionally preserves schema-35 board events with a `NULL` card ID during
-upgrade. Native JSON handlers and browser-session/CSRF BFF contracts now
-cover list/create/read/operations. Browser workboard SSE, actual CLI/daemon
-service composition, remaining claim/attempt/evaluation lifecycle commands,
-agent tools, and Kanban rendering remain unfinished, so DAR-82 remains In
-Progress.
+upgrade. Native JSON handlers and browser-session/CSRF BFF contracts now cover
+live list/create/read/operations, browser mutation reconciliation, and
+reconnectable workboard SSE through the daemon. The durable command layer also
+includes its first claim/heartbeat/recovery, criteria-revision, and checkpoint
+operations, although trusted lifecycle transport composition is not complete.
+Remaining candidate/acceptance/pause/cancel/block commands, agent tools, and
+Kanban rendering keep DAR-82 In Progress.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

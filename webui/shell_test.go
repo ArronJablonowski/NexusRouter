@@ -38,6 +38,7 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 		{"/console", "text/html", "/console/assets/v1/app.js"},
 		{"/console/chats/chat-a", "text/html", "DarwinRouter"},
 		{"/console/assets/v1/app.css", "text/css", "color-scheme"},
+		{"/console/assets/v1/operation-contract.js", "text/javascript", "DarwinOperationContract"},
 		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
@@ -126,10 +127,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "d6497164f8cc163b3deb6d78ab47481036f8f253cdaa9d5c95c7658e011a2199" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "8f5927693b5bad9957ce2099e02ae8922575299f7a8c558b0e434d9cdc7b6287" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/inspector.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -251,13 +252,33 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/inspector.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if lines := strings.Count(string(body), "\n") + 1; lines >= 1000 {
 			t.Fatalf("%s has %d lines; source files must remain below 1,000", name, lines)
+		}
+	}
+}
+
+func TestEmbeddedOperationContractCoversWorkboardReconciliation(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/operation-contract.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, action := range []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
+		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, ClaimRecover, CriteriaRevise, CheckpointAppend,
+		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock} {
+		if !strings.Contains(body, `"`+string(action)+`"`) {
+			t.Fatal("browser operation contract omitted action", action)
+		}
+	}
+	for _, subject := range []string{"board", "card"} {
+		if !strings.Contains(body, `"`+subject+`"`) {
+			t.Fatal("browser operation contract omitted subject", subject)
 		}
 	}
 }
