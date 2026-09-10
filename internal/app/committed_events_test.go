@@ -106,7 +106,7 @@ func TestReadCommittedEventsCancellationAndSchemaFailureAreSanitized(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = raw.Exec(`PRAGMA user_version=32; CREATE TABLE event_log(position INTEGER PRIMARY KEY,event_id TEXT)`); err != nil {
+	if _, err = raw.Exec(`DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32; CREATE TABLE event_log(position INTEGER PRIMARY KEY,event_id TEXT)`); err != nil {
 		raw.Close()
 		t.Fatal(err)
 	}

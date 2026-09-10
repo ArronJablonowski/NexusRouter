@@ -421,7 +421,15 @@ derived recovery-to-replacement lineage. It binds the exact recovery and both
 attempt/claim identities, clears the predecessor assignment when returning the
 card to Ready, exposes lineage through bounded attempt projections, and never
 copies predecessor task/session/output or grants replay authority. DAR-85 now
-also has a bounded per-board
+also has a schema-41 atomic runtime-start/claim boundary. A trusted host can
+commit the runtime's actual redacted first event and all initial runtime and
+Kanban ownership projections together, with an immutable marker that prevents
+later adoption of independently committed halves. Exact retries validate the
+complete progressed journal, event index, timing, worker identity, claim, and
+marker. A capacity-only supervisor slot and host-frozen runtime worker identity
+remove the need for a second synthetic worker journal once application wiring
+lands; these primitives do not by themselves enable unattended execution.
+DAR-85 also has a bounded per-board
 scheduling cycle that fully reads the authoritative supervision snapshot before
 task construction, subtracts existing running/stalled/orphaned claims from its
 WIP ceiling, and sends only ready cards through the durable claim-fenced worker

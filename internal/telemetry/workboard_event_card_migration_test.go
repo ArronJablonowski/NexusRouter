@@ -34,7 +34,7 @@ func downgradeWorkboardEventsTo35(t *testing.T, db *sql.DB) {
 		 SELECT id,board_id,sequence,operation_id,kind,actor_id,actor_type,created_at,body FROM workboard_events_v36;
 		DROP TABLE workboard_events_v36;
 		CREATE INDEX workboard_events_operation ON workboard_events(operation_id,sequence);
-		PRAGMA user_version=35;`); err != nil {
+		DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=35;`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

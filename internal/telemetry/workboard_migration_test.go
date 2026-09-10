@@ -13,6 +13,7 @@ import (
 )
 
 var workboardTables = []string{
+	"workboard_task_start_claims",
 	"workboard_events",
 	"workboard_operations",
 	"workboard_reassignments",
@@ -48,7 +49,7 @@ func downgradeWorkboards(t *testing.T, db *sql.DB) {
 			t.Fatal(table, err)
 		}
 	}
-	if _, err = tx.Exec("PRAGMA user_version=34"); err != nil {
+	if _, err = tx.Exec("DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=34"); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {
@@ -417,7 +418,7 @@ func TestWorkboardMigrationRejectsForgedRetainedObject(t *testing.T) {
 	}
 	if _, err = store.db.Exec(`DROP TRIGGER workboard_label_limit;
 		CREATE TRIGGER workboard_label_limit BEFORE INSERT ON workboard_card_labels BEGIN SELECT 1; END;
-		PRAGMA user_version=34`); err != nil {
+		DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=34`); err != nil {
 		t.Fatal(err)
 	}
 	if err = store.Close(); err != nil {

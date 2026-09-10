@@ -142,7 +142,7 @@ func downgradeWorkboardReassignmentsTo39(t *testing.T, db *sql.DB) {
 		DROP INDEX workboard_reassignments_card;
 		DROP TABLE workboard_reassignments;
 		DROP INDEX workboard_recoveries_identity;
-		PRAGMA user_version=39;`); err != nil {
+		DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=39;`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

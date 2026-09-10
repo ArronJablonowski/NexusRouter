@@ -27,6 +27,20 @@ func (s *Store) ApplyLifecycleMutation(ctx context.Context, mutation workboard.L
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
+	receipt, err := applyLifecycleMutationTx(ctx, tx, mutation, keyDigest, requestDigest)
+	if err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	return receipt, nil
+}
+
+// applyLifecycleMutationTx applies one already-validated lifecycle mutation to
+// an existing writer transaction. Keeping the mutation body transaction-local
+// lets trusted hosts bind runtime admission and board ownership in one commit.
+func applyLifecycleMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMutation, keyDigest, requestDigest string) (workboard.OperationReceipt, error) {
 	if receipt, found, replayErr := readLifecycleReplay(ctx, tx, mutation, keyDigest, requestDigest); found || replayErr != nil {
 		return receipt, replayErr
 	}
@@ -94,9 +108,6 @@ func (s *Store) ApplyLifecycleMutation(ctx context.Context, mutation workboard.L
 	}
 	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, mutation.Actor, mutation.Now, eventBody); err != nil {
 		return workboard.OperationReceipt{}, fmt.Errorf("insert lifecycle event: %w", err)
-	}
-	if err = tx.Commit(); err != nil {
-		return workboard.OperationReceipt{}, err
 	}
 	return receipt, nil
 }

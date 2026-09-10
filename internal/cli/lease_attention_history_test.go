@@ -99,7 +99,7 @@ func TestLeaseAttentionHistoryCLILegacyReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Legacy readers report unavailability, not an invented empty history.
-	if _, err := db.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE lease_attention_history; PRAGMA user_version=24`); err != nil {
+	if _, err := db.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE lease_attention_history; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=24`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

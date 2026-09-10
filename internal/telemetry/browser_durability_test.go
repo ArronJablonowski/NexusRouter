@@ -111,7 +111,7 @@ func TestBrowserOperationRecoveryMigratesFromSchema37(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`DROP TABLE legacy_browser_workboard_operations; DROP TABLE browser_operation_recoveries; PRAGMA user_version=37`); err != nil {
+	if _, err = store.db.Exec(`DROP TABLE legacy_browser_workboard_operations; DROP TABLE browser_operation_recoveries; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=37`); err != nil {
 		t.Fatal(err)
 	}
 	legacy, err := store.BeginBrowserOperation(ctx, browserTestSubject, "legacy-schema37-pending", "board.create", []byte(`{"action":"board.create","idempotency_key":"legacy-schema37-pending"}`))
@@ -157,7 +157,7 @@ func TestBrowserMigrationRejectsPartialShapeAndRollsBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`DROP TABLE browser_feedback; DROP TABLE browser_operations; CREATE TABLE browser_operations(sentinel TEXT); PRAGMA user_version=33`); err != nil {
+	if _, err = store.db.Exec(`DROP TABLE browser_feedback; DROP TABLE browser_operations; CREATE TABLE browser_operations(sentinel TEXT); DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=33`); err != nil {
 		t.Fatal(err)
 	}
 	if err = store.Close(); err != nil {

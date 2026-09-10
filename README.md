@@ -95,7 +95,16 @@ requested, acknowledged, and resume-requested phases. A bounded per-board
 scheduling cycle now reads the authoritative supervision projection before
 constructing tasks, accounts for existing work in its WIP ceiling, and sends
 only ready cards through the claim-fenced worker runner. Stock-daemon task
-construction and configured workboard judging remain DAR-85 work. Schema 40
+construction and configured workboard judging remain DAR-85 work. Schema 41
+adds a trusted-host admission primitive that commits the real redacted runtime
+`task.started` event, its task/event-log/timing projections, the Kanban attempt
+and claim, and an immutable cross-domain marker in one SQLite transaction. Exact
+replay revalidates the complete progressed task and both halves; independently
+committed or corrupted halves are never adopted. The runtime can now stamp a
+host-frozen worker identity on every event, and the supervisor exposes a shared
+capacity-only slot that creates no synthetic task. These are prerequisites: the
+stock worker runner does not use them yet, and the scheduler remains disabled
+until the single-journal application path is wired and qualified. Schema 40
 now binds each proof-gated recovery to its exact replacement attempt and claim
 inside the replacement claim transaction; recovery clears the predecessor's
 worker assignment so a distinct worker can claim the Ready card. The lineage

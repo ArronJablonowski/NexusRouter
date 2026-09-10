@@ -506,7 +506,7 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.Exec(`DROP TABLE event_log; DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; PRAGMA user_version=29`); err != nil {
+	if _, err = tx.Exec(`DROP TABLE event_log; DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

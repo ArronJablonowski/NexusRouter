@@ -190,7 +190,7 @@ func TestCommittedEventLogMigrationBackfillsCanonicalHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA user_version=32`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
@@ -222,7 +222,7 @@ func TestCommittedEventLogMigrationPreservesLegacyColonEventID(t *testing.T) {
 	if err = db.Append(ctx, 0, legacy); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA user_version=32`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
@@ -260,7 +260,7 @@ func TestCommittedEventLogMigrationRejectsLegacyTaskRowIDInversion(t *testing.T)
 	}
 	startBody, _ := start.Encode()
 	doneBody, _ := done.Encode()
-	if _, err = db.db.Exec(`DROP TABLE event_log; DELETE FROM events; INSERT INTO events(id,task_id,sequence,body) VALUES(?,?,2,?),(?,?,1,?); PRAGMA user_version=32`, done.ID, done.TaskID, doneBody, start.ID, start.TaskID, startBody); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; DELETE FROM events; INSERT INTO events(id,task_id,sequence,body) VALUES(?,?,2,?),(?,?,1,?); DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`, done.ID, done.TaskID, doneBody, start.ID, start.TaskID, startBody); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
@@ -291,7 +291,7 @@ func TestCommittedEventLogMigrationRejectsOrphanHistory(t *testing.T) {
 	if err = db.Append(ctx, 0, logEvent("start", "task", "session", 1, runtime.TaskStarted)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA foreign_keys=OFF; INSERT INTO events(id,task_id,sequence,body) VALUES('orphan','missing',1,X'7b7d'); PRAGMA user_version=32`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA foreign_keys=OFF; INSERT INTO events(id,task_id,sequence,body) VALUES('orphan','missing',1,X'7b7d'); DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {
@@ -430,7 +430,7 @@ func TestCommittedEventLogMigrationWrapperOverflowRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	poison, body := wrapperOverflowLogEvent(t, "legacy-poison", "legacy-task")
-	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA user_version=32`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = db.db.Exec(`INSERT INTO task_heads(task_id,session_id,sequence,state) VALUES(?,?,1,'running')`, poison.TaskID, poison.SessionID); err != nil {
@@ -536,7 +536,7 @@ func TestCommittedEventLogMigrationPreservesInterleavedGlobalOrderAndContinues(t
 		}
 		expected[event.TaskID]++
 	}
-	if _, err = db.db.Exec(`DROP TABLE event_log; PRAGMA user_version=32`); err != nil {
+	if _, err = db.db.Exec(`DROP TABLE event_log; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=32`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Close(); err != nil {

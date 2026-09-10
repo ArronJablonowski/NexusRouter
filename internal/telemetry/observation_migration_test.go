@@ -10,7 +10,7 @@ import (
 
 func downgradeObservationIndex(t *testing.T, db *Store) {
 	t.Helper()
-	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; PRAGMA user_version=30`); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=30`); err != nil {
 		t.Fatal(err)
 	}
 }

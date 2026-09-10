@@ -410,7 +410,7 @@ func downgradePausePhaseTo38(t *testing.T, db *sql.DB) {
 	if _, err = tx.Exec(`UPDATE workboard_cards SET body=json_remove(body,'$.pause_phase')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(`PRAGMA user_version=38`); err != nil {
+	if _, err = tx.Exec(`DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=38`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {

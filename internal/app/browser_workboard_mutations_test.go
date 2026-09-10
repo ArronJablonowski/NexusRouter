@@ -305,7 +305,7 @@ func TestBrowserWorkboardMutationRecoversSchema37PendingWithLegacyInitiatorAutho
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = raw.Exec(`DROP TABLE legacy_browser_workboard_operations; DROP TABLE browser_operation_recoveries; PRAGMA user_version=37`); err != nil {
+	if _, err = raw.Exec(`DROP TABLE legacy_browser_workboard_operations; DROP TABLE browser_operation_recoveries; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=37`); err != nil {
 		raw.Close()
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func TestWorkspaceIdentityMigrationRejectsForgedTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = raw.Exec(`DROP TABLE workspace_identity; CREATE TABLE workspace_identity(singleton INTEGER PRIMARY KEY,id TEXT); PRAGMA user_version=36`); err != nil {
+	if _, err = raw.Exec(`DROP TABLE workspace_identity; CREATE TABLE workspace_identity(singleton INTEGER PRIMARY KEY,id TEXT); DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=36`); err != nil {
 		raw.Close()
 		t.Fatal(err)
 	}

@@ -54,8 +54,14 @@ type ToolResult struct {
 	Recoverable bool
 }
 type RunRequest struct {
-	SkillContext       *SkillContextUse
-	SubmissionID       string
+	SkillContext *SkillContextUse
+	SubmissionID string
+	// WorkerID is an optional trusted host-supplied execution identity. It is
+	// copied onto every durable event emitted by this run so an enclosing
+	// worker capability can bind the inner agent loop to its durable owner.
+	// Prompts, model output, and tool arguments must never populate it. An
+	// empty value preserves root-task behavior.
+	WorkerID           string
 	Compaction         *ContextCompaction
 	ApprovedCompaction *ApprovedCompaction
 	Validation         string
@@ -110,6 +116,9 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr error) {
+	if r.WorkerID != "" && !validRunWorkerID(r.WorkerID) {
+		return Result{}, ErrInvalidRun
+	}
 	if r.SkillContext.Validate() != nil {
 		return Result{}, ErrInvalidRun
 	}
@@ -158,7 +167,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	turn := ""
 	attempt := ""
 	persist := func(ctx context.Context, k Kind, d Data) error {
-		e := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, Sequence: seq + 1, Time: time.Now().UTC(), Kind: k, TurnID: turn, AttemptID: attempt, Data: d}
+		e := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, WorkerID: r.WorkerID, Sequence: seq + 1, Time: time.Now().UTC(), Kind: k, TurnID: turn, AttemptID: attempt, Data: d}
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
 		}
@@ -643,4 +652,16 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 	}
 	return fail(ErrLimit)
+}
+
+func validRunWorkerID(value string) bool {
+	if len(value) < 1 || len(value) > 128 {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x21 || r > 0x7e {
+			return false
+		}
+	}
+	return true
 }

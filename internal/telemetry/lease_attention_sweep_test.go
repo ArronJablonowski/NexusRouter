@@ -163,13 +163,13 @@ func TestLeaseAttentionSweepBoundsAndQueryFailure(t *testing.T) {
 	if cursor != "" || n != 2 || err != nil {
 		t.Fatal(cursor, n, err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=24`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=24`); err != nil {
 		t.Fatal(err)
 	}
 	if next, n, err := s.SweepLeaseAttentionPage(ctx, "2", now, 1); next != "2" || n != 0 || err == nil {
 		t.Fatal("unsupported schema advanced", next, n, err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=26; ALTER TABLE resource_leases RENAME TO hidden_leases`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=26; ALTER TABLE resource_leases RENAME TO hidden_leases`); err != nil {
 		t.Fatal(err)
 	}
 	if next, n, err := s.SweepLeaseAttentionPage(ctx, "2", now, 1); next != "2" || n != 0 || err == nil {

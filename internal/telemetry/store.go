@@ -98,6 +98,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version == 41 {
+		if err = validateTaskStartClaimSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	workboardSchemaValidated := false
 	if version == 0 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE task_heads (
@@ -400,6 +405,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 40 {
 		if err = migrateWorkboardReassignments(ctx, conn, workboardSchemaValidated); err != nil {
+			return err
+		}
+	}
+	if version < 41 {
+		if err = migrateTaskStartClaims(ctx, conn); err != nil {
 			return err
 		}
 	}

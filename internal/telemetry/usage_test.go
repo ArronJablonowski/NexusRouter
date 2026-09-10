@@ -435,7 +435,7 @@ func TestUsageMigration29CoverageAndRejectsPartialSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = usageTask(t, s, "legacy", false, nil, runtime.TaskCompleted)
-	if _, err = s.db.Exec(`DROP TABLE submission_stream_events; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=29`); err != nil {
+	if _, err = s.db.Exec(`DROP TABLE submission_stream_events; DROP TABLE IF EXISTS usage_corrections; DROP TABLE IF EXISTS usage_heads; DROP TABLE IF EXISTS usage_records; DROP TABLE IF EXISTS usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.Close(); err != nil {
@@ -458,7 +458,7 @@ func TestUsageMigration29CoverageAndRejectsPartialSchema(t *testing.T) {
 	if s.db.QueryRow("PRAGMA user_version").Scan(&version) != nil || version != currentStorageSchema {
 		t.Fatal("migration version", version)
 	}
-	if _, err = s.db.Exec("DROP TABLE submission_stream_events; DROP TABLE IF EXISTS usage_heads; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=29"); err != nil {
+	if _, err = s.db.Exec("DROP TABLE submission_stream_events; DROP TABLE IF EXISTS usage_heads; DROP INDEX IF EXISTS evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=29"); err != nil {
 		t.Fatal(err)
 	}
 	_ = s.Close()
@@ -608,7 +608,7 @@ func TestUsageMigrationConcurrent29To30(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.db.Exec(`DROP TABLE submission_stream_events; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; PRAGMA user_version=29`); err != nil {
+	if _, err = s.db.Exec(`DROP TABLE submission_stream_events; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP INDEX IF EXISTS evaluations_routing_key; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.Close(); err != nil {

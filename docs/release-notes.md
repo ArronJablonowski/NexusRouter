@@ -83,6 +83,17 @@ supported-platform decision or publication approval is claimed.
   task attribution, transactional resource budgets, and configured independent
   judging remain open.
 
+  Schema 41 adds the next single-journal prerequisite: a trusted-host command
+  atomically commits the runtime's actual redacted `task.started` event, task
+  head, global event index, timing and skill projections, Kanban attempt/claim,
+  lifecycle receipt/event, and an immutable cross-domain marker. Replays prove
+  both halves and the complete progressed or terminal runtime history; partial,
+  independently committed, or corrupted state fails closed. Runtime events can
+  carry one validated host-frozen worker identity, and the worker supervisor now
+  offers a shared capacity-only slot without emitting a synthetic task or
+  acquiring a resource lease. The current worker runner has not yet switched to
+  these primitives, so stock scheduling remains disabled.
+
   Candidate evaluators can no longer claim the operator-owned `user_feedback`
   evidence source. Subjective-only work may enter Review with an exact empty
   evidence-set digest, and the authenticated Web UI Kanban can accept or reject

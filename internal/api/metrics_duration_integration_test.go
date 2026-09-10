@@ -50,7 +50,7 @@ func TestTaskDurationPropagatesSQLiteAppHTTPAndSDKExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := raw.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TABLE task_timings; DROP TABLE task_timing_metadata; PRAGMA user_version=28`); err != nil {
+	if _, err := raw.Exec(`DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TABLE task_timings; DROP TABLE task_timing_metadata; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=28`); err != nil {
 		raw.Close()
 		t.Fatal(err)
 	}

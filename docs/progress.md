@@ -6604,3 +6604,52 @@ toolgate 29.350s. Host-frozen runtime task/session attribution,
 transactional time/token/cost budgets, production judge composition, and broad
 crash/lease/acceptance qualification remain before unattended scheduling can
 be enabled or DAR-85 marked Done.
+
+## 2026-09-10 — DAR-85 atomic runtime-start/claim prerequisites
+
+DAR-85 remains in progress. Schema 41 introduces a trusted-host-only composite
+admission command. It commits the runtime's actual redacted `task.started`
+event, task head, global event-log entry, timing and skill projections, Kanban
+attempt and claim, lifecycle operation/event, and an immutable cross-domain
+marker in one SQLite transaction. Exact retry requires both halves plus that
+marker and replays the complete bounded runtime journal, including contiguous
+sequence/head/state, canonical event bodies, event-log parity, worker identity,
+and running or terminal timing. An ordinary pre-existing start, independently
+committed claim, competing card binding, corrupt projection, or failed final
+marker is rejected without adopting or partially publishing ownership.
+
+The runtime now accepts an optional validated trusted worker identity and stamps
+it on every emitted event. The existing worker supervisor also exposes a shared
+capacity-only slot that waits for cooperative callback completion, contains
+panics, and emits no synthetic task or resource lease. This creates the safe
+seams needed to replace the current outer worker journal with the one real model
+and tool journal. It does not yet change `WorkboardWorkerRunner`: the next slice
+must freeze task/session/parent/worker identity in the internal application
+request, intercept its redacted first append for the composite commit, begin
+heartbeats before acknowledging admission, and disable multi-task fallback for
+that initial pinned execution path.
+
+Schema migration tests now explicitly remove schema-41 objects when simulating
+older databases; retained future objects fail closed rather than being silently
+adopted. The marker's lease bound matches the domain's 1 ms through 10 minute
+range. Focused normal and race tests cover restart replay, progress and terminal
+replay, same-task cross-card contention, minimum/maximum leases, final-marker
+rollback, raw storage failures, migration preservation/no-backfill, and corrupt
+retained schemas. Stock daemon scheduling, transactional time/token/cost
+budgets, configured independent judging, and broader crash qualification remain
+open, so the default-disabled scheduler admission guard is unchanged.
+
+The complete race suite has grown beyond Go's default ten-minute package test
+timeout on this host even when packages are serialized. The repository `check`
+and `test` targets now use an explicit 15-minute package ceiling; individual
+tests retain their own tighter cooperative deadlines. This is a test-runner
+limit adjustment, not a runtime timeout or relaxed acceptance criterion.
+The first serialized full check reached the former ceiling in the unrelated
+`TestGroupedGenerationRechecksChangedToolOutcome` fixture; that exact test then
+passed five race-enabled repetitions in 6.208 seconds, and the complete
+application race suite passed independently in 620.973 seconds. A final
+`GOFLAGS='-p=1' make check` passed the source/LOC gate, vet, complete race suite,
+and `go build ./...` with the explicit ceiling. Its longest packages were
+application 617.763 seconds, telemetry 543.626 seconds, releasepack 456.856
+seconds, SDK 69.350 seconds, CLI 67.537 seconds, toolgate 32.802 seconds, and
+runtime 27.728 seconds.

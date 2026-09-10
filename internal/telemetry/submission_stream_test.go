@@ -217,7 +217,7 @@ func TestSubmissionStreamMigrationBackfillsStableOrder(t *testing.T) {
 	if _, err := db.FinishSubmission(ctx, claim.Status.ID, claim.Token, "succeeded", "", &submissions.Result{TaskID: twoDone.TaskID, PreviousTaskIDs: []string{oneDone.TaskID}, Text: "answer", Turns: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; PRAGMA user_version=31`); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=31`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
@@ -249,7 +249,7 @@ func TestSubmissionStreamMigrationRejectsCorruptHistoryAtomically(t *testing.T) 
 	if err := db.AppendSubmission(ctx, 0, start, claim.Status.ID, claim.Token); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; UPDATE task_heads SET session_id='different-session' WHERE task_id=?; PRAGMA user_version=31`, start.TaskID); err != nil {
+	if _, err := db.db.Exec(`DROP TABLE submission_stream_events; UPDATE task_heads SET session_id='different-session' WHERE task_id=?; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=31`, start.TaskID); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
