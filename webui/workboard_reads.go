@@ -16,6 +16,8 @@ func allowedBoardFields(action BoardAction) []string {
 		return []string{"board_id", "card_id", "title", "description", "priority", "labels", "parent_id", "assignee_id", "clear_parent", "clear_assignee", "budget", "expected_card_revision", "expected_graph_revision"}
 	case CardMove:
 		return []string{"board_id", "card_id", "target_state", "before_card_id", "after_card_id", "expected_board_revision", "expected_layout_revision", "expected_card_revision"}
+	case CardReorder:
+		return []string{"board_id", "card_id", "before_card_id", "after_card_id", "expected_board_revision", "expected_layout_revision", "expected_card_revision"}
 	case DependencyAdd, DependencyRemove:
 		return []string{"board_id", "card_id", "dependency_id", "expected_card_revision", "expected_graph_revision"}
 	case CardClaim:
@@ -266,7 +268,7 @@ func validClaimFilter(value string) bool {
 
 func validBoardAction(value BoardAction) bool {
 	switch value {
-	case BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove,
+	case BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
 		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, CheckpointAppend,
 		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest,
 		CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock, CriteriaRevise,

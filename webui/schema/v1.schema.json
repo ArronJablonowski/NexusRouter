@@ -721,6 +721,9 @@
     "board_request": {
       "type": "object",
       "additionalProperties": false,
+	  "x-invariants": [
+		"card.move and card.reorder before_card_id/after_card_id differ from card_id"
+	  ],
       "required": [
         "version",
         "action",
@@ -774,6 +777,15 @@
           "board_id",
           "card_id",
           "target_state",
+          "before_card_id",
+          "after_card_id",
+          "expected_board_revision",
+          "expected_layout_revision",
+          "expected_card_revision"
+        ],
+        "card.reorder": [
+          "board_id",
+          "card_id",
           "before_card_id",
           "after_card_id",
           "expected_board_revision",
@@ -928,6 +940,7 @@
             "card.create",
             "card.revise",
             "card.move",
+            "card.reorder",
             "dependency.add",
             "dependency.remove",
             "card.claim",
@@ -1392,6 +1405,7 @@
                 "enum": [
                   "card.revise",
                   "card.move",
+                  "card.reorder",
                   "dependency.add",
                   "dependency.remove",
                   "card.claim",
@@ -1488,6 +1502,32 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "card.reorder"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "expected_board_revision",
+              "expected_layout_revision"
+            ],
+            "oneOf": [
+              {
+                "required": ["before_card_id"],
+                "not": {"required": ["after_card_id"]}
+              },
+              {
+                "required": ["after_card_id"],
+                "not": {"required": ["before_card_id"]}
+              }
+            ],
+            "not": {"required": ["target_state"]}
           }
         },
         {

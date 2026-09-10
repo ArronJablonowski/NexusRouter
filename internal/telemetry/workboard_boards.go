@@ -144,7 +144,7 @@ func (s *Store) CreateWorkboard(ctx context.Context, scope string, request workb
 	if err = insertWorkboardOperation(ctx, tx, "creation", scope, keyDigest, receipt, response); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	if err = insertWorkboardEvent(ctx, tx, eventID, boardID, 1, operationID, string(workboard.BoardCreateAction), actor, now, eventBody); err != nil {
+	if err = insertWorkboardEvent(ctx, tx, eventID, boardID, 1, operationID, string(workboard.BoardCreateAction), "", actor, now, eventBody); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -237,7 +237,7 @@ func (s *Store) ArchiveWorkboard(ctx context.Context, request workboard.ArchiveB
 	if err = insertWorkboardOperation(ctx, tx, "board", board.ID, keyDigest, receipt, response); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(workboard.BoardArchiveAction), actor, now, eventBody); err != nil {
+	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(workboard.BoardArchiveAction), "", actor, now, eventBody); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -356,6 +356,9 @@ func (s *Store) ReadWorkboard(ctx context.Context, boardID string, options workb
 		if scanErr != nil {
 			return workboard.BoardSnapshot{}, scanErr
 		}
+		if scanErr = verifyStoredCardRelations(ctx, tx, card.ID, boardID, card); scanErr != nil {
+			return workboard.BoardSnapshot{}, scanErr
+		}
 		cards = append(cards, card)
 		positions = append(positions, position)
 	}
@@ -395,8 +398,18 @@ func insertWorkboardOperation(ctx context.Context, tx *sql.Tx, scopeKind, scopeI
 	return err
 }
 
-func insertWorkboardEvent(ctx context.Context, tx *sql.Tx, id, boardID string, sequence int64, operationID, kind string, actor workboard.Actor, now time.Time, body []byte) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO workboard_events(id,board_id,sequence,operation_id,kind,actor_id,actor_type,created_at,body) VALUES(?,?,?,?,?,?,?,?,?)`, id, boardID, sequence, operationID, kind, actor.ID, actor.Type, now.UnixNano(), body)
+func insertWorkboardEvent(ctx context.Context, tx *sql.Tx, id, boardID string, sequence int64, operationID, kind, cardID string, actor workboard.Actor, now time.Time, body []byte) error {
+	indexed := workboard.BoardEvent{Version: 1, ID: id, BoardID: boardID, Sequence: sequence, OperationID: operationID,
+		Kind: workboard.BoardAction(kind), ActorID: actor.ID, ActorType: actor.Type, CardID: cardID, CreatedAt: now.UTC()}
+	var canonical workboard.BoardEvent
+	if strictJSON(body, &canonical) != nil || indexed.Validate() != nil || canonical != indexed {
+		return ErrWorkboardCorrupt
+	}
+	var nullableCardID any
+	if cardID != "" {
+		nullableCardID = cardID
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO workboard_events(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body) VALUES(?,?,?,?,?,?,?,?,?,?)`, id, boardID, sequence, operationID, kind, actor.ID, actor.Type, nullableCardID, now.UnixNano(), body)
 	return err
 }
 
@@ -426,6 +439,9 @@ func readWorkboardReceipt(ctx context.Context, tx *sql.Tx, scopeKind, scopeID, k
 	indexed.CardID, indexed.CardRevision, indexed.ClaimRevision = receipt.CardID, receipt.CardRevision, receipt.ClaimRevision
 	if receipt.Validate() != nil || receipt != indexed || receipt.RequestDigest != requestDigest || receipt.ResponseDigest != receiptDigest(receipt) {
 		return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
+	}
+	if err = verifyWorkboardReceiptEvents(ctx, tx, receipt); err != nil {
+		return workboard.OperationReceipt{}, true, err
 	}
 	return receipt, true, nil
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
 
@@ -98,6 +99,10 @@ type Services struct {
 	Health                  func(context.Context) error
 	Feedback                func(context.Context, string, bool, float64) error
 	ApproveBrowserChallenge func(context.Context, string, string) error
+	WorkboardList           func(context.Context, contract.BoardListOptions) (contract.Page, error)
+	WorkboardRead           func(context.Context, string, contract.BoardSnapshotOptions) (contract.BoardSnapshot, error)
+	WorkboardMutate         func(context.Context, contract.BoardRequest) (contract.OperationReceipt, error)
+	WorkboardEvents         func(context.Context, string, contract.BoardEventOptions) (contract.BoardEventPage, error)
 }
 type Handler struct {
 	modelSlots       chan struct{}
@@ -112,6 +117,8 @@ type Handler struct {
 	metricsSlots     chan struct{}
 	steeringSlots    chan struct{}
 	approvalSlots    chan struct{}
+	workboardSlots   chan struct{}
+	workboardWrites  chan struct{}
 	taskWaitTimeout  time.Duration
 }
 
@@ -119,7 +126,7 @@ func New(token string, concurrent int, s Services) (*Handler, error) {
 	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
-	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2), taskWaitTimeout: 5 * time.Minute}, nil
+	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2), workboardSlots: make(chan struct{}, 4), workboardWrites: make(chan struct{}, 1), taskWaitTimeout: 5 * time.Minute}, nil
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -157,7 +164,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(403, "browser_origin_denied")
 		return
 	}
-	if r.URL.RawQuery != "" && !(r.URL.Path == "/v1/resources/leases" || r.URL.Path == "/v1/resources/attention" || attentionHistoryRoute(r.URL.Path) || r.Method == http.MethodGet && (r.URL.Path == "/v1/tasks" || sessionTasksRoute(r.URL.Path) || r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
+	if r.URL.RawQuery != "" && !(workboardQueryRoute(r.URL.Path, r.Method) || r.URL.Path == "/v1/resources/leases" || r.URL.Path == "/v1/resources/attention" || attentionHistoryRoute(r.URL.Path) || r.Method == http.MethodGet && (r.URL.Path == "/v1/tasks" || sessionTasksRoute(r.URL.Path) || r.URL.Path == "/v1/submissions" || r.URL.Path == "/v1/skills/workflows" || approvalRoute(r.URL.Path) || skillGenerationRoute(r.URL.Path))) {
 		fail(400, "query_not_supported")
 		return
 	}
@@ -171,9 +178,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/v1/metrics" && r.Method == http.MethodGet {
 		timeout = 5 * time.Second
 	}
+	if r.URL.Path == "/v1/workboards" || strings.HasPrefix(r.URL.Path, "/v1/workboards/") {
+		timeout = 5 * time.Second
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	switch {
+	case r.URL.Path == "/v1/workboards" || strings.HasPrefix(r.URL.Path, "/v1/workboards/"):
+		h.serveWorkboards(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/skills/comparison":
 		h.serveSkillComparison(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/skills/comparison/select":

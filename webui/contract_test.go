@@ -221,14 +221,18 @@ func TestSchemaBoardFieldMatrixMatchesGoValidator(t *testing.T) {
 	}
 	var schema struct {
 		Definitions map[string]struct {
-			Allowed map[string][]string `json:"x-allowedFieldsByAction"`
+			Allowed    map[string][]string `json:"x-allowedFieldsByAction"`
+			Invariants []string            `json:"x-invariants"`
 		} `json:"$defs"`
 	}
 	if err := json.Unmarshal(body, &schema); err != nil {
 		t.Fatal(err)
 	}
 	allowed := schema.Definitions["board_request"].Allowed
-	actions := []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, DependencyAdd, DependencyRemove,
+	if !slices.Contains(schema.Definitions["board_request"].Invariants, "card.move and card.reorder before_card_id/after_card_id differ from card_id") {
+		t.Fatal("schema omits the move/reorder self-anchor invariant")
+	}
+	actions := []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove,
 		CardClaim, ClaimHeartbeat, ClaimRecover, CriteriaRevise, CheckpointAppend, CandidateSubmit,
 		AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock}
 	if len(allowed) != len(actions) {
@@ -299,6 +303,8 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		"committed delta":             {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
 		"raw prompt escape":           {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
 		"move with title":             {"board_request", `{"version":1,"action":"card.move","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"target_state":"ready","title":"irrelevant"}`},
+		"reorder without anchor":      {"board_request", `{"version":1,"action":"card.reorder","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_board_revision":1,"expected_layout_revision":1,"expected_card_revision":1}`},
+		"reorder with both anchors":   {"board_request", `{"version":1,"action":"card.reorder","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","before_card_id":"before","after_card_id":"after","expected_board_revision":1,"expected_layout_revision":1,"expected_card_revision":1}`},
 		"false parent clear":          {"board_request", `{"version":1,"action":"card.revise","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"clear_parent":false}`},
 		"false assignee clear":        {"board_request", `{"version":1,"action":"card.revise","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","expected_card_revision":1,"clear_assignee":false}`},
 		"zero feedback revision":      {"feedback_request", `{"version":1,"action":"revise","idempotency_key":"fixture-key-0001","task_id":"task","feedback_id":"feedback","accepted":true,"attempt_cost":0,"expected_revision":0}`},
@@ -359,6 +365,7 @@ func TestWorkboardCommandsRequireLifecycleAndAuthorityFences(t *testing.T) {
 	criteria := []AcceptanceCriterion{criterion("tests", "objective")}
 	commands := []BoardRequest{
 		{Version: 1, Action: CardMove, IdempotencyKey: key, BoardID: "board", CardID: "card", TargetState: "ready", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
+		{Version: 1, Action: CardReorder, IdempotencyKey: key, BoardID: "board", CardID: "card", BeforeCardID: "anchor", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
 		{Version: 1, Action: CriteriaRevise, IdempotencyKey: key, BoardID: "board", CardID: "card", Criteria: criteria, ExpectedCardRevision: &revision, ExpectedCriteriaRevision: &revision},
 		{Version: 1, Action: ClaimRecover, IdempotencyKey: key, BoardID: "board", CardID: "card", ClaimID: "claim", AttemptID: "attempt", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, StopProofID: "stop-proof", TaskHeadDigest: digest, ProcessProofDigest: digest, EffectEvidenceDigest: digest, EffectResolution: "effect_free"},
 	}
@@ -372,7 +379,12 @@ func TestWorkboardCommandsRequireLifecycleAndAuthorityFences(t *testing.T) {
 	if badMove.Validate() == nil {
 		t.Fatal("generic move entered review")
 	}
-	badRecovery := commands[2]
+	badReorder := commands[1]
+	badReorder.AfterCardID = "other"
+	if badReorder.Validate() == nil {
+		t.Fatal("reorder accepted two anchors")
+	}
+	badRecovery := commands[3]
 	badRecovery.EffectResolution = "uncertain"
 	if badRecovery.Validate() == nil {
 		t.Fatal("uncertain recovery accepted")

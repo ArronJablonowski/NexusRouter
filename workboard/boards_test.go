@@ -46,6 +46,15 @@ func TestBoardRequestAndReceiptContracts(t *testing.T) {
 	if err := archive.Validate(); err == nil {
 		t.Fatal("accepted missing archive fence")
 	}
+	title, description := "Revised", ""
+	revise := ReviseBoardRequest{Version: 1, BoardID: "board", IdempotencyKey: "0123456789abcdef", ExpectedRevision: 1, Title: &title, Description: &description}
+	if err := revise.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	revise.Title, revise.Description = nil, nil
+	if err := revise.Validate(); err == nil {
+		t.Fatal("accepted empty board revision")
+	}
 	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
 	receipt := OperationReceipt{Version: 1, BoardID: "board", OperationID: "0123456789abcdef", RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1, EventCount: 1, TransactionBytes: 1, BoardRevision: 1, Outcome: "committed", CreatedAt: now}
 	if err := receipt.Validate(); err != nil {
@@ -54,6 +63,38 @@ func TestBoardRequestAndReceiptContracts(t *testing.T) {
 	receipt.EventCount = 2
 	if err := receipt.Validate(); err == nil {
 		t.Fatal("accepted inconsistent event range")
+	}
+}
+
+func TestBoardEventPageContract(t *testing.T) {
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	events := []BoardEvent{
+		{Version: 1, ID: "event-1", BoardID: "board", Sequence: 1, OperationID: "operation-000001", Kind: BoardCreateAction, ActorID: "operator", ActorType: "operator", CreatedAt: now},
+		{Version: 1, ID: "event-2", BoardID: "board", Sequence: 2, OperationID: "operation-000002", Kind: BoardReviseAction, ActorID: "operator", ActorType: "operator", CreatedAt: now},
+	}
+	page := BoardEventPage{Version: 1, BoardID: "board", HighWaterSequence: 2, Items: events}
+	if err := page.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	cardEvent := BoardEvent{Version: 1, ID: "event-3", BoardID: "board", Sequence: 3, OperationID: "operation-000003", Kind: CardMoveAction, ActorID: "operator", ActorType: "operator", CardID: "card", CreatedAt: now}
+	if err := cardEvent.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	cardEvent.CardID = ""
+	if err := cardEvent.Validate(); err == nil {
+		t.Fatal("accepted card event without card id")
+	}
+	boardEvent := events[0]
+	boardEvent.CardID = "card"
+	if err := boardEvent.Validate(); err == nil {
+		t.Fatal("accepted board event with card id")
+	}
+	page.Items[1].Sequence = 3
+	if err := page.Validate(); err == nil {
+		t.Fatal("accepted event gap past high-water")
+	}
+	if err := (BoardEventOptions{Limit: 0}).Validate(); err == nil {
+		t.Fatal("accepted unbounded event page")
 	}
 }
 

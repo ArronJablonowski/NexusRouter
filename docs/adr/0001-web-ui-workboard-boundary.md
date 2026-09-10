@@ -222,15 +222,31 @@ keys before advancing the schema, and rolls back atomically on an inconsistent
 partial object set. Schema availability alone grants no mutation authority;
 the transactional command service remains DAR-82.
 
-The current partial DAR-82 checkpoint implements board create/list/read/archive
-domain and repository behavior only. Creation atomically seeds the seven
-canonical columns, event, and committed idempotency receipt. Archive uses an
-optimistic board-revision fence and replays an exact retry before evaluating the
-now-stale fence. Semantic request digests exclude the raw idempotency key.
-Bounded list and snapshot cursors are HMAC-authenticated and bind their frozen
-insertion or board/filter/revision context. Every service operation derives and
-validates actor and creation-scope authority outside presentation input before
-the authority-neutral repository is called.
+The current second partial DAR-82 checkpoint implements board create/revise/
+list/read/archive, bounded redacted event reads, and card create/revise/move/
+reorder/dependency repository behavior. Mutations atomically update their
+projection, attributed metadata-only event, and committed idempotency receipt.
+Board and card operations replay an exact retry before evaluating a now-stale
+revision fence. Semantic request digests exclude the raw idempotency key.
+Bounded board, snapshot, card, and event cursors are
+HMAC-authenticated and bind the relevant high-water, filter, revision, graph,
+layout, and ordering context. Board operations derive and validate actor and
+creation-scope authority outside presentation input; card operations likewise
+receive trusted authority rather than client-supplied attribution.
+
+Native JSON handlers now enforce closed request/query shapes, route/action/path
+binding, idempotency headers, bounded concurrency, and sanitized failures.
+Browser BFF handlers define same-origin session/CSRF boundaries for board list,
+create, read, and operations. These handlers are contracts, not yet live product
+composition: the CLI/daemon does not yet wire them to repositories, and browser
+workboard SSE is not implemented.
+
+Schema 36 adds an optional normalized `card_id` to the immutable event index.
+Card and dependency events require it in both the index and canonical redacted
+body; board events forbid it. The serialized migration rebuilds only the event
+table, preserves prior schema-35 events with `NULL` card identity, re-establishes
+the same-board foreign key and operation index, and fails atomically on partial
+or forged retained schema.
 
 The service enforces this transition table; generic movement cannot bypass it:
 
@@ -396,10 +412,11 @@ the server or UI exists.
 DAR-77 through DAR-80 implement the app shell, authentication boundary, chat
 presentation and reconciliation, bounded chat mutations, and the read-only
 operational inspector described above. DAR-81 adds only the schema-35 durable
-workboard foundation. The partial DAR-82 repository checkpoint adds board
-create/list/read/archive plus domain/service and Web UI query/event contracts,
-but no workboard transport. Card persistence, native/BFF endpoints, workboard
-SSE, authenticated composition, agent board tools, and the Kanban feature UI
-remain DAR-82 through DAR-84, with later qualification in DAR-85 through
-DAR-87. Inspection projections and storage availability do not grant policy
-mutation or work-dispatch authority.
+workboard foundation. The second partial DAR-82 checkpoint adds board create/
+revise/list/read/archive, redacted event reads, card create/revise/move/reorder/
+dependency SQL, native JSON routes, and browser list/create/read/operations BFF
+contracts. Browser workboard SSE, actual CLI/daemon service composition, the
+remaining claim/attempt/evaluation lifecycle commands, agent board tools, and
+the Kanban feature UI remain DAR-82 through DAR-84, with later qualification in
+DAR-85 through DAR-87. Handler contracts and storage availability do not grant
+policy mutation or work-dispatch authority.

@@ -75,7 +75,7 @@ func serviceGraph(cards ...Card) Graph {
 
 func serviceFor(t *testing.T, store *fakeCardStore) *CardService {
 	t.Helper()
-	service, err := NewCardService(store)
+	service, err := NewCardService(store, boardAuthorityStub{authority: Authority{CreationScope: "session", Actor: Actor{ID: "operator", Type: "operator"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,10 +106,30 @@ func TestCardServiceCreateBindsReplayIdentityAndOwnsInput(t *testing.T) {
 		mutation.ExpectedLayoutRevision != 0 || len(mutation.RequestDigest) != 64 {
 		t.Fatalf("mutation=%+v", mutation)
 	}
+	if mutation.Actor != (Actor{ID: "operator", Type: "operator"}) {
+		t.Fatalf("trusted actor=%+v", mutation.Actor)
+	}
 	intent.Labels[0], intent.Dependencies[0] = "changed", "changed"
 	result.Labels[0] = "caller-change"
 	if mutation.Create.Labels[0] != "backend" || mutation.Create.Dependencies[0] != dependency.ID || store.applyResult.Labels[0] != "backend" {
 		t.Fatal("card slices alias caller or store state")
+	}
+}
+
+func TestCardServiceDeniesBeforeStoreAccess(t *testing.T) {
+	store := &fakeCardStore{}
+	denied := errors.New("denied")
+	service, err := NewCardService(store, boardAuthorityStub{err: denied})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := CreateCardRequest{BoardID: "board-a", IdempotencyKey: serviceKey, ExpectedBoardRevision: 1, ExpectedGraphRevision: 1,
+		Card: NewCard{Title: "Card", Priority: "normal", Labels: []string{}, Dependencies: []string{}}}
+	if _, err = service.CreateCard(context.Background(), request); !errors.Is(err, denied) {
+		t.Fatalf("denial error=%v", err)
+	}
+	if store.graphCalls != 0 || store.getCalls != 0 || len(store.mutations) != 0 {
+		t.Fatalf("store accessed after denial: %+v", store)
 	}
 }
 
@@ -186,6 +206,19 @@ func TestCardServiceMoveAndReorderUseDomainState(t *testing.T) {
 	reorder.BeforeCardID, store.applyResult = "b", a
 	if _, err := service.ReorderCard(context.Background(), reorder); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCardServiceMoveRejectsAnchorOutsideTargetColumn(t *testing.T) {
+	source, anchor := serviceCard("source", Backlog), serviceCard("anchor", Backlog)
+	store := &fakeCardStore{cards: map[string]Card{"source": source, "anchor": anchor}, graph: serviceGraph(source, anchor), applyResult: source}
+	request := MoveCardRequest{BoardID: "board-a", CardID: source.ID, BeforeCardID: anchor.ID, IdempotencyKey: serviceKey,
+		TargetState: Ready, ExpectedBoardRevision: 7, ExpectedCardRevision: 1, ExpectedLayoutRevision: 4}
+	if _, err := serviceFor(t, store).MoveCard(context.Background(), request); !errors.Is(err, &Violation{Code: CodeInvalid}) {
+		t.Fatalf("anchor state error=%v", err)
+	}
+	if len(store.mutations) != 0 {
+		t.Fatal("invalid anchored move reached store")
 	}
 }
 

@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// Schema 35 reserves normalized, bounded storage for the native workboard. The
-// command service remains responsible for graph-cycle/depth preflight and for
-// keeping the indexed projection columns identical to their canonical bodies.
-// All lifecycle writes will use one transaction with the operation receipt and
-// immutable event range.
+// Schema 35 reserves normalized, bounded storage for the native workboard. A
+// database with no retained workboard objects is created directly at the latest
+// schema-36 shape; only retained exact schema-35 objects take the compatibility
+// rebuild. The command service remains responsible for graph-cycle/depth
+// preflight and for keeping indexed projections identical to canonical bodies.
 func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 	var existing int
 	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master
@@ -21,10 +21,16 @@ func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 	// retaining later objects. Accept only the complete, exact schema; any
 	// partial or forged object set fails without attempting repair.
 	if existing > 0 {
-		if err := validateWorkboardSchema(ctx, conn); err != nil {
+		if err := validateWorkboardSchema(ctx, conn); err == nil {
+			_, err = conn.ExecContext(ctx, "PRAGMA user_version=35")
 			return err
 		}
-		_, err := conn.ExecContext(ctx, "PRAGMA user_version=35")
+		// A deliberately lowered user_version may retain the complete later
+		// schema. It is safe to advance only after that exact shape validates.
+		if err := validateWorkboardSchema36(ctx, conn); err != nil {
+			return err
+		}
+		_, err := conn.ExecContext(ctx, "PRAGMA user_version=36")
 		return err
 	}
 	_, err := conn.ExecContext(ctx, `CREATE TABLE workboard_boards(
@@ -363,9 +369,11 @@ func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 	 kind TEXT NOT NULL CHECK(length(CAST(kind AS BLOB)) BETWEEN 1 AND 128),
 	 actor_id TEXT NOT NULL CHECK(length(CAST(actor_id AS BLOB)) BETWEEN 1 AND 128),
 	 actor_type TEXT NOT NULL CHECK(actor_type IN('operator','worker','validator','model','system')),
+	 card_id TEXT CHECK(length(CAST(card_id AS BLOB)) BETWEEN 1 AND 128),
 	 created_at INTEGER NOT NULL CHECK(created_at>=0),
 	 body BLOB NOT NULL CHECK(length(body) BETWEEN 1 AND 1048576),
 	 PRIMARY KEY(board_id,sequence),
+	 FOREIGN KEY(board_id,card_id) REFERENCES workboard_cards(board_id,id),
 	 FOREIGN KEY(board_id,operation_id) REFERENCES workboard_operations(board_id,operation_id) DEFERRABLE INITIALLY DEFERRED);
 	CREATE INDEX workboard_events_operation ON workboard_events(operation_id,sequence);
 
@@ -405,14 +413,22 @@ func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 	if err != nil {
 		return err
 	}
-	if err = validateWorkboardSchema(ctx, conn); err != nil {
+	if err = validateWorkboardSchema36(ctx, conn); err != nil {
 		return err
 	}
-	_, err = conn.ExecContext(ctx, "PRAGMA user_version=35")
+	_, err = conn.ExecContext(ctx, "PRAGMA user_version=36")
 	return err
 }
 
 func validateWorkboardSchema(ctx context.Context, conn *sql.Conn) error {
+	return validateWorkboardSchemaVersion(ctx, conn, false)
+}
+
+func validateWorkboardSchema36(ctx context.Context, conn *sql.Conn) error {
+	return validateWorkboardSchemaVersion(ctx, conn, true)
+}
+
+func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCardIdentity bool) error {
 	shapes := map[string]string{
 		"workboard_boards":              "id:TEXT:0:1,revision:INTEGER:1:0,layout_revision:INTEGER:1:0,event_sequence:INTEGER:1:0,graph_revision:INTEGER:1:0,graph_digest:TEXT:1:0,state:TEXT:1:0,title:TEXT:1:0,description:TEXT:1:0,card_count:INTEGER:1:0,active_claims:INTEGER:1:0,created_at:INTEGER:1:0,updated_at:INTEGER:1:0,body:BLOB:1:0",
 		"workboard_columns":             "board_id:TEXT:1:1,version:INTEGER:1:0,id:TEXT:1:0,state:TEXT:1:2,ordinal:INTEGER:1:0,rank:TEXT:1:0,title:TEXT:1:0",
@@ -434,6 +450,9 @@ func validateWorkboardSchema(ctx context.Context, conn *sql.Conn) error {
 		"workboard_recoveries":          "id:TEXT:0:1,proof_id:TEXT:1:0,board_id:TEXT:1:0,card_id:TEXT:1:0,attempt_id:TEXT:1:0,old_claim_id:TEXT:1:0,old_claim_revision:INTEGER:1:0,card_revision:INTEGER:1:0,first_sequence:INTEGER:1:0,last_sequence:INTEGER:1:0,recovered_at:INTEGER:1:0,body:BLOB:1:0",
 		"workboard_operations":          "scope_kind:TEXT:1:1,scope_id:TEXT:1:2,key_digest:TEXT:1:3,operation_id:TEXT:1:0,board_id:TEXT:1:0,request_digest:TEXT:1:0,response_digest:TEXT:1:0,first_sequence:INTEGER:1:0,last_sequence:INTEGER:1:0,event_count:INTEGER:1:0,transaction_bytes:INTEGER:1:0,outcome:TEXT:1:0,response:BLOB:1:0,created_at:INTEGER:1:0",
 		"workboard_events":              "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,created_at:INTEGER:1:0,body:BLOB:1:0",
+	}
+	if eventCardIdentity {
+		shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0"
 	}
 	for table, shape := range shapes {
 		if !browserTableShape(ctx, conn, table, shape) {
@@ -463,6 +482,9 @@ func validateWorkboardSchema(ctx context.Context, conn *sql.Conn) error {
 		"workboard_recoveries":      {"foreignkey(board_id,card_id,attempt_id,old_claim_id,proof_id)referencesworkboard_recovery_proofs(board_id,card_id,attempt_id,claim_id,id)"},
 		"workboard_operations":      {"primarykey(scope_kind,scope_id,key_digest)", "operation_idtextnotnullunique", "unique(board_id,operation_id)", "check(outcome='committed')", "check(scope_kind!='board'orscope_id=board_id)"},
 		"workboard_events":          {"foreignkey(board_id,operation_id)referencesworkboard_operations(board_id,operation_id)deferrableinitiallydeferred", "primarykey(board_id,sequence)"},
+	}
+	if eventCardIdentity {
+		rules["workboard_events"] = append(rules["workboard_events"], "foreignkey(board_id,card_id)referencesworkboard_cards(board_id,id)")
 	}
 	for table, expected := range rules {
 		if !browserTableRules(ctx, conn, table, expected) {

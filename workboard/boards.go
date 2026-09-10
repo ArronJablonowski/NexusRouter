@@ -12,8 +12,15 @@ const (
 type BoardAction string
 
 const (
-	BoardCreateAction  BoardAction = "board.create"
-	BoardArchiveAction BoardAction = "board.archive"
+	BoardCreateAction          BoardAction = "board.create"
+	BoardReviseAction          BoardAction = "board.revise"
+	BoardArchiveAction         BoardAction = "board.archive"
+	CardCreateAction           BoardAction = "card.create"
+	CardReviseAction           BoardAction = "card.revise"
+	CardMoveAction             BoardAction = "card.move"
+	CardReorderAction          BoardAction = "card.reorder"
+	CardDependencyAddAction    BoardAction = "dependency.add"
+	CardDependencyRemoveAction BoardAction = "dependency.remove"
 )
 
 type Actor struct {
@@ -89,6 +96,26 @@ type ArchiveBoardRequest struct {
 	BoardID          string `json:"board_id"`
 	IdempotencyKey   string `json:"-"`
 	ExpectedRevision int64  `json:"expected_board_revision"`
+}
+
+// ReviseBoardRequest updates board metadata behind a revision fence. Pointer
+// fields distinguish an omitted value from intentionally clearing description.
+type ReviseBoardRequest struct {
+	Version          int     `json:"version"`
+	BoardID          string  `json:"board_id"`
+	IdempotencyKey   string  `json:"-"`
+	ExpectedRevision int64   `json:"expected_board_revision"`
+	Title            *string `json:"title"`
+	Description      *string `json:"description"`
+}
+
+func (r ReviseBoardRequest) Validate() error {
+	if r.Version != SchemaVersion || !validID(r.BoardID) || !validKey(r.IdempotencyKey) || r.ExpectedRevision < 1 ||
+		r.Title == nil && r.Description == nil || r.Title != nil && !bounded(*r.Title, 1, MaxTitleBytes) ||
+		r.Description != nil && !bounded(*r.Description, 0, MaxDescriptionBytes) {
+		return fail(CodeInvalid, "request")
+	}
+	return nil
 }
 
 func (r ArchiveBoardRequest) Validate() error {
@@ -210,15 +237,80 @@ type BoardEvent struct {
 	Kind        BoardAction `json:"kind"`
 	ActorID     string      `json:"actor_id"`
 	ActorType   string      `json:"actor_type"`
+	CardID      string      `json:"card_id,omitempty"`
 	CreatedAt   time.Time   `json:"created_at"`
 }
 
 func (e BoardEvent) Validate() error {
 	if e.Version != SchemaVersion || !validID(e.ID) || !validID(e.BoardID) || e.Sequence < 1 || !validKey(e.OperationID) ||
-		e.Kind != BoardCreateAction && e.Kind != BoardArchiveAction || (Actor{e.ActorID, e.ActorType}).Validate() != nil || !validTime(e.CreatedAt) {
+		!validBoardAction(e.Kind) || (Actor{e.ActorID, e.ActorType}).Validate() != nil || !optionalID(e.CardID) ||
+		boardActionRequiresCard(e.Kind) != (e.CardID != "") || !validTime(e.CreatedAt) {
 		return fail(CodeInvalid, "event")
 	}
 	return nil
+}
+
+func boardActionRequiresCard(action BoardAction) bool {
+	switch action {
+	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction:
+		return true
+	default:
+		return false
+	}
+}
+
+type BoardEventOptions struct {
+	After string
+	Limit int
+}
+
+func (o BoardEventOptions) Validate() error {
+	if !validCursor(o.After) || o.Limit < 1 || o.Limit > MaxPageItems {
+		return fail(CodeInvalid, "events")
+	}
+	return nil
+}
+
+// BoardEventPage is a bounded high-water snapshot over the immutable board
+// journal. The cursor, when present, is opaque and authenticated by the store.
+type BoardEventPage struct {
+	Version           int          `json:"version"`
+	BoardID           string       `json:"board_id"`
+	HighWaterSequence int64        `json:"high_water_sequence"`
+	Items             []BoardEvent `json:"items"`
+	NextCursor        string       `json:"next_cursor,omitempty"`
+	HasMore           bool         `json:"has_more"`
+}
+
+func (p BoardEventPage) Validate() error {
+	if p.Version != SchemaVersion || !validID(p.BoardID) || p.HighWaterSequence < 1 || len(p.Items) < 1 || len(p.Items) > MaxPageItems ||
+		p.HasMore != (p.NextCursor != "") || !validCursor(p.NextCursor) {
+		return fail(CodeInvalid, "event_page")
+	}
+	var previous int64
+	seen := make(map[string]bool, len(p.Items))
+	for _, event := range p.Items {
+		if event.Validate() != nil || event.BoardID != p.BoardID || event.Sequence > p.HighWaterSequence ||
+			previous != 0 && event.Sequence != previous+1 || seen[event.ID] {
+			return fail(CodeInvalid, "event_page")
+		}
+		previous = event.Sequence
+		seen[event.ID] = true
+	}
+	if !p.HasMore && previous != p.HighWaterSequence {
+		return fail(CodeInvalid, "event_page")
+	}
+	return nil
+}
+
+func validBoardAction(action BoardAction) bool {
+	switch action {
+	case BoardCreateAction, BoardReviseAction, BoardArchiveAction, CardCreateAction, CardReviseAction,
+		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction:
+		return true
+	default:
+		return false
+	}
 }
 
 type OperationReceipt struct {

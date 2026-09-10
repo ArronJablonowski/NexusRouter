@@ -45,6 +45,10 @@ func TestWorkboardReadContracts(t *testing.T) {
 	if err := eventPage.Validate(); err != nil {
 		t.Fatal("valid event page rejected", err)
 	}
+	event.Kind = CardReorder
+	if err := event.Validate(); err != nil {
+		t.Fatal("card reorder event rejected", err)
+	}
 	dependencyPage.Items[0].BoardID = "other-board"
 	if dependencyPage.Validate() == nil {
 		t.Fatal("cross-board dependency accepted")
@@ -77,6 +81,20 @@ func TestNewBoardActionsRequireExactFences(t *testing.T) {
 	for _, request := range invalid {
 		if request.Validate() == nil {
 			t.Fatalf("invalid %s accepted", request.Action)
+		}
+	}
+}
+
+func TestCardMoveAndReorderRejectSelfAnchors(t *testing.T) {
+	revision := int64(2)
+	for _, request := range []BoardRequest{
+		{Version: 1, Action: CardMove, IdempotencyKey: "operation-key-03", BoardID: "board-a", CardID: "card-a", TargetState: "ready", BeforeCardID: "card-a", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
+		{Version: 1, Action: CardMove, IdempotencyKey: "operation-key-04", BoardID: "board-a", CardID: "card-a", TargetState: "ready", AfterCardID: "card-a", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
+		{Version: 1, Action: CardReorder, IdempotencyKey: "operation-key-05", BoardID: "board-a", CardID: "card-a", BeforeCardID: "card-a", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
+		{Version: 1, Action: CardReorder, IdempotencyKey: "operation-key-06", BoardID: "board-a", CardID: "card-a", AfterCardID: "card-a", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
+	} {
+		if request.Validate() == nil {
+			t.Fatalf("%s accepted self anchor", request.Action)
 		}
 	}
 }

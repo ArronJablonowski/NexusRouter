@@ -39,6 +39,12 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	base := h.basePath + "/api/v1"
 	path := request.URL.Path
 	switch {
+	case path == base+"/workboards" && request.Method == http.MethodPost:
+		h.serveWorkboardMutation(writer, request, "", contract.BoardCreate)
+		return true
+	case browserWorkboardOperationID(h.basePath, path) != "":
+		h.serveWorkboardMutation(writer, request, browserWorkboardOperationID(h.basePath, path), "")
+		return true
 	case path == base+"/chats" && request.Method == http.MethodPost:
 		h.serveChatMutation(writer, request, contract.ChatSubmit, "", false)
 		return true

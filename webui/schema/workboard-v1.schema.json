@@ -1092,7 +1092,7 @@
         "board_id": {"$ref": "v1#/$defs/id"},
         "sequence": {"type": "integer", "minimum": 1},
         "operation_id": {"$ref": "v1#/$defs/key"},
-        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
+        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
         "actor_id": {"$ref": "v1#/$defs/id"},
         "actor_type": {"enum": ["operator", "worker", "validator", "model", "system"]},
         "card_id": {"$ref": "v1#/$defs/id"},

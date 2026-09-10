@@ -171,6 +171,7 @@ const (
 	CardCreate         BoardAction = "card.create"
 	CardRevise         BoardAction = "card.revise"
 	CardMove           BoardAction = "card.move"
+	CardReorder        BoardAction = "card.reorder"
 	DependencyAdd      BoardAction = "dependency.add"
 	DependencyRemove   BoardAction = "dependency.remove"
 	CardClaim          BoardAction = "card.claim"
@@ -272,7 +273,7 @@ func (r BoardRequest) Validate() error {
 		if r.Title == nil || strings.TrimSpace(*r.Title) == "" || r.CardID != "" || revisionBelowOne(r.ExpectedBoardRevision) || revisionBelowOne(r.ExpectedGraphRevision) || validateCriteria(r.Criteria, 1) != nil {
 			return ErrContract
 		}
-	case CardRevise, CardMove, DependencyAdd, DependencyRemove, CardClaim,
+	case CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove, CardClaim,
 		CardPauseRequest, CardCancelRequest, CardBlock, CardUnblock:
 		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) {
 			return ErrContract
@@ -289,7 +290,12 @@ func (r BoardRequest) Validate() error {
 			return ErrContract
 		}
 		if r.Action == CardMove && (!validMoveTarget(r.TargetState) || revisionBelowOne(r.ExpectedBoardRevision) ||
-			revisionBelowOne(r.ExpectedLayoutRevision) || (r.BeforeCardID != "" && r.AfterCardID != "")) {
+			revisionBelowOne(r.ExpectedLayoutRevision) || (r.BeforeCardID != "" && r.AfterCardID != "") ||
+			r.BeforeCardID == r.CardID || r.AfterCardID == r.CardID) {
+			return ErrContract
+		}
+		if r.Action == CardReorder && (revisionBelowOne(r.ExpectedBoardRevision) || revisionBelowOne(r.ExpectedLayoutRevision) ||
+			(r.BeforeCardID == "") == (r.AfterCardID == "") || r.BeforeCardID == r.CardID || r.AfterCardID == r.CardID) {
 			return ErrContract
 		}
 		if (r.Action == CardBlock || r.Action == CardUnblock) && (r.ReasonCode == "" || r.ClaimID == "" || revisionBelowOne(r.ExpectedClaimRevision)) {

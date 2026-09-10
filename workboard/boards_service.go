@@ -25,9 +25,22 @@ func (a Authority) Validate() error {
 
 type BoardRepository interface {
 	CreateWorkboard(context.Context, string, CreateBoardRequest, Actor, time.Time) (OperationReceipt, error)
+	ReviseWorkboard(context.Context, ReviseBoardRequest, Actor, time.Time) (OperationReceipt, error)
 	ArchiveWorkboard(context.Context, ArchiveBoardRequest, Actor, time.Time) (OperationReceipt, error)
 	ListWorkboards(context.Context, BoardListOptions) (BoardPage, error)
 	ReadWorkboard(context.Context, string, BoardSnapshotOptions) (BoardSnapshot, error)
+	ListWorkboardEvents(context.Context, string, BoardEventOptions) (BoardEventPage, error)
+}
+
+func (s *BoardService) Revise(ctx context.Context, request ReviseBoardRequest) (OperationReceipt, error) {
+	if request.Validate() != nil {
+		return OperationReceipt{}, fail(CodeInvalid, "request")
+	}
+	authority, err := s.authorize(ctx)
+	if err != nil {
+		return OperationReceipt{}, err
+	}
+	return s.repository.ReviseWorkboard(ctx, request, authority.Actor, s.now().UTC())
 }
 
 type BoardService struct {
@@ -83,6 +96,16 @@ func (s *BoardService) Read(ctx context.Context, boardID string, options BoardSn
 		return BoardSnapshot{}, err
 	}
 	return s.repository.ReadWorkboard(ctx, boardID, options)
+}
+
+func (s *BoardService) Events(ctx context.Context, boardID string, options BoardEventOptions) (BoardEventPage, error) {
+	if !validID(boardID) || options.Validate() != nil {
+		return BoardEventPage{}, fail(CodeInvalid, "events")
+	}
+	if _, err := s.authorize(ctx); err != nil {
+		return BoardEventPage{}, err
+	}
+	return s.repository.ListWorkboardEvents(ctx, boardID, options)
 }
 
 func (s *BoardService) authorize(ctx context.Context) (Authority, error) {

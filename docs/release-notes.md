@@ -56,14 +56,15 @@ supported-platform decision or publication approval is claimed.
   feedback record/revision, and tool-approval allow/deny/revoke. The embedded
   client reconciles task controls, feedback context, approvals, recent
   operations, and submission status after refresh or ambiguous acknowledgement.
-  Schema-35 Kanban persistence now exists. A partial DAR-82 checkpoint adds
-  authority-gated board domain/service contracts and transactional create,
-  list, read, and archive repository behavior. Canonical-column seeding,
-  immutable events, revision fencing, exact replay, aggregate transaction-byte
-  checks, and authenticated bounded cursors are covered. Versioned Web UI query
-  and event contracts exist, but card persistence, workboard HTTP/SSE/auth
-  wiring, agent tools, and the Kanban feature UI remain open; DAR-82 is still In
-  Progress.
+  Schema-35 Kanban persistence now exists. The second partial DAR-82 checkpoint
+  adds authority-gated board domain/service contracts, board create/revise/list/
+  read/archive and redacted event reads, plus card create/revise/move/reorder/
+  dependency SQL. Native JSON handlers and browser-session/CSRF BFF contracts
+  cover board list/create/read/operations. Canonical events, revision and graph
+  fencing, exact replay, aggregate transaction-byte checks, and authenticated
+  bounded cursors are covered. Browser workboard SSE, actual CLI/daemon service
+  composition, remaining claim/attempt/evaluation lifecycle commands, agent
+  tools, and the Kanban feature UI remain open; DAR-82 is still In Progress.
 
 - Schema 35 adds the native workboard storage foundation to the primary
   SQLite/WAL database. Normalized bounded tables cover boards, seven canonical
@@ -74,10 +75,12 @@ supported-platform decision or publication approval is claimed.
   limits where SQLite can do so; cycle, depth, and transaction-wide graph
   checks remain application-service responsibilities. Migration is serialized,
   restart-safe, and fails atomically on partial or forged retained objects.
-  DAR-81 itself is storage only. The subsequent partial DAR-82 checkpoint covers
-  board lifecycle persistence but not card persistence or any workboard
-  transport; DAR-82, DAR-83, and DAR-84 still own the remaining command/API,
-  agent-tool, and integrated Kanban UI work.
+  DAR-81 itself is storage only. The subsequent partial DAR-82 work now covers
+  board metadata lifecycle, core card/dependency persistence, native JSON
+  routes, and browser BFF handler contracts. It does not yet provide browser
+  SSE, live CLI/daemon composition, the full claim/attempt/evaluation lifecycle,
+  agent tools, or the integrated Kanban UI; DAR-82, DAR-83, and DAR-84 still own
+  that remaining work.
 
 - Schema 34 adds the session-subject-bound browser operation journal and
   additive browser feedback revision chain to the primary SQLite/WAL database;
@@ -367,7 +370,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 35. Schema 30 added the immutable
+The current durable store uses SQLite schema 36. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -376,7 +379,10 @@ ordered committed-runtime-event ledger used for restart-safe SDK catch-up, and
 schema 34 adds browser-session-bound operation and additive subjective-feedback
 records in the same SQLite/WAL store. Schema 35 adds bounded normalized native
 workboard storage and validates its exact tables, rules, indexes, triggers, and
-foreign-key integrity before advancing. Browser authority remains process-local
+foreign-key integrity before advancing. Schema 36 adds normalized card identity
+to immutable workboard events through a serialized table rebuild; existing
+schema-35 board events are preserved with `NULL` card identity, and partial or
+forged retained schema fails without advancing. Browser authority remains process-local
 and is revoked on restart even though these durable records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores

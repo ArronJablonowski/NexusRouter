@@ -5737,7 +5737,7 @@ BFF 4.361s. Focused workboard, Web UI, migration, restart, and race tests also
 passed. DAR-82, DAR-83, and DAR-84 still own the workboard command service/API,
 policy-constrained agent tools, and integrated Kanban UI.
 
-## 2026-09-09 — DAR-82 partial board repository checkpoint
+## 2026-09-09 — DAR-82 first partial board repository checkpoint
 
 DAR-82 remains In Progress. This checkpoint adds presentation-independent board
 domain records and validation, a repository interface, and an application
@@ -5775,3 +5775,43 @@ Card persistence and lifecycle commands, native and browser-facing HTTP routes,
 workboard SSE, authenticated daemon composition, policy-constrained agent tools,
 and Kanban rendering remain unfinished. Versioned Web UI board-query and
 redacted board-event contracts exist but are not yet wired to this repository.
+
+## 2026-09-09 — DAR-82 second partial card, event, and transport-contract checkpoint
+
+DAR-82 remains In Progress. The durable repository now extends the first board
+checkpoint with board metadata revision, bounded redacted board-event pages, and
+card create/revise/move/reorder/dependency mutations. Exact retries are resolved
+before stale revision checks. Card operations maintain board/card, graph, and
+layout fences as applicable and commit projection changes, metadata-only audit
+events, and replay responses in one SQLite transaction. Card graph checks reject
+missing or cross-board references, cycles, excessive depth/fanout, impossible
+state movement, and stale graph/layout/card/board revisions. Trusted authority
+supplies durable event attribution; idempotency keys and card request payloads
+do not enter the event stream.
+
+Board-event reads use an immutable high-water view and HMAC-authenticated cursor
+bound to the board and event range. They validate the normalized index against
+the canonical metadata-only event body, reject forged or cross-board cursors,
+detect journal gaps and corruption, and reconstruct fresh pages after restart.
+Board revision tests cover authority, no-op rejection, exact restart replay,
+same-key conflicts, stale fences, archived boards, and transactional rollback.
+Schema 36 adds the event index's optional normalized `card_id`: card and
+dependency events require matching identifiers in their canonical redacted body
+and index, while board events forbid one. Its serialized table rebuild preserves
+schema-35 board events with `NULL`, restores the same-board foreign key and
+operation index, and rejects partial or forged retained schema atomically.
+
+Native JSON workboard handlers now define bounded authenticated list/read/event
+queries and path/action/idempotency-bound mutations with closed JSON/query
+shapes and sanitized failures. Browser handlers define the corresponding
+session/CSRF BFF contracts for board list, create, read, and operations, without
+placing native bearer credentials in browser code. Focused domain, telemetry,
+native-handler, and browser-handler tests and race checks passed during this
+checkpoint, along with `go vet ./...`, the source format/1,000-line checker, and
+`git diff --check`. No final repository-wide `make check` is claimed here.
+
+Browser workboard SSE and reconnect behavior, actual CLI/daemon service
+composition, the remaining claim/attempt/evaluation lifecycle commands,
+policy-constrained agent tools, and visual Kanban rendering are still
+unfinished. This is therefore a partial DAR-82 checkpoint, not a completed
+issue or a usable Kanban surface.
