@@ -106,9 +106,24 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer db.Close()
-	workboards, err := app.NewWorkboardBridge(db, db, time.Now)
+	workspaceIdentity, err := db.WorkspaceIdentity(ctx)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot read durable workspace identity")
+		return 1
+	}
+	browserWorkboardAuthority, err := app.BrowserWorkboardAuthority(workspaceIdentity)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot initialize browser workboard authority")
+		return 1
+	}
+	workboards, err := app.NewWorkboardBridgeWithBrowserAuthority(db, db, time.Now, browserWorkboardAuthority)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot initialize workboard services")
+		return 1
+	}
+	workboardRecovery, err := app.NewWorkboardRecoveryCoordinator(db, time.Now)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot initialize workboard recovery services")
 		return 1
 	}
 	var dispatcher *app.Dispatcher
@@ -203,8 +218,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				return service.BrowserResources(ctx), nil
 			},
 		}, Workboards: webuiapp.WorkboardServices{
-			List: workboards.BrowserList, Read: workboards.BrowserRead,
-			Events: workboards.BrowserEvents, Mutate: browserWorkboards.Mutate,
+			List: workboards.BrowserList, Read: workboards.BrowserRead, Events: workboards.BrowserEvents,
+			AttemptHistory: workboards.BrowserAttemptHistory, AttemptDetail: workboards.BrowserAttemptDetail,
+			Dependencies: workboards.BrowserDependencies,
+			Mutate:       browserWorkboards.Mutate,
 		}})
 		if err != nil {
 			fmt.Fprintln(stderr, "invalid Web UI configuration")
@@ -337,10 +354,14 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 			return browserHandler.ApproveChallenge(id, code)
 		},
-		WorkboardList:   workboards.NativeList,
-		WorkboardRead:   workboards.NativeRead,
-		WorkboardMutate: workboards.NativeMutate,
-		WorkboardEvents: workboards.NativeEvents,
+		WorkboardList:           workboards.NativeList,
+		WorkboardRead:           workboards.NativeRead,
+		WorkboardMutate:         workboards.NativeMutate,
+		WorkboardEvents:         workboards.NativeEvents,
+		WorkboardAttemptHistory: workboards.NativeAttemptHistory,
+		WorkboardAttemptDetail:  workboards.NativeAttemptDetail,
+		WorkboardDependencies:   workboards.NativeDependencies,
+		WorkboardFinalizeCancel: workboardRecovery.FinalizeCancel,
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon configuration")

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -409,6 +410,308 @@ func TestWorkboardSubjectiveRejectionAddsNegativeUserFeedback(t *testing.T) {
 	current, _ = store.GetCard(ctx, boardID, card.ID)
 	if current.State != workboard.Ready || len(finalEvidence) != 3 || finalEvidence[2].Source != "user_feedback" || finalEvidence[2].Outcome != "failed" {
 		t.Fatalf("card=%+v evidence=%+v", current, finalEvidence)
+	}
+}
+
+func TestWorkboardAcceptanceUnlocksSuccessorsReplayAndRestart(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	card, boardID := readyLifecycleCard(t, ctx, store, clock)
+	cardService, err := workboard.NewCardService(store, telemetryCardAuthority{authority: workboard.Authority{CreationScope: "session", Actor: workboard.Actor{ID: "operator", Type: "operator"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := createCardForTest(t, ctx, cardService, boardID, "successor-first-key", "First successor", 3, 2, []string{card.ID})
+	second := createCardForTest(t, ctx, cardService, boardID, "successor-second-key", "Second successor", 4, 3, []string{card.ID})
+	blocker := createCardForTest(t, ctx, cardService, boardID, "successor-blocker-key", "Other prerequisite", 5, 4, nil)
+	partial := createCardForTest(t, ctx, cardService, boardID, "successor-partial-key", "Partially unblocked", 6, 5, []string{card.ID, blocker.ID})
+	worker := workboard.Actor{ID: "worker-unlock", Type: "worker"}
+	clock = card.UpdatedAt.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, worker, verifiedLifecycleRecovery("unlock-proof", workboard.EffectFree), &clock)
+	if _, err = lifecycle.Claim(ctx, workboard.ClaimRequest{BoardID: boardID, CardID: card.ID, IdempotencyKey: "unlock-claim-key", ExpectedCardRevision: card.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	evaluator := &evaluationFixture{evidence: []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "passed", ActorID: "go-test", ActorType: "validator", Reference: "unlock-tests"}}}
+	workerService := newTestEvaluationService(t, store, worker, evaluator, &clock)
+	submit := workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "unlock-submit-key", ExpectedCardRevision: card.Revision + 1, ExpectedClaimRevision: 1, CriteriaRevision: card.CriteriaRevision, Summary: "unlock candidate"}
+	if _, err = workerService.SubmitCandidate(ctx, submit); err != nil {
+		t.Fatal(err)
+	}
+	candidate, evidence := evaluationRows(t, store, boardID, card.ID, attemptID)
+	current, _ := store.GetCard(ctx, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	operator := newTestEvaluationService(t, store, workboard.Actor{ID: "operator-unlock", Type: "operator"}, evaluator, &clock)
+	decision := workboard.DecideCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, CandidateID: candidate.ID,
+		IdempotencyKey: "unlock-accept-key", ExpectedCardRevision: current.Revision, CriteriaRevision: card.CriteriaRevision,
+		CandidateDigest: candidate.Digest, CriteriaDigest: candidate.CriteriaDigest, EvidenceHeadRevision: int64(len(evidence)),
+		EvidenceSetDigest: workboard.EvidenceSetDigest(evidence), PolicyDigest: candidate.PolicyDigest, Evidence: "successors may proceed"}
+	accepted, err := operator.AcceptCandidate(ctx, decision)
+	if err != nil || accepted.EventCount != 4 || accepted.LastSequence-accepted.FirstSequence != 3 {
+		t.Fatalf("accepted=%+v err=%v", accepted, err)
+	}
+
+	got := make([]workboard.Card, 0, 2)
+	for _, successor := range []workboard.Card{first, second} {
+		updated, readErr := store.GetCard(ctx, boardID, successor.ID)
+		if readErr != nil || updated.State != workboard.Ready || updated.RemainingDependencies != 0 || updated.Revision != successor.Revision+1 {
+			t.Fatalf("successor=%+v err=%v", updated, readErr)
+		}
+		got = append(got, updated)
+	}
+	if got[0].Rank == got[1].Rank {
+		t.Fatalf("successor ranks collided: %q", got[0].Rank)
+	}
+	partiallyUpdated, readErr := store.GetCard(ctx, boardID, partial.ID)
+	if readErr != nil || partiallyUpdated.State != workboard.Backlog || partiallyUpdated.RemainingDependencies != 1 || partiallyUpdated.Revision != partial.Revision+1 {
+		t.Fatalf("partially updated successor=%+v err=%v", partiallyUpdated, readErr)
+	}
+	partialEvent, eventErr := scanCanonicalWorkboardEvent(store.db.QueryRowContext(ctx, `SELECT id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body
+		FROM workboard_events WHERE board_id=? AND operation_id=? AND card_id=?`, boardID, accepted.OperationID, partial.ID), boardID)
+	wantPartialEventID, idErr := successorEffectEventID(accepted.OperationID, card.ID, partiallyUpdated)
+	if eventErr != nil || idErr != nil || partialEvent.ID != wantPartialEventID || partialEvent.Kind != workboard.CardReviseAction ||
+		partialEvent.ActorID != "operator-unlock" || partialEvent.ActorType != "operator" {
+		t.Fatalf("partial event=%+v eventErr=%v idErr=%v", partialEvent, eventErr, idErr)
+	}
+	var response []byte
+	if err = store.db.QueryRow(`SELECT response FROM workboard_operations WHERE operation_id=?`, accepted.OperationID).Scan(&response); err != nil {
+		t.Fatal(err)
+	}
+	var envelope evaluationMutationResponse
+	if strictJSON(response, &envelope) != nil || len(envelope.Result.Successors) != 3 {
+		t.Fatalf("response=%s", response)
+	}
+	unlocked, partialRecorded := 0, false
+	for index, successor := range envelope.Result.Successors {
+		if index > 0 && envelope.Result.Successors[index-1].ID >= successor.ID || !containsString(successor.Dependencies, card.ID) {
+			t.Fatalf("successors=%+v", envelope.Result.Successors)
+		}
+		if successor.State == workboard.Ready && successor.RemainingDependencies == 0 {
+			unlocked++
+		}
+		if successor.ID == partial.ID && successor.State == workboard.Backlog && successor.RemainingDependencies == 1 {
+			partialRecorded = true
+		}
+	}
+	if unlocked != 2 || !partialRecorded {
+		t.Fatalf("successors=%+v", envelope.Result.Successors)
+	}
+	replayed, err := operator.AcceptCandidate(ctx, decision)
+	if err != nil || !reflect.DeepEqual(replayed, accepted) {
+		t.Fatalf("replay=%+v err=%v", replayed, err)
+	}
+	newTitle := "Partially unblocked after acceptance"
+	revised, err := cardService.ReviseCard(ctx, workboard.ReviseCardRequest{BoardID: boardID, CardID: partial.ID,
+		IdempotencyKey: "successor-later-revise", ExpectedCardRevision: partiallyUpdated.Revision, Patch: workboard.CardPatch{Title: &newTitle}})
+	if err != nil || revised.Revision != partiallyUpdated.Revision+1 {
+		t.Fatalf("later successor revision=%+v err=%v", revised, err)
+	}
+	replayed, err = operator.AcceptCandidate(ctx, decision)
+	if err != nil || !reflect.DeepEqual(replayed, accepted) {
+		t.Fatalf("replay after legitimate successor change=%+v err=%v", replayed, err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	clock = clock.Add(time.Hour)
+	operator = newTestEvaluationService(t, store, workboard.Actor{ID: "operator-unlock", Type: "operator"}, evaluator, &clock)
+	replayed, err = operator.AcceptCandidate(ctx, decision)
+	if err != nil || !reflect.DeepEqual(replayed, accepted) {
+		t.Fatalf("restart replay=%+v err=%v", replayed, err)
+	}
+
+	// Even after a successor has legitimately advanced, a canonically valid
+	// operation response cannot rewrite the historical dependency effect.
+	tamperedEnvelope := envelope
+	tamperedEnvelope.Result.Successors = append([]workboard.Card{}, envelope.Result.Successors...)
+	for index := range tamperedEnvelope.Result.Successors {
+		if tamperedEnvelope.Result.Successors[index].ID == partial.ID {
+			tamperedEnvelope.Result.Successors[index].RemainingDependencies = 2
+		}
+	}
+	tamperedResponse, _ := json.Marshal(tamperedEnvelope)
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_operations SET response=? WHERE operation_id=?`, tamperedResponse, accepted.OperationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = operator.AcceptCandidate(ctx, decision); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("valid successor response tamper error=%v", err)
+	}
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_operations SET response=? WHERE operation_id=?`, response, accepted.OperationID); err != nil {
+		t.Fatal(err)
+	}
+
+	// A canonically encoded but historically false successor projection must not
+	// be accepted merely because the operation response and event agree.
+	readTx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalCard, originalBody, err := readStoredCard(ctx, readTx, boardID, first.ID)
+	rollbackErr := readTx.Rollback()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rollbackErr != nil {
+		t.Fatal(rollbackErr)
+	}
+	tamperedCard := originalCard
+	tamperedCard.Rank = formatWorkboardRank(1)
+	tamperedBody := updateStoredBody(originalBody, tamperedCard)
+	tamperedBytes, _ := json.Marshal(tamperedBody)
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_cards SET rank=?,body=? WHERE board_id=? AND id=?`, tamperedCard.Rank, tamperedBytes, boardID, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.GetCard(ctx, boardID, first.ID); err != nil {
+		t.Fatalf("tampered projection should remain canonically valid: %v", err)
+	}
+	if _, err = operator.AcceptCandidate(ctx, decision); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("same-revision successor tamper error=%v", err)
+	}
+	originalBytes, _ := json.Marshal(originalBody)
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_cards SET rank=?,body=? WHERE board_id=? AND id=?`, originalCard.Rank, originalBytes, boardID, first.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// A valid canonical event ID cannot be substituted for the immutable effect
+	// digest, and removing an effect event must also invalidate exact replay.
+	tamperedEvent := partialEvent
+	tamperedEvent.ID = "tampered-successor-effect"
+	tamperedEventBytes, _ := json.Marshal(tamperedEvent)
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_events SET id=?,body=? WHERE board_id=? AND id=?`, tamperedEvent.ID, tamperedEventBytes, boardID, partialEvent.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = operator.AcceptCandidate(ctx, decision); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("valid successor event tamper error=%v", err)
+	}
+	partialEventBytes, _ := json.Marshal(partialEvent)
+	if _, err = store.db.ExecContext(ctx, `UPDATE workboard_events SET id=?,body=? WHERE board_id=? AND id=?`, partialEvent.ID, partialEventBytes, boardID, tamperedEvent.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.ExecContext(ctx, `DELETE FROM workboard_events WHERE board_id=? AND id=?`, boardID, partialEvent.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = operator.AcceptCandidate(ctx, decision); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("missing successor effect error=%v", err)
+	}
+}
+
+func TestWorkboardRejectionDoesNotUnlockSuccessor(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	clock := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	card, boardID := readyLifecycleCard(t, ctx, store, clock)
+	cardService, _ := workboard.NewCardService(store, telemetryCardAuthority{authority: workboard.Authority{CreationScope: "session", Actor: workboard.Actor{ID: "operator", Type: "operator"}}})
+	successor := createCardForTest(t, ctx, cardService, boardID, "reject-successor-key", "Rejected successor", 3, 2, []string{card.ID})
+	worker := workboard.Actor{ID: "worker-reject-unlock", Type: "worker"}
+	clock = card.UpdatedAt.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, worker, verifiedLifecycleRecovery("reject-unlock-proof", workboard.EffectFree), &clock)
+	if _, err = lifecycle.Claim(ctx, workboard.ClaimRequest{BoardID: boardID, CardID: card.ID, IdempotencyKey: "reject-unlock-claim", ExpectedCardRevision: card.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	evaluator := &evaluationFixture{evidence: []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "failed", ActorID: "go-test", ActorType: "validator", Reference: "failed"}}}
+	workerService := newTestEvaluationService(t, store, worker, evaluator, &clock)
+	if _, err = workerService.SubmitCandidate(ctx, workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "reject-unlock-submit", ExpectedCardRevision: card.Revision + 1, ExpectedClaimRevision: 1, CriteriaRevision: card.CriteriaRevision, Summary: "rejected"}); err != nil {
+		t.Fatal(err)
+	}
+	candidate, evidence := evaluationRows(t, store, boardID, card.ID, attemptID)
+	current, _ := store.GetCard(ctx, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	operator := newTestEvaluationService(t, store, workboard.Actor{ID: "operator-reject-unlock", Type: "operator"}, evaluator, &clock)
+	receipt, err := operator.RejectCandidate(ctx, workboard.DecideCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, CandidateID: candidate.ID,
+		IdempotencyKey: "reject-unlock-decision", ExpectedCardRevision: current.Revision, CriteriaRevision: card.CriteriaRevision,
+		CandidateDigest: candidate.Digest, CriteriaDigest: candidate.CriteriaDigest, EvidenceHeadRevision: int64(len(evidence)),
+		EvidenceSetDigest: workboard.EvidenceSetDigest(evidence), PolicyDigest: candidate.PolicyDigest, Evidence: "tests failed"})
+	updated, readErr := store.GetCard(ctx, boardID, successor.ID)
+	if err != nil || readErr != nil || receipt.EventCount != 1 || updated.State != workboard.Backlog || updated.RemainingDependencies != 1 || updated.Revision != successor.Revision {
+		t.Fatalf("receipt=%+v successor=%+v err=%v read=%v", receipt, updated, err, readErr)
+	}
+}
+
+func TestWorkboardAcceptanceSuccessorRollback(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	clock := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	card, boardID := readyLifecycleCard(t, ctx, store, clock)
+	cardService, _ := workboard.NewCardService(store, telemetryCardAuthority{authority: workboard.Authority{CreationScope: "session", Actor: workboard.Actor{ID: "operator", Type: "operator"}}})
+	first := createCardForTest(t, ctx, cardService, boardID, "rollback-successor-one", "Rollback one", 3, 2, []string{card.ID})
+	second := createCardForTest(t, ctx, cardService, boardID, "rollback-successor-two", "Rollback two", 4, 3, []string{card.ID})
+	worker := workboard.Actor{ID: "worker-unlock-rollback", Type: "worker"}
+	clock = card.UpdatedAt.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, worker, verifiedLifecycleRecovery("unlock-rollback-proof", workboard.EffectFree), &clock)
+	if _, err = lifecycle.Claim(ctx, workboard.ClaimRequest{BoardID: boardID, CardID: card.ID, IdempotencyKey: "unlock-rollback-claim", ExpectedCardRevision: card.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	evaluator := &evaluationFixture{evidence: []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "passed", ActorID: "go-test", ActorType: "validator", Reference: "passed"}}}
+	workerService := newTestEvaluationService(t, store, worker, evaluator, &clock)
+	if _, err = workerService.SubmitCandidate(ctx, workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "unlock-rollback-submit", ExpectedCardRevision: card.Revision + 1, ExpectedClaimRevision: 1, CriteriaRevision: card.CriteriaRevision, Summary: "rollback"}); err != nil {
+		t.Fatal(err)
+	}
+	candidate, evidence := evaluationRows(t, store, boardID, card.ID, attemptID)
+	current, _ := store.GetCard(ctx, boardID, card.ID)
+	var priorSequence int64
+	if err = store.db.QueryRow(`SELECT event_sequence FROM workboard_boards WHERE id=?`, boardID).Scan(&priorSequence); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`CREATE TRIGGER fail_successor_unlock_event BEFORE INSERT ON workboard_events WHEN NEW.kind='card.move' BEGIN SELECT RAISE(ABORT,'injected successor unlock failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(time.Second)
+	operator := newTestEvaluationService(t, store, workboard.Actor{ID: "operator-unlock-rollback", Type: "operator"}, evaluator, &clock)
+	decision := workboard.DecideCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, CandidateID: candidate.ID,
+		IdempotencyKey: "unlock-rollback-accept", ExpectedCardRevision: current.Revision, CriteriaRevision: card.CriteriaRevision,
+		CandidateDigest: candidate.Digest, CriteriaDigest: candidate.CriteriaDigest, EvidenceHeadRevision: int64(len(evidence)),
+		EvidenceSetDigest: workboard.EvidenceSetDigest(evidence), PolicyDigest: candidate.PolicyDigest, Evidence: "rollback first"}
+	if _, err = operator.AcceptCandidate(ctx, decision); err == nil || !strings.Contains(err.Error(), "injected successor unlock failure") {
+		t.Fatalf("rollback error=%v", err)
+	}
+	primary, _ := store.GetCard(ctx, boardID, card.ID)
+	for _, successor := range []workboard.Card{first, second} {
+		updated, readErr := store.GetCard(ctx, boardID, successor.ID)
+		if readErr != nil || updated.State != workboard.Backlog || updated.RemainingDependencies != 1 || updated.Revision != successor.Revision {
+			t.Fatalf("rolled back successor=%+v err=%v", updated, readErr)
+		}
+	}
+	var sequence, acceptances int64
+	if err = store.db.QueryRow(`SELECT event_sequence FROM workboard_boards WHERE id=?`, boardID).Scan(&sequence); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.db.QueryRow(`SELECT count(*) FROM workboard_acceptances WHERE attempt_id=?`, attemptID).Scan(&acceptances); err != nil {
+		t.Fatal(err)
+	}
+	if primary.State != workboard.Review || sequence != priorSequence || acceptances != 0 {
+		t.Fatalf("primary=%+v sequence=%d/%d acceptances=%d", primary, sequence, priorSequence, acceptances)
+	}
+	if _, err = store.db.Exec(`DROP TRIGGER fail_successor_unlock_event`); err != nil {
+		t.Fatal(err)
+	}
+	if receipt, retryErr := operator.AcceptCandidate(ctx, decision); retryErr != nil || receipt.EventCount != 3 {
+		t.Fatalf("retry=%+v err=%v", receipt, retryErr)
 	}
 }
 

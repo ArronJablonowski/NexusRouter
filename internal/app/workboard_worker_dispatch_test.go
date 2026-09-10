@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
@@ -69,8 +70,13 @@ func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err = store.Append(ctx, 0, runtime.Event{Version: 1, ID: "dispatch-start", TaskID: "dispatch-task", SessionID: "dispatch-session",
+		CorrelationID: "dispatch-task", Sequence: 1, Time: clock, Kind: runtime.TaskStarted}); err != nil {
+		t.Fatal(err)
+	}
 	claim, err := dispatch.Claim(ctx, workboard.ClaimRequest{BoardID: board.BoardID, CardID: card.CardID,
-		IdempotencyKey: "dispatch-claim-key-01", ExpectedCardRevision: *ready.CardRevision})
+		IdempotencyKey: "dispatch-claim-key-01", ExpectedCardRevision: *ready.CardRevision,
+		TaskID: "dispatch-task", SessionID: "dispatch-session"})
 	if err != nil || claim.Validate() != nil || claim.ClaimRevision == nil {
 		t.Fatalf("claim=%+v err=%v", claim, err)
 	}
@@ -156,5 +162,13 @@ func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {
 		final.Lifecycle[0].Acceptance.Rationale != "objective evidence accepted" ||
 		final.Lifecycle[0].Acceptance.PriorEvidenceHeadRevision != evidence[len(evidence)-1].Revision {
 		t.Fatalf("acceptance projection=%+v err=%v", final.Lifecycle, err)
+	}
+	history, err := bridge.NativeAttemptHistory(ctx, board.BoardID, current.ID, webui.AttemptHistoryOptions{Limit: 25})
+	if err != nil || history.Validate() != nil || len(history.Items) != 1 || history.Items[0].ID != current.CurrentAttemptID || history.Items[0].State != "accepted" {
+		t.Fatalf("attempt history=%+v err=%v", history, err)
+	}
+	detail, err := bridge.NativeAttemptDetail(ctx, board.BoardID, current.ID, current.CurrentAttemptID, webui.AttemptDetailOptions{Limit: 25})
+	if err != nil || detail.Validate() != nil || detail.Attempt.AcceptanceID == "" || detail.Attempt.Candidate == nil || len(detail.Attempt.Evidence) != 1 {
+		t.Fatalf("attempt detail=%+v err=%v", detail, err)
 	}
 }

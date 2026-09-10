@@ -111,6 +111,63 @@ func TestBrowserWorkboardReadsRequireSessionAndUseClosedQueries(t *testing.T) {
 	}
 }
 
+func TestBrowserLifecycleHistoryRoutesBindSessionAndClosedPath(t *testing.T) {
+	var calls atomic.Int32
+	attempt := validBrowserAttempt()
+	handler := browserWorkboardHandler(t, WorkboardServices{
+		AttemptHistory: func(_ context.Context, subject, board, card string, options contract.AttemptHistoryOptions) (contract.AttemptHistoryPage, error) {
+			calls.Add(1)
+			if len(subject) != 64 || board != "board-a" || card != "card-a" || options.Limit != 1 {
+				t.Fatal("history binding", subject, board, card, options)
+			}
+			return contract.AttemptHistoryPage{Version: 1, BoardID: board, CardID: card, HighWaterOrdinal: 1,
+				Items: []contract.AttemptHistoryRecord{{Version: 1, ID: attempt.ID, BoardID: board, CardID: card, Ordinal: 1,
+					Revision: 1, State: "running", WorkerID: "worker-a", CriteriaRevision: 1, StartedAt: attempt.StartedAt}}}, nil
+		},
+		AttemptDetail: func(_ context.Context, subject, board, card, id string, options contract.AttemptDetailOptions) (contract.AttemptDetailPage, error) {
+			calls.Add(1)
+			if len(subject) != 64 || board != "board-a" || card != "card-a" || id != "attempt-a" || options.Limit != 25 {
+				t.Fatal("detail binding", subject, board, card, id, options)
+			}
+			return contract.AttemptDetailPage{Version: 1, Attempt: attempt, Checkpoints: []contract.WorkCheckpoint{}}, nil
+		},
+	})
+	unauthorized := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorized, browserWorkboardGET("/app/api/v1/workboards/board-a/cards/card-a/attempts?limit=1"))
+	if unauthorized.Code != http.StatusUnauthorized || calls.Load() != 0 {
+		t.Fatal("unauthorized history dispatched", unauthorized.Code, calls.Load())
+	}
+	cookie, _ := authenticateBrowser(t, handler)
+	for _, target := range []string{"/app/api/v1/workboards/board-a/cards/card-a/attempts?limit=1",
+		"/app/api/v1/workboards/board-a/cards/card-a/attempts/attempt-a"} {
+		request := browserWorkboardGET(target)
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", target, response.Code, response.Body.String())
+		}
+	}
+	request := browserWorkboardGET("/app/api/v1/workboards/board-a/cards/card-a/attempts?limit=01")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || calls.Load() != 2 {
+		t.Fatal("invalid history query dispatched", response.Code, calls.Load())
+	}
+}
+
+func validBrowserAttempt() contract.Attempt {
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	criteria := []contract.AcceptanceCriterion{{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Tests pass.", Required: true}}
+	return contract.Attempt{Version: 1, ID: "attempt-a", BoardID: "board-a", CardID: "card-a", Ordinal: 1, Revision: 1,
+		State: "running", WorkerID: "worker-a", CriteriaRevision: 1, CriteriaDigest: contract.AcceptanceCriteriaDigest(criteria), PolicyDigest: strings.Repeat("b", 64),
+		Budget: contract.WorkBudget{AttemptLimit: 3}, Criteria: criteria, TaskIDs: []string{}, SessionIDs: []string{},
+		Claim: &contract.Claim{Version: 1, ID: "claim-a", BoardID: "board-a", CardID: "card-a", AttemptID: "attempt-a", Revision: 1,
+			State: "active", OwnerID: "worker-a", OwnerType: "worker", ExpiresAt: now.Add(time.Minute), LastHeartbeat: now},
+		Evidence: []contract.EvidenceRecord{}, StartedAt: now}
+}
+
 func TestBrowserWorkboardMutationsRequireCSRFAndBindPath(t *testing.T) {
 	var calls atomic.Int32
 	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(_ context.Context, subject string, input contract.BoardRequest) (contract.OperationReceipt, error) {

@@ -322,6 +322,7 @@ func TestAutoCapacityRerankDiscardsRejectedCandidateCompaction(t *testing.T) {
 	svc.settings.Workers.Max = 2
 	svc.settings.Workers.DelegateModel = "worker"
 	svc.settings.Workers.DelegateMaxCalls = 1
+	svc.settings.Routing.Exploration = 0
 	var streams atomic.Int32
 	svc.providerFactory = applicationProviderFactory(func(_ context.Context, connection providers.Connection) (providers.Provider, error) {
 		if connection.Purpose == providers.PurposeDiscovery {

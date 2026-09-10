@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
@@ -22,7 +23,9 @@ func workboardQueryRoute(path, method string) bool {
 	if method != http.MethodGet {
 		return false
 	}
-	return path == "/v1/workboards" || nativeWorkboardReadID(path) != "" || nativeWorkboardEventID(path) != ""
+	_, _, _, lifecycle := nativeWorkboardLifecycleRoute(path)
+	_, _, dependencies := nativeWorkboardDependencyRoute(path)
+	return path == "/v1/workboards" || nativeWorkboardReadID(path) != "" || nativeWorkboardEventID(path) != "" || lifecycle || dependencies
 }
 
 func (h *Handler) serveWorkboards(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +43,19 @@ func (h *Handler) serveWorkboards(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case nativeWorkboardEventID(r.URL.Path) != "":
 		h.serveWorkboardEvents(w, r, nativeWorkboardEventID(r.URL.Path))
+	case func() bool { _, _, ok := nativeWorkboardDependencyRoute(r.URL.Path); return ok }():
+		boardID, cardID, _ := nativeWorkboardDependencyRoute(r.URL.Path)
+		h.serveWorkboardDependencies(w, r, boardID, cardID)
+	case func() bool { _, _, _, ok := nativeWorkboardLifecycleRoute(r.URL.Path); return ok }():
+		boardID, cardID, attemptID, _ := nativeWorkboardLifecycleRoute(r.URL.Path)
+		if attemptID == "" {
+			h.serveWorkboardAttemptHistory(w, r, boardID, cardID)
+		} else {
+			h.serveWorkboardAttemptDetail(w, r, boardID, cardID, attemptID)
+		}
+	case func() bool { _, _, _, ok := nativeWorkboardCancelFinalizeRoute(r.URL.Path); return ok }():
+		boardID, cardID, attemptID, _ := nativeWorkboardCancelFinalizeRoute(r.URL.Path)
+		h.serveWorkboardFinalizeCancel(w, r, boardID, cardID, attemptID)
 	case nativeWorkboardOperationID(r.URL.Path) != "":
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
@@ -52,6 +68,115 @@ func (h *Handler) serveWorkboards(w http.ResponseWriter, r *http.Request) {
 	default:
 		failure(w, http.StatusNotFound, "not_found")
 	}
+}
+
+type workboardCancelFinalizeInput struct {
+	Version               int    `json:"version"`
+	ClaimID               string `json:"claim_id"`
+	ExpectedCardRevision  int64  `json:"expected_card_revision"`
+	ExpectedClaimRevision int64  `json:"expected_claim_revision"`
+}
+
+func (h *Handler) serveWorkboardFinalizeCancel(w http.ResponseWriter, r *http.Request, boardID, cardID, attemptID string) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		failure(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	key, ok := exactIdempotencyHeader(r)
+	var input workboardCancelFinalizeInput
+	if !ok || decodeWorkboardJSON(r, &input) != nil || input.Version != contract.ContractVersion ||
+		!contract.ValidID(input.ClaimID) || input.ExpectedCardRevision < 1 || input.ExpectedClaimRevision < 1 {
+		failure(w, http.StatusBadRequest, "invalid_workboard_request")
+		return
+	}
+	if h.services.WorkboardFinalizeCancel == nil {
+		failure(w, http.StatusServiceUnavailable, "workboard_cancel_finalize_unavailable")
+		return
+	}
+	if !takeWorkboardSlot(h.workboardWrites) {
+		capacityFailure(w)
+		return
+	}
+	defer releaseWorkboardSlot(h.workboardWrites)
+	receipt, err := safeWorkboardCall(func() (contract.OperationReceipt, error) {
+		return h.services.WorkboardFinalizeCancel(r.Context(), app.WorkboardCancelFinalizationRequest{BoardID: boardID,
+			CardID: cardID, AttemptID: attemptID, ClaimID: input.ClaimID, IdempotencyKey: key,
+			ExpectedCardRevision: input.ExpectedCardRevision, ExpectedClaimRevision: input.ExpectedClaimRevision})
+	})
+	if err != nil || receipt.Validate() != nil || receipt.BoardID != boardID || receipt.CardID != cardID {
+		workboardFailure(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, receipt)
+}
+
+func (h *Handler) serveWorkboardAttemptHistory(w http.ResponseWriter, r *http.Request, boardID, cardID string) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		failure(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !strictNativeGET(r) {
+		failure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	options, err := parseWorkboardAttemptHistoryQuery(r.URL.RawQuery)
+	if err != nil {
+		failure(w, http.StatusBadRequest, "invalid_workboard_query")
+		return
+	}
+	if h.services.WorkboardAttemptHistory == nil {
+		failure(w, http.StatusServiceUnavailable, "workboard_history_unavailable")
+		return
+	}
+	if !takeWorkboardSlot(h.workboardSlots) {
+		capacityFailure(w)
+		return
+	}
+	defer releaseWorkboardSlot(h.workboardSlots)
+	page, err := safeWorkboardCall(func() (contract.AttemptHistoryPage, error) {
+		return h.services.WorkboardAttemptHistory(r.Context(), boardID, cardID, options)
+	})
+	if err != nil || page.Validate() != nil || page.BoardID != boardID || page.CardID != cardID || len(page.Items) > options.Limit {
+		workboardFailure(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (h *Handler) serveWorkboardAttemptDetail(w http.ResponseWriter, r *http.Request, boardID, cardID, attemptID string) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		failure(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+	if !strictNativeGET(r) {
+		failure(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	options, err := parseWorkboardAttemptDetailQuery(r.URL.RawQuery)
+	if err != nil {
+		failure(w, http.StatusBadRequest, "invalid_workboard_query")
+		return
+	}
+	if h.services.WorkboardAttemptDetail == nil {
+		failure(w, http.StatusServiceUnavailable, "workboard_attempt_unavailable")
+		return
+	}
+	if !takeWorkboardSlot(h.workboardSlots) {
+		capacityFailure(w)
+		return
+	}
+	defer releaseWorkboardSlot(h.workboardSlots)
+	page, err := safeWorkboardCall(func() (contract.AttemptDetailPage, error) {
+		return h.services.WorkboardAttemptDetail(r.Context(), boardID, cardID, attemptID, options)
+	})
+	if err != nil || page.Validate() != nil || page.Attempt.BoardID != boardID || page.Attempt.CardID != cardID || page.Attempt.ID != attemptID || len(page.Checkpoints) > options.Limit {
+		workboardFailure(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
 }
 
 func (h *Handler) serveWorkboardList(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +388,30 @@ func parseWorkboardEventQuery(raw string) (contract.BoardEventOptions, error) {
 	return result, nil
 }
 
+func parseWorkboardAttemptHistoryQuery(raw string) (contract.AttemptHistoryOptions, error) {
+	result := contract.AttemptHistoryOptions{Limit: 25}
+	err := parseClosedQuery(raw, map[string]func(string) error{
+		"after": func(v string) error { result.After = v; return nil },
+		"limit": func(v string) error { n, err := canonicalPositiveInt(v); result.Limit = n; return err },
+	})
+	if err != nil || result.Validate() != nil {
+		return result, errors.New("invalid query")
+	}
+	return result, nil
+}
+
+func parseWorkboardAttemptDetailQuery(raw string) (contract.AttemptDetailOptions, error) {
+	result := contract.AttemptDetailOptions{Limit: 25}
+	err := parseClosedQuery(raw, map[string]func(string) error{
+		"after": func(v string) error { result.After = v; return nil },
+		"limit": func(v string) error { n, err := canonicalPositiveInt(v); result.Limit = n; return err },
+	})
+	if err != nil || result.Validate() != nil {
+		return result, errors.New("invalid query")
+	}
+	return result, nil
+}
+
 func parseClosedQuery(raw string, setters map[string]func(string) error) error {
 	if len(raw) > 4096 {
 		return errors.New("invalid query")
@@ -298,6 +447,38 @@ func nativeWorkboardOperationID(path string) string {
 
 func nativeWorkboardEventID(path string) string {
 	return exactNativeWorkboardMiddle(path, "/v1/workboards/", "/events")
+}
+
+func nativeWorkboardLifecycleRoute(path string) (boardID, cardID, attemptID string, ok bool) {
+	if !strings.HasPrefix(path, "/v1/workboards/") {
+		return "", "", "", false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, "/v1/workboards/"), "/")
+	if len(parts) != 4 && len(parts) != 5 || len(parts) >= 4 && (parts[1] != "cards" || parts[3] != "attempts") {
+		return "", "", "", false
+	}
+	if !contract.ValidID(parts[0]) || !contract.ValidID(parts[2]) {
+		return "", "", "", false
+	}
+	if len(parts) == 5 {
+		if !contract.ValidID(parts[4]) {
+			return "", "", "", false
+		}
+		attemptID = parts[4]
+	}
+	return parts[0], parts[2], attemptID, true
+}
+
+func nativeWorkboardCancelFinalizeRoute(path string) (boardID, cardID, attemptID string, ok bool) {
+	if !strings.HasPrefix(path, "/v1/workboards/") {
+		return "", "", "", false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, "/v1/workboards/"), "/")
+	if len(parts) != 6 || parts[1] != "cards" || parts[3] != "attempts" || parts[5] != "cancel-finalize" ||
+		!contract.ValidID(parts[0]) || !contract.ValidID(parts[2]) || !contract.ValidID(parts[4]) {
+		return "", "", "", false
+	}
+	return parts[0], parts[2], parts[4], true
 }
 
 func exactNativeWorkboardMiddle(path, prefix, suffix string) string {

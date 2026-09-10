@@ -210,7 +210,7 @@ func projectBoardEvent(board, cursor string, event contract.BoardEvent) (contrac
 		change = "board_revised"
 	case contract.DependencyAdd, contract.DependencyRemove:
 		change = "dependency_changed"
-	case contract.CardClaim, contract.ClaimHeartbeat, contract.ClaimRecover, contract.ClaimAttention:
+	case contract.CardClaim, contract.ClaimHeartbeat, contract.ClaimRecover, contract.ClaimFail, contract.ClaimAttention:
 		change = "claim_changed"
 	case contract.CheckpointAppend, contract.CandidateSubmit, contract.CriteriaRevise:
 		change = "evidence_changed"

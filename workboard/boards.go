@@ -24,6 +24,7 @@ const (
 	CardClaimAction            BoardAction = "card.claim"
 	ClaimHeartbeatAction       BoardAction = "claim.heartbeat"
 	ClaimRecoverAction         BoardAction = "claim.recover"
+	ClaimFailAction            BoardAction = "claim.fail"
 	ClaimAttentionAction       BoardAction = "claim.attention"
 	CriteriaReviseAction       BoardAction = "criteria.revise"
 	CheckpointAppendAction     BoardAction = "checkpoint.append"
@@ -267,7 +268,7 @@ func (e BoardEvent) Validate() error {
 func boardActionRequiresCard(action BoardAction) bool {
 	switch action {
 	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
-		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimFailAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
 		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
 		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true
@@ -326,7 +327,7 @@ func validBoardAction(action BoardAction) bool {
 	switch action {
 	case BoardCreateAction, BoardReviseAction, BoardArchiveAction, CardCreateAction, CardReviseAction,
 		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
-		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimFailAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
 		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
 		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true

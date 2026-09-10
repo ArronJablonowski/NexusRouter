@@ -66,6 +66,10 @@ func finalizeStoredCancel(ctx context.Context, tx *sql.Tx, mutation workboard.Co
 	body.CancelRequested, body.PauseRequested = false, false
 	card.State, card.CurrentClaimID, card.BlockReason = workboard.Canceled, "", ""
 	card.CancelRequested, card.PauseRequested = false, false
+	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Canceled)
+	if err != nil {
+		return 0, 0, err
+	}
 	card.Revision++
 	card.UpdatedAt = mutation.Now
 	board.ActiveClaims--

@@ -16,28 +16,32 @@ const (
 	LifecycleClaim     LifecycleKind = "card.claim"
 	LifecycleHeartbeat LifecycleKind = "claim.heartbeat"
 	LifecycleRecover   LifecycleKind = "claim.recover"
+	LifecycleFail      LifecycleKind = "claim.fail"
 )
 
 // LifecycleMutation is the replay-bound command passed to durable storage.
 // Now and verifier conclusions are execution observations, not client intent,
 // and are deliberately excluded from the semantic request digest.
 type LifecycleMutation struct {
-	Version               int             `json:"version"`
-	Kind                  LifecycleKind   `json:"kind"`
-	BoardID               string          `json:"board_id"`
-	CardID                string          `json:"card_id"`
-	AttemptID             string          `json:"attempt_id,omitempty"`
-	ClaimID               string          `json:"claim_id,omitempty"`
-	IdempotencyKey        string          `json:"-"`
-	RequestDigest         string          `json:"-"`
-	Actor                 Actor           `json:"actor"`
-	ExpectedCardRevision  int64           `json:"expected_card_revision,omitempty"`
-	ExpectedClaimRevision int64           `json:"expected_claim_revision,omitempty"`
-	LeaseTTL              time.Duration   `json:"-"`
-	PolicyDigest          string          `json:"policy_digest,omitempty"`
-	Now                   time.Time       `json:"-"`
-	Recovery              *RecoveryIntent `json:"recovery,omitempty"`
-	Verified              *RecoveryProof  `json:"-"`
+	Version               int              `json:"version"`
+	Kind                  LifecycleKind    `json:"kind"`
+	BoardID               string           `json:"board_id"`
+	CardID                string           `json:"card_id"`
+	AttemptID             string           `json:"attempt_id,omitempty"`
+	ClaimID               string           `json:"claim_id,omitempty"`
+	IdempotencyKey        string           `json:"-"`
+	RequestDigest         string           `json:"-"`
+	Actor                 Actor            `json:"actor"`
+	ExpectedCardRevision  int64            `json:"expected_card_revision,omitempty"`
+	ExpectedClaimRevision int64            `json:"expected_claim_revision,omitempty"`
+	LeaseTTL              time.Duration    `json:"-"`
+	PolicyDigest          string           `json:"policy_digest,omitempty"`
+	TaskID                string           `json:"task_id,omitempty"`
+	SessionID             string           `json:"session_id,omitempty"`
+	EffectResolution      EffectResolution `json:"effect_resolution,omitempty"`
+	Now                   time.Time        `json:"-"`
+	Recovery              *RecoveryIntent  `json:"recovery,omitempty"`
+	Verified              *RecoveryProof   `json:"-"`
 }
 
 type RecoveryIntent struct {
@@ -59,6 +63,10 @@ func (i RecoveryIntent) validate() error {
 type ClaimRequest struct {
 	BoardID, CardID, IdempotencyKey string
 	ExpectedCardRevision            int64
+	// TaskID and SessionID are supplied only by a trusted runtime binding. When
+	// present they are atomically attached to the new attempt and claim, so a
+	// supervisor never has to infer ownership from an in-memory callback.
+	TaskID, SessionID string
 }
 
 type HeartbeatRequest struct {
@@ -70,6 +78,15 @@ type RecoverClaimRequest struct {
 	BoardID, CardID, AttemptID, ClaimID, IdempotencyKey string
 	ExpectedCardRevision, ExpectedClaimRevision         int64
 	Proof                                               RecoveryIntent
+}
+
+// FailClaimRequest is the worker-owned terminal transition for a callback
+// whose execution is known to have produced no side effect. Confirmed or
+// uncertain effects are deliberately ineligible for this transition.
+type FailClaimRequest struct {
+	BoardID, CardID, AttemptID, ClaimID, IdempotencyKey string
+	ExpectedCardRevision, ExpectedClaimRevision         int64
+	EffectResolution                                    EffectResolution
 }
 
 type RecoveryRecord struct {
@@ -133,7 +150,9 @@ func NewLifecycleService(repository LifecycleRepository, authority AuthoritySour
 }
 
 func (s *LifecycleService) Claim(ctx context.Context, request ClaimRequest) (OperationReceipt, error) {
-	if !validID(request.BoardID) || !validID(request.CardID) || !validKey(request.IdempotencyKey) || request.ExpectedCardRevision < 1 {
+	bound := request.TaskID != "" || request.SessionID != ""
+	if !validID(request.BoardID) || !validID(request.CardID) || !validKey(request.IdempotencyKey) || request.ExpectedCardRevision < 1 ||
+		bound && (!validID(request.TaskID) || !validID(request.SessionID)) {
 		return OperationReceipt{}, fail(CodeInvalid, "claim")
 	}
 	actor, err := s.authorize(ctx, true)
@@ -142,7 +161,7 @@ func (s *LifecycleService) Claim(ctx context.Context, request ClaimRequest) (Ope
 	}
 	mutation := LifecycleMutation{Version: LifecycleMutationVersion, Kind: LifecycleClaim, BoardID: request.BoardID, CardID: request.CardID,
 		IdempotencyKey: request.IdempotencyKey, Actor: actor, ExpectedCardRevision: request.ExpectedCardRevision,
-		LeaseTTL: s.leaseTTL, PolicyDigest: s.policyDigest, Now: s.now().UTC()}
+		LeaseTTL: s.leaseTTL, PolicyDigest: s.policyDigest, TaskID: request.TaskID, SessionID: request.SessionID, Now: s.now().UTC()}
 	return s.execute(ctx, mutation)
 }
 
@@ -157,6 +176,22 @@ func (s *LifecycleService) Heartbeat(ctx context.Context, request HeartbeatReque
 	mutation := LifecycleMutation{Version: LifecycleMutationVersion, Kind: LifecycleHeartbeat, BoardID: request.BoardID, CardID: request.CardID,
 		AttemptID: request.AttemptID, ClaimID: request.ClaimID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedClaimRevision: request.ExpectedClaimRevision, LeaseTTL: s.leaseTTL, Now: s.now().UTC()}
+	return s.execute(ctx, mutation)
+}
+
+func (s *LifecycleService) Fail(ctx context.Context, request FailClaimRequest) (OperationReceipt, error) {
+	if !validLifecycleIDs(request.BoardID, request.CardID, request.AttemptID, request.ClaimID) || !validKey(request.IdempotencyKey) ||
+		request.ExpectedCardRevision < 1 || request.ExpectedClaimRevision < 1 || request.EffectResolution != EffectFree {
+		return OperationReceipt{}, fail(CodeInvalid, "failure")
+	}
+	actor, err := s.authorize(ctx, true)
+	if err != nil {
+		return OperationReceipt{}, err
+	}
+	mutation := LifecycleMutation{Version: LifecycleMutationVersion, Kind: LifecycleFail, BoardID: request.BoardID, CardID: request.CardID,
+		AttemptID: request.AttemptID, ClaimID: request.ClaimID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
+		ExpectedCardRevision: request.ExpectedCardRevision, ExpectedClaimRevision: request.ExpectedClaimRevision,
+		EffectResolution: request.EffectResolution, Now: s.now().UTC()}
 	return s.execute(ctx, mutation)
 }
 

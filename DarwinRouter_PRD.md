@@ -393,8 +393,8 @@ inside the primary SQLite/WAL database: normalized bounded records for boards,
 canonical columns, cards, dependency edges, events, attempts, claims,
 heartbeats and checkpoints, candidates, evidence, acceptance, recovery proofs, and scoped
 idempotency receipts. It does not expose workboard mutations. The command APIs,
-agent tools, and Kanban feature views remain DAR-82, DAR-83, and DAR-84 work. A
-partial DAR-82 checkpoint now adds authority-gated board domain/service
+agent tools, and Kanban feature views are delivered through DAR-82, DAR-83, and
+DAR-84. DAR-82 now provides authority-gated board domain/service
 contracts and transactional repositories for board create/revise/list/read/
 archive, redacted event pages, and card create/revise/move/reorder/dependency
 mutations. It atomically maintains canonical columns, attributed immutable
@@ -409,9 +409,13 @@ includes claim/heartbeat/recovery, criteria revision, checkpoints, candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, lifecycle projections, and stale-claim attention. Operator-safe
 actions are composed through browser/native adapters, while worker actions use
-a fixed-authority internal dispatcher. Runtime worker integration, real
-stop-proof verifier composition, agent tools, and Kanban rendering keep DAR-82
-In Progress.
+a fixed-authority internal dispatcher bound atomically to runtime task/session
+identity. Independently derived stop proof gates automatic recovery and cancel
+finalization; proof-ineligible attention claims remain visible without starving
+later recoverable work. Schema 37 persists a non-secret workspace identity and
+schema 38 preserves initiating and recovery-session attribution for exact
+browser reconciliation, including legacy pending operations. DAR-83 owns the
+integrated visual Kanban inside this same Web UI; DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

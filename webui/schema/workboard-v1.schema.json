@@ -1131,6 +1131,81 @@
       "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"items": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}],
       "x-invariants": ["links bind page board and selected card according to direction", "links are unique"]
     },
+    "attempt_history_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 25}
+      }
+    },
+    "attempt_history_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "id", "board_id", "card_id", "ordinal", "revision", "state", "worker_id", "criteria_revision", "checkpoint_count", "started_at"],
+      "properties": {
+        "version": {"const": 1},
+        "id": {"$ref": "v1#/$defs/id"},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 32},
+        "revision": {"type": "integer", "minimum": 1},
+        "state": {"enum": ["running", "review", "accepted", "rejected", "failed", "canceled"]},
+        "worker_id": {"$ref": "v1#/$defs/id"},
+        "criteria_revision": {"type": "integer", "minimum": 1},
+        "checkpoint_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "candidate_id": {"$ref": "v1#/$defs/id"},
+        "acceptance_id": {"$ref": "v1#/$defs/id"},
+        "started_at": {"$ref": "#/$defs/time"},
+        "ended_at": {"$ref": "#/$defs/time"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "running"}}}, "then": {"not": {"required": ["ended_at"]}}, "else": {"required": ["ended_at"]}},
+        {"if": {"properties": {"state": {"enum": ["review", "accepted", "rejected"]}}}, "then": {"required": ["candidate_id"]}, "else": {"not": {"required": ["candidate_id"]}}},
+        {"if": {"properties": {"state": {"enum": ["accepted", "rejected"]}}}, "then": {"required": ["acceptance_id"]}, "else": {"not": {"required": ["acceptance_id"]}}}
+      ]
+    },
+    "attempt_history_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "board_id", "card_id", "high_water_ordinal", "items", "has_more"],
+      "properties": {
+        "version": {"const": 1},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "high_water_ordinal": {"type": "integer", "minimum": 0, "maximum": 32},
+        "items": {"type": "array", "maxItems": 25, "items": {"$ref": "#/$defs/attempt_history_record"}},
+        "next_cursor": {"$ref": "v1#/$defs/cursor"},
+        "has_more": {"type": "boolean"}
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"items": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}],
+      "x-invariants": ["records bind page board and card", "records descend by ordinal and do not exceed the frozen high-water", "a terminal page ends at ordinal one"]
+    },
+    "attempt_detail_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limit"],
+      "properties": {
+        "after": {"$ref": "v1#/$defs/cursor"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 25}
+      }
+    },
+    "attempt_detail_page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "attempt", "checkpoint_high_water_revision", "checkpoints", "has_more"],
+      "properties": {
+        "version": {"const": 1},
+        "attempt": {"$ref": "#/$defs/attempt"},
+        "checkpoint_high_water_revision": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "checkpoints": {"type": "array", "maxItems": 25, "items": {"$ref": "#/$defs/work_checkpoint"}},
+        "next_cursor": {"$ref": "v1#/$defs/cursor"},
+        "has_more": {"type": "boolean"}
+      },
+      "allOf": [{"if": {"properties": {"has_more": {"const": true}}}, "then": {"required": ["next_cursor"], "properties": {"checkpoints": {"minItems": 1}}}, "else": {"not": {"required": ["next_cursor"]}}}],
+      "x-invariants": ["checkpoint identities match the attempt", "checkpoint revisions descend and do not exceed the frozen high-water", "a terminal page ends at revision one"]
+    },
     "board_event_options": {
       "type": "object",
       "additionalProperties": false,
@@ -1150,7 +1225,7 @@
         "board_id": {"$ref": "v1#/$defs/id"},
         "sequence": {"type": "integer", "minimum": 1},
         "operation_id": {"$ref": "v1#/$defs/key"},
-        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
+        "kind": {"enum": ["board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "claim.fail", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
         "actor_id": {"$ref": "v1#/$defs/id"},
         "actor_type": {"enum": ["operator", "worker", "validator", "model", "system"]},
         "card_id": {"$ref": "v1#/$defs/id"},

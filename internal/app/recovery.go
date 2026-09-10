@@ -17,6 +17,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	workerAfter := ""
 	attentionAfter := ""
 	configAfter := ""
+	workboardAfter := ""
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -66,6 +67,19 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			d.supervisorHeartbeat(-1)
 			if readerErr != nil && ctx.Err() == nil {
 				d.recordError()
+			}
+		}
+		if ctx.Err() == nil && d.workboardRecovery != nil {
+			query, cancel := context.WithTimeout(ctx, 5*time.Second)
+			nextWorkboard, _, workboardErr := d.workboardRecovery.RecoverAttentionPage(query, workboardAfter)
+			cancel()
+			d.supervisorHeartbeat(-1)
+			if workboardErr != nil {
+				if ctx.Err() == nil {
+					d.recordError()
+				}
+			} else {
+				workboardAfter = nextWorkboard
 			}
 		}
 		if ctx.Err() == nil {

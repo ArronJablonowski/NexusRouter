@@ -146,6 +146,37 @@ type RecoveryResult struct {
 	NoReplayRequired bool
 }
 
+type WorkerFailure struct {
+	OwnerID          string
+	ExpectedRevision int64
+	Now              time.Time
+	EffectResolution EffectResolution
+}
+
+// ApplyWorkerFailure releases only a claim still owned by the worker when the
+// host has positively classified the failed execution as effect-free. It does
+// not infer safety from a timeout, cancellation, or missing acknowledgement.
+func ApplyWorkerFailure(lease Lease, failure WorkerFailure) (Lease, error) {
+	if err := ValidateLease(lease); err != nil || !validID(failure.OwnerID) || !validTime(failure.Now) ||
+		failure.EffectResolution != EffectFree {
+		return Lease{}, fail(CodeInvalid, "failure")
+	}
+	if failure.ExpectedRevision != lease.Revision {
+		return Lease{}, fail(CodeStaleRevision, "claim_revision")
+	}
+	if failure.OwnerID != lease.OwnerID {
+		return Lease{}, fail(CodeLeaseOwner, "owner")
+	}
+	if lease.State == LeaseReleased || failure.Now.Before(lease.LastHeartbeat) {
+		return Lease{}, fail(CodeIllegalTransition, "claim")
+	}
+	released := failure.Now.UTC()
+	lease.Revision++
+	lease.State = LeaseReleased
+	lease.ReleasedAt = &released
+	return lease, nil
+}
+
 func ApplyRecovery(lease Lease, recovery Recovery) (RecoveryResult, error) {
 	if err := ValidateLease(lease); err != nil || !validTime(recovery.Now) {
 		return RecoveryResult{}, fail(CodeInvalid, "recovery")

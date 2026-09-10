@@ -58,6 +58,98 @@ func TestBrowserMigrationOperationCapacityPreservesPending(t *testing.T) {
 	}
 }
 
+func TestBrowserOperationAdoptionTerminalizesAtCapacityAndAttributesRecovery(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	request := []byte(`{"version":1,"idempotency_key":"capacity-retry-key","action":"board.create"}`)
+	target, err := store.BeginBrowserOperation(ctx, browserTestSubject, "capacity-retry-key", "board.create", request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().UnixNano()
+	for i := 1; i < MaxBrowserOperations; i++ {
+		id := fmt.Sprintf("op_%064x", i)
+		_, err = store.db.Exec(`INSERT INTO browser_operations(operation_id,session_subject,key_digest,kind,request_digest,state,created_at,updated_at) VALUES(?,?,?,?,?,'pending',?,?)`, id, browserTestSubject, fmt.Sprintf("%064x", i), "submit", fmt.Sprintf("%064x", i+1), now, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	recoverySubject := "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	adopted, found, err := store.AdoptableBrowserOperation(ctx, recoverySubject, "capacity-retry-key", "board.create", request)
+	if err != nil || !found || adopted.OperationID != target.OperationID {
+		t.Fatalf("adopted=%+v found=%t err=%v", adopted, found, err)
+	}
+	response := []byte(`{"version":1,"outcome":"committed"}`)
+	committed, err := store.RecoverBrowserOperation(ctx, recoverySubject, adopted, "committed", response)
+	if err != nil || committed.State != "committed" || committed.Subject != browserTestSubject {
+		t.Fatalf("committed=%+v err=%v", committed, err)
+	}
+	recovery, err := store.BrowserOperationRecovery(ctx, target.OperationID)
+	if err != nil || recovery.RecoverySubject != recoverySubject {
+		t.Fatalf("recovery=%+v err=%v", recovery, err)
+	}
+	var pending, total int
+	if err = store.db.QueryRow(`SELECT count(*) FROM browser_operations WHERE state='pending'`).Scan(&pending); err != nil || pending != MaxBrowserOperations-1 {
+		t.Fatal("original row leaked pending capacity", pending, err)
+	}
+	if err = store.db.QueryRow(`SELECT count(*) FROM browser_operations`).Scan(&total); err != nil || total != MaxBrowserOperations {
+		t.Fatal("adoption inserted or deleted operation row", total, err)
+	}
+	if _, err = store.BeginBrowserOperation(ctx, recoverySubject, "capacity-new-operation", "board.create", []byte(`{"version":1,"idempotency_key":"capacity-new-operation","action":"board.create"}`)); err != nil {
+		t.Fatal("recovered terminal row did not free capacity under pressure", err)
+	}
+}
+
+func TestBrowserOperationRecoveryMigratesFromSchema37(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`DROP TABLE legacy_browser_workboard_operations; DROP TABLE browser_operation_recoveries; PRAGMA user_version=37`); err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := store.BeginBrowserOperation(ctx, browserTestSubject, "legacy-schema37-pending", "board.create", []byte(`{"action":"board.create","idempotency_key":"legacy-schema37-pending"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	var version int
+	if err = reopened.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != currentStorageSchema {
+		t.Fatal("schema 37 did not migrate", version, err)
+	}
+	var shape string
+	if err = reopened.db.QueryRow(`SELECT group_concat(name||':'||type||':'||"notnull"||':'||pk,',') FROM pragma_table_info('browser_operation_recoveries')`).Scan(&shape); err != nil || shape != "operation_id:TEXT:0:1,recovery_subject:TEXT:1:0,recovered_at:INTEGER:1:0" {
+		t.Fatal("recovery attribution table missing", shape, err)
+	}
+	if err = reopened.db.QueryRow(`SELECT group_concat(name||':'||type||':'||"notnull"||':'||pk,',') FROM pragma_table_info('legacy_browser_workboard_operations')`).Scan(&shape); err != nil || shape != "operation_id:TEXT:0:1" {
+		t.Fatal("legacy provenance table missing", shape, err)
+	}
+	var legacyCount int
+	if err = reopened.db.QueryRow(`SELECT count(*) FROM legacy_browser_workboard_operations WHERE operation_id=?`, legacy.OperationID).Scan(&legacyCount); err != nil || legacyCount != 1 {
+		t.Fatal("schema-37 pending workboard operation not marked", legacyCount, err)
+	}
+	fresh, err := reopened.BeginBrowserOperation(ctx, browserTestSubject, "fresh-schema38-pending", "board.create", []byte(`{"action":"board.create","idempotency_key":"fresh-schema38-pending"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = reopened.db.QueryRow(`SELECT count(*) FROM legacy_browser_workboard_operations WHERE operation_id=?`, fresh.OperationID).Scan(&legacyCount); err != nil || legacyCount != 0 {
+		t.Fatal("post-migration pending operation marked legacy", legacyCount, err)
+	}
+}
+
 func TestBrowserMigrationRejectsPartialShapeAndRollsBack(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "state.db")

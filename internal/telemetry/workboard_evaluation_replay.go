@@ -42,6 +42,9 @@ func readEvaluationReplay(ctx context.Context, tx *sql.Tx, m workboard.Evaluatio
 	if receipt.CardID != m.CardID || receipt.CardRevision == nil || (m.Kind == workboard.EvaluationCandidateSubmit) != (receipt.ClaimRevision != nil) {
 		return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 	}
+	if err = verifyEvaluationReplayEvents(ctx, tx, m, envelope); err != nil {
+		return workboard.OperationReceipt{}, true, err
+	}
 	if m.Kind == workboard.EvaluationCandidateSubmit {
 		candidate, err := readEvaluationCandidate(ctx, tx, m.BoardID, m.CardID, m.AttemptID)
 		if err != nil || candidate.SubmittedBy != m.Actor.ID || candidate.Summary != m.Summary || !reflect.DeepEqual(candidate.ArtifactRefs, m.ArtifactRefs) {
@@ -51,12 +54,15 @@ func readEvaluationReplay(ctx context.Context, tx *sql.Tx, m workboard.Evaluatio
 		if evidenceErr != nil {
 			return workboard.OperationReceipt{}, true, evidenceErr
 		}
-		if envelope.Result.Acceptance != nil || envelope.Result.Candidate == nil ||
+		if envelope.Result.Acceptance != nil || len(envelope.Result.Successors) != 0 || envelope.Result.Candidate == nil ||
 			!reflect.DeepEqual(candidate, *envelope.Result.Candidate) || candidate.EvidenceCount > len(evidence) ||
 			!reflect.DeepEqual(evidence[:candidate.EvidenceCount], envelope.Result.Evidence) {
 			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 		}
 	} else {
+		if m.Kind == workboard.EvaluationReject && len(envelope.Result.Successors) != 0 {
+			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
+		}
 		acceptance, err := readEvaluationAcceptance(ctx, tx, m.BoardID, m.CardID, m.AttemptID)
 		decision := "accepted"
 		if m.Kind == workboard.EvaluationReject {
@@ -75,12 +81,67 @@ func readEvaluationReplay(ctx context.Context, tx *sql.Tx, m workboard.Evaluatio
 			int64(len(evidence)) != acceptance.EvidenceHeadRevision || workboard.EvidenceSetDigest(evidence) != acceptance.EvidenceSetDigest {
 			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 		}
-		storedResult := evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Acceptance: &acceptance}
+		if err = verifyEvaluationSuccessorProjections(ctx, tx, envelope.Result.Successors); err != nil {
+			return workboard.OperationReceipt{}, true, err
+		}
+		storedResult := evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Acceptance: &acceptance, Successors: envelope.Result.Successors}
 		if !sameEvaluationStoredResult(storedResult, envelope.Result) {
 			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 		}
 	}
 	return receipt, true, nil
+}
+
+func verifyEvaluationReplayEvents(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, envelope evaluationMutationResponse) error {
+	rows, err := tx.QueryContext(ctx, `SELECT id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body
+		FROM workboard_events WHERE board_id=? AND operation_id=? ORDER BY sequence`, m.BoardID, envelope.Receipt.OperationID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	expectedCards := []string{m.CardID}
+	expectedKinds := []workboard.BoardAction{evaluationAction(m.Kind)}
+	expectedIDs := []string{""}
+	for _, successor := range envelope.Result.Successors {
+		kind, kindErr := successorEffectAction(successor)
+		id, idErr := successorEffectEventID(envelope.Receipt.OperationID, m.CardID, successor)
+		if kindErr != nil || idErr != nil {
+			return ErrWorkboardCorrupt
+		}
+		expectedCards = append(expectedCards, successor.ID)
+		expectedKinds = append(expectedKinds, kind)
+		expectedIDs = append(expectedIDs, id)
+	}
+	count := 0
+	for index := 0; rows.Next(); index++ {
+		event, scanErr := scanCanonicalWorkboardEvent(rows, m.BoardID)
+		if scanErr != nil {
+			return scanErr
+		}
+		if index >= len(expectedCards) || event.Sequence != envelope.Receipt.FirstSequence+int64(index) || event.OperationID != envelope.Receipt.OperationID ||
+			event.Kind != expectedKinds[index] || event.CardID != expectedCards[index] || index > 0 && event.ID != expectedIDs[index] ||
+			event.ActorID != m.Actor.ID || event.ActorType != m.Actor.Type {
+			return ErrWorkboardCorrupt
+		}
+		count++
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	if count != len(expectedCards) || len(expectedCards) != envelope.Receipt.EventCount {
+		return ErrWorkboardCorrupt
+	}
+	return nil
+}
+
+func verifyEvaluationSuccessorProjections(ctx context.Context, tx *sql.Tx, successors []workboard.Card) error {
+	for _, committed := range successors {
+		current, _, err := readStoredCard(ctx, tx, committed.BoardID, committed.ID)
+		if err != nil || current.Revision < committed.Revision || current.Revision == committed.Revision && !reflect.DeepEqual(current, committed) {
+			return ErrWorkboardCorrupt
+		}
+	}
+	return nil
 }
 
 func readRunningEvaluationAttempt(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, claim storedLifecycleClaim) (storedLifecycleAttempt, []byte, error) {

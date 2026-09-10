@@ -27,7 +27,7 @@ func (s *Store) ApplyLifecycleMutation(ctx context.Context, mutation workboard.L
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	if receipt, found, replayErr := readWorkboardReceipt(ctx, tx, "board", mutation.BoardID, keyDigest, requestDigest); found || replayErr != nil {
+	if receipt, found, replayErr := readLifecycleReplay(ctx, tx, mutation, keyDigest, requestDigest); found || replayErr != nil {
 		return receipt, replayErr
 	}
 	board, _, _, err := readBoardRow(ctx, tx, mutation.BoardID)
@@ -50,6 +50,8 @@ func (s *Store) ApplyLifecycleMutation(ctx context.Context, mutation workboard.L
 		claimRevision, durableBytes, err = applyClaimHeartbeat(ctx, tx, mutation, &board, card)
 	case workboard.LifecycleRecover:
 		claimRevision, durableBytes, err = applyClaimRecovery(ctx, tx, mutation, &board, &card, &cardBody)
+	case workboard.LifecycleFail:
+		claimRevision, durableBytes, err = applyClaimFailure(ctx, tx, mutation, &board, &card, &cardBody)
 	}
 	if err != nil {
 		return workboard.OperationReceipt{}, fmt.Errorf("apply lifecycle projection: %w", err)
@@ -107,6 +109,22 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 		body.AssigneeID != "" && body.AssigneeID != mutation.Actor.ID {
 		return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "claim"}
 	}
+	if mutation.TaskID != "" {
+		var sessionID, state string
+		if err := tx.QueryRowContext(ctx, `SELECT session_id,state FROM task_heads WHERE task_id=?`, mutation.TaskID).Scan(&sessionID, &state); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "runtime_binding"}
+			}
+			return 0, 0, err
+		}
+		var priorBindings int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM workboard_attempt_tasks WHERE task_id=?`, mutation.TaskID).Scan(&priorBindings); err != nil {
+			return 0, 0, err
+		}
+		if sessionID != mutation.SessionID || state != "running" || priorBindings != 0 {
+			return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "runtime_binding"}
+		}
+	}
 	attemptID, claimID := newWorkboardID(), newWorkboardID()
 	if attemptID == "" || claimID == "" {
 		return 0, 0, errors.New("secure identifier generation failed")
@@ -121,12 +139,17 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 		return 0, 0, invalidWorkboard("lease")
 	}
 	claim := storedLifecycleClaim{Version: 1, ID: claimID, BoardID: board.ID, CardID: card.ID, AttemptID: attemptID, Revision: 1,
-		State: string(lease.State), OwnerID: mutation.Actor.ID, OwnerType: "worker", ExpiresAt: lease.ExpiresAt, LastHeartbeat: lease.LastHeartbeat}
+		State: string(lease.State), OwnerID: mutation.Actor.ID, OwnerType: "worker", TaskID: mutation.TaskID,
+		ExpiresAt: lease.ExpiresAt, LastHeartbeat: lease.LastHeartbeat}
+	taskIDs, sessionIDs := []string{}, []string{}
+	if mutation.TaskID != "" {
+		taskIDs, sessionIDs = []string{mutation.TaskID}, []string{mutation.SessionID}
+	}
 	body.AttemptCount++
 	attempt := storedLifecycleAttempt{Version: 1, ID: attemptID, BoardID: board.ID, CardID: card.ID, Ordinal: body.AttemptCount, Revision: 1,
 		State: "running", WorkerID: mutation.Actor.ID, CriteriaRevision: body.CriteriaRevision, CriteriaDigest: criteriaDigest,
 		PolicyDigest: mutation.PolicyDigest, Budget: body.Budget, Criteria: append([]storedWorkboardCriterion{}, body.Criteria...),
-		TaskIDs: []string{}, SessionIDs: []string{}, Claim: claim, StartedAt: mutation.Now}
+		TaskIDs: taskIDs, SessionIDs: sessionIDs, Claim: claim, StartedAt: mutation.Now}
 	attemptBytes, err := encodeLifecycle(attempt, workboard.MaxTransactionBytes)
 	if err != nil {
 		return 0, 0, err
@@ -148,9 +171,19 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 		return 0, 0, normalizeLifecycleWriteError(err)
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO workboard_claims(id,board_id,card_id,attempt_id,revision,state,owner_id,owner_type,task_id,expires_at,last_heartbeat,released_at,body)
-		VALUES(?,?,?,?,?,?,?,?,NULL,?,?,NULL,?)`, claim.ID, claim.BoardID, claim.CardID, claim.AttemptID, claim.Revision, claim.State,
-		claim.OwnerID, claim.OwnerType, claim.ExpiresAt.UnixNano(), claim.LastHeartbeat.UnixNano(), claimBytes); err != nil {
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL,?)`, claim.ID, claim.BoardID, claim.CardID, claim.AttemptID, claim.Revision, claim.State,
+		claim.OwnerID, claim.OwnerType, nullable(claim.TaskID), claim.ExpiresAt.UnixNano(), claim.LastHeartbeat.UnixNano(), claimBytes); err != nil {
 		return 0, 0, normalizeLifecycleWriteError(err)
+	}
+	if mutation.TaskID != "" {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO workboard_attempt_tasks(board_id,card_id,attempt_id,ordinal,task_id) VALUES(?,?,?,?,?)`,
+			board.ID, card.ID, attemptID, 0, mutation.TaskID); err != nil {
+			return 0, 0, normalizeLifecycleWriteError(err)
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO workboard_attempt_sessions(board_id,card_id,attempt_id,ordinal,session_id) VALUES(?,?,?,?,?)`,
+			board.ID, card.ID, attemptID, 0, mutation.SessionID); err != nil {
+			return 0, 0, normalizeLifecycleWriteError(err)
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO workboard_claim_heartbeats(claim_id,revision,observed_at,expires_at,actor_id,body) VALUES(?,?,?,?,?,?)`,
 		claim.ID, 1, mutation.Now.UnixNano(), claim.ExpiresAt.UnixNano(), mutation.Actor.ID, heartbeatBytes); err != nil {
@@ -158,6 +191,11 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 	}
 	body.CurrentAttemptID, body.CurrentClaimID, body.AssigneeID, body.State = attemptID, claimID, mutation.Actor.ID, string(workboard.InProgress)
 	card.CurrentAttemptID, card.CurrentClaimID, card.AssigneeID, card.State = attemptID, claimID, mutation.Actor.ID, workboard.InProgress
+	inProgressRank, err := appendRank(ctx, tx, board.ID, workboard.InProgress)
+	if err != nil {
+		return 0, 0, err
+	}
+	card.Rank, body.Rank = inProgressRank, inProgressRank
 	card.AttemptCount = body.AttemptCount
 	card.Revision++
 	card.UpdatedAt = mutation.Now

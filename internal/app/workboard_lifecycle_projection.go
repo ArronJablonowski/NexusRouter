@@ -16,11 +16,7 @@ func workboardLifecycle(source workboard.CardLifecycleSnapshot) (contract.CardLi
 		Checkpoints: make([]contract.WorkCheckpoint, len(source.Checkpoints)), CheckpointCount: source.CheckpointCount,
 		CheckpointsHasMore: source.CheckpointsHasMore}
 	for index, checkpoint := range source.Checkpoints {
-		result.Checkpoints[index] = contract.WorkCheckpoint{Version: contract.ContractVersion, ID: checkpoint.ID, BoardID: checkpoint.BoardID,
-			CardID: checkpoint.CardID, AttemptID: checkpoint.AttemptID, ClaimID: checkpoint.ClaimID, Revision: checkpoint.Revision,
-			ClaimRevision: checkpoint.ClaimRevision, CriteriaRevision: checkpoint.CriteriaRevision, CriteriaDigest: checkpoint.CriteriaDigest,
-			PolicyDigest: checkpoint.PolicyDigest, Evidence: checkpoint.Evidence, EvidenceDigest: checkpoint.EvidenceDigest,
-			ActorID: checkpoint.ActorID, ActorType: checkpoint.ActorType, CreatedAt: checkpoint.CreatedAt}
+		result.Checkpoints[index] = workboardCheckpoint(checkpoint)
 	}
 	if source.Attempt.Acceptance != nil {
 		acceptance := *source.Attempt.Acceptance

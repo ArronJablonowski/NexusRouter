@@ -12,16 +12,18 @@ import (
 )
 
 type bridgeBoardRepository struct {
-	page          workboard.BoardPage
-	events        workboard.BoardEventPage
-	createReceipt workboard.OperationReceipt
-	createScope   string
-	createActor   workboard.Actor
-	createCalls   int
-	archiveErr    error
-	eventOptions  workboard.BoardEventOptions
-	control       workboard.ControlMutation
-	evaluation    workboard.EvaluationMutation
+	page              workboard.BoardPage
+	events            workboard.BoardEventPage
+	createReceipt     workboard.OperationReceipt
+	createScope       string
+	createActor       workboard.Actor
+	createCalls       int
+	archiveErr        error
+	eventOptions      workboard.BoardEventOptions
+	control           workboard.ControlMutation
+	evaluation        workboard.EvaluationMutation
+	dependencyPage    workboard.DependencyPage
+	dependencyOptions workboard.DependencyOptions
 }
 
 func (r *bridgeBoardRepository) CreateWorkboard(_ context.Context, scope string, _ workboard.CreateBoardRequest, actor workboard.Actor, _ time.Time) (workboard.OperationReceipt, error) {
@@ -54,6 +56,10 @@ func (r *bridgeBoardRepository) ListCards(context.Context, string, workboard.Car
 func (r *bridgeBoardRepository) LoadGraph(context.Context, string) (workboard.Graph, error) {
 	return workboard.Graph{}, nil
 }
+func (r *bridgeBoardRepository) ListDependencyEdges(_ context.Context, _, _ string, options workboard.DependencyOptions) (workboard.DependencyPage, error) {
+	r.dependencyOptions = options
+	return r.dependencyPage, nil
+}
 func (r *bridgeBoardRepository) ApplyCardMutation(context.Context, workboard.CardMutation) (workboard.CardMutationResult, error) {
 	return workboard.CardMutationResult{}, nil
 }
@@ -65,6 +71,14 @@ func (r *bridgeBoardRepository) ReplayProgressMutation(context.Context, workboar
 }
 func (r *bridgeBoardRepository) ReadCardLifecycleSnapshots(context.Context, string, []string) (map[string]workboard.CardLifecycleSnapshot, error) {
 	return map[string]workboard.CardLifecycleSnapshot{}, nil
+}
+
+func (r *bridgeBoardRepository) ListAttemptHistory(context.Context, string, string, workboard.AttemptHistoryOptions) (workboard.AttemptHistoryPage, error) {
+	return workboard.AttemptHistoryPage{}, errors.New("not implemented")
+}
+
+func (r *bridgeBoardRepository) ReadAttemptDetail(context.Context, string, string, string, workboard.AttemptDetailOptions) (workboard.AttemptDetailPage, error) {
+	return workboard.AttemptDetailPage{}, errors.New("not implemented")
 }
 func (r *bridgeBoardRepository) ApplyControlMutation(_ context.Context, mutation workboard.ControlMutation) (workboard.OperationReceipt, error) {
 	r.control = mutation
@@ -119,7 +133,11 @@ func TestWorkboardBridgeBindsBrowserMutationAuthority(t *testing.T) {
 	repository := &bridgeBoardRepository{createReceipt: workboard.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "operation-key-01",
 		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
 		EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: now}}
-	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	authority, err := BrowserWorkboardAuthority("stable-browser-authority-fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridge, err := NewWorkboardBridgeWithBrowserAuthority(repository, repository, func() time.Time { return now }, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,8 +145,33 @@ func TestWorkboardBridgeBindsBrowserMutationAuthority(t *testing.T) {
 	request := webui.BoardRequest{Version: 1, Action: webui.BoardCreate, IdempotencyKey: "operation-key-01", Title: &title}
 	subject := strings.Repeat("c", 64)
 	receipt, err := bridge.BrowserMutate(context.Background(), subject, request)
-	if err != nil || receipt.Validate() != nil || repository.createScope != subject || repository.createActor.ID != subject || repository.createActor.Type != "operator" {
+	if err != nil || receipt.Validate() != nil || repository.createScope != authority.CreationScope || repository.createActor != authority.Actor ||
+		repository.createScope == subject || repository.createActor.ID == subject {
 		t.Fatalf("receipt=%+v scope=%q actor=%+v err=%v", receipt, repository.createScope, repository.createActor, err)
+	}
+}
+
+func TestBrowserWorkboardAuthorityIsStableScopedAndValidated(t *testing.T) {
+	secret := "stable-browser-authority-fixture"
+	first, err := BrowserWorkboardAuthority(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := BrowserWorkboardAuthority(secret)
+	if err != nil || second != first {
+		t.Fatalf("second=%+v first=%+v err=%v", second, first, err)
+	}
+	different, err := BrowserWorkboardAuthority("different-browser-authority-fixture")
+	if err != nil || different == first || first.CreationScope == first.Actor.ID || strings.Contains(first.CreationScope, secret) || strings.Contains(first.Actor.ID, secret) {
+		t.Fatalf("first=%+v different=%+v err=%v", first, different, err)
+	}
+	if _, err = BrowserWorkboardAuthority("short"); err == nil {
+		t.Fatal("short authority secret accepted")
+	}
+	repository := &bridgeBoardRepository{}
+	if _, err = NewWorkboardBridgeWithBrowserAuthority(repository, repository, time.Now,
+		workboard.Authority{CreationScope: "stable-scope", Actor: workboard.Actor{ID: "worker-a", Type: "worker"}}); err == nil {
+		t.Fatal("worker browser authority accepted")
 	}
 }
 
@@ -149,7 +192,11 @@ func TestWorkboardBridgeRejectsWorkerAuthorityActionsBeforeDispatch(t *testing.T
 
 func TestWorkboardBridgeComposesOnlyOperatorControlAndAcceptanceAuthority(t *testing.T) {
 	repository := &bridgeBoardRepository{}
-	bridge, err := NewWorkboardBridge(repository, repository, time.Now)
+	authority, err := BrowserWorkboardAuthority("stable-browser-authority-fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridge, err := NewWorkboardBridgeWithBrowserAuthority(repository, repository, time.Now, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +212,9 @@ func TestWorkboardBridgeComposesOnlyOperatorControlAndAcceptanceAuthority(t *tes
 		ExpectedCardRevision: &revision, CriteriaRevision: &revision, EvidenceHeadRevision: &revision,
 		CandidateDigest: digest, CriteriaDigest: digest, EvidenceSetDigest: digest, PolicyDigest: digest, Evidence: "operator accepted"}
 	subject := strings.Repeat("c", 64)
-	if _, err = bridge.BrowserMutate(context.Background(), subject, accept); err == nil || repository.evaluation.Actor.Type != "operator" || repository.evaluation.Actor.ID != subject || repository.evaluation.DecisionAuthorityID != subject {
+	if _, err = bridge.BrowserMutate(context.Background(), subject, accept); err == nil || repository.evaluation.Actor != authority.Actor ||
+		repository.evaluation.DecisionAuthorityID != authority.CreationScope || repository.evaluation.Actor.ID == subject ||
+		repository.evaluation.DecisionAuthorityID == subject {
 		t.Fatalf("acceptance authority=%+v scope=%q err=%v", repository.evaluation.Actor, repository.evaluation.DecisionAuthorityID, err)
 	}
 }

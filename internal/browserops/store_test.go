@@ -182,3 +182,27 @@ func TestRejectedOperationReplaysAndChangedRequestConflicts(t *testing.T) {
 		t.Fatal("changed rejected request accepted", err)
 	}
 }
+
+func TestPendingAdoptionFailsClosedWhenInitiatorIsAmbiguous(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "browser.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	request := []byte(`{"version":1,"idempotency_key":"same-workboard-key","action":"board.create"}`)
+	if _, err = store.Begin(ctx, testSubject, "same-workboard-key", "board.create", request); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Begin(ctx, otherSubject, "same-workboard-key", "board.create", request); err != nil {
+		t.Fatal(err)
+	}
+	recoverySubject := "2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	if _, _, err = store.Adoptable(ctx, recoverySubject, "same-workboard-key", "board.create", request); !errors.Is(err, ErrConflict) {
+		t.Fatal("ambiguous initiating session was selected", err)
+	}
+	first, _, err := store.List(ctx, testSubject, "", 10)
+	if err != nil || len(first) != 1 || first[0].State != "pending" {
+		t.Fatal("failed adoption changed initiator", first, err)
+	}
+}

@@ -167,65 +167,6 @@ func markObservedClaimAttention(ctx context.Context, tx *sql.Tx, board workboard
 }
 
 func (s *Store) ListClaimAttention(ctx context.Context, boardID string, limit int) ([]workboard.ClaimAttention, error) {
-	if !validWorkboardID(boardID) || limit < 1 || limit > workboard.MaxAttentionScanClaims {
-		return nil, invalidWorkboard("attention_list")
-	}
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	if _, _, _, err = readBoardRow(ctx, tx, boardID); err != nil {
-		return nil, err
-	}
-	rows, err := tx.QueryContext(ctx, `SELECT card_id,attempt_id,id FROM workboard_claims WHERE board_id=? AND state='attention' ORDER BY expires_at,id LIMIT ?`, boardID, limit)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]attentionCandidate, 0, limit)
-	for rows.Next() {
-		var item attentionCandidate
-		if err = rows.Scan(&item.cardID, &item.attemptID, &item.claimID); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		ids = append(ids, item)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	items := make([]workboard.ClaimAttention, 0, len(ids))
-	for _, id := range ids {
-		lease, _, readErr := readLifecycleClaim(ctx, tx, boardID, id.cardID, id.attemptID, id.claimID)
-		if readErr != nil {
-			return nil, readErr
-		}
-		event, readErr := scanCanonicalWorkboardEvent(tx.QueryRowContext(ctx, `SELECT id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body
-			FROM workboard_events WHERE board_id=? AND card_id=? AND kind=? ORDER BY sequence DESC LIMIT 1`, boardID, id.cardID, string(workboard.ClaimAttentionAction)), boardID)
-		if readErr != nil || event.CardID != id.cardID || event.Kind != workboard.ClaimAttentionAction {
-			if errors.Is(readErr, sql.ErrNoRows) {
-				return nil, ErrWorkboardCorrupt
-			}
-			if readErr != nil {
-				return nil, readErr
-			}
-			return nil, ErrWorkboardCorrupt
-		}
-		reason := workboard.AttentionStale
-		if !event.CreatedAt.Before(lease.ExpiresAt) {
-			reason = workboard.AttentionExpired
-		}
-		item := workboard.ClaimAttention{Version: 1, BoardID: boardID, CardID: lease.CardID, AttemptID: lease.AttemptID,
-			ClaimID: lease.ClaimID, ClaimRevision: lease.Revision, OwnerID: lease.OwnerID, Reason: reason, ObservedAt: event.CreatedAt, ExpiresAt: lease.ExpiresAt}
-		if item.Validate() != nil {
-			return nil, ErrWorkboardCorrupt
-		}
-		items = append(items, item)
-	}
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	items, _, err := s.ListClaimAttentionPage(ctx, boardID, "", limit)
+	return items, err
 }

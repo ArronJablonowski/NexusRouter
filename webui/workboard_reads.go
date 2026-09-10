@@ -262,7 +262,7 @@ func validBoardAction(value BoardAction) bool {
 		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, ClaimAttention, CheckpointAppend,
 		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest,
 		CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock, CriteriaRevise,
-		ClaimRecover:
+		ClaimRecover, ClaimFail:
 		return true
 	default:
 		return false

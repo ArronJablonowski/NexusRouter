@@ -65,9 +65,13 @@ supported-platform decision or publication approval is claimed.
   bounded cursors are covered. A later DAR-82 checkpoint adds live daemon
   composition, reconnectable board SSE, candidate/evidence/acceptance,
   pause/cancel and block/unblock control, bounded lifecycle reads, and durable
-  stale-claim attention. Worker-owned mutations remain behind a fixed-authority
-  internal dispatcher. Runtime worker and real stop-proof verifier integration,
-  agent tools, and the Kanban feature UI remain open; DAR-82 is still In Progress.
+  stale-claim attention. Worker-owned mutations run through a fixed-authority
+  dispatcher atomically bound to runtime task/session identity. Effect-free
+  failures release claims; uncertain effects remain blocked without replay.
+  Independently derived stop proof, bounded attention pagination, lifecycle and
+  dependency history, durable workspace identity, and cross-session operation
+  reconciliation complete the DAR-82 backend. Agent tools and the integrated
+  Kanban feature UI remain DAR-84 and DAR-83 work.
 
 - Schema 35 adds the native workboard storage foundation to the primary
   SQLite/WAL database. Normalized bounded tables cover boards, seven canonical
@@ -373,7 +377,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 36. Schema 30 added the immutable
+The current durable store uses SQLite schema 38. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -385,8 +389,12 @@ workboard storage and validates its exact tables, rules, indexes, triggers, and
 foreign-key integrity before advancing. Schema 36 adds normalized card identity
 to immutable workboard events through a serialized table rebuild; existing
 schema-35 board events are preserved with `NULL` card identity, and partial or
-forged retained schema fails without advancing. Browser authority remains process-local
-and is revoked on restart even though these durable records survive migration,
+forged retained schema fails without advancing. Schema 37 adds a non-secret
+persistent workspace identity that survives database backup and restore.
+Schema 38 adds exact cross-session browser-operation reconciliation while
+preserving the initiating subject and safely isolating legacy pending workboard
+operations. Browser sessions remain process-local and are revoked on restart
+even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores
 retain the existing task-duration epoch.

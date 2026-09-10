@@ -5892,3 +5892,42 @@ rebuilt packages were application 546.173s, releasepack 476.519s, telemetry
 worker-supervisor/tool-registry binding, real recovery/cancel verifiers, agent
 tools, lifecycle history pagination, and the integrated visual Kanban remain
 open.
+
+## 2026-09-09 — DAR-82 authenticated workboard backend completion
+
+The authenticated workboard backend now covers the complete operator and
+runtime lifecycle needed by the integrated Web UI Kanban. Native bearer and
+browser session/CSRF adapters share bounded board/card CRUD, stable ordering,
+filters, dependency traversal, lifecycle history, reconnectable SSE, optimistic
+revision fences, and exact idempotent responses. Dependency reads recompute the
+canonical graph digest and fail closed on missing normalized edges or projection
+tampering.
+
+Worker claims are atomically bound to the same host-generated identity used by
+the bounded in-process runtime supervisor and to canonical task/session records.
+Effect-free execution or validation failure durably releases the claim and
+returns the card to Ready; confirmed or uncertain effects remain blocked for
+operator review and are never automatically replayed. Recovery and cancel
+finalization derive stop evidence from canonical terminal task history, process
+guards, and effect records rather than accepting proof claims from a browser or
+model. Keyset traversal prevents proof-ineligible attention claims from starving
+later recoverable work. All internal lifecycle transitions allocate a fresh rank
+in their target column, preventing collisions when source-column ranks are
+reused.
+
+Acceptance emits an attributed event for every dependent whose remaining count
+changes, including partially unlocked cards, and exact replay verifies immutable
+successor-effect commitments while allowing later legitimate revisions. Schema
+37 stores one non-secret random workspace identity independent of API tokens.
+Schema 38 atomically reconciles cross-session lost acknowledgements, preserves
+the initiating browser subject and recovery subject separately, and marks
+pre-upgrade pending operations so they replay only under their original legacy
+authority. The integrated visual board remains DAR-83 and agent-facing board
+tools remain DAR-84; the Kanban is part of the authenticated DarwinRouter Web UI,
+not a separate application.
+
+Repository-wide verification passed with `make check`: source formatting and
+the 1,000-line limit, `go vet ./...`, the full race suite, and `go build ./...`
+all succeeded. A pre-existing compaction fixture was also made deterministic by
+disabling the production exploration policy for that fixed-route test; it then
+passed 100 focused runs and 50 race-enabled focused runs before the full gate.

@@ -103,6 +103,10 @@ type Services struct {
 	WorkboardRead           func(context.Context, string, contract.BoardSnapshotOptions) (contract.BoardSnapshot, error)
 	WorkboardMutate         func(context.Context, contract.BoardRequest) (contract.OperationReceipt, error)
 	WorkboardEvents         func(context.Context, string, contract.BoardEventOptions) (contract.BoardEventPage, error)
+	WorkboardAttemptHistory func(context.Context, string, string, contract.AttemptHistoryOptions) (contract.AttemptHistoryPage, error)
+	WorkboardAttemptDetail  func(context.Context, string, string, string, contract.AttemptDetailOptions) (contract.AttemptDetailPage, error)
+	WorkboardDependencies   func(context.Context, string, string, contract.DependencyOptions) (contract.DependencyPage, error)
+	WorkboardFinalizeCancel func(context.Context, app.WorkboardCancelFinalizationRequest) (contract.OperationReceipt, error)
 }
 type Handler struct {
 	modelSlots       chan struct{}

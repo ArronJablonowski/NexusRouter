@@ -158,6 +158,10 @@ func transitionStoredBlock(ctx context.Context, tx *sql.Tx, mutation workboard.C
 	} else {
 		card.State, card.BlockReason = workboard.InProgress, ""
 	}
+	card.Rank, err = appendRank(ctx, tx, card.BoardID, card.State)
+	if err != nil {
+		return 0, 0, err
+	}
 	card.Revision++
 	card.UpdatedAt = mutation.Now
 	bytes, err := writeLifecycleCard(ctx, tx, *card, *body, mutation.ExpectedCardRevision)

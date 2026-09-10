@@ -188,6 +188,7 @@ const (
 	CardUnblock        BoardAction = "card.unblock"
 	CriteriaRevise     BoardAction = "criteria.revise"
 	ClaimRecover       BoardAction = "claim.recover"
+	ClaimFail          BoardAction = "claim.fail"
 )
 
 type BoardRequest struct {

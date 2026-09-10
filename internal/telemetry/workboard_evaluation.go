@@ -83,28 +83,34 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	if err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	operationID, eventID := newWorkboardID(), newWorkboardID()
-	if operationID == "" || eventID == "" {
+	operationID := newWorkboardID()
+	if operationID == "" {
 		return workboard.OperationReceipt{}, errors.New("secure identifier generation failed")
 	}
+	events, eventBodies, err := evaluationEvents(board, card, mutation, operationID, storedResult.Successors)
+	if err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	if len(events) < 1 || len(events) > workboard.MaxTransactionEvents {
+		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "transaction_events"}
+	}
+	firstSequence := board.EventSequence + 1
 	board.Revision++
-	board.EventSequence++
+	board.EventSequence += int64(len(events))
 	board.UpdatedAt = mutation.Now
 	boardBody, err := json.Marshal(board)
 	if err != nil || board.Validate() != nil {
 		return workboard.OperationReceipt{}, ErrWorkboardCorrupt
 	}
-	event := workboard.BoardEvent{Version: 1, ID: eventID, BoardID: board.ID, Sequence: board.EventSequence, OperationID: operationID,
-		Kind: evaluationAction(mutation.Kind), ActorID: mutation.Actor.ID, ActorType: mutation.Actor.Type, CardID: card.ID, CreatedAt: mutation.Now}
-	eventBody, err := json.Marshal(event)
-	if err != nil || event.Validate() != nil {
-		return workboard.OperationReceipt{}, ErrWorkboardCorrupt
+	eventBytes := 0
+	for _, body := range eventBodies {
+		eventBytes += len(body)
 	}
 	cardRevision := card.Revision
-	receipt := workboard.OperationReceipt{Version: 1, BoardID: board.ID, OperationID: operationID, RequestDigest: want, FirstSequence: board.EventSequence,
-		LastSequence: board.EventSequence, EventCount: 1, BoardRevision: board.Revision, CardID: card.ID, CardRevision: &cardRevision,
+	receipt := workboard.OperationReceipt{Version: 1, BoardID: board.ID, OperationID: operationID, RequestDigest: want, FirstSequence: firstSequence,
+		LastSequence: board.EventSequence, EventCount: len(events), BoardRevision: board.Revision, CardID: card.ID, CardRevision: &cardRevision,
 		ClaimRevision: claimRevision, Outcome: "committed", CreatedAt: mutation.Now}
-	response, err := finalizeEvaluationReceipt(&receipt, storedResult, durable+len(boardBody)+len(eventBody))
+	response, err := finalizeEvaluationReceipt(&receipt, storedResult, durable+len(boardBody)+eventBytes)
 	if err != nil {
 		return workboard.OperationReceipt{}, err
 	}
@@ -119,8 +125,10 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	if err = insertWorkboardOperation(ctx, tx, "board", board.ID, keyDigest, receipt, response); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, event.Sequence, operationID, string(event.Kind), card.ID, mutation.Actor, mutation.Now, eventBody); err != nil {
-		return workboard.OperationReceipt{}, err
+	for index, event := range events {
+		if err = insertWorkboardEvent(ctx, tx, event.ID, board.ID, event.Sequence, operationID, string(event.Kind), event.CardID, mutation.Actor, mutation.Now, eventBodies[index]); err != nil {
+			return workboard.OperationReceipt{}, err
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return workboard.OperationReceipt{}, err
@@ -215,6 +223,10 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 		}
 	}
 	card.State, card.CurrentClaimID, card.Revision, card.UpdatedAt = workboard.Review, "", card.Revision+1, m.Now
+	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Review)
+	if err != nil {
+		return 0, 0, evaluationStoredResult{}, err
+	}
 	cardBody.State, cardBody.CurrentClaimID = string(workboard.Review), ""
 	*cardBody = updateStoredBody(*cardBody, *card)
 	cardBytes, err := writeEvaluationCard(ctx, tx, *card, *cardBody, m.ExpectedCardRevision)
@@ -226,7 +238,7 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if board.ActiveClaims < 0 {
 		return 0, 0, evaluationStoredResult{}, ErrWorkboardCorrupt
 	}
-	return claim.Revision, durable + cardBytes, evaluationStoredResult{Candidate: &candidate, Evidence: evidence}, nil
+	return claim.Revision, durable + cardBytes, evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Successors: []workboard.Card{}}, nil
 }
 
 func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, board *workboard.Board, card *workboard.Card, cardBody *storedWorkboardCard) (int, evaluationStoredResult, error) {
@@ -276,6 +288,16 @@ func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if record.Validate() != nil {
 		return 0, evaluationStoredResult{}, ErrWorkboardCorrupt
 	}
+	successorPlans := []acceptedSuccessorPlan{}
+	if m.Kind == workboard.EvaluationAccept {
+		successorPlans, err = prepareAcceptedSuccessors(ctx, tx, m.BoardID, m.CardID, m.Now)
+		if err != nil {
+			return 0, evaluationStoredResult{}, err
+		}
+		if 1+len(successorPlans) > workboard.MaxTransactionEvents {
+			return 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "transaction_events"}
+		}
+	}
 	attempt.Revision++
 	attempt.State, attempt.AcceptanceID, attempt.DecisionBy, attempt.DecisionByType = decision, acceptanceID, m.Actor.ID, m.Actor.Type
 	attempt.DecisionAuthorityID, attempt.AcceptanceEvidenceDigest, attempt.EndedAt = m.DecisionAuthorityID, finalDigest, &m.Now
@@ -311,6 +333,10 @@ func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 		return 0, evaluationStoredResult{}, err
 	}
 	card.State, card.Revision, card.UpdatedAt = target, card.Revision+1, m.Now
+	card.Rank, err = appendRank(ctx, tx, board.ID, target)
+	if err != nil {
+		return 0, evaluationStoredResult{}, err
+	}
 	if target == workboard.Done {
 		card.AcceptanceID, cardBody.AcceptanceID = acceptanceID, acceptanceID
 	} else {
@@ -323,8 +349,166 @@ func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 		return 0, evaluationStoredResult{}, err
 	}
 	board.LayoutRevision++
-	durable += len(recordBytes) + cardBytes
-	return durable, evaluationStoredResult{Candidate: attempt.Candidate, Evidence: attempt.Evidence, Acceptance: &record}, nil
+	successors, successorBytes, err := writeAcceptedSuccessors(ctx, tx, successorPlans)
+	if err != nil {
+		return 0, evaluationStoredResult{}, err
+	}
+	durable += len(recordBytes) + cardBytes + successorBytes
+	if durable > workboard.MaxTransactionBytes {
+		return 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "transaction_bytes"}
+	}
+	return durable, evaluationStoredResult{Candidate: attempt.Candidate, Evidence: attempt.Evidence, Acceptance: &record, Successors: successors}, nil
+}
+
+type acceptedSuccessorPlan struct {
+	card             workboard.Card
+	bodyBytes        []byte
+	expectedRevision int64
+	result           workboard.Card
+}
+
+// prepareAcceptedSuccessors validates the complete bounded reverse fanout and
+// materializes every projection before any successor row is changed.
+func prepareAcceptedSuccessors(ctx context.Context, tx *sql.Tx, boardID, dependencyID string, now time.Time) ([]acceptedSuccessorPlan, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT card_id FROM workboard_dependencies WHERE board_id=? AND dependency_id=? ORDER BY card_id LIMIT ?`,
+		boardID, dependencyID, workboard.MaxReverseFanout+1)
+	if err != nil {
+		return nil, err
+	}
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) != nil {
+			_ = rows.Close()
+			return nil, ErrWorkboardCorrupt
+		}
+		ids = append(ids, id)
+	}
+	if err = rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	if len(ids) > workboard.MaxReverseFanout {
+		return nil, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "reverse_fanout"}
+	}
+
+	var readyRank uint64
+	var lastReadyRank string
+	err = tx.QueryRowContext(ctx, `SELECT rank FROM workboard_cards WHERE board_id=? AND state=? ORDER BY rank DESC LIMIT 1`, boardID, workboard.Ready).Scan(&lastReadyRank)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	if err == nil {
+		readyRank, err = parseWorkboardRank(lastReadyRank)
+		if err != nil {
+			return nil, ErrWorkboardCorrupt
+		}
+	}
+
+	plans := make([]acceptedSuccessorPlan, 0, len(ids))
+	preparedBytes := 0
+	for _, id := range ids {
+		card, body, readErr := readStoredCard(ctx, tx, boardID, id)
+		if readErr != nil || !containsString(card.Dependencies, dependencyID) {
+			if readErr != nil {
+				return nil, readErr
+			}
+			return nil, ErrWorkboardCorrupt
+		}
+		remaining, countErr := unresolvedDependencies(ctx, tx, boardID, card.Dependencies)
+		if countErr != nil {
+			return nil, countErr
+		}
+		if remaining != card.RemainingDependencies || remaining < 1 {
+			return nil, ErrWorkboardCorrupt
+		}
+		expectedRevision := card.Revision
+		card.RemainingDependencies--
+		if card.State == workboard.Backlog && card.RemainingDependencies == 0 {
+			if ^uint64(0)-readyRank < workboardRankStep {
+				return nil, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "rank"}
+			}
+			readyRank += workboardRankStep
+			card.State, card.Rank = workboard.Ready, formatWorkboardRank(readyRank)
+		}
+		card.Revision++
+		card.UpdatedAt = now
+		body = updateStoredBody(body, card)
+		bodyBytes, marshalErr := json.Marshal(body)
+		if marshalErr != nil || card.Validate() != nil || !validStoredCardReferences(body) {
+			return nil, ErrWorkboardCorrupt
+		}
+		preparedBytes += len(bodyBytes)
+		if preparedBytes > workboard.MaxTransactionBytes {
+			return nil, &workboard.Violation{Code: workboard.CodeLimitExceeded, Field: "transaction_bytes"}
+		}
+		plans = append(plans, acceptedSuccessorPlan{card: card, bodyBytes: bodyBytes, expectedRevision: expectedRevision, result: card})
+	}
+	return plans, nil
+}
+
+func writeAcceptedSuccessors(ctx context.Context, tx *sql.Tx, plans []acceptedSuccessorPlan) ([]workboard.Card, int, error) {
+	results := make([]workboard.Card, 0, len(plans))
+	durable := 0
+	for _, plan := range plans {
+		result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,rank=?,remaining_dependencies=?,updated_at=?,body=?
+			WHERE board_id=? AND id=? AND revision=?`, plan.card.Revision, plan.card.State, plan.card.Rank, plan.card.RemainingDependencies,
+			plan.card.UpdatedAt.UnixNano(), plan.bodyBytes, plan.card.BoardID, plan.card.ID, plan.expectedRevision)
+		if err != nil {
+			return nil, 0, err
+		}
+		if changed, _ := result.RowsAffected(); changed != 1 {
+			return nil, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "successor_revision"}
+		}
+		results = append(results, plan.result)
+		durable += len(plan.bodyBytes)
+	}
+	return results, durable, nil
+}
+
+func evaluationEvents(board workboard.Board, card workboard.Card, mutation workboard.EvaluationMutation, operationID string, successors []workboard.Card) ([]workboard.BoardEvent, [][]byte, error) {
+	targets := []struct {
+		kind      workboard.BoardAction
+		cardID    string
+		successor *workboard.Card
+	}{{kind: evaluationAction(mutation.Kind), cardID: card.ID}}
+	for index := range successors {
+		kind, err := successorEffectAction(successors[index])
+		if err != nil {
+			return nil, nil, err
+		}
+		targets = append(targets, struct {
+			kind      workboard.BoardAction
+			cardID    string
+			successor *workboard.Card
+		}{kind: kind, cardID: successors[index].ID, successor: &successors[index]})
+	}
+	events := make([]workboard.BoardEvent, len(targets))
+	bodies := make([][]byte, len(targets))
+	for index, target := range targets {
+		id := newWorkboardID()
+		if target.successor != nil {
+			var effectErr error
+			id, effectErr = successorEffectEventID(operationID, card.ID, *target.successor)
+			if effectErr != nil {
+				return nil, nil, effectErr
+			}
+		}
+		if id == "" {
+			return nil, nil, errors.New("secure identifier generation failed")
+		}
+		event := workboard.BoardEvent{Version: 1, ID: id, BoardID: board.ID, Sequence: board.EventSequence + int64(index) + 1,
+			OperationID: operationID, Kind: target.kind, ActorID: mutation.Actor.ID, ActorType: mutation.Actor.Type, CardID: target.cardID, CreatedAt: mutation.Now}
+		body, err := json.Marshal(event)
+		if err != nil || event.Validate() != nil {
+			return nil, nil, ErrWorkboardCorrupt
+		}
+		events[index], bodies[index] = event, body
+	}
+	return events, bodies, nil
 }
 
 func buildReviewFeedback(m workboard.EvaluationMutation, attempt storedEvaluationAttempt, outcome string) ([]workboard.EvidenceRecord, error) {
@@ -431,9 +615,9 @@ func writeEvaluationCard(ctx context.Context, tx *sql.Tx, card workboard.Card, b
 	if err != nil || card.Validate() != nil || !validStoredCardReferences(body) {
 		return 0, ErrWorkboardCorrupt
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,assignee_id=?,block_reason=?,attempt_count=?,current_attempt_id=?,current_claim_id=?,acceptance_id=?,
+	result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,rank=?,assignee_id=?,block_reason=?,attempt_count=?,current_attempt_id=?,current_claim_id=?,acceptance_id=?,
 		cancel_requested=?,pause_requested=?,updated_at=?,body=? WHERE board_id=? AND id=? AND revision=?`, card.Revision, card.State,
-		nullable(body.AssigneeID), nullable(body.BlockReason), body.AttemptCount, nullable(body.CurrentAttemptID), nullable(body.CurrentClaimID), nullable(body.AcceptanceID),
+		card.Rank, nullable(body.AssigneeID), nullable(body.BlockReason), body.AttemptCount, nullable(body.CurrentAttemptID), nullable(body.CurrentClaimID), nullable(body.AcceptanceID),
 		boolInt(body.CancelRequested), boolInt(body.PauseRequested), card.UpdatedAt.UnixNano(), bodyBytes, card.BoardID, card.ID, expectedRevision)
 	if err != nil {
 		return 0, err

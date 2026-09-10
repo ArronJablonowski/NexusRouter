@@ -81,6 +81,10 @@ func applyClaimRecovery(ctx context.Context, tx *sql.Tx, mutation workboard.Life
 	body.State, body.CurrentClaimID = string(workboard.Ready), ""
 	body.BlockReason, body.CancelRequested, body.PauseRequested = "", false, false
 	card.State, card.CurrentClaimID = workboard.Ready, ""
+	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Ready)
+	if err != nil {
+		return 0, 0, err
+	}
 	card.Revision++
 	card.UpdatedAt = mutation.Now
 	board.ActiveClaims--
@@ -155,9 +159,9 @@ func writeLifecycleCard(ctx context.Context, tx *sql.Tx, card workboard.Card, bo
 	if !validStoredCardReferences(body) {
 		return 0, ErrWorkboardCorrupt
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,assignee_id=?,block_reason=?,attempt_count=?,current_attempt_id=?,current_claim_id=?,
+	result, err := tx.ExecContext(ctx, `UPDATE workboard_cards SET revision=?,state=?,rank=?,assignee_id=?,block_reason=?,attempt_count=?,current_attempt_id=?,current_claim_id=?,
 		cancel_requested=?,pause_requested=?,updated_at=?,body=? WHERE board_id=? AND id=? AND revision=?`, card.Revision, card.State,
-		nullable(body.AssigneeID), nullable(body.BlockReason), body.AttemptCount, nullable(body.CurrentAttemptID), nullable(body.CurrentClaimID),
+		card.Rank, nullable(body.AssigneeID), nullable(body.BlockReason), body.AttemptCount, nullable(body.CurrentAttemptID), nullable(body.CurrentClaimID),
 		boolInt(body.CancelRequested), boolInt(body.PauseRequested), card.UpdatedAt.UnixNano(), bodyBytes, card.BoardID, card.ID, expectedRevision)
 	if err != nil {
 		return 0, err
@@ -184,19 +188,27 @@ func validateLifecycleMutation(m workboard.LifecycleMutation, applying bool) err
 	switch m.Kind {
 	case workboard.LifecycleClaim:
 		if m.Actor.Type != "worker" || m.ExpectedCardRevision < 1 || m.AttemptID != "" || m.ClaimID != "" ||
-			m.ExpectedClaimRevision != 0 || m.LeaseTTL < workboard.MinLeaseTTL || m.LeaseTTL > workboard.MaxLeaseTTL || !validDigest(m.PolicyDigest) || m.Recovery != nil {
+			m.ExpectedClaimRevision != 0 || m.LeaseTTL < workboard.MinLeaseTTL || m.LeaseTTL > workboard.MaxLeaseTTL || !validDigest(m.PolicyDigest) || m.Recovery != nil ||
+			m.EffectResolution != "" || (m.TaskID != "" || m.SessionID != "") && (!validWorkboardID(m.TaskID) || !validWorkboardID(m.SessionID)) {
 			return invalidWorkboard("claim")
 		}
 	case workboard.LifecycleHeartbeat:
 		if m.Actor.Type != "worker" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) || m.ExpectedCardRevision != 0 ||
-			m.ExpectedClaimRevision < 1 || m.LeaseTTL < workboard.MinLeaseTTL || m.LeaseTTL > workboard.MaxLeaseTTL || m.PolicyDigest != "" || m.Recovery != nil {
+			m.ExpectedClaimRevision < 1 || m.LeaseTTL < workboard.MinLeaseTTL || m.LeaseTTL > workboard.MaxLeaseTTL || m.PolicyDigest != "" || m.Recovery != nil ||
+			m.TaskID != "" || m.SessionID != "" || m.EffectResolution != "" {
 			return invalidWorkboard("heartbeat")
 		}
 	case workboard.LifecycleRecover:
 		if m.Actor.Type != "operator" && m.Actor.Type != "system" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) ||
 			m.ExpectedCardRevision < 1 || m.ExpectedClaimRevision < 1 || m.LeaseTTL != 0 || m.PolicyDigest != "" || m.Recovery == nil ||
-			!validRecoveryIntent(*m.Recovery) || applying && !validVerifiedRecovery(m) {
+			m.TaskID != "" || m.SessionID != "" || m.EffectResolution != "" || !validRecoveryIntent(*m.Recovery) || applying && !validVerifiedRecovery(m) {
 			return invalidWorkboard("recovery")
+		}
+	case workboard.LifecycleFail:
+		if m.Actor.Type != "worker" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) ||
+			m.ExpectedCardRevision < 1 || m.ExpectedClaimRevision < 1 || m.LeaseTTL != 0 || m.PolicyDigest != "" || m.Recovery != nil ||
+			m.TaskID != "" || m.SessionID != "" || m.EffectResolution != workboard.EffectFree {
+			return invalidWorkboard("failure")
 		}
 	default:
 		return invalidWorkboard("kind")
@@ -224,6 +236,8 @@ func lifecycleAction(kind workboard.LifecycleKind) workboard.BoardAction {
 		return workboard.ClaimHeartbeatAction
 	case workboard.LifecycleRecover:
 		return workboard.ClaimRecoverAction
+	case workboard.LifecycleFail:
+		return workboard.ClaimFailAction
 	default:
 		return ""
 	}

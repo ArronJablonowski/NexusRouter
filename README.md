@@ -49,18 +49,22 @@ and host resources. It explicitly distinguishes unavailable projections from
 unknown measurements and separates routed execution usage from auxiliary
 classifier, summarizer, audit, and optional-judge usage. Inspection is bounded
 and GET-only: it does not change models, routing policy, approvals, or runtime
-state. DAR-81 provides the schema-35 durable workboard foundation. A partial
-DAR-82 checkpoint now adds board domain/service contracts; transactional board
+state. DAR-81 provides the schema-35 durable workboard foundation. DAR-82 now
+adds board domain/service contracts; transactional board
 create, revise, list, read, archive, and redacted event reads; rich SQL-backed
-card mutations; and the first durable claim, heartbeat, recovery,
+card mutations; and durable claim, heartbeat, recovery,
 criteria-revision, and checkpoint commands. Native JSON routes and the
 browser-session/CSRF BFF are composed into the daemon for board/card reads and
 operator-safe mutations, with reconnectable board-event SSE and a request-bound
 browser operation journal. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
-attention. Runtime worker integration, real stop-proof verifiers, agent tools,
-and the visual Kanban remain unfinished, so DAR-82 remains In Progress.
+attention. Bounded in-process workers are atomically bound to claims and runtime
+tasks; stop-proof recovery is independently derived from durable task, process,
+and effect evidence; lifecycle and dependency history is paginated; and exact
+browser recovery survives restart and credential rotation through a persistent
+workspace identity. Agent tools and the visual Kanban remain DAR-84 and DAR-83
+work respectively.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -79,10 +83,11 @@ workboard storage in the primary SQLite/WAL database. Versioned Web UI board
 query and redacted event contracts now back live native JSON handlers and
 bounded browser BFF handlers for list/create/read/operations and reconnectable
 SSE. Browser mutations use the same durable reconciliation journal as chat
-controls. Remaining runtime worker/verifier composition, agent tools, and
-Kanban feature views remain open. Schema 36 adds normalized card identity to workboard
-events; existing schema-35 board events upgrade transactionally with a `NULL`
-card ID.
+controls. Schema 36 adds normalized card identity to workboard events; existing
+schema-35 board events upgrade transactionally with a `NULL` card ID. Schema 37
+adds a non-secret persistent workspace identity, and schema 38 records exact
+cross-session browser reconciliation while preserving legacy pending-operation
+attribution. Agent tools and the integrated Kanban feature view remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

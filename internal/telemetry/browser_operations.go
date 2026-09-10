@@ -34,6 +34,13 @@ type BrowserOperation struct {
 	Response      []byte
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Legacy        bool
+}
+
+type BrowserOperationRecovery struct {
+	OperationID     string
+	RecoverySubject string
+	RecoveredAt     time.Time
 }
 
 func (s *Store) BeginBrowserOperation(ctx context.Context, subject, key, kind string, request []byte) (BrowserOperation, error) {
@@ -69,6 +76,19 @@ func (s *Store) BeginBrowserOperation(ctx context.Context, subject, key, kind st
 		return BrowserOperation{}, err
 	}
 	if count >= MaxBrowserOperations {
+		// Terminal rows normally follow the retention policy, but under hard-cap
+		// pressure they are evictable so reconciled crashes do not consume a
+		// permanent slot while pending rows remain deliberately non-prunable.
+		if _, err = tx.ExecContext(ctx, `DELETE FROM browser_operations WHERE operation_id IN (
+		 SELECT operation_id FROM browser_operations WHERE state IN('committed','rejected')
+		 ORDER BY updated_at,operation_id LIMIT ?)`, count-MaxBrowserOperations+1); err != nil {
+			return BrowserOperation{}, err
+		}
+		if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM browser_operations").Scan(&count); err != nil {
+			return BrowserOperation{}, err
+		}
+	}
+	if count >= MaxBrowserOperations {
 		return BrowserOperation{}, ErrBrowserOperationCapacity
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO browser_operations(operation_id,session_subject,key_digest,kind,request_digest,state,response,created_at,updated_at)
@@ -88,6 +108,120 @@ func (s *Store) CommitBrowserOperation(ctx context.Context, subject, operationID
 
 func (s *Store) RejectBrowserOperation(ctx context.Context, subject, operationID, requestDigest string, response []byte) (BrowserOperation, error) {
 	return s.finishBrowserOperation(ctx, subject, operationID, requestDigest, "rejected", response)
+}
+
+// AdoptableBrowserOperation finds an exact pending request initiated by a
+// different browser session. The key is re-derived against each initiating
+// subject, so a matching body digest alone can never authorize adoption.
+// Multiple matches fail closed rather than selecting an ambiguous owner.
+func (s *Store) AdoptableBrowserOperation(ctx context.Context, recoverySubject, key, kind string, request []byte) (BrowserOperation, bool, error) {
+	if s == nil || ctx == nil || !validBrowserDigest(recoverySubject) || !validBrowserKey(key) || !validBrowserKind(kind) || len(request) == 0 || len(request) > MaxBrowserOperationRequestBytes {
+		return BrowserOperation{}, false, ErrBrowserOperationInvalid
+	}
+	requestHash := sha256.Sum256(request)
+	requestDigest := hex.EncodeToString(requestHash[:])
+	rows, err := s.db.QueryContext(ctx, `SELECT o.operation_id,o.session_subject,o.key_digest,o.kind,o.request_digest,o.state,o.response,o.created_at,o.updated_at,
+	 EXISTS(SELECT 1 FROM legacy_browser_workboard_operations l WHERE l.operation_id=o.operation_id)
+	 FROM browser_operations o WHERE o.state='pending' AND o.kind=? AND o.request_digest=? AND o.session_subject<>?
+	 ORDER BY o.created_at,o.operation_id`, kind, requestDigest, recoverySubject)
+	if err != nil {
+		return BrowserOperation{}, false, err
+	}
+	defer rows.Close()
+	var candidate BrowserOperation
+	found := false
+	for rows.Next() {
+		var record BrowserOperation
+		var keyDigest string
+		var created, updated int64
+		if err = rows.Scan(&record.OperationID, &record.Subject, &keyDigest, &record.Kind, &record.RequestDigest, &record.State, &record.Response, &created, &updated, &record.Legacy); err != nil {
+			return BrowserOperation{}, false, err
+		}
+		wantKey := sha256.Sum256([]byte(record.Subject + "\x00" + key))
+		if keyDigest != hex.EncodeToString(wantKey[:]) || record.OperationID != "op_"+keyDigest {
+			continue
+		}
+		record.Version = 1
+		record.CreatedAt, record.UpdatedAt = time.Unix(0, created).UTC(), time.Unix(0, updated).UTC()
+		if !record.Valid() {
+			return BrowserOperation{}, false, ErrBrowserOperationConflict
+		}
+		if found {
+			return BrowserOperation{}, false, ErrBrowserOperationConflict
+		}
+		candidate, found = record, true
+	}
+	if err = rows.Err(); err != nil {
+		return BrowserOperation{}, false, err
+	}
+	return candidate, found, nil
+}
+
+// RecoverBrowserOperation terminalizes an adopted row without changing its
+// initiating session subject. A separate immutable row attributes the browser
+// session that reconciled the durable domain outcome.
+func (s *Store) RecoverBrowserOperation(ctx context.Context, recoverySubject string, record BrowserOperation, state string, response []byte) (BrowserOperation, error) {
+	if s == nil || ctx == nil || !validBrowserDigest(recoverySubject) || recoverySubject == record.Subject || !record.Valid() || record.State != "pending" ||
+		(state != "committed" && state != "rejected") || len(response) == 0 || len(response) > MaxBrowserOperationResponseBytes {
+		return BrowserOperation{}, ErrBrowserOperationInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return BrowserOperation{}, err
+	}
+	defer tx.Rollback()
+	current, err := readBrowserOperation(ctx, tx, record.OperationID)
+	if err != nil || current.Subject != record.Subject || current.Kind != record.Kind || current.RequestDigest != record.RequestDigest {
+		return BrowserOperation{}, ErrBrowserOperationConflict
+	}
+	now := time.Now().UTC()
+	if current.State == "pending" {
+		result, updateErr := tx.ExecContext(ctx, `UPDATE browser_operations SET state=?,response=?,updated_at=?
+		 WHERE operation_id=? AND session_subject=? AND state='pending' AND request_digest=?`, state, response, now.UnixNano(), record.OperationID, record.Subject, record.RequestDigest)
+		if updateErr != nil {
+			return BrowserOperation{}, updateErr
+		}
+		if changed, changeErr := result.RowsAffected(); changeErr != nil || changed != 1 {
+			return BrowserOperation{}, ErrBrowserOperationConflict
+		}
+		current.State, current.Response, current.UpdatedAt = state, append([]byte(nil), response...), now
+	} else if current.State != state || string(current.Response) != string(response) {
+		return BrowserOperation{}, ErrBrowserOperationConflict
+	}
+	result, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO browser_operation_recoveries(operation_id,recovery_subject,recovered_at) VALUES(?,?,?)`, record.OperationID, recoverySubject, now.UnixNano())
+	if err != nil {
+		return BrowserOperation{}, err
+	}
+	if changed, changeErr := result.RowsAffected(); changeErr != nil {
+		return BrowserOperation{}, changeErr
+	} else if changed == 0 {
+		var existing string
+		if err = tx.QueryRowContext(ctx, `SELECT recovery_subject FROM browser_operation_recoveries WHERE operation_id=?`, record.OperationID).Scan(&existing); err != nil || existing != recoverySubject {
+			return BrowserOperation{}, ErrBrowserOperationConflict
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return BrowserOperation{}, err
+	}
+	return current, nil
+}
+
+func (s *Store) BrowserOperationRecovery(ctx context.Context, operationID string) (BrowserOperationRecovery, error) {
+	if s == nil || ctx == nil || !validBrowserOperationID(operationID) {
+		return BrowserOperationRecovery{}, ErrBrowserOperationInvalid
+	}
+	var recovery BrowserOperationRecovery
+	var recovered int64
+	err := s.db.QueryRowContext(ctx, `SELECT operation_id,recovery_subject,recovered_at FROM browser_operation_recoveries WHERE operation_id=?`, operationID).
+		Scan(&recovery.OperationID, &recovery.RecoverySubject, &recovered)
+	if err != nil {
+		return BrowserOperationRecovery{}, err
+	}
+	recovery.RecoveredAt = time.Unix(0, recovered).UTC()
+	if recovery.OperationID != operationID || !validBrowserDigest(recovery.RecoverySubject) || recovery.RecoveredAt.IsZero() {
+		return BrowserOperationRecovery{}, ErrBrowserOperationConflict
+	}
+	return recovery, nil
 }
 
 func (s *Store) finishBrowserOperation(ctx context.Context, subject, operationID, requestDigest, state string, response []byte) (BrowserOperation, error) {

@@ -58,6 +58,17 @@ func validNativeReceipt(board string) contract.OperationReceipt {
 	return contract.OperationReceipt{Version: 1, BoardID: board, OperationID: workboardKey, RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1, EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)}
 }
 
+func validNativeAttempt() contract.Attempt {
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	criteria := []contract.AcceptanceCriterion{{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Tests pass.", Required: true}}
+	return contract.Attempt{Version: 1, ID: "attempt-a", BoardID: "board-a", CardID: "card-a", Ordinal: 1, Revision: 1,
+		State: "running", WorkerID: "worker-a", CriteriaRevision: 1, CriteriaDigest: contract.AcceptanceCriteriaDigest(criteria),
+		PolicyDigest: strings.Repeat("b", 64), Budget: contract.WorkBudget{AttemptLimit: 3}, Criteria: criteria, TaskIDs: []string{}, SessionIDs: []string{},
+		Claim: &contract.Claim{Version: 1, ID: "claim-a", BoardID: "board-a", CardID: "card-a", AttemptID: "attempt-a", Revision: 1,
+			State: "active", OwnerID: "worker-a", OwnerType: "worker", ExpiresAt: now.Add(time.Minute), LastHeartbeat: now},
+		Evidence: []contract.EvidenceRecord{}, StartedAt: now}
+}
+
 func TestNativeWorkboardReadRoutesAreAuthenticatedAndClosed(t *testing.T) {
 	var calls atomic.Int32
 	handler := nativeWorkboardHandler(t, func(services *Services) {
@@ -82,6 +93,23 @@ func TestNativeWorkboardReadRoutesAreAuthenticatedAndClosed(t *testing.T) {
 			}
 			return contract.BoardEventPage{Version: 1, BoardID: id, Items: []contract.BoardEvent{}, HighWaterSequence: 0}, nil
 		}
+		services.WorkboardAttemptHistory = func(_ context.Context, board, card string, options contract.AttemptHistoryOptions) (contract.AttemptHistoryPage, error) {
+			calls.Add(1)
+			if board != "board-a" || card != "card-a" || options.Limit != 1 {
+				t.Fatal("history request was not bound", board, card, options)
+			}
+			a := validNativeAttempt()
+			return contract.AttemptHistoryPage{Version: 1, BoardID: board, CardID: card, HighWaterOrdinal: 1,
+				Items: []contract.AttemptHistoryRecord{{Version: 1, ID: a.ID, BoardID: board, CardID: card, Ordinal: 1, Revision: 1,
+					State: "running", WorkerID: "worker-a", CriteriaRevision: 1, StartedAt: a.StartedAt}}}, nil
+		}
+		services.WorkboardAttemptDetail = func(_ context.Context, board, card, attempt string, options contract.AttemptDetailOptions) (contract.AttemptDetailPage, error) {
+			calls.Add(1)
+			if board != "board-a" || card != "card-a" || attempt != "attempt-a" || options.Limit != 25 {
+				t.Fatal("detail request was not bound", board, card, attempt, options)
+			}
+			return contract.AttemptDetailPage{Version: 1, Attempt: validNativeAttempt(), Checkpoints: []contract.WorkCheckpoint{}}, nil
+		}
 	})
 
 	unauthorized := httptest.NewRecorder()
@@ -105,14 +133,15 @@ func TestNativeWorkboardReadRoutesAreAuthenticatedAndClosed(t *testing.T) {
 		}
 	}
 
-	for _, target := range []string{"/v1/workboards?limit=1&state=active", "/v1/workboards/board-a?claim_state=unclaimed", "/v1/workboards/board-a/events"} {
+	for _, target := range []string{"/v1/workboards?limit=1&state=active", "/v1/workboards/board-a?claim_state=unclaimed", "/v1/workboards/board-a/events",
+		"/v1/workboards/board-a/cards/card-a/attempts?limit=1", "/v1/workboards/board-a/cards/card-a/attempts/attempt-a"} {
 		response = httptest.NewRecorder()
 		handler.ServeHTTP(response, nativeWorkboardRequest(http.MethodGet, target, ""))
 		if response.Code != http.StatusOK {
 			t.Fatalf("%s: %d %s", target, response.Code, response.Body.String())
 		}
 	}
-	if calls.Load() != 3 {
+	if calls.Load() != 5 {
 		t.Fatal("unexpected calls", calls.Load())
 	}
 }

@@ -67,6 +67,36 @@ func TestExpiryMarksAttentionWithoutReleasingOwnership(t *testing.T) {
 	}
 }
 
+func TestWorkerFailureReleasesOnlyOwnedEffectFreeLease(t *testing.T) {
+	lease := leaseFixture()
+	failure := WorkerFailure{OwnerID: lease.OwnerID, ExpectedRevision: lease.Revision,
+		Now: lease.LastHeartbeat.Add(time.Second), EffectResolution: EffectFree}
+	released, err := ApplyWorkerFailure(lease, failure)
+	if err != nil || released.State != LeaseReleased || released.Revision != lease.Revision+1 || released.ReleasedAt == nil ||
+		!released.ReleasedAt.Equal(failure.Now) {
+		t.Fatalf("released=%+v err=%v", released, err)
+	}
+	for _, test := range []struct {
+		name string
+		edit func(*WorkerFailure)
+		code ErrorCode
+	}{
+		{"stale", func(f *WorkerFailure) { f.ExpectedRevision-- }, CodeStaleRevision},
+		{"wrong owner", func(f *WorkerFailure) { f.OwnerID = "worker-b" }, CodeLeaseOwner},
+		{"uncertain effect", func(f *WorkerFailure) { f.EffectResolution = "uncertain" }, CodeInvalid},
+		{"resolved effect", func(f *WorkerFailure) { f.EffectResolution = ResolvedNoReplay }, CodeInvalid},
+		{"clock regression", func(f *WorkerFailure) { f.Now = lease.LastHeartbeat.Add(-time.Second) }, CodeIllegalTransition},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := failure
+			test.edit(&candidate)
+			if _, err := ApplyWorkerFailure(lease, candidate); !errors.Is(err, &Violation{Code: test.code}) {
+				t.Fatalf("error=%v", err)
+			}
+		})
+	}
+}
+
 func recoveryFixture() Recovery {
 	return Recovery{
 		ExpectedRevision: 2,

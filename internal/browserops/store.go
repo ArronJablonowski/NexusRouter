@@ -22,6 +22,7 @@ var (
 )
 
 type Record = telemetry.BrowserOperation
+type Recovery = telemetry.BrowserOperationRecovery
 
 type Store struct{ telemetry *telemetry.Store }
 
@@ -59,6 +60,27 @@ func (s *Store) Reject(ctx context.Context, subject, operationID, requestDigest 
 		return Record{}, ErrInvalid
 	}
 	return s.telemetry.RejectBrowserOperation(ctx, subject, operationID, requestDigest, response)
+}
+
+func (s *Store) Adoptable(ctx context.Context, recoverySubject, key, kind string, request []byte) (Record, bool, error) {
+	if s == nil || s.telemetry == nil {
+		return Record{}, false, ErrInvalid
+	}
+	return s.telemetry.AdoptableBrowserOperation(ctx, recoverySubject, key, kind, request)
+}
+
+func (s *Store) Recover(ctx context.Context, recoverySubject string, record Record, state string, response []byte) (Record, error) {
+	if s == nil || s.telemetry == nil {
+		return Record{}, ErrInvalid
+	}
+	return s.telemetry.RecoverBrowserOperation(ctx, recoverySubject, record, state, response)
+}
+
+func (s *Store) Recovery(ctx context.Context, operationID string) (Recovery, error) {
+	if s == nil || s.telemetry == nil {
+		return Recovery{}, ErrInvalid
+	}
+	return s.telemetry.BrowserOperationRecovery(ctx, operationID)
 }
 
 func (s *Store) List(ctx context.Context, subject, after string, limit int) ([]Record, string, error) {

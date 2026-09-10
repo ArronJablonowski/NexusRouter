@@ -67,7 +67,7 @@ func TestWorkboardEventCardMigrationUpgradesExisting35(t *testing.T) {
 	var id, boardID, operationID, kind, actorID, actorType string
 	var sequence, createdAt int64
 	var body []byte
-	if err = store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 36 {
+	if err = store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != currentStorageSchema {
 		t.Fatalf("schema version=%d err=%v", version, err)
 	}
 	if err = store.db.QueryRow(`SELECT id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body

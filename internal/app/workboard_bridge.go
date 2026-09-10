@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -13,12 +15,15 @@ import (
 // native API and browser BFF contracts. Identity is supplied by the trusted
 // transport adapter and never decoded from a BoardRequest.
 type WorkboardBridge struct {
-	boards     *workboard.BoardService
-	cards      *workboard.CardService
-	progress   *workboard.ProgressService
-	control    *workboard.ControlService
-	evaluation *workboard.EvaluationService
-	lifecycle  workboard.LifecycleSnapshotRepository
+	boards           *workboard.BoardService
+	cards            *workboard.CardService
+	progress         *workboard.ProgressService
+	control          *workboard.ControlService
+	evaluation       *workboard.EvaluationService
+	lifecycle        workboard.LifecycleSnapshotRepository
+	history          workboard.LifecycleHistoryRepository
+	dependencies     *workboard.DependencyReadService
+	browserAuthority workboard.Authority
 }
 
 type unavailableControlVerifier struct{}
@@ -49,6 +54,35 @@ func (contextWorkboardAuthority) WorkboardAuthority(ctx context.Context) (workbo
 }
 
 func NewWorkboardBridge(repository workboard.BoardRepository, cards workboard.CardStore, now func() time.Time) (*WorkboardBridge, error) {
+	authority, err := BrowserWorkboardAuthority("darwin-embedded-local-workspace-v1")
+	if err != nil {
+		return nil, err
+	}
+	return NewWorkboardBridgeWithBrowserAuthority(repository, cards, now, authority)
+}
+
+// BrowserWorkboardAuthority derives the stable local workspace operator used
+// for domain authorization and idempotency from the database-owned, non-secret
+// workspace identity. Bearer tokens authenticate ephemeral transports; they
+// must not change the domain actor when a browser session or token rotates.
+// Per-session attribution remains in the browser operation journal instead.
+func BrowserWorkboardAuthority(workspaceIdentity string) (workboard.Authority, error) {
+	if len(workspaceIdentity) < 16 {
+		return workboard.Authority{}, errors.New("workboard workspace identity unavailable")
+	}
+	scope := sha256.Sum256(append([]byte("darwin.workboard.browser.scope.v1\x00"), []byte(workspaceIdentity)...))
+	actor := sha256.Sum256(append([]byte("darwin.workboard.browser.actor.v1\x00"), []byte(workspaceIdentity)...))
+	authority := workboard.Authority{CreationScope: hex.EncodeToString(scope[:]), Actor: workboard.Actor{ID: hex.EncodeToString(actor[:]), Type: "operator"}}
+	if authority.Validate() != nil {
+		return workboard.Authority{}, errors.New("invalid workboard browser authority")
+	}
+	return authority, nil
+}
+
+func NewWorkboardBridgeWithBrowserAuthority(repository workboard.BoardRepository, cards workboard.CardStore, now func() time.Time, browserAuthority workboard.Authority) (*WorkboardBridge, error) {
+	if browserAuthority.Validate() != nil || browserAuthority.Actor.Type != "operator" {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "browser_authority"}
+	}
 	boards, err := workboard.NewBoardService(repository, contextWorkboardAuthority{}, now)
 	if err != nil {
 		return nil, err
@@ -69,6 +103,18 @@ func NewWorkboardBridge(repository workboard.BoardRepository, cards workboard.Ca
 	if !ok {
 		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "lifecycle_reader"}
 	}
+	history, ok := cards.(workboard.LifecycleHistoryRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "lifecycle_history_reader"}
+	}
+	dependencyRepository, ok := cards.(workboard.DependencyPageRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "dependency_reader"}
+	}
+	dependencies, err := workboard.NewDependencyReadService(dependencyRepository, contextWorkboardAuthority{})
+	if err != nil {
+		return nil, err
+	}
 	controlRepository, ok := cards.(workboard.ControlRepository)
 	if !ok {
 		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "control_repository"}
@@ -85,7 +131,8 @@ func NewWorkboardBridge(repository workboard.BoardRepository, cards workboard.Ca
 	if err != nil {
 		return nil, err
 	}
-	return &WorkboardBridge{boards: boards, cards: cardService, progress: progress, control: control, evaluation: evaluation, lifecycle: lifecycle}, nil
+	return &WorkboardBridge{boards: boards, cards: cardService, progress: progress, control: control, evaluation: evaluation,
+		lifecycle: lifecycle, history: history, dependencies: dependencies, browserAuthority: browserAuthority}, nil
 }
 
 func nativeWorkboardContext(ctx context.Context) context.Context {
@@ -98,9 +145,8 @@ func nativeWorkboardContext(ctx context.Context) context.Context {
 	})
 }
 
-func browserWorkboardContext(ctx context.Context, subject string) (context.Context, error) {
-	authority := workboard.Authority{CreationScope: subject, Actor: workboard.Actor{ID: subject, Type: "operator"}}
-	if ctx == nil || !validBrowserSubject(subject) || authority.Validate() != nil {
+func browserWorkboardContext(ctx context.Context, subject string, authority workboard.Authority) (context.Context, error) {
+	if ctx == nil || !validBrowserSubject(subject) || authority.Validate() != nil || authority.Actor.Type != "operator" {
 		return nil, errors.New("workboard authority unavailable")
 	}
 	return context.WithValue(ctx, workboardAuthorityKey{}, authority), nil
@@ -111,7 +157,7 @@ func (b *WorkboardBridge) NativeList(ctx context.Context, options webui.BoardLis
 }
 
 func (b *WorkboardBridge) BrowserList(ctx context.Context, subject string, options webui.BoardListOptions) (webui.Page, error) {
-	trusted, err := browserWorkboardContext(ctx, subject)
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
 	if err != nil {
 		return webui.Page{}, err
 	}
@@ -123,11 +169,62 @@ func (b *WorkboardBridge) NativeRead(ctx context.Context, boardID string, option
 }
 
 func (b *WorkboardBridge) BrowserRead(ctx context.Context, subject, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
-	trusted, err := browserWorkboardContext(ctx, subject)
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
 	if err != nil {
 		return webui.BoardSnapshot{}, err
 	}
 	return b.read(trusted, boardID, options)
+}
+
+func (b *WorkboardBridge) NativeAttemptHistory(ctx context.Context, boardID, cardID string, options webui.AttemptHistoryOptions) (webui.AttemptHistoryPage, error) {
+	return b.attemptHistory(nativeWorkboardContext(ctx), boardID, cardID, options)
+}
+
+func (b *WorkboardBridge) BrowserAttemptHistory(ctx context.Context, subject, boardID, cardID string, options webui.AttemptHistoryOptions) (webui.AttemptHistoryPage, error) {
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
+	if err != nil {
+		return webui.AttemptHistoryPage{}, err
+	}
+	return b.attemptHistory(trusted, boardID, cardID, options)
+}
+
+func (b *WorkboardBridge) attemptHistory(ctx context.Context, boardID, cardID string, options webui.AttemptHistoryOptions) (webui.AttemptHistoryPage, error) {
+	if options.Validate() != nil || !authorizedWorkboardRead(ctx) {
+		return webui.AttemptHistoryPage{}, errors.New("invalid attempt history read")
+	}
+	page, err := b.history.ListAttemptHistory(ctx, boardID, cardID, workboard.AttemptHistoryOptions{After: options.After, Limit: options.Limit})
+	if err != nil {
+		return webui.AttemptHistoryPage{}, err
+	}
+	return projectAttemptHistory(page)
+}
+
+func (b *WorkboardBridge) NativeAttemptDetail(ctx context.Context, boardID, cardID, attemptID string, options webui.AttemptDetailOptions) (webui.AttemptDetailPage, error) {
+	return b.attemptDetail(nativeWorkboardContext(ctx), boardID, cardID, attemptID, options)
+}
+
+func (b *WorkboardBridge) BrowserAttemptDetail(ctx context.Context, subject, boardID, cardID, attemptID string, options webui.AttemptDetailOptions) (webui.AttemptDetailPage, error) {
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
+	if err != nil {
+		return webui.AttemptDetailPage{}, err
+	}
+	return b.attemptDetail(trusted, boardID, cardID, attemptID, options)
+}
+
+func (b *WorkboardBridge) attemptDetail(ctx context.Context, boardID, cardID, attemptID string, options webui.AttemptDetailOptions) (webui.AttemptDetailPage, error) {
+	if options.Validate() != nil || !authorizedWorkboardRead(ctx) {
+		return webui.AttemptDetailPage{}, errors.New("invalid attempt detail read")
+	}
+	page, err := b.history.ReadAttemptDetail(ctx, boardID, cardID, attemptID, workboard.AttemptDetailOptions{After: options.After, Limit: options.Limit})
+	if err != nil {
+		return webui.AttemptDetailPage{}, err
+	}
+	return projectAttemptDetail(page)
+}
+
+func authorizedWorkboardRead(ctx context.Context) bool {
+	authority, err := (contextWorkboardAuthority{}).WorkboardAuthority(ctx)
+	return err == nil && authority.Validate() == nil && authority.Actor.Type == "operator"
 }
 
 func (b *WorkboardBridge) read(ctx context.Context, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
@@ -175,11 +272,23 @@ func (b *WorkboardBridge) NativeMutate(ctx context.Context, request webui.BoardR
 }
 
 func (b *WorkboardBridge) BrowserMutate(ctx context.Context, subject string, request webui.BoardRequest) (webui.OperationReceipt, error) {
-	trusted, err := browserWorkboardContext(ctx, subject)
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
 	if err != nil {
 		return webui.OperationReceipt{}, err
 	}
 	return b.mutate(trusted, request)
+}
+
+// legacyBrowserMutate exists only for schema-38 recovery of a pending browser
+// operation created before workspace authority existed. Its durable initiating
+// subject is both the legacy creation scope and actor; the recovery session is
+// deliberately excluded from domain attribution.
+func (b *WorkboardBridge) legacyBrowserMutate(ctx context.Context, initiatingSubject string, request webui.BoardRequest) (webui.OperationReceipt, error) {
+	if ctx == nil || !validBrowserSubject(initiatingSubject) {
+		return webui.OperationReceipt{}, errors.New("legacy workboard authority unavailable")
+	}
+	authority := workboard.Authority{CreationScope: initiatingSubject, Actor: workboard.Actor{ID: initiatingSubject, Type: "operator"}}
+	return b.mutate(context.WithValue(ctx, workboardAuthorityKey{}, authority), request)
 }
 
 func (b *WorkboardBridge) mutate(ctx context.Context, request webui.BoardRequest) (webui.OperationReceipt, error) {
@@ -292,7 +401,7 @@ func (b *WorkboardBridge) NativeEvents(ctx context.Context, boardID string, opti
 }
 
 func (b *WorkboardBridge) BrowserEvents(ctx context.Context, subject, boardID string, options webui.BoardEventOptions) (webui.BoardEventPage, error) {
-	trusted, err := browserWorkboardContext(ctx, subject)
+	trusted, err := browserWorkboardContext(ctx, subject, b.browserAuthority)
 	if err != nil {
 		return webui.BoardEventPage{}, err
 	}

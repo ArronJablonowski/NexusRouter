@@ -15,6 +15,7 @@ type evaluationStoredResult struct {
 	Candidate  *workboard.CandidateRecord  `json:"candidate"`
 	Evidence   []workboard.EvidenceRecord  `json:"evidence"`
 	Acceptance *workboard.AcceptanceRecord `json:"acceptance,omitempty"`
+	Successors []workboard.Card            `json:"successors,omitempty"`
 }
 
 type evaluationMutationResponse struct {
@@ -124,6 +125,23 @@ func validateEvaluationStoredResult(result evaluationStoredResult) error {
 			a.EvidenceHeadRevision != int64(len(result.Evidence)) || a.EvidenceSetDigest != workboard.EvidenceSetDigest(result.Evidence) {
 			return ErrWorkboardCorrupt
 		}
+	}
+	seenSuccessors := make(map[string]bool, len(result.Successors))
+	seenPositions := make(map[string]bool, len(result.Successors))
+	for index, successor := range result.Successors {
+		if successor.Validate() != nil || successor.BoardID != result.Candidate.BoardID ||
+			!containsString(successor.Dependencies, result.Candidate.CardID) ||
+			(successor.State != workboard.Backlog && successor.State != workboard.Ready) ||
+			(successor.State == workboard.Ready) != (successor.RemainingDependencies == 0) ||
+			seenSuccessors[successor.ID] || index > 0 && result.Successors[index-1].ID >= successor.ID {
+			return ErrWorkboardCorrupt
+		}
+		position := string(successor.State) + "\x00" + successor.Rank
+		if seenPositions[position] {
+			return ErrWorkboardCorrupt
+		}
+		seenSuccessors[successor.ID] = true
+		seenPositions[position] = true
 	}
 	return nil
 }

@@ -349,6 +349,11 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 	attempt := attemptFixture("accepted")
 	lifecycle := CardLifecycle{Version: 1, CardID: card.ID, Attempt: attempt, Checkpoints: []WorkCheckpoint{},
 		CheckpointCount: 0, Acceptance: ptrAcceptance(acceptanceFixture(attempt))}
+	history := AttemptHistoryPage{Version: 1, BoardID: board.ID, CardID: card.ID, HighWaterOrdinal: 1,
+		Items: []AttemptHistoryRecord{{Version: 1, ID: attempt.ID, BoardID: board.ID, CardID: card.ID, Ordinal: 1,
+			Revision: attempt.Revision, State: attempt.State, WorkerID: attempt.WorkerID, CriteriaRevision: attempt.CriteriaRevision,
+			CandidateID: attempt.Candidate.ID, AcceptanceID: attempt.AcceptanceID, StartedAt: attempt.StartedAt, EndedAt: attempt.EndedAt}}}
+	detail := AttemptDetailPage{Version: 1, Attempt: attempt, Checkpoints: []WorkCheckpoint{}}
 	receipt := OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "operation-key-01", RequestDigest: strings.Repeat("d", 64), ResponseDigest: strings.Repeat("e", 64), FirstSequence: 2, LastSequence: 3, EventCount: 2, TransactionBytes: 2048, BoardRevision: 2, CardID: "card-a", CardRevision: int64ptr(3), Outcome: "committed", CreatedAt: workboardTime()}
 	values := []struct {
 		definition string
@@ -359,6 +364,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"card", card},
 		{"attempt", attempt},
 		{"card_lifecycle", lifecycle},
+		{"attempt_history_page", history},
+		{"attempt_detail_page", detail},
 		{"snapshot", BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
 		{"page", Page{Version: 1, Items: []Board{board}}},
 		{"operation_receipt", receipt},

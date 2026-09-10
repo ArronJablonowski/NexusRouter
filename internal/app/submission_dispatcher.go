@@ -38,6 +38,7 @@ type Dispatcher struct {
 	closed             bool
 	healthNow          func() time.Time
 	renewInterval      time.Duration
+	workboardRecovery  *WorkboardRecoveryCoordinator
 }
 
 func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
@@ -50,6 +51,12 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, eventSink: s.eventSink, eventSinkSequencer: s.eventSinkSequencer, lifecycle: ctx, recoverySecrets: func() []string { return memorySecrets(s.settings, s.secret) }, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
+	d.workboardRecovery, err = NewWorkboardRecoveryCoordinator(db, time.Now)
+	if err != nil {
+		db.Close()
+		cancel()
+		return nil, ErrSubmission
+	}
 	var workers sync.WaitGroup
 	workers.Add(1)
 	go func() {

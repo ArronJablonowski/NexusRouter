@@ -64,6 +64,9 @@ func (d *WorkboardWorkerDispatch) Claim(ctx context.Context, request workboard.C
 	if d == nil || d.lifecycle == nil {
 		return workboard.OperationReceipt{}, ErrAdmission
 	}
+	if request.TaskID == "" || request.SessionID == "" {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
 	return d.lifecycle.Claim(ctx, request)
 }
 
@@ -72,6 +75,13 @@ func (d *WorkboardWorkerDispatch) Heartbeat(ctx context.Context, request workboa
 		return workboard.OperationReceipt{}, ErrAdmission
 	}
 	return d.lifecycle.Heartbeat(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) Fail(ctx context.Context, request workboard.FailClaimRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.lifecycle == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.lifecycle.Fail(ctx, request)
 }
 
 func (d *WorkboardWorkerDispatch) AppendCheckpoint(ctx context.Context, request workboard.AppendCheckpointRequest) (workboard.OperationReceipt, error) {

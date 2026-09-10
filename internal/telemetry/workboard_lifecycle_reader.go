@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"reflect"
 	"time"
@@ -46,38 +45,20 @@ func (s *Store) ReadCardLifecycleSnapshots(ctx context.Context, boardID string, 
 }
 
 func readCardLifecycleSnapshot(ctx context.Context, tx *sql.Tx, boardID, cardID string) (workboard.CardLifecycleSnapshot, bool, error) {
-	var body []byte
-	var revision int64
-	var state string
-	err := tx.QueryRowContext(ctx, `SELECT revision,state,body FROM workboard_attempts
-		WHERE board_id=? AND card_id=? ORDER BY ordinal DESC LIMIT 1`, boardID, cardID).Scan(&revision, &state, &body)
+	var attemptID string
+	err := tx.QueryRowContext(ctx, `SELECT id FROM workboard_attempts
+		WHERE board_id=? AND card_id=? ORDER BY ordinal DESC LIMIT 1`, boardID, cardID).Scan(&attemptID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return workboard.CardLifecycleSnapshot{}, false, nil
 	}
 	if err != nil {
 		return workboard.CardLifecycleSnapshot{}, false, err
 	}
-	var stored storedLifecycleAttempt
-	if json.Unmarshal(body, &stored) != nil || stored.BoardID != boardID || stored.CardID != cardID || stored.Revision != revision || stored.State != state {
-		return workboard.CardLifecycleSnapshot{}, false, ErrWorkboardCorrupt
-	}
-	attempt := attemptSnapshot(stored)
-	if candidate, found, candidateErr := readSnapshotCandidate(ctx, tx, boardID, cardID, stored.ID); candidateErr != nil {
-		return workboard.CardLifecycleSnapshot{}, false, candidateErr
-	} else if found {
-		attempt.Candidate = &candidate
-	}
-	evidence, err := readSnapshotEvidence(ctx, tx, boardID, cardID, stored.ID)
+	attempt, count, err := readCanonicalAttemptSnapshot(ctx, tx, boardID, cardID, attemptID)
 	if err != nil {
 		return workboard.CardLifecycleSnapshot{}, false, err
 	}
-	attempt.Evidence = evidence
-	if acceptance, found, acceptanceErr := readSnapshotAcceptance(ctx, tx, boardID, cardID, stored.ID); acceptanceErr != nil {
-		return workboard.CardLifecycleSnapshot{}, false, acceptanceErr
-	} else if found {
-		attempt.Acceptance = &acceptance
-	}
-	checkpoints, count, err := readSnapshotCheckpoints(ctx, tx, boardID, cardID, stored.ID)
+	checkpoints, _, err := readSnapshotCheckpoints(ctx, tx, boardID, cardID, attemptID)
 	if err != nil {
 		return workboard.CardLifecycleSnapshot{}, false, err
 	}

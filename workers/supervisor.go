@@ -38,9 +38,14 @@ type FinalizingLeaseJournal interface {
 }
 type Work struct {
 	TaskID, SessionID, ParentID, Scope string
-	SubmissionID                       string
-	DelegationOrigin                   *runtime.DelegationOrigin
-	DelegationAuditIntent              *runtime.DelegationAuditIntent
+	// WorkerID is an optional trusted host-supplied identity. It exists so an
+	// application capability can bind this execution to another durable lease
+	// before Execute begins. Prompts and tool arguments must never populate it.
+	// An empty value preserves the supervisor's generated-identity behavior.
+	WorkerID              string
+	SubmissionID          string
+	DelegationOrigin      *runtime.DelegationOrigin
+	DelegationAuditIntent *runtime.DelegationAuditIntent
 	// Execute must honor cancellation. Only inference and read-only tools are
 	// admitted here; there is no safe forced termination of arbitrary Go code.
 	Execute  func(context.Context) (string, error)
@@ -74,6 +79,9 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 	if w.TaskID == "" || w.SessionID == "" || w.ParentID == "" || w.Scope == "" || w.Execute == nil || w.Validate == nil {
 		return "", ErrWork
 	}
+	if w.WorkerID != "" && !validWorkerID(w.WorkerID) {
+		return "", ErrWork
+	}
 	if w.DelegationOrigin != nil {
 		w.DelegationOrigin = w.DelegationOrigin.Clone()
 		if w.DelegationOrigin.Validate() != nil {
@@ -99,7 +107,10 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
-	worker := rand.Text()
+	worker := w.WorkerID
+	if worker == "" {
+		worker = rand.Text()
+	}
 	leaseToken := ""
 	leaseFinalized := false
 	seq := int64(0)
@@ -268,6 +279,18 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 			return result.text, nil
 		}
 	}
+}
+
+func validWorkerID(value string) bool {
+	if len(value) < 1 || len(value) > 128 {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x21 || r > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 func finalizeWorkerLease(j FinalizingLeaseJournal, ctx context.Context, seq int64, e runtime.Event, token, owner string) (err error) {
