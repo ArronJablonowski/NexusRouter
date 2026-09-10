@@ -56,15 +56,20 @@ card mutations; and durable claim, heartbeat, recovery,
 criteria-revision, and checkpoint commands. Native JSON routes and the
 browser-session/CSRF BFF are composed into the daemon for board/card reads and
 operator-safe mutations, with reconnectable board-event SSE and a request-bound
-browser operation journal. The lifecycle layer now also covers candidate
+browser operation journal. DAR-83 now has a first integrated, read-only Kanban
+slice inside that same authenticated Web UI: active board navigation, seven
+canonical lifecycle lanes, bounded card pagination, expandable dependency and
+attempt previews, and reconnect-safe SSE invalidation followed by authoritative
+snapshot refetch. It does not yet provide filters, list mode, mutations,
+keyboard movement, or acceptance controls. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
 attention. Bounded in-process workers are atomically bound to claims and runtime
 tasks; stop-proof recovery is independently derived from durable task, process,
 and effect evidence; lifecycle and dependency history is paginated; and exact
 browser recovery survives restart and credential rotation through a persistent
-workspace identity. Agent tools and the visual Kanban remain DAR-84 and DAR-83
-work respectively.
+workspace identity. Agent tools remain DAR-84 work, while the remaining
+interactive Kanban behavior remains DAR-83 work.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -87,7 +92,8 @@ controls. Schema 36 adds normalized card identity to workboard events; existing
 schema-35 board events upgrade transactionally with a `NULL` card ID. Schema 37
 adds a non-secret persistent workspace identity, and schema 38 records exact
 cross-session browser reconciliation while preserving legacy pending-operation
-attribution. Agent tools and the integrated Kanban feature view remain open.
+attribution. The first integrated read-only Kanban feature view is implemented;
+its mutation, filtering, alternate-list, and keyboard workflows remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

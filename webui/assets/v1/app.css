@@ -90,6 +90,45 @@ input { padding: .55rem .7rem; }
 .inspector-list + .secondary { width: 100%; margin-top: .65rem; }
 .state-running { color: #73e6b1; }
 .state-failed, .state-canceled { color: #ffb6b6; }
+.workboard-view { min-width: 0; }
+.workboard-view[hidden], .chat-view[hidden] { display: none; }
+.workboard-heading, .kanban-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.workboard-heading { margin-bottom: 1rem; }
+.workboard-heading h1, .kanban-heading h2, .board-index h2 { margin: .15rem 0 0; }
+.workboard-layout { display: grid; grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr); gap: 1rem; min-height: calc(100vh - 9rem); }
+.board-index, .kanban-panel { min-width: 0; border: 1px solid #34415d; border-radius: 1rem; background: #111a2ddd; box-shadow: 0 1rem 3rem #0003; }
+.board-index { display: flex; flex-direction: column; padding: 1rem; }
+.board-list { flex: 1; margin: .7rem 0; padding: 0; overflow-y: auto; list-style: none; }
+.board-list a { display: block; margin-bottom: .4rem; padding: .75rem; border-radius: .65rem; text-decoration: none; }
+.board-list a:hover, .board-list a:focus-visible, .board-list a[aria-current="page"] { background: #263758; }
+.board-name { display: block; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.board-summary { display: block; margin-top: .35rem; color: #9fb0ce; font-size: .76rem; }
+.kanban-panel { display: flex; flex-direction: column; overflow: hidden; }
+.kanban-heading { padding: 1.2rem 1.4rem; border-bottom: 1px solid #2a3550; }
+.kanban { display: grid; grid-template-columns: repeat(7, minmax(14rem, 1fr)); gap: .8rem; padding: 1rem; overflow: auto; }
+.kanban[aria-busy="true"] { opacity: .72; }
+.kanban-column { min-height: 16rem; padding: .7rem; border: 1px solid #34415d; border-radius: .75rem; background: #0d1628; }
+.kanban-column-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 0 .7rem; font-size: .9rem; }
+.kanban-cards { margin: 0; padding: 0; list-style: none; }
+.kanban-card { margin-bottom: .6rem; padding: .75rem; border: 1px solid #3c4b69; border-radius: .65rem; background: #17223a; }
+.kanban-card h4 { margin: 0; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.35; }
+.card-toggle { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.35; }
+.card-details { margin-top: .7rem; padding-top: .65rem; border-top: 1px solid #34415d; color: #cbd6e9; font-size: .78rem; line-height: 1.45; }
+.card-details[hidden] { display: none; }
+.card-details p { margin: .35rem 0; overflow-wrap: anywhere; }
+.card-detail-section { margin-top: .75rem; padding-top: .65rem; border-top: 1px solid #34415d; }
+.card-detail-section h5 { margin: 0 0 .35rem; color: #eef4ff; font-size: .78rem; }
+.card-detail-list, .checkpoint-list { margin: 0; padding-left: 1.15rem; }
+.card-detail-list li, .checkpoint-list li { margin: .25rem 0; overflow-wrap: anywhere; }
+.attempt-toggle { width: 100%; padding: .35rem; background: #263758; color: inherit; text-align: left; }
+.attempt-detail { padding: .35rem; }
+.attempt-detail[hidden] { display: none; }
+.detail-empty { color: #9fb0ce; }
+.detail-more { color: #ffcf70; }
+.card-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; color: #9fb0ce; font-size: .72rem; }
+.card-alert { color: #ffcf70; }
+.column-empty { margin: 1rem 0; color: #7586a5; font-size: .8rem; text-align: center; }
+.kanban-more { margin: 0 auto 1rem; }
 :focus-visible { outline: 3px solid #73e6b1; outline-offset: 3px; }
 
 @media (max-width: 78rem) {
@@ -109,6 +148,8 @@ input { padding: .55rem .7rem; }
   .chat-view { grid-template: minmax(14rem, 35vh) minmax(22rem, 1fr) / 1fr; height: auto; min-height: calc(100vh - 9.5rem); }
   .transcript { min-height: 18rem; }
   .inspector, #task-inspector { display: block; }
+  .workboard-layout { grid-template-columns: 1fr; }
+  .board-index { min-height: 15rem; }
   #task-inspector[hidden] { display: none; }
 }
 

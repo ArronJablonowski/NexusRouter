@@ -115,7 +115,7 @@ func TestOperationMappingIsClosedOwnedAndBrowserScoped(t *testing.T) {
 			t.Fatal("existing application primitive mislabeled", operation)
 		}
 	}
-	for _, operation := range []string{"session.challenge", "chat.history", "operation.list", "task.controls", "feedback.record", "feedback.inspect", "approval.decide", "board.list", "board.create", "board.read", "board.mutate", "board.stream"} {
+	for _, operation := range []string{"session.challenge", "chat.history", "operation.list", "task.controls", "feedback.record", "feedback.inspect", "approval.decide", "board.list", "board.create", "board.read", "board.dependencies", "board.attempts", "board.attempt", "board.mutate", "board.stream"} {
 		if existing[operation] {
 			t.Fatal("future application primitive mislabeled", operation)
 		}

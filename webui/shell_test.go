@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -37,9 +38,11 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 	for _, test := range []struct{ target, contentType, contains string }{
 		{"/console", "text/html", "/console/assets/v1/app.js"},
 		{"/console/chats/chat-a", "text/html", "DarwinRouter"},
+		{"/console/workboards/board-a", "text/html", "Workboard lanes"},
 		{"/console/assets/v1/app.css", "text/css", "color-scheme"},
 		{"/console/assets/v1/operation-contract.js", "text/javascript", "DarwinOperationContract"},
 		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
+		{"/console/assets/v1/workboards.js", "text/javascript", "kanban"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
 		response := shellRequest(t, handler, http.MethodGet, test.target, true)
@@ -54,6 +57,9 @@ func TestShellRequiresHostAndAuthenticationForEveryResource(t *testing.T) {
 	unauthorized := shellRequest(t, handler, http.MethodGet, "/console/assets/v1/app.js", false)
 	if unauthorized.Code != http.StatusUnauthorized || strings.Contains(unauthorized.Body.String(), "app.js") {
 		t.Fatal("asset bypassed authentication or leaked path")
+	}
+	if workboards := shellRequest(t, handler, http.MethodGet, "/console/assets/v1/workboards.js", false); workboards.Code != http.StatusUnauthorized || strings.Contains(workboards.Body.String(), "kanban") {
+		t.Fatal("workboard asset bypassed authentication or leaked content")
 	}
 	request := httptest.NewRequest(http.MethodGet, "http://evil.example/console", nil)
 	request.Header.Set("X-Test-Session", "valid")
@@ -127,10 +133,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "e09cd0d4e319f07362e7c18fa07dcc7144b1b580d7564d847a16a25e86fcf08e" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "2310dd1286d55734a4fc2b70b23ba3fc8877628fc35aafda2d9f707bbafe7909" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboards.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -252,7 +258,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboards.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -260,6 +266,90 @@ func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
 		if lines := strings.Count(string(body), "\n") + 1; lines >= 1000 {
 			t.Fatalf("%s has %d lines; source files must remain below 1,000", name, lines)
 		}
+	}
+}
+
+func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/workboards.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`requestJSON("/api/v1/workboards?" + query.toString())`, `requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID)`,
+		"const boardPageLimit = 25, cardPageLimit = 100, dependencyLimit = 100, attemptLimit = 25, maxBoards = 100, maxCards = 10000", "new URLSearchParams", "validCursorTail(value, boardPageLimit)",
+		"value.cards.length <= cardPageLimit", "cardTotal + snapshot.cards.length > maxCards", "ids.has(card.id)",
+		`credentials: "same-origin"`, `cache: "no-store"`, "node.textContent = text", `kanban.setAttribute("aria-busy", "true")`,
+		"No active workboards yet.", "This workboard has no cards yet.", "Use Refresh to try again.", "column.state === states[index]",
+		"boardIDs.has(board.id)", "boardCursors.has(page.next_cursor)", "cardCursors.has(snapshot.next_cursor)", "snapshotFence !== fence",
+		`toggle.setAttribute("aria-expanded"`, `toggle.setAttribute("aria-label", "Inspect card: "`, "active claim", "dependencies remaining",
+		`new EventSource(base + "/api/v1/workboards/"`, `event.lastEventId !== payload.cursor`, `streamFailures >= 8`, `window.clearTimeout(invalidationTimer)`,
+		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
+		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("workboard client guard missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "localStorage", "sessionStorage", "X-Darwin-CSRF", `method: "POST"`, `+ checkpoint.evidence`} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("read-only workboard slice contains unsafe primitive %q", forbidden)
+		}
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(index)
+	for _, required := range []string{`href="__DARWIN_BASE_PATH__/workboards"`, `id="workboard-view"`, `aria-labelledby="workboard-title"`,
+		`id="board-list-state"`, `role="status"`, `id="workboard-state"`, `id="kanban"`, `role="region"`, `aria-label="Workboard lanes"`,
+		`id="refresh-workboards"`, `id="load-more-boards"`, `id="load-more-cards"`, `/assets/v1/workboards.js`} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("accessible workboard markup missing %q", required)
+		}
+	}
+}
+
+func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	guard := strings.Index(body, `const workboardRoute = window.DarwinRoutes.workboards(relativePath)`)
+	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals()`)
+	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
+	if guard < 0 || !strings.Contains(body[guard:chat], `if (!workboardRoute)`) || chat < guard || csrf < chat {
+		t.Fatal("workboard route does not guard unrelated startup requests")
+	}
+	if !strings.Contains(body, `for (const link of document.querySelectorAll("[data-view]"))`) || !strings.Contains(body, `link.setAttribute("aria-current", "page")`) {
+		t.Fatal("workboard navigation cannot expose its current page")
+	}
+}
+
+func TestWorkboardClientRejectsInvalidDecodedBoardBeforeBoardRequests(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is unavailable")
+	}
+	script := `
+const asset = process.argv[1];
+const urls = [];
+let streams = 0;
+const node = {hidden:false, disabled:false, textContent:"", dataset:{}, children:[], classList:{toggle(){}},
+  addEventListener(){}, setAttribute(){}, replaceChildren(){this.children=[]}, append(value){this.children.push(value)}};
+global.document = {body:{dataset:{basePath:"/app"}}, querySelector(){return node}, createElement(){return Object.assign({}, node, {dataset:{}, children:[]})}};
+global.window = {location:{pathname:"/app/workboards/%2F"}, DarwinRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
+global.EventSource = class { constructor(){ streams++ } close(){} addEventListener(){} };
+require(asset);
+setImmediate(() => {
+  if (streams !== 0 || urls.some(url => url.includes("/workboards/%2F"))) process.exit(1);
+});`
+	command := exec.Command(node, "-e", script, "./assets/v1/workboards.js")
+	command.Dir = "."
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("invalid decoded board opened a board request: %v\n%s", err, output)
 	}
 }
 

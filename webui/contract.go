@@ -825,6 +825,9 @@ var operationSpecs = []OperationSpec{
 	{Operation: "board.list", Method: "GET", BrowserPath: "/app/api/v1/workboards", ServicePrimitive: "new GET /v1/workboards", Security: SessionRead},
 	{Operation: "board.create", Method: "POST", BrowserPath: "/app/api/v1/workboards", ServicePrimitive: "new POST /v1/workboards", Security: SessionCSRFMutation, Mutation: true},
 	{Operation: "board.read", Method: "GET", BrowserPath: "/app/api/v1/workboards/{board}", ServicePrimitive: "new bounded workboard snapshot projection", Security: SessionRead},
+	{Operation: "board.dependencies", Method: "GET", BrowserPath: "/app/api/v1/workboards/{board}/cards/{card}/dependencies", ServicePrimitive: "new bounded dependency projection", Security: SessionRead},
+	{Operation: "board.attempts", Method: "GET", BrowserPath: "/app/api/v1/workboards/{board}/cards/{card}/attempts", ServicePrimitive: "new bounded attempt-history projection", Security: SessionRead},
+	{Operation: "board.attempt", Method: "GET", BrowserPath: "/app/api/v1/workboards/{board}/cards/{card}/attempts/{attempt}", ServicePrimitive: "new bounded attempt-detail projection", Security: SessionRead},
 	{Operation: "board.mutate", Method: "POST", BrowserPath: "/app/api/v1/workboards/{board}/operations", ServicePrimitive: "new POST /v1/workboards/{board}/operations", Security: SessionCSRFMutation, Mutation: true},
 	{Operation: "board.stream", Method: "GET", BrowserPath: "/app/api/v1/workboards/{board}/events", ServicePrimitive: "new GET /v1/workboards/{board}/events", Security: SessionRead},
 }

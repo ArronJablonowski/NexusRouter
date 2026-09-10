@@ -969,14 +969,13 @@
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
+	const workboardRoute = window.DarwinRoutes.workboards(relativePath);
 	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
-	loadChats("");
-	checkRecentOperations();
-	window.DarwinInspector.loadGlobals();
-	updateControls();
+	if (!workboardRoute) {
+	loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals(); updateControls();
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"
@@ -988,9 +987,9 @@
 		csrfToken = session.csrf_token;
 		updateControls();
 		if (!selectedChat) connection.textContent = "Connected";
-	}).catch(() => { connection.textContent = "Session needs attention"; });
+	}).catch(() => { connection.textContent = "Session needs attention"; }); }
 	for (const link of document.querySelectorAll("[data-view]")) {
-		const selected = window.location.pathname.startsWith(link.pathname);
+		const selected = link.dataset.view === "workboards" ? workboardRoute : window.DarwinRoutes.chats(relativePath);
 		if (selected) link.setAttribute("aria-current", "page");
 		else link.removeAttribute("aria-current");
 	}

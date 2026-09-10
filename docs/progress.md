@@ -5931,3 +5931,41 @@ the 1,000-line limit, `go vet ./...`, the full race suite, and `go build ./...`
 all succeeded. A pre-existing compaction fixture was also made deterministic by
 disabling the production exploration policy for that fixed-route test; it then
 passed 100 focused runs and 50 race-enabled focused runs before the full gate.
+
+## 2026-09-09 — DAR-83 first integrated Kanban checkpoint
+
+DAR-83 remains in progress. The authenticated embedded Web UI now includes a
+first-class Workboards destination alongside Chats; this is one DarwinRouter
+application shell and authority boundary, not a separately deployed board app.
+Active workboards open as a responsive seven-lane Kanban using the canonical
+Backlog, Ready, In Progress, Blocked, Review, Done, and Canceled lifecycle
+states. Board and card pagination is bounded, duplicate/cursor/rank violations
+fail closed, and every card page is fenced to one board, layout, event, graph,
+and column generation.
+
+Cards expose keyboard-operable disclosure controls with bounded prerequisite,
+dependent, attempt-history, and checkpoint previews. Raw checkpoint evidence is
+validated but deliberately not rendered. Dynamic values use inert text nodes;
+the new asset remains behind the existing host allowlist and authenticated
+same-origin session boundary and neither stores credentials nor loads external
+resources. Malformed decoded board IDs are rejected before a board fetch or
+event stream can start, and failed previews can be retried.
+
+Workboard-scoped SSE treats each committed event only as an invalidation. It
+binds the browser event ID to the validated server cursor, coalesces changes,
+and refetches the authoritative snapshot instead of inferring state. Streams
+close on unload or board change and stop after bounded consecutive reconnect
+failures. Focused JavaScript syntax, source-limit, contract, shell, browser BFF,
+CLI, and diff checks passed before the repository-wide gate.
+
+This checkpoint is intentionally read-only. Filters, list presentation,
+board/card/dependency mutations, revision-conflict and lost-ack reconciliation,
+keyboard move/reorder controls, and acceptance/rejection UI remain assigned to
+later DAR-83 slices. Agent-facing workboard tools remain DAR-84 work.
+
+Repository-wide `make check` passed for this checkpoint: source formatting and
+the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
+`go build ./...`. The longest rebuilt packages were application 568.690s,
+telemetry 483.396s, releasepack 480.364s, SDK 65.751s, CLI 64.589s, toolgate
+31.024s, workers 10.103s, processguard 3.548s, browser BFF 3.325s, and Web UI
+3.139s.
