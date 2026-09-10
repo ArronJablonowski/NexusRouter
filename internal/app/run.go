@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/ArronJablonowski/DarwinRouter/contextengine"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
@@ -53,6 +54,7 @@ type Request struct {
 	memoryPrepared                  bool
 	memoryContext                   *memoryContext
 	autoCompactionTried             bool
+	runtimeHostAdmission            *runtimeHostAdmission
 	Validation                      string
 	onlyModelID, retryOfTaskID      string
 	ModelID, Prompt, ContinueTaskID string
@@ -64,6 +66,57 @@ type Request struct {
 	LocalRequired                   bool
 	route                           *runtime.Data
 }
+
+// runtimeHostAdmission binds one app execution to identities allocated by a
+// trusted enclosing host. The callback owns the first durable append so it can
+// atomically commit that exact redacted TaskStarted event with host state.
+// Copies share state and therefore cannot reuse the one-shot callback.
+type runtimeHostAdmission struct {
+	taskID, sessionID, parentTaskID, workerID string
+	store                                     *telemetry.Store
+	commitFirst                               func(context.Context, runtime.Event) error
+	state                                     *runtimeHostAdmissionState
+}
+
+type runtimeHostAdmissionState struct {
+	mu        sync.Mutex
+	attempted bool
+	committed bool
+}
+
+// withRuntimeHostAdmission is intentionally package-private: runtime identity
+// is trusted host configuration, never a public Request input.
+func withRuntimeHostAdmission(r Request, admission runtimeHostAdmission) (Request, error) {
+	if r.runtimeHostAdmission != nil || admission.state != nil || admission.store == nil || admission.commitFirst == nil ||
+		!sessions.ValidEventPageID(admission.taskID) || !sessions.ValidEventPageID(admission.sessionID) ||
+		(admission.parentTaskID != "" && !sessions.ValidEventPageID(admission.parentTaskID)) ||
+		!validRuntimeHostWorkerID(admission.workerID) ||
+		invalidRuntimeHostRequestState(r) {
+		return Request{}, ErrAdmission
+	}
+	admission.state = &runtimeHostAdmissionState{}
+	r.runtimeHostAdmission = &admission
+	return r, nil
+}
+
+func invalidRuntimeHostRequestState(r Request) bool {
+	return r.submissionID != "" || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil ||
+		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.continuation != nil || r.retryOfTaskID != "" ||
+		r.onlyModelID != "" || r.autoCompactionTried
+}
+
+func validRuntimeHostWorkerID(value string) bool {
+	if len(value) < 1 || len(value) > 128 {
+		return false
+	}
+	for _, c := range value {
+		if c < 0x21 || c > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
 type Result struct {
 	PreviousTaskIDs      []string
 	RouteEstimatedCost   *float64
@@ -86,7 +139,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if classifyErr != nil {
 		return result, classifyErr
 	}
-	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil {
+	if s.Validate() != nil || r.ModelID == "" || validateInput(r) != nil || validateRuntimeHostStore(ctx, s, r) != nil {
 		return result, ErrAdmission
 	}
 	if r.delegatedParent != "" {
@@ -223,11 +276,22 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if value := metricsExportSecret(s, secret); value != "" {
 		secrets = append(secrets, value)
 	}
-	db, err := telemetry.Open(ctx, s.Telemetry.Database)
-	if err != nil {
-		return result, errors.New("cannot open task storage")
+	var (
+		db  *telemetry.Store
+		err error
+	)
+	if r.runtimeHostAdmission != nil {
+		db = r.runtimeHostAdmission.store
+		if _, err := db.WorkspaceIdentity(ctx); err != nil {
+			return result, ErrAdmission
+		}
+	} else {
+		db, err = telemetry.Open(ctx, s.Telemetry.Database)
+		if err != nil {
+			return result, errors.New("cannot open task storage")
+		}
+		defer db.Close()
 	}
-	defer db.Close()
 	if s.Tools.WorkboardReadEnabled {
 		if registry == nil {
 			registry = &tools.Registry{}
@@ -305,6 +369,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, ErrAdmission
 	}
 	result.TaskID = rand.Text()
+	if r.runtimeHostAdmission != nil {
+		result.TaskID = r.runtimeHostAdmission.taskID
+	}
 	if model.EstimatedCost != nil {
 		cost := *model.EstimatedCost
 		result.RouteEstimatedCost = &cost
@@ -324,7 +391,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if sessionID == "" {
 		sessionID = result.TaskID
 	}
-	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken}
+	if r.runtimeHostAdmission != nil {
+		sessionID = r.runtimeHostAdmission.sessionID
+	}
+	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken, runtimeHostAdmission: r.runtimeHostAdmission}
 	if r.textSink != nil || r.presentationTextSink != nil {
 		j.textDelivery = &textDelivery{secrets: secrets, emit: func(text string, final bool) {
 			if !final {
@@ -378,11 +448,16 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			maxTurns = min(s.Workers.DelegateMaxTurns, s.Tools.MaxTurns, s.Runtime.MaxTurns)
 		}
 	}
+	workerID := ""
+	if r.runtimeHostAdmission != nil {
+		parentID = r.runtimeHostAdmission.parentTaskID
+		workerID = r.runtimeHostAdmission.workerID
+	}
 	var compaction *runtime.ContextCompaction
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), SubmissionID: r.submissionID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {
@@ -397,6 +472,24 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	return result, err
 }
 
+func validateRuntimeHostStore(ctx context.Context, s config.Settings, r Request) error {
+	if r.runtimeHostAdmission == nil {
+		return nil
+	}
+	a := r.runtimeHostAdmission
+	if ctx == nil || a.store == nil || a.commitFirst == nil || a.state == nil || invalidRuntimeHostRequestState(r) ||
+		!sessions.ValidEventPageID(a.taskID) || !sessions.ValidEventPageID(a.sessionID) ||
+		(a.parentTaskID != "" && !sessions.ValidEventPageID(a.parentTaskID)) || !validRuntimeHostWorkerID(a.workerID) ||
+		r.ModelID == "" || r.ModelID == "auto" || s.Workers.DelegateModel != "" {
+		return ErrAdmission
+	}
+	same, err := a.store.SameDatabaseFile(ctx, s.Telemetry.Database)
+	if err != nil || !same {
+		return ErrAdmission
+	}
+	return nil
+}
+
 type redactingJournal struct {
 	submissionID, submissionToken string
 	db                            *telemetry.Store
@@ -405,6 +498,7 @@ type redactingJournal struct {
 	eventDelivery                 *eventDelivery
 	deliverPerCall                bool
 	textDelivery                  *textDelivery
+	runtimeHostAdmission          *runtimeHostAdmission
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
@@ -467,6 +561,14 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 	}
 	e.Data = redacted
 	commit := func() error {
+		if j.runtimeHostAdmission != nil {
+			if err := j.runtimeHostAdmission.validateAppend(expected, e, j.db); err != nil {
+				return err
+			}
+			if expected == 0 {
+				return j.runtimeHostAdmission.commit(ctx, e)
+			}
+		}
 		if finish {
 			return j.db.FinishWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)
 		}
@@ -496,6 +598,52 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 	if j.textDelivery != nil && (j.eventDelivery == nil || !j.eventDelivery.Failed()) {
 		j.textDelivery.accept(e.Kind, rawText)
 	}
+	return nil
+}
+
+func (a *runtimeHostAdmission) validateAppend(expected int64, event runtime.Event, store *telemetry.Store) error {
+	if a == nil || a.state == nil || store == nil || store != a.store || expected < 0 || event.Sequence != expected+1 ||
+		event.TaskID != a.taskID || event.SessionID != a.sessionID || event.CorrelationID != a.taskID || event.WorkerID != a.workerID || event.Validate() != nil {
+		return ErrAdmission
+	}
+	if expected == 0 && (event.Kind != runtime.TaskStarted || event.Data.ParentTaskID != a.parentTaskID || event.TurnID != "" ||
+		event.AttemptID != "" || event.RouteID != "" || event.CausationID != "") {
+		return ErrAdmission
+	}
+	if expected > 0 {
+		a.state.mu.Lock()
+		committed := a.state.committed
+		a.state.mu.Unlock()
+		if !committed {
+			return ErrAdmission
+		}
+	}
+	return nil
+}
+
+func (a *runtimeHostAdmission) commit(ctx context.Context, event runtime.Event) error {
+	if ctx == nil || ctx.Err() != nil {
+		return ErrAdmission
+	}
+	a.state.mu.Lock()
+	defer a.state.mu.Unlock()
+	if a.state.attempted {
+		return ErrAdmission
+	}
+	a.state.attempted = true
+	if err := a.commitFirst(ctx, event); err != nil {
+		return err
+	}
+	stored, err := a.store.Read(ctx, event.TaskID, 0, 2)
+	if err != nil || len(stored) != 1 {
+		return ErrAdmission
+	}
+	want, wantErr := event.Encode()
+	got, gotErr := stored[0].Encode()
+	if wantErr != nil || gotErr != nil || string(want) != string(got) {
+		return ErrAdmission
+	}
+	a.state.committed = true
 	return nil
 }
 func redact(value string, secrets []string) string {

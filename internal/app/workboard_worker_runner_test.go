@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,90 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
 )
+
+func bindTestWorkboardRuntime(ctx context.Context, handle *WorkboardWorkerHandle) error {
+	request, err := handle.BindRuntimeRequest(Request{})
+	if err != nil || request.runtimeHostAdmission == nil {
+		return errors.Join(ErrAdmission, err)
+	}
+	admission := request.runtimeHostAdmission
+	return admission.commit(ctx, runtime.Event{Version: 1, ID: rand.Text(), TaskID: admission.taskID,
+		SessionID: admission.sessionID, CorrelationID: admission.taskID, WorkerID: admission.workerID,
+		Sequence: 1, Time: time.Now().UTC(), Kind: runtime.TaskStarted,
+		Data: runtime.Data{ParentTaskID: admission.parentTaskID}})
+}
+
+func TestWorkboardWorkerRunnerLeavesUnboundCardReady(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, &capturingWorkboardEvaluator{}, strings.Repeat("1", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	_, err = runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "unbound-runtime-task",
+		SessionID: "unbound-runtime-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
+		ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
+		Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			called = true
+			if mutationErr := handle.AppendCheckpoint(run, "not yet claimed"); !errors.Is(mutationErr, ErrAdmission) {
+				return WorkboardCandidate{}, errors.New("pending handle admitted a mutation")
+			}
+			return WorkboardCandidate{Summary: "must not be submitted"}, nil
+		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
+	if !called || !errors.Is(err, ErrAdmission) {
+		t.Fatalf("called=%v err=%v", called, err)
+	}
+	card, cardErr := store.GetCard(ctx, boardID, cardID)
+	snapshots, snapshotErr := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	events, eventErr := store.Read(ctx, "unbound-runtime-task", 0, 10)
+	if cardErr != nil || snapshotErr != nil || eventErr != nil || card.State != "ready" || card.CurrentAttemptID != "" ||
+		snapshots[cardID].Attempt != nil || len(events) != 0 {
+		t.Fatalf("unbound execution changed durable state: card=%+v lifecycle=%+v events=%+v errors=%v/%v/%v",
+			card, snapshots[cardID], events, cardErr, snapshotErr, eventErr)
+	}
+}
+
+func TestWorkboardWorkerHandleBindsRuntimeRequestOnlyOnce(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, &capturingWorkboardEvaluator{}, strings.Repeat("2", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "single-bind-task",
+		SessionID: "single-bind-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
+		ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
+		Execute: func(_ context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			first, firstErr := handle.BindRuntimeRequest(Request{})
+			if firstErr != nil || first.runtimeHostAdmission == nil {
+				return WorkboardCandidate{}, errors.Join(errors.New("first bind failed"), firstErr)
+			}
+			if _, secondErr := handle.BindRuntimeRequest(Request{}); !errors.Is(secondErr, ErrAdmission) {
+				return WorkboardCandidate{}, errors.New("second bind was admitted")
+			}
+			return WorkboardCandidate{}, errors.New("stop before runtime start")
+		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
+	if err == nil {
+		t.Fatal("bound-but-unstarted callback succeeded")
+	}
+	card, cardErr := store.GetCard(ctx, boardID, cardID)
+	if cardErr != nil || card.State != "ready" || card.CurrentClaimID != "" {
+		t.Fatalf("binding alone claimed card: card=%+v err=%v", card, cardErr)
+	}
+}
 
 func TestWorkboardWorkerRunnerBindsRuntimeAndCompletesReviewLifecycle(t *testing.T) {
 	ctx := context.Background()
@@ -37,6 +122,9 @@ func TestWorkboardWorkerRunnerBindsRuntimeAndCompletesReviewLifecycle(t *testing
 		SessionID: "board-runtime-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 		ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
 		Execute: func(ctx context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			if err := bindTestWorkboardRuntime(ctx, handle); err != nil {
+				return WorkboardCandidate{}, err
+			}
 			retained = handle
 			if err := handle.AppendCheckpoint(ctx, "implementation compiled"); err != nil {
 				return WorkboardCandidate{}, err
@@ -76,7 +164,7 @@ func TestWorkboardWorkerRunnerBindsRuntimeAndCompletesReviewLifecycle(t *testing
 		t.Fatalf("incorrect durable binding: %+v", lifecycle)
 	}
 	events, err := store.Read(ctx, "board-runtime-task", 0, 100)
-	if err != nil || len(events) < 5 || events[len(events)-1].Kind != runtime.TaskCompleted {
+	if err != nil || len(events) != 1 || events[0].Kind != runtime.TaskStarted {
 		t.Fatalf("events=%+v err=%v", events, err)
 	}
 	for _, event := range events {
@@ -105,6 +193,9 @@ func TestWorkboardWorkerRunnerDoesNotRetryAmbiguousExecution(t *testing.T) {
 		SessionID: "ambiguous-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 		ExpectedCardRevision: cardRevision, FailureEffect: runtime.UncertainEffect,
 		Execute: func(ctx context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			if err := bindTestWorkboardRuntime(ctx, handle); err != nil {
+				return WorkboardCandidate{}, err
+			}
 			calls.Add(1)
 			if checkpointErr := handle.AppendCheckpoint(ctx, "external effect may have started"); checkpointErr != nil {
 				return WorkboardCandidate{}, checkpointErr
@@ -151,7 +242,10 @@ func TestWorkboardWorkerRunnerJoinsHeartbeatOnPanicAndCancellation(t *testing.T)
 				_, runErr := runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "joined-" + mode + "-task",
 					SessionID: "joined-" + mode + "-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 					ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
-					Execute: func(ctx context.Context, _ *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+					Execute: func(ctx context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+						if err := bindTestWorkboardRuntime(ctx, handle); err != nil {
+							return WorkboardCandidate{}, err
+						}
 						close(entered)
 						if mode == "panic" {
 							time.Sleep(80 * time.Millisecond)
@@ -228,6 +322,9 @@ func TestWorkboardWorkerRunnerConsumesDurableCancelAfterHeartbeatAndPreservesCla
 			SessionID: "durable-board-cancel-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
 			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, handle); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				close(entered)
 				<-run.Done()
 				// Cancellation cleanup must not retain an ambient workboard
@@ -282,9 +379,9 @@ func TestWorkboardWorkerRunnerConsumesDurableCancelAfterHeartbeatAndPreservesCla
 	default:
 	}
 	status, err := store.TaskLeaseStatus(ctx, taskID, time.Now().UTC())
-	if err != nil || status.TaskState != "running" || status.Leases == nil || status.Leases.LiveReaders != 1 ||
+	if err != nil || status.TaskState != "running" || status.Leases == nil || status.Leases.LiveReaders != 0 ||
 		status.Leases.ReleasedReaders != 0 {
-		t.Fatalf("runtime reader was not held through callback join: status=%+v err=%v", status, err)
+		t.Fatalf("workboard slot created a synthetic runtime resource lease: status=%+v err=%v", status, err)
 	}
 	before, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
 	lifecycle := before[cardID]
@@ -308,13 +405,13 @@ func TestWorkboardWorkerRunnerConsumesDurableCancelAfterHeartbeatAndPreservesCla
 		t.Fatal("worker did not finish after callback joined")
 	}
 	events, err := store.Read(ctx, taskID, 0, 100)
-	if err != nil || len(events) < 3 || events[len(events)-1].Kind != runtime.TaskCanceled {
+	if err != nil || len(events) != 1 || events[0].Kind != runtime.TaskStarted {
 		t.Fatalf("runtime cancellation events=%+v err=%v", events, err)
 	}
 	status, err = store.TaskLeaseStatus(ctx, taskID, time.Now().UTC())
-	if err != nil || status.TaskState != "canceled" || status.Leases == nil || status.Leases.LiveReaders != 0 ||
-		status.Leases.ExpiredReaders != 0 || status.Leases.ReleasedReaders != 1 {
-		t.Fatalf("runtime reader was not atomically released: status=%+v err=%v", status, err)
+	if err != nil || status.TaskState != "running" || status.Leases == nil || status.Leases.LiveReaders != 0 ||
+		status.Leases.ExpiredReaders != 0 || status.Leases.ReleasedReaders != 0 {
+		t.Fatalf("workboard runner synthesized runtime lease/finalization: status=%+v err=%v", status, err)
 	}
 	after, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
 	if err != nil || after[cardID].Attempt == nil || after[cardID].Attempt.Claim == nil ||
@@ -352,7 +449,10 @@ func TestWorkboardWorkerRunnerDoesNotConsumePauseAsCancellation(t *testing.T) {
 		_, runErr := runner.Run(parent, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "pause-not-cancel-task",
 			SessionID: "pause-not-cancel-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
-			Execute: func(run context.Context, _ *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, handle); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				close(entered)
 				select {
 				case <-run.Done():
@@ -441,6 +541,9 @@ func TestWorkboardWorkerRunnerRevokesCapabilityBeforeObservationFailureCleanup(t
 			SessionID: "observation-failure-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
 			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, handle); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				close(entered)
 				<-run.Done()
 				cleanupMutations <- []error{
@@ -525,7 +628,10 @@ func TestWorkboardWorkerRunnerFinalizesEffectFreeExecuteAndValidationFailures(t 
 			_, err = runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "effect-free-" + mode,
 				SessionID: "effect-free-" + mode + "-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 				ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
-				Execute: func(context.Context, *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+					if err := bindTestWorkboardRuntime(run, handle); err != nil {
+						return WorkboardCandidate{}, err
+					}
 					if mode == "execute" {
 						return WorkboardCandidate{}, errors.New("execution failed before effects")
 					}

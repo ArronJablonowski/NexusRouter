@@ -79,20 +79,24 @@ supported-platform decision or publication approval is claimed.
   detail, and history reads; and conservatively backfills only unambiguous
   legacy successors. Exact replay, competing replacement workers, rollback,
   attempt exhaustion, restart, canonical drift, and migration corruption are
-  covered. The scheduler is not enabled in the stock daemon yet: inner runtime
-  task attribution, transactional resource budgets, and configured independent
-  judging remain open.
+  covered. The worker runner now composes the schema-41 single-journal boundary.
+  It uses a capacity-only supervisor slot, binds a trusted runtime request once,
+  freezes task/session/parent/worker identity, verifies that the injected live
+  store is the exact configured database file, and intercepts the runtime's
+  actual redacted first append. That append atomically creates the runtime
+  journal/projections and the Kanban attempt/claim/marker; the claim heartbeat
+  starts before admission returns. Unbound or bound-but-unstarted callbacks
+  leave the card Ready without a task or claim, and successful execution
+  produces one real model/tool journal with no synthetic outer task or resource
+  lease.
 
-  Schema 41 adds the next single-journal prerequisite: a trusted-host command
-  atomically commits the runtime's actual redacted `task.started` event, task
-  head, global event index, timing and skill projections, Kanban attempt/claim,
-  lifecycle receipt/event, and an immutable cross-domain marker. Replays prove
-  both halves and the complete progressed or terminal runtime history; partial,
-  independently committed, or corrupted state fails closed. Runtime events can
-  carry one validated host-frozen worker identity, and the worker supervisor now
-  offers a shared capacity-only slot without emitting a synthetic task or
-  acquiring a resource lease. The current worker runner has not yet switched to
-  these primitives, so stock scheduling remains disabled.
+  This integration is intentionally limited to an explicitly selected model.
+  It rejects automatic routing, managed residency, worker delegation, provider
+  fallback, provider-overflow compaction, and automatic post-run audit. The
+  default-disabled scheduler is still not composed into the stock daemon, which
+  continues to reject attempts to enable it. Transactional time/token/cost
+  budgets, configured independent acceptance judging, and broader
+  crash/lease/acceptance qualification remain open.
 
   Candidate evaluators can no longer claim the operator-owned `user_feedback`
   evidence source. Subjective-only work may enter Review with an exact empty

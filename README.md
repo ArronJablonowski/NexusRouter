@@ -92,19 +92,28 @@ the workboard claim for independently proven finalization. They acknowledge
 pause and resume only at exact-fenced safe boundaries while retaining their
 heartbeat, claim, and supervisor slot. The integrated Kanban distinguishes
 requested, acknowledged, and resume-requested phases. A bounded per-board
-scheduling cycle now reads the authoritative supervision projection before
-constructing tasks, accounts for existing work in its WIP ceiling, and sends
-only ready cards through the claim-fenced worker runner. Stock-daemon task
-construction and configured workboard judging remain DAR-85 work. Schema 41
-adds a trusted-host admission primitive that commits the real redacted runtime
-`task.started` event, its task/event-log/timing projections, the Kanban attempt
-and claim, and an immutable cross-domain marker in one SQLite transaction. Exact
-replay revalidates the complete progressed task and both halves; independently
-committed or corrupted halves are never adopted. The runtime can now stamp a
-host-frozen worker identity on every event, and the supervisor exposes a shared
-capacity-only slot that creates no synthetic task. These are prerequisites: the
-stock worker runner does not use them yet, and the scheduler remains disabled
-until the single-journal application path is wired and qualified. Schema 40
+scheduling cycle reads the complete authoritative supervision projection before
+constructing tasks, counts running, stalled, and orphaned claims against its WIP
+ceiling, and sends only ready cards through the claim-fenced worker runner. The
+runner now uses the supervisor's capacity-only slot and a trusted, one-use
+runtime binding instead of a synthetic outer worker task. For an explicitly
+selected model, the runtime freezes the host-supplied task, session, parent, and
+worker identities; uses the exact already-open configured SQLite database; and
+commits the actual redacted `task.started` event, runtime projections, Kanban
+attempt and claim, and cross-domain marker in one transaction before
+acknowledging admission. The claim heartbeat starts before that first append
+returns. A request that never binds and starts the runtime leaves the card Ready
+and creates no task or claim. The resulting model/tool execution has one real
+runtime journal, and every event retains the same worker identity as the
+workboard attempt and claim.
+
+This is a narrow trusted-host path, not unattended scheduling. It requires an
+explicit model and rejects automatic routing, managed model residency, worker
+delegation, provider fallback, provider-overflow compaction, and automatic
+post-run audit. The stock daemon still rejects
+`workboard.scheduler.enabled: true`. Transactional time/token/cost budgets,
+configured independent acceptance judging, and broader crash/lease/acceptance
+qualification remain open before DAR-85 can be marked Done. Schema 40
 now binds each proof-gated recovery to its exact replacement attempt and claim
 inside the replacement claim transaction; recovery clears the predecessor's
 worker assignment so a distinct worker can claim the Ready card. The lineage
@@ -1824,7 +1833,7 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Finish daemon workboard execution binding, recovery-to-reassignment lineage, and configured acceptance judging through DAR-85.
+1. Finish transactional workboard execution budgets, configured acceptance judging, stock-daemon scheduler composition, and broad crash/lease/acceptance qualification through DAR-85.
 2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

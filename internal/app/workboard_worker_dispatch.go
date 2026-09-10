@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -68,6 +69,20 @@ func (d *WorkboardWorkerDispatch) Claim(ctx context.Context, request workboard.C
 		return workboard.OperationReceipt{}, ErrAdmission
 	}
 	return d.lifecycle.Claim(ctx, request)
+}
+
+// ClaimTaskStart atomically commits the first runtime event with the card
+// claim. Callers must pass the already-redacted event that the runtime host is
+// about to acknowledge; independently appending TaskStarted and then claiming
+// would leave a crash window with only one half visible.
+func (d *WorkboardWorkerDispatch) ClaimTaskStart(ctx context.Context, event runtime.Event, request workboard.ClaimRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.lifecycle == nil || ctx == nil || event.Validate() != nil || event.Kind != runtime.TaskStarted || event.Sequence != 1 {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	if request.TaskID == "" || request.SessionID == "" {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.lifecycle.ClaimTaskStart(ctx, event, request)
 }
 
 func (d *WorkboardWorkerDispatch) Heartbeat(ctx context.Context, request workboard.HeartbeatRequest) (workboard.OperationReceipt, error) {

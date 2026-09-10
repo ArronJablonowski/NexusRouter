@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 type residencyFixture struct {
@@ -88,6 +90,37 @@ func managedResidencyFixture(t *testing.T) (*Service, *residencyFixture) {
 		return resources.Snapshot{Time: time.Now(), TotalRAM: 1000, AvailableRAM: available, CPUs: 4}, nil
 	}
 	return svc, fixture
+}
+
+func TestRuntimeHostAdmissionRejectsManagedResidencyBeforeProfileOrProvider(t *testing.T) {
+	svc, fixture := managedResidencyFixture(t)
+	ctx := context.Background()
+	store, err := telemetry.Open(ctx, svc.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	request, err := withRuntimeHostAdmission(Request{ModelID: "a", Prompt: "do not dispatch"}, runtimeHostAdmission{
+		taskID: "managed-host-task", sessionID: "managed-host-session", parentTaskID: "managed-host-parent",
+		workerID: "managed-host-worker", store: store,
+		commitFirst: func(ctx context.Context, event runtime.Event) error { return store.Append(ctx, 0, event) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.Run(ctx, request); !errors.Is(err, ErrAdmission) {
+		t.Fatalf("managed host route admitted: %v", err)
+	}
+	fixture.mu.Lock()
+	profiles, unloads, streams := fixture.profiles, fixture.unloads, fixture.streams
+	fixture.mu.Unlock()
+	if profiles != 0 || unloads != 0 || streams != 0 {
+		t.Fatalf("managed host rejection followed side-effect path: profiles=%d unloads=%d streams=%d", profiles, unloads, streams)
+	}
+	events, readErr := store.Read(ctx, "managed-host-task", 0, 10)
+	if readErr != nil || len(events) != 0 {
+		t.Fatalf("managed host rejection created a task: events=%+v err=%v", events, readErr)
+	}
 }
 
 func TestManagedResidencyConfirmsUnloadAndReprofiles(t *testing.T) {

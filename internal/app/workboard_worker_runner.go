@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
@@ -22,6 +23,8 @@ type WorkboardCandidate struct {
 
 // WorkboardWorkerTask binds one already-identified runtime task to one ready
 // card. Runtime identity is host configuration, never model/browser input.
+// Scope remains a required reserved scheduler input, but this runner uses
+// Supervisor.WithSlot and acquires no synthetic runtime resource lease for it.
 type WorkboardWorkerTask struct {
 	BoardID, CardID, TaskID, SessionID, ParentTaskID, Scope string
 	SubmissionID                                            string
@@ -40,6 +43,8 @@ type workboardWorkerRepository interface {
 	workboard.EvaluationRepository
 	workboard.LifecycleSnapshotRepository
 	workboard.WorkerControlRepository
+	GetCard(context.Context, string, string) (workboard.Card, error)
+	RuntimeStore() *telemetry.Store
 }
 
 // WorkboardWorkerRunner composes the existing bounded in-process supervisor
@@ -47,13 +52,14 @@ type workboardWorkerRepository interface {
 // retry: any ambiguous boundary remains represented by the durable claim and
 // runtime event history for independent supervision.
 type WorkboardWorkerRunner struct {
-	supervisor *workers.Supervisor
-	repository workboardWorkerRepository
-	evaluator  workboard.CandidateEvaluator
-	policy     string
-	heartbeat  time.Duration
-	ttl        time.Duration
-	now        func() time.Time
+	supervisor   *workers.Supervisor
+	repository   workboardWorkerRepository
+	evaluator    workboard.CandidateEvaluator
+	policy       string
+	heartbeat    time.Duration
+	ttl          time.Duration
+	now          func() time.Time
+	runtimeStore *telemetry.Store
 }
 
 func NewWorkboardWorkerRunner(supervisor *workers.Supervisor, repository workboardWorkerRepository,
@@ -63,14 +69,18 @@ func NewWorkboardWorkerRunner(supervisor *workers.Supervisor, repository workboa
 		ttl <= 2*heartbeat || ttl > workboard.MaxLeaseTTL || len(policyDigest) != 64 {
 		return nil, ErrAdmission
 	}
+	runtimeStore := repository.RuntimeStore()
+	if runtimeStore == nil {
+		return nil, ErrAdmission
+	}
 	return &WorkboardWorkerRunner{supervisor: supervisor, repository: repository, evaluator: evaluator,
-		policy: policyDigest, heartbeat: heartbeat, ttl: ttl, now: now}, nil
+		policy: policyDigest, heartbeat: heartbeat, ttl: ttl, now: now, runtimeStore: runtimeStore}, nil
 }
 
 func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTask) (WorkboardCandidate, error) {
 	if ctx == nil || r == nil || r.supervisor == nil || task.BoardID == "" || task.CardID == "" || task.TaskID == "" ||
 		task.SessionID == "" || task.ParentTaskID == "" || task.Scope == "" || task.ExpectedCardRevision < 1 ||
-		task.Execute == nil || task.Validate == nil ||
+		task.SubmissionID != "" || task.Execute == nil || task.Validate == nil ||
 		(task.FailureEffect != runtime.NoEffect && task.FailureEffect != runtime.ConfirmedEffect && task.FailureEffect != runtime.UncertainEffect) {
 		return WorkboardCandidate{}, ErrAdmission
 	}
@@ -83,22 +93,12 @@ func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTas
 	var executionErr error
 	supervised, stopSupervisor := context.WithCancel(ctx)
 	defer stopSupervisor()
-	output, err := r.supervisor.Run(supervised, workers.Work{TaskID: task.TaskID, SessionID: task.SessionID,
-		ParentID: task.ParentTaskID, Scope: task.Scope, SubmissionID: task.SubmissionID, WorkerID: workerID,
-		Execute: func(run context.Context) (string, error) {
-			candidate, executionErr = r.execute(run, stopSupervisor, dispatch, workerID, task)
-			return candidate.Summary, executionErr
-		},
-		// Validation already ran while the workboard lease was held and before
-		// candidate submission. The supervisor still enforces its acceptance
-		// boundary and durable terminal ordering around that result.
-		Validate: func(context.Context, string) error { return nil },
+	err = r.supervisor.WithSlot(supervised, func(run context.Context) error {
+		candidate, executionErr = r.execute(run, stopSupervisor, dispatch, workerID, task)
+		return executionErr
 	})
 	if err != nil {
 		return WorkboardCandidate{}, errors.Join(err, executionErr)
-	}
-	if output != candidate.Summary {
-		return WorkboardCandidate{}, workers.ErrDurability
 	}
 	candidate.ArtifactRefs = append([]string{}, candidate.ArtifactRefs...)
 	return candidate, nil
@@ -107,32 +107,18 @@ func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTas
 func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor context.CancelFunc, dispatch *WorkboardWorkerDispatch, workerID string,
 	task WorkboardWorkerTask,
 ) (candidate WorkboardCandidate, runErr error) {
-	claim, err := dispatch.Claim(ctx, workboard.ClaimRequest{BoardID: task.BoardID, CardID: task.CardID,
-		IdempotencyKey: workboardOperationKey("claim"), ExpectedCardRevision: task.ExpectedCardRevision,
-		TaskID: task.TaskID, SessionID: task.SessionID})
-	if err != nil || claim.CardRevision == nil || claim.ClaimRevision == nil {
-		return WorkboardCandidate{}, errors.Join(workers.ErrWork, err)
-	}
-	snapshots, err := r.repository.ReadCardLifecycleSnapshots(ctx, task.BoardID, []string{task.CardID})
-	snapshot, found := snapshots[task.CardID]
-	if err != nil || !found || snapshot.Attempt == nil || snapshot.Attempt.Claim == nil {
-		return WorkboardCandidate{}, errors.Join(workers.ErrDurability, err)
-	}
-	attempt, durableClaim := snapshot.Attempt, snapshot.Attempt.Claim
-	if attempt.WorkerID != workerID || durableClaim.OwnerID != workerID || durableClaim.TaskID != task.TaskID ||
-		!containsExact(attempt.TaskIDs, task.TaskID) || !containsExact(attempt.SessionIDs, task.SessionID) ||
-		durableClaim.Revision != *claim.ClaimRevision {
+	if r.runtimeStore == nil {
 		return WorkboardCandidate{}, workers.ErrDurability
 	}
-	handle := &WorkboardWorkerHandle{dispatch: dispatch, controls: r.repository, boardID: task.BoardID, cardID: task.CardID,
-		attemptID: attempt.ID, claimID: durableClaim.ID, cardRevision: *claim.CardRevision,
-		claimRevision: *claim.ClaimRevision, criteriaRevision: attempt.CriteriaRevision, workerID: workerID,
-		taskID: task.TaskID, active: true, controlChanged: make(chan struct{}, 1)}
+	handle := &WorkboardWorkerHandle{dispatch: dispatch, controls: r.repository, repository: r.repository,
+		boardID: task.BoardID, cardID: task.CardID, cardRevision: task.ExpectedCardRevision,
+		workerID: workerID, taskID: task.TaskID, sessionID: task.SessionID, parentTaskID: task.ParentTaskID,
+		claimKey: workboardOperationKey("claim"), runtimeStore: r.runtimeStore,
+		controlChanged: make(chan struct{}, 1)}
 	defer handle.revoke()
 	run, cancel := context.WithCancel(ctx)
 	handle.bindCancellation(cancel, stopSupervisor)
 	heartbeats := make(chan error, 1)
-	go handle.heartbeat(run, r.heartbeat, heartbeats)
 	joined := false
 	joinHeartbeat := func() error {
 		if joined {
@@ -140,7 +126,13 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 		}
 		cancel()
 		joined = true
+		if !handle.heartbeatIsStarted() {
+			return nil
+		}
 		return <-heartbeats
+	}
+	handle.commitFirst = func(commitCtx context.Context, event runtime.Event) error {
+		return handle.claimTaskStart(commitCtx, event, run, r.heartbeat, heartbeats)
 	}
 	// This defer is also the panic boundary's join guarantee: Supervisor.Run
 	// cannot return and release ownership while the board heartbeat still runs.
@@ -155,7 +147,7 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 	heartbeatErr := joinHeartbeat()
 	runErr = errors.Join(runErr, heartbeatErr, ctx.Err())
 	if runErr != nil {
-		if heartbeatErr == nil {
+		if heartbeatErr == nil && handle.claimIsCommitted() {
 			cleanup, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cleanupCancel()
 			if task.FailureEffect == runtime.NoEffect {
@@ -206,14 +198,97 @@ type WorkboardWorkerHandle struct {
 	mu                                            sync.Mutex
 	dispatch                                      *WorkboardWorkerDispatch
 	controls                                      workboard.WorkerControlRepository
+	repository                                    workboard.LifecycleSnapshotRepository
+	runtimeStore                                  *telemetry.Store
 	boardID, cardID, attemptID, claimID           string
-	workerID, taskID                              string
+	workerID, taskID, sessionID, parentTaskID     string
+	claimKey                                      string
 	cardRevision, claimRevision, criteriaRevision int64
+	bound, claimCommitted, heartbeatStarted       bool
 	active                                        bool
 	blocked                                       bool
 	paused                                        bool
 	controlChanged                                chan struct{}
 	cancelCallback, stopSupervisor                context.CancelFunc
+	commitFirst                                   func(context.Context, runtime.Event) error
+}
+
+// BindRuntimeRequest attaches this pending worker capability to exactly one
+// runtime request. It does not claim the card. The claim is committed only when
+// the host presents the actual redacted TaskStarted event through commitFirst.
+func (h *WorkboardWorkerHandle) BindRuntimeRequest(request Request) (Request, error) {
+	if h == nil {
+		return Request{}, ErrAdmission
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.bound || h.claimCommitted || h.active || h.commitFirst == nil || h.runtimeStore == nil {
+		return Request{}, ErrAdmission
+	}
+	h.bound = true
+	return withRuntimeHostAdmission(request, runtimeHostAdmission{taskID: h.taskID, sessionID: h.sessionID,
+		parentTaskID: h.parentTaskID, workerID: h.workerID, store: h.runtimeStore, commitFirst: h.commitFirst})
+}
+
+func (h *WorkboardWorkerHandle) claimTaskStart(ctx context.Context, event runtime.Event, run context.Context,
+	interval time.Duration, heartbeats chan<- error,
+) (err error) {
+	defer func() {
+		if recover() != nil {
+			h.revoke()
+			err = workers.ErrDurability
+		}
+	}()
+	if ctx == nil || event.Validate() != nil || event.Kind != runtime.TaskStarted || event.Sequence != 1 ||
+		event.TaskID != h.taskID || event.SessionID != h.sessionID || event.CorrelationID != h.taskID ||
+		event.WorkerID != h.workerID || event.Data.ParentTaskID != h.parentTaskID || event.Data.SubmissionID != "" {
+		return ErrAdmission
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.bound || h.claimCommitted || h.active || h.heartbeatStarted || run.Err() != nil {
+		return ErrAdmission
+	}
+	receipt, err := h.dispatch.ClaimTaskStart(ctx, event, workboard.ClaimRequest{BoardID: h.boardID, CardID: h.cardID,
+		IdempotencyKey: h.claimKey, ExpectedCardRevision: h.cardRevision, TaskID: h.taskID, SessionID: h.sessionID})
+	if err != nil || receipt.CardRevision == nil || receipt.ClaimRevision == nil {
+		return errors.Join(workers.ErrWork, err)
+	}
+	h.claimCommitted = true
+	snapshots, err := h.repository.ReadCardLifecycleSnapshots(ctx, h.boardID, []string{h.cardID})
+	snapshot, found := snapshots[h.cardID]
+	card, cardErr := h.runtimeStore.GetCard(ctx, h.boardID, h.cardID)
+	if err != nil || cardErr != nil || !found || snapshot.Attempt == nil || snapshot.Attempt.Claim == nil {
+		return errors.Join(workers.ErrDurability, err, cardErr)
+	}
+	attempt, durableClaim := snapshot.Attempt, snapshot.Attempt.Claim
+	if snapshot.CardID != h.cardID || attempt.Validate() != nil || attempt.WorkerID != h.workerID ||
+		durableClaim.OwnerID != h.workerID || durableClaim.TaskID != h.taskID ||
+		!containsExact(attempt.TaskIDs, h.taskID) || !containsExact(attempt.SessionIDs, h.sessionID) ||
+		card.Revision != *receipt.CardRevision || card.CurrentAttemptID != attempt.ID || card.CurrentClaimID != durableClaim.ID ||
+		durableClaim.Revision != *receipt.ClaimRevision {
+		return workers.ErrDurability
+	}
+	h.attemptID, h.claimID = attempt.ID, durableClaim.ID
+	h.cardRevision, h.claimRevision, h.criteriaRevision = *receipt.CardRevision, *receipt.ClaimRevision, attempt.CriteriaRevision
+	h.active = true
+	h.heartbeatStarted = true
+	started := make(chan struct{})
+	go h.heartbeat(run, interval, heartbeats, started)
+	<-started
+	return nil
+}
+
+func (h *WorkboardWorkerHandle) claimIsCommitted() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.claimCommitted
+}
+
+func (h *WorkboardWorkerHandle) heartbeatIsStarted() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.heartbeatStarted
 }
 
 // SafeBoundary is the only point at which a cooperative callback acknowledges
@@ -445,9 +520,10 @@ func (h *WorkboardWorkerHandle) fail(ctx context.Context) error {
 	return nil
 }
 
-func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, done chan<- error) {
+func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, done chan<- error, started chan<- struct{}) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	close(started)
 	for {
 		select {
 		case <-ctx.Done():

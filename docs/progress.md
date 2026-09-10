@@ -6653,3 +6653,40 @@ and `go build ./...` with the explicit ceiling. Its longest packages were
 application 617.763 seconds, telemetry 543.626 seconds, releasepack 456.856
 seconds, SDK 69.350 seconds, CLI 67.537 seconds, toolgate 32.802 seconds, and
 runtime 27.728 seconds.
+
+## 2026-09-10 — DAR-85 single-journal workboard runtime binding
+
+DAR-85 remains in progress. `WorkboardWorkerRunner` now uses the supervisor's
+shared capacity-only slot rather than creating a synthetic outer worker task or
+resource lease. Its pending handle may bind exactly one trusted runtime request.
+The binding freezes task, session, parent, and worker identity, injects the
+already-open runtime store, and verifies by filesystem identity that it is the
+configured telemetry database. The runtime's actual redacted `task.started`
+append is the claim boundary: one SQLite transaction commits the runtime
+journal/projections, Kanban attempt and claim, lifecycle records, and schema-41
+marker. Exact post-commit readback is required, later events retain the frozen
+identities, and the claim heartbeat starts before the first append is
+acknowledged. A callback that never starts the bound runtime leaves the card
+Ready with no task, attempt, or claim.
+
+An integrated local-provider test exercises one real runtime journal from
+atomic start/claim through model completion, candidate validation, Review
+transition, and claim release. The provider observes the durable start and
+active claim before returning inference, and runtime and workboard worker
+identities remain equal. Focused tests cover redaction-before-commit/delivery,
+one-shot binding and first-append use, sequence/identity/store mismatch, exact
+database-file identity versus a copied database, unbound execution, ambiguous
+failure without retry, and rejection of managed residency before profiling,
+unload, provider dispatch, or task creation. Targeted race stress passed three
+repetitions across host admission, runner, scheduler, and telemetry boundaries;
+timing-heavy runner/pause/scheduler tests passed five race repetitions and
+twenty normal repetitions, with no race report, hang, or flaky failure.
+
+The trusted-host path intentionally accepts only an explicit model. Automatic
+routing, managed residency, worker delegation, provider fallback,
+provider-overflow compaction, and automatic post-run audit are disabled or
+rejected so one host-owned identity cannot expand into additional runtime tasks.
+The stock daemon still rejects `workboard.scheduler.enabled: true`;
+transactional time/token/cost budgets, configured independent acceptance
+judging, and broader crash/lease/acceptance qualification remain open. DAR-85
+must not be marked Done yet.

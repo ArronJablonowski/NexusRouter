@@ -38,6 +38,9 @@ func TestWorkboardWorkerSafeBoundaryPausesWithLiveHeartbeatAndResumes(t *testing
 			SessionID: "pause-resume-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
 			Execute: func(run context.Context, worker *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, worker); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				handle = worker
 				close(entered)
 				<-reachBoundary
@@ -108,6 +111,9 @@ func TestWorkboardWorkerSafeBoundaryCancellationPrecedesResume(t *testing.T) {
 			SessionID: "paused-cancel-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
 			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
 			Execute: func(run context.Context, worker *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, worker); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				close(entered)
 				<-reachBoundary
 				boundaryErr := worker.SafeBoundary(run)

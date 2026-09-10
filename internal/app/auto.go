@@ -116,6 +116,15 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	if s == nil || ctx == nil {
 		return Result{}, ErrAdmission
 	}
+	// Host-owned identities authorize one named execution attempt. Automatic
+	// routing can create fallback task identities and is therefore not an
+	// admissible host-runtime surface.
+	if r.runtimeHostAdmission != nil && (r.ModelID == "" || r.ModelID == "auto") {
+		return Result{}, ErrAdmission
+	}
+	if validateRuntimeHostStore(ctx, s.settings, r) != nil {
+		return Result{}, ErrAdmission
+	}
 	if r.delegatedParent == "" {
 		r.presentationTextSink = s.presentationTextSink
 	}
@@ -158,18 +167,20 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 		}
 	}
 	result, runErr = s.runRouteChain(ctx, r)
-	if recovered, ok := s.providerOverflowCompaction(ctx, r, result, runErr); ok {
-		next, nextErr := s.runRouteChain(ctx, recovered)
-		if next.TaskID != "" {
-			previous := append([]string(nil), result.PreviousTaskIDs...)
-			previous = append(previous, result.TaskID)
-			next.PreviousTaskIDs = append(previous, next.PreviousTaskIDs...)
-			next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
-			next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
-			result, runErr = next, nextErr
+	if r.runtimeHostAdmission == nil {
+		if recovered, ok := s.providerOverflowCompaction(ctx, r, result, runErr); ok {
+			next, nextErr := s.runRouteChain(ctx, recovered)
+			if next.TaskID != "" {
+				previous := append([]string(nil), result.PreviousTaskIDs...)
+				previous = append(previous, result.TaskID)
+				next.PreviousTaskIDs = append(previous, next.PreviousTaskIDs...)
+				next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
+				next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
+				result, runErr = next, nextErr
+			}
 		}
 	}
-	if runErr == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
+	if runErr == nil && r.runtimeHostAdmission == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
 		audit, auditErr := s.AuditTask(ctx, result.TaskID, s.settings.Evaluation.AutoReviewModel, s.settings.Evaluation.AutoReviewMaxCost)
 		result.AuditStatus = "failed"
 		if auditErr == nil {
@@ -187,7 +198,7 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 	} else {
 		result, err = s.runWithPressure(ctx, r, s.runAuto)
-		if err != nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {
+		if err != nil && r.runtimeHostAdmission == nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {
 			fallbacks := append([]string(nil), result.fallbackModelIDs...)
 			if len(fallbacks) >= sessions.MaxTerminalRouteAttempts {
 				fallbacks = fallbacks[:sessions.MaxTerminalRouteAttempts-1]
@@ -427,6 +438,10 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 			for _, pr := range cfg.Providers {
 				if pr.ID != m.Provider {
 					continue
+				}
+				if r.runtimeHostAdmission != nil && pr.ManageResidency {
+					c.PolicyAllowed = false
+					break
 				}
 				key := ""
 				c.CredentialRequired = pr.APIKeyEnv != ""

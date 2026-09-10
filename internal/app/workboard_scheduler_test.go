@@ -40,7 +40,10 @@ func TestWorkboardSchedulerRunsReadyCardThroughDurableWorkerLifecycleOnce(t *tes
 		return WorkboardWorkerTask{
 			TaskID: "scheduler-runtime-task", SessionID: "scheduler-runtime-session", ParentTaskID: "scheduler-parent-task",
 			Scope: "workboard-card-" + cardID, FailureEffect: runtime.NoEffect,
-			Execute: func(context.Context, *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				if err := bindTestWorkboardRuntime(run, handle); err != nil {
+					return WorkboardCandidate{}, err
+				}
 				return WorkboardCandidate{Summary: "scheduler candidate", ArtifactRefs: []string{"artifact://scheduler-test"}}, nil
 			},
 			Validate: func(_ context.Context, candidate WorkboardCandidate) error {

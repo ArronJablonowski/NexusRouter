@@ -426,17 +426,25 @@ commit the runtime's actual redacted first event and all initial runtime and
 Kanban ownership projections together, with an immutable marker that prevents
 later adoption of independently committed halves. Exact retries validate the
 complete progressed journal, event index, timing, worker identity, claim, and
-marker. A capacity-only supervisor slot and host-frozen runtime worker identity
-remove the need for a second synthetic worker journal once application wiring
-lands; these primitives do not by themselves enable unattended execution.
-DAR-85 also has a bounded per-board
-scheduling cycle that fully reads the authoritative supervision snapshot before
-task construction, subtracts existing running/stalled/orphaned claims from its
-WIP ceiling, and sends only ready cards through the durable claim-fenced worker
-runner. The cycle is intentionally dependency-injected and is not yet stock-
-daemon execution: atomic inner runtime-task attribution, durable resource-budget
-consumption and the configured acceptance judge remain required before
-unattended scheduling is enabled. DAR-83 owns the
+marker. A capacity-only supervisor slot and host-frozen runtime identity are now
+composed by the workboard worker runner. A trusted, one-use binding supplies the
+exact already-open configured SQLite store and freezes task, session, parent,
+and worker identities. On the runtime's first append, the host atomically
+commits the actual redacted `task.started` event and all initial runtime and
+Kanban ownership projections, then starts the claim heartbeat before admission
+returns. The runner emits no synthetic outer task or resource lease; binding
+without a runtime start creates no task, attempt, or claim. The marker and
+complete progressed journal continue to prevent adoption of independently
+committed or corrupted halves.
+
+The bounded per-board scheduling cycle still remains dependency-injected rather
+than stock-daemon execution. Its integrated runtime path accepts only an
+explicit model and fails closed for automatic routing, managed residency,
+worker delegation, provider fallback, provider-overflow compaction, and
+automatic post-run audit. The stock daemon continues to reject an enabled
+scheduler. Durable transactional time/token/cost budgets, the configured
+independent acceptance judge, and broader crash/lease/acceptance qualification
+remain required before unattended scheduling is enabled. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,

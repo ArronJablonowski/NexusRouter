@@ -37,7 +37,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if classifyErr != nil {
 		return Result{}, classifyErr
 	}
-	if s == nil || s.settings.Validate() != nil || validateInput(r) != nil || ctx.Err() != nil {
+	if s == nil || s.settings.Validate() != nil || validateInput(r) != nil || ctx.Err() != nil || validateRuntimeHostStore(ctx, s.settings, r) != nil {
 		return Result{}, ErrAdmission
 	}
 	r.providerFactory = s.providerFactory
@@ -78,6 +78,13 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	}
 	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return Result{}, ErrAdmission
+	}
+	if r.runtimeHostAdmission != nil {
+		for _, provider := range s.settings.Providers {
+			if provider.ID == model.Provider && provider.ManageResidency {
+				return Result{}, ErrAdmission
+			}
+		}
 	}
 	var err error
 	r, err = s.prepareExplicitApprovedCompaction(ctx, r, model)

@@ -16,7 +16,7 @@ import (
 // rejected the first turn before any output, tool activity or side effect.
 func (s *Service) providerOverflowCompaction(ctx context.Context, r Request, failed Result, runErr error) (Request, bool) {
 	var failure *providers.Failure
-	if !s.settings.Runtime.AutoApprovedCompaction || ctx.Err() != nil || r.delegatedParent != "" || r.ContinueTaskID == "" || r.Compaction != nil || r.SummaryAttemptID != "" || failed.TaskID == "" || !errors.As(runErr, &failure) || failure == nil || failure.Code != "context_overflow" {
+	if !s.settings.Runtime.AutoApprovedCompaction || ctx.Err() != nil || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID == "" || r.Compaction != nil || r.SummaryAttemptID != "" || failed.TaskID == "" || !errors.As(runErr, &failure) || failure == nil || failure.Code != "context_overflow" {
 		return Request{}, false
 	}
 	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
