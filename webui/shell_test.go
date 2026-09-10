@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "4e5910739fa21fb17aabaa27feff2092b63c8eb50a8992502f9de03a6a69aa8d" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "1459b3a3f43a64bfd6d5c61c3c26b062e4ee9bf4b2cfaa30cba8a633e04dedbf" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -676,7 +676,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`client.acceptancePlan(context, detail.card.id, detail.attempt, "acceptance.accept")`, `window.addEventListener("darwin:acceptance-review"`,
 		`expected_card_revision: plan.cardRevision`, `evidence_head_revision: plan.evidenceHeadRevision`, `evidence_set_digest: plan.evidenceSetDigest`,
 		`Acceptance committed. The card is Done; dependent cards may have been unlocked.`, `Model-audit evidence informs review but never independently authorizes acceptance.`,
-		`shell.inert = true`, `shell.inert = false`, `skipLink.inert = true`, `skipLink.inert = false`, `stableReviewFocus.focus()`, `reviewNotice(unknown, true)`,
+		`shell.inert = true`, `shell.inert = false`, `skipLink.inert = true`, `skipLink.inert = false`, `restoreModalFocus(stable ? null : opener, stableReviewFocus)`, `reviewNotice(unknown, true)`,
 		`The exact candidate decision was rejected.`, `required acceptance evidence is missing or failed.`,
 	} {
 		if !strings.Contains(body, required) {
@@ -700,6 +700,88 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		if !strings.Contains(markup, required) {
 			t.Fatalf("candidate decision UI missing %q", required)
 		}
+	}
+}
+
+func TestEmbeddedWorkboardDialogsIsolateBackgroundAndRestoreFocus(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/workboard-mutations.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`function showModal(dialog) { document.body.append(dialog); shell.inert = true; skipLink.inert = true; dialog.hidden = false; }`,
+		`function hideModal(dialog) { dialog.hidden = true; shell.inert = false; skipLink.inert = false; }`,
+		`function availableModalFocus(node)`,
+		`document.body.contains(node)`,
+		`depth < 64`,
+		`current.hidden || current.inert`,
+		`function restoreModalFocus(opener, fallback)`,
+		`if (barrier() || activeAction || activeReview) return`,
+		`if (barrier() || activeAction || activeReview || !detail`,
+		`const dialog = dialogs[action]; showModal(dialog)`,
+		`hideModal(dialog); activeAction = ""`,
+		`restoreModalFocus(opener, stableReviewFocus)`,
+		`restoreModalFocus(stable ? null : opener, stableReviewFocus)`,
+		`showModal(reviewDialog)`,
+		`hideModal(reviewDialog)`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("workboard modal isolation missing %q", required)
+		}
+	}
+	if strings.Contains(body, `dialogs[action].hidden = false`) {
+		t.Fatal("ordinary workboard dialog can open while it remains inside the inert shell")
+	}
+}
+
+func TestEmbeddedWorkboardModalHelpersBehavior(t *testing.T) {
+	nodeBinary, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	script := `'use strict';
+const fs = require('fs'), source = fs.readFileSync(process.argv[1], 'utf8');
+function extract(name) {
+  const start = source.indexOf('function ' + name + '(');
+  if (start < 0) process.exit(20);
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    else if (source[index] === '}' && --depth === 0) return source.slice(start, index + 1);
+  }
+  process.exit(21);
+}
+const appended = [], body = {hidden:false, inert:false, parentElement:null, append(node){ appended.push(node); node.parentNode = this; node.parentElement = this; }, contains(node){ for (let current = node; current; current = current.parentElement) if (current === this) return true; return false; }}, document = {body}, shell = {inert:false}, skipLink = {inert:false};
+const showModal = Function('document', 'shell', 'skipLink', 'return (' + extract('showModal') + ')')(document, shell, skipLink);
+const hideModal = Function('shell', 'skipLink', 'return (' + extract('hideModal') + ')')(shell, skipLink);
+const availableModalFocus = Function('document', 'return (' + extract('availableModalFocus') + ')')(document);
+const restoreModalFocus = Function('availableModalFocus', 'return (' + extract('restoreModalFocus') + ')')(availableModalFocus);
+const dialog = {hidden:true, parentNode:null};
+showModal(dialog);
+if (appended.length !== 1 || appended[0] !== dialog || dialog.parentNode !== document.body || dialog.hidden || !shell.inert || !skipLink.inert) process.exit(1);
+hideModal(dialog);
+if (!dialog.hidden || shell.inert || skipLink.inert) process.exit(2);
+let focused = '';
+const control = (name, extra = {}) => ({isConnected:true, disabled:false, hidden:false, inert:false, parentElement:body, focus(){focused = name}, ...extra});
+const fallback = control('fallback'), opener = control('opener');
+restoreModalFocus(opener, fallback); if (focused !== 'opener') process.exit(3);
+focused = ''; restoreModalFocus(control('gone', {isConnected:false}), fallback); if (focused !== 'fallback') process.exit(4);
+focused = ''; restoreModalFocus(control('disabled', {disabled:true}), fallback); if (focused !== 'fallback') process.exit(5);
+focused = ''; restoreModalFocus(control('hidden', {hidden:true}), fallback); if (focused !== 'fallback') process.exit(6);
+focused = ''; restoreModalFocus(null, control('bad-fallback', {disabled:true})); if (focused !== '') process.exit(7);
+const hiddenAncestor = {hidden:true, inert:false, parentElement:body};
+focused = ''; restoreModalFocus(control('hidden-child', {parentElement:hiddenAncestor}), fallback); if (focused !== 'fallback') process.exit(8);
+const inertAncestor = {hidden:false, inert:true, parentElement:body};
+focused = ''; restoreModalFocus(control('inert-child', {parentElement:inertAncestor}), fallback); if (focused !== 'fallback') process.exit(9);
+focused = ''; restoreModalFocus(control('detached', {parentElement:null}), fallback); if (focused !== 'fallback') process.exit(10);
+let deep = body; for (let index = 0; index < 64; index++) deep = {hidden:false, inert:false, parentElement:deep};
+focused = ''; restoreModalFocus(control('too-deep', {parentElement:deep}), fallback); if (focused !== 'fallback') process.exit(11);`
+	command := exec.Command(nodeBinary, "-e", script, "./assets/v1/workboard-mutations.js")
+	command.Dir = "."
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("workboard modal helper behavior failed: %v\n%s", err, output)
 	}
 }
 

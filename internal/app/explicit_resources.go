@@ -73,7 +73,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 			return Result{}, ErrAdmission
 		}
 	}
-	if r.delegatedParent == "" && (s.settings.Tools.Enabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
+	if r.delegatedParent == "" && (s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
 		return Result{}, ErrAdmission
 	}
 	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {

@@ -39,6 +39,7 @@ type workboardWorkerRepository interface {
 	workboard.ControlRepository
 	workboard.EvaluationRepository
 	workboard.LifecycleSnapshotRepository
+	workboard.WorkerControlRepository
 }
 
 // WorkboardWorkerRunner composes the existing bounded in-process supervisor
@@ -80,10 +81,12 @@ func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTas
 	}
 	var candidate WorkboardCandidate
 	var executionErr error
-	output, err := r.supervisor.Run(ctx, workers.Work{TaskID: task.TaskID, SessionID: task.SessionID,
+	supervised, stopSupervisor := context.WithCancel(ctx)
+	defer stopSupervisor()
+	output, err := r.supervisor.Run(supervised, workers.Work{TaskID: task.TaskID, SessionID: task.SessionID,
 		ParentID: task.ParentTaskID, Scope: task.Scope, SubmissionID: task.SubmissionID, WorkerID: workerID,
 		Execute: func(run context.Context) (string, error) {
-			candidate, executionErr = r.execute(run, dispatch, workerID, task)
+			candidate, executionErr = r.execute(run, stopSupervisor, dispatch, workerID, task)
 			return candidate.Summary, executionErr
 		},
 		// Validation already ran while the workboard lease was held and before
@@ -101,7 +104,7 @@ func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTas
 	return candidate, nil
 }
 
-func (r *WorkboardWorkerRunner) execute(ctx context.Context, dispatch *WorkboardWorkerDispatch, workerID string,
+func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor context.CancelFunc, dispatch *WorkboardWorkerDispatch, workerID string,
 	task WorkboardWorkerTask,
 ) (candidate WorkboardCandidate, runErr error) {
 	claim, err := dispatch.Claim(ctx, workboard.ClaimRequest{BoardID: task.BoardID, CardID: task.CardID,
@@ -121,13 +124,14 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, dispatch *Workboard
 		durableClaim.Revision != *claim.ClaimRevision {
 		return WorkboardCandidate{}, workers.ErrDurability
 	}
-	handle := &WorkboardWorkerHandle{dispatch: dispatch, boardID: task.BoardID, cardID: task.CardID,
+	handle := &WorkboardWorkerHandle{dispatch: dispatch, controls: r.repository, boardID: task.BoardID, cardID: task.CardID,
 		attemptID: attempt.ID, claimID: durableClaim.ID, cardRevision: *claim.CardRevision,
-		claimRevision: *claim.ClaimRevision, criteriaRevision: attempt.CriteriaRevision, active: true}
+		claimRevision: *claim.ClaimRevision, criteriaRevision: attempt.CriteriaRevision, workerID: workerID,
+		taskID: task.TaskID, active: true}
 	defer handle.revoke()
 	run, cancel := context.WithCancel(ctx)
 	heartbeats := make(chan error, 1)
-	go handle.heartbeat(run, r.heartbeat, cancel, heartbeats)
+	go handle.heartbeat(run, r.heartbeat, cancel, stopSupervisor, heartbeats)
 	joined := false
 	joinHeartbeat := func() error {
 		if joined {
@@ -192,7 +196,9 @@ func workboardOperationKey(kind string) string { return "worker-" + kind + "-" +
 type WorkboardWorkerHandle struct {
 	mu                                            sync.Mutex
 	dispatch                                      *WorkboardWorkerDispatch
+	controls                                      workboard.WorkerControlRepository
 	boardID, cardID, attemptID, claimID           string
+	workerID, taskID                              string
 	cardRevision, claimRevision, criteriaRevision int64
 	active                                        bool
 	blocked                                       bool
@@ -278,7 +284,7 @@ func (h *WorkboardWorkerHandle) fail(ctx context.Context) error {
 	return nil
 }
 
-func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, cancel context.CancelFunc, done chan<- error) {
+func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Duration, cancel, stopSupervisor context.CancelFunc, done chan<- error) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -302,6 +308,26 @@ func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Dur
 			AttemptID: h.attemptID, ClaimID: h.claimID, IdempotencyKey: workboardOperationKey("heartbeat"),
 			ExpectedClaimRevision: h.claimRevision})
 		err = h.advance(receipt, err)
+		if err == nil {
+			target := workboard.WorkerControlTarget{BoardID: h.boardID, CardID: h.cardID, AttemptID: h.attemptID,
+				ClaimID: h.claimID, WorkerID: h.workerID, TaskID: h.taskID, CardRevision: h.cardRevision, ClaimRevision: h.claimRevision}
+			var observed workboard.WorkerControlObservation
+			observed, err = h.controls.ReadWorkerControl(ctx, target)
+			if err == nil && observed.Validate(target) != nil {
+				err = workers.ErrDurability
+			}
+			if err == nil && observed.CancelRequested {
+				// Revoke the board mutation capability before waking callback
+				// cleanup. A callback may use a fresh context while unwinding;
+				// cancellation must not leave that escaped capability usable.
+				h.active = false
+				stopSupervisor()
+				cancel()
+				h.mu.Unlock()
+				done <- context.Canceled
+				return
+			}
+		}
 		h.mu.Unlock()
 		if err != nil {
 			cancel()

@@ -6231,3 +6231,49 @@ telemetry 462.330s, CLI 64.942s, SDK 64.333s, toolgate 29.362s, and workers
 between application fixtures and subsequently reached the package timeout; the
 two named tests passed together under the race detector in 3.698s, and the
 complete clean retry passed.
+
+## 2026-09-10 — DAR-83/DAR-84 worker control, modal, and agent-read checkpoint
+
+Running workboard workers now read one coherent durable control projection only
+after a successful heartbeat. The observation is fenced to the exact card,
+attempt, claim, card/claim revisions, worker, and runtime task. A durable
+`cancel_requested` flag cancels the supervisor-owned context, joins the worker
+callback before releasing capacity, persists `TaskCanceled`, and atomically
+releases only the runtime reader. The running workboard attempt, claim, and
+cancellation flag remain intact for proof-gated operator finalization; canceled
+output never reaches candidate evaluation. Pause is visible in the projection
+but deliberately not consumed until a durable pause acknowledgement/resume
+protocol exists.
+
+Immediate same-daemon finalization remains unavailable: the current recovery
+verifier requires an independently unlocked process owner, while MVP workers
+run in-process. The preserved state can be finalized after independently
+provable process stop/restart. A future trusted in-process stop-acknowledgement
+record must bind the joined callback and released runtime reader before same-
+daemon finalization can be enabled.
+
+All Workboard editors and the candidate-review dialog now move outside the
+application shell before making the shell and skip link inert. Shared helpers
+restore background interactivity and return focus to a connected, enabled,
+visible opener or the stable Refresh control. Both asynchronous review and
+ordinary editor entry points refuse to open while either modal type is active,
+preventing a delayed candidate response from creating overlapping modal state.
+The existing Escape behavior and bounded Tab traps remain in force.
+
+DAR-84 now has a first read-only agent-tool slice. An explicit
+`tools.workboard_read_enabled` setting adds provider-neutral `workboard_list`
+and `workboard_read` tools only to local root execution. They reuse bounded
+browser-safe projections, closed schemas, the durable tool lifecycle, and the
+shared `workboards` reader scope. The trusted caller is a model, never an
+operator; delegated children cannot inherit these names, and extensions cannot
+shadow them. Marshal failures and results exceeding the executor's 1 MiB cap
+become a stable recoverable/no-effect `workboard_unavailable` result. Agent
+writes, argument-derived dynamic resource scopes, approval-backed mutations,
+and the remaining operation catalog are still required for DAR-84 completion.
+
+Repository-wide `make check` passed on the exact integrated tree: source
+formatting and the 1,000-line limit, `go vet ./...`, the full race-enabled test
+suite, and `go build ./...`. The longest rebuilt packages were application
+573.003s, releasepack 503.227s, telemetry 481.439s, SDK 67.343s, CLI 66.412s,
+toolgate 32.029s, runtime 27.081s, workers 9.079s, browser BFF 5.316s, Web UI
+5.013s, process guard 4.601s, tools 4.174s, and workboard 1.215s.

@@ -442,10 +442,20 @@ event before authoritative refresh. Authoritative card refetches now carry a
 bounded, validated keyboard-focus anchor across superseding same-board
 refreshes. The replacement DOM restores the exact enabled control, then the
 card toggle, then the stable Refresh control, without retaining stale nodes or
-stealing focus after the operator moves elsewhere. Worker-side pause/cancel
-consumption, selected/expanded-card context restoration, and broader browser
-qualification remain open.
-DAR-84 owns agent board tools.
+stealing focus after the operator moves elsewhere. Ordinary editors and the
+candidate-review dialog are reparented outside an inert application background,
+exclude overlapping modal state, and restore focus to a live opener or Refresh.
+Running workers now consume durable cancellation requests after a heartbeat,
+cancel and join the supervisor-owned callback, persist runtime cancellation,
+and preserve the workboard claim for independent finalization. Pause
+consumption, trusted same-daemon stop acknowledgement, selected/expanded-card
+context restoration, and broader browser qualification remain open.
+DAR-84 now provides an explicitly enabled, local-root-only read slice through
+the provider-neutral `workboard_list` and `workboard_read` tools. They use
+bounded projections, closed schemas, durable read events and shared leases,
+and are excluded from child catalogs. Agent mutation tools remain DAR-84 work;
+they require trusted argument-derived scopes and approval policy rather than
+the fixed read scope.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

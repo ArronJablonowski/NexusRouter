@@ -205,6 +205,201 @@ func TestWorkboardWorkerRunnerJoinsHeartbeatOnPanicAndCancellation(t *testing.T)
 	}
 }
 
+func TestWorkboardWorkerRunnerConsumesDurableCancelAfterHeartbeatAndPreservesClaim(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	evaluator := &capturingWorkboardEvaluator{}
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, evaluator, strings.Repeat("e", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered, canceled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	cleanupMutations := make(chan []error, 1)
+	done := make(chan error, 1)
+	const taskID = "durable-board-cancel-task"
+	go func() {
+		_, runErr := runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: taskID,
+			SessionID: "durable-board-cancel-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
+			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
+			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				close(entered)
+				<-run.Done()
+				// Cancellation cleanup must not retain an ambient workboard
+				// capability merely by replacing the canceled context.
+				cleanupMutations <- []error{
+					handle.AppendCheckpoint(context.Background(), "late cancellation cleanup"),
+					handle.Block(context.Background(), "late-cancel-block"),
+					handle.Unblock(context.Background(), "late-cancel-unblock"),
+				}
+				close(canceled)
+				// Deliberately model slow cancellation cleanup. Neither the
+				// supervisor slot nor its resource reader may be released yet.
+				<-release
+				return WorkboardCandidate{}, run.Err()
+			},
+			Validate: func(context.Context, WorkboardCandidate) error { return nil },
+		})
+		done <- runErr
+	}()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker callback did not start")
+	}
+	bridge, err := NewWorkboardBridge(store, store, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := store.GetCard(ctx, boardID, cardID)
+	if err != nil || card.CurrentAttemptID == "" || card.CurrentClaimID == "" {
+		t.Fatalf("claimed card=%+v err=%v", card, err)
+	}
+	requested, err := bridge.NativeMutate(ctx, webui.BoardRequest{Version: 1, Action: webui.CardCancelRequest,
+		IdempotencyKey: "runner-cancel-request-01", BoardID: boardID, CardID: cardID,
+		ExpectedCardRevision: revisionPointer(card.Revision)})
+	if err != nil || requested.CardRevision == nil {
+		t.Fatalf("cancel request=%+v err=%v", requested, err)
+	}
+	select {
+	case <-canceled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("durable cancellation was not consumed after heartbeat")
+	}
+	for index, mutationErr := range <-cleanupMutations {
+		if !errors.Is(mutationErr, ErrAdmission) {
+			t.Fatalf("cleanup mutation %d retained board capability: %v", index, mutationErr)
+		}
+	}
+	select {
+	case err = <-done:
+		t.Fatalf("runner released before callback joined: %v", err)
+	default:
+	}
+	status, err := store.TaskLeaseStatus(ctx, taskID, time.Now().UTC())
+	if err != nil || status.TaskState != "running" || status.Leases == nil || status.Leases.LiveReaders != 1 ||
+		status.Leases.ReleasedReaders != 0 {
+		t.Fatalf("runtime reader was not held through callback join: status=%+v err=%v", status, err)
+	}
+	before, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	lifecycle := before[cardID]
+	if err != nil || lifecycle.Attempt == nil || lifecycle.Attempt.Claim == nil || lifecycle.CheckpointCount != 0 ||
+		lifecycle.Attempt.State != "running" || lifecycle.Attempt.Claim.State != "active" ||
+		lifecycle.Attempt.Claim.Revision < 2 {
+		t.Fatalf("cancel was not observed after a durable heartbeat: lifecycle=%+v err=%v", lifecycle, err)
+	}
+	card, err = store.GetCard(ctx, boardID, cardID)
+	if err != nil || !card.CancelRequested || card.CurrentAttemptID != lifecycle.Attempt.ID ||
+		card.CurrentClaimID != lifecycle.Attempt.Claim.ID {
+		t.Fatalf("workboard cancel binding changed: card=%+v lifecycle=%+v err=%v", card, lifecycle, err)
+	}
+	close(release)
+	select {
+	case err = <-done:
+		if err == nil || !errors.Is(err, context.Canceled) {
+			t.Fatalf("runner did not report cancellation: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker did not finish after callback joined")
+	}
+	events, err := store.Read(ctx, taskID, 0, 100)
+	if err != nil || len(events) < 3 || events[len(events)-1].Kind != runtime.TaskCanceled {
+		t.Fatalf("runtime cancellation events=%+v err=%v", events, err)
+	}
+	status, err = store.TaskLeaseStatus(ctx, taskID, time.Now().UTC())
+	if err != nil || status.TaskState != "canceled" || status.Leases == nil || status.Leases.LiveReaders != 0 ||
+		status.Leases.ExpiredReaders != 0 || status.Leases.ReleasedReaders != 1 {
+		t.Fatalf("runtime reader was not atomically released: status=%+v err=%v", status, err)
+	}
+	after, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	if err != nil || after[cardID].Attempt == nil || after[cardID].Attempt.Claim == nil ||
+		after[cardID].Attempt.State != "running" || after[cardID].Attempt.Claim.State != "active" ||
+		after[cardID].Attempt.Claim.Revision != lifecycle.Attempt.Claim.Revision {
+		t.Fatalf("runner released or mutated workboard claim: before=%+v after=%+v err=%v", lifecycle, after[cardID], err)
+	}
+	card, err = store.GetCard(ctx, boardID, cardID)
+	if err != nil || !card.CancelRequested || card.CurrentClaimID != lifecycle.Attempt.Claim.ID {
+		t.Fatalf("runner cleared durable cancellation: card=%+v err=%v", card, err)
+	}
+	if evaluator.request.BoardID != "" {
+		t.Fatalf("canceled output entered evaluation: %+v", evaluator.request)
+	}
+}
+
+func TestWorkboardWorkerRunnerDoesNotConsumePauseAsCancellation(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, &capturingWorkboardEvaluator{}, strings.Repeat("f", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered, callbackCanceled, release := make(chan struct{}), make(chan struct{}, 1), make(chan struct{})
+	done := make(chan error, 1)
+	parent, cancelParent := context.WithCancel(ctx)
+	defer cancelParent()
+	go func() {
+		_, runErr := runner.Run(parent, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "pause-not-cancel-task",
+			SessionID: "pause-not-cancel-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
+			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
+			Execute: func(run context.Context, _ *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				close(entered)
+				select {
+				case <-run.Done():
+					callbackCanceled <- struct{}{}
+					return WorkboardCandidate{}, run.Err()
+				case <-release:
+					return WorkboardCandidate{}, errors.New("test release")
+				}
+			}, Validate: func(context.Context, WorkboardCandidate) error { return nil },
+		})
+		done <- runErr
+	}()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker callback did not start")
+	}
+	bridge, err := NewWorkboardBridge(store, store, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := store.GetCard(ctx, boardID, cardID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = bridge.NativeMutate(ctx, webui.BoardRequest{Version: 1, Action: webui.CardPauseRequest,
+		IdempotencyKey: "runner-pause-request-01", BoardID: boardID, CardID: cardID,
+		ExpectedCardRevision: revisionPointer(card.Revision)}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-callbackCanceled:
+		t.Fatal("pause request was incorrectly consumed as cancellation")
+	default:
+	}
+	close(release)
+	select {
+	case err = <-done:
+		if err == nil {
+			t.Fatal("test failure unexpectedly succeeded")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker did not join")
+	}
+}
+
 func TestWorkboardWorkerRunnerFinalizesEffectFreeExecuteAndValidationFailures(t *testing.T) {
 	for _, mode := range []string{"execute", "validate"} {
 		t.Run(mode, func(t *testing.T) {

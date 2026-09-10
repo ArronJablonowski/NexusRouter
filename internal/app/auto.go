@@ -313,7 +313,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		return Result{}, ErrAdmission
 	}
 	cfg := s.settings
-	if cfg.Tools.Enabled {
+	if cfg.Tools.Enabled || cfg.Tools.WorkboardReadEnabled {
 		r.LocalRequired = true
 	}
 	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)

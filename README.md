@@ -80,12 +80,17 @@ shows candidate summaries, inert artifact references, criteria, required-source
 evidence, and separately labelled advisory model audits. Accept/reject remains
 disabled unless the displayed deterministic and subjective-evidence rules can
 satisfy the durable decision, and each request freezes the exact card, attempt,
-candidate, evidence head, and configuration digests. Remaining lifecycle
-finalization, worker control consumption, selected/expanded-card restoration,
-and browser end-to-end qualification remain open. Authoritative refetches now
+candidate, evidence head, and configuration digests. Running workers now
+consume a durable cancellation request after an exact heartbeat, cancel and
+join the supervisor-owned callback, persist runtime cancellation, and retain
+the workboard claim for independently proven finalization. Pause consumption,
+same-daemon stop acknowledgement, selected/expanded-card restoration, and
+browser end-to-end qualification remain open. Authoritative refetches now
 preserve a validated keyboard-focus identity across same-board and superseding
 refreshes, restoring the exact replacement control, its card toggle, or the
 stable Refresh control without retaining stale DOM or stealing newer focus.
+Workboard dialogs now render outside an inert application background, refuse
+overlapping modal state, and restore focus to a live opener or Refresh.
 The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
@@ -93,8 +98,9 @@ attention. Bounded in-process workers are atomically bound to claims and runtime
 tasks; stop-proof recovery is independently derived from durable task, process,
 and effect evidence; lifecycle and dependency history is paginated; and exact
 browser recovery survives restart and credential rotation through a persistent
-workspace identity. Agent tools remain DAR-84 work, while the remaining
-interactive Kanban behavior remains DAR-83 work.
+workspace identity. Local root coordinators may opt into the read-only
+`workboard_list` and `workboard_read` tools; agent mutations remain DAR-84 work,
+while the remaining interactive Kanban behavior remains DAR-83 work.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -1196,10 +1202,18 @@ Opt in to the built-in `read_file` tool with a narrow workspace directory:
 tools:
   enabled: true
   read_root: /absolute/path/to/workspace
+  workboard_read_enabled: true
   max_turns: 8
 ```
 
 This allows local models to read UTF-8 regular files up to 64 KiB within that directory. Relative paths and symlinks cannot escape the configured root. Do not include credentials or other files the model should not see in this scope. Enabling file tools excludes cloud execution; explicit cloud selection is denied. Tool results become sensitive durable session content. Tools default off. Separately opt in to `create_enabled` and an absolute `create_root` for terminal-reviewed new-file creation; see [reviewed file creation](docs/reviewed-file-creation.md). Opt-in `replace_enabled` with an absolute `replace_root` supports [reviewed existing-file replacement](docs/reviewed-file-replacement.md), with exact old/new content and retained recovery copies. Delegated writes and unattended approvals remain unfinished. Tool-enabled models require `context_tokens` metadata. Each turn checks serialized context including tools and schemas plus a 1,024-token reserve; overflow ends the task without discarding durable tool results. Tokenizer-based accounting, automatic compaction and budget-exhaustion recovery remain unfinished.
+
+`workboard_read_enabled` independently opts the root coordinator into the
+read-only `workboard_list` and `workboard_read` Kanban tools. Both use bounded
+pages, strict closed argument schemas, the runtime's durable read lifecycle and
+shared `workboards` lease. They are available only to local root execution and
+are never inherited by delegated workers. Board mutations remain unavailable to
+models. Returned board/card content becomes sensitive durable session content.
 
 Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Current immutable evaluation and advisory-audit observations are decayed individually by source time before aggregation. `routing.decay_half_life` supplies the default and exact `routing.decay_overrides` domain/profile entries may replace it. Persisted route explanations report raw/effective samples, average decay contribution and source-time windows without prompts or outputs; see [fitness observation decay](docs/fitness-decay.md). Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Successful model discovery is cached for up to five seconds per provider/endpoint/credential/privacy identity; execution failures invalidate it. Failed discovery is not cached. Explicit and automatic local reservations share one application service; discovery caches are also service-local. Neither is shared across separate processes.
 

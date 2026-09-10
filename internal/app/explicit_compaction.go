@@ -147,6 +147,9 @@ func initialTaskTools(cfg config.Settings, r Request) []providers.Tool {
 	if cfg.Tools.Enabled {
 		result = append(result, readFileSpec())
 	}
+	if cfg.Tools.WorkboardReadEnabled {
+		result = append(result, workboardListSpec(), workboardReadSpec())
+	}
 	if cfg.Tools.CreateEnabled {
 		result = append(result, createFileSpec())
 	}

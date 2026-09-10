@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/webui"
@@ -145,6 +146,19 @@ func nativeWorkboardContext(ctx context.Context) context.Context {
 	})
 }
 
+// rootAgentWorkboardContext grants only the domain identity needed by the
+// built-in, read-only root-agent tools. It is deliberately distinct from the
+// operator authority used by native and browser mutation surfaces.
+func rootAgentWorkboardContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return nil
+	}
+	return context.WithValue(ctx, workboardAuthorityKey{}, workboard.Authority{
+		CreationScope: "root-agent-tools",
+		Actor:         workboard.Actor{ID: "darwin_root_agent", Type: "model"},
+	})
+}
+
 func browserWorkboardContext(ctx context.Context, subject string, authority workboard.Authority) (context.Context, error) {
 	if ctx == nil || !validBrowserSubject(subject) || authority.Validate() != nil || authority.Actor.Type != "operator" {
 		return nil, errors.New("workboard authority unavailable")
@@ -154,6 +168,10 @@ func browserWorkboardContext(ctx context.Context, subject string, authority work
 
 func (b *WorkboardBridge) NativeList(ctx context.Context, options webui.BoardListOptions) (webui.Page, error) {
 	return b.list(nativeWorkboardContext(ctx), options)
+}
+
+func (b *WorkboardBridge) RootAgentList(ctx context.Context, options webui.BoardListOptions) (webui.Page, error) {
+	return b.list(rootAgentWorkboardContext(ctx), options)
 }
 
 func (b *WorkboardBridge) BrowserList(ctx context.Context, subject string, options webui.BoardListOptions) (webui.Page, error) {
@@ -166,6 +184,39 @@ func (b *WorkboardBridge) BrowserList(ctx context.Context, subject string, optio
 
 func (b *WorkboardBridge) NativeRead(ctx context.Context, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
 	return b.read(nativeWorkboardContext(ctx), boardID, options)
+}
+
+func (b *WorkboardBridge) RootAgentRead(ctx context.Context, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
+	if ctx == nil {
+		return webui.BoardSnapshot{}, context.Canceled
+	}
+	trusted := rootAgentWorkboardContext(ctx)
+	const attempts = 3
+	for range attempts {
+		result, cardIDs, err := b.readBase(trusted, boardID, options)
+		if err != nil {
+			return webui.BoardSnapshot{}, err
+		}
+		if err := b.attachLifecycle(trusted, boardID, cardIDs, &result); err != nil {
+			return webui.BoardSnapshot{}, err
+		}
+		confirmed, _, err := b.readBase(trusted, boardID, options)
+		if err != nil {
+			return webui.BoardSnapshot{}, err
+		}
+		candidate := result
+		candidate.Lifecycle = nil
+		if reflect.DeepEqual(candidate, confirmed) {
+			if result.Validate() != nil {
+				return webui.BoardSnapshot{}, errors.New("invalid workboard snapshot projection")
+			}
+			return result, nil
+		}
+		if ctx.Err() != nil {
+			return webui.BoardSnapshot{}, ctx.Err()
+		}
+	}
+	return webui.BoardSnapshot{}, errors.New("workboard snapshot changed during read")
 }
 
 func (b *WorkboardBridge) BrowserRead(ctx context.Context, subject, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
@@ -228,10 +279,24 @@ func authorizedWorkboardRead(ctx context.Context) bool {
 }
 
 func (b *WorkboardBridge) read(ctx context.Context, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, error) {
+	result, cardIDs, err := b.readBase(ctx, boardID, options)
+	if err != nil {
+		return webui.BoardSnapshot{}, err
+	}
+	if err := b.attachLifecycle(ctx, boardID, cardIDs, &result); err != nil {
+		return webui.BoardSnapshot{}, err
+	}
+	if result.Validate() != nil {
+		return webui.BoardSnapshot{}, errors.New("invalid workboard snapshot projection")
+	}
+	return result, nil
+}
+
+func (b *WorkboardBridge) readBase(ctx context.Context, boardID string, options webui.BoardSnapshotOptions) (webui.BoardSnapshot, []string, error) {
 	snapshot, err := b.boards.Read(ctx, boardID, workboard.BoardSnapshotOptions{After: options.After, Limit: options.Limit,
 		State: workboard.State(options.State), AssigneeID: options.AssigneeID, OwnerID: options.OwnerID, ClaimState: options.ClaimState})
 	if err != nil {
-		return webui.BoardSnapshot{}, err
+		return webui.BoardSnapshot{}, nil, err
 	}
 	result := webui.BoardSnapshot{Version: webui.ContractVersion, Board: workboardBoard(snapshot.Board), NextCursor: snapshot.NextCursor,
 		HasMore: snapshot.HasMore, GraphRevision: snapshot.GraphRevision, GraphDigest: snapshot.GraphDigest,
@@ -247,24 +312,28 @@ func (b *WorkboardBridge) read(ctx context.Context, boardID string, options webu
 	for index := range snapshot.Cards {
 		cardIDs[index] = snapshot.Cards[index].ID
 	}
+	if result.Validate() != nil {
+		return webui.BoardSnapshot{}, nil, errors.New("invalid workboard snapshot projection")
+	}
+	return result, cardIDs, nil
+}
+
+func (b *WorkboardBridge) attachLifecycle(ctx context.Context, boardID string, cardIDs []string, result *webui.BoardSnapshot) error {
 	lifecycle, err := b.lifecycle.ReadCardLifecycleSnapshots(ctx, boardID, cardIDs)
 	if err != nil {
-		return webui.BoardSnapshot{}, err
+		return err
 	}
 	result.Lifecycle = make([]webui.CardLifecycle, 0, len(lifecycle))
 	for _, cardID := range cardIDs {
 		if detail, exists := lifecycle[cardID]; exists {
 			projected, projectErr := workboardLifecycle(detail)
 			if projectErr != nil {
-				return webui.BoardSnapshot{}, projectErr
+				return projectErr
 			}
 			result.Lifecycle = append(result.Lifecycle, projected)
 		}
 	}
-	if result.Validate() != nil {
-		return webui.BoardSnapshot{}, errors.New("invalid workboard snapshot projection")
-	}
-	return result, nil
+	return nil
 }
 
 func (b *WorkboardBridge) NativeMutate(ctx context.Context, request webui.BoardRequest) (webui.OperationReceipt, error) {

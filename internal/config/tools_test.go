@@ -9,7 +9,7 @@ import (
 
 func TestToolsDefaults(t *testing.T) {
 	s := Defaults()
-	if s.Tools.Enabled || s.Tools.ReadRoot != "" || s.Tools.MaxTurns != 8 {
+	if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || s.Tools.ReadRoot != "" || s.Tools.MaxTurns != 8 {
 		t.Fatalf("tools defaults = %#v", s.Tools)
 	}
 	if err := s.Validate(); err != nil {
@@ -69,11 +69,11 @@ func TestToolsReadRootRedactedWithoutMutatingSettings(t *testing.T) {
 }
 
 func TestToolsLoadScalarOverrides(t *testing.T) {
-	s, err := Load(Options{Flags: map[string]string{"tools.enabled": "true", "tools.read_root": "/test/read-root", "tools.max_turns": "12"}})
+	s, err := Load(Options{Flags: map[string]string{"tools.enabled": "true", "tools.read_root": "/test/read-root", "tools.workboard_read_enabled": "true", "tools.max_turns": "12"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Tools != (Tools{Enabled: true, ReadRoot: "/test/read-root", MaxTurns: 12}) {
+	if s.Tools != (Tools{Enabled: true, ReadRoot: "/test/read-root", WorkboardReadEnabled: true, MaxTurns: 12}) {
 		t.Fatalf("loaded tools = %#v", s.Tools)
 	}
 }

@@ -142,13 +142,14 @@ type Telemetry struct {
 	TraceExport   *TraceExport   `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
-	CreateEnabled  bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
-	CreateRoot     string `yaml:"create_root" json:"create_root,omitempty"`
-	ReplaceEnabled bool   `yaml:"replace_enabled" json:"replace_enabled,omitempty"`
-	ReplaceRoot    string `yaml:"replace_root" json:"replace_root,omitempty"`
-	Enabled        bool   `yaml:"enabled" json:"enabled"`
-	ReadRoot       string `yaml:"read_root" json:"read_root"`
-	MaxTurns       int    `yaml:"max_turns" json:"max_turns"`
+	CreateEnabled        bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
+	CreateRoot           string `yaml:"create_root" json:"create_root,omitempty"`
+	ReplaceEnabled       bool   `yaml:"replace_enabled" json:"replace_enabled,omitempty"`
+	ReplaceRoot          string `yaml:"replace_root" json:"replace_root,omitempty"`
+	WorkboardReadEnabled bool   `yaml:"workboard_read_enabled" json:"workboard_read_enabled,omitempty"`
+	Enabled              bool   `yaml:"enabled" json:"enabled"`
+	ReadRoot             string `yaml:"read_root" json:"read_root"`
+	MaxTurns             int    `yaml:"max_turns" json:"max_turns"`
 }
 
 type Runtime struct {

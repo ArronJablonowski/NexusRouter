@@ -95,7 +95,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		r.toolPresenter = nil
 		// Children receive only explicit context and, optionally, a borrowed
 		// read-only capability. Never grant memory, skills or recursion.
-		s.Tools.Enabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false
+		s.Tools.Enabled, s.Tools.WorkboardReadEnabled, s.Memory.Enabled, s.Skills.Enabled = r.delegatedTools != nil, false, false, false
 		s.Tools.CreateEnabled = false
 		s.Tools.ReplaceEnabled = false
 		s.Workers.DelegateModel = ""
@@ -141,7 +141,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 	}
 	// File tools are local-only until an explicit data-egress approval exists.
-	if (s.Tools.Enabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
+	if (s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
 		return result, ErrAdmission
 	}
 	if s.Workers.DelegateModel != "" && model.ContextTokens == 0 {
@@ -228,6 +228,14 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return result, errors.New("cannot open task storage")
 	}
 	defer db.Close()
+	if s.Tools.WorkboardReadEnabled {
+		if registry == nil {
+			registry = &tools.Registry{}
+		}
+		if registerWorkboardReadTools(registry, db) != nil {
+			return result, ErrAdmission
+		}
+	}
 	messages := []providers.Message{}
 	sessionID := ""
 	privacy := "cloud_allowed"
@@ -352,7 +360,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
 		}
 		loop.Tools = executor
-		if s.Tools.Enabled || len(r.toolExtension.Names()) > 0 {
+		if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
 			maxTurns = min(maxTurns, s.Tools.MaxTurns)
 		}
 	}

@@ -32,8 +32,23 @@ supported-platform decision or publication approval is claimed.
   preserve a bounded keyboard-focus identity across superseding same-board
   refreshes and restore the exact replacement control, its card toggle, or the
   stable Refresh control without retaining stale DOM or stealing newer focus.
-  Worker control consumption, selected/expanded-card restoration, and browser
-  end-to-end qualification remain open.
+  Ordinary Workboard editors now render outside an inert application
+  background, exclude overlapping modal state, and restore focus safely.
+  Running workers consume exact durable cancellation after a successful
+  heartbeat, cancel and join the supervisor callback, persist runtime
+  cancellation, and preserve the workboard claim for independent finalization.
+  Pause consumption, trusted same-daemon stop acknowledgement,
+  selected/expanded-card restoration, and browser end-to-end qualification
+  remain open.
+
+- DAR-84 now has its first provider-neutral agent-facing Kanban slice. An
+  explicit `tools.workboard_read_enabled` gate exposes bounded
+  `workboard_list` and `workboard_read` projections to local root execution.
+  The tools use closed schemas, normal durable tool events, shared read leases,
+  a model identity distinct from operator authority, sanitized failures, and
+  existing context/turn limits. Delegated children receive neither tool, and
+  extension code cannot shadow their reserved names. Agent mutations, dynamic
+  write scopes, and approval-backed board operations remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
