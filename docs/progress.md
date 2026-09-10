@@ -6690,3 +6690,37 @@ The stock daemon still rejects `workboard.scheduler.enabled: true`;
 transactional time/token/cost budgets, configured independent acceptance
 judging, and broader crash/lease/acceptance qualification remain open. DAR-85
 must not be marked Done yet.
+
+## 2026-09-10 — DAR-85 scheduler identity and transactional budget checkpoint
+
+DAR-85 remains in progress. The configuration boundary now names an
+explicit `workboard.scheduler.worker_model` and a nested `acceptance_judge`
+with an explicit reviewer model, cost ceiling, and timeout. Enabling that
+configuration is designed to fail closed unless the worker is mode-eligible and
+bounded, the global LLM-judge gate is active, and the reviewer is a distinct
+local model whose configured estimate fits the review ceiling. This is
+configuration validation only: the stock daemon continues to reject an enabled
+scheduler, and production acceptance-review dispatch is not yet composed.
+
+The runner/supervision changes preserve card assignment as execution
+authority. An assigned Ready card must use its exact assignee as the durable
+worker identity; an unassigned card receives a fresh host-generated identity.
+Both assigned and unassigned work may start as top-level runtime tasks with an
+empty parent identity, while all emitted runtime events, the attempt, and the
+claim retain the same worker identity.
+
+Schema 42 implements the transactional accounting boundary: before execution,
+one exact card revision, runtime task/session/worker, model/provider, effective
+configuration digest, and route cost reserve global/per-board WIP plus the
+card's remaining time, tokens, and cost. Once runtime starts, failure and
+cancellation remain charged; unknown measurements consume their full
+reservation; and WIP is released only by proof-bearing attempt finalization,
+not merely by a terminal runtime event. A successful run whose known token use
+or actual elapsed time exceeds its reservation cannot enter Review; supervised
+recovery can still settle the actual overrun so capacity is not leaked.
+Admissions and settlements are immutable, replay-validated, migration-tested,
+and included in runner integration tests. Automatic acceptance review is still
+required to consume the same card budget, but its production dispatch is not
+yet composed. Provider-side hard token ceilings, scheduler enablement, and the
+remaining DAR-85 lifecycle qualification should not be inferred from this
+checkpoint.

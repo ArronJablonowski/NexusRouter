@@ -339,6 +339,24 @@ bounded retries, and stall/attention states prevent runaway work. Lease expiry
 makes work recoverable but does not prove execution stopped or authorize replay
 of confirmed or uncertain side effects.
 
+Before any unattended card execution constructs a provider request or invokes a
+tool, the scheduler must transactionally reserve a global and per-board WIP slot
+and the card's remaining time, token, and cost allowance against the exact card
+revision, execution profile, model/provider identity, task/session identity, and
+configuration digest. The first durable runtime event and card claim consume
+that reservation atomically. A reservation released with proof before runtime
+start is uncharged; after runtime start, success, failure, and cancellation all
+remain charged. Known provider usage and observed duration are recorded, while
+missing, malformed, or ambiguous measurements conservatively consume the full
+reserved allowance. A terminal runtime event alone does not release Workboard
+WIP: candidate submission or another proof-bearing attempt finalization must do
+so in the same transaction. Stale heartbeats, lease expiry, daemon restart, and
+attention state never refund a reservation. Automatic acceptance-review calls
+reserve and consume the same card budget before dispatch, including failed or
+malformed reviews. These records are append-only, replay-validated, and are the
+authoritative source for the integrated Web UI's used, reserved, remaining, and
+attention-required budget presentation.
+
 Long-running cards may span multiple runtime tasks and sessions. On restart the
 supervisor re-derives board state from the append-only work log, task journals,
 claims, leases, checkpoints, and runtime observations rather than trusting
@@ -428,8 +446,11 @@ later adoption of independently committed halves. Exact retries validate the
 complete progressed journal, event index, timing, worker identity, claim, and
 marker. A capacity-only supervisor slot and host-frozen runtime identity are now
 composed by the workboard worker runner. A trusted, one-use binding supplies the
-exact already-open configured SQLite store and freezes task, session, parent,
-and worker identities. On the runtime's first append, the host atomically
+exact already-open configured SQLite store and freezes task, session, optional
+parent, and worker identities. An assigned card requires that exact assignee as
+its worker; an unassigned card receives a fresh host-generated identity. Both
+may execute as top-level tasks without a parent. On the runtime's first append,
+the host atomically
 commits the actual redacted `task.started` event and all initial runtime and
 Kanban ownership projections, then starts the claim heartbeat before admission
 returns. The runner emits no synthetic outer task or resource lease; binding
@@ -442,9 +463,12 @@ than stock-daemon execution. Its integrated runtime path accepts only an
 explicit model and fails closed for automatic routing, managed residency,
 worker delegation, provider fallback, provider-overflow compaction, and
 automatic post-run audit. The stock daemon continues to reject an enabled
-scheduler. Durable transactional time/token/cost budgets, the configured
-independent acceptance judge, and broader crash/lease/acceptance qualification
-remain required before unattended scheduling is enabled. DAR-83 owns the
+scheduler. Schema 42 now provides repository-verified transactional execution
+admissions and settlements with exact runtime/configuration identity, bounded
+WIP, conservative unknown-usage accounting, successful-overrun rejection, and
+replay/tamper tests. Provider-side hard token ceilings, the independent local
+reviewer dispatch, stock-daemon composition, and broader crash/lease/acceptance
+qualification remain required before unattended scheduling is enabled. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,
@@ -568,6 +592,12 @@ workboard:
     interval: 5s
     max_active_claims: 3
     card_scan_limit: 10000
+    worker_model: local-worker
+    acceptance_judge:
+      enabled: false
+      reviewer_model: local-reviewer
+      max_cost: 0.01
+      timeout: 30s
 
 hardware:
   auto_profile: true
@@ -593,11 +623,20 @@ providers:
     api_key_env: CLOUD_LLM_API_KEY
 
 models:
-  - id: local-fast
+  - id: local-worker
     provider: local-primary
-    model: "local-model-id"
+    model: "local-worker-model-id"
     locality: local
     capabilities: [chat, summarize, classify]
+    context_tokens: 8192
+    estimated_cost: 0
+  - id: local-reviewer
+    provider: local-primary
+    model: "independent-local-reviewer-model-id"
+    locality: local
+    capabilities: [chat, audit]
+    context_tokens: 8192
+    estimated_cost: 0
   - id: cloud-reasoning
     provider: cloud-primary
     model: "cloud-model-id"
@@ -653,6 +692,15 @@ telemetry:
 ```
 
 Durations, percentages, weights, paths, provider references, capability names, and mode-specific contradictions must be validated before the daemon becomes ready.
+
+When unattended scheduling is enabled, both scheduler model aliases are
+mandatory and resolve directly; adaptive routing cannot choose either role. The
+worker must be available in the configured deployment mode and have positive
+context capacity plus an explicit cost estimate. The reviewer must additionally
+be local, remain within its bounded `100ms`–`5m` timeout and `max_cost`, and have
+a different provider/model identity from the worker. The global LLM-judge gate
+must remain enabled. These fail-closed configuration rules do not themselves
+enable the stock scheduler or prove that independent review dispatch is wired.
 
 ## 8. Adaptive Routing
 

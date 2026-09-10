@@ -70,6 +70,7 @@ func TestExplicitTaskEndToEnd(t *testing.T) {
 func TestAdmissionNoNetwork(t *testing.T) {
 	s := config.Defaults()
 	s.Mode = "local_only"
+	s.Telemetry.Database = filepath.Join(t.TempDir(), "admission.db")
 	s.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://192.168.1.2:11434"}}
 	s.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
 	if _, err := RunExplicit(context.Background(), s, Request{ModelID: "chat", Prompt: "hello"}, nil); err != ErrAdmission {

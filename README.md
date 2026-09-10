@@ -97,23 +97,32 @@ constructing tasks, counts running, stalled, and orphaned claims against its WIP
 ceiling, and sends only ready cards through the claim-fenced worker runner. The
 runner now uses the supervisor's capacity-only slot and a trusted, one-use
 runtime binding instead of a synthetic outer worker task. For an explicitly
-selected model, the runtime freezes the host-supplied task, session, parent, and
-worker identities; uses the exact already-open configured SQLite database; and
+selected model, the runtime freezes the host-supplied task, session, optional
+parent, and worker identities; uses the exact already-open configured SQLite
+database; and
 commits the actual redacted `task.started` event, runtime projections, Kanban
 attempt and claim, and cross-domain marker in one transaction before
 acknowledging admission. The claim heartbeat starts before that first append
 returns. A request that never binds and starts the runtime leaves the card Ready
 and creates no task or claim. The resulting model/tool execution has one real
 runtime journal, and every event retains the same worker identity as the
-workboard attempt and claim.
+workboard attempt and claim. An assigned card may run only under its exact
+assignee identity. An unassigned card receives a fresh host-generated worker
+identity. Either form may be a top-level runtime task with no parent task.
 
 This is a narrow trusted-host path, not unattended scheduling. It requires an
 explicit model and rejects automatic routing, managed model residency, worker
 delegation, provider fallback, provider-overflow compaction, and automatic
 post-run audit. The stock daemon still rejects
-`workboard.scheduler.enabled: true`. Transactional time/token/cost budgets,
-configured independent acceptance judging, and broader crash/lease/acceptance
-qualification remain open before DAR-85 can be marked Done. Schema 40
+`workboard.scheduler.enabled: true`. Schema 42 now transactionally binds the
+first runtime event, claim, model/provider, effective configuration digest,
+resource reservation, and global/per-board WIP admission; proof-bearing
+finalization writes an immutable settlement in the same transaction. Known
+usage and actual elapsed time are charged, ambiguous measurements consume the
+reservation, and an over-budget successful run cannot enter Review. Provider-
+side hard token ceilings, configured independent acceptance-review dispatch,
+stock-daemon composition, and broader crash/lease/acceptance qualification
+remain open before DAR-85 can be marked Done. Schema 40
 now binds each proof-gated recovery to its exact replacement attempt and claim
 inside the replacement claim transaction; recovery clears the predecessor's
 worker assignment so a distinct worker can claim the Ready card. The lineage
@@ -507,12 +516,39 @@ settings, such as estimated cost and routing weights, remain supported.
 The workboard is required in configuration version 1 because authenticated Web
 UI and API routes currently expose it; `workboard.enabled: false` is rejected
 rather than misleadingly leaving those surfaces active. Its unattended
-scheduler is disabled by default. The versioned scheduler boundary accepts
-an interval from `250ms` through `24h`, 1–64 active claims (never more than
-`workers.max_in_process`), and a card scan limit from 1–10,000. The stock daemon
-currently rejects `workboard.scheduler.enabled: true` before opening storage,
-binding its listener, or constructing providers; it will not silently ignore an
-enabled scheduler until the supervised execution path is fully wired.
+scheduler is disabled by default. Its configuration shape is explicit even
+while execution remains guarded:
+
+```yaml
+workboard:
+  enabled: true
+  scheduler:
+    enabled: false
+    interval: 5s
+    max_active_claims: 3
+    card_scan_limit: 10000
+    worker_model: local-worker
+    acceptance_judge:
+      enabled: false
+      reviewer_model: local-reviewer
+      max_cost: 0.01
+      timeout: 30s
+```
+
+The versioned scheduler boundary accepts an interval from `250ms` through
+`24h`, 1–64 active claims (never more than `workers.max_in_process`), and a card
+scan limit from 1–10,000. Enabling it requires `worker_model` to resolve to one
+configured, mode-eligible model with positive context capacity and a configured
+cost estimate. It also requires the global LLM-judge gate and the nested
+acceptance judge. `reviewer_model` must resolve to a local, mode-eligible model
+with positive context capacity and a configured estimate no greater than
+`max_cost`; its provider/model identity must differ from the worker's. Judge
+timeouts are bounded from `100ms` through `5m`. These are configuration
+admission checks, not evidence that review dispatch is composed. The stock
+daemon currently rejects `workboard.scheduler.enabled: true` before opening
+storage, binding its listener, or constructing providers; it will not silently
+ignore an enabled scheduler until independent review, provider-side token
+ceilings, and lifecycle qualification are complete.
 
 Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; DarwinRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
 

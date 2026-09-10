@@ -125,6 +125,7 @@ func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (Work
 		task.BoardID = item.BoardID
 		task.CardID = item.CardID
 		task.ExpectedCardRevision = item.CardRevision
+		task.WorkerID = item.AssigneeID
 		tasks = append(tasks, task)
 	}
 	result.Deferred = result.Ready - considered

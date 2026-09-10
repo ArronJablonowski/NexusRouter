@@ -14,6 +14,15 @@ workboard:
     interval: 5s
     max_active_claims: 3
     card_scan_limit: 10000
+    # Enabling the scheduler requires explicit, configured aliases for both an
+    # execution model and an independent local acceptance reviewer. Adaptive
+    # routing is not used for either role.
+    worker_model: ""
+    acceptance_judge:
+      enabled: false
+      reviewer_model: ""
+      max_cost: 0
+      timeout: 30s
 providers:
   - id: local-primary
     kind: ollama

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -241,7 +242,11 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if board.ActiveClaims < 0 {
 		return 0, 0, evaluationStoredResult{}, ErrWorkboardCorrupt
 	}
-	return claim.Revision, durable + cardBytes, evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Successors: []workboard.Card{}}, nil
+	settlementBytes, err := settleExecutionAttempt(ctx, tx, m.BoardID, m.CardID, m.AttemptID, m.ClaimID, runtime.TaskCompleted, true, m.Now)
+	if err != nil {
+		return 0, 0, evaluationStoredResult{}, err
+	}
+	return claim.Revision, durable + cardBytes + settlementBytes, evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Successors: []workboard.Card{}}, nil
 }
 
 func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, board *workboard.Board, card *workboard.Card, cardBody *storedWorkboardCard) (int, evaluationStoredResult, error) {

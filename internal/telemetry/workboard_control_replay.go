@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -28,6 +29,11 @@ func (s *Store) ReplayControlMutation(ctx context.Context, mutation workboard.Co
 		mutation.Kind == workboard.ControlBlock || mutation.Kind == workboard.ControlUnblock || mutation.Kind == workboard.ControlCancelFinalize
 	if receipt.CardID != mutation.CardID || receipt.CardRevision == nil || wantsClaim != (receipt.ClaimRevision != nil) {
 		return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
+	}
+	if mutation.Kind == workboard.ControlCancelFinalize {
+		if err = validateExecutionSettlementReplay(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID, runtime.TaskCanceled, false); err != nil {
+			return workboard.OperationReceipt{}, true, err
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return workboard.OperationReceipt{}, false, err

@@ -184,6 +184,25 @@ func TestWorkboardSchedulerContainsFactoryAndRunnerFailures(t *testing.T) {
 	}
 }
 
+func TestWorkboardSchedulerFreezesAuthoritativeAssigneeIdentity(t *testing.T) {
+	item := schedulerReady("card-a", 2)
+	item.AssigneeID = "worker-assigned"
+	reader := &schedulerReaderStub{pages: map[string]workboard.SupervisionPage{"": schedulerPage([]workboard.SupervisionItem{item}, "")}}
+	factory := WorkboardTaskFactoryFunc(func(context.Context, workboard.SupervisionItem) (WorkboardWorkerTask, error) {
+		return WorkboardWorkerTask{WorkerID: "factory-controlled"}, nil
+	})
+	runner := &schedulerRunnerStub{}
+	scheduler, err := NewWorkboardScheduler(reader, factory, runner, WorkboardScheduleLimits{MaxInFlight: 1, ScanLimit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := scheduler.RunCycle(context.Background(), "board-a")
+	tasks := runner.tasksSnapshot()
+	if err != nil || result.Succeeded != 1 || len(tasks) != 1 || tasks[0].WorkerID != "worker-assigned" {
+		t.Fatalf("result=%+v tasks=%+v err=%v", result, tasks, err)
+	}
+}
+
 func TestWorkboardSchedulerContainsFactoryAndRunnerPanics(t *testing.T) {
 	reader := &schedulerReaderStub{pages: map[string]workboard.SupervisionPage{
 		"": schedulerPage([]workboard.SupervisionItem{

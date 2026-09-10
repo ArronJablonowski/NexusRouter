@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
@@ -19,12 +20,11 @@ func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCata
 		return zero, err
 	}
 	secrets := memorySecrets(s.settings, s.secret)
-	redacted, err := s.settings.RedactedJSON()
+	configID, err := settingsConfigID(s.settings)
 	if err != nil {
 		return zero, ErrAdmission
 	}
-	digest := sha256.Sum256(redacted)
-	catalog := routing.ModelCatalog{Version: 1, ConfigID: hex.EncodeToString(digest[:]), Models: make([]routing.ConfiguredModel, len(s.settings.Models))}
+	catalog := routing.ModelCatalog{Version: 1, ConfigID: configID, Models: make([]routing.ConfiguredModel, len(s.settings.Models))}
 	for i, configured := range s.settings.Models {
 		var cost *float64
 		if configured.EstimatedCost != nil {
@@ -48,4 +48,13 @@ func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCata
 		return zero, ErrAdmission
 	}
 	return catalog, nil
+}
+
+func settingsConfigID(settings config.Settings) (string, error) {
+	redacted, err := settings.RedactedJSON()
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(redacted)
+	return hex.EncodeToString(digest[:]), nil
 }

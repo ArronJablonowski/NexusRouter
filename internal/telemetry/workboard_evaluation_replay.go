@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -58,6 +59,9 @@ func readEvaluationReplay(ctx context.Context, tx *sql.Tx, m workboard.Evaluatio
 			!reflect.DeepEqual(candidate, *envelope.Result.Candidate) || candidate.EvidenceCount > len(evidence) ||
 			!reflect.DeepEqual(evidence[:candidate.EvidenceCount], envelope.Result.Evidence) {
 			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
+		}
+		if err = validateExecutionSettlementReplay(ctx, tx, m.BoardID, m.CardID, m.AttemptID, m.ClaimID, runtime.TaskCompleted, true); err != nil {
+			return workboard.OperationReceipt{}, true, err
 		}
 	} else {
 		if m.Kind == workboard.EvaluationReject && len(envelope.Result.Successors) != 0 {

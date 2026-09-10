@@ -14,11 +14,25 @@ func TestWorkboardSupervisionDerivesReadyRunningAndStalledWithoutMutation(t *tes
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 	store, card, boardID := supervisionFixture(t, now)
 	defer store.Close()
+	assignee := "supervision-worker"
+	cards, err := workboard.NewCardService(store, telemetryCardAuthority{authority: workboard.Authority{
+		CreationScope: "session", Actor: workboard.Actor{ID: "operator", Type: "operator"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revised, err := cards.ReviseCard(ctx, workboard.ReviseCardRequest{BoardID: boardID, CardID: card.ID,
+		IdempotencyKey: "supervision-assign-worker", ExpectedCardRevision: card.Revision,
+		Patch: workboard.CardPatch{AssigneeID: &assignee}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	card = revised.Card
 
 	ready, err := store.ReadSupervisionPage(ctx, workboard.SupervisionQuery{BoardID: boardID, Limit: 10,
 		ObservedAt: now.Add(time.Second), StaleBefore: now.Add(-time.Minute)})
 	if err != nil || ready.Validate() != nil || len(ready.Items) != 1 || ready.Items[0].State != workboard.SupervisionReady ||
-		ready.Items[0].Reason != workboard.SupervisionDependenciesSatisfied || !ready.Items[0].Actions.Claim {
+		ready.Items[0].Reason != workboard.SupervisionDependenciesSatisfied || ready.Items[0].AssigneeID != assignee || !ready.Items[0].Actions.Claim {
 		t.Fatalf("ready=%+v err=%v", ready, err)
 	}
 	clock := card.UpdatedAt.Add(2 * time.Second)
@@ -33,6 +47,7 @@ func TestWorkboardSupervisionDerivesReadyRunningAndStalledWithoutMutation(t *tes
 		ObservedAt: runningAt, StaleBefore: runningAt.Add(-30 * time.Second)})
 	if err != nil || len(running.Items) != 1 || running.Items[0].State != workboard.SupervisionRunning ||
 		running.Items[0].Reason != workboard.SupervisionLeaseHealthy || !running.Items[0].Actions.PauseRequest ||
+		running.Items[0].AssigneeID != assignee || running.Items[0].WorkerID != assignee ||
 		!running.Items[0].Actions.CancelRequest || running.Items[0].Actions.RecoveryCheck {
 		t.Fatalf("running=%+v err=%v", running, err)
 	}

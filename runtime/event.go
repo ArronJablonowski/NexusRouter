@@ -100,6 +100,9 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if e.Data.ConfigID != "" && (!validConfigID(e.Data.ConfigID) || (e.Kind != TaskStarted && e.Kind != RouteSelected)) {
+		return errors.New("invalid configuration identity")
+	}
 	if e.Data.RouteEstimatedCost != nil && (e.Kind != TaskStarted || math.IsNaN(*e.Data.RouteEstimatedCost) || math.IsInf(*e.Data.RouteEstimatedCost, 0) || *e.Data.RouteEstimatedCost < 0) {
 		return errors.New("invalid route estimated cost")
 	}
@@ -186,6 +189,18 @@ func (e Event) Validate() error {
 		return errors.New("unsupported event kind")
 	}
 	return nil
+}
+
+func validConfigID(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, c := range value {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 func (e Event) Encode() ([]byte, error) {

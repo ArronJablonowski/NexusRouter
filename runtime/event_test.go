@@ -87,6 +87,8 @@ func TestEventValidation(t *testing.T) {
 		func(e *Event) { v := -1.0; e.Data.RouteEstimatedCost = &v },
 		func(e *Event) { v := math.NaN(); e.Data.RouteEstimatedCost = &v },
 		func(e *Event) { v := 1.0; e.Data.RouteEstimatedCost = &v; e.Kind = TaskCompleted },
+		func(e *Event) { e.Data.ConfigID = "not-a-digest" },
+		func(e *Event) { e.Data.ConfigID = strings.Repeat("a", 64); e.Kind = TaskCompleted },
 	} {
 		e := base
 		mutate(&e)

@@ -50,6 +50,7 @@ type SupervisionItem struct {
 	ClaimID       string             `json:"claim_id,omitempty"`
 	ClaimRevision int64              `json:"claim_revision,omitempty"`
 	PausePhase    PausePhase         `json:"pause_phase,omitempty"`
+	AssigneeID    string             `json:"assignee_id,omitempty"`
 	WorkerID      string             `json:"worker_id,omitempty"`
 	TaskID        string             `json:"task_id,omitempty"`
 	LastHeartbeat time.Time          `json:"last_heartbeat,omitempty"`
@@ -64,14 +65,15 @@ func (i SupervisionItem) Validate() error {
 	if i.State == SupervisionReady {
 		if i.Reason != SupervisionDependenciesSatisfied || i.AttemptID != "" || i.ClaimID != "" || i.ClaimRevision != 0 ||
 			i.WorkerID != "" || i.TaskID != "" || i.PausePhase != PauseNone || !i.LastHeartbeat.IsZero() || !i.ExpiresAt.IsZero() ||
-			i.Actions != (SupervisionActions{Claim: true}) {
+			!optionalID(i.AssigneeID) || i.Actions != (SupervisionActions{Claim: true}) {
 			return fail(CodeInvalid, "supervision_item")
 		}
 		return nil
 	}
 	if i.State != SupervisionRunning && i.State != SupervisionStalled && i.State != SupervisionOrphaned ||
-		!validLifecycleIDs(i.AttemptID, i.ClaimID, i.WorkerID) || !optionalID(i.TaskID) || i.ClaimRevision < 1 || !validTime(i.LastHeartbeat) || !validTime(i.ExpiresAt) ||
-		!i.LastHeartbeat.Before(i.ExpiresAt) || !validPausePhase(i.PausePhase) || i.Actions.Claim {
+		!validLifecycleIDs(i.AttemptID, i.ClaimID, i.WorkerID) || !optionalID(i.AssigneeID) || !optionalID(i.TaskID) || i.ClaimRevision < 1 || !validTime(i.LastHeartbeat) || !validTime(i.ExpiresAt) ||
+		!i.LastHeartbeat.Before(i.ExpiresAt) || !validPausePhase(i.PausePhase) || i.Actions.Claim ||
+		(i.AssigneeID != "" && i.AssigneeID != i.WorkerID) {
 		return fail(CodeInvalid, "supervision_item")
 	}
 	switch i.State {

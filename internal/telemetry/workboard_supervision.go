@@ -107,7 +107,8 @@ func readSupervisionItem(ctx context.Context, tx *sql.Tx, boardID, cardID string
 	if err != nil {
 		return workboard.SupervisionItem{}, err
 	}
-	base := workboard.SupervisionItem{Version: 1, BoardID: boardID, CardID: card.ID, CardRevision: card.Revision}
+	base := workboard.SupervisionItem{Version: 1, BoardID: boardID, CardID: card.ID, CardRevision: card.Revision,
+		AssigneeID: body.AssigneeID}
 	if card.State == workboard.Ready {
 		if card.RemainingDependencies != 0 || card.CurrentAttemptID != "" || card.CurrentClaimID != "" || body.CurrentAttemptID != "" || body.CurrentClaimID != "" {
 			return workboard.SupervisionItem{}, ErrWorkboardCorrupt

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -94,7 +95,11 @@ func finalizeStoredCancel(ctx context.Context, tx *sql.Tx, mutation workboard.Co
 		proof.ProcessProofDigest, proof.EffectEvidenceDigest, proof.EffectResolution, proof.CreatedAt.UnixNano(), proofBytes); err != nil {
 		return 0, 0, normalizeLifecycleWriteError(err)
 	}
-	return claim.Revision, len(claimBytes) + len(oldAttemptBytes) + len(attemptBytes) + cardBytes + len(proofBytes), nil
+	settlementBytes, err := settleExecutionAttempt(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID, runtime.TaskCanceled, false, mutation.Now)
+	if err != nil {
+		return 0, 0, err
+	}
+	return claim.Revision, len(claimBytes) + len(oldAttemptBytes) + len(attemptBytes) + cardBytes + len(proofBytes) + settlementBytes, nil
 }
 
 func readControlAttempt(ctx context.Context, tx *sql.Tx, mutation workboard.ControlMutation, claim storedLifecycleClaim) (storedLifecycleAttempt, []byte, error) {

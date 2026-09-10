@@ -1,0 +1,68 @@
+package config
+
+import (
+	"errors"
+	"time"
+)
+
+// validateWorkboardSchedulerModels keeps unattended Workboard execution
+// fail-closed. The scheduler is not allowed to select either participant via
+// adaptive routing: both aliases resolve to one configured provider/model
+// identity before the daemon can start.
+func (s Settings) validateWorkboardSchedulerModels() error {
+	scheduler := s.Workboard.Scheduler
+	judge := scheduler.AcceptanceJudge
+	timeout, timeoutErr := Duration(judge.Timeout)
+	if timeoutErr != nil || timeout < 100*time.Millisecond || timeout > 5*time.Minute {
+		return errors.New("invalid workboard acceptance judge timeout")
+	}
+	if !finite(judge.MaxCost) || judge.MaxCost < 0 {
+		return errors.New("invalid workboard acceptance judge cost ceiling")
+	}
+	if judge.Enabled && !scheduler.Enabled {
+		return errors.New("workboard acceptance judge requires enabled scheduler")
+	}
+	if judge.Enabled && !s.Evaluation.Judge {
+		return errors.New("workboard acceptance judge requires global LLM judge gate")
+	}
+
+	worker, workerFound := configuredModel(s.Models, scheduler.WorkerModel)
+	reviewer, reviewerFound := configuredModel(s.Models, judge.ReviewerModel)
+	if scheduler.WorkerModel != "" && (!identifier.MatchString(scheduler.WorkerModel) || !workerFound) {
+		return errors.New("unknown workboard scheduler worker model")
+	}
+	if judge.ReviewerModel != "" && (!identifier.MatchString(judge.ReviewerModel) || !reviewerFound) {
+		return errors.New("unknown workboard acceptance reviewer model")
+	}
+	if !scheduler.Enabled {
+		return nil
+	}
+	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 {
+		return errors.New("enabled workboard scheduler requires bounded worker and acceptance reviewer")
+	}
+	if !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
+		!finite(*worker.EstimatedCost) || *worker.EstimatedCost < 0 || (worker.Locality != "local" && *worker.EstimatedCost == 0) {
+		return errors.New("workboard scheduler worker unavailable within configured limits")
+	}
+	if reviewer.Locality != "local" || !modelAvailableInMode(reviewer, s.Mode) || reviewer.ContextTokens < 1 || reviewer.EstimatedCost == nil ||
+		!finite(*reviewer.EstimatedCost) || *reviewer.EstimatedCost < 0 || *reviewer.EstimatedCost > judge.MaxCost {
+		return errors.New("workboard acceptance reviewer unavailable within configured limits")
+	}
+	if worker.Provider == reviewer.Provider && worker.Model == reviewer.Model {
+		return errors.New("workboard worker and acceptance reviewer must be independent models")
+	}
+	return nil
+}
+
+func configuredModel(models []Model, alias string) (Model, bool) {
+	for _, model := range models {
+		if model.ID == alias {
+			return model, true
+		}
+	}
+	return Model{}, false
+}
+
+func modelAvailableInMode(model Model, mode string) bool {
+	return mode == "hybrid" || (mode == "local_only" && model.Locality == "local") || (mode == "cloud_only" && model.Locality == "cloud")
+}

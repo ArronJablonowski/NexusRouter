@@ -27,8 +27,16 @@ type WorkboardCandidate struct {
 // Supervisor.WithSlot and acquires no synthetic runtime resource lease for it.
 type WorkboardWorkerTask struct {
 	BoardID, CardID, TaskID, SessionID, ParentTaskID, Scope string
-	SubmissionID                                            string
-	ExpectedCardRevision                                    int64
+	// WorkerID is a trusted, stable scheduler identity. It is required to
+	// exactly match an assigned card. Unassigned cards receive a fresh identity
+	// when this field is empty.
+	WorkerID             string
+	SubmissionID         string
+	ExpectedCardRevision int64
+	// Reservation opts this task into the transactional schema-42 admission
+	// path. The value is copied before the callback starts and must match the
+	// actual task.started route exactly.
+	Reservation *workboard.ExecutionReservation
 	// FailureEffect is a trusted host classification of the task's possible
 	// side effects. Only NoEffect permits automatic release after failure.
 	FailureEffect runtime.Effect
@@ -79,12 +87,25 @@ func NewWorkboardWorkerRunner(supervisor *workers.Supervisor, repository workboa
 
 func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTask) (WorkboardCandidate, error) {
 	if ctx == nil || r == nil || r.supervisor == nil || task.BoardID == "" || task.CardID == "" || task.TaskID == "" ||
-		task.SessionID == "" || task.ParentTaskID == "" || task.Scope == "" || task.ExpectedCardRevision < 1 ||
+		task.SessionID == "" || task.Scope == "" || task.ExpectedCardRevision < 1 ||
 		task.SubmissionID != "" || task.Execute == nil || task.Validate == nil ||
+		(task.WorkerID != "" && !validRuntimeHostWorkerID(task.WorkerID)) ||
 		(task.FailureEffect != runtime.NoEffect && task.FailureEffect != runtime.ConfirmedEffect && task.FailureEffect != runtime.UncertainEffect) {
 		return WorkboardCandidate{}, ErrAdmission
 	}
-	workerID := rand.Text()
+	if task.Reservation != nil {
+		reservation := *task.Reservation
+		task.Reservation = &reservation
+	}
+	card, err := r.repository.GetCard(ctx, task.BoardID, task.CardID)
+	if err != nil || card.Revision != task.ExpectedCardRevision || card.State != workboard.Ready ||
+		(card.AssigneeID != "" && task.WorkerID != card.AssigneeID) {
+		return WorkboardCandidate{}, errors.Join(ErrAdmission, err)
+	}
+	workerID := task.WorkerID
+	if workerID == "" {
+		workerID = rand.Text()
+	}
 	dispatch, err := NewWorkboardWorkerDispatch(r.repository, workerID, r.policy, r.ttl, r.evaluator, r.now)
 	if err != nil {
 		return WorkboardCandidate{}, err
@@ -117,6 +138,19 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 		controlChanged: make(chan struct{}, 1)}
 	defer handle.revoke()
 	run, cancel := context.WithCancel(ctx)
+	if task.Reservation != nil && task.Reservation.TimeLimitMS > 0 {
+		baseCancel := cancel
+		var deadlineCancel context.CancelFunc
+		run, deadlineCancel = context.WithTimeout(run, time.Duration(task.Reservation.TimeLimitMS)*time.Millisecond)
+		cancel = func() {
+			deadlineCancel()
+			baseCancel()
+		}
+	}
+	if task.Reservation != nil {
+		reservation := *task.Reservation
+		handle.reservation = &reservation
+	}
 	handle.bindCancellation(cancel, stopSupervisor)
 	heartbeats := make(chan error, 1)
 	joined := false
@@ -211,6 +245,7 @@ type WorkboardWorkerHandle struct {
 	controlChanged                                chan struct{}
 	cancelCallback, stopSupervisor                context.CancelFunc
 	commitFirst                                   func(context.Context, runtime.Event) error
+	reservation                                   *workboard.ExecutionReservation
 }
 
 // BindRuntimeRequest attaches this pending worker capability to exactly one
@@ -249,8 +284,14 @@ func (h *WorkboardWorkerHandle) claimTaskStart(ctx context.Context, event runtim
 	if !h.bound || h.claimCommitted || h.active || h.heartbeatStarted || run.Err() != nil {
 		return ErrAdmission
 	}
-	receipt, err := h.dispatch.ClaimTaskStart(ctx, event, workboard.ClaimRequest{BoardID: h.boardID, CardID: h.cardID,
-		IdempotencyKey: h.claimKey, ExpectedCardRevision: h.cardRevision, TaskID: h.taskID, SessionID: h.sessionID})
+	request := workboard.ClaimRequest{BoardID: h.boardID, CardID: h.cardID, IdempotencyKey: h.claimKey,
+		ExpectedCardRevision: h.cardRevision, TaskID: h.taskID, SessionID: h.sessionID}
+	var receipt workboard.OperationReceipt
+	if h.reservation == nil {
+		receipt, err = h.dispatch.ClaimTaskStart(ctx, event, request)
+	} else {
+		receipt, err = h.dispatch.ClaimBudgetedTaskStart(ctx, event, request, *h.reservation)
+	}
 	if err != nil || receipt.CardRevision == nil || receipt.ClaimRevision == nil {
 		return errors.Join(workers.ErrWork, err)
 	}

@@ -85,6 +85,20 @@ func (d *WorkboardWorkerDispatch) ClaimTaskStart(ctx context.Context, event runt
 	return d.lifecycle.ClaimTaskStart(ctx, event, request)
 }
 
+// ClaimBudgetedTaskStart is the stock scheduler path. Capacity admission is
+// inseparable from the first runtime event and worker claim; callers cannot
+// reserve capacity speculatively or after provider execution has begun.
+func (d *WorkboardWorkerDispatch) ClaimBudgetedTaskStart(ctx context.Context, event runtime.Event, request workboard.ClaimRequest,
+	reservation workboard.ExecutionReservation,
+) (workboard.OperationReceipt, error) {
+	if d == nil || d.lifecycle == nil || ctx == nil || reservation.Validate(event) != nil ||
+		event.Validate() != nil || event.Kind != runtime.TaskStarted || event.Sequence != 1 ||
+		request.TaskID == "" || request.SessionID == "" {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.lifecycle.ClaimBudgetedTaskStart(ctx, event, request, reservation)
+}
+
 func (d *WorkboardWorkerDispatch) Heartbeat(ctx context.Context, request workboard.HeartbeatRequest) (workboard.OperationReceipt, error) {
 	if d == nil || d.lifecycle == nil {
 		return workboard.OperationReceipt{}, ErrAdmission

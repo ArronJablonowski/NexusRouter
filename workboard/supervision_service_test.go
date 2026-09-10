@@ -105,6 +105,11 @@ func TestSupervisionProjectionValidationRejectsUnsafeActions(t *testing.T) {
 	if err := running.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	contradictory := running
+	contradictory.AssigneeID = "worker-b"
+	if contradictory.Validate() == nil {
+		t.Fatal("running projection admitted contradictory assignee and worker identities")
+	}
 	unsafe := running
 	unsafe.Actions.RecoveryCheck = true
 	if unsafe.Validate() == nil {

@@ -66,6 +66,95 @@ func TestWorkboardWorkerRunnerLeavesUnboundCardReady(t *testing.T) {
 	}
 }
 
+func TestWorkboardWorkerRunnerAllowsTopLevelTaskAndFreezesAssignedIdentity(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	bridge, err := NewWorkboardBridge(store, store, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assigned := "worker-stable"
+	revised, err := bridge.NativeMutate(ctx, webui.BoardRequest{Version: 1, Action: webui.CardRevise,
+		IdempotencyKey: "assign-stable-worker", BoardID: boardID, CardID: cardID, AssigneeID: assigned,
+		ExpectedCardRevision: revisionPointer(cardRevision)})
+	if err != nil || revised.CardRevision == nil {
+		t.Fatalf("assign receipt=%+v err=%v", revised, err)
+	}
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, &capturingWorkboardEvaluator{}, strings.Repeat("4", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "assigned-top-task",
+		SessionID: "assigned-top-session", WorkerID: assigned, Scope: "board-card-" + cardID,
+		ExpectedCardRevision: *revised.CardRevision, FailureEffect: runtime.NoEffect,
+		Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			if bindErr := bindTestWorkboardRuntime(run, handle); bindErr != nil {
+				return WorkboardCandidate{}, bindErr
+			}
+			time.Sleep(45 * time.Millisecond)
+			return WorkboardCandidate{Summary: "top-level candidate"}, nil
+		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
+	if err != nil || candidate.Summary != "top-level candidate" {
+		t.Fatalf("candidate=%+v err=%v", candidate, err)
+	}
+	events, err := store.Read(ctx, "assigned-top-task", 0, 100)
+	if err != nil || len(events) != 1 || events[0].WorkerID != assigned || events[0].Data.ParentTaskID != "" {
+		t.Fatalf("top-level identity journal=%+v err=%v", events, err)
+	}
+	states, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	attempt := states[cardID].Attempt
+	if err != nil || attempt == nil || attempt.Claim == nil || attempt.WorkerID != assigned ||
+		attempt.Claim.OwnerID != assigned || attempt.Claim.State != "released" || attempt.Claim.Revision < 2 {
+		t.Fatalf("identity was not frozen through heartbeat: state=%+v err=%v", states[cardID], err)
+	}
+}
+
+func TestWorkboardWorkerRunnerRejectsAssignedIdentityMismatchBeforeExecution(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	bridge, err := NewWorkboardBridge(store, store, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revised, err := bridge.NativeMutate(ctx, webui.BoardRequest{Version: 1, Action: webui.CardRevise,
+		IdempotencyKey: "assign-mismatch-worker", BoardID: boardID, CardID: cardID, AssigneeID: "worker-right",
+		ExpectedCardRevision: revisionPointer(cardRevision)})
+	if err != nil || revised.CardRevision == nil {
+		t.Fatalf("assign receipt=%+v err=%v", revised, err)
+	}
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, store, &capturingWorkboardEvaluator{}, strings.Repeat("5", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	_, err = runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "assigned-mismatch-task",
+		SessionID: "assigned-mismatch-session", WorkerID: "worker-wrong", Scope: "board-card-" + cardID,
+		ExpectedCardRevision: *revised.CardRevision, FailureEffect: runtime.NoEffect,
+		Execute: func(context.Context, *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			called = true
+			return WorkboardCandidate{}, nil
+		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
+	if !errors.Is(err, ErrAdmission) || called {
+		t.Fatalf("mismatched assigned worker admitted: called=%v err=%v", called, err)
+	}
+	card, cardErr := store.GetCard(ctx, boardID, cardID)
+	if cardErr != nil || card.State != workboard.Ready || card.AssigneeID != "worker-right" || card.CurrentClaimID != "" {
+		t.Fatalf("mismatch changed card: card=%+v err=%v", card, cardErr)
+	}
+}
+
 func TestWorkboardWorkerHandleBindsRuntimeRequestOnlyOnce(t *testing.T) {
 	ctx := context.Background()
 	store, boardID, cardID, cardRevision := readyWorkboardCard(t)

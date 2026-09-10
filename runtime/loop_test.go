@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
@@ -73,7 +74,9 @@ func TestDurableToolLoop(t *testing.T) {
 		}
 		return runtime.ToolResult{Content: "found", Effect: runtime.NoEffect}, nil
 	})}
-	result, err := l.Run(context.Background(), runRequest())
+	request := runRequest()
+	request.ConfigID = strings.Repeat("a", 64)
+	result, err := l.Run(context.Background(), request)
 	if err != nil || result.Text != "answer" || result.Turns != 2 || executions != 1 {
 		t.Fatalf("%+v %v", result, err)
 	}
@@ -98,7 +101,7 @@ func TestDurableToolLoop(t *testing.T) {
 			t.Fatalf("event %d: %+v", i, e)
 		}
 	}
-	if len(events[0].Data.Messages) != 1 || len(events[2].Data.ToolCalls) != 1 {
+	if len(events[0].Data.Messages) != 1 || events[0].Data.ConfigID != request.ConfigID || len(events[2].Data.ToolCalls) != 1 {
 		t.Fatal("replay content missing")
 	}
 }

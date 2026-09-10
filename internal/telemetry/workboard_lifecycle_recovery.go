@@ -131,7 +131,11 @@ func applyClaimRecovery(ctx context.Context, tx *sql.Tx, mutation workboard.Life
 		recovery.OldClaimID, recovery.OldClaimRevision, recovery.CardRevision, recovery.FirstSequence, recovery.LastSequence, recovery.RecoveredAt.UnixNano(), recoveryBytes); err != nil {
 		return 0, 0, normalizeLifecycleWriteError(err)
 	}
-	return claim.Revision, len(claimBytes) + len(attemptBytes) + len(nextAttemptBytes) + cardBytes + len(proofBytes) + len(recoveryBytes), nil
+	settlementBytes, err := settleExecutionAttempt(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID, "", false, mutation.Now)
+	if err != nil {
+		return 0, 0, err
+	}
+	return claim.Revision, len(claimBytes) + len(attemptBytes) + len(nextAttemptBytes) + cardBytes + len(proofBytes) + len(recoveryBytes) + settlementBytes, nil
 }
 
 type storedRecoveryProof struct {

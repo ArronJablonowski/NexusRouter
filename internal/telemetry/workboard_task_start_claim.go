@@ -52,6 +52,9 @@ func (s *Store) CommitTaskStartClaim(ctx context.Context, command workboard.Task
 		if err = validateTaskStartClaimRecord(ctx, tx, command, receipt, body); err != nil {
 			return workboard.OperationReceipt{}, err
 		}
+		if err = validateExecutionAdmissionReplay(ctx, tx, command, receipt, body); err != nil {
+			return workboard.OperationReceipt{}, err
+		}
 		if err = tx.Commit(); err != nil {
 			return workboard.OperationReceipt{}, err
 		}
@@ -65,6 +68,9 @@ func (s *Store) CommitTaskStartClaim(ctx context.Context, command workboard.Task
 		return workboard.OperationReceipt{}, err
 	}
 	if err = insertTaskStartClaimRecord(ctx, tx, command, receipt, body); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	if err = insertExecutionAdmission(ctx, tx, command, receipt, body); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
 	if err = tx.Commit(); err != nil {

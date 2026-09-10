@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -107,5 +108,9 @@ func applyClaimFailure(ctx context.Context, tx *sql.Tx, mutation workboard.Lifec
 	if board.ActiveClaims < 0 {
 		return 0, 0, ErrWorkboardCorrupt
 	}
-	return claim.Revision, len(claimBytes) + len(attemptBytes) + len(nextAttemptBytes) + len(cardBytes), nil
+	settlementBytes, err := settleExecutionAttempt(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID, runtime.TaskFailed, false, mutation.Now)
+	if err != nil {
+		return 0, 0, err
+	}
+	return claim.Revision, len(claimBytes) + len(attemptBytes) + len(nextAttemptBytes) + len(cardBytes) + settlementBytes, nil
 }

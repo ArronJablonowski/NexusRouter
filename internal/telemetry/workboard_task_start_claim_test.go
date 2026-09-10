@@ -51,7 +51,20 @@ func TestTaskStartClaimSchema40MigrationAndLeaseTTLBounds(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err = store.db.Exec(`DROP TRIGGER workboard_task_start_claim_immutable_delete;
+			if _, err = store.db.Exec(`DROP TRIGGER workboard_execution_settlement_immutable_delete;
+				DROP TRIGGER workboard_execution_settlement_immutable_update;
+				DROP TRIGGER workboard_execution_admission_immutable_delete;
+				DROP TRIGGER workboard_execution_admission_immutable_update;
+				DROP TRIGGER workboard_execution_settlement_binding;
+				DROP TRIGGER workboard_execution_admission_binding;
+				DROP TRIGGER workboard_execution_admission_no_active;
+				DROP INDEX workboard_execution_settlements_board;
+				DROP INDEX workboard_execution_admissions_card;
+				DROP INDEX workboard_execution_admissions_board;
+				DROP INDEX workboard_execution_admissions_global;
+				DROP TABLE workboard_execution_settlements;
+				DROP TABLE workboard_execution_admissions;
+				DROP TRIGGER workboard_task_start_claim_immutable_delete;
 				DROP TRIGGER workboard_task_start_claim_immutable_update;
 				DROP INDEX workboard_task_start_claims_board;
 				DROP TABLE workboard_task_start_claims;
@@ -67,7 +80,7 @@ func TestTaskStartClaimSchema40MigrationAndLeaseTTLBounds(t *testing.T) {
 			}
 			defer store.Close()
 			var migrated, markers int
-			if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&migrated); err != nil || migrated != 41 {
+			if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&migrated); err != nil || migrated != currentStorageSchema {
 				t.Fatalf("schema=%d err=%v", migrated, err)
 			}
 			if err = store.db.QueryRow(`SELECT count(*) FROM workboard_task_start_claims`).Scan(&markers); err != nil || markers != 0 {

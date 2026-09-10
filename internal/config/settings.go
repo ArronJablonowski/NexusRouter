@@ -52,10 +52,18 @@ type Workboard struct {
 	Scheduler WorkboardScheduler `yaml:"scheduler" json:"scheduler"`
 }
 type WorkboardScheduler struct {
-	Enabled         bool   `yaml:"enabled" json:"enabled"`
-	Interval        string `yaml:"interval" json:"interval"`
-	MaxActiveClaims int    `yaml:"max_active_claims" json:"max_active_claims"`
-	CardScanLimit   int    `yaml:"card_scan_limit" json:"card_scan_limit"`
+	Enabled         bool                     `yaml:"enabled" json:"enabled"`
+	Interval        string                   `yaml:"interval" json:"interval"`
+	MaxActiveClaims int                      `yaml:"max_active_claims" json:"max_active_claims"`
+	CardScanLimit   int                      `yaml:"card_scan_limit" json:"card_scan_limit"`
+	WorkerModel     string                   `yaml:"worker_model" json:"worker_model"`
+	AcceptanceJudge WorkboardAcceptanceJudge `yaml:"acceptance_judge" json:"acceptance_judge"`
+}
+type WorkboardAcceptanceJudge struct {
+	Enabled       bool    `yaml:"enabled" json:"enabled"`
+	ReviewerModel string  `yaml:"reviewer_model" json:"reviewer_model"`
+	MaxCost       float64 `yaml:"max_cost" json:"max_cost"`
+	Timeout       string  `yaml:"timeout" json:"timeout"`
 }
 type Hardware struct {
 	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`
@@ -171,7 +179,7 @@ type Runtime struct {
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h"},
-		Workboard: Workboard{Enabled: true, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000}},
+		Workboard: Workboard{Enabled: true, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
@@ -259,6 +267,9 @@ func (s Settings) Validate() error {
 		s.Workboard.Scheduler.MaxActiveClaims < 1 || s.Workboard.Scheduler.MaxActiveClaims > 64 || (s.Workboard.Scheduler.Enabled && s.Workboard.Scheduler.MaxActiveClaims > s.Workers.Max) ||
 		s.Workboard.Scheduler.CardScanLimit < 1 || s.Workboard.Scheduler.CardScanLimit > 10000 {
 		return errors.New("invalid workboard scheduler configuration")
+	}
+	if err := s.validateWorkboardSchedulerModels(); err != nil {
+		return err
 	}
 	if s.Workers.DelegateModel != "" {
 		if !identifier.MatchString(s.Workers.DelegateModel) || h < time.Millisecond || l > 10*time.Minute || l <= 2*h {

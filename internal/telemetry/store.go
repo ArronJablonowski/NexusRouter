@@ -98,8 +98,8 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
-	if version == 41 {
-		if err = validateTaskStartClaimSchema(ctx, conn); err != nil {
+	if version == 42 {
+		if err = validateWorkboardExecutionBudgetSchema(ctx, conn); err != nil {
 			return err
 		}
 	}
@@ -410,6 +410,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 41 {
 		if err = migrateTaskStartClaims(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 42 {
+		if err = migrateWorkboardExecutionBudgets(ctx, conn); err != nil {
 			return err
 		}
 	}
