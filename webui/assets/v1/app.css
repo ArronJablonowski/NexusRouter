@@ -137,6 +137,9 @@ input { padding: .55rem .7rem; }
 .detail-empty { color: #9fb0ce; }
 .detail-more { color: #ffcf70; }
 .card-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; color: #9fb0ce; font-size: .72rem; }
+.card-position-controls { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
+.card-position-controls button { min-height: 2.75rem; flex: 1 1 6.5rem; padding: .45rem .6rem; }
+.card-position-controls button[hidden] { display: none; }
 .card-alert { color: #ffcf70; }
 .column-empty { margin: 1rem 0; color: #7586a5; font-size: .8rem; text-align: center; }
 .kanban-more { margin: 0 auto 1rem; }

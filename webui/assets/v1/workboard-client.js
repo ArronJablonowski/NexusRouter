@@ -40,8 +40,26 @@
 	}
 	function captureCurrent(capture, context) {
 		if (!capture || capture.action === "board.create") return true;
-		return Boolean(context && context.board && context.board.id === capture.boardID && context.board.revision === capture.boardRevision && context.graphRevision === capture.graphRevision &&
-			(capture.action !== "card.revise" || context.card && context.card.id === capture.cardID && context.card.revision === capture.cardRevision));
+		const position = capture.action === "card.move" || capture.action === "card.reorder";
+		if (!context || !context.board || context.board.id !== capture.boardID || context.board.revision !== capture.boardRevision || position && context.board.layout_revision !== capture.layoutRevision) return false;
+		if (position) {
+			const card = context.cards && context.cards.find(item => item.id === capture.cardID), anchor = capture.anchorID && context.cards.find(item => item.id === capture.anchorID);
+			return Boolean(card && card.revision === capture.cardRevision && card.state === capture.sourceState && (!capture.anchorID || anchor && anchor.state === capture.sourceState && anchor.rank === capture.anchorRank));
+		}
+		return context.graphRevision === capture.graphRevision && (capture.action !== "card.revise" || context.card && context.card.id === capture.cardID && context.card.revision === capture.cardRevision);
+	}
+	function positionPlan(context, cardID, direction) {
+		if (!context || !context.board || context.board.state !== "active" || !context.complete || !context.unfiltered || !Array.isArray(context.cards) || !id(cardID)) return null;
+		const card = context.cards.find(item => item.id === cardID); if (!card) return null;
+		const common = {boardID: context.board.id, boardRevision: context.board.revision, layoutRevision: context.board.layout_revision, cardID: card.id, cardRevision: card.revision, sourceState: card.state};
+		if (direction === "ready" || direction === "backlog") {
+			if (card.state === direction || card.state === "backlog" && direction !== "ready" || card.state === "ready" && direction !== "backlog" || !["backlog", "ready"].includes(card.state) || direction === "ready" && card.remaining_dependencies !== 0 || card.current_claim_id) return null;
+			return Object.freeze({...common, action: "card.move", targetState: direction, anchorID: "", anchorRank: ""});
+		}
+		if (direction !== "up" && direction !== "down") return null;
+		const lane = context.cards.filter(item => item.state === card.state), index = lane.findIndex(item => item.id === card.id), anchor = lane[index + (direction === "up" ? -1 : 1)];
+		if (index < 0 || !anchor || anchor.id === card.id) return null;
+		return Object.freeze({...common, action: "card.reorder", anchorID: anchor.id, anchorRank: anchor.rank, beforeCardID: direction === "up" ? anchor.id : "", afterCardID: direction === "down" ? anchor.id : ""});
 	}
 	function exact(value, required, optional) { if (!value || typeof value !== "object" || Array.isArray(value)) return false; const keys = Object.keys(value), allowed = new Set([...required, ...optional]); return required.every(key => Object.hasOwn(value, key)) && keys.every(key => allowed.has(key)); }
 	function id(value) { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value); }
@@ -54,11 +72,11 @@
 		if (!intent || !intent.body || !exact(body, required, ["card_id", "card_revision", "claim_revision"]) || body.version !== 1 || !id(body.board_id) || !printableKey(body.operation_id) || !digest.test(body.request_digest) || !digest.test(body.response_digest) ||
 			!Number.isSafeInteger(body.first_sequence) || body.first_sequence < 1 || !Number.isSafeInteger(body.last_sequence) || body.last_sequence < body.first_sequence || !Number.isSafeInteger(body.event_count) || body.event_count < 1 || body.event_count > 128 || body.last_sequence - body.first_sequence + 1 !== body.event_count ||
 			!Number.isSafeInteger(body.transaction_bytes) || body.transaction_bytes < 1 || body.transaction_bytes > 1048576 || !Number.isSafeInteger(body.board_revision) || body.board_revision < 1 || body.outcome !== "committed" || !time(body.created_at)) return false;
-		const action = intent.body.action, cardAction = action === "card.create" || action === "card.revise", captured = intent.capture || {};
+		const action = intent.body.action, cardAction = ["card.create", "card.revise", "card.move", "card.reorder"].includes(action), positioned = action === "card.move" || action === "card.reorder", captured = intent.capture || {};
 		const expectedBoard = action === "board.create" ? 1 : captured.boardRevision + 1;
 		if ((action === "card.revise" ? body.board_revision < expectedBoard : body.board_revision !== expectedBoard) || action !== "board.create" && body.board_id !== intent.body.board_id || cardAction !== Object.hasOwn(body, "card_id") || !cardAction && (body.card_revision !== undefined || body.claim_revision !== undefined) || body.claim_revision !== undefined) return false;
 		if (!cardAction || !id(body.card_id) || !Number.isSafeInteger(body.card_revision)) return !cardAction;
-		return action === "card.create" ? body.card_revision === 1 : body.card_id === intent.body.card_id && body.card_revision === captured.cardRevision + 1;
+		return action === "card.create" ? body.card_revision === 1 : body.card_id === intent.body.card_id && body.card_revision === captured.cardRevision + 1 && (!positioned || body.board_revision === captured.boardRevision + 1);
 	}
 	function mutationError(body, status) {
 		if (!exact(body, ["version", "code", "message", "retryable"], ["current_revision", "retry_after_ms", "subject_type", "subject_id", "current_state", "operation_id"]) || body.version !== 1 || !id(body.code) || !text(body.message, 256, false) || typeof body.retryable !== "boolean" ||
@@ -68,5 +86,5 @@
 		return Object.freeze({body, definitive: Boolean(expected && body.code === expected[0] && body.retryable === expected[1]), operationID: body.operation_id || ""});
 	}
 	function acknowledgeAllowed(intent, operationsReady, operationReadFailed, unresolvedCount) { return Boolean(intent && !intent.operationID && intent.reconciledClean && operationsReady && !operationReadFailed && unresolvedCount === 0); }
-	return Object.freeze({acknowledgeAllowed, canonical, captureCurrent, compareText, current, freezeIntent, mutationError, mutationResolution, receiptMatches, reparent});
+	return Object.freeze({acknowledgeAllowed, canonical, captureCurrent, compareText, current, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent});
 });

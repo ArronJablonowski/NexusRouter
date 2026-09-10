@@ -56,8 +56,8 @@ card mutations; and durable claim, heartbeat, recovery,
 criteria-revision, and checkpoint commands. Native JSON routes and the
 browser-session/CSRF BFF are composed into the daemon for board/card reads and
 operator-safe mutations, with reconnectable board-event SSE and a request-bound
-browser operation journal. DAR-83 now has a first integrated, read-only Kanban
-slice inside that same authenticated Web UI: active board navigation, seven
+browser operation journal. DAR-83 now has an integrated Kanban
+inside that same authenticated Web UI: active board navigation, seven
 canonical lifecycle lanes, bounded card pagination, expandable dependency and
 attempt previews, and reconnect-safe SSE invalidation followed by authoritative
 snapshot refetch. Operators can filter active or archived boards and cards by
@@ -66,8 +66,12 @@ list presentations without refetching. The integrated board now also provides
 revision-fenced create/edit controls for boards and cards plus confirmed board
 archival. Its browser operation journal blocks concurrent writes, correlates
 ambiguous outcomes without replaying them, and requires authoritative refetch
-after accepted receipts or conflicts. Keyboard move/reorder, dependency
-editing, lifecycle, and acceptance controls remain open. The lifecycle layer now also covers candidate
+after accepted receipts or conflicts. Every card now exposes native keyboard
+controls for safe same-lane reordering and Backlog/Ready movement. Positioning
+is disabled until the unfiltered board is fully loaded, freezes board/layout/card
+revision fences, validates the exact receipt and event, and never retries an
+ambiguous side effect. Dependency editing, lifecycle, acceptance, richer focus
+restoration, and browser end-to-end qualification remain open. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
 attention. Bounded in-process workers are atomically bound to claims and runtime
@@ -100,9 +104,10 @@ adds a non-secret persistent workspace identity, and schema 38 records exact
 cross-session browser reconciliation while preserving legacy pending-operation
 attribution. The integrated Kanban now includes bounded filters, an alternate
 canonical list presentation, card selection, and the first operator mutation
-slice for board and card creation/revision plus confirmed board archival.
-Keyboard movement, dependency editing, lifecycle, and acceptance workflows
-remain open.
+slice for board and card creation/revision plus confirmed board archival. Cards
+also have accessible move-up, move-down, and legal Backlog/Ready controls using
+the same no-replay mutation barrier. Dependency editing, lifecycle, and
+acceptance workflows remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

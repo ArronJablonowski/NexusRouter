@@ -6037,3 +6037,35 @@ workers 9.729s, and browser BFF/Web UI from cache after focused clean passes.
 
 Keyboard move/reorder, dependency editing, lifecycle and acceptance controls,
 and browser end-to-end qualification remain later DAR-83/DAR-86 work.
+
+## 2026-09-10 — DAR-83 accessible card positioning checkpoint
+
+DAR-83 remains in progress. Cards in both the Kanban and canonical-list
+presentations now expose visible native-button controls for moving one position
+up or down in the same lane and for the legal Backlog/Ready transition. Native
+buttons preserve Tab, Shift-Tab, Enter, and Space behavior without taking over
+arrow keys. Cross-lane controls explicitly append to the destination lane.
+
+Positioning fails closed unless the board is active, unfiltered, and fully
+loaded, so an apparent neighbor can never conceal a filtered or unpaginated
+card. Each click re-derives its plan from the validated canonical model and
+freezes the board, layout, source-card, and anchor evidence before issuing one
+request. Same-lane reorder uses exactly one adjacent anchor; impossible boundary
+moves and illegal Backlog/Ready transitions remain disabled.
+
+Move and reorder now share the existing CSRF, global operation barrier,
+idempotency, conflict refresh, and no-automatic-replay path. Browser and Go
+receipt checks require exact successor board/card revisions, matching card
+identity, no claim revision, and one immutable event bound to the domain
+operation and action. Lost-ack reconciliation additionally requires the exact
+card subject before a move/reorder outcome can clear the retained intent.
+
+Focused JavaScript syntax checks and race-enabled Web UI/application tests pass.
+The repository-wide `make check` gate also passed: source formatting and the
+1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and `go
+build ./...`. The longest rebuilt packages were application 562.170s,
+releasepack 479.584s, telemetry 478.995s, SDK 66.213s, CLI 64.987s, toolgate
+30.983s, workers 10.402s, browser BFF 3.392s, and Web UI 3.247s. Dependency
+editing, lifecycle and acceptance controls, richer focus restoration,
+optimistic-but-uncommitted visual positioning, and broader browser end-to-end
+qualification remain later DAR-83/DAR-86 work.

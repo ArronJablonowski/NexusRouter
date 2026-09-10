@@ -40,7 +40,7 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 			EventCount: 1, TransactionBytes: 128, BoardRevision: boardRevision, CardID: cardID, CardRevision: cardRevision,
 			Outcome: "committed", CreatedAt: now}
 	}
-	cardOne, cardFive := int64(1), int64(5)
+	cardOne, cardFour, cardFive, claimOne := int64(1), int64(4), int64(5), int64(1)
 	tests := []struct {
 		name    string
 		request contract.BoardRequest
@@ -55,11 +55,64 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 		{"card create wrong card revision", contract.BoardRequest{Action: contract.CardCreate, BoardID: "board-a", ExpectedBoardRevision: &revision}, receipt(5, "card-a", &cardFive), false},
 		{"card revise", contract.BoardRequest{Action: contract.CardRevise, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), true},
 		{"card revise wrong card", contract.BoardRequest{Action: contract.CardRevise, BoardID: "board-a", CardID: "card-b", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), false},
+		{"card move", contract.BoardRequest{Action: contract.CardMove, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, receipt(5, "card-a", &cardFive), true},
+		{"card move wrong board revision", contract.BoardRequest{Action: contract.CardMove, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, receipt(6, "card-a", &cardFive), false},
+		{"card move wrong card revision", contract.BoardRequest{Action: contract.CardMove, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, receipt(5, "card-a", &cardFour), false},
+		{"card reorder", contract.BoardRequest{Action: contract.CardReorder, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, receipt(5, "card-a", &cardFive), true},
+		{"card reorder missing card revision", contract.BoardRequest{Action: contract.CardReorder, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, receipt(5, "card-a", nil), false},
+		{"card reorder claim revision", contract.BoardRequest{Action: contract.CardReorder, BoardID: "board-a", CardID: "card-a", ExpectedBoardRevision: &revision, ExpectedCardRevision: &revision}, func() contract.OperationReceipt {
+			got := receipt(5, "card-a", &cardFive)
+			got.ClaimRevision = &claimOne
+			return got
+		}(), false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if got := workboardReceiptMatchesRequest(test.receipt, test.request); got != test.want {
 				t.Fatalf("correlation=%t want=%t receipt=%+v", got, test.want, test.receipt)
+			}
+		})
+	}
+}
+
+func TestBrowserWorkboardMoveAndReorderReceiptsRequireExactEvent(t *testing.T) {
+	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
+	boardRevision, cardRevision, nextCardRevision := int64(4), int64(7), int64(8)
+	receipt := contract.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "domain-operation-0001",
+		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
+		EventCount: 1, TransactionBytes: 128, BoardRevision: 5, CardID: "card-a", CardRevision: &nextCardRevision,
+		Outcome: "committed", CreatedAt: now}
+	request := func(action contract.BoardAction) contract.BoardRequest {
+		return contract.BoardRequest{Action: action, BoardID: "board-a", CardID: "card-a",
+			ExpectedBoardRevision: &boardRevision, ExpectedCardRevision: &cardRevision}
+	}
+	tests := []struct {
+		name        string
+		action      contract.BoardAction
+		eventAction workboard.BoardAction
+		operationID string
+		cardID      string
+		want        bool
+	}{
+		{"move", contract.CardMove, workboard.CardMoveAction, receipt.OperationID, receipt.CardID, true},
+		{"reorder", contract.CardReorder, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, true},
+		{"wrong action", contract.CardMove, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, false},
+		{"wrong operation", contract.CardMove, workboard.CardMoveAction, "other-operation-0001", receipt.CardID, false},
+		{"wrong card", contract.CardMove, workboard.CardMoveAction, receipt.OperationID, "card-b", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := &bridgeBoardRepository{events: browserMutationEventPage(now, test.eventAction, test.operationID, test.cardID)}
+			bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutations := &BrowserWorkboardMutations{bridge: bridge}
+			if got := mutations.receiptMatchesRequest(context.Background(), strings.Repeat("c", 64), receipt, request(test.action)); got != test.want {
+				t.Fatalf("correlation=%t want=%t event=%+v", got, test.want, repository.events.Items)
+			}
+			if repository.eventOptions.Limit != 1 || repository.eventOptions.TailAfterSequence != 0 {
+				t.Fatalf("event options=%+v", repository.eventOptions)
 			}
 		})
 	}

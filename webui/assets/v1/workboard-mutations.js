@@ -43,6 +43,11 @@
 		for (const action of ["board.revise", "card.create"]) openButtons[action].disabled = blocked || !activeBoard;
 		openButtons["board.archive"].disabled = blocked || !activeBoard || context.board.active_claims !== 0;
 		openButtons["card.revise"].disabled = blocked || !activeBoard || !context.card;
+		for (const button of document.querySelectorAll(".card-position")) {
+			const direction = button.dataset.position, card = context.cards && context.cards.find(item => item.id === button.dataset.cardId);
+			button.hidden = (direction === "ready" && (!card || card.state !== "backlog")) || (direction === "backlog" && (!card || card.state !== "ready"));
+			button.disabled = blocked || !client.positionPlan(context, button.dataset.cardId, direction);
+		}
 		reconcile.hidden = !pendingIntent && !unresolved.length && !operationReadFailed;
 		acknowledge.hidden = !client.acknowledgeAllowed(pendingIntent, operationsReady, operationReadFailed, unresolved.length);
 		for (const button of closeButtons) button.disabled = inFlight;
@@ -75,7 +80,8 @@
 			if (generation !== scanGeneration) return;
 			unresolved = items.filter(item => item.state === "pending"); operationsReady = true;
 			const exact = pendingIntent && pendingIntent.operationID ? items.find(item => item.id === pendingIntent.operationID) : null;
-			if (exact && exact.action === pendingIntent.body.action && (exact.state === "committed" || exact.state === "rejected")) {
+			const position = pendingIntent && (pendingIntent.body.action === "card.move" || pendingIntent.body.action === "card.reorder");
+			if (exact && exact.action === pendingIntent.body.action && (!position || exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id) && (exact.state === "committed" || exact.state === "rejected")) {
 				pendingIntent = null; inFlight = false; window.DarwinWorkboards.refresh(); const others = unresolved.length ? " Other pending operations still block writes." : ""; show((exact.state === "committed" ? "The exact operation committed. Authoritative state was refreshed." : "The exact operation was rejected. Authoritative state was refreshed.") + others, exact.state === "rejected" || unresolved.length > 0); return;
 			}
 			if (pendingIntent && !pendingIntent.operationID) { if (!unresolved.length) pendingIntent = Object.freeze({...pendingIntent, reconciledClean: true}); show(unresolved.length ? "The outcome is unknown and pending operations remain. Actions stay blocked." : "No matching operation was published in a clean bounded scan. You may acknowledge the local unknown outcome; the request will not be replayed.", true); }
@@ -144,21 +150,32 @@
 		const path = action === "board.create" ? "/api/v1/workboards" : "/api/v1/workboards/" + encodeURIComponent(body.board_id) + "/operations";
 		return client.freezeIntent(path, body);
 	}
-	async function mutate(action) {
-		if (barrier() || stale(action)) return; const built = build(action); if (!built) { formStatus(forms[action], "Review the bounded fields and provide a meaningful change.", true); return; }
-		const intent = Object.freeze({path: built.path, domainKey: built.body.idempotency_key, capture: activeCapture, body: built.body, encoded: built.encoded, operationID: "", reconciledClean: false}); pendingIntent = intent; inFlight = true; formStatus(forms[action], "Submitting one exact request…", false); updateControls();
+	function buildPosition(plan) {
+		if (!plan || !client.captureCurrent(plan, window.DarwinWorkboards.context())) return null;
+		const body = {version: 1, action: plan.action, idempotency_key: key(), board_id: plan.boardID, card_id: plan.cardID, expected_board_revision: plan.boardRevision, expected_layout_revision: plan.layoutRevision, expected_card_revision: plan.cardRevision};
+		if (plan.action === "card.move") body.target_state = plan.targetState;
+		else if (plan.beforeCardID) body.before_card_id = plan.beforeCardID;
+		else if (plan.afterCardID) body.after_card_id = plan.afterCardID;
+		else return null;
+		return client.freezeIntent("/api/v1/workboards/" + encodeURIComponent(body.board_id) + "/operations", body);
+	}
+	async function mutate(action, supplied, capture) {
+		if (barrier() || capture && !client.captureCurrent(capture, window.DarwinWorkboards.context()) || !capture && stale(action)) return;
+		const built = supplied || build(action), direct = Boolean(supplied); if (!built) { if (forms[action]) formStatus(forms[action], "Review the bounded fields and provide a meaningful change.", true); else show("The card position is no longer available. Refresh and choose the move again.", true); return; }
+		const intent = Object.freeze({path: built.path, domainKey: built.body.idempotency_key, capture: capture || activeCapture, body: built.body, encoded: built.encoded, operationID: "", reconciledClean: false}); pendingIntent = intent; inFlight = true; if (direct) show("Submitting one exact card position request…", false); else formStatus(forms[action], "Submitting one exact request…", false); updateControls();
 		try {
 			const response = await fetch(base + built.path, {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json", "Accept": "application/json", "X-Darwin-CSRF": csrfToken}, body: intent.encoded});
 			let body = null; try { body = await response.json(); } catch (_) {}
 			const resolution = client.mutationResolution(response.status, response.ok && client.receiptMatches(body, intent));
-			if (resolution === "committed") { pendingIntent = null; inFlight = false; close(); window.DarwinWorkboards.refresh(); show("Committed receipt validated. Authoritative workboard state is refreshing.", false); return; }
-			const error = client.mutationError(body, response.status); if (definitive.has(response.status) && error && error.definitive) { pendingIntent = null; inFlight = false; formStatus(forms[action], "The request was definitively rejected. Refresh authoritative state before editing again.", true); window.DarwinWorkboards.refresh(); if (response.status === 401 || response.status === 403) { csrfToken = ""; operationReadFailed = true; show("The authenticated mutation session was rejected. Reload the page before attempting another action.", true); return; } if ([404, 409, 422].includes(response.status)) { await scanOperations("The request was rejected and authoritative state was refreshed."); return; } show("The request was not committed (HTTP " + String(response.status) + ").", true); return; }
+			if (resolution === "committed") { pendingIntent = null; inFlight = false; if (!direct) close(); window.DarwinWorkboards.refresh(); show("Committed receipt validated. Authoritative workboard state is refreshing.", false); return; }
+			const error = client.mutationError(body, response.status); if (definitive.has(response.status) && error && error.definitive) { pendingIntent = null; inFlight = false; if (!direct) formStatus(forms[action], "The request was definitively rejected. Refresh authoritative state before editing again.", true); window.DarwinWorkboards.refresh(); if (response.status === 401 || response.status === 403) { csrfToken = ""; operationReadFailed = true; show("The authenticated mutation session was rejected. Reload the page before attempting another action.", true); return; } if ([404, 409, 422].includes(response.status)) { await scanOperations("The request was rejected and authoritative state was refreshed."); return; } show("The request was not committed (HTTP " + String(response.status) + ").", true); return; }
 			pendingIntent = Object.freeze({...intent, operationID: error && error.operationID || ""}); inFlight = false; show(pendingIntent.operationID ? "Outcome unknown. Reconcile only operation " + pendingIntent.operationID + "; the request will not be replayed." : "Outcome unknown and no operation ID was published. The request will not be replayed.", true);
 		} catch (_) { if (!pendingIntent || pendingIntent.domainKey !== intent.domainKey) return; inFlight = false; show("Outcome unknown after a network or malformed response. The exact request is retained and will not be replayed.", true); }
 	}
 	for (const [action, button] of Object.entries(openButtons)) button.addEventListener("click", () => open(action));
 	for (const button of closeButtons) button.addEventListener("click", close);
 	for (const [action, button] of Object.entries(submitButtons)) button.addEventListener("click", () => mutate(action));
+	window.addEventListener("darwin:card-position", event => { const detail = event.detail || {}, context = window.DarwinWorkboards.context(), plan = client.positionPlan(context, detail.cardID, detail.direction); if (!plan || barrier()) return; const built = buildPosition(plan); if (built) mutate(plan.action, built, plan); });
 	document.querySelector("#board-archive-confirm").addEventListener("change", updateControls);
 	document.querySelector("#add-card-create-criterion").addEventListener("click", () => { const rows = document.querySelectorAll("#card-create-criteria .criterion-row"); if (rows.length < 32) document.querySelector("#card-create-criteria").insertBefore(criterionRow(null), document.querySelector("#add-card-create-criterion")); });
 	for (const dialog of Object.values(dialogs)) dialog.addEventListener("keydown", event => { if (event.key === "Escape" && !inFlight) { event.preventDefault(); close(); return; } if (event.key !== "Tab") return; const nodes = focusable(dialog); if (!nodes.length) return; const first = nodes[0], last = nodes[nodes.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } });

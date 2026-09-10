@@ -13,8 +13,12 @@ supported-platform decision or publication approval is claimed.
   session operation journal before enabling writes, and never automatically
   replays an ambiguous result. Exact browser operation identifiers are safely
   published for reconciliation without exposing request content or domain
-  receipt digests. Keyboard move/reorder, dependency editing, lifecycle, and
-  acceptance controls remain open.
+  receipt digests. Each card now adds native keyboard move controls for exact
+  adjacent reordering and legal Backlog/Ready transitions. They require a full,
+  unfiltered snapshot, freeze board/layout/card revision fences, validate the
+  exact successor receipt and immutable event, and share the existing no-replay
+  ambiguity barrier. Dependency editing, lifecycle, acceptance, richer focus
+  restoration, and browser end-to-end qualification remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native

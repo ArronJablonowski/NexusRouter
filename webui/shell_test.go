@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "3731209db1e42f55fe6e19585a8526386b1e6cdd1ea417c544e38a37552fd9d4" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "fb7b84c0befc54a34c0d7bcebb4bc9e036d6c30502019dfba71465e5df4dd7b2" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -288,6 +288,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`new EventSource(base + "/api/v1/workboards/"`, `event.lastEventId !== payload.cursor`, `streamFailures >= 8`, `window.clearTimeout(invalidationTimer)`,
 		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
+		`position.setAttribute("role", "group")`, `button.dataset.position = direction`, `new CustomEvent("darwin:card-position"`, `complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count)`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard client guard missing %q", required)
@@ -324,7 +325,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		`function clearCardState()`, `snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
 		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(loadedCards, cardNodes`, `const filterSignature = [appliedFilters.state`,
 		`filterForm.requestSubmit()`, `aria-invalid`, `presentation = "kanban"`, `presentation = "list"`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120)`,
-		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · read-only`, `" matching cards loaded · "`,
+		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · "`, `" matching cards loaded · "`, `position controls require all cards loaded and filters clear`,
 		`let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active"`, `const boardState = appliedBoardState`, `appliedBoardState = boardStateFilter.value`,
 		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(loadedCards, cardNodes`,
 		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
@@ -356,7 +357,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		t.Fatal(err)
 	}
 	css := string(styles)
-	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`} {
+	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`, `.card-position-controls { display: flex;`, `.card-position-controls button { min-height: 2.75rem;`} {
 		if !strings.Contains(css, required) {
 			t.Fatalf("responsive workboard layout missing %q", required)
 		}
@@ -507,6 +508,18 @@ const boardIntent = {body:{action:"board.revise",board_id:"board-a"},capture:{bo
 if (!client.receiptMatches(receipt,boardIntent) || client.receiptMatches({...receipt,board_revision:2},boardIntent) || client.receiptMatches({...receipt,operation_id:"short"},boardIntent)) process.exit(8);
 const cardIntent = {body:{action:"card.revise",board_id:"board-a",card_id:"card-a"},capture:{boardRevision:2,cardRevision:4}};
 if (!client.receiptMatches({...receipt,board_revision:7,card_id:"card-a",card_revision:5},cardIntent) || client.receiptMatches({...receipt,card_id:"card-a",card_revision:4},cardIntent)) process.exit(9);
+const positionContext = {board:{id:"board-a",state:"active",revision:2,layout_revision:6},complete:true,unfiltered:true,cards:[
+  {id:"card-a",state:"backlog",rank:"a",revision:4,remaining_dependencies:0,current_claim_id:""},
+  {id:"card-b",state:"backlog",rank:"b",revision:5,remaining_dependencies:0,current_claim_id:""},
+  {id:"card-c",state:"ready",rank:"a",revision:3,remaining_dependencies:0,current_claim_id:""}
+]};
+const down = client.positionPlan(positionContext,"card-a","down"), up = client.positionPlan(positionContext,"card-b","up"), moved = client.positionPlan(positionContext,"card-a","ready");
+if (!down || down.action !== "card.reorder" || down.afterCardID !== "card-b" || !up || up.beforeCardID !== "card-a" || !moved || moved.action !== "card.move" || moved.targetState !== "ready") process.exit(12);
+if (client.positionPlan(positionContext,"card-a","up") || client.positionPlan({...positionContext,complete:false},"card-a","down") || client.positionPlan({...positionContext,unfiltered:false},"card-a","ready") || client.positionPlan(positionContext,"card-c","ready")) process.exit(13);
+if (!client.captureCurrent(down,positionContext) || client.captureCurrent(down,{...positionContext,board:{...positionContext.board,layout_revision:7}}) || client.captureCurrent(down,{...positionContext,cards:positionContext.cards.map(card=>card.id==="card-b"?{...card,rank:"c"}:card)})) process.exit(14);
+const moveIntent = {body:{action:"card.move",board_id:"board-a",card_id:"card-a"},capture:moved};
+const moveReceipt = {...receipt,card_id:"card-a",card_revision:5};
+if (!client.receiptMatches(moveReceipt,moveIntent) || client.receiptMatches({...moveReceipt,board_revision:4},moveIntent) || client.receiptMatches({...moveReceipt,card_revision:6},moveIntent) || client.receiptMatches({...moveReceipt,claim_revision:1},moveIntent)) process.exit(15);
 const ambiguous = client.mutationError({version:1,code:"workboard_unavailable",message:"Unavailable",retryable:true,operation_id:"op_1234567890123456"},503);
 const conflict = client.mutationError({version:1,code:"revision_conflict",message:"Conflict",retryable:true,current_revision:3},409);
 if (!ambiguous || ambiguous.definitive || ambiguous.operationID !== "op_1234567890123456" || !conflict || !conflict.definitive || client.mutationError({version:1,code:"workboard_unavailable",message:"\ud800",retryable:true},503)) process.exit(10);
@@ -545,6 +558,8 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`rows.length < 32`, `rows.length > 32`, `textBytes(JSON.stringify(result)) <= 65536`, `clearParent && parent`, `clearAssignee && assignee`,
 		`body.expected_graph_revision = activeCapture.graphRevision`, `client.receiptMatches(body, intent)`, `client.mutationError(body, response.status)`, `client.acknowledgeAllowed(pendingIntent`,
 		`action === "board.create" ? "/api/v1/workboards"`, `encodeURIComponent(body.board_id) + "/operations"`,
+		`expected_layout_revision: plan.layoutRevision`, `client.positionPlan(context, button.dataset.cardId, direction)`, `window.addEventListener("darwin:card-position"`,
+		`exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)
