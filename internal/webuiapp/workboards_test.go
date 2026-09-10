@@ -201,6 +201,26 @@ func TestBrowserWorkboardMutationsRequireCSRFAndBindPath(t *testing.T) {
 	}
 }
 
+func TestBrowserWorkboardRejectsWorkerActionBeforeCallback(t *testing.T) {
+	var calls atomic.Int32
+	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(context.Context, string, contract.BoardRequest) (contract.OperationReceipt, error) {
+		calls.Add(1)
+		return contract.OperationReceipt{}, nil
+	}})
+	cookie, csrf := authenticateBrowser(t, handler)
+	revision := int64(1)
+	body, _ := json.Marshal(contract.BoardRequest{Version: 1, Action: contract.CardClaim, IdempotencyKey: browserWorkboardKey,
+		BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision})
+	request := browserRequest(http.MethodPost, "/app/api/v1/workboards/board-a/operations", string(body))
+	request.AddCookie(cookie)
+	request.Header.Set("X-Darwin-CSRF", csrf)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || calls.Load() != 0 {
+		t.Fatalf("worker action crossed browser operator boundary: status=%d calls=%d", response.Code, calls.Load())
+	}
+}
+
 func TestBrowserWorkboardErrorsAndMethodsAreSanitized(t *testing.T) {
 	handler := browserWorkboardHandler(t, WorkboardServices{Read: func(context.Context, string, string, contract.BoardSnapshotOptions) (contract.BoardSnapshot, error) {
 		return contract.BoardSnapshot{}, errors.New("private path /secret and key")

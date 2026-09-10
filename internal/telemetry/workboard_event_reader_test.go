@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -94,6 +95,82 @@ func TestWorkboardEventCursorRejectsForgeryAndCrossBoard(t *testing.T) {
 	}
 	if _, err = store.ListWorkboardEvents(ctx, secondBoard.BoardID, workboard.BoardEventOptions{After: page.NextCursor, Limit: 1}); !errors.Is(err, ErrWorkboardCursor) {
 		t.Fatalf("cross-board cursor = %v", err)
+	}
+}
+
+func TestWorkboardEventTailFollowIsBoundedAndRestartSafe(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := workboard.Actor{ID: "operator", Type: "operator"}
+	now := time.Date(2026, 9, 9, 19, 30, 0, 0, time.UTC)
+	created, err := store.CreateWorkboard(ctx, "session", createBoardRequest("tail-create-event-001", "One", ""), actor, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for revision, title := range []string{"Two", "Three", "Four"} {
+		value := title
+		request := workboard.ReviseBoardRequest{Version: 1, BoardID: created.BoardID, IdempotencyKey: fmt.Sprintf("tail-revise-event-%03d", revision+1), ExpectedRevision: int64(revision + 1), Title: &value}
+		if _, err = store.ReviseWorkboard(ctx, request, actor, now.Add(time.Duration(revision+1)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	idle, err := store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 100, TailAfterSequence: 4})
+	if err != nil || idle.Validate() != nil || idle.HighWaterSequence != 4 || len(idle.Items) != 1 || idle.Items[0].Sequence != 4 || idle.HasMore {
+		t.Fatalf("idle tail=%+v err=%v", idle, err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	value := "Five"
+	if _, err = store.ReviseWorkboard(ctx, workboard.ReviseBoardRequest{Version: 1, BoardID: created.BoardID, IdempotencyKey: "tail-revise-event-004", ExpectedRevision: 4, Title: &value}, actor, now.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	followed, err := store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 100, TailAfterSequence: 4})
+	if err != nil || followed.Validate() != nil || followed.HighWaterSequence != 5 || len(followed.Items) != 1 || followed.Items[0].Sequence != 5 || followed.HasMore {
+		t.Fatalf("followed tail=%+v err=%v", followed, err)
+	}
+	bounded, err := store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 1, TailAfterSequence: 3})
+	if err != nil || bounded.Validate() != nil || len(bounded.Items) != 1 || bounded.Items[0].Sequence != 4 || !bounded.HasMore {
+		t.Fatalf("bounded tail=%+v err=%v", bounded, err)
+	}
+	last, err := store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 1, After: bounded.NextCursor})
+	if err != nil || last.Validate() != nil || len(last.Items) != 1 || last.Items[0].Sequence != 5 || last.HasMore {
+		t.Fatalf("tail continuation=%+v err=%v", last, err)
+	}
+}
+
+func TestWorkboardEventTailFollowRejectsInvalidAnchorAndCorruption(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	actor := workboard.Actor{ID: "operator", Type: "operator"}
+	created, err := store.CreateWorkboard(ctx, "session", createBoardRequest("tail-corrupt-event-001", "Board", ""), actor, time.Date(2026, 9, 9, 19, 45, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 1, TailAfterSequence: 2}); !errors.Is(err, ErrWorkboardCursor) {
+		t.Fatalf("future tail anchor=%v", err)
+	}
+	if _, err = store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{After: "cursor", Limit: 1, TailAfterSequence: 1}); err == nil {
+		t.Fatalf("mixed cursor modes=%v", err)
+	}
+	if _, err = store.db.Exec(`UPDATE workboard_events SET actor_id='tampered' WHERE board_id=? AND sequence=1`, created.BoardID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.ListWorkboardEvents(ctx, created.BoardID, workboard.BoardEventOptions{Limit: 1, TailAfterSequence: 1}); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("corrupt tail anchor=%v", err)
 	}
 }
 

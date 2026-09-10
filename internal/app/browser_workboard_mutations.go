@@ -55,7 +55,7 @@ func (b *BrowserWorkboardMutations) Mutate(ctx context.Context, subject string, 
 }
 
 func workboardReceiptMatchesRequest(receipt contract.OperationReceipt, request contract.BoardRequest) bool {
-	if receipt.Validate() != nil || receipt.OperationID != request.IdempotencyKey {
+	if receipt.Validate() != nil {
 		return false
 	}
 	if request.BoardID != "" && receipt.BoardID != request.BoardID || request.CardID != "" && receipt.CardID != request.CardID {

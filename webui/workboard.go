@@ -452,18 +452,20 @@ func (a Attempt) Validate() error {
 }
 
 type BoardSnapshot struct {
-	Version       int      `json:"version"`
-	Board         Board    `json:"board"`
-	Columns       []Column `json:"columns"`
-	Cards         []Card   `json:"cards"`
-	NextCursor    string   `json:"next_cursor,omitempty"`
-	HasMore       bool     `json:"has_more"`
-	GraphRevision int64    `json:"graph_revision"`
-	GraphDigest   string   `json:"graph_digest"`
+	Version       int             `json:"version"`
+	Board         Board           `json:"board"`
+	Columns       []Column        `json:"columns"`
+	Cards         []Card          `json:"cards"`
+	Lifecycle     []CardLifecycle `json:"lifecycle,omitempty"`
+	NextCursor    string          `json:"next_cursor,omitempty"`
+	HasMore       bool            `json:"has_more"`
+	GraphRevision int64           `json:"graph_revision"`
+	GraphDigest   string          `json:"graph_digest"`
 }
 
 func (s BoardSnapshot) Validate() error {
 	if s.Version != ContractVersion || s.Board.Validate() != nil || len(s.Cards) > MaxCardPageItems ||
+		len(s.Lifecycle) > len(s.Cards) ||
 		s.HasMore != (s.NextCursor != "") || s.GraphRevision < 1 || !validWorkboardDigest(s.GraphDigest) ||
 		(s.NextCursor != "" && !boundedPrintable(s.NextCursor, 1, MaxCursorBytes)) ||
 		validateColumns(s.Board.ID, s.Columns) != nil {
@@ -475,6 +477,13 @@ func (s BoardSnapshot) Validate() error {
 			return ErrContract
 		}
 		seen[card.ID] = true
+	}
+	lifecycleSeen := map[string]bool{}
+	for _, lifecycle := range s.Lifecycle {
+		if lifecycle.Validate() != nil || lifecycle.Attempt.BoardID != s.Board.ID || !seen[lifecycle.CardID] || lifecycleSeen[lifecycle.CardID] {
+			return ErrContract
+		}
+		lifecycleSeen[lifecycle.CardID] = true
 	}
 	if len(s.Cards) == 0 && s.HasMore {
 		return ErrContract
@@ -528,30 +537,34 @@ type OperationReceipt struct {
 }
 
 type AcceptanceDecisionRecord struct {
-	Version              int       `json:"version"`
-	ID                   string    `json:"id"`
-	BoardID              string    `json:"board_id"`
-	CardID               string    `json:"card_id"`
-	AttemptID            string    `json:"attempt_id"`
-	CandidateID          string    `json:"candidate_id"`
-	CandidateDigest      string    `json:"candidate_digest"`
-	CriteriaRevision     int64     `json:"criteria_revision"`
-	CriteriaDigest       string    `json:"criteria_digest"`
-	EvidenceHeadRevision int64     `json:"evidence_head_revision"`
-	EvidenceSetDigest    string    `json:"evidence_set_digest"`
-	PolicyDigest         string    `json:"policy_digest"`
-	Decision             string    `json:"decision"`
-	DecidedBy            string    `json:"decided_by"`
-	DecidedByType        string    `json:"decided_by_type"`
-	DecisionAuthorityID  string    `json:"decision_authority_id"`
-	DecidedAt            time.Time `json:"decided_at"`
+	Version                   int       `json:"version"`
+	ID                        string    `json:"id"`
+	BoardID                   string    `json:"board_id"`
+	CardID                    string    `json:"card_id"`
+	AttemptID                 string    `json:"attempt_id"`
+	CandidateID               string    `json:"candidate_id"`
+	CandidateDigest           string    `json:"candidate_digest"`
+	CriteriaRevision          int64     `json:"criteria_revision"`
+	CriteriaDigest            string    `json:"criteria_digest"`
+	PriorEvidenceHeadRevision int64     `json:"prior_evidence_head_revision"`
+	PriorEvidenceSetDigest    string    `json:"prior_evidence_set_digest"`
+	EvidenceHeadRevision      int64     `json:"evidence_head_revision"`
+	EvidenceSetDigest         string    `json:"evidence_set_digest"`
+	PolicyDigest              string    `json:"policy_digest"`
+	Decision                  string    `json:"decision"`
+	DecidedBy                 string    `json:"decided_by"`
+	DecidedByType             string    `json:"decided_by_type"`
+	DecisionAuthorityID       string    `json:"decision_authority_id"`
+	Rationale                 string    `json:"rationale"`
+	DecidedAt                 time.Time `json:"decided_at"`
 }
 
 func (r AcceptanceDecisionRecord) ValidateAgainst(attempt Attempt) error {
 	if r.Version != ContractVersion || !validID(r.ID) || !validID(r.BoardID) || !validID(r.CardID) ||
 		!validID(r.AttemptID) || !validID(r.CandidateID) || !validWorkboardDigest(r.CandidateDigest) ||
-		r.CriteriaRevision < 1 || !validWorkboardDigest(r.CriteriaDigest) || r.EvidenceHeadRevision < 1 ||
-		!validWorkboardDigest(r.EvidenceSetDigest) || !validWorkboardDigest(r.PolicyDigest) ||
+		r.CriteriaRevision < 1 || !validWorkboardDigest(r.CriteriaDigest) || r.PriorEvidenceHeadRevision < 1 ||
+		r.EvidenceHeadRevision < r.PriorEvidenceHeadRevision || !validWorkboardDigest(r.PriorEvidenceSetDigest) ||
+		!validWorkboardDigest(r.EvidenceSetDigest) || !validWorkboardDigest(r.PolicyDigest) || requireText(r.Rationale, MaxEvidenceBytes) != nil ||
 		(r.Decision != "accepted" && r.Decision != "rejected") || !validID(r.DecidedBy) ||
 		(r.DecidedByType != "operator" && r.DecidedByType != "validator") || !validID(r.DecisionAuthorityID) ||
 		!validWorkboardTime(r.DecidedAt) || attempt.Validate() != nil || attempt.Candidate == nil || len(attempt.Evidence) < 1 ||
@@ -562,6 +575,7 @@ func (r AcceptanceDecisionRecord) ValidateAgainst(attempt Attempt) error {
 		(r.Decision == "accepted") != (attempt.State == "accepted") ||
 		r.CriteriaRevision != attempt.CriteriaRevision || r.CriteriaDigest != attempt.CriteriaDigest ||
 		r.EvidenceHeadRevision != attempt.Evidence[len(attempt.Evidence)-1].Revision || r.EvidenceSetDigest != EvidenceDigest(attempt.Evidence) ||
+		r.PriorEvidenceHeadRevision > int64(len(attempt.Evidence)) || r.PriorEvidenceSetDigest != EvidenceDigest(attempt.Evidence[:r.PriorEvidenceHeadRevision]) ||
 		r.PolicyDigest != attempt.PolicyDigest || r.DecidedBy == attempt.WorkerID {
 		return ErrContract
 	}

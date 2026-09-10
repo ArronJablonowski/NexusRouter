@@ -55,10 +55,12 @@ create, revise, list, read, archive, and redacted event reads; rich SQL-backed
 card mutations; and the first durable claim, heartbeat, recovery,
 criteria-revision, and checkpoint commands. Native JSON routes and the
 browser-session/CSRF BFF are composed into the daemon for board/card reads and
-mutations, with reconnectable board-event SSE and a request-bound browser
-operation journal. The remaining candidate/acceptance/pause/cancel/block
-lifecycle commands, trusted lifecycle transport composition, agent tools, and
-visual Kanban remain unfinished, so DAR-82 remains In Progress.
+operator-safe mutations, with reconnectable board-event SSE and a request-bound
+browser operation journal. The lifecycle layer now also covers candidate
+submission, evidence-based acceptance/rejection, pause/cancel requests,
+block/unblock, bounded lifecycle projections, and observation-driven stale-claim
+attention. Runtime worker integration, real stop-proof verifiers, agent tools,
+and the visual Kanban remain unfinished, so DAR-82 remains In Progress.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -77,9 +79,8 @@ workboard storage in the primary SQLite/WAL database. Versioned Web UI board
 query and redacted event contracts now back live native JSON handlers and
 bounded browser BFF handlers for list/create/read/operations and reconnectable
 SSE. Browser mutations use the same durable reconciliation journal as chat
-controls. Remaining lifecycle transport composition,
-candidate/acceptance/pause/cancel/block commands, agent tools, and Kanban
-feature views remain open. Schema 36 adds normalized card identity to workboard
+controls. Remaining runtime worker/verifier composition, agent tools, and
+Kanban feature views remain open. Schema 36 adds normalized card identity to workboard
 events; existing schema-35 board events upgrade transactionally with a `NULL`
 card ID.
 

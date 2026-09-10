@@ -127,7 +127,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "8f5927693b5bad9957ce2099e02ae8922575299f7a8c558b0e434d9cdc7b6287" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "e09cd0d4e319f07362e7c18fa07dcc7144b1b580d7564d847a16a25e86fcf08e" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -270,8 +270,7 @@ func TestEmbeddedOperationContractCoversWorkboardReconciliation(t *testing.T) {
 	}
 	body := string(script)
 	for _, action := range []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
-		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, ClaimRecover, CriteriaRevise, CheckpointAppend,
-		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock} {
+		DependencyAdd, DependencyRemove, CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest} {
 		if !strings.Contains(body, `"`+string(action)+`"`) {
 			t.Fatal("browser operation contract omitted action", action)
 		}

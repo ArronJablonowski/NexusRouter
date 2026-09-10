@@ -142,7 +142,7 @@ func prepareBoardPage(key []byte, board, principal, filter, pageStart string, re
 		return preparedBoardPage{}, contract.ErrContract
 	}
 	if page.HighWaterSequence == 0 && len(page.Items) != 0 || page.HighWaterSequence > 0 && len(page.Items) == 0 ||
-		len(page.Items) > 0 && pageStart == "" && page.Items[0].Sequence != 1 ||
+		len(page.Items) > 0 && pageStart == "" && resume.after == 0 && page.Items[0].Sequence != 1 ||
 		len(page.Items) > 0 && !page.HasMore && page.Items[len(page.Items)-1].Sequence != page.HighWaterSequence {
 		return preparedBoardPage{}, contract.ErrContract
 	}
@@ -210,7 +210,7 @@ func projectBoardEvent(board, cursor string, event contract.BoardEvent) (contrac
 		change = "board_revised"
 	case contract.DependencyAdd, contract.DependencyRemove:
 		change = "dependency_changed"
-	case contract.CardClaim, contract.ClaimHeartbeat, contract.ClaimRecover:
+	case contract.CardClaim, contract.ClaimHeartbeat, contract.ClaimRecover, contract.ClaimAttention:
 		change = "claim_changed"
 	case contract.CheckpointAppend, contract.CandidateSubmit, contract.CriteriaRevise:
 		change = "evidence_changed"
@@ -228,7 +228,7 @@ func projectBoardEvent(board, cursor string, event contract.BoardEvent) (contrac
 	return projected, nil
 }
 
-func (h *Handler) readBoardEventPage(ctx context.Context, subject, board, after string) (page contract.BoardEventPage, err error) {
+func (h *Handler) readBoardEventPage(ctx context.Context, subject, board, after string, tailAfter int64) (page contract.BoardEventPage, err error) {
 	defer func() {
 		if recover() != nil {
 			err = errors.New("workboard events unavailable")
@@ -236,7 +236,7 @@ func (h *Handler) readBoardEventPage(ctx context.Context, subject, board, after 
 	}()
 	readContext, cancel := context.WithTimeout(ctx, boardStreamReadTime)
 	defer cancel()
-	return h.workboards.Events(readContext, subject, board, contract.BoardEventOptions{After: after, Limit: boardStreamPageLimit})
+	return h.workboards.Events(readContext, subject, board, contract.BoardEventOptions{After: after, Limit: boardStreamPageLimit, TailAfterSequence: tailAfter})
 }
 
 func (h *Handler) serveBoardEvents(writer http.ResponseWriter, request *http.Request, board string) {
@@ -278,7 +278,11 @@ func (h *Handler) serveBoardEvents(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	pageStart := resume.ledger
-	page, err := h.readBoardEventPage(request.Context(), subject, board, pageStart)
+	initialTail := int64(0)
+	if pageStart == "" {
+		initialTail = resume.after
+	}
+	page, err := h.readBoardEventPage(request.Context(), subject, board, pageStart, initialTail)
 	if request.Context().Err() != nil {
 		return
 	}
@@ -327,7 +331,11 @@ func (h *Handler) serveBoardEvents(writer http.ResponseWriter, request *http.Req
 			case <-time.After(boardStreamPoll):
 			}
 		}
-		page, err = h.readBoardEventPage(streamContext, subject, board, pageStart)
+		tailAfter := int64(0)
+		if pageStart == "" {
+			tailAfter = resume.after
+		}
+		page, err = h.readBoardEventPage(streamContext, subject, board, pageStart, tailAfter)
 		if streamContext.Err() != nil || err != nil {
 			return
 		}

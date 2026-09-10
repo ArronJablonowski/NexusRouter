@@ -62,9 +62,12 @@ supported-platform decision or publication approval is claimed.
   dependency SQL. Native JSON handlers and browser-session/CSRF BFF contracts
   cover board list/create/read/operations. Canonical events, revision and graph
   fencing, exact replay, aggregate transaction-byte checks, and authenticated
-  bounded cursors are covered. Browser workboard SSE, actual CLI/daemon service
-  composition, remaining claim/attempt/evaluation lifecycle commands, agent
-  tools, and the Kanban feature UI remain open; DAR-82 is still In Progress.
+  bounded cursors are covered. A later DAR-82 checkpoint adds live daemon
+  composition, reconnectable board SSE, candidate/evidence/acceptance,
+  pause/cancel and block/unblock control, bounded lifecycle reads, and durable
+  stale-claim attention. Worker-owned mutations remain behind a fixed-authority
+  internal dispatcher. Runtime worker and real stop-proof verifier integration,
+  agent tools, and the Kanban feature UI remain open; DAR-82 is still In Progress.
 
 - Schema 35 adds the native workboard storage foundation to the primary
   SQLite/WAL database. Normalized bounded tables cover boards, seven canonical

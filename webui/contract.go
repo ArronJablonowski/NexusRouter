@@ -176,6 +176,7 @@ const (
 	DependencyRemove   BoardAction = "dependency.remove"
 	CardClaim          BoardAction = "card.claim"
 	ClaimHeartbeat     BoardAction = "claim.heartbeat"
+	ClaimAttention     BoardAction = "claim.attention"
 	CheckpointAppend   BoardAction = "checkpoint.append"
 	CandidateSubmit    BoardAction = "candidate.submit"
 	AcceptanceAccept   BoardAction = "acceptance.accept"
@@ -273,8 +274,7 @@ func (r BoardRequest) Validate() error {
 		if r.Title == nil || strings.TrimSpace(*r.Title) == "" || r.CardID != "" || revisionBelowOne(r.ExpectedBoardRevision) || revisionBelowOne(r.ExpectedGraphRevision) || validateCriteria(r.Criteria, 1) != nil {
 			return ErrContract
 		}
-	case CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove, CardClaim,
-		CardPauseRequest, CardCancelRequest, CardBlock, CardUnblock:
+	case CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove, CardPauseRequest, CardCancelRequest:
 		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) {
 			return ErrContract
 		}
@@ -298,33 +298,8 @@ func (r BoardRequest) Validate() error {
 			(r.BeforeCardID == "") == (r.AfterCardID == "") || r.BeforeCardID == r.CardID || r.AfterCardID == r.CardID) {
 			return ErrContract
 		}
-		if (r.Action == CardBlock || r.Action == CardUnblock) && (r.ReasonCode == "" || r.ClaimID == "" || revisionBelowOne(r.ExpectedClaimRevision)) {
-			return ErrContract
-		}
-	case ClaimHeartbeat:
-		if r.CardID == "" || r.ClaimID == "" || r.AttemptID == "" || revisionBelowOne(r.ExpectedClaimRevision) {
-			return ErrContract
-		}
-	case ClaimRecover:
-		if r.CardID == "" || r.ClaimID == "" || r.AttemptID == "" || revisionBelowOne(r.ExpectedCardRevision) || revisionBelowOne(r.ExpectedClaimRevision) ||
-			r.StopProofID == "" || !validWorkboardDigest(r.TaskHeadDigest) || !validWorkboardDigest(r.ProcessProofDigest) ||
-			!validWorkboardDigest(r.EffectEvidenceDigest) || (r.EffectResolution != "effect_free" && r.EffectResolution != "resolved_no_replay") {
-			return ErrContract
-		}
-	case CardCancelFinalize:
-		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) || r.StopProofID == "" ||
-			!validWorkboardDigest(r.TaskHeadDigest) || !validWorkboardDigest(r.ProcessProofDigest) ||
-			!validWorkboardDigest(r.EffectEvidenceDigest) || (r.EffectResolution != "effect_free" && r.EffectResolution != "resolved_no_replay") ||
-			(r.ClaimID == "") != (r.AttemptID == "") || (r.ClaimID == "") != (r.ExpectedClaimRevision == nil) {
-			return ErrContract
-		}
 	case CriteriaRevise:
 		if r.CardID == "" || revisionBelowOne(r.ExpectedCardRevision) || revisionBelowOne(r.ExpectedCriteriaRevision) || validateCriteria(r.Criteria, 1) != nil {
-			return ErrContract
-		}
-	case CheckpointAppend, CandidateSubmit:
-		if r.CardID == "" || r.ClaimID == "" || r.AttemptID == "" || revisionBelowOne(r.CriteriaRevision) ||
-			revisionBelowOne(r.ExpectedCardRevision) || revisionBelowOne(r.ExpectedClaimRevision) || strings.TrimSpace(r.Evidence) == "" {
 			return ErrContract
 		}
 	case AcceptanceAccept, AcceptanceReject:

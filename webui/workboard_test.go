@@ -160,10 +160,12 @@ func acceptanceFixture(attempt Attempt) AcceptanceDecisionRecord {
 		Version: 1, ID: "acceptance-a", BoardID: attempt.BoardID, CardID: attempt.CardID,
 		AttemptID: attempt.ID, CandidateID: attempt.Candidate.ID, CandidateDigest: attempt.Candidate.Digest,
 		CriteriaRevision: attempt.CriteriaRevision, CriteriaDigest: attempt.CriteriaDigest,
-		EvidenceHeadRevision: attempt.Evidence[len(attempt.Evidence)-1].Revision,
-		EvidenceSetDigest:    EvidenceDigest(attempt.Evidence), PolicyDigest: attempt.PolicyDigest,
+		PriorEvidenceHeadRevision: attempt.Evidence[len(attempt.Evidence)-1].Revision,
+		PriorEvidenceSetDigest:    EvidenceDigest(attempt.Evidence),
+		EvidenceHeadRevision:      attempt.Evidence[len(attempt.Evidence)-1].Revision,
+		EvidenceSetDigest:         EvidenceDigest(attempt.Evidence), PolicyDigest: attempt.PolicyDigest,
 		Decision: "accepted", DecidedBy: "operator-a", DecidedByType: "operator",
-		DecisionAuthorityID: "browser-session-policy", DecidedAt: *attempt.EndedAt,
+		DecisionAuthorityID: "browser-session-policy", Rationale: "Operator accepted the evidence.", DecidedAt: *attempt.EndedAt,
 	}
 }
 
@@ -345,6 +347,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 	board := boardFixture()
 	card := cardFixture()
 	attempt := attemptFixture("accepted")
+	lifecycle := CardLifecycle{Version: 1, CardID: card.ID, Attempt: attempt, Checkpoints: []WorkCheckpoint{},
+		CheckpointCount: 0, Acceptance: ptrAcceptance(acceptanceFixture(attempt))}
 	receipt := OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "operation-key-01", RequestDigest: strings.Repeat("d", 64), ResponseDigest: strings.Repeat("e", 64), FirstSequence: 2, LastSequence: 3, EventCount: 2, TransactionBytes: 2048, BoardRevision: 2, CardID: "card-a", CardRevision: int64ptr(3), Outcome: "committed", CreatedAt: workboardTime()}
 	values := []struct {
 		definition string
@@ -354,6 +358,7 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"column", columnFixtures(board.ID)[0]},
 		{"card", card},
 		{"attempt", attempt},
+		{"card_lifecycle", lifecycle},
 		{"snapshot", BoardSnapshot{Version: 1, Board: board, Columns: columnFixtures(board.ID), Cards: []Card{card}, GraphRevision: 1, GraphDigest: strings.Repeat("c", 64)}},
 		{"page", Page{Version: 1, Items: []Board{board}}},
 		{"operation_receipt", receipt},
@@ -379,6 +384,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, json.RawMessage(item.body), false)
 	}
 }
+
+func ptrAcceptance(value AcceptanceDecisionRecord) *AcceptanceDecisionRecord { return &value }
 
 func int64ptr(value int64) *int64 { return &value }
 

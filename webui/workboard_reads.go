@@ -20,24 +20,12 @@ func allowedBoardFields(action BoardAction) []string {
 		return []string{"board_id", "card_id", "before_card_id", "after_card_id", "expected_board_revision", "expected_layout_revision", "expected_card_revision"}
 	case DependencyAdd, DependencyRemove:
 		return []string{"board_id", "card_id", "dependency_id", "expected_card_revision", "expected_graph_revision"}
-	case CardClaim:
-		return []string{"board_id", "card_id", "expected_card_revision"}
-	case ClaimHeartbeat:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "expected_claim_revision"}
-	case ClaimRecover:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "expected_card_revision", "expected_claim_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"}
 	case CriteriaRevise:
 		return []string{"board_id", "card_id", "criteria", "expected_card_revision", "expected_criteria_revision"}
-	case CheckpointAppend, CandidateSubmit:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "criteria_revision", "expected_card_revision", "expected_claim_revision", "evidence"}
 	case AcceptanceAccept, AcceptanceReject:
 		return []string{"board_id", "card_id", "attempt_id", "candidate_id", "criteria_revision", "expected_card_revision", "evidence", "candidate_digest", "criteria_digest", "evidence_head_revision", "evidence_set_digest", "policy_digest"}
 	case CardPauseRequest, CardCancelRequest:
-		return []string{"board_id", "card_id", "reason_code", "expected_card_revision"}
-	case CardCancelFinalize:
-		return []string{"board_id", "card_id", "claim_id", "attempt_id", "expected_card_revision", "expected_claim_revision", "stop_proof_id", "task_head_digest", "process_proof_digest", "effect_evidence_digest", "effect_resolution"}
-	case CardBlock, CardUnblock:
-		return []string{"board_id", "card_id", "claim_id", "reason_code", "expected_card_revision", "expected_claim_revision"}
+		return []string{"board_id", "card_id", "expected_card_revision"}
 	default:
 		return nil
 	}
@@ -186,12 +174,14 @@ func (p DependencyPage) Validate() error {
 }
 
 type BoardEventOptions struct {
-	After string `json:"after,omitempty"`
-	Limit int    `json:"limit"`
+	After             string `json:"after,omitempty"`
+	Limit             int    `json:"limit"`
+	TailAfterSequence int64  `json:"-"`
 }
 
 func (o BoardEventOptions) Validate() error {
-	if !validPageCursor(o.After) || o.Limit < 1 || o.Limit > MaxBoardEventPageItems {
+	if !validPageCursor(o.After) || o.Limit < 1 || o.Limit > MaxBoardEventPageItems || o.TailAfterSequence < 0 ||
+		o.After != "" && o.TailAfterSequence != 0 {
 		return ErrContract
 	}
 	return nil
@@ -269,7 +259,7 @@ func validClaimFilter(value string) bool {
 func validBoardAction(value BoardAction) bool {
 	switch value {
 	case BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder,
-		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, CheckpointAppend,
+		DependencyAdd, DependencyRemove, CardClaim, ClaimHeartbeat, ClaimAttention, CheckpointAppend,
 		CandidateSubmit, AcceptanceAccept, AcceptanceReject, CardPauseRequest,
 		CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock, CriteriaRevise,
 		ClaimRecover:

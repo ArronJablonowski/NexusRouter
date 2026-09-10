@@ -448,10 +448,8 @@ func validOperationAction(value string) bool {
 	case "submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke":
 		return true
 	case string(BoardCreate), string(BoardRevise), string(BoardArchive), string(CardCreate), string(CardRevise),
-		string(CardMove), string(CardReorder), string(DependencyAdd), string(DependencyRemove), string(CardClaim),
-		string(ClaimHeartbeat), string(ClaimRecover), string(CriteriaRevise), string(CheckpointAppend), string(CandidateSubmit),
-		string(AcceptanceAccept), string(AcceptanceReject), string(CardPauseRequest), string(CardCancelRequest),
-		string(CardCancelFinalize), string(CardBlock), string(CardUnblock):
+		string(CardMove), string(CardReorder), string(DependencyAdd), string(DependencyRemove), string(CriteriaRevise),
+		string(AcceptanceAccept), string(AcceptanceReject), string(CardPauseRequest), string(CardCancelRequest):
 		return true
 	default:
 		return false

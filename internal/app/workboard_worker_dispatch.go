@@ -1,0 +1,103 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
+)
+
+// WorkboardWorkerDispatch is an internal capability-bound entry point for the
+// worker-owned lifecycle operations currently implemented by the durable
+// workboard store. It deliberately exposes neither recovery nor operator
+// commands, and it never derives worker identity from a transport request.
+type WorkboardWorkerDispatch struct {
+	lifecycle  *workboard.LifecycleService
+	progress   *workboard.ProgressService
+	control    *workboard.ControlService
+	evaluation *workboard.EvaluationService
+}
+
+type fixedWorkboardAuthority struct{ authority workboard.Authority }
+
+func (a fixedWorkboardAuthority) WorkboardAuthority(ctx context.Context) (workboard.Authority, error) {
+	if ctx == nil || ctx.Err() != nil || a.authority.Validate() != nil {
+		return workboard.Authority{}, errors.New("workboard worker authority unavailable")
+	}
+	return a.authority, nil
+}
+
+type unavailableRecoveryVerifier struct{}
+
+func (unavailableRecoveryVerifier) VerifyRecovery(context.Context, workboard.RecoverClaimRequest, workboard.Actor) (workboard.RecoveryProof, error) {
+	return workboard.RecoveryProof{}, errors.New("workboard recovery unavailable through worker dispatch")
+}
+
+func NewWorkboardWorkerDispatch(repository interface {
+	workboard.LifecycleRepository
+	workboard.ProgressRepository
+	workboard.ControlRepository
+	workboard.EvaluationRepository
+}, workerID, policyDigest string, leaseTTL time.Duration, evaluator workboard.CandidateEvaluator, now func() time.Time) (*WorkboardWorkerDispatch, error) {
+	authority := fixedWorkboardAuthority{authority: workboard.Authority{CreationScope: "internal-worker", Actor: workboard.Actor{ID: workerID, Type: "worker"}}}
+	lifecycle, err := workboard.NewLifecycleService(repository, authority, unavailableRecoveryVerifier{}, now, leaseTTL, policyDigest)
+	if err != nil {
+		return nil, err
+	}
+	progress, err := workboard.NewProgressService(repository, authority, now)
+	if err != nil {
+		return nil, err
+	}
+	control, err := workboard.NewControlService(repository, authority, unavailableControlVerifier{}, now)
+	if err != nil {
+		return nil, err
+	}
+	evaluation, err := workboard.NewEvaluationService(repository, authority, evaluator, now)
+	if err != nil {
+		return nil, err
+	}
+	return &WorkboardWorkerDispatch{lifecycle: lifecycle, progress: progress, control: control, evaluation: evaluation}, nil
+}
+
+func (d *WorkboardWorkerDispatch) Claim(ctx context.Context, request workboard.ClaimRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.lifecycle == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.lifecycle.Claim(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) Heartbeat(ctx context.Context, request workboard.HeartbeatRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.lifecycle == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.lifecycle.Heartbeat(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) AppendCheckpoint(ctx context.Context, request workboard.AppendCheckpointRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.progress == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.progress.AppendCheckpoint(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) SubmitCandidate(ctx context.Context, request workboard.SubmitCandidateRequest) (workboard.OperationReceipt, error) {
+	if d == nil || d.evaluation == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.evaluation.SubmitCandidate(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) Block(ctx context.Context, request workboard.ClaimCardControl) (workboard.OperationReceipt, error) {
+	if d == nil || d.control == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.control.Block(ctx, request)
+}
+
+func (d *WorkboardWorkerDispatch) Unblock(ctx context.Context, request workboard.ClaimCardControl) (workboard.OperationReceipt, error) {
+	if d == nil || d.control == nil {
+		return workboard.OperationReceipt{}, ErrAdmission
+	}
+	return d.control.Unblock(ctx, request)
+}

@@ -143,7 +143,7 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	validChat := ChatRequest{Version: 1, Action: ChatSubmit, IdempotencyKey: key, ModelID: "auto", Text: "hello"}
 	validApproval := ApprovalRequest{Version: 1, IdempotencyKey: key, TaskID: "task", ApprovalID: "approval", Action: ApprovalAllow, ExpectedRevision: 1}
 	validFeedback := FeedbackRequest{Version: 1, IdempotencyKey: key, TaskID: "task", Action: FeedbackRevise, FeedbackID: "feedback", Accepted: true, ExpectedRevision: &revision}
-	validBoard := BoardRequest{Version: 1, Action: ClaimHeartbeat, IdempotencyKey: key, BoardID: "board", CardID: "card", ClaimID: "claim", AttemptID: "attempt", ExpectedClaimRevision: &revision}
+	validBoard := BoardRequest{Version: 1, Action: CardPauseRequest, IdempotencyKey: key, BoardID: "board", CardID: "card", ExpectedCardRevision: &revision}
 	validEvent := Event{Version: 1, Kind: ChatDelta, Durability: Provisional, Subject: "subject", Data: json.RawMessage(`{"task_id":"task","text":"partial"}`)}
 	validError := Error{Version: 1, Code: "conflict", Message: "Refresh and retry.", Retryable: true, CurrentRevision: &revision, SubjectType: "task", SubjectID: "task", CurrentState: "running", OperationID: "operation"}
 	for name, validate := range map[string]func() error{
@@ -164,7 +164,7 @@ func TestContractValidationFailsClosed(t *testing.T) {
 	badCost := math.NaN()
 	badFeedback.AttemptCost = &badCost
 	badBoard := validBoard
-	badBoard.ClaimID = ""
+	badBoard.CardID = ""
 	title := "card"
 	badCreate := BoardRequest{Version: 1, Action: CardCreate, IdempotencyKey: key, BoardID: "board", Title: &title}
 	badEvent := validEvent
@@ -233,8 +233,7 @@ func TestSchemaBoardFieldMatrixMatchesGoValidator(t *testing.T) {
 		t.Fatal("schema omits the move/reorder self-anchor invariant")
 	}
 	actions := []BoardAction{BoardCreate, BoardRevise, BoardArchive, CardCreate, CardRevise, CardMove, CardReorder, DependencyAdd, DependencyRemove,
-		CardClaim, ClaimHeartbeat, ClaimRecover, CriteriaRevise, CheckpointAppend, CandidateSubmit,
-		AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest, CardCancelFinalize, CardBlock, CardUnblock}
+		CriteriaRevise, AcceptanceAccept, AcceptanceReject, CardPauseRequest, CardCancelRequest}
 	if len(allowed) != len(actions) {
 		t.Fatal("schema action matrix is incomplete", len(allowed), len(actions))
 	}
@@ -298,7 +297,7 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		"steer without fence":         {"chat_request", `{"version":1,"action":"steer","idempotency_key":"fixture-key-0001","task_id":"task","text":"adjust"}`},
 		"cancel without fence":        {"chat_request", `{"version":1,"action":"cancel","idempotency_key":"fixture-key-0001","task_id":"task"}`},
 		"mixed queued cancel":         {"chat_request", `{"version":1,"action":"cancel_submission","idempotency_key":"fixture-key-0001","submission_id":"submission","task_id":"task"}`},
-		"incomplete heartbeat":        {"board_request", `{"version":1,"action":"claim.heartbeat","idempotency_key":"fixture-key-0001","board_id":"board"}`},
+		"worker heartbeat":            {"board_request", `{"version":1,"action":"claim.heartbeat","idempotency_key":"fixture-key-0001","board_id":"board","card_id":"card","claim_id":"claim","attempt_id":"attempt","expected_claim_revision":1}`},
 		"cursor on provisional":       {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial"}}`},
 		"committed delta":             {"event", `{"version":1,"cursor":"chat:1","kind":"chat.delta","durability":"committed","subject":"chat","revision":1,"data":{"task_id":"task","text":"partial"}}`},
 		"raw prompt escape":           {"event", `{"version":1,"kind":"chat.delta","durability":"provisional","subject":"chat","revision":0,"data":{"task_id":"task","text":"partial","prompt":"secret"}}`},
@@ -320,9 +319,9 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		})
 	}
 	for name, body := range map[string]string{
-		"board revise":    `{"version":1,"action":"board.revise","idempotency_key":"fixture-key-0001","board_id":"board","expected_board_revision":1,"title":"Updated"}`,
-		"board archive":   `{"version":1,"action":"board.archive","idempotency_key":"fixture-key-0002","board_id":"board","expected_board_revision":1}`,
-		"cancel finalize": `{"version":1,"action":"card.cancel_finalize","idempotency_key":"fixture-key-0003","board_id":"board","card_id":"card","expected_card_revision":1,"stop_proof_id":"stop-proof","task_head_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","process_proof_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","effect_evidence_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","effect_resolution":"resolved_no_replay"}`,
+		"board revise":  `{"version":1,"action":"board.revise","idempotency_key":"fixture-key-0001","board_id":"board","expected_board_revision":1,"title":"Updated"}`,
+		"board archive": `{"version":1,"action":"board.archive","idempotency_key":"fixture-key-0002","board_id":"board","expected_board_revision":1}`,
+		"pause request": `{"version":1,"action":"card.pause_request","idempotency_key":"fixture-key-0003","board_id":"board","card_id":"card","expected_card_revision":1}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			validateSchemaValue(t, compiler, location+"#/$defs/board_request", json.RawMessage(body), true)
@@ -361,13 +360,12 @@ func TestRequestAndEventBounds(t *testing.T) {
 func TestWorkboardCommandsRequireLifecycleAndAuthorityFences(t *testing.T) {
 	key := "contract-key-0001"
 	revision := int64(2)
-	digest := strings.Repeat("a", 64)
 	criteria := []AcceptanceCriterion{criterion("tests", "objective")}
 	commands := []BoardRequest{
 		{Version: 1, Action: CardMove, IdempotencyKey: key, BoardID: "board", CardID: "card", TargetState: "ready", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
 		{Version: 1, Action: CardReorder, IdempotencyKey: key, BoardID: "board", CardID: "card", BeforeCardID: "anchor", ExpectedBoardRevision: &revision, ExpectedLayoutRevision: &revision, ExpectedCardRevision: &revision},
 		{Version: 1, Action: CriteriaRevise, IdempotencyKey: key, BoardID: "board", CardID: "card", Criteria: criteria, ExpectedCardRevision: &revision, ExpectedCriteriaRevision: &revision},
-		{Version: 1, Action: ClaimRecover, IdempotencyKey: key, BoardID: "board", CardID: "card", ClaimID: "claim", AttemptID: "attempt", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, StopProofID: "stop-proof", TaskHeadDigest: digest, ProcessProofDigest: digest, EffectEvidenceDigest: digest, EffectResolution: "effect_free"},
+		{Version: 1, Action: CardPauseRequest, IdempotencyKey: key, BoardID: "board", CardID: "card", ExpectedCardRevision: &revision},
 	}
 	for _, command := range commands {
 		if err := command.Validate(); err != nil {
@@ -384,14 +382,36 @@ func TestWorkboardCommandsRequireLifecycleAndAuthorityFences(t *testing.T) {
 	if badReorder.Validate() == nil {
 		t.Fatal("reorder accepted two anchors")
 	}
-	badRecovery := commands[3]
-	badRecovery.EffectResolution = "uncertain"
-	if badRecovery.Validate() == nil {
-		t.Fatal("uncertain recovery accepted")
+	workerClaim := BoardRequest{Version: 1, Action: CardClaim, IdempotencyKey: key, BoardID: "board", CardID: "card", ExpectedCardRevision: &revision}
+	if workerClaim.Validate() == nil {
+		t.Fatal("worker claim exposed through public request")
 	}
 	title := "board"
 	boardCreate := BoardRequest{Version: 1, Action: BoardCreate, IdempotencyKey: key, Title: &title, Labels: []string{"unrepresented"}}
 	if boardCreate.Validate() == nil {
 		t.Fatal("unrepresented board labels accepted")
+	}
+}
+
+func TestPublicBoardRequestRejectsWorkerAndProofGatedActions(t *testing.T) {
+	revision := int64(1)
+	digest := strings.Repeat("a", 64)
+	requests := []BoardRequest{
+		{Version: 1, Action: CardClaim, IdempotencyKey: "worker-action-key-01", BoardID: "board", CardID: "card", ExpectedCardRevision: &revision},
+		{Version: 1, Action: ClaimHeartbeat, IdempotencyKey: "worker-action-key-02", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", ExpectedClaimRevision: &revision},
+		{Version: 1, Action: CheckpointAppend, IdempotencyKey: "worker-action-key-03", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", CriteriaRevision: &revision, ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, Evidence: "progress"},
+		{Version: 1, Action: CandidateSubmit, IdempotencyKey: "worker-action-key-04", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", CriteriaRevision: &revision, ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, Evidence: "candidate"},
+		{Version: 1, Action: CardBlock, IdempotencyKey: "worker-action-key-05", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, ReasonCode: "blocked"},
+		{Version: 1, Action: CardUnblock, IdempotencyKey: "worker-action-key-06", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, ReasonCode: "blocked"},
+		{Version: 1, Action: ClaimRecover, IdempotencyKey: "worker-action-key-07", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, StopProofID: "proof", TaskHeadDigest: digest, ProcessProofDigest: digest, EffectEvidenceDigest: digest, EffectResolution: "effect_free"},
+		{Version: 1, Action: CardCancelFinalize, IdempotencyKey: "worker-action-key-08", BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim", ExpectedCardRevision: &revision, ExpectedClaimRevision: &revision, StopProofID: "proof", TaskHeadDigest: digest, ProcessProofDigest: digest, EffectEvidenceDigest: digest, EffectResolution: "effect_free"},
+	}
+	for _, request := range requests {
+		if request.Validate() == nil {
+			t.Fatalf("public request advertised privileged action %s", request.Action)
+		}
+		if validOperationAction(string(request.Action)) {
+			t.Fatalf("browser operation journal advertised privileged action %s", request.Action)
+		}
 	}
 }

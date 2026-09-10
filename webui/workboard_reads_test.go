@@ -61,13 +61,12 @@ func TestWorkboardReadContracts(t *testing.T) {
 
 func TestNewBoardActionsRequireExactFences(t *testing.T) {
 	revision := int64(2)
-	digest := strings.Repeat("a", 64)
 	title := "Renamed"
 	description := ""
 	valid := []BoardRequest{
 		{Version: 1, Action: BoardRevise, IdempotencyKey: "operation-key-01", BoardID: "board-a", Title: &title, ExpectedBoardRevision: &revision},
 		{Version: 1, Action: BoardArchive, IdempotencyKey: "operation-key-02", BoardID: "board-a", ExpectedBoardRevision: &revision},
-		{Version: 1, Action: CardCancelFinalize, IdempotencyKey: "operation-key-03", BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision, StopProofID: "stop-proof", TaskHeadDigest: digest, ProcessProofDigest: digest, EffectEvidenceDigest: digest, EffectResolution: "effect_free"},
+		{Version: 1, Action: CardPauseRequest, IdempotencyKey: "operation-key-03", BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision},
 	}
 	for _, request := range valid {
 		if err := request.Validate(); err != nil {
@@ -77,7 +76,7 @@ func TestNewBoardActionsRequireExactFences(t *testing.T) {
 	invalid := valid
 	invalid[0].Title, invalid[0].Description = nil, nil
 	invalid[1].Description = &description
-	invalid[2].ClaimID = "claim-a"
+	invalid[2].ReasonCode = "unrepresented"
 	for _, request := range invalid {
 		if request.Validate() == nil {
 			t.Fatalf("invalid %s accepted", request.Action)

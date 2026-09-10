@@ -24,8 +24,17 @@ const (
 	CardClaimAction            BoardAction = "card.claim"
 	ClaimHeartbeatAction       BoardAction = "claim.heartbeat"
 	ClaimRecoverAction         BoardAction = "claim.recover"
+	ClaimAttentionAction       BoardAction = "claim.attention"
 	CriteriaReviseAction       BoardAction = "criteria.revise"
 	CheckpointAppendAction     BoardAction = "checkpoint.append"
+	CandidateSubmitAction      BoardAction = "candidate.submit"
+	AcceptanceAcceptAction     BoardAction = "acceptance.accept"
+	AcceptanceRejectAction     BoardAction = "acceptance.reject"
+	CardPauseRequestAction     BoardAction = "card.pause_request"
+	CardCancelRequestAction    BoardAction = "card.cancel_request"
+	CardCancelFinalizeAction   BoardAction = "card.cancel_finalize"
+	CardBlockAction            BoardAction = "card.block"
+	CardUnblockAction          BoardAction = "card.unblock"
 )
 
 type Actor struct {
@@ -258,7 +267,9 @@ func (e BoardEvent) Validate() error {
 func boardActionRequiresCard(action BoardAction) bool {
 	switch action {
 	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
-		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, CriteriaReviseAction, CheckpointAppendAction:
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
+		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
+		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true
 	default:
 		return false
@@ -266,12 +277,14 @@ func boardActionRequiresCard(action BoardAction) bool {
 }
 
 type BoardEventOptions struct {
-	After string
-	Limit int
+	After             string
+	Limit             int
+	TailAfterSequence int64
 }
 
 func (o BoardEventOptions) Validate() error {
-	if !validCursor(o.After) || o.Limit < 1 || o.Limit > MaxPageItems {
+	if !validCursor(o.After) || o.Limit < 1 || o.Limit > MaxPageItems || o.TailAfterSequence < 0 ||
+		o.After != "" && o.TailAfterSequence != 0 {
 		return fail(CodeInvalid, "events")
 	}
 	return nil
@@ -313,7 +326,9 @@ func validBoardAction(action BoardAction) bool {
 	switch action {
 	case BoardCreateAction, BoardReviseAction, BoardArchiveAction, CardCreateAction, CardReviseAction,
 		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
-		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, CriteriaReviseAction, CheckpointAppendAction:
+		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
+		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
+		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true
 	default:
 		return false

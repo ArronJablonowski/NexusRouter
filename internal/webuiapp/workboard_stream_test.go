@@ -12,8 +12,47 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
+
+func TestBoardStreamRestartRequiresFreshSnapshotForNewBrowserPrincipal(t *testing.T) {
+	services := WorkboardServices{Events: func(context.Context, string, string, contract.BoardEventOptions) (contract.BoardEventPage, error) {
+		return boardEventPage(), nil
+	}}
+	newHandler := func() *Handler {
+		store, err := browserauth.New(browserauth.Options{SessionTTL: time.Hour})
+		if err != nil {
+			t.Fatal(err)
+		}
+		handler, err := New(Options{BasePath: "/app", AllowedHosts: []string{"127.0.0.1:7788"}, Store: store,
+			CursorKey: testStreamCursorKey, Workboards: services})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return handler
+	}
+	before := newHandler()
+	oldCookie, _ := authenticateBrowser(t, before)
+	oldPrincipal, ok := before.store.Subject(oldCookie.Value)
+	if !ok {
+		t.Fatal("old principal unavailable")
+	}
+	cursor, err := encodeBoardStreamCursor(before.cursorKey[:], "board-a", oldPrincipal, boardStreamFilterAll,
+		boardStreamCursor{after: 1, high: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := newHandler()
+	newCookie, _ := authenticateBrowser(t, after)
+	request := authenticatedBoardStreamRequest(context.Background(), newCookie)
+	request.Header.Set("Last-Event-ID", cursor)
+	response := httptest.NewRecorder()
+	after.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || response.Header().Get("Content-Type") == "text/event-stream" {
+		t.Fatalf("cursor from expired process-local authority was not failed closed: %d %s", response.Code, response.Body.String())
+	}
+}
 
 func boardEvent(sequence int64, action contract.BoardAction, card string) contract.BoardEvent {
 	return contract.BoardEvent{Version: 1, ID: fmt.Sprintf("event-%06d", sequence), BoardID: "board-a", Sequence: sequence,
@@ -277,6 +316,90 @@ func TestBoardStreamCapsPagesEventsAndBytes(t *testing.T) {
 	}
 }
 
+func TestBoardStreamPopulatedBoardPollsFromDurableTail(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var reads, fullReads, tailReads atomic.Int32
+	handler := browserWorkboardHandler(t, WorkboardServices{Events: func(_ context.Context, _ string, _ string, options contract.BoardEventOptions) (contract.BoardEventPage, error) {
+		reads.Add(1)
+		page := contract.BoardEventPage{Version: 1, BoardID: "board-a", HighWaterSequence: 250}
+		switch {
+		case options.After == "" && options.TailAfterSequence == 0:
+			fullReads.Add(1)
+			page.Items = boardEvents(1, 100)
+			page.HasMore, page.NextCursor = true, "page-100"
+		case options.After == "page-100" && options.TailAfterSequence == 0:
+			page.Items = boardEvents(101, 200)
+			page.HasMore, page.NextCursor = true, "page-200"
+		case options.After == "page-200" && options.TailAfterSequence == 0:
+			page.Items = boardEvents(201, 250)
+		case options.After == "" && options.TailAfterSequence == 250:
+			tailReads.Add(1)
+			page.Items = boardEvents(250, 250)
+			cancel()
+		default:
+			t.Fatalf("unexpected event read options: %+v", options)
+		}
+		return page, nil
+	}})
+	handler.boardStreamLife = time.Second
+	cookie, _ := authenticateBrowser(t, handler)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authenticatedBoardStreamRequest(ctx, cookie))
+	if response.Code != http.StatusOK || reads.Load() != 4 || fullReads.Load() != 1 || tailReads.Load() != 1 ||
+		strings.Count(response.Body.String(), "event: board.changed") != 250 {
+		t.Fatalf("tail polling failed: code=%d reads=%d full=%d tail=%d events=%d", response.Code, reads.Load(), fullReads.Load(), tailReads.Load(), strings.Count(response.Body.String(), "event: board.changed"))
+	}
+}
+
+func TestBoardStreamReconnectStartsAtDurableTail(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var reads atomic.Int32
+	handler := browserWorkboardHandler(t, WorkboardServices{Events: func(_ context.Context, _ string, _ string, options contract.BoardEventOptions) (contract.BoardEventPage, error) {
+		read := reads.Add(1)
+		if options.After != "" || options.TailAfterSequence != int64(249+read) {
+			t.Fatalf("reconnect did not tail follow: read=%d options=%+v", read, options)
+		}
+		sequence := int64(250 + read)
+		if read == 2 {
+			cancel()
+		}
+		return contract.BoardEventPage{Version: 1, BoardID: "board-a", HighWaterSequence: sequence, Items: boardEvents(sequence, sequence)}, nil
+	}})
+	handler.boardStreamLife = time.Second
+	cookie, _ := authenticateBrowser(t, handler)
+	principal, ok := handler.store.Subject(cookie.Value)
+	if !ok {
+		t.Fatal("browser subject unavailable")
+	}
+	resume, err := encodeBoardStreamCursor(handler.cursorKey[:], "board-a", principal, boardStreamFilterAll, boardStreamCursor{after: 250, high: 250})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := authenticatedBoardStreamRequest(ctx, cookie)
+	request.Header.Set("Last-Event-ID", resume)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || reads.Load() != 2 || strings.Count(response.Body.String(), "event: board.changed") != 1 ||
+		!strings.Contains(response.Body.String(), `"revision":251`) || strings.Contains(response.Body.String(), `"revision":250`) {
+		t.Fatalf("reconnect tail failed: code=%d reads=%d body=%s", response.Code, reads.Load(), response.Body.String())
+	}
+}
+
+func boardEvents(first, last int64) []contract.BoardEvent {
+	items := make([]contract.BoardEvent, 0, last-first+1)
+	for sequence := first; sequence <= last; sequence++ {
+		action := contract.CardRevise
+		card := "card-a"
+		if sequence == 1 {
+			action, card = contract.BoardCreate, ""
+		}
+		items = append(items, boardEvent(sequence, action, card))
+	}
+	return items
+}
+
 func TestProjectedBoardStreamEventIsMinimalAndCommitted(t *testing.T) {
 	event := boardEvent(2, contract.CardMove, "card-a")
 	projected, err := projectBoardEvent("board-a", "opaque-cursor", event)
@@ -298,7 +421,7 @@ func TestBoardStreamProjectsLifecycleChangeClasses(t *testing.T) {
 	}{
 		{contract.BoardCreate, "board_created"}, {contract.BoardArchive, "board_revised"},
 		{contract.CardMove, "card_changed"}, {contract.DependencyAdd, "dependency_changed"},
-		{contract.CardClaim, "claim_changed"}, {contract.CheckpointAppend, "evidence_changed"},
+		{contract.CardClaim, "claim_changed"}, {contract.ClaimAttention, "claim_changed"}, {contract.CheckpointAppend, "evidence_changed"},
 		{contract.AcceptanceAccept, "acceptance_changed"},
 	} {
 		card := "card-a"

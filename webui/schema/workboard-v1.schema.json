@@ -516,6 +516,44 @@
         {"if": {"properties": {"state": {"enum": ["failed", "canceled"]}}}, "then": {"required": ["ended_at"], "not": {"anyOf": [{"required": ["candidate"]}, {"required": ["acceptance_id"]}, {"required": ["decision_by"]}, {"required": ["decision_by_type"]}, {"required": ["decision_authority_id"]}, {"required": ["acceptance_evidence_digest"]}]}}}
       ]
     },
+    "work_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "id", "board_id", "card_id", "attempt_id", "claim_id", "revision", "claim_revision", "criteria_revision", "criteria_digest", "policy_digest", "evidence", "evidence_digest", "actor_id", "actor_type", "created_at"],
+      "properties": {
+        "version": {"const": 1},
+        "id": {"$ref": "v1#/$defs/id"},
+        "board_id": {"$ref": "v1#/$defs/id"},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "attempt_id": {"$ref": "v1#/$defs/id"},
+        "claim_id": {"$ref": "v1#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "claim_revision": {"type": "integer", "minimum": 1},
+        "criteria_revision": {"type": "integer", "minimum": 1},
+        "criteria_digest": {"$ref": "#/$defs/digest"},
+        "policy_digest": {"$ref": "#/$defs/digest"},
+        "evidence": {"type": "string", "minLength": 1, "x-maxBytes": 65536},
+        "evidence_digest": {"$ref": "#/$defs/digest"},
+        "actor_id": {"$ref": "v1#/$defs/id"},
+        "actor_type": {"const": "worker"},
+        "created_at": {"$ref": "#/$defs/time"}
+      }
+    },
+    "card_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "card_id", "attempt", "checkpoints", "checkpoint_count", "checkpoints_has_more"],
+      "properties": {
+        "version": {"const": 1},
+        "card_id": {"$ref": "v1#/$defs/id"},
+        "attempt": {"$ref": "#/$defs/attempt"},
+        "checkpoints": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/work_checkpoint"}},
+        "checkpoint_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "checkpoints_has_more": {"type": "boolean"},
+        "acceptance": {"$ref": "#/$defs/acceptance_decision"}
+      },
+      "x-invariants": ["attempt.card_id == card_id", "checkpoint_count >= len(checkpoints)", "checkpoints_has_more == checkpoint_count > len(checkpoints)", "checkpoint and acceptance identities match attempt"]
+    },
     "card": {
       "type": "object",
       "additionalProperties": false,
@@ -714,6 +752,11 @@
             "$ref": "#/$defs/card"
           }
         },
+        "lifecycle": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/card_lifecycle"}
+        },
         "next_cursor": {
           "$ref": "v1#/$defs/cursor"
         },
@@ -869,6 +912,8 @@
         "candidate_digest",
         "criteria_revision",
         "criteria_digest",
+		"prior_evidence_head_revision",
+		"prior_evidence_set_digest",
         "evidence_head_revision",
         "evidence_set_digest",
         "policy_digest",
@@ -876,6 +921,7 @@
         "decided_by",
         "decided_by_type",
         "decision_authority_id",
+		"rationale",
         "decided_at"
       ],
       "properties": {
@@ -907,6 +953,13 @@
         "criteria_digest": {
           "$ref": "#/$defs/digest"
         },
+		"prior_evidence_head_revision": {
+		  "type": "integer",
+		  "minimum": 1
+		},
+		"prior_evidence_set_digest": {
+		  "$ref": "#/$defs/digest"
+		},
         "evidence_head_revision": {
           "type": "integer",
           "minimum": 1
@@ -932,6 +985,11 @@
         "decision_authority_id": {
           "$ref": "v1#/$defs/id"
         },
+		"rationale": {
+		  "type": "string",
+		  "minLength": 1,
+		  "x-maxBytes": 65536
+		},
         "decided_at": {
           "$ref": "#/$defs/time"
         }

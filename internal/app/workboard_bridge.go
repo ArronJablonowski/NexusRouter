@@ -13,8 +13,24 @@ import (
 // native API and browser BFF contracts. Identity is supplied by the trusted
 // transport adapter and never decoded from a BoardRequest.
 type WorkboardBridge struct {
-	boards *workboard.BoardService
-	cards  *workboard.CardService
+	boards     *workboard.BoardService
+	cards      *workboard.CardService
+	progress   *workboard.ProgressService
+	control    *workboard.ControlService
+	evaluation *workboard.EvaluationService
+	lifecycle  workboard.LifecycleSnapshotRepository
+}
+
+type unavailableControlVerifier struct{}
+
+func (unavailableControlVerifier) VerifyControlStop(context.Context, workboard.FinalizeCancelRequest, workboard.Actor) (workboard.RecoveryProof, error) {
+	return workboard.RecoveryProof{}, errors.New("workboard cancel finalization unavailable")
+}
+
+type unavailableCandidateEvaluator struct{}
+
+func (unavailableCandidateEvaluator) EvaluateCandidate(context.Context, workboard.SubmitCandidateRequest, workboard.Actor) ([]workboard.EvidenceInput, error) {
+	return nil, errors.New("workboard candidate evaluation unavailable")
 }
 
 type workboardAuthorityKey struct{}
@@ -41,7 +57,35 @@ func NewWorkboardBridge(repository workboard.BoardRepository, cards workboard.Ca
 	if err != nil {
 		return nil, err
 	}
-	return &WorkboardBridge{boards: boards, cards: cardService}, nil
+	progressRepository, ok := cards.(workboard.ProgressRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "progress_repository"}
+	}
+	progress, err := workboard.NewProgressService(progressRepository, contextWorkboardAuthority{}, now)
+	if err != nil {
+		return nil, err
+	}
+	lifecycle, ok := cards.(workboard.LifecycleSnapshotRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "lifecycle_reader"}
+	}
+	controlRepository, ok := cards.(workboard.ControlRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "control_repository"}
+	}
+	control, err := workboard.NewControlService(controlRepository, contextWorkboardAuthority{}, unavailableControlVerifier{}, now)
+	if err != nil {
+		return nil, err
+	}
+	evaluationRepository, ok := cards.(workboard.EvaluationRepository)
+	if !ok {
+		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "evaluation_repository"}
+	}
+	evaluation, err := workboard.NewEvaluationService(evaluationRepository, contextWorkboardAuthority{}, unavailableCandidateEvaluator{}, now)
+	if err != nil {
+		return nil, err
+	}
+	return &WorkboardBridge{boards: boards, cards: cardService, progress: progress, control: control, evaluation: evaluation, lifecycle: lifecycle}, nil
 }
 
 func nativeWorkboardContext(ctx context.Context) context.Context {
@@ -101,6 +145,24 @@ func (b *WorkboardBridge) read(ctx context.Context, boardID string, options webu
 	}
 	for index, card := range snapshot.Cards {
 		result.Cards[index] = workboardCard(card)
+	}
+	cardIDs := make([]string, len(snapshot.Cards))
+	for index := range snapshot.Cards {
+		cardIDs[index] = snapshot.Cards[index].ID
+	}
+	lifecycle, err := b.lifecycle.ReadCardLifecycleSnapshots(ctx, boardID, cardIDs)
+	if err != nil {
+		return webui.BoardSnapshot{}, err
+	}
+	result.Lifecycle = make([]webui.CardLifecycle, 0, len(lifecycle))
+	for _, cardID := range cardIDs {
+		if detail, exists := lifecycle[cardID]; exists {
+			projected, projectErr := workboardLifecycle(detail)
+			if projectErr != nil {
+				return webui.BoardSnapshot{}, projectErr
+			}
+			result.Lifecycle = append(result.Lifecycle, projected)
+		}
 	}
 	if result.Validate() != nil {
 		return webui.BoardSnapshot{}, errors.New("invalid workboard snapshot projection")
@@ -174,6 +236,29 @@ func (b *WorkboardBridge) mutate(ctx context.Context, request webui.BoardRequest
 			result, err = b.cards.RemoveDependency(ctx, command)
 		}
 		receipt = result.Receipt
+	case webui.CriteriaRevise:
+		receipt, err = b.progress.ReviseCriteria(ctx, workboard.ReviseCriteriaRequest{BoardID: request.BoardID, CardID: request.CardID,
+			IdempotencyKey: request.IdempotencyKey, ExpectedCardRevision: *request.ExpectedCardRevision,
+			ExpectedCriteriaRevision: *request.ExpectedCriteriaRevision, Criteria: domainCriteria(request.Criteria)})
+	case webui.CardPauseRequest, webui.CardCancelRequest:
+		command := workboard.RequestCardControl{BoardID: request.BoardID, CardID: request.CardID,
+			IdempotencyKey: request.IdempotencyKey, ExpectedCardRevision: *request.ExpectedCardRevision}
+		if request.Action == webui.CardPauseRequest {
+			receipt, err = b.control.RequestPause(ctx, command)
+		} else {
+			receipt, err = b.control.RequestCancel(ctx, command)
+		}
+	case webui.AcceptanceAccept, webui.AcceptanceReject:
+		command := workboard.DecideCandidateRequest{BoardID: request.BoardID, CardID: request.CardID, AttemptID: request.AttemptID,
+			CandidateID: request.CandidateID, IdempotencyKey: request.IdempotencyKey, ExpectedCardRevision: *request.ExpectedCardRevision,
+			CriteriaRevision: *request.CriteriaRevision, EvidenceHeadRevision: *request.EvidenceHeadRevision,
+			CandidateDigest: request.CandidateDigest, CriteriaDigest: request.CriteriaDigest, EvidenceSetDigest: request.EvidenceSetDigest,
+			PolicyDigest: request.PolicyDigest, Evidence: request.Evidence}
+		if request.Action == webui.AcceptanceAccept {
+			receipt, err = b.evaluation.AcceptCandidate(ctx, command)
+		} else {
+			receipt, err = b.evaluation.RejectCandidate(ctx, command)
+		}
 	default:
 		return webui.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeInvalid, Field: "action_unavailable"}
 	}
@@ -215,7 +300,7 @@ func (b *WorkboardBridge) BrowserEvents(ctx context.Context, subject, boardID st
 }
 
 func (b *WorkboardBridge) events(ctx context.Context, boardID string, options webui.BoardEventOptions) (webui.BoardEventPage, error) {
-	page, err := b.boards.Events(ctx, boardID, workboard.BoardEventOptions{After: options.After, Limit: options.Limit})
+	page, err := b.boards.Events(ctx, boardID, workboard.BoardEventOptions{After: options.After, Limit: options.Limit, TailAfterSequence: options.TailAfterSequence})
 	if err != nil {
 		return webui.BoardEventPage{}, err
 	}

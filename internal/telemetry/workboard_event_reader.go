@@ -36,17 +36,41 @@ func (s *Store) ListWorkboardEvents(ctx context.Context, boardID string, options
 	if err != nil {
 		return workboard.BoardEventPage{}, err
 	}
-	if options.After == "" {
+	tailMode := options.TailAfterSequence != 0
+	var anchor workboard.BoardEvent
+	if tailMode {
+		if options.TailAfterSequence > board.EventSequence {
+			return workboard.BoardEventPage{}, ErrWorkboardCursor
+		}
+		cursor = workboardEventCursor{Version: 1, BoardID: boardID, High: board.EventSequence, After: options.TailAfterSequence}
+		anchor, err = scanCanonicalWorkboardEvent(tx.QueryRowContext(ctx, `SELECT id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body
+			FROM workboard_events WHERE board_id=? AND sequence=?`, boardID, cursor.After), boardID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return workboard.BoardEventPage{}, ErrWorkboardCorrupt
+			}
+			return workboard.BoardEventPage{}, err
+		}
+		if anchor.Sequence != cursor.After {
+			return workboard.BoardEventPage{}, ErrWorkboardCorrupt
+		}
+	} else if options.After == "" {
 		cursor = workboardEventCursor{Version: 1, BoardID: boardID, High: board.EventSequence}
 	} else if cursor.High > board.EventSequence {
 		return workboard.BoardEventPage{}, ErrWorkboardCursor
 	}
 	var count, minimum, maximum int64
 	if err = tx.QueryRowContext(ctx, `SELECT count(*),COALESCE(min(sequence),0),COALESCE(max(sequence),0)
-		FROM workboard_events WHERE board_id=? AND sequence<=?`, boardID, cursor.High).Scan(&count, &minimum, &maximum); err != nil {
+		FROM workboard_events WHERE board_id=? AND sequence>? AND sequence<=?`, boardID, rangeStart(cursor, tailMode), cursor.High).Scan(&count, &minimum, &maximum); err != nil {
 		return workboard.BoardEventPage{}, err
 	}
-	if count != cursor.High || minimum != 1 || maximum != cursor.High {
+	expectedCount := cursor.High
+	expectedMinimum := int64(1)
+	if tailMode {
+		expectedCount = cursor.High - cursor.After
+		expectedMinimum = cursor.After + 1
+	}
+	if count != expectedCount || count > 0 && (minimum != expectedMinimum || maximum != cursor.High) || count == 0 && (minimum != 0 || maximum != 0) {
 		return workboard.BoardEventPage{}, ErrWorkboardCorrupt
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body
@@ -69,14 +93,19 @@ func (s *Store) ListWorkboardEvents(ctx context.Context, boardID string, options
 	if err = rows.Err(); err != nil {
 		return workboard.BoardEventPage{}, err
 	}
+	if tailMode && len(items) == 0 {
+		items = append(items, anchor)
+	}
 	page := workboard.BoardEventPage{Version: 1, BoardID: boardID, HighWaterSequence: cursor.High, Items: items}
-	if len(items) > options.Limit {
-		page.Items = items[:options.Limit]
-		page.HasMore = true
-		cursor.After = page.Items[len(page.Items)-1].Sequence
-		page.NextCursor, err = s.encodeWorkboardEventCursor(cursor)
-		if err != nil {
-			return workboard.BoardEventPage{}, err
+	if !tailMode || items[0].Sequence != cursor.After {
+		if len(items) > options.Limit {
+			page.Items = items[:options.Limit]
+			page.HasMore = true
+			cursor.After = page.Items[len(page.Items)-1].Sequence
+			page.NextCursor, err = s.encodeWorkboardEventCursor(cursor)
+			if err != nil {
+				return workboard.BoardEventPage{}, err
+			}
 		}
 	}
 	if page.Validate() != nil {
@@ -86,6 +115,13 @@ func (s *Store) ListWorkboardEvents(ctx context.Context, boardID string, options
 		return workboard.BoardEventPage{}, err
 	}
 	return page, nil
+}
+
+func rangeStart(cursor workboardEventCursor, tailMode bool) int64 {
+	if tailMode {
+		return cursor.After
+	}
+	return 0
 }
 
 func scanCanonicalWorkboardEvent(row rowScanner, boardID string) (workboard.BoardEvent, error) {

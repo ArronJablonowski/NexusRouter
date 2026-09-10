@@ -98,6 +98,25 @@ func MarkAttention(lease Lease, expectedRevision int64, now time.Time) (Lease, e
 	return lease, nil
 }
 
+// MarkAttentionFromObservation records a supervisor observation without
+// releasing ownership or implying that execution has stopped. A claim is
+// eligible when its lease expired or its last heartbeat crossed the configured
+// stale boundary.
+func MarkAttentionFromObservation(lease Lease, expectedRevision int64, now, staleBefore time.Time) (Lease, error) {
+	if err := ValidateLease(lease); err != nil || !validTime(now) || !validTime(staleBefore) || staleBefore.After(now) {
+		return Lease{}, fail(CodeInvalid, "attention")
+	}
+	if expectedRevision != lease.Revision {
+		return Lease{}, fail(CodeStaleRevision, "claim_revision")
+	}
+	if lease.State != LeaseActive || now.Before(lease.ExpiresAt) && lease.LastHeartbeat.After(staleBefore) {
+		return Lease{}, fail(CodeInvalid, "attention")
+	}
+	lease.Revision++
+	lease.State = LeaseAttention
+	return lease, nil
+}
+
 type EffectResolution string
 
 const (

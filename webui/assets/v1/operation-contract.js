@@ -5,10 +5,8 @@
 		"approval.allow", "approval.deny", "approval.revoke",
 		"board.create", "board.revise", "board.archive",
 		"card.create", "card.revise", "card.move", "card.reorder",
-		"dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover",
-		"criteria.revise", "checkpoint.append", "candidate.submit",
-		"acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request",
-		"card.cancel_finalize", "card.block", "card.unblock"
+		"dependency.add", "dependency.remove", "criteria.revise",
+		"acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request"
 	]);
 	const subjects = new Set(["chat", "task", "submission", "feedback", "approval", "board", "card"]);
 	window.DarwinOperationContract = Object.freeze({

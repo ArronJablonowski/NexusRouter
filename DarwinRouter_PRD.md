@@ -404,11 +404,14 @@ pagination. Schema 36 adds normalized card identity to immutable events and
 transactionally preserves schema-35 board events with a `NULL` card ID during
 upgrade. Native JSON handlers and browser-session/CSRF BFF contracts now cover
 live list/create/read/operations, browser mutation reconciliation, and
-reconnectable workboard SSE through the daemon. The durable command layer also
-includes its first claim/heartbeat/recovery, criteria-revision, and checkpoint
-operations, although trusted lifecycle transport composition is not complete.
-Remaining candidate/acceptance/pause/cancel/block commands, agent tools, and
-Kanban rendering keep DAR-82 In Progress.
+reconnectable workboard SSE through the daemon. The durable command layer now
+includes claim/heartbeat/recovery, criteria revision, checkpoints, candidate
+submission, evidence-based acceptance/rejection, pause/cancel requests,
+block/unblock, lifecycle projections, and stale-claim attention. Operator-safe
+actions are composed through browser/native adapters, while worker actions use
+a fixed-authority internal dispatcher. Runtime worker integration, real
+stop-proof verifier composition, agent tools, and Kanban rendering keep DAR-82
+In Progress.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

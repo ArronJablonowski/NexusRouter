@@ -499,7 +499,7 @@
       "required": ["version", "operation_id", "action", "state", "created_at", "updated_at"],
       "properties": {
         "version": {"const": 1}, "operation_id": {"$ref": "#/$defs/id"},
-        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke", "board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "card.claim", "claim.heartbeat", "claim.recover", "criteria.revise", "checkpoint.append", "candidate.submit", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request", "card.cancel_finalize", "card.block", "card.unblock"]},
+        "action": {"enum": ["submit", "resume", "steer", "cancel", "cancel_submission", "record", "revise", "approval.allow", "approval.deny", "approval.revoke", "board.create", "board.revise", "board.archive", "card.create", "card.revise", "card.move", "card.reorder", "dependency.add", "dependency.remove", "criteria.revise", "acceptance.accept", "acceptance.reject", "card.pause_request", "card.cancel_request"]},
         "state": {"enum": ["pending", "committed", "rejected"]},
         "subject_type": {"enum": ["chat", "task", "submission", "feedback", "approval", "board", "card"]},
         "subject_id": {"$ref": "#/$defs/id"},
@@ -806,57 +806,12 @@
           "expected_card_revision",
           "expected_graph_revision"
         ],
-        "card.claim": [
-          "board_id",
-          "card_id",
-          "expected_card_revision"
-        ],
-        "claim.heartbeat": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "attempt_id",
-          "expected_claim_revision"
-        ],
-        "claim.recover": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "attempt_id",
-          "expected_card_revision",
-          "expected_claim_revision",
-          "stop_proof_id",
-          "task_head_digest",
-          "process_proof_digest",
-          "effect_evidence_digest",
-          "effect_resolution"
-        ],
         "criteria.revise": [
           "board_id",
           "card_id",
           "criteria",
           "expected_card_revision",
           "expected_criteria_revision"
-        ],
-        "checkpoint.append": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "attempt_id",
-          "criteria_revision",
-          "expected_card_revision",
-          "expected_claim_revision",
-          "evidence"
-        ],
-        "candidate.submit": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "attempt_id",
-          "criteria_revision",
-          "expected_card_revision",
-          "expected_claim_revision",
-          "evidence"
         ],
         "acceptance.accept": [
           "board_id",
@@ -889,43 +844,12 @@
         "card.pause_request": [
           "board_id",
           "card_id",
-          "reason_code",
           "expected_card_revision"
         ],
         "card.cancel_request": [
           "board_id",
           "card_id",
-          "reason_code",
           "expected_card_revision"
-        ],
-		"card.cancel_finalize": [
-		  "board_id",
-		  "card_id",
-		  "claim_id",
-		  "attempt_id",
-		  "expected_card_revision",
-		  "expected_claim_revision",
-		  "stop_proof_id",
-		  "task_head_digest",
-		  "process_proof_digest",
-		  "effect_evidence_digest",
-		  "effect_resolution"
-		],
-        "card.block": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "reason_code",
-          "expected_card_revision",
-          "expected_claim_revision"
-        ],
-        "card.unblock": [
-          "board_id",
-          "card_id",
-          "claim_id",
-          "reason_code",
-          "expected_card_revision",
-          "expected_claim_revision"
         ]
       },
       "properties": {
@@ -943,19 +867,11 @@
             "card.reorder",
             "dependency.add",
             "dependency.remove",
-            "card.claim",
-            "claim.heartbeat",
-            "claim.recover",
             "criteria.revise",
-            "checkpoint.append",
-            "candidate.submit",
             "acceptance.accept",
             "acceptance.reject",
             "card.pause_request",
-            "card.cancel_request",
-			"card.cancel_finalize",
-            "card.block",
-            "card.unblock"
+            "card.cancel_request"
           ]
         },
         "idempotency_key": {

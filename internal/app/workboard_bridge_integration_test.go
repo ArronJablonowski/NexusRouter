@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestWorkboardBridgePersistsRichCardThroughNativeContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Add(-time.Second)
 	bridge, err := NewWorkboardBridge(store, store, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
@@ -38,16 +39,25 @@ func TestWorkboardBridgePersistsRichCardThroughNativeContract(t *testing.T) {
 	if err != nil || cardReceipt.Validate() != nil || cardReceipt.CardID == "" {
 		t.Fatalf("card receipt=%+v err=%v", cardReceipt, err)
 	}
+	now = time.Now().UTC().Add(time.Second)
+	revisedCriteria := append(criteria, webui.AcceptanceCriterion{Version: 1, ID: "operator-review", Kind: "subjective",
+		RequiredSource: "user_feedback", ValidatorID: "operator", Description: "Operator accepts the result", Required: true})
+	criteriaReceipt, err := bridge.BrowserMutate(ctx, strings.Repeat("a", 64), webui.BoardRequest{Version: 1, Action: webui.CriteriaRevise,
+		IdempotencyKey: "bridge-criteria-key-01", BoardID: boardReceipt.BoardID, CardID: cardReceipt.CardID,
+		Criteria: revisedCriteria, ExpectedCardRevision: cardReceipt.CardRevision, ExpectedCriteriaRevision: revisionPointer(1)})
+	if err != nil || criteriaReceipt.Validate() != nil || criteriaReceipt.CardRevision == nil || *criteriaReceipt.CardRevision != *cardReceipt.CardRevision+1 {
+		t.Fatalf("criteria receipt=%+v err=%v", criteriaReceipt, err)
+	}
 	snapshot, err := bridge.NativeRead(ctx, boardReceipt.BoardID, webui.BoardSnapshotOptions{Limit: 100})
 	if err != nil || snapshot.Validate() != nil || len(snapshot.Cards) != 1 {
 		t.Fatalf("snapshot=%+v err=%v", snapshot, err)
 	}
 	card := snapshot.Cards[0]
-	if card.ID != cardReceipt.CardID || card.Budget != *budget || len(card.Criteria) != 1 || card.Criteria[0] != criteria[0] {
+	if card.ID != cardReceipt.CardID || card.Budget != *budget || card.CriteriaRevision != 2 || len(card.Criteria) != 2 || card.Criteria[1] != revisedCriteria[1] {
 		t.Fatalf("rich card did not round trip: %+v", card)
 	}
 	events, err := bridge.NativeEvents(ctx, boardReceipt.BoardID, webui.BoardEventOptions{Limit: 100})
-	if err != nil || events.Validate() != nil || len(events.Items) != 2 || events.Items[1].CardID != cardReceipt.CardID {
+	if err != nil || events.Validate() != nil || len(events.Items) != 3 || events.Items[2].Kind != webui.CriteriaRevise || events.Items[2].CardID != cardReceipt.CardID {
 		t.Fatalf("events=%+v err=%v", events, err)
 	}
 }

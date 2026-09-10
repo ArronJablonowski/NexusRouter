@@ -5853,3 +5853,42 @@ pause/cancel/finalize, block/unblock, stall/attention supervision, lifecycle
 read projections and trusted transport dispatch remain open, as do agent tools
 and the integrated visual Kanban in DAR-83/DAR-84. This checkpoint is therefore
 not a completed issue or a usable visual board.
+
+## 2026-09-09 — DAR-82 fourth partial evaluation, control, and supervision checkpoint
+
+DAR-82 remains In Progress. Candidate submission now runs through a
+worker-authorized evaluator and moves the durable attempt into review with an
+immutable candidate, artifact references, and typed evidence. Objective
+criteria require deterministic validator evidence; model audit remains
+advisory. Acceptance and rejection preserve the evidence prefix, append trusted
+operator feedback for subjective criteria, retain the operator rationale, and
+atomically bind the prior and final evidence heads, criteria, policy, candidate,
+decision, event, and canonical replay envelope. Concurrent exact retries
+coalesce only within the same scoped idempotency identity; different keys remain
+independent.
+
+Operator-safe pause/cancel requests and accept/reject decisions are composed
+through the native and browser workboard bridge with transport-bound identity.
+Worker claim, heartbeat, checkpoint, candidate submission, block, and unblock
+use a separate fixed-authority internal dispatcher. Recovery and cancel
+finalization are deliberately absent from those transports until an independent
+stop-proof verifier is available. Bounded lifecycle projections return the
+latest attempt, claim, checkpoints, candidate, evidence, and acceptance for
+visible cards while checking canonical bodies against normalized indexes.
+
+The supervisor can re-derive expired or stale-heartbeat claims from durable
+observations and mark them `attention` transactionally. This does not claim the
+worker stopped, release ownership, reassign work, or retry a side effect.
+Workboard SSE can tail from a canonical durable sequence without rescanning the
+ledger prefix. Browser authority remains process-local, so daemon restart fails
+an old browser cursor closed and requires reauthentication plus a fresh bounded
+snapshot.
+
+Final repository-wide `make check` passed: source formatting and the 1,000-line
+limit, `go vet ./...`, the full race suite, and `go build ./...`. The longest
+rebuilt packages were application 546.173s, releasepack 476.519s, telemetry
+437.714s, SDK 66.174s, CLI 63.754s, toolgate 30.092s, runtime 25.856s, workers
+11.922s, Web UI 5.216s, browser BFF 4.725s, and workboard 4.218s. Runtime
+worker-supervisor/tool-registry binding, real recovery/cancel verifiers, agent
+tools, lifecycle history pagination, and the integrated visual Kanban remain
+open.
