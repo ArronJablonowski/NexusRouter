@@ -433,8 +433,14 @@ refresh. The current lifecycle-control slice adds explicit, confirmed pause and
 cancellation requests for claimed in-progress or blocked cards, persistent
 request badges, exact successor-card/event validation, and wording that does
 not misrepresent a request as completed worker stop. Proof-gated cancellation
-finalization, acceptance controls, and broader browser qualification remain
-open. DAR-84 owns agent board tools.
+finalization remains open. The current acceptance slice adds an evidence-first
+candidate review dialog inside the Kanban, renders criterion provenance and
+keeps model-audit evidence advisory, then permits only evidence-eligible accept
+or reject decisions with exact card/attempt/candidate/digest fences. Acceptance
+fanout receipts validate the primary decision plus every bounded successor
+event before authoritative refresh. Worker-side pause/cancel consumption,
+richer focus restoration, and broader browser qualification remain open.
+DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

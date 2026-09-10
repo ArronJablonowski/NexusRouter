@@ -23,8 +23,13 @@ supported-platform decision or publication approval is claimed.
   and authoritative refresh. Claimed in-progress or blocked cards now expose
   confirmed pause and cancellation request controls with persistent badges,
   exact card/event receipts, and clear non-final status language. Verified stop
-  finalization, acceptance, richer focus restoration, and browser end-to-end
-  qualification remain open.
+  finalization remains open. Review cards now load and validate the exact
+  candidate, artifact references, criteria, and evidence before opening a
+  decision dialog. Model audits are explicitly advisory; eligible accept/reject
+  requests require operator rationale and freeze the card, attempt, candidate,
+  evidence, criteria, and policy fences. Acceptance receipts validate the
+  bounded primary-plus-successor event range. Worker control consumption,
+  richer focus restoration, and browser end-to-end qualification remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native

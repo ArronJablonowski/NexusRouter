@@ -75,8 +75,14 @@ prerequisite from an explicit same-board choice list using card/graph revision
 fences and exact dependency-event correlation. In-progress and blocked cards
 also expose confirmed pause/cancellation request controls with persistent request
 badges; these record intent and never claim that a worker has already stopped.
-Remaining lifecycle finalization, acceptance, richer focus restoration, and
-browser end-to-end qualification remain open. The lifecycle layer now also covers candidate
+Review-state cards now open an evidence-first candidate decision dialog that
+shows candidate summaries, inert artifact references, criteria, required-source
+evidence, and separately labelled advisory model audits. Accept/reject remains
+disabled unless the displayed deterministic and subjective-evidence rules can
+satisfy the durable decision, and each request freezes the exact card, attempt,
+candidate, evidence head, and configuration digests. Remaining lifecycle
+finalization, worker control consumption, richer focus restoration, and browser
+end-to-end qualification remain open. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
 attention. Bounded in-process workers are atomically bound to claims and runtime
@@ -114,7 +120,9 @@ also have accessible move-up, move-down, and legal Backlog/Ready controls using
 the same no-replay mutation barrier. Selected-card dependency add/remove uses a
 complete, unfiltered same-board selector and the same journal. Active work also
 has explicit pause/cancellation request controls; verified stop finalization and
-acceptance workflows remain open.
+worker consumption remain open. Review cards have evidence-first accept/reject
+controls with bounded candidate detail, explicit operator rationale, advisory
+model-audit labeling, and exact multi-event acceptance receipt correlation.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "095e7a6387d39c69d72588691671bd418077833f2af9c18c1e979333d9f61347" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "4b0d37673751de5fc6266903f5536f515de5cee0281d635fa5f65dab2c733c79" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -290,10 +290,17 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
 		`position.setAttribute("role", "group")`, `button.dataset.position = direction`, `new CustomEvent("darwin:card-position"`, `complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count)`,
 		`lifecycle.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
+		`"Review candidate"`, `"darwin:acceptance-review"`, `renderCandidateReview`, `"Advisory model audits"`, `"Model-audit evidence is advisory and does not independently authorize acceptance."`,
+		`card.current_attempt_id`, `page.attempt.state !== "review"`, `evidenceIDs.has(evidence.id)`, `criterionIDs.has(evidence.criterion_id)`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard client guard missing %q", required)
 		}
+	}
+	rendered := strings.Index(body, `target.replaceChildren(element("p", "", "Exact review candidate from attempt "`)
+	dispatched := strings.Index(body, `window.dispatchEvent(new CustomEvent("darwin:acceptance-review"`)
+	if rendered < 0 || dispatched <= rendered {
+		t.Fatal("acceptance review event can precede validated review rendering")
 	}
 	for _, forbidden := range []string{"innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "localStorage", "sessionStorage", "X-Darwin-CSRF", `method: "POST"`, `+ checkpoint.evidence`} {
 		if strings.Contains(body, forbidden) {
@@ -330,7 +337,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		`let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active"`, `const boardState = appliedBoardState`, `appliedBoardState = boardStateFilter.value`,
 		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(loadedCards, cardNodes`,
 		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
-		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `Nested candidate, evidence, and decision content is not displayed.`,
+		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `candidate.evidence_count >= 1`, `validEvidence`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard filter/presentation guard missing %q", required)
@@ -536,6 +543,16 @@ if (!pause || !cancel || pause.cardRevision !== 4 || client.controlPlan({...cont
 if (!client.captureCurrent(pause,controlContext) || client.captureCurrent(pause,{...controlContext,board:{...controlContext.board,revision:12}}) || client.captureCurrent(pause,{...controlContext,cards:[{...controlContext.cards[0],cancel_requested:true}]})) process.exit(20);
 const controlIntent = {body:{action:"card.pause_request",board_id:"board-a",card_id:"card-run"},capture:pause}, controlReceipt = {...receipt,board_revision:12,card_id:"card-run",card_revision:5};
 if (!client.receiptMatches(controlReceipt,controlIntent) || !client.receiptMatches({...controlReceipt,board_revision:20},controlIntent) || client.receiptMatches({...controlReceipt,board_revision:11},controlIntent) || client.receiptMatches({...controlReceipt,card_revision:6},controlIntent) || client.receiptMatches({...controlReceipt,claim_revision:2},controlIntent)) process.exit(21);
+const reviewCard = {id:"card-review",state:"review",rank:"a",revision:9,criteria_revision:3,remaining_dependencies:0,current_attempt_id:"attempt-a",current_claim_id:"",acceptance_id:""};
+const reviewContext = {board:{id:"board-a",state:"active",revision:14},cards:[reviewCard]}, digestA = "a".repeat(64), digestB = "b".repeat(64), digestC = "c".repeat(64), digestD = "d".repeat(64);
+const reviewAttempt = {id:"attempt-a",board_id:"board-a",card_id:"card-review",state:"review",criteria_revision:3,criteria_digest:digestB,policy_digest:digestC,criteria:[{id:"tests",kind:"objective",required_source:"deterministic",validator_id:"validator-a",required:true},{id:"taste",kind:"subjective",required_source:"user_feedback",validator_id:"operator-a",required:true}],evidence:[{criterion_id:"tests",source:"deterministic",outcome:"passed",actor_id:"validator-a"}],candidate:{id:"candidate-a",board_id:"board-a",card_id:"card-review",attempt_id:"attempt-a",digest:digestA,criteria_digest:digestB,policy_digest:digestC,evidence_digest:digestD,evidence_count:1}};
+const accept = client.acceptancePlan(reviewContext,"card-review",reviewAttempt,"acceptance.accept"), reject = client.acceptancePlan(reviewContext,"card-review",reviewAttempt,"acceptance.reject");
+if (!accept || !reject || accept.evidenceHeadRevision !== 1 || accept.evidenceSetDigest !== digestD || !client.captureCurrent(accept,reviewContext) || client.captureCurrent(accept,{...reviewContext,cards:[{...reviewCard,revision:10}]})) process.exit(22);
+if (client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,evidence:[{...reviewAttempt.evidence[0],outcome:"failed"}]},"acceptance.accept") || !client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,criteria:reviewAttempt.criteria.slice(0,1),evidence:[{...reviewAttempt.evidence[0],outcome:"failed"}]},"acceptance.reject") || client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,criteria:reviewAttempt.criteria.slice(0,1)},"acceptance.reject")) process.exit(23);
+const subjectiveFailure = {...reviewAttempt,evidence:[...reviewAttempt.evidence,{criterion_id:"taste",source:"user_feedback",outcome:"failed",actor_id:"operator-a"}],candidate:{...reviewAttempt.candidate,evidence_count:2}};
+if (client.acceptancePlan(reviewContext,"card-review",subjectiveFailure,"acceptance.accept") || !client.acceptancePlan(reviewContext,"card-review",subjectiveFailure,"acceptance.reject")) process.exit(25);
+const acceptanceIntent = {body:{action:"acceptance.accept",board_id:"board-a",card_id:"card-review"},capture:accept}, acceptanceReceipt = {...receipt,last_sequence:10,event_count:3,board_revision:15,card_id:"card-review",card_revision:10};
+if (!client.receiptMatches(acceptanceReceipt,acceptanceIntent) || !client.receiptMatches({...acceptanceReceipt,board_revision:20},acceptanceIntent) || client.receiptMatches({...acceptanceReceipt,board_revision:14},acceptanceIntent) || client.receiptMatches({...acceptanceReceipt,card_id:"other-card"},acceptanceIntent) || client.receiptMatches({...acceptanceReceipt,claim_revision:1},acceptanceIntent)) process.exit(24);
 const ambiguous = client.mutationError({version:1,code:"workboard_unavailable",message:"Unavailable",retryable:true,operation_id:"op_1234567890123456"},503);
 const conflict = client.mutationError({version:1,code:"revision_conflict",message:"Conflict",retryable:true,current_revision:3},409);
 if (!ambiguous || ambiguous.definitive || ambiguous.operationID !== "op_1234567890123456" || !conflict || !conflict.definitive || client.mutationError({version:1,code:"workboard_unavailable",message:"\ud800",retryable:true},503)) process.exit(10);
@@ -579,6 +596,11 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`client.dependencyPlan(context, activeCapture`, `expected_graph_revision: activeCapture.graphRevision`, `activeCapture.dependencies.length >= 64`,
 		`client.controlPlan(context, button.dataset.cardId, button.dataset.control)`, `window.addEventListener("darwin:card-control"`, `window.confirm(warning)`,
 		`Cancellation is not final until verified stop finalization`, `expected_card_revision: plan.cardRevision`,
+		`client.acceptancePlan(context, detail.card.id, detail.attempt, "acceptance.accept")`, `window.addEventListener("darwin:acceptance-review"`,
+		`expected_card_revision: plan.cardRevision`, `evidence_head_revision: plan.evidenceHeadRevision`, `evidence_set_digest: plan.evidenceSetDigest`,
+		`Acceptance committed. The card is Done; dependent cards may have been unlocked.`, `Model-audit evidence informs review but never independently authorizes acceptance.`,
+		`shell.inert = true`, `shell.inert = false`, `skipLink.inert = true`, `skipLink.inert = false`, `stableReviewFocus.focus()`, `reviewNotice(unknown, true)`,
+		`The exact candidate decision was rejected.`, `required acceptance evidence is missing or failed.`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)
@@ -596,8 +618,11 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(index), `/assets/v1/workboard-mutations.js`) {
-		t.Fatal("workboard mutation client is not loaded by the authenticated shell")
+	markup := string(index)
+	for _, required := range []string{`/assets/v1/workboard-mutations.js`, `id="candidate-review-dialog"`, `id="candidate-review-rationale"`, `id="candidate-review-confirm"`, `id="candidate-review-accept"`, `id="candidate-review-reject"`, `aria-modal="true"`} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("candidate decision UI missing %q", required)
+		}
 	}
 }
 

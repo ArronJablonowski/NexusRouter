@@ -83,6 +83,15 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 			got.ClaimRevision = &claimOne
 			return got
 		}(), false},
+		{"acceptance accept", contract.BoardRequest{Action: contract.AcceptanceAccept, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), true},
+		{"acceptance reject unrelated board revision", contract.BoardRequest{Action: contract.AcceptanceReject, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(2, "card-a", &cardFive), true},
+		{"acceptance wrong card revision", contract.BoardRequest{Action: contract.AcceptanceAccept, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFour), false},
+		{"acceptance missing card revision", contract.BoardRequest{Action: contract.AcceptanceReject, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", nil), false},
+		{"acceptance claim revision", contract.BoardRequest{Action: contract.AcceptanceAccept, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, func() contract.OperationReceipt {
+			got := receipt(9, "card-a", &cardFive)
+			got.ClaimRevision = &claimOne
+			return got
+		}(), false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -90,6 +99,93 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 				t.Fatalf("correlation=%t want=%t receipt=%+v", got, test.want, test.receipt)
 			}
 		})
+	}
+}
+
+func TestBrowserWorkboardAcceptanceReceiptsRequireExactBoundedEventRange(t *testing.T) {
+	now := time.Date(2026, 9, 10, 18, 0, 0, 0, time.UTC)
+	const firstSequence int64 = 7
+	cardRevision, nextCardRevision := int64(7), int64(8)
+	request := func(action contract.BoardAction) contract.BoardRequest {
+		return contract.BoardRequest{Action: action, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &cardRevision}
+	}
+	event := func(sequence int64, action workboard.BoardAction, operationID, cardID string) workboard.BoardEvent {
+		return workboard.BoardEvent{Version: 1, ID: "event-" + cardID + "-" + string(rune('a'+sequence-firstSequence)), BoardID: "board-a",
+			Sequence: sequence, OperationID: operationID, Kind: action, ActorID: "browser-operator", ActorType: "operator", CardID: cardID, CreatedAt: now}
+	}
+	page := func(events ...workboard.BoardEvent) workboard.BoardEventPage {
+		highWater := firstSequence - 1
+		if len(events) > 0 {
+			highWater = events[len(events)-1].Sequence
+		}
+		return workboard.BoardEventPage{Version: 1, BoardID: "board-a", HighWaterSequence: highWater, Items: events}
+	}
+	receipt := func(count int) contract.OperationReceipt {
+		return contract.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "domain-operation-0001",
+			RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: firstSequence,
+			LastSequence: firstSequence + int64(count) - 1, EventCount: count, TransactionBytes: 1024, BoardRevision: 12,
+			CardID: "card-a", CardRevision: &nextCardRevision, Outcome: "committed", CreatedAt: now}
+	}
+	validAccept := []workboard.BoardEvent{
+		event(7, workboard.AcceptanceAcceptAction, "domain-operation-0001", "card-a"),
+		event(8, workboard.CardMoveAction, "domain-operation-0001", "card-b"),
+		event(9, workboard.CardReviseAction, "domain-operation-0001", "card-c"),
+	}
+	tests := []struct {
+		name    string
+		action  contract.BoardAction
+		receipt contract.OperationReceipt
+		events  workboard.BoardEventPage
+		want    bool
+	}{
+		{"reject exact event", contract.AcceptanceReject, receipt(1), page(event(7, workboard.AcceptanceRejectAction, "domain-operation-0001", "card-a")), true},
+		{"reject multiple events", contract.AcceptanceReject, receipt(2), page(event(7, workboard.AcceptanceRejectAction, "domain-operation-0001", "card-a"), event(8, workboard.CardMoveAction, "domain-operation-0001", "card-b")), false},
+		{"accept no successors", contract.AcceptanceAccept, receipt(1), page(event(7, workboard.AcceptanceAcceptAction, "domain-operation-0001", "card-a")), true},
+		{"accept successor range", contract.AcceptanceAccept, receipt(3), page(validAccept...), true},
+		{"accept missing event", contract.AcceptanceAccept, receipt(3), page(validAccept[:2]...), false},
+		{"accept wrong primary action", contract.AcceptanceAccept, receipt(3), page(event(7, workboard.AcceptanceRejectAction, "domain-operation-0001", "card-a"), validAccept[1], validAccept[2]), false},
+		{"accept wrong primary card", contract.AcceptanceAccept, receipt(3), page(event(7, workboard.AcceptanceAcceptAction, "domain-operation-0001", "card-z"), validAccept[1], validAccept[2]), false},
+		{"accept foreign operation", contract.AcceptanceAccept, receipt(3), page(validAccept[0], event(8, workboard.CardMoveAction, "other-operation-0001", "card-b"), validAccept[2]), false},
+		{"accept noncontiguous sequence", contract.AcceptanceAccept, receipt(3), page(validAccept[0], event(9, workboard.CardMoveAction, "domain-operation-0001", "card-b"), event(10, workboard.CardReviseAction, "domain-operation-0001", "card-c")), false},
+		{"accept unsupported successor action", contract.AcceptanceAccept, receipt(3), page(validAccept[0], event(8, workboard.CardDependencyAddAction, "domain-operation-0001", "card-b"), validAccept[2]), false},
+		{"accept repeats primary card", contract.AcceptanceAccept, receipt(3), page(validAccept[0], event(8, workboard.CardMoveAction, "domain-operation-0001", "card-a"), validAccept[2]), false},
+		{"accept repeats successor card", contract.AcceptanceAccept, receipt(3), page(validAccept[0], event(8, workboard.CardMoveAction, "domain-operation-0001", "card-b"), event(9, workboard.CardReviseAction, "domain-operation-0001", "card-b")), false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := &bridgeBoardRepository{events: test.events}
+			bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutations := &BrowserWorkboardMutations{bridge: bridge}
+			if got := mutations.receiptMatchesRequest(context.Background(), strings.Repeat("c", 64), test.receipt, request(test.action)); got != test.want {
+				t.Fatalf("correlation=%t want=%t receipt=%+v events=%+v", got, test.want, test.receipt, test.events.Items)
+			}
+		})
+	}
+
+	tooMany := receipt(workboard.MaxReverseFanout + 2)
+	repository := &bridgeBoardRepository{}
+	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if (&BrowserWorkboardMutations{bridge: bridge}).receiptMatchesRequest(context.Background(), strings.Repeat("c", 64), tooMany, request(contract.AcceptanceAccept)) {
+		t.Fatal("acceptance receipt above the bounded successor fanout accepted")
+	}
+	if repository.eventOptions.Limit != 0 {
+		t.Fatal("oversized acceptance receipt reached event storage")
+	}
+
+	repository = &bridgeBoardRepository{events: page(validAccept...)}
+	bridge, err = NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(&BrowserWorkboardMutations{bridge: bridge}).receiptMatchesRequest(context.Background(), strings.Repeat("c", 64), receipt(3), request(contract.AcceptanceAccept)) ||
+		repository.eventOptions.Limit != 3 || repository.eventOptions.TailAfterSequence != firstSequence-1 {
+		t.Fatalf("acceptance event query=%+v", repository.eventOptions)
 	}
 }
 

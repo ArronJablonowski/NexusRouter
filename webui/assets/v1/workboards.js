@@ -139,8 +139,15 @@
 	function validCandidate(candidate, item) {
 		return candidate && candidate.version === 1 && idPattern.test(candidate.id) && candidate.board_id === item.board_id && candidate.card_id === item.card_id && candidate.attempt_id === item.id &&
 			Number.isSafeInteger(candidate.revision) && candidate.revision >= 1 && digestPattern.test(candidate.digest) && candidate.criteria_digest === item.criteria_digest && candidate.policy_digest === item.policy_digest && digestPattern.test(candidate.evidence_digest) &&
-			Number.isSafeInteger(candidate.evidence_count) && candidate.evidence_count >= 0 && candidate.evidence_count <= item.evidence.length && boundedText(candidate.summary, 65536, false) &&
+			Number.isSafeInteger(candidate.evidence_count) && candidate.evidence_count >= 1 && candidate.evidence_count <= item.evidence.length && boundedText(candidate.summary, 65536, false) &&
 			uniqueIDs(candidate.artifact_refs, 32, "") && candidate.submitted_by === item.worker_id && validTime(candidate.created_at);
+	}
+	function validEvidence(evidence, item, candidate, priorRevision, priorTime) {
+		if (!evidence || evidence.version !== 1 || !idPattern.test(evidence.id) || !Number.isSafeInteger(evidence.revision) || evidence.revision <= priorRevision || evidence.board_id !== item.board_id || evidence.card_id !== item.card_id || evidence.attempt_id !== item.id || evidence.candidate_id !== candidate.id ||
+			!idPattern.test(evidence.criterion_id) || !["deterministic", "user_feedback", "model_audit"].includes(evidence.source) || !["passed", "failed", "abstained"].includes(evidence.outcome) ||
+			!idPattern.test(evidence.actor_id) || !idPattern.test(evidence.reference) || evidence.candidate_digest !== candidate.digest || evidence.criteria_digest !== item.criteria_digest || evidence.policy_digest !== item.policy_digest || !validTime(evidence.created_at) || Date.parse(evidence.created_at) < priorTime) return false;
+		return evidence.source === "deterministic" ? evidence.actor_type === "validator" && evidence.outcome !== "abstained" :
+			evidence.source === "user_feedback" ? evidence.actor_type === "operator" && evidence.outcome !== "abstained" : evidence.actor_type === "model";
 	}
 	function validAttempt(item, boardID, cardID) {
 		if (!item || item.version !== 1 || item.board_id !== boardID || item.card_id !== cardID || !idPattern.test(item.id) || !idPattern.test(item.worker_id) || !attemptStates.includes(item.state) ||
@@ -154,6 +161,8 @@
 		if (item.claim === null || item.candidate === null) return false;
 		const claim = item.claim === undefined ? null : item.claim, candidate = item.candidate === undefined ? null : item.candidate;
 		if (claim && !validClaim(claim, item) || candidate && !validCandidate(candidate, item)) return false;
+		const criterionIDs = new Set(item.criteria.map(criterion => criterion.id)), evidenceIDs = new Set(); let priorEvidenceRevision = 0, priorEvidenceTime = 0;
+		if (candidate && (!item.evidence.every(evidence => { if (evidenceIDs.has(evidence.id) || !criterionIDs.has(evidence.criterion_id) || !validEvidence(evidence, item, candidate, priorEvidenceRevision, priorEvidenceTime)) return false; evidenceIDs.add(evidence.id); priorEvidenceRevision = evidence.revision; priorEvidenceTime = Date.parse(evidence.created_at); return true; }) || item.state === "review" && candidate.evidence_count !== item.evidence.length)) return false;
 		const noDecision = !item.acceptance_id && !item.decision_by && !item.decision_by_type && !item.decision_authority_id && !item.acceptance_evidence_digest;
 		if (item.state === "running") return claim && claim.state !== "released" && !candidate && noDecision;
 		if (item.state === "review") return candidate && claim && claim.state === "released" && noDecision;
@@ -263,12 +272,50 @@
 		for (const link of page.items) target.append(element("li", "", direction === "prerequisites" ? link.dependency_id : link.card_id));
 		if (page.has_more) target.append(element("li", "detail-more", "Showing the first " + String(page.items.length) + " relationships; more are available."));
 	}
+	function immutable(value) {
+		if (Array.isArray(value)) return Object.freeze(value.map(immutable));
+		if (!value || typeof value !== "object") return value;
+		const result = {}; for (const [key, item] of Object.entries(value)) result[key] = immutable(item); return Object.freeze(result);
+	}
+	function renderCandidateReview(target, card, attempt) {
+		const candidate = attempt.candidate;
+		const candidateSection = detailList("Candidate output");
+		candidateSection.items.append(element("li", "", candidate.summary));
+		if (candidate.artifact_refs.length) for (const reference of candidate.artifact_refs) candidateSection.items.append(element("li", "", "Artifact: " + reference));
+		else candidateSection.items.append(element("li", "detail-empty", "No artifact references."));
+		const criteriaSection = detailList("Acceptance criteria and evidence"), audits = detailList("Advisory model audits");
+		for (const criterion of attempt.criteria) {
+			const item = element("li"), heading = element("p", "", criterion.description);
+			heading.append(document.createTextNode(" · " + (criterion.kind === "objective" ? "Objective" : "Subjective") + " · " + (criterion.required ? "Required" : "Optional") + " · source " + criterion.required_source)); item.append(heading);
+			const records = attempt.evidence.filter(evidence => evidence.criterion_id === criterion.id && evidence.source !== "model_audit"), list = element("ul", "card-detail-list");
+			for (const evidence of records) list.append(element("li", "", evidence.source + " · " + evidence.outcome + " · reference " + evidence.reference));
+			if (!records.length) list.append(element("li", "detail-empty", "No objective or user-feedback evidence recorded."));
+			item.append(list); criteriaSection.items.append(item);
+		}
+		const advisory = attempt.evidence.filter(evidence => evidence.source === "model_audit");
+		for (const evidence of advisory) audits.items.append(element("li", "", evidence.outcome + " · criterion " + evidence.criterion_id + " · reference " + evidence.reference));
+		if (!advisory.length) audits.items.append(element("li", "detail-empty", "No model-audit evidence."));
+		audits.section.insertBefore(element("p", "help", "Model-audit evidence is advisory and does not independently authorize acceptance."), audits.items);
+		target.replaceChildren(element("p", "", "Exact review candidate from attempt " + attempt.id + "."), candidateSection.section, criteriaSection.section, audits.section);
+		target.setAttribute("aria-busy", "false");
+		return immutable({card, attempt});
+	}
+	function loadCandidateReview(card, target, button, onReady) {
+		if (card.state !== "review" || !idPattern.test(card.current_attempt_id) || card.current_claim_id || card.acceptance_id) return;
+		button.disabled = true; button.setAttribute("aria-expanded", "true"); target.hidden = false; target.setAttribute("aria-busy", "true"); notice(target, "Loading the exact candidate and acceptance evidence…", false);
+		const query = new URLSearchParams({limit: String(attemptLimit)}), path = "/api/v1/workboards/" + encodeURIComponent(card.board_id) + "/cards/" + encodeURIComponent(card.id) + "/attempts/" + encodeURIComponent(card.current_attempt_id) + "?" + query.toString();
+		requestJSON(path).then(page => {
+			const current = loadedCards.find(item => item.id === card.id);
+			if (!current || current.revision !== card.revision || current.state !== "review" || current.current_attempt_id !== card.current_attempt_id || !validAttemptDetail(page, card.board_id, card.id, card.current_attempt_id) || page.attempt.state !== "review") throw new Error("stale candidate review");
+			const detail = renderCandidateReview(target, card, page.attempt); button.disabled = false; onReady(detail);
+		}).catch(() => { delete target.dataset.loaded; target.setAttribute("aria-busy", "false"); notice(target, "Candidate review could not be validated. Refresh the board before deciding.", true); button.disabled = false; button.setAttribute("aria-expanded", "false"); });
+	}
 	function loadAttemptDetail(boardID, cardID, attempt, target, button) {
 		button.disabled = true; notice(target, "Loading attempt detail…", false);
 		const query = new URLSearchParams({limit: String(attemptLimit)});
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "/cards/" + encodeURIComponent(cardID) + "/attempts/" + encodeURIComponent(attempt.id) + "?" + query.toString()).then(page => {
 			if (!validAttemptDetail(page, boardID, cardID, attempt.id)) throw new Error("invalid attempt detail");
-			target.replaceChildren(element("p", "", "Bounded preview: worker " + page.attempt.worker_id + " · " + page.attempt.state + " · revision " + String(page.attempt.revision) + ". Nested candidate, evidence, and decision content is not displayed."));
+			target.replaceChildren(element("p", "", "Bounded preview: worker " + page.attempt.worker_id + " · " + page.attempt.state + " · revision " + String(page.attempt.revision) + "."));
 			const checkpoints = element("ol", "checkpoint-list");
 			for (const checkpoint of page.checkpoints) checkpoints.append(element("li", "", "Checkpoint " + String(checkpoint.revision) + " · " + checkpoint.created_at));
 			if (!page.checkpoints.length) checkpoints.append(element("li", "detail-empty", "No checkpoints."));
@@ -330,13 +377,19 @@
 			const button = element("button", action === "card.cancel_request" ? "danger card-control" : "secondary card-control", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.control = action;
 			button.setAttribute("aria-label", label + ": " + card.title); button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-control", {detail: Object.freeze({cardID: card.id, action})}))); lifecycle.append(button);
 		}
+		const review = element("div", "candidate-review"); review.hidden = true; review.setAttribute("role", "region"); review.setAttribute("aria-label", "Candidate review for " + card.title);
+		if (card.state === "review") {
+			let reviewDetail = null;
+			const button = element("button", "secondary card-review", "Review candidate"); button.type = "button"; button.dataset.cardId = card.id; button.setAttribute("aria-label", "Review candidate: " + card.title); button.setAttribute("aria-expanded", "false");
+			button.addEventListener("click", () => { if (reviewDetail) window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail: reviewDetail})); else if (!review.dataset.loaded) { review.dataset.loaded = "true"; loadCandidateReview(card, review, button, detail => { reviewDetail = detail; window.dispatchEvent(new CustomEvent("darwin:acceptance-review", {detail})); }); } }); lifecycle.append(button);
+		}
 		const details = element("div", "card-details"); details.hidden = true;
 		if (card.description) details.append(element("p", "", card.description));
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
 		details.append(element("p", "", card.labels.length ? "Labels: " + card.labels.join(", ") : "No labels"));
 		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); selectedCard = Object.freeze({...card, labels: Object.freeze(card.labels.slice()), dependencies: Object.freeze(card.dependencies.slice()), criteria: Object.freeze(card.criteria.map(item => Object.freeze({...item}))), budget: Object.freeze({...card.budget})}); for (const observer of contextObservers) observer(); const expanded = toggle.getAttribute("aria-expanded") === "true"; toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
-		article.append(toggle, meta, position, lifecycle, details); item.append(article);
+		article.append(toggle, meta, position, lifecycle, review, details); item.append(article);
 		return item;
 	}
 	function validateCardBatch(cards, reset) {
@@ -403,7 +456,7 @@
 	window.DarwinWorkboards = Object.freeze({
 		context: () => Object.freeze({
 			board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision,
-			cards: Object.freeze(loadedCards.map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, remaining_dependencies: card.remaining_dependencies, current_claim_id: card.current_claim_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested}))),
+			cards: Object.freeze(loadedCards.map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested}))),
 			complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count),
 			unfiltered: !appliedFilters.state && !appliedFilters.assignee && !appliedFilters.owner && !appliedFilters.claim
 		}),

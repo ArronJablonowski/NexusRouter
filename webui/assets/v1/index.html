@@ -325,6 +325,22 @@
             </div>
           </section>
         </div>
+        <div id="candidate-review-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog workboard-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="candidate-review-title" aria-describedby="candidate-review-help">
+            <h2 id="candidate-review-title" tabindex="-1">Review candidate</h2>
+            <p id="candidate-review-help" class="help">Inspect the exact candidate and evidence before deciding. Model-audit evidence is advisory and cannot independently satisfy required acceptance criteria.</p>
+            <div id="candidate-review-content" aria-live="polite"></div>
+            <p class="fence-summary">Expected card revision: <output id="candidate-review-card-revision">Not loaded</output> · attempt: <output id="candidate-review-attempt">Not loaded</output> · evidence head: <output id="candidate-review-evidence-head">Not loaded</output></p>
+            <div id="candidate-review-form" class="mutation-form" role="form" aria-labelledby="candidate-review-title">
+              <label for="candidate-review-rationale">Decision rationale</label>
+              <textarea id="candidate-review-rationale" name="evidence" required maxlength="65536" data-max-bytes="65536" rows="5" aria-describedby="candidate-review-rationale-help"></textarea>
+              <p id="candidate-review-rationale-help" class="help">Required; explain which displayed evidence supports this durable decision, using 1–65,536 UTF-8 bytes.</p>
+              <label class="confirmation"><input id="candidate-review-confirm" type="checkbox" required> I reviewed this exact candidate, criteria, and evidence.</label>
+              <div class="button-row"><button id="candidate-review-accept" type="button" disabled>Accept candidate</button><button id="candidate-review-reject" class="danger" type="button" disabled>Reject candidate</button><button id="candidate-review-close" class="secondary" type="button">Close without deciding</button></div>
+              <output id="candidate-review-status" class="mutation-form-status" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
   </div>

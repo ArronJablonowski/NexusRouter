@@ -126,6 +126,36 @@ func (b *BrowserWorkboardMutations) receiptMatchesRequest(ctx context.Context, s
 		}
 		event := page.Items[0]
 		return event.Sequence == receipt.FirstSequence && event.OperationID == receipt.OperationID && event.Kind == request.Action && event.CardID == receipt.CardID
+	case contract.AcceptanceAccept, contract.AcceptanceReject:
+		if request.Action == contract.AcceptanceReject && receipt.EventCount != 1 ||
+			request.Action == contract.AcceptanceAccept && receipt.EventCount > workboard.MaxReverseFanout+1 {
+			return false
+		}
+		page, err := b.bridge.BrowserEvents(ctx, subject, receipt.BoardID, contract.BoardEventOptions{
+			Limit: receipt.EventCount, TailAfterSequence: receipt.FirstSequence - 1,
+		})
+		if err != nil || page.Validate() != nil || len(page.Items) != receipt.EventCount {
+			return false
+		}
+		seen := make(map[string]bool, len(page.Items))
+		for index, event := range page.Items {
+			if event.Sequence != receipt.FirstSequence+int64(index) || event.OperationID != receipt.OperationID {
+				return false
+			}
+			if index == 0 {
+				if event.Kind != request.Action || event.CardID != receipt.CardID {
+					return false
+				}
+				seen[event.CardID] = true
+				continue
+			}
+			if request.Action != contract.AcceptanceAccept || seen[event.CardID] ||
+				(event.Kind != contract.CardMove && event.Kind != contract.CardRevise) {
+				return false
+			}
+			seen[event.CardID] = true
+		}
+		return true
 	default:
 		return true
 	}
@@ -168,6 +198,9 @@ func workboardReceiptMatchesRequest(receipt contract.OperationReceipt, request c
 		return receipt.CardID != "" && receipt.CardRevision != nil && receipt.ClaimRevision == nil &&
 			request.ExpectedCardRevision != nil && *receipt.CardRevision == *request.ExpectedCardRevision+1
 	case contract.CardPauseRequest, contract.CardCancelRequest:
+		return receipt.CardID != "" && receipt.CardRevision != nil && receipt.ClaimRevision == nil &&
+			request.ExpectedCardRevision != nil && *receipt.CardRevision == *request.ExpectedCardRevision+1
+	case contract.AcceptanceAccept, contract.AcceptanceReject:
 		return receipt.CardID != "" && receipt.CardRevision != nil && receipt.ClaimRevision == nil &&
 			request.ExpectedCardRevision != nil && *receipt.CardRevision == *request.ExpectedCardRevision+1
 	}

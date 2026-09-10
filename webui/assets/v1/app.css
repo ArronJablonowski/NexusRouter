@@ -134,6 +134,8 @@ input { padding: .55rem .7rem; }
 .attempt-toggle { width: 100%; padding: .35rem; background: #263758; color: inherit; text-align: left; }
 .attempt-detail { padding: .35rem; }
 .attempt-detail[hidden] { display: none; }
+.advisory-evidence { border-left: .2rem solid #7f8ba3; color: #aebbd0; padding-left: .65rem; }
+#candidate-review-content { max-height: min(45vh, 34rem); overflow: auto; }
 .detail-empty { color: #9fb0ce; }
 .detail-more { color: #ffcf70; }
 .card-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; color: #9fb0ce; font-size: .72rem; }

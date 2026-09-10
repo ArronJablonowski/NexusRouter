@@ -305,6 +305,31 @@ func TestBrowserCardControlMutationPreservesClosedFence(t *testing.T) {
 	}
 }
 
+func TestBrowserAcceptanceMutationPreservesClosedEvidenceFences(t *testing.T) {
+	var got contract.BoardRequest
+	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(_ context.Context, _ string, input contract.BoardRequest) (contract.OperationReceipt, error) {
+		got = input
+		receipt := validBrowserReceipt(input.BoardID)
+		next := *input.ExpectedCardRevision + 1
+		receipt.CardID, receipt.CardRevision, receipt.BoardRevision = input.CardID, &next, 12
+		return receipt, nil
+	}})
+	cookie, csrf := authenticateBrowser(t, handler)
+	digest := strings.Repeat("a", 64)
+	request := browserRequest(http.MethodPost, "/app/api/v1/workboards/board-a/operations",
+		`{"version":1,"action":"acceptance.accept","idempotency_key":"browser-acceptance-key-01","board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","candidate_id":"candidate-a","criteria_revision":3,"expected_card_revision":6,"evidence_head_revision":2,"evidence":"Reviewed deterministic tests and the subjective criterion.","candidate_digest":"`+digest+`","criteria_digest":"`+digest+`","evidence_set_digest":"`+digest+`","policy_digest":"`+digest+`"}`)
+	request.AddCookie(cookie)
+	request.Header.Set("X-Darwin-CSRF", csrf)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || got.Action != contract.AcceptanceAccept || got.BoardID != "board-a" || got.CardID != "card-a" ||
+		got.AttemptID != "attempt-a" || got.CandidateID != "candidate-a" || got.ExpectedCardRevision == nil || *got.ExpectedCardRevision != 6 ||
+		got.CriteriaRevision == nil || *got.CriteriaRevision != 3 || got.EvidenceHeadRevision == nil || *got.EvidenceHeadRevision != 2 ||
+		got.CandidateDigest != digest || got.CriteriaDigest != digest || got.EvidenceSetDigest != digest || got.PolicyDigest != digest {
+		t.Fatalf("status=%d request=%+v body=%s", response.Code, got, response.Body.String())
+	}
+}
+
 func TestBrowserWorkboardRejectsWorkerActionBeforeCallback(t *testing.T) {
 	var calls atomic.Int32
 	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(context.Context, string, contract.BoardRequest) (contract.OperationReceipt, error) {

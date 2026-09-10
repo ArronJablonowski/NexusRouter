@@ -6148,3 +6148,49 @@ the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
 releasepack 479.597s, telemetry 478.719s, SDK 66.402s, CLI 64.645s, toolgate
 31.113s, workers 10.315s, process guard 3.600s, browser BFF 3.419s, and Web UI
 3.277s.
+
+## 2026-09-10 — DAR-83 evidence-first acceptance checkpoint
+
+DAR-83 remains in progress. Review-state cards inside both Web UI workboard
+presentations now expose a `Review candidate` entry point. It fetches the exact
+current attempt detail, rechecks the authoritative card revision/state/attempt,
+and rejects malformed or duplicate candidate evidence before enabling a
+decision. Candidate summaries, artifact references, every criterion, evidence
+source/outcome/reference, and separately labelled model audits are rendered as
+inert text. Model-audit evidence is explicitly advisory and never substitutes
+for a required deterministic or user-feedback source.
+
+The decision dialog requires an explicit review confirmation and a bounded
+durable rationale. Acceptance is offered only when every required objective
+criterion has passing deterministic evidence from its configured validator and
+no required-source failure; required subjective criteria receive positive
+operator feedback from acceptance. Rejection is offered only when required
+evidence already failed or a required subjective criterion can receive negative
+operator feedback. An all-objective, all-passing candidate cannot be rejected
+arbitrarily through this surface.
+
+Each decision freezes the exact board/card/attempt/candidate identities, card
+and criteria revisions, evidence head, and candidate/criteria/evidence/policy
+digests. The closed request uses the established CSRF, global operation barrier,
+durable idempotency, definitive-conflict refresh, exact-card reconciliation, and
+ambiguous no-replay path. Filtered or partially paginated boards remain eligible
+because the exact attempt is loaded separately and successor transitions are
+validated transactionally by the domain service.
+
+Browser receipt hardening now requires the exact successor card revision and no
+claim revision. Rejection requires one exact event. Acceptance validates a
+bounded contiguous range of up to 65 same-operation events: the target
+acceptance first, followed only by unique non-target card move/revision events
+for unlocked successors. The client separately requires the board revision to
+advance beyond its captured snapshot. Focused race-enabled Web UI, browser BFF,
+backend event-correlation, source/LOC, JavaScript syntax, and diff checks pass.
+Worker-side pause/cancel consumption, proof-gated cancellation finalization,
+richer focus restoration, and broader browser end-to-end qualification remain
+open.
+
+Repository-wide `make check` passed for this checkpoint: source formatting and
+the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
+`go build ./...`. The longest rebuilt packages were application 563.182s,
+releasepack 482.916s, telemetry 481.027s, SDK 66.406s, CLI 65.123s, toolgate
+31.192s, workers 10.122s, process guard 3.392s, browser BFF 3.398s, and Web UI
+3.244s.
