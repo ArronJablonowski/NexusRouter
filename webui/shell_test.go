@@ -42,6 +42,7 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 		{"/console/assets/v1/app.css", "text/css", "color-scheme"},
 		{"/console/assets/v1/operation-contract.js", "text/javascript", "DarwinOperationContract"},
 		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
+		{"/console/assets/v1/workboard-client.js", "text/javascript", "DarwinWorkboardClient"},
 		{"/console/assets/v1/workboards.js", "text/javascript", "kanban"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
@@ -133,10 +134,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "2310dd1286d55734a4fc2b70b23ba3fc8877628fc35aafda2d9f707bbafe7909" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "c6c52d9e0d3a732d1045bd979eb834c5eecdb183bb030cac472d4c7306d1b5e2" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboards.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -258,7 +259,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboards.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -278,9 +279,9 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 	for _, required := range []string{
 		`requestJSON("/api/v1/workboards?" + query.toString())`, `requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID)`,
 		"const boardPageLimit = 25, cardPageLimit = 100, dependencyLimit = 100, attemptLimit = 25, maxBoards = 100, maxCards = 10000", "new URLSearchParams", "validCursorTail(value, boardPageLimit)",
-		"value.cards.length <= cardPageLimit", "cardTotal + snapshot.cards.length > maxCards", "ids.has(card.id)",
+		"value.cards.length > cardPageLimit", "cardTotal + snapshot.cards.length > maxCards", "client.canonical(cards, previous",
 		`credentials: "same-origin"`, `cache: "no-store"`, "node.textContent = text", `kanban.setAttribute("aria-busy", "true")`,
-		"No active workboards yet.", "This workboard has no cards yet.", "Use Refresh to try again.", "column.state === states[index]",
+		`"No " + boardState + " workboards."`, "No cards match the current filters.", "Use Refresh to try again.", "column.state === states[index]",
 		"boardIDs.has(board.id)", "boardCursors.has(page.next_cursor)", "cardCursors.has(snapshot.next_cursor)", "snapshotFence !== fence",
 		`toggle.setAttribute("aria-expanded"`, `toggle.setAttribute("aria-label", "Inspect card: "`, "active claim", "dependencies remaining",
 		`new EventSource(base + "/api/v1/workboards/"`, `event.lastEventId !== payload.cursor`, `streamFailures >= 8`, `window.clearTimeout(invalidationTimer)`,
@@ -306,6 +307,57 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`id="refresh-workboards"`, `id="load-more-boards"`, `id="load-more-cards"`, `/assets/v1/workboards.js`} {
 		if !strings.Contains(markup, required) {
 			t.Fatalf("accessible workboard markup missing %q", required)
+		}
+	}
+}
+
+func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/workboards.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`value === "" || value === "unassigned" || idPattern.test(value)`, `["", "unclaimed", "active", "attention"].includes(filters.claim)`,
+		`query.set("state", appliedFilters.state)`, `query.set("assignee_id", appliedFilters.assignee)`, `query.set("owner_id", appliedFilters.owner)`, `query.set("claim_state", appliedFilters.claim)`,
+		`function clearCardState()`, `snapshotGraphRevision = 0; snapshotGraphDigest = ""; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
+		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(loadedCards, cardNodes`, `const filterSignature = [appliedFilters.state`,
+		`filterForm.requestSubmit()`, `aria-invalid`, `presentation = "kanban"`, `presentation = "list"`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120)`,
+		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · read-only`, `" matching cards loaded · "`,
+		`let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active"`, `const boardState = appliedBoardState`, `appliedBoardState = boardStateFilter.value`,
+		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(loadedCards, cardNodes`,
+		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
+		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `Nested candidate, evidence, and decision content is not displayed.`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("workboard filter/presentation guard missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{`.sort(`, `method: "POST"`, "X-Darwin-CSRF", "page.attempt.candidate", "page.attempt.evidence", "page.attempt.decision"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("workboard filtering introduced forbidden behavior %q", forbidden)
+		}
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(index)
+	for _, required := range []string{`id="board-state-filter"`, `id="card-state-filter"`, `id="assignee-filter" maxlength="128"`, `id="owner-filter" maxlength="128"`,
+		`id="claim-state-filter"`, `id="workboard-filter-status"`, `role="status" aria-live="polite"`, `id="workboard-live-status"`, `id="show-kanban"`, `aria-pressed="true"`,
+		`id="show-list"`, `aria-pressed="false"`, `id="workboard-card-list"`, `aria-label="Cards in canonical order"`} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("accessible workboard filter markup missing %q", required)
+		}
+	}
+	styles, err := embeddedShellAssets.ReadFile("assets/v1/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(styles)
+	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`} {
+		if !strings.Contains(css, required) {
+			t.Fatalf("responsive workboard layout missing %q", required)
 		}
 	}
 }
@@ -340,6 +392,7 @@ const node = {hidden:false, disabled:false, textContent:"", dataset:{}, children
   addEventListener(){}, setAttribute(){}, replaceChildren(){this.children=[]}, append(value){this.children.push(value)}};
 global.document = {body:{dataset:{basePath:"/app"}}, querySelector(){return node}, createElement(){return Object.assign({}, node, {dataset:{}, children:[]})}};
 global.window = {location:{pathname:"/app/workboards/%2F"}, DarwinRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+window.DarwinWorkboardClient = require("./assets/v1/workboard-client.js");
 global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
 global.EventSource = class { constructor(){ streams++ } close(){} addEventListener(){} };
 require(asset);
@@ -350,6 +403,62 @@ setImmediate(() => {
 	command.Dir = "."
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("invalid decoded board opened a board request: %v\n%s", err, output)
+	}
+}
+
+func TestWorkboardClientInvalidActorAndModeSwitchIssueNoRequest(t *testing.T) {
+	nodeBinary, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is unavailable")
+	}
+	script := `
+const asset = process.argv[1], urls = [], nodes = new Map();
+function make() { return {hidden:false, disabled:false, textContent:"", value:"", dataset:{}, children:[], events:{},
+  classList:{toggle(){}}, addEventListener(type, callback){this.events[type]=callback}, setAttribute(){},
+  replaceChildren(...values){this.children=values}, append(...values){this.children.push(...values)}, contains(value){return value===this},
+  focus(){document.activeElement=this}, requestSubmit(){this.events.submit({preventDefault(){}})}}; }
+global.document = {body:{dataset:{basePath:"/app"}}, activeElement:null, querySelector(selector){if(!nodes.has(selector))nodes.set(selector,make());return nodes.get(selector)}, createElement(){return make()}};
+nodes.set("#board-state-filter", Object.assign(make(), {value:"active"}));
+global.window = {location:{pathname:"/app/workboards"}, DarwinRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+window.DarwinWorkboardClient = require("./assets/v1/workboard-client.js");
+global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
+global.EventSource = class { close(){} addEventListener(){} };
+require(asset);
+setImmediate(() => {
+  const initial = urls.length, assignee = nodes.get("#assignee-filter"), form = nodes.get("#card-filters");
+  assignee.value = "not an id"; form.events.submit({preventDefault(){}});
+  if (urls.length !== initial) process.exit(1);
+  nodes.get("#show-list").events.click();
+  if (urls.length !== initial) process.exit(2);
+});`
+	command := exec.Command(nodeBinary, "-e", script, "./assets/v1/workboards.js")
+	command.Dir = "."
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("invalid filter or presentation switch issued a request: %v\n%s", err, output)
+	}
+}
+
+func TestWorkboardClientModelRejectsStaleAndCrossPageResponsesAndRetainsNodes(t *testing.T) {
+	nodeBinary, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is unavailable")
+	}
+	script := `
+const client = require(process.argv[1]);
+if (client.current(4, 5, "board-a", "board-a") || client.current(5, 5, "board-a", "board-b") || !client.current(5, 5, "board-a", "board-a")) process.exit(1);
+const states = ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"];
+const first = [{id:"card-a", state:"backlog", rank:"a"}], accepted = client.canonical(first, null, [], states);
+if (!accepted || client.canonical([{id:"card-b", state:"backlog", rank:"0"}], accepted.last, ["card-a"], states) !== null) process.exit(2);
+let requests = 0, focused = null;
+function node(name) { return {name, children:[], expanded:false, parent:null, append(child){if(child.parent)child.parent.children=child.parent.children.filter(item=>item!==child);child.parent=this;this.children.push(child)}, contains(value){return value===this || this.children.some(child=>child.contains(value))}, focus(){focused=this}}; }
+const card = node("card"), toggle = node("toggle"); card.append(toggle); toggle.expanded = true; focused = toggle;
+const nodes = new Map([["card-a", card]]), list = node("list"), lane = node("lane");
+if (!client.reparent(first, nodes, () => list, focused) || list.children[0] !== card || !toggle.expanded || focused !== toggle || requests !== 0) process.exit(3);
+if (!client.reparent(first, nodes, () => lane, focused) || lane.children[0] !== card || list.children.length !== 0 || !toggle.expanded || focused !== toggle || requests !== 0) process.exit(4);`
+	command := exec.Command(nodeBinary, "-e", script, "./assets/v1/workboard-client.js")
+	command.Dir = "."
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("workboard client behavior failed: %v\n%s", err, output)
 	}
 }
 

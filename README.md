@@ -60,7 +60,9 @@ browser operation journal. DAR-83 now has a first integrated, read-only Kanban
 slice inside that same authenticated Web UI: active board navigation, seven
 canonical lifecycle lanes, bounded card pagination, expandable dependency and
 attempt previews, and reconnect-safe SSE invalidation followed by authoritative
-snapshot refetch. It does not yet provide filters, list mode, mutations,
+snapshot refetch. Operators can filter active or archived boards and cards by
+state, assignee, owner, or claim state, then switch between Kanban and canonical
+list presentations without refetching. It does not yet provide mutations,
 keyboard movement, or acceptance controls. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
@@ -92,8 +94,9 @@ controls. Schema 36 adds normalized card identity to workboard events; existing
 schema-35 board events upgrade transactionally with a `NULL` card ID. Schema 37
 adds a non-secret persistent workspace identity, and schema 38 records exact
 cross-session browser reconciliation while preserving legacy pending-operation
-attribution. The first integrated read-only Kanban feature view is implemented;
-its mutation, filtering, alternate-list, and keyboard workflows remain open.
+attribution. The integrated read-only Kanban now includes bounded filters and an
+alternate canonical list presentation; mutation and keyboard workflows remain
+open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

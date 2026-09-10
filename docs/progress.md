@@ -5969,3 +5969,34 @@ the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
 telemetry 483.396s, releasepack 480.364s, SDK 65.751s, CLI 64.589s, toolgate
 31.024s, workers 10.103s, processguard 3.548s, browser BFF 3.325s, and Web UI
 3.139s.
+
+## 2026-09-09 — DAR-83 filter and canonical-list checkpoint
+
+DAR-83 remains in progress. The integrated Workboards view now discovers both
+active and archived boards and applies bounded card filters for lifecycle state,
+assignee, claim owner, and claim state. Applied filter values are snapshotted
+for every pagination generation, encoded with `URLSearchParams`, included in the
+client snapshot fence, and reset atomically with cursor, identity, rank, graph,
+card-node, and pagination state. Invalid actor filters issue no request.
+
+The same validated card collection now supports Kanban and canonical-list
+presentations without another network request or event-stream connection.
+Existing card nodes are moved between presentations, preserving expanded detail
+and keyboard focus. List cards include lifecycle state as text. Card pages must
+remain in global canonical state/rank/ID order across boundaries, and column
+ranks must increase strictly. Result counts are reported separately from live
+connection status, and archived deep links are visibly labeled read-only.
+
+Committed workboard invalidations continue to trigger authoritative refetches
+with the currently applied filters and now refresh the board index as well as
+the selected snapshot. Focused JavaScript syntax, Web UI, browser BFF,
+source-limit, asset-integrity, and diff checks passed before the final
+repository-wide gate. Mutations, CAS conflict/lost-ack reconciliation, keyboard
+move/reorder, dependency editing, and acceptance controls remain open.
+
+Repository-wide `make check` passed for this checkpoint: source formatting and
+the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
+`go build ./...`. The longest rebuilt packages were application 565.880s,
+releasepack 484.189s, telemetry 483.134s, SDK 66.732s, CLI 64.188s, toolgate
+30.543s, workers 9.831s, processguard 3.157s, browser BFF 2.971s, and Web UI
+2.855s.

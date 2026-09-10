@@ -145,6 +145,11 @@
         <div class="workboard-layout">
           <aside class="board-index" aria-labelledby="board-index-title">
             <div class="control-heading"><h2 id="board-index-title">Boards</h2><output id="board-count" class="count" aria-live="polite"></output></div>
+            <label for="board-state-filter">Board state</label>
+            <select id="board-state-filter">
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
             <div id="board-list-state" class="notice" role="status">Loading workboards…</div>
             <ol id="board-list" class="board-list" aria-label="Available workboards"></ol>
             <button id="load-more-boards" class="secondary" type="button" hidden>Load more boards</button>
@@ -154,8 +159,33 @@
               <div><p class="eyebrow">Kanban board</p><h2 id="selected-board-title">Choose a workboard</h2></div>
               <output id="selected-board-meta" class="status"></output>
             </header>
+            <output id="workboard-live-status" class="live-status" role="status" aria-live="polite">Live updates start when a board is selected.</output>
+            <form id="card-filters" class="workboard-filters" novalidate>
+              <label for="card-state-filter">Card state</label>
+              <select id="card-state-filter">
+                <option value="">All states</option>
+                <option value="backlog">Backlog</option><option value="ready">Ready</option><option value="in_progress">In progress</option>
+                <option value="blocked">Blocked</option><option value="review">Review</option><option value="done">Done</option><option value="canceled">Canceled</option>
+              </select>
+              <label for="assignee-filter">Assignee</label>
+              <input id="assignee-filter" maxlength="128" autocomplete="off" placeholder="ID, unassigned, or all" aria-describedby="workboard-filter-status">
+              <label for="owner-filter">Claim owner</label>
+              <input id="owner-filter" maxlength="128" autocomplete="off" placeholder="ID, unassigned, or all" aria-describedby="workboard-filter-status">
+              <label for="claim-state-filter">Claim state</label>
+              <select id="claim-state-filter">
+                <option value="">All claim states</option><option value="unclaimed">Unclaimed</option><option value="active">Active</option><option value="attention">Attention</option>
+              </select>
+              <button type="submit">Apply filters</button>
+              <button id="reset-card-filters" class="secondary" type="button">Reset</button>
+            </form>
+            <div class="presentation-controls" role="group" aria-label="Card presentation">
+              <button id="show-kanban" type="button" aria-pressed="true">Kanban</button>
+              <button id="show-list" class="secondary" type="button" aria-pressed="false">List</button>
+            </div>
+            <output id="workboard-filter-status" class="filter-status" role="status" aria-live="polite"></output>
             <div id="workboard-state" class="notice" role="status">Choose a board to view its cards.</div>
             <div id="kanban" class="kanban" role="region" aria-label="Workboard lanes" tabindex="0" hidden></div>
+            <ol id="workboard-card-list" class="workboard-card-list" aria-label="Cards in canonical order" hidden></ol>
             <button id="load-more-cards" class="secondary kanban-more" type="button" hidden>Load more cards</button>
           </section>
         </div>
@@ -181,6 +211,7 @@
   </div>
   <script src="__DARWIN_BASE_PATH__/assets/v1/operation-contract.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/inspector.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-client.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboards.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>

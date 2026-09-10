@@ -5,18 +5,23 @@
 	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path)});
 	const route = window.DarwinRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
 	if (!route) return;
+	const client = window.DarwinWorkboardClient;
+	if (!client) return;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const states = ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"];
 	const boardPageLimit = 25, cardPageLimit = 100, dependencyLimit = 100, attemptLimit = 25, maxBoards = 100, maxCards = 10000;
 	const view = document.querySelector("#workboard-view"), chat = document.querySelector("#chat-view");
 	const list = document.querySelector("#board-list"), listState = document.querySelector("#board-list-state"), boardCount = document.querySelector("#board-count");
-	const loadMoreBoards = document.querySelector("#load-more-boards"), refresh = document.querySelector("#refresh-workboards");
-	const selectedTitle = document.querySelector("#selected-board-title"), selectedMeta = document.querySelector("#selected-board-meta");
-	const stateNode = document.querySelector("#workboard-state"), kanban = document.querySelector("#kanban"), loadMoreCards = document.querySelector("#load-more-cards");
+	const loadMoreBoards = document.querySelector("#load-more-boards"), refresh = document.querySelector("#refresh-workboards"), boardStateFilter = document.querySelector("#board-state-filter");
+	const selectedTitle = document.querySelector("#selected-board-title"), selectedMeta = document.querySelector("#selected-board-meta"), liveStatus = document.querySelector("#workboard-live-status");
+	const stateNode = document.querySelector("#workboard-state"), kanban = document.querySelector("#kanban"), cardList = document.querySelector("#workboard-card-list"), loadMoreCards = document.querySelector("#load-more-cards");
+	const filterForm = document.querySelector("#card-filters"), cardStateFilter = document.querySelector("#card-state-filter"), assigneeFilter = document.querySelector("#assignee-filter"), ownerFilter = document.querySelector("#owner-filter"), claimStateFilter = document.querySelector("#claim-state-filter"), filterStatus = document.querySelector("#workboard-filter-status");
+	const resetFilters = document.querySelector("#reset-card-filters"), showKanban = document.querySelector("#show-kanban"), showList = document.querySelector("#show-list");
 	let selectedID = "", boardCursor = "", cardCursor = "", boardTotal = 0, cardTotal = 0, boardRequestVersion = 0, cardRequestVersion = 0, snapshotFence = null;
 	let boardSource = null, streamBoard = "", streamRevision = 0, streamFailures = 0, invalidationTimer = 0, snapshotGraphRevision = 0, snapshotGraphDigest = "";
-	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map();
+	let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active", appliedFilters = Object.freeze({state: "", assignee: "", owner: "", claim: ""});
+	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map();
 	chat.hidden = true;
 	view.hidden = false;
 	function element(name, className, text) {
@@ -35,6 +40,19 @@
 			if (!response.ok) throw new Error("request unavailable");
 			return response.json();
 		});
+	}
+	function actorFilter(value) { return value === "" || value === "unassigned" || idPattern.test(value); }
+	function readFilters() {
+		const filters = {state: cardStateFilter.value, assignee: assigneeFilter.value.trim(), owner: ownerFilter.value.trim(), claim: claimStateFilter.value};
+		const valid = (filters.state === "" || states.includes(filters.state)) && actorFilter(filters.assignee) && actorFilter(filters.owner) && ["", "unclaimed", "active", "attention"].includes(filters.claim);
+		assigneeFilter.setAttribute("aria-invalid", actorFilter(filters.assignee) ? "false" : "true"); ownerFilter.setAttribute("aria-invalid", actorFilter(filters.owner) ? "false" : "true");
+		return valid ? Object.freeze(filters) : null;
+	}
+	function filterQuery(query) {
+		if (appliedFilters.state) query.set("state", appliedFilters.state);
+		if (appliedFilters.assignee) query.set("assignee_id", appliedFilters.assignee);
+		if (appliedFilters.owner) query.set("owner_id", appliedFilters.owner);
+		if (appliedFilters.claim) query.set("claim_state", appliedFilters.claim);
 	}
 	function textBytes(value) { try { return new TextEncoder().encode(value).length; } catch (_) { return Number.MAX_SAFE_INTEGER; } }
 	function validUnicode(value) { for (const rune of value) if (rune.length === 1 && rune.charCodeAt(0) >= 0xd800 && rune.charCodeAt(0) <= 0xdfff) return false; return true; }
@@ -78,11 +96,15 @@
 			(!(value.cancel_requested || value.pause_requested) || value.state === "in_progress" || value.state === "blocked");
 	}
 	function validSnapshot(value, boardID) {
-		return value && value.version === 1 && validBoard(value.board) && value.board.id === boardID && Array.isArray(value.columns) && value.columns.length === states.length &&
-			Array.isArray(value.cards) && value.cards.length <= cardPageLimit && typeof value.has_more === "boolean" && (value.next_cursor === undefined || typeof value.next_cursor === "string") &&
-			value.has_more === Boolean(value.next_cursor) && (!value.next_cursor || boundedPrintable(value.next_cursor, 1, 512)) && (!value.has_more || value.cards.length > 0) && Number.isSafeInteger(value.graph_revision) && value.graph_revision > 0 && digestPattern.test(value.graph_digest) &&
-			value.cards.every(card => validCard(card, boardID)) && value.columns.every((column, index) =>
-				column && column.version === 1 && column.board_id === boardID && column.id === column.state && column.state === states[index] && boundedText(column.title, 256, false) && boundedPrintable(column.rank, 1, 128));
+		if (!value || value.version !== 1 || !validBoard(value.board) || value.board.id !== boardID || !Array.isArray(value.columns) || value.columns.length !== states.length ||
+			!Array.isArray(value.cards) || value.cards.length > cardPageLimit || typeof value.has_more !== "boolean" || (value.next_cursor !== undefined && typeof value.next_cursor !== "string") ||
+			value.has_more !== Boolean(value.next_cursor) || value.next_cursor && !boundedPrintable(value.next_cursor, 1, 512) || value.has_more && value.cards.length === 0 || !Number.isSafeInteger(value.graph_revision) || value.graph_revision < 1 || !digestPattern.test(value.graph_digest) ||
+			!value.cards.every(card => validCard(card, boardID))) return false;
+		let previousRank = "";
+		return value.columns.every((column, index) => {
+			const valid = column && column.version === 1 && column.board_id === boardID && column.id === column.state && column.state === states[index] && boundedText(column.title, 256, false) && boundedPrintable(column.rank, 1, 128) && (!index || client.compareText(column.rank, previousRank) > 0);
+			previousRank = column && column.rank; return valid;
+		});
 	}
 	function validDependencyPage(value, boardID, cardID, direction) {
 		if (!value || value.version !== 1 || value.board_id !== boardID || value.card_id !== cardID || value.direction !== direction || !validCursorTail(value, dependencyLimit) ||
@@ -97,17 +119,45 @@
 		});
 	}
 	const attemptStates = ["running", "review", "accepted", "rejected", "failed", "canceled"];
+	function optionalID(value) { return value === undefined || value === "" || idPattern.test(value); }
 	function validAttemptRecord(item, boardID, cardID) {
-		return item && item.version === 1 && item.board_id === boardID && item.card_id === cardID && idPattern.test(item.id) && idPattern.test(item.worker_id) &&
-			attemptStates.includes(item.state) && Number.isSafeInteger(item.ordinal) && item.ordinal >= 1 && item.ordinal <= 32 && Number.isSafeInteger(item.revision) && item.revision >= 1 &&
-			Number.isSafeInteger(item.criteria_revision) && item.criteria_revision >= 1 && Number.isSafeInteger(item.checkpoint_count) && item.checkpoint_count >= 0 && item.checkpoint_count <= 10000;
+		if (!item || item.version !== 1 || item.board_id !== boardID || item.card_id !== cardID || !idPattern.test(item.id) || !idPattern.test(item.worker_id) || !attemptStates.includes(item.state) ||
+			!Number.isSafeInteger(item.ordinal) || item.ordinal < 1 || item.ordinal > 32 || !Number.isSafeInteger(item.revision) || item.revision < 1 ||
+			!Number.isSafeInteger(item.criteria_revision) || item.criteria_revision < 1 || !Number.isSafeInteger(item.checkpoint_count) || item.checkpoint_count < 0 || item.checkpoint_count > 10000 ||
+			!optionalID(item.candidate_id) || !optionalID(item.acceptance_id) || !validTime(item.started_at) ||
+			!(item.state === "running" ? item.ended_at === undefined : validTime(item.ended_at) && Date.parse(item.ended_at) >= Date.parse(item.started_at))) return false;
+		return Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state) && Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state);
+	}
+	function validClaim(claim, item) {
+		if (!claim || claim.version !== 1 || !idPattern.test(claim.id) || claim.board_id !== item.board_id || claim.card_id !== item.card_id || claim.attempt_id !== item.id ||
+			!Number.isSafeInteger(claim.revision) || claim.revision < 1 || !["active", "attention", "released"].includes(claim.state) || claim.owner_id !== item.worker_id || claim.owner_type !== "worker" ||
+			!optionalID(claim.task_id) || !validTime(claim.expires_at) || !validTime(claim.last_heartbeat) || Date.parse(claim.expires_at) < Date.parse(claim.last_heartbeat)) return false;
+		return claim.state === "released" ? validTime(claim.released_at) && Date.parse(claim.released_at) >= Date.parse(claim.last_heartbeat) : claim.released_at === undefined && Date.parse(claim.expires_at) > Date.parse(claim.last_heartbeat) && Date.parse(claim.expires_at) - Date.parse(claim.last_heartbeat) <= 600000;
+	}
+	function validCandidate(candidate, item) {
+		return candidate && candidate.version === 1 && idPattern.test(candidate.id) && candidate.board_id === item.board_id && candidate.card_id === item.card_id && candidate.attempt_id === item.id &&
+			Number.isSafeInteger(candidate.revision) && candidate.revision >= 1 && digestPattern.test(candidate.digest) && candidate.criteria_digest === item.criteria_digest && candidate.policy_digest === item.policy_digest && digestPattern.test(candidate.evidence_digest) &&
+			Number.isSafeInteger(candidate.evidence_count) && candidate.evidence_count >= 0 && candidate.evidence_count <= item.evidence.length && boundedText(candidate.summary, 65536, false) &&
+			uniqueIDs(candidate.artifact_refs, 32, "") && candidate.submitted_by === item.worker_id && validTime(candidate.created_at);
 	}
 	function validAttempt(item, boardID, cardID) {
-		return item && item.version === 1 && item.board_id === boardID && item.card_id === cardID && idPattern.test(item.id) && idPattern.test(item.worker_id) &&
-			attemptStates.includes(item.state) && Number.isSafeInteger(item.ordinal) && item.ordinal >= 1 && item.ordinal <= 32 && Number.isSafeInteger(item.revision) && item.revision >= 1 &&
-			Number.isSafeInteger(item.criteria_revision) && item.criteria_revision >= 1 && digestPattern.test(item.criteria_digest) && digestPattern.test(item.policy_digest) &&
-			validBudget(item.budget) && validCriteria(item.criteria, item.criteria_revision) && uniqueIDs(item.task_ids, 128, "") && uniqueIDs(item.session_ids, 128, "") &&
-			Array.isArray(item.evidence) && item.evidence.length <= 100 && validTime(item.started_at) && ((item.state === "running" && !item.ended_at) || (item.state !== "running" && validTime(item.ended_at) && Date.parse(item.ended_at) >= Date.parse(item.started_at)));
+		if (!item || item.version !== 1 || item.board_id !== boardID || item.card_id !== cardID || !idPattern.test(item.id) || !idPattern.test(item.worker_id) || !attemptStates.includes(item.state) ||
+			!Number.isSafeInteger(item.ordinal) || item.ordinal < 1 || item.ordinal > 32 || !Number.isSafeInteger(item.revision) || item.revision < 1 ||
+			!Number.isSafeInteger(item.criteria_revision) || item.criteria_revision < 1 || !digestPattern.test(item.criteria_digest) || !digestPattern.test(item.policy_digest) ||
+			!validBudget(item.budget) || !validCriteria(item.criteria, item.criteria_revision) || !uniqueIDs(item.task_ids, 128, "") || !uniqueIDs(item.session_ids, 128, "") ||
+			!Array.isArray(item.evidence) || item.evidence.length > 100 || !optionalID(item.acceptance_id) || !optionalID(item.decision_by) || !optionalID(item.decision_authority_id) ||
+			!(item.decision_by_type === undefined || item.decision_by_type === "" || item.decision_by_type === "operator" || item.decision_by_type === "validator") ||
+			!(item.acceptance_evidence_digest === undefined || item.acceptance_evidence_digest === "" || digestPattern.test(item.acceptance_evidence_digest)) || !validTime(item.started_at) ||
+			!(item.state === "running" ? item.ended_at === undefined : validTime(item.ended_at) && Date.parse(item.ended_at) >= Date.parse(item.started_at))) return false;
+		if (item.claim === null || item.candidate === null) return false;
+		const claim = item.claim === undefined ? null : item.claim, candidate = item.candidate === undefined ? null : item.candidate;
+		if (claim && !validClaim(claim, item) || candidate && !validCandidate(candidate, item)) return false;
+		const noDecision = !item.acceptance_id && !item.decision_by && !item.decision_by_type && !item.decision_authority_id && !item.acceptance_evidence_digest;
+		if (item.state === "running") return claim && claim.state !== "released" && !candidate && noDecision;
+		if (item.state === "review") return candidate && claim && claim.state === "released" && noDecision;
+		if (item.state === "accepted" || item.state === "rejected") return candidate && claim && claim.state === "released" && idPattern.test(item.acceptance_id) && idPattern.test(item.decision_by) && item.decision_by !== item.worker_id &&
+			(item.decision_by_type === "operator" || item.decision_by_type === "validator") && idPattern.test(item.decision_authority_id) && digestPattern.test(item.acceptance_evidence_digest);
+		return (!claim || claim.state === "released") && noDecision;
 	}
 	function validAttemptHistory(value, boardID, cardID) {
 		if (!value || value.version !== 1 || value.board_id !== boardID || value.card_id !== cardID || !validCursorTail(value, attemptLimit) ||
@@ -146,10 +196,12 @@
 			notice(listState, "Loading workboards…", false);
 		}
 		loadMoreBoards.disabled = true;
-		const query = new URLSearchParams({limit: String(boardPageLimit), state: "active"});
+		const boardState = appliedBoardState;
+		if (boardState !== "active" && boardState !== "archived") { notice(listState, "Choose a valid board state.", true); return; }
+		const query = new URLSearchParams({limit: String(boardPageLimit), state: boardState});
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/workboards?" + query.toString()).then(page => {
-			if (current !== boardRequestVersion) return;
+			if (!client.current(current, boardRequestVersion)) return;
 			if (!validBoardPage(page) || boardTotal + page.items.length > maxBoards || after && boardCursors.has(after) || page.has_more && (page.next_cursor === after || boardCursors.has(page.next_cursor))) throw new Error("invalid workboard page");
 			const incoming = new Set();
 			for (const board of page.items) if (boardIDs.has(board.id) || incoming.has(board.id)) throw new Error("duplicate board"); else incoming.add(board.id);
@@ -159,7 +211,7 @@
 			boardTotal += page.items.length; boardCursor = page.next_cursor || "";
 			boardCount.textContent = String(boardTotal);
 			listState.hidden = boardTotal > 0;
-			if (!boardTotal) notice(listState, "No active workboards yet.", false);
+			if (!boardTotal) notice(listState, "No " + boardState + " workboards.", false);
 			loadMoreBoards.hidden = !page.has_more || boardTotal >= maxBoards;
 			loadMoreBoards.disabled = false;
 		}).catch(() => {
@@ -185,6 +237,21 @@
 			laneLists.set(column.state, cards); laneCounts.set(column.state, count);
 		}
 	}
+	function renderPresentation() {
+		const listMode = presentation === "list";
+		const focused = document.activeElement;
+		showKanban.setAttribute("aria-pressed", listMode ? "false" : "true"); showList.setAttribute("aria-pressed", listMode ? "true" : "false");
+		showKanban.classList.toggle("secondary", listMode); showList.classList.toggle("secondary", !listMode);
+		if (!selectedID || visibleColumns.length !== states.length) { kanban.hidden = true; cardList.hidden = true; return; }
+		if (listMode) {
+			cardList.replaceChildren(); client.reparent(loadedCards, cardNodes, () => cardList, focused); cardList.hidden = false; kanban.hidden = true;
+		} else {
+			renderColumns(visibleColumns);
+			client.reparent(loadedCards, cardNodes, card => laneLists.get(card.state), focused);
+			for (const state of states) laneCounts.get(state).textContent = String(laneLists.get(state).children.length);
+			cardList.hidden = true; kanban.hidden = false;
+		}
+	}
 	function detailList(title) {
 		const section = element("section", "card-detail-section"); section.append(element("h5", "", title));
 		const items = element("ul", "card-detail-list"); section.append(items); return {section, items};
@@ -199,7 +266,7 @@
 		const query = new URLSearchParams({limit: String(attemptLimit)});
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "/cards/" + encodeURIComponent(cardID) + "/attempts/" + encodeURIComponent(attempt.id) + "?" + query.toString()).then(page => {
 			if (!validAttemptDetail(page, boardID, cardID, attempt.id)) throw new Error("invalid attempt detail");
-			target.replaceChildren(element("p", "", "Worker " + page.attempt.worker_id + " · " + page.attempt.state + " · revision " + String(page.attempt.revision)));
+			target.replaceChildren(element("p", "", "Bounded preview: worker " + page.attempt.worker_id + " · " + page.attempt.state + " · revision " + String(page.attempt.revision) + ". Nested candidate, evidence, and decision content is not displayed."));
 			const checkpoints = element("ol", "checkpoint-list");
 			for (const checkpoint of page.checkpoints) checkpoints.append(element("li", "", "Checkpoint " + String(checkpoint.revision) + " · " + checkpoint.created_at));
 			if (!page.checkpoints.length) checkpoints.append(element("li", "detail-empty", "No checkpoints."));
@@ -243,6 +310,7 @@
 		toggle.type = "button"; toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Inspect card: " + card.title);
 		const meta = element("div", "card-meta");
 		meta.append(element("span", "", card.priority + " priority"));
+		meta.append(element("span", "", card.state.replace("_", " ") + " state"));
 		meta.append(element("span", "", "revision " + String(card.revision)));
 		if (card.remaining_dependencies > 0) meta.append(element("span", "card-alert", String(card.remaining_dependencies) + " dependencies remaining"));
 		if (card.assignee_id && idPattern.test(card.assignee_id)) meta.append(element("span", "", "assigned " + card.assignee_id));
@@ -256,49 +324,57 @@
 		return item;
 	}
 	function validateCardBatch(cards, reset) {
-		const ids = reset ? new Set() : new Set(cardIDs), ranks = reset ? new Map() : new Map(laneRanks);
-		for (const card of cards) { const prior = ranks.get(card.state) || ""; if (ids.has(card.id) || prior && card.rank <= prior) return null; ids.add(card.id); ranks.set(card.state, card.rank); }
-		return ranks;
+		const previous = reset || !loadedCards.length ? null : loadedCards[loadedCards.length - 1];
+		const result = client.canonical(cards, previous, reset ? [] : cardIDs, states);
+		return result && result.ranks;
+	}
+	function clearCardState() {
+		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
+		kanban.replaceChildren(); cardList.replaceChildren(); laneLists.clear(); laneCounts.clear(); cardNodes.clear(); kanban.hidden = true; cardList.hidden = true; loadMoreCards.hidden = true;
 	}
 	function appendCards(cards, ranks) {
 		const nodes = cards.map(cardNode);
-		for (let index = 0; index < cards.length; index++) { const card = cards[index], lane = laneLists.get(card.state); cardIDs.add(card.id); laneRanks.set(card.state, ranks.get(card.state)); lane.append(nodes[index]); laneCounts.get(card.state).textContent = String(lane.children.length); }
+		for (let index = 0; index < cards.length; index++) { cardIDs.add(cards[index].id); cardNodes.set(cards[index].id, nodes[index]); }
+		for (const state of states) if (ranks.has(state)) laneRanks.set(state, ranks.get(state));
+		loadedCards.push(...cards); renderPresentation();
 	}
 	function loadBoard(boardID, after, reset) {
 		if (!idPattern.test(boardID)) { notice(stateNode, "The workboard address is invalid.", true); return; }
 		selectedID = boardID;
 		const current = ++cardRequestVersion;
 		if (reset) {
-			cardCursor = ""; cardTotal = 0; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; kanban.hidden = true;
+			clearCardState();
 			selectedTitle.textContent = "Loading workboard…"; selectedMeta.textContent = "";
 			notice(stateNode, "Loading cards and lanes…", false);
 		}
-		kanban.setAttribute("aria-busy", "true"); loadMoreCards.disabled = true;
+		kanban.setAttribute("aria-busy", "true"); cardList.setAttribute("aria-busy", "true"); loadMoreCards.disabled = true;
 		const query = new URLSearchParams({limit: String(cardPageLimit)});
+		filterQuery(query);
 		if (after) query.set("after", after);
 		requestJSON("/api/v1/workboards/" + encodeURIComponent(boardID) + "?" + query.toString()).then(snapshot => {
-			if (current !== cardRequestVersion || selectedID !== boardID) return;
+			if (!client.current(current, cardRequestVersion, boardID, selectedID)) return;
 			if (!validSnapshot(snapshot, boardID) || cardTotal + snapshot.cards.length > maxCards || after && cardCursors.has(after) || snapshot.has_more && (snapshot.next_cursor === after || cardCursors.has(snapshot.next_cursor))) throw new Error("invalid workboard snapshot");
 			const ranks = validateCardBatch(snapshot.cards, reset); if (!ranks) throw new Error("invalid card order");
 			const columnSignature = snapshot.columns.map(column => [column.id, column.state, column.title, column.rank].join("\u0000")).join("\u0001");
-			const fence = JSON.stringify([snapshot.board.revision, snapshot.board.layout_revision, snapshot.board.event_sequence, snapshot.graph_revision, snapshot.graph_digest, columnSignature]);
+			const filterSignature = [appliedFilters.state, appliedFilters.assignee, appliedFilters.owner, appliedFilters.claim].join("\u0000");
+			const fence = JSON.stringify([snapshot.board.revision, snapshot.board.layout_revision, snapshot.board.event_sequence, snapshot.graph_revision, snapshot.graph_digest, columnSignature, filterSignature]);
 			if (snapshotFence && snapshotFence !== fence) throw new Error("workboard changed during pagination");
 			if (!snapshotFence) snapshotFence = fence;
 			snapshotGraphRevision = snapshot.graph_revision; snapshotGraphDigest = snapshot.graph_digest;
 			streamRevision = Math.max(streamRevision, snapshot.board.event_sequence);
 			if (after) cardCursors.add(after);
-			if (reset) renderColumns(snapshot.columns);
+			if (reset) visibleColumns = snapshot.columns.slice();
 			appendCards(snapshot.cards, ranks);
 			cardTotal += snapshot.cards.length; cardCursor = snapshot.next_cursor || "";
 			selectedTitle.textContent = snapshot.board.title;
-			selectedMeta.textContent = String(cardTotal) + " of " + String(snapshot.board.card_count) + " cards";
-			stateNode.hidden = true; kanban.hidden = false; kanban.setAttribute("aria-busy", "false");
-			if (!cardTotal) notice(stateNode, "This workboard has no cards yet.", false);
+			selectedMeta.textContent = snapshot.board.state + " board · read-only · " + String(cardTotal) + " matching cards loaded · " + String(snapshot.board.card_count) + " total on board" + (snapshot.has_more ? " · more matching available" : "");
+			stateNode.hidden = true; kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false");
+			if (!cardTotal) notice(stateNode, "No cards match the current filters.", false);
 			loadMoreCards.hidden = !snapshot.has_more || cardTotal >= maxCards;
 			loadMoreCards.disabled = false;
 		}).catch(() => {
 			if (current !== cardRequestVersion) return;
-			kanban.setAttribute("aria-busy", "false"); kanban.hidden = true;
+			kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false"); kanban.hidden = true; cardList.hidden = true;
 			notice(stateNode, "This workboard could not be loaded. Use Refresh to try again.", true);
 			loadMoreCards.hidden = true;
 		});
@@ -308,9 +384,9 @@
 		boardSource = null; streamBoard = "";
 	}
 	function queueInvalidation(message) {
-		if (message) selectedMeta.textContent = message;
+		if (message) liveStatus.textContent = message;
 		if (invalidationTimer || !selectedID) return;
-		invalidationTimer = window.setTimeout(() => { invalidationTimer = 0; if (selectedID) loadBoard(selectedID, "", true); }, 120);
+		invalidationTimer = window.setTimeout(() => { invalidationTimer = 0; loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120);
 	}
 	function validBoardEvent(payload, boardID) {
 		const changes = ["board_created", "board_revised", "card_changed", "dependency_changed", "claim_changed", "evidence_changed", "acceptance_changed"];
@@ -333,10 +409,22 @@
 			if (payload.revision <= streamRevision) return;
 			streamRevision = payload.revision; queueInvalidation("Updating after a committed change…");
 		});
-		source.onopen = () => { if (boardSource === source) { streamFailures = 0; selectedMeta.textContent = cardTotal ? String(cardTotal) + " cards · Live" : "Live"; } };
-		source.onerror = () => { if (boardSource === source) { streamFailures++; if (streamFailures >= 8) { closeBoardStream(); notice(stateNode, "Live updates stopped after repeated reconnect failures. Use Refresh to reconnect.", true); return; } selectedMeta.textContent = "Reconnecting live updates…"; queueInvalidation(""); } };
+		source.onopen = () => { if (boardSource === source) { streamFailures = 0; liveStatus.textContent = "Live updates connected."; } };
+		source.onerror = () => { if (boardSource === source) { streamFailures++; if (streamFailures >= 8) { closeBoardStream(); liveStatus.textContent = "Live updates stopped after repeated reconnect failures. Use Refresh to reconnect."; return; } liveStatus.textContent = "Reconnecting live updates…"; queueInvalidation(""); } };
 	}
 	refresh.addEventListener("click", () => { loadBoards("", true); if (selectedID) { closeBoardStream(); connectBoard(selectedID); loadBoard(selectedID, "", true); } });
+	function applyCardFilters() {
+		const next = readFilters();
+		if (!next) { filterStatus.textContent = "Assignee and owner must be an ID, unassigned, or empty for all."; return; }
+		appliedFilters = next; filterStatus.textContent = "Filters applied.";
+		loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true);
+	}
+	filterForm.addEventListener("submit", event => { event.preventDefault(); applyCardFilters(); });
+	for (const control of [cardStateFilter, assigneeFilter, ownerFilter, claimStateFilter]) control.addEventListener("change", () => filterForm.requestSubmit());
+	boardStateFilter.addEventListener("change", () => { if (boardStateFilter.value !== "active" && boardStateFilter.value !== "archived") { notice(listState, "Choose a valid board state.", true); return; } appliedBoardState = boardStateFilter.value; loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); });
+	resetFilters.addEventListener("click", () => { cardStateFilter.value = ""; assigneeFilter.value = ""; ownerFilter.value = ""; claimStateFilter.value = ""; applyCardFilters(); assigneeFilter.focus(); });
+	showKanban.addEventListener("click", () => { presentation = "kanban"; renderPresentation(); showKanban.focus(); });
+	showList.addEventListener("click", () => { presentation = "list"; renderPresentation(); showList.focus(); });
 	loadMoreBoards.addEventListener("click", () => { if (boardCursor) loadBoards(boardCursor, false); });
 	loadMoreCards.addEventListener("click", () => { if (selectedID && cardCursor) loadBoard(selectedID, cardCursor, false); });
 	loadBoards("", true);
