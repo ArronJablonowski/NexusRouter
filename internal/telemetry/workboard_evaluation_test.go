@@ -358,6 +358,145 @@ func TestWorkboardSubjectiveFeedbackIsAddedDuringReview(t *testing.T) {
 	}
 }
 
+func TestWorkboardSubjectiveOnlyCandidateStartsWithEmptyEvidence(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	card, boardID := readyLifecycleCard(t, ctx, store, clock)
+	criteria := []workboard.AcceptanceCriterion{{Version: 1, ID: "creative", Kind: "subjective", RequiredSource: "user_feedback",
+		ValidatorID: "operator", Description: "The user approves the creative result.", Required: true}}
+	clock = card.UpdatedAt.Add(time.Second)
+	progress := newTestProgressService(t, store, workboard.Actor{ID: "operator", Type: "operator"}, &clock)
+	if _, err = progress.ReviseCriteria(ctx, workboard.ReviseCriteriaRequest{BoardID: boardID, CardID: card.ID,
+		IdempotencyKey: "subjective-only-criteria", ExpectedCardRevision: card.Revision,
+		ExpectedCriteriaRevision: card.CriteriaRevision, Criteria: criteria}); err != nil {
+		t.Fatal(err)
+	}
+	card, err = store.GetCard(ctx, boardID, card.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker := workboard.Actor{ID: "worker-subjective-only", Type: "worker"}
+	clock = clock.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, worker, verifiedLifecycleRecovery("subjective-only-proof", workboard.EffectFree), &clock)
+	if _, err = lifecycle.Claim(ctx, workboard.ClaimRequest{BoardID: boardID, CardID: card.ID,
+		IdempotencyKey: "subjective-only-claim", ExpectedCardRevision: card.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	clock = clock.Add(time.Second)
+	evaluator := &evaluationFixture{evidence: []workboard.EvidenceInput{}}
+	workerService := newTestEvaluationService(t, store, worker, evaluator, &clock)
+	submit := workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "subjective-only-submit", ExpectedCardRevision: card.Revision + 1, ExpectedClaimRevision: 1,
+		CriteriaRevision: card.CriteriaRevision, Summary: "A creative candidate awaiting the user's taste judgment."}
+	submitted, err := workerService.SubmitCandidate(ctx, submit)
+	if err != nil || submitted.Validate() != nil || evaluator.count() != 1 {
+		t.Fatalf("submit=%+v calls=%d err=%v", submitted, evaluator.count(), err)
+	}
+	candidate, prior := evaluationRows(t, store, boardID, card.ID, attemptID)
+	if candidate.EvidenceCount != 0 || len(prior) != 0 || candidate.EvidenceDigest != workboard.EvidenceSetDigest([]workboard.EvidenceRecord{}) {
+		t.Fatalf("candidate=%+v evidence=%+v", candidate, prior)
+	}
+	current, err := store.GetCard(ctx, boardID, card.ID)
+	if err != nil || current.State != workboard.Review {
+		t.Fatal(current, err)
+	}
+	clock = clock.Add(time.Second)
+	operator := newTestEvaluationService(t, store, workboard.Actor{ID: "operator-subjective-only", Type: "operator"}, evaluator, &clock)
+	decision := workboard.DecideCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, CandidateID: candidate.ID,
+		IdempotencyKey: "subjective-only-accept", ExpectedCardRevision: current.Revision, CriteriaRevision: card.CriteriaRevision,
+		CandidateDigest: candidate.Digest, CriteriaDigest: candidate.CriteriaDigest, EvidenceHeadRevision: 0,
+		EvidenceSetDigest: workboard.EvidenceSetDigest(prior), PolicyDigest: candidate.PolicyDigest,
+		Evidence: "The authenticated user approves this creative result."}
+	accepted, err := operator.AcceptCandidate(ctx, decision)
+	if err != nil || accepted.Validate() != nil {
+		t.Fatalf("accept=%+v err=%v", accepted, err)
+	}
+	_, finalEvidence := evaluationRows(t, store, boardID, card.ID, attemptID)
+	if len(finalEvidence) != 1 || finalEvidence[0].Revision != 1 || finalEvidence[0].CriterionID != "creative" ||
+		finalEvidence[0].Source != "user_feedback" || finalEvidence[0].Outcome != "passed" || finalEvidence[0].ActorID != "operator-subjective-only" {
+		t.Fatalf("final evidence=%+v", finalEvidence)
+	}
+	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acceptance, readErr := readEvaluationAcceptance(ctx, tx, boardID, card.ID, attemptID)
+	_ = tx.Rollback()
+	if readErr != nil || acceptance.PriorEvidenceHeadRevision != 0 ||
+		acceptance.PriorEvidenceSetDigest != workboard.EvidenceSetDigest(prior) || acceptance.EvidenceHeadRevision != 1 ||
+		acceptance.EvidenceSetDigest != workboard.EvidenceSetDigest(finalEvidence) {
+		t.Fatalf("acceptance=%+v err=%v", acceptance, readErr)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	workerService = newTestEvaluationService(t, store, worker, evaluator, &clock)
+	if replayed, replayErr := workerService.SubmitCandidate(ctx, submit); replayErr != nil || !reflect.DeepEqual(replayed, submitted) || evaluator.count() != 1 {
+		t.Fatalf("submit replay=%+v calls=%d err=%v", replayed, evaluator.count(), replayErr)
+	}
+	operator = newTestEvaluationService(t, store, workboard.Actor{ID: "operator-subjective-only", Type: "operator"}, evaluator, &clock)
+	if replayed, replayErr := operator.AcceptCandidate(ctx, decision); replayErr != nil || !reflect.DeepEqual(replayed, accepted) {
+		t.Fatalf("accept replay=%+v want=%+v err=%v", replayed, accepted, replayErr)
+	}
+}
+
+func TestWorkboardCandidateEvaluatorCannotForgeUserFeedback(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	clock := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	card, boardID := readyLifecycleCard(t, ctx, store, clock)
+	worker := workboard.Actor{ID: "worker-forged-feedback", Type: "worker"}
+	clock = card.UpdatedAt.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, worker, verifiedLifecycleRecovery("forged-feedback-proof", workboard.EffectFree), &clock)
+	if _, err = lifecycle.Claim(ctx, workboard.ClaimRequest{BoardID: boardID, CardID: card.ID,
+		IdempotencyKey: "forged-feedback-claim", ExpectedCardRevision: card.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	evaluator := &evaluationFixture{evidence: []workboard.EvidenceInput{{CriterionID: "tests", Source: "user_feedback",
+		Outcome: "passed", ActorID: "operator-forged", ActorType: "operator", Reference: "forged-feedback"}}}
+	clock = clock.Add(time.Second)
+	service := newTestEvaluationService(t, store, worker, evaluator, &clock)
+	request := workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "forged-feedback-submit", ExpectedCardRevision: card.Revision + 1, ExpectedClaimRevision: 1,
+		CriteriaRevision: card.CriteriaRevision, Summary: "candidate with forged feedback"}
+	if _, err = service.SubmitCandidate(ctx, request); !errors.Is(err, &workboard.Violation{Code: workboard.CodeInvalid}) {
+		t.Fatalf("forged user feedback accepted: %v", err)
+	}
+	var candidates, evidence, operations int
+	if err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM workboard_candidates WHERE attempt_id=?`, attemptID).Scan(&candidates); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM workboard_evidence WHERE attempt_id=?`, attemptID).Scan(&evidence); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM workboard_operations WHERE operation_id=?`, request.IdempotencyKey).Scan(&operations); err != nil {
+		t.Fatal(err)
+	}
+	snapshots, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{card.ID})
+	snapshot := snapshots[card.ID]
+	if err != nil || candidates != 0 || evidence != 0 || operations != 0 || snapshot.Attempt == nil ||
+		snapshot.Attempt.Candidate != nil || snapshot.Attempt.Claim == nil || snapshot.Attempt.Claim.State != "active" ||
+		snapshot.Attempt.State != "running" {
+		t.Fatalf("candidate=%d evidence=%d operations=%d lifecycle=%+v err=%v", candidates, evidence, operations, snapshot, err)
+	}
+}
+
 func TestWorkboardSubjectiveRejectionAddsNegativeUserFeedback(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))

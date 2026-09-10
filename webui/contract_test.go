@@ -319,9 +319,10 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		})
 	}
 	for name, body := range map[string]string{
-		"board revise":  `{"version":1,"action":"board.revise","idempotency_key":"fixture-key-0001","board_id":"board","expected_board_revision":1,"title":"Updated"}`,
-		"board archive": `{"version":1,"action":"board.archive","idempotency_key":"fixture-key-0002","board_id":"board","expected_board_revision":1}`,
-		"pause request": `{"version":1,"action":"card.pause_request","idempotency_key":"fixture-key-0003","board_id":"board","card_id":"card","expected_card_revision":1}`,
+		"board revise":               `{"version":1,"action":"board.revise","idempotency_key":"fixture-key-0001","board_id":"board","expected_board_revision":1,"title":"Updated"}`,
+		"board archive":              `{"version":1,"action":"board.archive","idempotency_key":"fixture-key-0002","board_id":"board","expected_board_revision":1}`,
+		"pause request":              `{"version":1,"action":"card.pause_request","idempotency_key":"fixture-key-0003","board_id":"board","card_id":"card","expected_card_revision":1}`,
+		"subjective-only acceptance": `{"version":1,"action":"acceptance.accept","idempotency_key":"fixture-key-0004","board_id":"board","card_id":"card","attempt_id":"attempt","candidate_id":"candidate","criteria_revision":1,"expected_card_revision":1,"evidence_head_revision":0,"evidence":"The authenticated user approves this result.","candidate_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","criteria_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","evidence_set_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","policy_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			validateSchemaValue(t, compiler, location+"#/$defs/board_request", json.RawMessage(body), true)

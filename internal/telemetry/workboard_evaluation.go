@@ -546,7 +546,7 @@ func evaluationAttemptFromBase(a storedLifecycleAttempt) storedEvaluationAttempt
 }
 
 func buildCandidateEvidence(m workboard.EvaluationMutation, candidateID, candidateDigest string, attempt storedLifecycleAttempt) ([]workboard.EvidenceRecord, error) {
-	if len(m.Evaluated) < 1 || len(m.Evaluated) > workboard.MaxEvaluationEvidence {
+	if len(m.Evaluated) > workboard.MaxEvaluationEvidence {
 		return nil, invalidWorkboard("evidence")
 	}
 	criteria := map[string]storedWorkboardCriterion{}
@@ -556,7 +556,13 @@ func buildCandidateEvidence(m workboard.EvaluationMutation, candidateID, candida
 	result := make([]workboard.EvidenceRecord, len(m.Evaluated))
 	for index, input := range m.Evaluated {
 		criterion, ok := criteria[input.CriterionID]
-		if !ok || input.Validate() != nil || input.Source == "deterministic" && input.ActorID != criterion.ValidatorID {
+		// Candidate evaluators run under worker submission authority. They may
+		// report deterministic validation and advisory model audits, but they
+		// can never manufacture the operator-owned user-feedback rung. That
+		// evidence is created only by buildReviewFeedback after an authenticated
+		// accept/reject decision.
+		if !ok || input.Validate() != nil || input.Source == "user_feedback" ||
+			input.Source == "deterministic" && input.ActorID != criterion.ValidatorID {
 			return nil, invalidWorkboard("evidence")
 		}
 		id := newWorkboardID()

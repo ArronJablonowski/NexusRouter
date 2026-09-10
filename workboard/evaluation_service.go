@@ -106,7 +106,7 @@ type CandidateRecord struct {
 func (c CandidateRecord) Validate() error {
 	if c.Version != SchemaVersion || !validLifecycleIDs(c.ID, c.BoardID, c.CardID, c.AttemptID, c.SubmittedBy) || c.Revision < 1 ||
 		!digest(c.Digest) || !digest(c.CriteriaDigest) || !digest(c.PolicyDigest) || !digest(c.EvidenceDigest) ||
-		c.EvidenceCount < 1 || c.EvidenceCount > MaxEvaluationEvidence || !boundedText(c.Summary, MaxDescriptionBytes, false) ||
+		c.EvidenceCount < 0 || c.EvidenceCount > MaxEvaluationEvidence || !boundedText(c.Summary, MaxDescriptionBytes, false) ||
 		!validIDs(c.ArtifactRefs, MaxCandidateArtifacts) || !validTime(c.CreatedAt) {
 		return fail(CodeInvalid, "candidate")
 	}
@@ -138,7 +138,7 @@ type AcceptanceRecord struct {
 
 func (a AcceptanceRecord) Validate() error {
 	if a.Version != SchemaVersion || !validLifecycleIDs(a.ID, a.BoardID, a.CardID, a.AttemptID, a.CandidateID, a.DecidedBy, a.DecisionAuthorityID) ||
-		!digest(a.CandidateDigest) || a.CriteriaRevision < 1 || a.PriorEvidenceHeadRevision < 1 || a.EvidenceHeadRevision < a.PriorEvidenceHeadRevision ||
+		!digest(a.CandidateDigest) || a.CriteriaRevision < 1 || a.PriorEvidenceHeadRevision < 0 || a.EvidenceHeadRevision < a.PriorEvidenceHeadRevision ||
 		!digest(a.CriteriaDigest) || !digest(a.PriorEvidenceSetDigest) || !digest(a.EvidenceSetDigest) ||
 		!digest(a.PolicyDigest) || (a.Decision != "accepted" && a.Decision != "rejected") ||
 		(a.DecidedByType != "operator" && a.DecidedByType != "validator") || !boundedText(a.Rationale, MaxCheckpointBytes, false) || !validTime(a.DecidedAt) {
@@ -267,6 +267,15 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		active.err = err
 		return OperationReceipt{}, err
 	}
+	for _, evidence := range mutation.Evaluated {
+		// User feedback is an operator review action, never output from a
+		// worker-side candidate evaluator. Repositories enforce the same rule
+		// at their durable boundary as defense in depth.
+		if evidence.Source == "user_feedback" {
+			active.err = fail(CodeInvalid, "evidence")
+			return OperationReceipt{}, active.err
+		}
+	}
 	active.receipt, active.err = s.apply(ctx, mutation)
 	return active.receipt, active.err
 }
@@ -280,7 +289,7 @@ func (s *EvaluationService) RejectCandidate(ctx context.Context, request DecideC
 
 func (s *EvaluationService) decide(ctx context.Context, kind EvaluationKind, request DecideCandidateRequest) (OperationReceipt, error) {
 	if !validLifecycleIDs(request.BoardID, request.CardID, request.AttemptID, request.CandidateID) || !validKey(request.IdempotencyKey) || request.ExpectedCardRevision < 1 ||
-		request.CriteriaRevision < 1 || request.EvidenceHeadRevision < 1 || !digest(request.CandidateDigest) || !digest(request.CriteriaDigest) ||
+		request.CriteriaRevision < 1 || request.EvidenceHeadRevision < 0 || !digest(request.CandidateDigest) || !digest(request.CriteriaDigest) ||
 		!digest(request.EvidenceSetDigest) || !digest(request.PolicyDigest) || !boundedText(request.Evidence, MaxCheckpointBytes, false) {
 		return OperationReceipt{}, fail(CodeInvalid, "acceptance")
 	}

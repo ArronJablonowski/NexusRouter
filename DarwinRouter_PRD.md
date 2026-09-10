@@ -546,12 +546,12 @@ web_ui:
   browser_session_ttl: 8h
 
 workboard:
-  enabled: true
-  max_active_claims: 3
-  max_decomposition_depth: 4
-  max_children_per_card: 16
-  default_attempt_limit: 3
-  agent_mutation_policy: ask
+  enabled: true  # Required in configuration v1 while API/Web UI routes are mounted.
+  scheduler:
+    enabled: false  # Stock daemon rejects true until supervised execution is wired.
+    interval: 5s
+    max_active_claims: 3
+    card_scan_limit: 10000
 
 hardware:
   auto_profile: true
@@ -721,6 +721,13 @@ Outcome evidence is applied in this order:
 4. Optional LLM judging when objective evidence is unavailable.
 
 Contradictory lower-priority evidence cannot override stronger evidence without an auditable policy decision. Model self-assessment alone is never success evidence.
+
+Candidate-side evaluators cannot emit `user_feedback`. That evidence source is
+reserved for an authenticated operator accept/reject action and is appended as
+an immutable review record. A subjective-only candidate may therefore enter
+Review with an empty, digest-bound evidence set; the first operator decision
+creates evidence revision 1. The runtime must not invent placeholder evidence
+or require an LLM judge merely to make a creative result reviewable.
 
 ### 9.1.1 Orchestrator audits and domain-sensitive feedback
 

@@ -83,6 +83,16 @@ supported-platform decision or publication approval is claimed.
   task attribution, transactional resource budgets, and configured independent
   judging remain open.
 
+  Candidate evaluators can no longer claim the operator-owned `user_feedback`
+  evidence source. Subjective-only work may enter Review with an exact empty
+  evidence-set digest, and the authenticated Web UI Kanban can accept or reject
+  it from evidence head zero; that decision appends the first immutable user
+  feedback record. Objective acceptance still requires its configured
+  deterministic proof. Configuration now publishes an inert, default-disabled
+  `workboard.scheduler` boundary. The stock daemon rejects attempts to enable
+  it before binding a listener, opening storage, or spawning a managed process,
+  pending safe task attribution, global budgets, and judge composition.
+
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
   evidence after executing the host-matching artifact from the exact
@@ -454,7 +464,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 39. Schema 30 added the immutable
+The current durable store uses SQLite schema 40. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -472,7 +482,10 @@ Schema 38 adds exact cross-session browser-operation reconciliation while
 preserving the initiating subject and safely isolating legacy pending workboard
 operations. Schema 39 adds a durable workboard pause phase while retaining the
 version-1 `pause_requested` compatibility bit; legacy true values migrate only
-to requested, never to an unproven worker acknowledgement. Browser sessions remain process-local and are revoked on restart
+to requested, never to an unproven worker acknowledgement. Schema 40 adds an
+immutable recovery-to-replacement link bound to exact predecessor and successor
+attempt/claim identities; conservative upgrade backfill links only unambiguous
+successors. Browser sessions remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores

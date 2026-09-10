@@ -155,7 +155,7 @@
 	function validCandidate(candidate, item) {
 		return candidate && candidate.version === 1 && idPattern.test(candidate.id) && candidate.board_id === item.board_id && candidate.card_id === item.card_id && candidate.attempt_id === item.id &&
 			Number.isSafeInteger(candidate.revision) && candidate.revision >= 1 && digestPattern.test(candidate.digest) && candidate.criteria_digest === item.criteria_digest && candidate.policy_digest === item.policy_digest && digestPattern.test(candidate.evidence_digest) &&
-			Number.isSafeInteger(candidate.evidence_count) && candidate.evidence_count >= 1 && candidate.evidence_count <= item.evidence.length && boundedText(candidate.summary, 65536, false) &&
+			Number.isSafeInteger(candidate.evidence_count) && candidate.evidence_count >= 0 && candidate.evidence_count <= item.evidence.length && boundedText(candidate.summary, 65536, false) &&
 			uniqueIDs(candidate.artifact_refs, 32, "") && candidate.submitted_by === item.worker_id && validTime(candidate.created_at);
 	}
 	function validEvidence(evidence, item, candidate, priorRevision, priorTime) {
@@ -209,7 +209,7 @@
 	function validAcceptance(acceptance, attempt) {
 		if (!acceptance || acceptance.version !== 1 || !idPattern.test(acceptance.id) || acceptance.id !== attempt.acceptance_id || acceptance.board_id !== attempt.board_id || acceptance.card_id !== attempt.card_id || acceptance.attempt_id !== attempt.id ||
 			!attempt.candidate || acceptance.candidate_id !== attempt.candidate.id || acceptance.candidate_digest !== attempt.candidate.digest || acceptance.criteria_revision !== attempt.criteria_revision || acceptance.criteria_digest !== attempt.criteria_digest ||
-			!Number.isSafeInteger(acceptance.prior_evidence_head_revision) || acceptance.prior_evidence_head_revision < 1 || !digestPattern.test(acceptance.prior_evidence_set_digest) ||
+			!Number.isSafeInteger(acceptance.prior_evidence_head_revision) || acceptance.prior_evidence_head_revision < 0 || !digestPattern.test(acceptance.prior_evidence_set_digest) ||
 			!Number.isSafeInteger(acceptance.evidence_head_revision) || acceptance.evidence_head_revision < acceptance.prior_evidence_head_revision || !digestPattern.test(acceptance.evidence_set_digest) || acceptance.evidence_set_digest !== attempt.acceptance_evidence_digest ||
 			acceptance.policy_digest !== attempt.policy_digest || !["accepted", "rejected"].includes(acceptance.decision) || acceptance.decision !== attempt.state || acceptance.decided_by !== attempt.decision_by || acceptance.decided_by === attempt.worker_id ||
 			acceptance.decided_by_type !== attempt.decision_by_type || !["operator", "validator"].includes(acceptance.decided_by_type) || acceptance.decision_authority_id !== attempt.decision_authority_id ||

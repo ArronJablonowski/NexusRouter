@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "c6037a7dafa5edea69caaf3a51a90f319c03c07072b288dca6fb30ccc52b3ad6" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "db7445419aefb062504ed11f097b2a11121f8013fbfc2a5a9c5cef5c584870cb" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -348,7 +348,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		`let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active"`, `const boardState = appliedBoardState`, `appliedBoardState = boardStateFilter.value`,
 		`cardNodes.clear()`, `cardNodes.set(cards[index].id, nodes[index])`, `card.state.replace("_", " ") + " state"`, `client.reparent(cards, cardNodes`,
 		`Boolean(item.candidate_id) === ["review", "accepted", "rejected"].includes(item.state)`, `Boolean(item.acceptance_id) === ["accepted", "rejected"].includes(item.state)`,
-		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `candidate.evidence_count >= 1`, `validEvidence`,
+		`candidate && claim && claim.state === "released"`, `"Bounded preview: worker "`, `candidate.evidence_count >= 0`, `validEvidence`,
 		`"Lease owner " + claim.owner_id`, `claim.state === "attention" ? " · stale/orphan attention required"`, `" · expires " + claim.expires_at`, `" · heartbeat " + claim.last_heartbeat`,
 		`selectedCardAnchor = client.cardViewAnchor(card.board_id, card.id, !expanded)`, `client.cardViewTransition(selectedCardAnchor, focusBoardID, boardID, [], false)`, `restoreCardView(cardView && cardView.card)`,
 		`selectedCardAnchor = viewTransition ? viewTransition.anchor : null`, `!filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count`,
@@ -562,6 +562,9 @@ const reviewContext = {board:{id:"board-a",state:"active",revision:14},cards:[re
 const reviewAttempt = {id:"attempt-a",board_id:"board-a",card_id:"card-review",state:"review",criteria_revision:3,criteria_digest:digestB,policy_digest:digestC,criteria:[{id:"tests",kind:"objective",required_source:"deterministic",validator_id:"validator-a",required:true},{id:"taste",kind:"subjective",required_source:"user_feedback",validator_id:"operator-a",required:true}],evidence:[{criterion_id:"tests",source:"deterministic",outcome:"passed",actor_id:"validator-a"}],candidate:{id:"candidate-a",board_id:"board-a",card_id:"card-review",attempt_id:"attempt-a",digest:digestA,criteria_digest:digestB,policy_digest:digestC,evidence_digest:digestD,evidence_count:1}};
 const accept = client.acceptancePlan(reviewContext,"card-review",reviewAttempt,"acceptance.accept"), reject = client.acceptancePlan(reviewContext,"card-review",reviewAttempt,"acceptance.reject");
 if (!accept || !reject || accept.evidenceHeadRevision !== 1 || accept.evidenceSetDigest !== digestD || !client.captureCurrent(accept,reviewContext) || client.captureCurrent(accept,{...reviewContext,cards:[{...reviewCard,revision:10}]})) process.exit(22);
+const subjectiveOnly = {...reviewAttempt,criteria:[reviewAttempt.criteria[1]],evidence:[],candidate:{...reviewAttempt.candidate,evidence_count:0}};
+const subjectiveAccept = client.acceptancePlan(reviewContext,"card-review",subjectiveOnly,"acceptance.accept"), subjectiveReject = client.acceptancePlan(reviewContext,"card-review",subjectiveOnly,"acceptance.reject");
+if (!subjectiveAccept || !subjectiveReject || subjectiveAccept.evidenceHeadRevision !== 0 || subjectiveAccept.evidenceSetDigest !== digestD) process.exit(26);
 if (client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,evidence:[{...reviewAttempt.evidence[0],outcome:"failed"}]},"acceptance.accept") || !client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,criteria:reviewAttempt.criteria.slice(0,1),evidence:[{...reviewAttempt.evidence[0],outcome:"failed"}]},"acceptance.reject") || client.acceptancePlan(reviewContext,"card-review",{...reviewAttempt,criteria:reviewAttempt.criteria.slice(0,1)},"acceptance.reject")) process.exit(23);
 const subjectiveFailure = {...reviewAttempt,evidence:[...reviewAttempt.evidence,{criterion_id:"taste",source:"user_feedback",outcome:"failed",actor_id:"operator-a"}],candidate:{...reviewAttempt.candidate,evidence_count:2}};
 if (client.acceptancePlan(reviewContext,"card-review",subjectiveFailure,"acceptance.accept") || !client.acceptancePlan(reviewContext,"card-review",subjectiveFailure,"acceptance.reject")) process.exit(25);

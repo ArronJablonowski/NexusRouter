@@ -999,7 +999,7 @@
         },
 		"prior_evidence_head_revision": {
 		  "type": "integer",
-		  "minimum": 1
+		  "minimum": 0
 		},
 		"prior_evidence_set_digest": {
 		  "$ref": "#/$defs/digest"

@@ -647,7 +647,7 @@ type AcceptanceDecisionRecord struct {
 func (r AcceptanceDecisionRecord) ValidateAgainst(attempt Attempt) error {
 	if r.Version != ContractVersion || !validID(r.ID) || !validID(r.BoardID) || !validID(r.CardID) ||
 		!validID(r.AttemptID) || !validID(r.CandidateID) || !validWorkboardDigest(r.CandidateDigest) ||
-		r.CriteriaRevision < 1 || !validWorkboardDigest(r.CriteriaDigest) || r.PriorEvidenceHeadRevision < 1 ||
+		r.CriteriaRevision < 1 || !validWorkboardDigest(r.CriteriaDigest) || r.PriorEvidenceHeadRevision < 0 ||
 		r.EvidenceHeadRevision < r.PriorEvidenceHeadRevision || !validWorkboardDigest(r.PriorEvidenceSetDigest) ||
 		!validWorkboardDigest(r.EvidenceSetDigest) || !validWorkboardDigest(r.PolicyDigest) || requireText(r.Rationale, MaxEvidenceBytes) != nil ||
 		(r.Decision != "accepted" && r.Decision != "rejected") || !validID(r.DecidedBy) ||

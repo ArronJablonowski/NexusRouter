@@ -6569,3 +6569,38 @@ per-package ten-minute timeout and passed the source/LOC gate, vet, complete rac
 suite, and `go build ./...`. Its longest rebuilt packages were application
 555.933s, releasepack 464.495s, telemetry 472.414s, CLI 64.239s, SDK 60.975s,
 and toolgate 29.396s.
+
+## 2026-09-10 — DAR-85 subjective evidence provenance and inert scheduler boundary
+
+DAR-85 remains in progress. Candidate submission now rejects evaluator-supplied
+`user_feedback` before any candidate, evidence, operation, or card transition is
+persisted. Only an authenticated operator accept/reject action can append that
+evidence source. A card whose criteria are entirely subjective may enter Review
+with zero pre-existing evidence, bound to the canonical empty evidence-set
+digest; its operator decision creates evidence revision 1. Submit and decision
+replay preserve the zero-to-one boundary across restart. The authenticated Web
+UI Kanban, browser contract, checked-in schemas, and acceptance planner all
+support evidence head zero while continuing to deny objective decisions that
+lack deterministic proof.
+
+The versioned configuration now includes a required v1 `workboard` section and
+a nested unattended scheduler boundary. Scheduling defaults off with bounded
+interval, active-claim, and scan settings. Because the current per-board cycle
+does not yet have single-runtime-task attribution or global transactional
+budgets, the stock `serve` and managed-daemon start paths reject an enabled
+scheduler before listener binding, storage creation, provider construction, or
+child launch rather than silently ignoring it. The integrated Web UI/API
+workboard remains enabled; disabling that feature is rejected in configuration
+v1 until its mounted routes can be removed coherently.
+
+Full normal repository tests passed. Focused configuration, CLI, workboard,
+telemetry, and Web UI tests pass normally, and focused race-enabled coverage
+passes for the provenance, subjective review, schema/client, and scheduler
+admission boundaries. The final serialized `make check` passed the source/LOC
+gate, `go vet ./...`, the complete race-enabled repository suite, and
+`go build ./...`; the longest rebuilt packages were application 565.304s,
+releasepack 464.026s, telemetry 471.925s, CLI 63.186s, SDK 61.259s, and
+toolgate 29.350s. Host-frozen runtime task/session attribution,
+transactional time/token/cost budgets, production judge composition, and broad
+crash/lease/acceptance qualification remain before unattended scheduling can
+be enabled or DAR-85 marked Done.

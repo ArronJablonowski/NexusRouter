@@ -308,7 +308,7 @@ func (r BoardRequest) Validate() error {
 		}
 	case AcceptanceAccept, AcceptanceReject:
 		if r.CardID == "" || r.AttemptID == "" || r.CandidateID == "" || revisionBelowOne(r.CriteriaRevision) ||
-			revisionBelowOne(r.ExpectedCardRevision) || revisionBelowOne(r.EvidenceHeadRevision) || strings.TrimSpace(r.Evidence) == "" ||
+			revisionBelowOne(r.ExpectedCardRevision) || r.EvidenceHeadRevision == nil || *r.EvidenceHeadRevision < 0 || strings.TrimSpace(r.Evidence) == "" ||
 			!validWorkboardDigest(r.CandidateDigest) || !validWorkboardDigest(r.CriteriaDigest) ||
 			!validWorkboardDigest(r.EvidenceSetDigest) || !validWorkboardDigest(r.PolicyDigest) {
 			return ErrContract

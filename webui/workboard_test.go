@@ -155,6 +155,38 @@ func TestAcceptanceAndRecoveryReceiptsBindAuthority(t *testing.T) {
 	}
 }
 
+func TestSubjectiveOnlyAcceptanceProjectsZeroPriorEvidence(t *testing.T) {
+	attempt, record := subjectiveOnlyAcceptanceFixture()
+	if err := attempt.Validate(); err != nil {
+		t.Fatal("subjective-only accepted attempt rejected", err)
+	}
+	if err := record.ValidateAgainst(attempt); err != nil {
+		t.Fatal("zero-prior-evidence acceptance rejected", err)
+	}
+	record.PriorEvidenceHeadRevision = -1
+	if record.ValidateAgainst(attempt) == nil {
+		t.Fatal("negative prior evidence head accepted")
+	}
+}
+
+func subjectiveOnlyAcceptanceFixture() (Attempt, AcceptanceDecisionRecord) {
+	attempt := attemptFixture("accepted")
+	attempt.Criteria = []AcceptanceCriterion{criterion("taste", "subjective")}
+	attempt.CriteriaDigest = AcceptanceCriteriaDigest(attempt.Criteria)
+	attempt.Candidate.CriteriaDigest = attempt.CriteriaDigest
+	attempt.Candidate.EvidenceCount = 0
+	attempt.Candidate.EvidenceDigest = EvidenceDigest([]EvidenceRecord{})
+	attempt.Evidence = []EvidenceRecord{evidenceFixture(*attempt.Candidate, "user_feedback")}
+	attempt.Evidence[0].CriterionID = "taste"
+	attempt.AcceptanceEvidenceDigest = EvidenceDigest(attempt.Evidence)
+	record := acceptanceFixture(attempt)
+	record.PriorEvidenceHeadRevision = 0
+	record.PriorEvidenceSetDigest = EvidenceDigest([]EvidenceRecord{})
+	record.EvidenceHeadRevision = 1
+	record.EvidenceSetDigest = EvidenceDigest(attempt.Evidence)
+	return attempt, record
+}
+
 func acceptanceFixture(attempt Attempt) AcceptanceDecisionRecord {
 	return AcceptanceDecisionRecord{
 		Version: 1, ID: "acceptance-a", BoardID: attempt.BoardID, CardID: attempt.CardID,
@@ -347,6 +379,7 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 	board := boardFixture()
 	card := cardFixture()
 	attempt := attemptFixture("accepted")
+	subjectiveAttempt, subjectiveAcceptance := subjectiveOnlyAcceptanceFixture()
 	lifecycle := CardLifecycle{Version: 1, CardID: card.ID, Attempt: attempt, Checkpoints: []WorkCheckpoint{},
 		CheckpointCount: 0, Acceptance: ptrAcceptance(acceptanceFixture(attempt))}
 	history := AttemptHistoryPage{Version: 1, BoardID: board.ID, CardID: card.ID, HighWaterOrdinal: 1,
@@ -374,6 +407,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"page", Page{Version: 1, Items: []Board{board}}},
 		{"operation_receipt", receipt},
 		{"acceptance_decision", acceptanceFixture(attempt)},
+		{"attempt", subjectiveAttempt},
+		{"acceptance_decision", subjectiveAcceptance},
 		{"recovery_receipt", recoveryFixture()},
 	}
 	for _, item := range values {

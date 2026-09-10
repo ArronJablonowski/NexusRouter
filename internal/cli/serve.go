@@ -54,6 +54,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot load daemon configuration")
 		return 1
 	}
+	if !stockDaemonConfigurationSupported(s) {
+		fmt.Fprintln(stderr, "workboard scheduler is not available in the stock daemon")
+		return 1
+	}
 	host, port, err := net.SplitHostPort(s.Daemon.Listen)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon address")

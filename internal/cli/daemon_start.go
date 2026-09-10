@@ -18,12 +18,20 @@ import (
 
 var errDaemonStart = errors.New("managed daemon start unavailable")
 
+// stockDaemonConfigurationSupported rejects feature flags whose durable
+// supervisor has not yet been wired into the stock daemon. Keeping this check
+// outside config validation lets embedding hosts consume the versioned schema
+// without making the stock CLI silently ignore enabled behavior.
+func stockDaemonConfigurationSupported(cfg config.Settings) bool {
+	return !cfg.Workboard.Scheduler.Enabled
+}
+
 // runDaemonStart owns only the process it starts. No PID file or externally
 // supplied PID grants signal authority. A successful authenticated response
 // must identify this fresh launch, not another listener that won the bind race.
 func runDaemonStart(ctx context.Context, cfg config.Settings, path, token string) (daemon.Status, error) {
 	bad := func() (daemon.Status, error) { return daemon.Status{}, errDaemonStart }
-	if ctx == nil || ctx.Err() != nil || path == "" || token == "" || token != os.Getenv("DARWIN_API_TOKEN") {
+	if ctx == nil || ctx.Err() != nil || path == "" || token == "" || token != os.Getenv("DARWIN_API_TOKEN") || !stockDaemonConfigurationSupported(cfg) {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

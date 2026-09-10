@@ -5,6 +5,15 @@ runtime:
   # Reuse a currently operator-approved stored summary only when full-history
   # automatic routing has no eligible route. Never generates or approves one.
   auto_use_approved_summary: false
+workboard:
+  enabled: true
+  scheduler:
+    # Unattended execution is deliberately unavailable in the stock daemon
+    # until durable task attribution, budgets, and acceptance are wired.
+    enabled: false
+    interval: 5s
+    max_active_claims: 3
+    card_scan_limit: 10000
 providers:
   - id: local-primary
     kind: ollama

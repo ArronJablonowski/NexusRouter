@@ -81,7 +81,12 @@ evidence, and separately labelled advisory model audits. Accept/reject remains
 disabled unless the displayed deterministic and subjective-evidence rules can
 satisfy the durable decision, and each request freezes the exact card, attempt,
 candidate, evidence head, and configuration digests. Running workers now
-consume a durable cancellation request after an exact heartbeat, cancel and
+cannot manufacture `user_feedback` through candidate evaluation. Subjective-
+only candidates enter the same integrated Kanban review with a digest-bound
+empty evidence set; an authenticated operator accept/reject creates the first
+immutable feedback record, while objective criteria remain blocked without
+their required deterministic proof. Workers consume a durable cancellation
+request after an exact heartbeat, cancel and
 join the supervisor-owned callback, persist runtime cancellation, and retain
 the workboard claim for independently proven finalization. They acknowledge
 pause and resume only at exact-fenced safe boundaries while retaining their
@@ -480,6 +485,16 @@ still use text such as `--set memory.max_facts=8`, but fractional or overflowing
 values are rejected. Type-invalid lower-precedence files or environment values
 are rejected even if a later layer overrides them. Genuine floating-point
 settings, such as estimated cost and routing weights, remain supported.
+
+The workboard is required in configuration version 1 because authenticated Web
+UI and API routes currently expose it; `workboard.enabled: false` is rejected
+rather than misleadingly leaving those surfaces active. Its unattended
+scheduler is disabled by default. The versioned scheduler boundary accepts
+an interval from `250ms` through `24h`, 1–64 active claims (never more than
+`workers.max_in_process`), and a card scan limit from 1–10,000. The stock daemon
+currently rejects `workboard.scheduler.enabled: true` before opening storage,
+binding its listener, or constructing providers; it will not silently ignore an
+enabled scheduler until the supervised execution path is fully wired.
 
 Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; DarwinRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
 

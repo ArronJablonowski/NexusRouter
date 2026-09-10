@@ -183,7 +183,7 @@ func readReviewEvaluationAttempt(ctx context.Context, tx *sql.Tx, m workboard.Ev
 	if strictJSON(body, &attempt) != nil || attempt.Revision != indexedRevision || attempt.State != indexedState || attempt.WorkerID != workerID ||
 		attempt.CriteriaDigest != criteriaDigest || attempt.PolicyDigest != policyDigest || attempt.State != "review" || attempt.EndedAt == nil ||
 		attempt.EndedAt.UnixNano() != ended || attempt.ID != m.AttemptID || attempt.BoardID != m.BoardID || attempt.CardID != m.CardID ||
-		attempt.Candidate == nil || attempt.Candidate.Validate() != nil || len(attempt.Evidence) < 1 || workboard.EvidenceSetDigest(attempt.Evidence) != attempt.Candidate.EvidenceDigest {
+		attempt.Candidate == nil || attempt.Candidate.Validate() != nil || workboard.EvidenceSetDigest(attempt.Evidence) != attempt.Candidate.EvidenceDigest {
 		return storedEvaluationAttempt{}, nil, ErrWorkboardCorrupt
 	}
 	storedCandidate, err := readEvaluationCandidate(ctx, tx, m.BoardID, m.CardID, m.AttemptID)
@@ -309,7 +309,7 @@ func validateEvaluationMutation(m workboard.EvaluationMutation, requireEvaluatio
 	case workboard.EvaluationCandidateSubmit:
 		if m.Actor.Type != "worker" || !validWorkboardID(m.ClaimID) || m.CandidateID != "" || m.ExpectedClaimRevision < 1 || m.EvidenceHeadRevision != 0 ||
 			m.CandidateDigest != "" || m.CriteriaDigest != "" || m.EvidenceSetDigest != "" || m.PolicyDigest != "" || m.DecisionAuthorityID != "" ||
-			m.Summary == "" || len(m.ArtifactRefs) > workboard.MaxCandidateArtifacts || requireEvaluation && (len(m.Evaluated) < 1 || len(m.Evaluated) > workboard.MaxEvaluationEvidence) || !requireEvaluation && m.Evaluated != nil {
+			m.Summary == "" || len(m.ArtifactRefs) > workboard.MaxCandidateArtifacts || requireEvaluation && len(m.Evaluated) > workboard.MaxEvaluationEvidence || !requireEvaluation && m.Evaluated != nil {
 			return invalidWorkboard("candidate")
 		}
 		for _, item := range m.Evaluated {
@@ -319,7 +319,7 @@ func validateEvaluationMutation(m workboard.EvaluationMutation, requireEvaluatio
 		}
 	case workboard.EvaluationAccept, workboard.EvaluationReject:
 		if m.Actor.Type != "operator" && m.Actor.Type != "validator" || !validWorkboardID(m.CandidateID) || !validWorkboardID(m.DecisionAuthorityID) ||
-			m.ClaimID != "" || m.ExpectedClaimRevision != 0 || m.EvidenceHeadRevision < 1 || !validDigest(m.CandidateDigest) || !validDigest(m.CriteriaDigest) ||
+			m.ClaimID != "" || m.ExpectedClaimRevision != 0 || m.EvidenceHeadRevision < 0 || !validDigest(m.CandidateDigest) || !validDigest(m.CriteriaDigest) ||
 			!validDigest(m.EvidenceSetDigest) || !validDigest(m.PolicyDigest) || m.Summary != "" || m.ArtifactRefs != nil || m.Evaluated != nil || m.Evidence == "" {
 			return invalidWorkboard("acceptance")
 		}
