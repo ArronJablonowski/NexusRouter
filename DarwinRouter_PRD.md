@@ -418,8 +418,11 @@ browser reconciliation, including legacy pending operations. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,
-and reconnect-safe SSE invalidation/full refetch. Operator mutations, keyboard
-movement, and acceptance controls remain open. DAR-84 owns agent board tools.
+and reconnect-safe SSE invalidation/full refetch. Its next slice adds
+revision-fenced board/card creation and revision, confirmed archive controls,
+strict receipt validation, and browser-journal reconciliation that never
+replays an ambiguous side effect. Keyboard movement, dependency editing,
+lifecycle, and acceptance controls remain open. DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

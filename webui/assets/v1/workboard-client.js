@@ -30,5 +30,43 @@
 		if (focused && cards.some(card => nodes.get(card.id).contains(focused))) focused.focus({preventScroll: true});
 		return true;
 	}
-	return Object.freeze({canonical, compareText, current, reparent});
+	function freezeIntent(path, body) {
+		const freeze = value => { if (value && typeof value === "object" && !Object.isFrozen(value)) { for (const item of Object.values(value)) freeze(item); Object.freeze(value); } return value; };
+		return Object.freeze({path, body: freeze(body), encoded: JSON.stringify(body)});
+	}
+	function mutationResolution(status, receiptValid) {
+		if (status >= 200 && status < 300) return receiptValid ? "committed" : "ambiguous";
+		return [400, 401, 403, 404, 409, 422].includes(status) ? "definitive" : "ambiguous";
+	}
+	function captureCurrent(capture, context) {
+		if (!capture || capture.action === "board.create") return true;
+		return Boolean(context && context.board && context.board.id === capture.boardID && context.board.revision === capture.boardRevision && context.graphRevision === capture.graphRevision &&
+			(capture.action !== "card.revise" || context.card && context.card.id === capture.cardID && context.card.revision === capture.cardRevision));
+	}
+	function exact(value, required, optional) { if (!value || typeof value !== "object" || Array.isArray(value)) return false; const keys = Object.keys(value), allowed = new Set([...required, ...optional]); return required.every(key => Object.hasOwn(value, key)) && keys.every(key => allowed.has(key)); }
+	function id(value) { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value); }
+	function printableKey(value) { return typeof value === "string" && value.length >= 16 && value.length <= 128 && /^[\x21-\x7e]+$/.test(value); }
+	function time(value) { const parsed = typeof value === "string" ? Date.parse(value) : NaN; return Number.isFinite(parsed) && parsed >= Date.UTC(1970, 0, 1) && parsed < Date.UTC(2261, 0, 1); }
+	function wellFormed(value) { for (let index = 0; index < value.length; index++) { const code = value.charCodeAt(index); if (code >= 0xd800 && code <= 0xdbff) { if (++index >= value.length || value.charCodeAt(index) < 0xdc00 || value.charCodeAt(index) > 0xdfff) return false; } else if (code >= 0xdc00 && code <= 0xdfff) return false; } return true; }
+	function text(value, max, empty) { if (typeof value !== "string" || !empty && !value.trim() || !wellFormed(value) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(value)) return false; return new TextEncoder().encode(value).length <= max; }
+	function receiptMatches(body, intent) {
+		const required = ["version", "board_id", "operation_id", "request_digest", "response_digest", "first_sequence", "last_sequence", "event_count", "transaction_bytes", "board_revision", "outcome", "created_at"], digest = /^[0-9a-f]{64}$/;
+		if (!intent || !intent.body || !exact(body, required, ["card_id", "card_revision", "claim_revision"]) || body.version !== 1 || !id(body.board_id) || !printableKey(body.operation_id) || !digest.test(body.request_digest) || !digest.test(body.response_digest) ||
+			!Number.isSafeInteger(body.first_sequence) || body.first_sequence < 1 || !Number.isSafeInteger(body.last_sequence) || body.last_sequence < body.first_sequence || !Number.isSafeInteger(body.event_count) || body.event_count < 1 || body.event_count > 128 || body.last_sequence - body.first_sequence + 1 !== body.event_count ||
+			!Number.isSafeInteger(body.transaction_bytes) || body.transaction_bytes < 1 || body.transaction_bytes > 1048576 || !Number.isSafeInteger(body.board_revision) || body.board_revision < 1 || body.outcome !== "committed" || !time(body.created_at)) return false;
+		const action = intent.body.action, cardAction = action === "card.create" || action === "card.revise", captured = intent.capture || {};
+		const expectedBoard = action === "board.create" ? 1 : captured.boardRevision + 1;
+		if ((action === "card.revise" ? body.board_revision < expectedBoard : body.board_revision !== expectedBoard) || action !== "board.create" && body.board_id !== intent.body.board_id || cardAction !== Object.hasOwn(body, "card_id") || !cardAction && (body.card_revision !== undefined || body.claim_revision !== undefined) || body.claim_revision !== undefined) return false;
+		if (!cardAction || !id(body.card_id) || !Number.isSafeInteger(body.card_revision)) return !cardAction;
+		return action === "card.create" ? body.card_revision === 1 : body.card_id === intent.body.card_id && body.card_revision === captured.cardRevision + 1;
+	}
+	function mutationError(body, status) {
+		if (!exact(body, ["version", "code", "message", "retryable"], ["current_revision", "retry_after_ms", "subject_type", "subject_id", "current_state", "operation_id"]) || body.version !== 1 || !id(body.code) || !text(body.message, 256, false) || typeof body.retryable !== "boolean" ||
+			body.current_revision !== undefined && (!Number.isSafeInteger(body.current_revision) || body.current_revision < 0) || body.retry_after_ms !== undefined && (!Number.isSafeInteger(body.retry_after_ms) || body.retry_after_ms < 1 || body.retry_after_ms > 60000) ||
+			(body.subject_type === undefined) !== (body.subject_id === undefined) || body.subject_type !== undefined && (!["chat", "task", "submission", "feedback", "approval", "board", "card", "claim"].includes(body.subject_type) || !id(body.subject_id)) || body.current_state !== undefined && !id(body.current_state) || body.operation_id !== undefined && !id(body.operation_id)) return null;
+		const expected = {400: ["invalid_workboard_request", false], 401: ["unauthorized", false], 403: ["request_denied", false], 404: ["not_found", false], 409: ["revision_conflict", true], 422: ["workboard_rejected", false]}[status];
+		return Object.freeze({body, definitive: Boolean(expected && body.code === expected[0] && body.retryable === expected[1]), operationID: body.operation_id || ""});
+	}
+	function acknowledgeAllowed(intent, operationsReady, operationReadFailed, unresolvedCount) { return Boolean(intent && !intent.operationID && intent.reconciledClean && operationsReady && !operationReadFailed && unresolvedCount === 0); }
+	return Object.freeze({acknowledgeAllowed, canonical, captureCurrent, compareText, current, freezeIntent, mutationError, mutationResolution, receiptMatches, reparent});
 });

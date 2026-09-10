@@ -6,6 +6,16 @@ complete, but DAR-46 remains open. The newly required Web UI and integrated
 Kanban backlog is also unfinished. No signed production release, release tag,
 supported-platform decision or publication approval is claimed.
 
+- DAR-83 now adds the first operator mutation controls directly to the
+  authenticated Kanban. Operators can create, revise, and archive boards and
+  create or revise cards through bounded dialogs with immutable revision
+  fences. The browser validates action-specific receipts, scans the durable
+  session operation journal before enabling writes, and never automatically
+  replays an ambiguous result. Exact browser operation identifiers are safely
+  published for reconciliation without exposing request content or domain
+  receipt digests. Keyboard move/reorder, dependency editing, lifecycle, and
+  acceptance controls remain open.
+
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
   evidence after executing the host-matching artifact from the exact

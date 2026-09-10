@@ -42,21 +42,21 @@ func (b *BrowserWorkboardMutations) Mutate(ctx context.Context, subject string, 
 	}
 	if replay {
 		var receipt contract.OperationReceipt
-		if decodeReceipt(record.Response, &receipt) != nil || !workboardReceiptMatchesRequest(receipt, request) {
-			return contract.OperationReceipt{}, ErrBrowserMutation
+		if decodeReceipt(record.Response, &receipt) != nil || !b.receiptMatchesRequest(ctx, subject, receipt, request) {
+			return contract.OperationReceipt{}, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 		}
 		return receipt, nil
 	}
 	receipt, err := b.bridge.BrowserMutate(ctx, subject, request)
 	if err != nil {
 		subjectType, subjectID := workboardRequestSubject(request)
-		return contract.OperationReceipt{}, b.journal.reject(ctx, subject, record, subjectType, subjectID, err)
+		return contract.OperationReceipt{}, browserOperationFailure(record.OperationID, b.journal.reject(ctx, subject, record, subjectType, subjectID, err))
 	}
-	if receipt.Validate() != nil || !workboardReceiptMatchesRequest(receipt, request) {
-		return contract.OperationReceipt{}, ErrBrowserMutation
+	if receipt.Validate() != nil || !b.receiptMatchesRequest(ctx, subject, receipt, request) {
+		return contract.OperationReceipt{}, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 	}
 	if err = b.journal.commit(ctx, subject, record, receipt); err != nil {
-		return contract.OperationReceipt{}, err
+		return contract.OperationReceipt{}, browserOperationFailure(record.OperationID, err)
 	}
 	return receipt, nil
 }
@@ -80,7 +80,7 @@ func (b *BrowserWorkboardMutations) recoverPending(ctx context.Context, recovery
 	if mutationErr != nil {
 		code, definitive := browserRejectionCode(mutationErr)
 		if !definitive {
-			return contract.OperationReceipt{}, true, mutationErr
+			return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, mutationErr)
 		}
 		subjectType, subjectID := workboardRequestSubject(request)
 		field := ""
@@ -90,24 +90,55 @@ func (b *BrowserWorkboardMutations) recoverPending(ctx context.Context, recovery
 		}
 		rejected, marshalErr := json.Marshal(browserRejection{Version: 1, Code: code, SubjectType: subjectType, SubjectID: subjectID, Field: field})
 		if marshalErr != nil {
-			return contract.OperationReceipt{}, true, ErrBrowserMutation
+			return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 		}
 		if _, err = b.journal.store.Recover(ctx, recoverySubject, record, "rejected", rejected); err != nil {
-			return contract.OperationReceipt{}, true, ErrBrowserMutation
+			return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 		}
 		return contract.OperationReceipt{}, true, &BrowserOperationError{OperationID: record.OperationID, Cause: mutationErr}
 	}
-	if receipt.Validate() != nil || !workboardReceiptMatchesRequest(receipt, request) {
-		return contract.OperationReceipt{}, true, ErrBrowserMutation
+	if receipt.Validate() != nil || !b.receiptMatchesRequest(ctx, recoverySubject, receipt, request) {
+		return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 	}
 	response, err := json.Marshal(receipt)
 	if err != nil {
-		return contract.OperationReceipt{}, true, ErrBrowserMutation
+		return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 	}
 	if _, err = b.journal.store.Recover(ctx, recoverySubject, record, "committed", response); err != nil {
-		return contract.OperationReceipt{}, true, ErrBrowserMutation
+		return contract.OperationReceipt{}, true, browserOperationFailure(record.OperationID, ErrBrowserMutation)
 	}
 	return receipt, true, nil
+}
+
+func (b *BrowserWorkboardMutations) receiptMatchesRequest(ctx context.Context, subject string, receipt contract.OperationReceipt, request contract.BoardRequest) bool {
+	if !workboardReceiptMatchesRequest(receipt, request) {
+		return false
+	}
+	switch request.Action {
+	case contract.BoardCreate, contract.BoardRevise, contract.BoardArchive, contract.CardCreate, contract.CardRevise:
+		if receipt.EventCount != 1 || receipt.FirstSequence != receipt.LastSequence {
+			return false
+		}
+		page, err := b.bridge.BrowserEvents(ctx, subject, receipt.BoardID, contract.BoardEventOptions{Limit: 1, TailAfterSequence: receipt.FirstSequence - 1})
+		if err != nil || page.Validate() != nil || len(page.Items) != 1 {
+			return false
+		}
+		event := page.Items[0]
+		return event.Sequence == receipt.FirstSequence && event.OperationID == receipt.OperationID && event.Kind == request.Action && event.CardID == receipt.CardID
+	default:
+		return true
+	}
+}
+
+func browserOperationFailure(operationID string, err error) error {
+	if err == nil {
+		err = ErrBrowserMutation
+	}
+	var operationErr *BrowserOperationError
+	if errors.As(err, &operationErr) && operationErr.OperationID == operationID {
+		return err
+	}
+	return &BrowserOperationError{OperationID: operationID, Cause: err}
 }
 
 func workboardReceiptMatchesRequest(receipt contract.OperationReceipt, request contract.BoardRequest) bool {
@@ -117,8 +148,17 @@ func workboardReceiptMatchesRequest(receipt contract.OperationReceipt, request c
 	if request.BoardID != "" && receipt.BoardID != request.BoardID || request.CardID != "" && receipt.CardID != request.CardID {
 		return false
 	}
-	if request.Action == contract.BoardCreate || request.Action == contract.BoardRevise || request.Action == contract.BoardArchive {
-		return receipt.CardID == ""
+	switch request.Action {
+	case contract.BoardCreate:
+		return receipt.CardID == "" && receipt.BoardRevision == 1
+	case contract.BoardRevise, contract.BoardArchive:
+		return receipt.CardID == "" && request.ExpectedBoardRevision != nil && receipt.BoardRevision == *request.ExpectedBoardRevision+1
+	case contract.CardCreate:
+		return receipt.CardID != "" && receipt.CardRevision != nil && *receipt.CardRevision == 1 &&
+			request.ExpectedBoardRevision != nil && receipt.BoardRevision == *request.ExpectedBoardRevision+1
+	case contract.CardRevise:
+		return receipt.CardID != "" && receipt.CardRevision != nil && request.ExpectedCardRevision != nil &&
+			*receipt.CardRevision == *request.ExpectedCardRevision+1
 	}
 	return receipt.CardID != ""
 }

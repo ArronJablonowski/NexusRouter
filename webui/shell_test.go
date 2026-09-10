@@ -44,6 +44,7 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
 		{"/console/assets/v1/workboard-client.js", "text/javascript", "DarwinWorkboardClient"},
 		{"/console/assets/v1/workboards.js", "text/javascript", "kanban"},
+		{"/console/assets/v1/workboard-mutations.js", "text/javascript", "idempotency_key"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
 		response := shellRequest(t, handler, http.MethodGet, test.target, true)
@@ -134,10 +135,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "c6c52d9e0d3a732d1045bd979eb834c5eecdb183bb030cac472d4c7306d1b5e2" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "3731209db1e42f55fe6e19585a8526386b1e6cdd1ea417c544e38a37552fd9d4" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -259,7 +260,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -283,7 +284,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`credentials: "same-origin"`, `cache: "no-store"`, "node.textContent = text", `kanban.setAttribute("aria-busy", "true")`,
 		`"No " + boardState + " workboards."`, "No cards match the current filters.", "Use Refresh to try again.", "column.state === states[index]",
 		"boardIDs.has(board.id)", "boardCursors.has(page.next_cursor)", "cardCursors.has(snapshot.next_cursor)", "snapshotFence !== fence",
-		`toggle.setAttribute("aria-expanded"`, `toggle.setAttribute("aria-label", "Inspect card: "`, "active claim", "dependencies remaining",
+		`toggle.setAttribute("aria-expanded"`, `toggle.setAttribute("aria-pressed", "false")`, `toggle.setAttribute("aria-label", "Select and inspect card: "`, "selected-card", "active claim", "dependencies remaining",
 		`new EventSource(base + "/api/v1/workboards/"`, `event.lastEventId !== payload.cursor`, `streamFailures >= 8`, `window.clearTimeout(invalidationTimer)`,
 		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
@@ -320,7 +321,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 	for _, required := range []string{
 		`value === "" || value === "unassigned" || idPattern.test(value)`, `["", "unclaimed", "active", "attention"].includes(filters.claim)`,
 		`query.set("state", appliedFilters.state)`, `query.set("assignee_id", appliedFilters.assignee)`, `query.set("owner_id", appliedFilters.owner)`, `query.set("claim_state", appliedFilters.claim)`,
-		`function clearCardState()`, `snapshotGraphRevision = 0; snapshotGraphDigest = ""; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
+		`function clearCardState()`, `snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true)`,
 		`loadedCards.push(...cards); renderPresentation()`, `cardList.replaceChildren(); client.reparent(loadedCards, cardNodes`, `const filterSignature = [appliedFilters.state`,
 		`filterForm.requestSubmit()`, `aria-invalid`, `presentation = "kanban"`, `presentation = "list"`, `loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); }, 120)`,
 		`client.canonical(cards, previous`, `client.compareText(column.rank, previousRank) > 0`, `snapshot.board.state + " board · read-only`, `" matching cards loaded · "`,
@@ -358,6 +359,56 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`} {
 		if !strings.Contains(css, required) {
 			t.Fatalf("responsive workboard layout missing %q", required)
+		}
+	}
+}
+
+func TestEmbeddedWorkboardMutationScaffoldsAreHiddenBoundedAndAccessible(t *testing.T) {
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(index)
+	for _, required := range []string{
+		`id="workboard-mutation-controls" class="workboard-mutation-controls" aria-label="Workboard actions" hidden`,
+		`id="board-create-dialog" class="workboard-dialog-backdrop" hidden`, `id="board-revise-dialog" class="workboard-dialog-backdrop" hidden`,
+		`id="board-archive-dialog" class="workboard-dialog-backdrop" hidden`, `id="card-create-dialog" class="workboard-dialog-backdrop" hidden`, `id="card-revise-dialog" class="workboard-dialog-backdrop" hidden`,
+		`role="alertdialog" aria-modal="true" aria-labelledby="board-archive-title"`, `id="board-archive-confirm" type="checkbox" required`, `id="submit-board-archive" class="danger" type="button" disabled`,
+		`name="title" required maxlength="256" data-max-bytes="256"`, `name="description" maxlength="65536" data-max-bytes="65536"`,
+		`name="board_id" type="hidden"`, `name="card_id" type="hidden"`, `name="expected_board_revision" type="hidden"`, `name="expected_card_revision" type="hidden"`, `name="expected_graph_revision" type="hidden"`,
+		`name="parent_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}"`, `name="assignee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}"`,
+		`name="labels" maxlength="2079" data-max-items="32" data-item-max-bytes="64"`, `name="dependencies" maxlength="8255" data-max-items="64" data-item-max-bytes="128"`,
+		`name="budget.attempt_limit" type="number" required min="1" max="32"`, `name="budget.time_limit_ms" type="number" required min="0" max="2592000000"`,
+		`name="budget.token_limit" type="number" required min="0" max="1000000000"`, `name="budget.cost_micros" type="number" required min="0" max="1000000000000"`,
+		`id="card-create-criteria" class="criteria-fields form-span" data-min-items="1" data-max-items="32" data-max-bytes="65536"`,
+		`name="criteria.id" required maxlength="128"`, `name="criteria.kind" required`, `name="criteria.required_source" required`, `name="criteria.validator_id" required maxlength="128"`,
+		`name="criteria.description" required maxlength="4096" data-max-bytes="4096"`, `name="criteria.required" type="checkbox"`,
+		`name="clear_parent" type="checkbox"`, `name="clear_assignee" type="checkbox"`, `class="mutation-form-status" role="status" aria-live="polite"`,
+	} {
+		if !strings.Contains(markup, required) {
+			t.Fatalf("workboard mutation scaffold missing %q", required)
+		}
+	}
+	for _, form := range []string{`id="board-create-form" class="mutation-form" role="form"`, `id="board-revise-form" class="mutation-form" role="form"`, `id="board-archive-form" class="mutation-form" role="form"`, `id="card-create-form" class="mutation-form mutation-form-grid" role="form"`, `id="card-revise-form" class="mutation-form mutation-form-grid" role="form"`} {
+		if !strings.Contains(markup, form) {
+			t.Fatal("missing inert mutation form region", form)
+		}
+	}
+	mutationStart := strings.Index(markup, `id="workboard-mutation-controls"`)
+	if mutationStart < 0 {
+		t.Fatal("missing mutation scaffold boundary")
+	}
+	mutationEnd := strings.Index(markup[mutationStart:], `<div id="approval-dialog"`)
+	if mutationEnd < 0 || strings.Contains(markup[mutationStart:mutationStart+mutationEnd], `<form`) || strings.Contains(markup[mutationStart:mutationStart+mutationEnd], `type="submit"`) {
+		t.Fatal("inert mutation scaffold can submit a browser request")
+	}
+	styles, err := embeddedShellAssets.ReadFile("assets/v1/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{`.workboard-dialog-backdrop[hidden] { display: none; }`, `.workboard-dialog { width: min(38rem, 100%);`, `.mutation-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr));`, `.mutation-form-grid, .budget-fields, .criterion-row { grid-template-columns: 1fr; }`} {
+		if !strings.Contains(string(styles), required) {
+			t.Fatalf("responsive mutation scaffold styling missing %q", required)
 		}
 	}
 }
@@ -446,6 +497,20 @@ func TestWorkboardClientModelRejectsStaleAndCrossPageResponsesAndRetainsNodes(t 
 	script := `
 const client = require(process.argv[1]);
 if (client.current(4, 5, "board-a", "board-a") || client.current(5, 5, "board-a", "board-b") || !client.current(5, 5, "board-a", "board-a")) process.exit(1);
+const frozen = client.freezeIntent("/operations", {version:1, nested:{value:"exact"}});
+if (!Object.isFrozen(frozen) || !Object.isFrozen(frozen.body) || !Object.isFrozen(frozen.body.nested) || frozen.encoded !== JSON.stringify(frozen.body)) process.exit(5);
+if (client.mutationResolution(200, false) !== "ambiguous" || client.mutationResolution(500, false) !== "ambiguous" || client.mutationResolution(408, false) !== "ambiguous" || client.mutationResolution(409, false) !== "definitive" || client.mutationResolution(200, true) !== "committed") process.exit(6);
+const capture = {action:"card.revise",boardID:"board-a",boardRevision:2,graphRevision:3,cardID:"card-a",cardRevision:4};
+if (!client.captureCurrent(capture,{board:{id:"board-a",revision:2},graphRevision:3,card:{id:"card-a",revision:4}}) || client.captureCurrent(capture,{board:{id:"board-a",revision:3},graphRevision:3,card:{id:"card-a",revision:4}})) process.exit(7);
+const receipt = {version:1,board_id:"board-a",operation_id:"domain.operation:01",request_digest:"a".repeat(64),response_digest:"b".repeat(64),first_sequence:8,last_sequence:8,event_count:1,transaction_bytes:128,board_revision:3,outcome:"committed",created_at:"2026-09-09T20:00:00Z"};
+const boardIntent = {body:{action:"board.revise",board_id:"board-a"},capture:{boardRevision:2}};
+if (!client.receiptMatches(receipt,boardIntent) || client.receiptMatches({...receipt,board_revision:2},boardIntent) || client.receiptMatches({...receipt,operation_id:"short"},boardIntent)) process.exit(8);
+const cardIntent = {body:{action:"card.revise",board_id:"board-a",card_id:"card-a"},capture:{boardRevision:2,cardRevision:4}};
+if (!client.receiptMatches({...receipt,board_revision:7,card_id:"card-a",card_revision:5},cardIntent) || client.receiptMatches({...receipt,card_id:"card-a",card_revision:4},cardIntent)) process.exit(9);
+const ambiguous = client.mutationError({version:1,code:"workboard_unavailable",message:"Unavailable",retryable:true,operation_id:"op_1234567890123456"},503);
+const conflict = client.mutationError({version:1,code:"revision_conflict",message:"Conflict",retryable:true,current_revision:3},409);
+if (!ambiguous || ambiguous.definitive || ambiguous.operationID !== "op_1234567890123456" || !conflict || !conflict.definitive || client.mutationError({version:1,code:"workboard_unavailable",message:"\ud800",retryable:true},503)) process.exit(10);
+if (client.acknowledgeAllowed({operationID:"",reconciledClean:false},true,false,0) || !client.acknowledgeAllowed({operationID:"",reconciledClean:true},true,false,0) || client.acknowledgeAllowed({operationID:"",reconciledClean:true},true,false,1)) process.exit(11);
 const states = ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"];
 const first = [{id:"card-a", state:"backlog", rank:"a"}], accepted = client.canonical(first, null, [], states);
 if (!accepted || client.canonical([{id:"card-b", state:"backlog", rank:"0"}], accepted.last, ["card-a"], states) !== null) process.exit(2);
@@ -459,6 +524,46 @@ if (!client.reparent(first, nodes, () => lane, focused) || lane.children[0] !== 
 	command.Dir = "."
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("workboard client behavior failed: %v\n%s", err, output)
+	}
+}
+
+func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
+	script, err := embeddedShellAssets.ReadFile("assets/v1/workboard-mutations.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	for _, required := range []string{
+		`fetch(base + "/api/v1/session/csrf"`, `method: "POST"`, `const limit = Math.min(25, 100 - items.length)`, `items.length >= 100`,
+		`window.crypto.getRandomValues(bytes)`, `client.freezeIntent(path, body)`, `const resolution = client.mutationResolution`,
+		`!csrfToken || !operationsReady || operationReadFailed || inFlight || Boolean(pendingIntent) || unresolved.length > 0`,
+		`new Set([400, 401, 403, 404, 409, 422])`, `response.status === 401 || response.status === 403`,
+		`pendingIntent = Object.freeze({...intent, operationID: error && error.operationID || ""})`, `pendingIntent.operationID ? items.find(item => item.id === pendingIntent.operationID)`,
+		`The exact request is retained and will not be replayed.`, `Acknowledge this unresolved workboard outcome without retrying the exact request?`,
+		`window.DarwinWorkboards.refresh()`, `client.captureCurrent(activeCapture`, `This editor is stale because the authoritative snapshot changed.`,
+		`event.key === "Escape"`, `event.key !== "Tab"`, `document.activeElement === first`, `activeOpener`,
+		`rows.length < 32`, `rows.length > 32`, `textBytes(JSON.stringify(result)) <= 65536`, `clearParent && parent`, `clearAssignee && assignee`,
+		`body.expected_graph_revision = activeCapture.graphRevision`, `client.receiptMatches(body, intent)`, `client.mutationError(body, response.status)`, `client.acknowledgeAllowed(pendingIntent`,
+		`action === "board.create" ? "/api/v1/workboards"`, `encodeURIComponent(body.board_id) + "/operations"`,
+	} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("workboard mutation safety guard missing %q", required)
+		}
+	}
+	if strings.Count(body, `fetch(base + built.path`) != 1 {
+		t.Fatal("workboard intent has an automatic replay path")
+	}
+	for _, forbidden := range []string{"localStorage", "sessionStorage", "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("workboard mutation client uses unsafe primitive %q", forbidden)
+		}
+	}
+	index, err := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(index), `/assets/v1/workboard-mutations.js`) {
+		t.Fatal("workboard mutation client is not loaded by the authenticated shell")
 	}
 }
 

@@ -2,6 +2,8 @@ package webuiapp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
@@ -341,5 +344,32 @@ func TestBrowserWorkboardErrorsAndMethodsAreSanitized(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != http.MethodPost {
 		t.Fatal("authorized operation method probe did not receive method contract", response.Code, response.Header().Get("Allow"))
+	}
+}
+
+func TestBrowserWorkboardAmbiguousErrorPublishesOnlyJournalCorrelation(t *testing.T) {
+	var operationID string
+	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(_ context.Context, subject string, input contract.BoardRequest) (contract.OperationReceipt, error) {
+		digest := sha256.Sum256([]byte(subject + "\x00" + input.IdempotencyKey))
+		operationID = "op_" + hex.EncodeToString(digest[:])
+		return contract.OperationReceipt{}, &app.BrowserOperationError{OperationID: operationID, Cause: errors.New("private request and receipt body")}
+	}})
+	cookie, csrf := authenticateBrowser(t, handler)
+	title := "Sensitive board title"
+	body, _ := json.Marshal(contract.BoardRequest{Version: 1, Action: contract.BoardCreate, IdempotencyKey: browserWorkboardKey, Title: &title})
+	request := browserRequest(http.MethodPost, "/app/api/v1/workboards", string(body))
+	request.AddCookie(cookie)
+	request.Header.Set("X-Darwin-CSRF", csrf)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	var published contract.Error
+	if response.Code != http.StatusServiceUnavailable || json.Unmarshal(response.Body.Bytes(), &published) != nil || published.Validate() != nil ||
+		published.OperationID != operationID || !published.Retryable || published.Code != "workboard_unavailable" {
+		t.Fatalf("status=%d error=%+v body=%s", response.Code, published, response.Body.String())
+	}
+	for _, secret := range []string{title, browserWorkboardKey, "private request", "receipt body"} {
+		if strings.Contains(response.Body.String(), secret) {
+			t.Fatalf("browser error leaked %q: %s", secret, response.Body.String())
+		}
 	}
 }

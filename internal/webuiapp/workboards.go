@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
@@ -284,6 +285,10 @@ func (h *Handler) workboardFailure(writer http.ResponseWriter, request *http.Req
 		code, status = "workboard_timeout", http.StatusGatewayTimeout
 	}
 	published := contract.Error{Version: 1, Code: code, Message: "The workboard operation could not be completed.", Retryable: retryable}
+	var operationErr *app.BrowserOperationError
+	if errors.As(err, &operationErr) {
+		published.OperationID = operationErr.OperationID
+	}
 	if published.Validate() != nil {
 		h.writeError(writer, request, http.StatusServiceUnavailable, "workboard_unavailable")
 		return

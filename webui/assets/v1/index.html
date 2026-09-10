@@ -189,6 +189,125 @@
             <button id="load-more-cards" class="secondary kanban-more" type="button" hidden>Load more cards</button>
           </section>
         </div>
+        <div id="workboard-mutation-controls" class="workboard-mutation-controls" aria-label="Workboard actions" hidden>
+          <button id="open-board-create" type="button">Create board</button>
+          <button id="open-board-revise" class="secondary" type="button">Edit board</button>
+          <button id="open-card-create" type="button">Create card</button>
+          <button id="open-card-revise" class="secondary" type="button">Edit selected card</button>
+          <button id="open-board-archive" class="danger" type="button">Archive board</button>
+          <button id="reconcile-workboard-operations" class="secondary" type="button" hidden>Check operation status</button>
+          <button id="acknowledge-workboard-operation" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
+          <output id="workboard-mutation-status" role="status" aria-live="polite"></output>
+        </div>
+        <div id="board-create-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog" role="dialog" aria-modal="true" aria-labelledby="board-create-title" aria-describedby="board-create-help">
+            <h2 id="board-create-title">Create workboard</h2>
+            <p id="board-create-help" class="help">Creates a durable active board. Text limits are measured in UTF-8 bytes.</p>
+            <div id="board-create-form" class="mutation-form" role="form" aria-labelledby="board-create-title">
+              <label for="board-create-name">Title</label>
+              <input id="board-create-name" name="title" required maxlength="256" data-max-bytes="256" aria-describedby="board-create-title-help">
+              <p id="board-create-title-help" class="help">Required; 1–256 UTF-8 bytes.</p>
+              <label for="board-create-description">Description</label>
+              <textarea id="board-create-description" name="description" maxlength="65536" data-max-bytes="65536" rows="5" aria-describedby="board-create-description-help"></textarea>
+              <p id="board-create-description-help" class="help">Optional; at most 65,536 UTF-8 bytes.</p>
+              <div class="button-row"><button id="submit-board-create" type="button">Create board</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
+        <div id="board-revise-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog" role="dialog" aria-modal="true" aria-labelledby="board-revise-title" aria-describedby="board-revise-help">
+            <h2 id="board-revise-title">Edit workboard</h2>
+            <p id="board-revise-help" class="help">The displayed revision is a required conflict fence. Change at least one field.</p>
+            <div id="board-revise-form" class="mutation-form" role="form" aria-labelledby="board-revise-title">
+              <input name="board_id" type="hidden"><input name="expected_board_revision" type="hidden">
+              <p class="fence-summary">Expected board revision: <output id="board-revise-revision">Not loaded</output></p>
+              <label for="board-revise-name">Title</label>
+              <input id="board-revise-name" name="title" maxlength="256" data-max-bytes="256" aria-describedby="board-revise-title-help">
+              <p id="board-revise-title-help" class="help">Optional change; when supplied, 1–256 UTF-8 bytes.</p>
+              <label for="board-revise-description">Description</label>
+              <textarea id="board-revise-description" name="description" maxlength="65536" data-max-bytes="65536" rows="5" aria-describedby="board-revise-description-help"></textarea>
+              <p id="board-revise-description-help" class="help">Optional change; may be empty, at most 65,536 UTF-8 bytes.</p>
+              <div class="button-row"><button id="submit-board-revise" type="button">Save board</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
+        <div id="board-archive-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog destructive-dialog" role="alertdialog" aria-modal="true" aria-labelledby="board-archive-title" aria-describedby="board-archive-warning">
+            <h2 id="board-archive-title">Archive workboard</h2>
+            <p id="board-archive-warning">Archiving is destructive to active workflow: the board becomes read-only and cannot have active claims.</p>
+            <div id="board-archive-form" class="mutation-form" role="form" aria-labelledby="board-archive-title">
+              <input name="board_id" type="hidden"><input name="expected_board_revision" type="hidden">
+              <p class="fence-summary">Expected board revision: <output id="board-archive-revision">Not loaded</output></p>
+              <label class="confirmation"><input id="board-archive-confirm" type="checkbox" required> I understand that this archives the selected board.</label>
+              <div class="button-row"><button id="submit-board-archive" class="danger" type="button" disabled>Archive board</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
+        <div id="card-create-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog workboard-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="card-create-title" aria-describedby="card-create-help">
+            <h2 id="card-create-title">Create card</h2>
+            <p id="card-create-help" class="help">Required board and graph revisions prevent creating against stale layout or dependencies.</p>
+            <div id="card-create-form" class="mutation-form mutation-form-grid" role="form" aria-labelledby="card-create-title">
+              <input name="board_id" type="hidden"><input name="expected_board_revision" type="hidden"><input name="expected_graph_revision" type="hidden">
+              <p class="fence-summary form-span">Expected board revision: <output id="card-create-board-revision">Not loaded</output> · graph revision: <output id="card-create-graph-revision">Not loaded</output></p>
+              <div><label for="card-create-name">Title</label><input id="card-create-name" name="title" required maxlength="256" data-max-bytes="256"><p class="help">Required; 1–256 UTF-8 bytes.</p></div>
+              <div><label for="card-create-priority">Priority</label><select id="card-create-priority" name="priority" required><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+              <div class="form-span"><label for="card-create-description">Description</label><textarea id="card-create-description" name="description" maxlength="65536" data-max-bytes="65536" rows="5"></textarea><p class="help">Optional; at most 65,536 UTF-8 bytes.</p></div>
+              <div><label for="card-create-parent">Parent card ID</label><input id="card-create-parent" name="parent_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}" autocomplete="off"><p class="help">Optional ID; 1–128 ASCII characters.</p></div>
+              <div><label for="card-create-assignee">Assignee ID</label><input id="card-create-assignee" name="assignee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}" autocomplete="off"><p class="help">Optional ID; 1–128 ASCII characters.</p></div>
+              <div><label for="card-create-labels">Labels</label><textarea id="card-create-labels" name="labels" maxlength="2079" data-max-items="32" data-item-max-bytes="64" rows="4" aria-describedby="card-create-labels-help"></textarea><p id="card-create-labels-help" class="help">One per line; at most 32 unique labels, each 1–64 UTF-8 bytes.</p></div>
+              <div><label for="card-create-dependencies">Dependency card IDs</label><textarea id="card-create-dependencies" name="dependencies" maxlength="8255" data-max-items="64" data-item-max-bytes="128" rows="4" aria-describedby="card-create-dependencies-help"></textarea><p id="card-create-dependencies-help" class="help">One unique ID per line; at most 64.</p></div>
+              <fieldset class="budget-fields form-span"><legend>Work budget</legend>
+                <label for="card-create-attempt-limit">Attempts</label><input id="card-create-attempt-limit" name="budget.attempt_limit" type="number" required min="1" max="32" step="1" value="1">
+                <label for="card-create-time-limit">Time, ms</label><input id="card-create-time-limit" name="budget.time_limit_ms" type="number" required min="0" max="2592000000" step="1" value="0">
+                <label for="card-create-token-limit">Tokens</label><input id="card-create-token-limit" name="budget.token_limit" type="number" required min="0" max="1000000000" step="1" value="0">
+                <label for="card-create-cost-limit">Cost, micros</label><input id="card-create-cost-limit" name="budget.cost_micros" type="number" required min="0" max="1000000000000" step="1" value="0">
+              </fieldset>
+              <fieldset id="card-create-criteria" class="criteria-fields form-span" data-min-items="1" data-max-items="32" data-max-bytes="65536"><legend>Acceptance criteria</legend>
+                <p class="help">Provide 1–32 criteria; the encoded set is limited to 65,536 bytes. Objective criteria require deterministic sources; subjective criteria require user feedback.</p>
+                <div class="criterion-row">
+                  <label for="card-create-criterion-id">Criterion ID</label><input id="card-create-criterion-id" name="criteria.id" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}">
+                  <label for="card-create-criterion-kind">Kind</label><select id="card-create-criterion-kind" name="criteria.kind" required><option value="objective">Objective</option><option value="subjective">Subjective</option></select>
+                  <label for="card-create-required-source">Required source</label><select id="card-create-required-source" name="criteria.required_source" required><option value="deterministic">Deterministic</option><option value="user_feedback">User feedback</option></select>
+                  <label for="card-create-validator">Validator ID</label><input id="card-create-validator" name="criteria.validator_id" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}">
+                  <label for="card-create-criterion-description">Description</label><textarea id="card-create-criterion-description" name="criteria.description" required maxlength="4096" data-max-bytes="4096" rows="3"></textarea>
+                  <label class="confirmation"><input id="card-create-criterion-required" name="criteria.required" type="checkbox"> Required</label>
+                </div>
+                <button id="add-card-create-criterion" class="secondary" type="button">Add criterion</button>
+              </fieldset>
+              <div class="button-row form-span"><button id="submit-card-create" type="button">Create card</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status form-span" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
+        <div id="card-revise-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog workboard-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="card-revise-title" aria-describedby="card-revise-help">
+            <h2 id="card-revise-title">Edit card</h2>
+            <p id="card-revise-help" class="help">Change at least one field. Only changed fields will be sent; parent changes also require the displayed graph revision.</p>
+            <div id="card-revise-form" class="mutation-form mutation-form-grid" role="form" aria-labelledby="card-revise-title">
+              <input name="board_id" type="hidden"><input name="card_id" type="hidden"><input name="expected_card_revision" type="hidden"><input name="expected_graph_revision" type="hidden">
+              <p class="fence-summary form-span">Expected card revision: <output id="card-revise-revision">Not loaded</output> · graph revision: <output id="card-revise-graph-revision">Used only for parent changes</output></p>
+              <div><label for="card-revise-name">Title</label><input id="card-revise-name" name="title" maxlength="256" data-max-bytes="256"><p class="help">When changed, 1–256 UTF-8 bytes.</p></div>
+              <div><label for="card-revise-priority">Priority</label><select id="card-revise-priority" name="priority"><option value="">Unchanged</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+              <div class="form-span"><label for="card-revise-description">Description</label><textarea id="card-revise-description" name="description" maxlength="65536" data-max-bytes="65536" rows="5"></textarea><p class="help">Optional change; may be empty, at most 65,536 UTF-8 bytes.</p></div>
+              <div><label for="card-revise-parent">Parent card ID</label><input id="card-revise-parent" name="parent_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}" autocomplete="off" aria-describedby="card-revise-parent-help"><label class="confirmation"><input name="clear_parent" type="checkbox"> Clear parent</label><p id="card-revise-parent-help" class="help">Enter a replacement ID or select Clear parent, never both.</p></div>
+              <div><label for="card-revise-assignee">Assignee ID</label><input id="card-revise-assignee" name="assignee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}" autocomplete="off" aria-describedby="card-revise-assignee-help"><label class="confirmation"><input name="clear_assignee" type="checkbox"> Clear assignee</label><p id="card-revise-assignee-help" class="help">Enter a replacement ID or select Clear assignee, never both.</p></div>
+              <div class="form-span"><label for="card-revise-labels">Labels</label><textarea id="card-revise-labels" name="labels" maxlength="2079" data-max-items="32" data-item-max-bytes="64" rows="4"></textarea><p class="help">Edit to replace the label set; remove all lines to clear it. At most 32 unique labels, each 1–64 UTF-8 bytes.</p></div>
+              <fieldset class="budget-fields form-span"><legend>Replacement work budget (optional)</legend>
+                <p class="help form-span">To replace the budget, complete all four values.</p>
+                <label for="card-revise-attempt-limit">Attempts</label><input id="card-revise-attempt-limit" name="budget.attempt_limit" type="number" min="1" max="32" step="1">
+                <label for="card-revise-time-limit">Time, ms</label><input id="card-revise-time-limit" name="budget.time_limit_ms" type="number" min="0" max="2592000000" step="1">
+                <label for="card-revise-token-limit">Tokens</label><input id="card-revise-token-limit" name="budget.token_limit" type="number" min="0" max="1000000000" step="1">
+                <label for="card-revise-cost-limit">Cost, micros</label><input id="card-revise-cost-limit" name="budget.cost_micros" type="number" min="0" max="1000000000000" step="1">
+              </fieldset>
+              <div class="button-row form-span"><button id="submit-card-revise" type="button">Save card</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status form-span" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
   </div>
@@ -213,6 +332,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/inspector.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-client.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboards.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

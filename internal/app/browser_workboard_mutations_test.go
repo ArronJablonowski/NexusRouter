@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -16,6 +18,52 @@ import (
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
+
+func expectedBrowserOperationID(subject, key string) string {
+	digest := sha256.Sum256([]byte(subject + "\x00" + key))
+	return "op_" + hex.EncodeToString(digest[:])
+}
+
+func browserMutationEventPage(now time.Time, action workboard.BoardAction, operationID, cardID string) workboard.BoardEventPage {
+	return workboard.BoardEventPage{Version: 1, BoardID: "board-a", HighWaterSequence: 1, Items: []workboard.BoardEvent{{
+		Version: 1, ID: "event-operation-0001", BoardID: "board-a", Sequence: 1, OperationID: operationID,
+		Kind: action, ActorID: "browser-operator", ActorType: "operator", CardID: cardID, CreatedAt: now,
+	}}}
+}
+
+func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testing.T) {
+	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
+	revision := int64(4)
+	receipt := func(boardRevision int64, cardID string, cardRevision *int64) contract.OperationReceipt {
+		return contract.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "domain-operation-0001",
+			RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
+			EventCount: 1, TransactionBytes: 128, BoardRevision: boardRevision, CardID: cardID, CardRevision: cardRevision,
+			Outcome: "committed", CreatedAt: now}
+	}
+	cardOne, cardFive := int64(1), int64(5)
+	tests := []struct {
+		name    string
+		request contract.BoardRequest
+		receipt contract.OperationReceipt
+		want    bool
+	}{
+		{"board create", contract.BoardRequest{Action: contract.BoardCreate}, receipt(1, "", nil), true},
+		{"board create wrong revision", contract.BoardRequest{Action: contract.BoardCreate}, receipt(2, "", nil), false},
+		{"board revise", contract.BoardRequest{Action: contract.BoardRevise, BoardID: "board-a", ExpectedBoardRevision: &revision}, receipt(5, "", nil), true},
+		{"board revise stale receipt", contract.BoardRequest{Action: contract.BoardRevise, BoardID: "board-a", ExpectedBoardRevision: &revision}, receipt(4, "", nil), false},
+		{"card create", contract.BoardRequest{Action: contract.CardCreate, BoardID: "board-a", ExpectedBoardRevision: &revision}, receipt(5, "card-a", &cardOne), true},
+		{"card create wrong card revision", contract.BoardRequest{Action: contract.CardCreate, BoardID: "board-a", ExpectedBoardRevision: &revision}, receipt(5, "card-a", &cardFive), false},
+		{"card revise", contract.BoardRequest{Action: contract.CardRevise, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), true},
+		{"card revise wrong card", contract.BoardRequest{Action: contract.CardRevise, BoardID: "board-a", CardID: "card-b", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := workboardReceiptMatchesRequest(test.receipt, test.request); got != test.want {
+				t.Fatalf("correlation=%t want=%t receipt=%+v", got, test.want, test.receipt)
+			}
+		})
+	}
+}
 
 func newBrowserTestSubject(t *testing.T) string {
 	t.Helper()
@@ -145,7 +193,8 @@ func TestBrowserWorkboardMutationCommitsAndReplaysFromJournal(t *testing.T) {
 	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
 	repository := &bridgeBoardRepository{createReceipt: workboard.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "board-operation-key-0001",
 		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
-		EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: now}}
+		EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: now},
+		events: browserMutationEventPage(now, workboard.BoardCreateAction, "board-operation-key-0001", "")}
 	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
@@ -168,6 +217,40 @@ func TestBrowserWorkboardMutationCommitsAndReplaysFromJournal(t *testing.T) {
 	if err != nil || len(page.Items) != 1 || page.Items[0].State != "committed" || page.Items[0].Action != string(contract.BoardCreate) ||
 		page.Items[0].SubjectType != "board" || page.Items[0].SubjectID != first.BoardID {
 		t.Fatalf("page=%+v err=%v", page, err)
+	}
+}
+
+func TestBrowserWorkboardMutationRejectsReceiptFromDifferentAction(t *testing.T) {
+	ctx := context.Background()
+	journal, err := browserops.Open(ctx, filepath.Join(t.TempDir(), "browser.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journal.Close()
+	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
+	operationID := "swapped-operation-0001"
+	repository := &bridgeBoardRepository{createReceipt: workboard.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: operationID,
+		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
+		EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: now},
+		events: browserMutationEventPage(now, workboard.BoardArchiveAction, operationID, "")}
+	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutations, err := NewBrowserWorkboardMutations(bridge, journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	title, subject := "Delivery", strings.Repeat("d", 64)
+	request := contract.BoardRequest{Version: 1, Action: contract.BoardCreate, IdempotencyKey: "swapped-browser-key-0001", Title: &title}
+	_, err = mutations.Mutate(ctx, subject, request)
+	var operationErr *BrowserOperationError
+	if !errors.As(err, &operationErr) || !errors.Is(err, ErrBrowserMutation) || operationErr.OperationID != expectedBrowserOperationID(subject, request.IdempotencyKey) {
+		t.Fatalf("cross-action receipt accepted: %#v", err)
+	}
+	records, _, listErr := journal.List(ctx, subject, "", 10)
+	if listErr != nil || len(records) != 1 || records[0].State != "pending" || repository.createCalls != 1 {
+		t.Fatalf("records=%+v calls=%d err=%v", records, repository.createCalls, listErr)
 	}
 }
 
@@ -199,6 +282,85 @@ func TestBrowserWorkboardMutationJournalsDefinitiveRejection(t *testing.T) {
 	page, err := mutations.journal.Operations(ctx, subject, "", 100)
 	if err != nil || len(page.Items) != 1 || page.Items[0].State != "rejected" || page.Items[0].SubjectType != "board" || page.Items[0].SubjectID != "board-a" {
 		t.Fatalf("page=%+v err=%v", page, err)
+	}
+}
+
+func TestBrowserWorkboardMutationCorrelatesNondefinitiveFailure(t *testing.T) {
+	ctx := context.Background()
+	journal, err := browserops.Open(ctx, filepath.Join(t.TempDir(), "browser.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journal.Close()
+	privateFailure := errors.New("private bridge failure with request content")
+	repository := &bridgeBoardRepository{archiveErr: privateFailure}
+	bridge, err := NewWorkboardBridge(repository, repository, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutations, err := NewBrowserWorkboardMutations(bridge, journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision, subject := int64(2), strings.Repeat("e", 64)
+	request := contract.BoardRequest{Version: 1, Action: contract.BoardArchive, IdempotencyKey: "ambiguous-archive-key-0001", BoardID: "board-a", ExpectedBoardRevision: &revision}
+	_, err = mutations.Mutate(ctx, subject, request)
+	var operationErr *BrowserOperationError
+	wantID := expectedBrowserOperationID(subject, request.IdempotencyKey)
+	if !errors.As(err, &operationErr) || operationErr.OperationID != wantID || !errors.Is(err, privateFailure) {
+		t.Fatalf("operation error=%#v want_id=%q", err, wantID)
+	}
+	records, _, listErr := journal.List(ctx, subject, "", 10)
+	if listErr != nil || len(records) != 1 || records[0].OperationID != wantID || records[0].State != "pending" || len(records[0].Response) != 0 {
+		t.Fatalf("records=%+v err=%v", records, listErr)
+	}
+	foreign, _, listErr := journal.List(ctx, strings.Repeat("f", 64), "", 10)
+	if listErr != nil || len(foreign) != 0 {
+		t.Fatalf("foreign session observed operation: records=%+v err=%v", foreign, listErr)
+	}
+}
+
+func TestBrowserWorkboardMutationCorrelatesJournalCommitFailure(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "browser.db")
+	journal, err := browserops.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journal.Close()
+	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
+	repository := &bridgeBoardRepository{createReceipt: workboard.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "lost-ack-domain-key-0001",
+		RequestDigest: strings.Repeat("a", 64), ResponseDigest: strings.Repeat("b", 64), FirstSequence: 1, LastSequence: 1,
+		EventCount: 1, TransactionBytes: 128, BoardRevision: 1, Outcome: "committed", CreatedAt: now},
+		events: browserMutationEventPage(now, workboard.BoardCreateAction, "lost-ack-domain-key-0001", "")}
+	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutations, err := NewBrowserWorkboardMutations(bridge, journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	if _, err = raw.Exec(`CREATE TRIGGER fail_browser_commit BEFORE UPDATE OF state ON browser_operations
+		WHEN NEW.state='committed' BEGIN SELECT RAISE(ABORT,'private receipt content'); END`); err != nil {
+		t.Fatal(err)
+	}
+	title, subject := "Sensitive board title", strings.Repeat("a", 64)
+	request := contract.BoardRequest{Version: 1, Action: contract.BoardCreate, IdempotencyKey: "lost-ack-browser-key-0001", Title: &title}
+	_, err = mutations.Mutate(ctx, subject, request)
+	var operationErr *BrowserOperationError
+	wantID := expectedBrowserOperationID(subject, request.IdempotencyKey)
+	if !errors.As(err, &operationErr) || operationErr.OperationID != wantID || !errors.Is(err, ErrBrowserMutation) || strings.Contains(err.Error(), title) || strings.Contains(err.Error(), repository.createReceipt.ResponseDigest) {
+		t.Fatalf("operation error=%#v want_id=%q", err, wantID)
+	}
+	records, _, listErr := journal.List(ctx, subject, "", 10)
+	if listErr != nil || len(records) != 1 || records[0].OperationID != wantID || records[0].State != "pending" || len(records[0].Response) != 0 || repository.createCalls != 1 {
+		t.Fatalf("records=%+v calls=%d err=%v", records, repository.createCalls, listErr)
 	}
 }
 

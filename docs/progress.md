@@ -6000,3 +6000,40 @@ the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
 releasepack 484.189s, telemetry 483.134s, SDK 66.732s, CLI 64.188s, toolgate
 30.543s, workers 9.831s, processguard 3.157s, browser BFF 2.971s, and Web UI
 2.855s.
+
+## 2026-09-10 — DAR-83 safe board and card mutation checkpoint
+
+DAR-83 remains in progress. The authenticated Workboards view now includes
+bounded dialogs for board creation and revision, confirmed board archival, card
+creation, and selected-card revision. Editors capture immutable board, graph,
+and card revisions when opened and become stale if the authoritative snapshot
+changes. Board archival is unavailable while claims remain active. Card inputs
+enforce bounded labels, dependencies, budgets, and objective-versus-subjective
+acceptance-criterion source rules.
+
+The browser obtains a same-origin CSRF token independently on the Workboards
+route and completes a bounded global operation-journal scan before enabling any
+write. Every logical intent receives one cryptographic idempotency key and one
+frozen serialized body. Successful responses must satisfy the closed receipt
+contract and action-specific identity/revision rules. Network failures, 408s,
+5xx responses, and malformed success bodies retain an ambiguous local intent
+and are never replayed automatically. A published browser operation ID can be
+reconciled exactly; an outcome without one can be acknowledged only after a
+new clean journal scan finds no pending operation. Other pending session work
+continues to block writes.
+
+The Go browser mutation boundary now preserves the exact session-derived
+operation ID on ambiguous bridge, invalid-receipt, replay-validation, and
+journal-commit failures while keeping request bodies and receipt digests out of
+the browser error. It also rejects valid-shaped receipts whose board/card
+identity or action-specific revisions do not match the request. Focused Node
+syntax and executable contract tests, Web UI tests, browser BFF tests,
+application correlation tests, source/LOC checks, and diff checks pass. The
+repository-wide `make check` gate passed: source formatting and the 1,000-line
+limit, `go vet ./...`, the complete race-enabled test suite, and `go build
+./...`. The longest rebuilt packages were application 568.807s, telemetry
+483.442s, releasepack 483.432s, SDK 67.250s, CLI 65.513s, toolgate 30.796s,
+workers 9.729s, and browser BFF/Web UI from cache after focused clean passes.
+
+Keyboard move/reorder, dependency editing, lifecycle and acceptance controls,
+and browser end-to-end qualification remain later DAR-83/DAR-86 work.

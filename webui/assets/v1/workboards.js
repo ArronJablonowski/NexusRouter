@@ -21,6 +21,8 @@
 	let selectedID = "", boardCursor = "", cardCursor = "", boardTotal = 0, cardTotal = 0, boardRequestVersion = 0, cardRequestVersion = 0, snapshotFence = null;
 	let boardSource = null, streamBoard = "", streamRevision = 0, streamFailures = 0, invalidationTimer = 0, snapshotGraphRevision = 0, snapshotGraphDigest = "";
 	let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active", appliedFilters = Object.freeze({state: "", assignee: "", owner: "", claim: ""});
+	let currentBoard = null, selectedCard = null;
+	const contextObservers = new Set();
 	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map();
 	chat.hidden = true;
 	view.hidden = false;
@@ -307,7 +309,7 @@
 		item.dataset.cardId = card.id;
 		const article = element("article");
 		const toggle = element("button", "card-toggle", card.title);
-		toggle.type = "button"; toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Inspect card: " + card.title);
+		toggle.type = "button"; toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-pressed", "false"); toggle.setAttribute("aria-label", "Select and inspect card: " + card.title);
 		const meta = element("div", "card-meta");
 		meta.append(element("span", "", card.priority + " priority"));
 		meta.append(element("span", "", card.state.replace("_", " ") + " state"));
@@ -319,7 +321,7 @@
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
 		details.append(element("p", "", card.labels.length ? "Labels: " + card.labels.join(", ") : "No labels"));
-		toggle.addEventListener("click", () => { const expanded = toggle.getAttribute("aria-expanded") === "true"; toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
+		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); selectedCard = Object.freeze({...card, labels: Object.freeze(card.labels.slice()), dependencies: Object.freeze(card.dependencies.slice()), criteria: Object.freeze(card.criteria.map(item => Object.freeze({...item}))), budget: Object.freeze({...card.budget})}); for (const observer of contextObservers) observer(); const expanded = toggle.getAttribute("aria-expanded") === "true"; toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
 		article.append(toggle, meta, details); item.append(article);
 		return item;
 	}
@@ -329,8 +331,9 @@
 		return result && result.ranks;
 	}
 	function clearCardState() {
-		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
+		cardCursor = ""; cardTotal = 0; snapshotGraphRevision = 0; snapshotGraphDigest = ""; currentBoard = null; selectedCard = null; cardIDs.clear(); cardCursors.clear(); laneRanks.clear(); snapshotFence = null; loadedCards = []; visibleColumns = [];
 		kanban.replaceChildren(); cardList.replaceChildren(); laneLists.clear(); laneCounts.clear(); cardNodes.clear(); kanban.hidden = true; cardList.hidden = true; loadMoreCards.hidden = true;
+		for (const observer of contextObservers) observer();
 	}
 	function appendCards(cards, ranks) {
 		const nodes = cards.map(cardNode);
@@ -367,6 +370,8 @@
 			appendCards(snapshot.cards, ranks);
 			cardTotal += snapshot.cards.length; cardCursor = snapshot.next_cursor || "";
 			selectedTitle.textContent = snapshot.board.title;
+			currentBoard = Object.freeze({...snapshot.board});
+			for (const observer of contextObservers) observer();
 			selectedMeta.textContent = snapshot.board.state + " board · read-only · " + String(cardTotal) + " matching cards loaded · " + String(snapshot.board.card_count) + " total on board" + (snapshot.has_more ? " · more matching available" : "");
 			stateNode.hidden = true; kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false");
 			if (!cardTotal) notice(stateNode, "No cards match the current filters.", false);
@@ -379,6 +384,11 @@
 			loadMoreCards.hidden = true;
 		});
 	}
+	window.DarwinWorkboards = Object.freeze({
+		context: () => Object.freeze({board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision}),
+		refresh: () => { loadBoards("", true); if (selectedID) loadBoard(selectedID, "", true); },
+		subscribe: observer => { if (typeof observer !== "function") return () => {}; contextObservers.add(observer); return () => contextObservers.delete(observer); }
+	});
 	function closeBoardStream() {
 		if (boardSource) boardSource.close();
 		boardSource = null; streamBoard = "";

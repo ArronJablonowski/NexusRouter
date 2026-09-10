@@ -121,6 +121,7 @@ input { padding: .55rem .7rem; }
 .kanban-column-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 0 .7rem; font-size: .9rem; }
 .kanban-cards { margin: 0; padding: 0; list-style: none; }
 .kanban-card { margin-bottom: .6rem; padding: .75rem; border: 1px solid #3c4b69; border-radius: .65rem; background: #17223a; }
+.kanban-card.selected-card { border-color: #73e6b1; box-shadow: 0 0 0 1px #73e6b1; }
 .kanban-card h4 { margin: 0; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.35; }
 .card-toggle { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.35; }
 .card-details { margin-top: .7rem; padding-top: .65rem; border-top: 1px solid #34415d; color: #cbd6e9; font-size: .78rem; line-height: 1.45; }
@@ -142,6 +143,31 @@ input { padding: .55rem .7rem; }
 .workboard-card-list { margin: 0; padding: 1rem 1.4rem; overflow: auto; list-style: none; }
 .workboard-card-list[hidden] { display: none; }
 .workboard-card-list .kanban-card { max-width: 56rem; }
+.workboard-mutation-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.workboard-mutation-controls[hidden], .workboard-dialog-backdrop[hidden] { display: none; }
+.workboard-dialog-backdrop { position: fixed; inset: 0; z-index: 12; display: grid; place-items: center; padding: 1rem; background: #050813dd; }
+.workboard-dialog { width: min(38rem, 100%); max-height: calc(100vh - 2rem); overflow: auto; padding: 1.4rem; border: 1px solid #465675; border-radius: 1rem; background: #111a2d; box-shadow: 0 1rem 4rem #000a; }
+.workboard-dialog-wide { width: min(62rem, 100%); }
+.workboard-dialog h2 { margin: 0 0 .5rem; }
+.destructive-dialog { border-color: #d66; }
+.mutation-form { display: grid; gap: .45rem; margin-top: 1rem; }
+.mutation-form > label, .mutation-form-grid label, .budget-fields label, .criteria-fields label { color: #dbe5f7; font-size: .8rem; }
+.mutation-form input, .mutation-form textarea, .mutation-form select { width: 100%; min-width: 0; }
+.mutation-form textarea { resize: vertical; }
+.mutation-form .help { margin: 0 0 .5rem; }
+.mutation-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1rem; }
+.form-span { grid-column: 1 / -1; }
+.fence-summary { margin: 0; padding: .65rem; border-left: .25rem solid #73e6b1; background: #17223a; color: #cbd6e9; }
+.confirmation { display: flex; align-items: flex-start; gap: .5rem; margin: .5rem 0; }
+.confirmation input { width: auto; margin-top: .2rem; }
+.budget-fields, .criteria-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem .7rem; padding: .8rem; border: 1px solid #34415d; border-radius: .6rem; }
+.budget-fields legend, .criteria-fields legend { padding: 0 .35rem; font-weight: 700; }
+.budget-fields label { grid-row: 1; }
+.budget-fields input { grid-row: 2; }
+.criteria-fields > .help, .criterion-row, .criteria-fields > button { grid-column: 1 / -1; }
+.criterion-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem .7rem; }
+.criterion-row textarea, .criterion-row .confirmation { grid-column: 1 / -1; }
+.mutation-form-status { min-height: 1.2rem; color: #ffcf70; }
 :focus-visible { outline: 3px solid #73e6b1; outline-offset: 3px; }
 
 @media (max-width: 78rem) {
@@ -154,6 +180,8 @@ input { padding: .55rem .7rem; }
   .workboard-layout { grid-template-columns: 1fr; }
   .workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workboard-filters label, .workboard-filters input, .workboard-filters select, .workboard-filters button { grid-row: auto; }
+  .budget-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .budget-fields label, .budget-fields input { grid-row: auto; }
 }
 
 @media (max-width: 42rem) {
@@ -168,6 +196,8 @@ input { padding: .55rem .7rem; }
   .board-index { min-height: 15rem; }
   .workboard-filters { grid-template-columns: 1fr; }
   .workboard-filters label, .workboard-filters input, .workboard-filters select, .workboard-filters button { grid-row: auto; }
+  .mutation-form-grid, .budget-fields, .criterion-row { grid-template-columns: 1fr; }
+  .form-span, .criteria-fields > .help, .criterion-row, .criteria-fields > button, .criterion-row textarea, .criterion-row .confirmation { grid-column: 1; }
   #task-inspector[hidden] { display: none; }
 }
 
