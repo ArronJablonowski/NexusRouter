@@ -115,7 +115,8 @@ func (b *BrowserWorkboardMutations) receiptMatchesRequest(ctx context.Context, s
 		return false
 	}
 	switch request.Action {
-	case contract.BoardCreate, contract.BoardRevise, contract.BoardArchive, contract.CardCreate, contract.CardRevise, contract.CardMove, contract.CardReorder:
+	case contract.BoardCreate, contract.BoardRevise, contract.BoardArchive, contract.CardCreate, contract.CardRevise, contract.CardMove, contract.CardReorder,
+		contract.DependencyAdd, contract.DependencyRemove:
 		if receipt.EventCount != 1 || receipt.FirstSequence != receipt.LastSequence {
 			return false
 		}
@@ -162,6 +163,9 @@ func workboardReceiptMatchesRequest(receipt contract.OperationReceipt, request c
 	case contract.CardMove, contract.CardReorder:
 		return receipt.CardID != "" && receipt.CardRevision != nil && receipt.ClaimRevision == nil &&
 			request.ExpectedBoardRevision != nil && receipt.BoardRevision == *request.ExpectedBoardRevision+1 &&
+			request.ExpectedCardRevision != nil && *receipt.CardRevision == *request.ExpectedCardRevision+1
+	case contract.DependencyAdd, contract.DependencyRemove:
+		return receipt.CardID != "" && receipt.CardRevision != nil && receipt.ClaimRevision == nil &&
 			request.ExpectedCardRevision != nil && *receipt.CardRevision == *request.ExpectedCardRevision+1
 	}
 	return receipt.CardID != ""

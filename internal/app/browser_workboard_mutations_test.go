@@ -65,6 +65,15 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 			got.ClaimRevision = &claimOne
 			return got
 		}(), false},
+		{"dependency add", contract.BoardRequest{Action: contract.DependencyAdd, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b", ExpectedCardRevision: &revision, ExpectedGraphRevision: &revision}, receipt(9, "card-a", &cardFive), true},
+		{"dependency remove", contract.BoardRequest{Action: contract.DependencyRemove, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b", ExpectedCardRevision: &revision, ExpectedGraphRevision: &revision}, receipt(3, "card-a", &cardFive), true},
+		{"dependency wrong card revision", contract.BoardRequest{Action: contract.DependencyAdd, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b", ExpectedCardRevision: &revision, ExpectedGraphRevision: &revision}, receipt(9, "card-a", &cardFour), false},
+		{"dependency missing card revision", contract.BoardRequest{Action: contract.DependencyRemove, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b", ExpectedCardRevision: &revision, ExpectedGraphRevision: &revision}, receipt(9, "card-a", nil), false},
+		{"dependency claim revision", contract.BoardRequest{Action: contract.DependencyAdd, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b", ExpectedCardRevision: &revision, ExpectedGraphRevision: &revision}, func() contract.OperationReceipt {
+			got := receipt(9, "card-a", &cardFive)
+			got.ClaimRevision = &claimOne
+			return got
+		}(), false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -75,7 +84,7 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 	}
 }
 
-func TestBrowserWorkboardMoveAndReorderReceiptsRequireExactEvent(t *testing.T) {
+func TestBrowserWorkboardCardMutationReceiptsRequireExactEvent(t *testing.T) {
 	now := time.Date(2026, 9, 9, 20, 0, 0, 0, time.UTC)
 	boardRevision, cardRevision, nextCardRevision := int64(4), int64(7), int64(8)
 	receipt := contract.OperationReceipt{Version: 1, BoardID: "board-a", OperationID: "domain-operation-0001",
@@ -83,8 +92,13 @@ func TestBrowserWorkboardMoveAndReorderReceiptsRequireExactEvent(t *testing.T) {
 		EventCount: 1, TransactionBytes: 128, BoardRevision: 5, CardID: "card-a", CardRevision: &nextCardRevision,
 		Outcome: "committed", CreatedAt: now}
 	request := func(action contract.BoardAction) contract.BoardRequest {
-		return contract.BoardRequest{Action: action, BoardID: "board-a", CardID: "card-a",
-			ExpectedBoardRevision: &boardRevision, ExpectedCardRevision: &cardRevision}
+		result := contract.BoardRequest{Action: action, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &cardRevision}
+		if action == contract.DependencyAdd || action == contract.DependencyRemove {
+			result.DependencyID, result.ExpectedGraphRevision = "card-b", &boardRevision
+		} else {
+			result.ExpectedBoardRevision = &boardRevision
+		}
+		return result
 	}
 	tests := []struct {
 		name        string
@@ -96,7 +110,10 @@ func TestBrowserWorkboardMoveAndReorderReceiptsRequireExactEvent(t *testing.T) {
 	}{
 		{"move", contract.CardMove, workboard.CardMoveAction, receipt.OperationID, receipt.CardID, true},
 		{"reorder", contract.CardReorder, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, true},
+		{"dependency add", contract.DependencyAdd, workboard.CardDependencyAddAction, receipt.OperationID, receipt.CardID, true},
+		{"dependency remove", contract.DependencyRemove, workboard.CardDependencyRemoveAction, receipt.OperationID, receipt.CardID, true},
 		{"wrong action", contract.CardMove, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, false},
+		{"dependency wrong action", contract.DependencyAdd, workboard.CardDependencyRemoveAction, receipt.OperationID, receipt.CardID, false},
 		{"wrong operation", contract.CardMove, workboard.CardMoveAction, "other-operation-0001", receipt.CardID, false},
 		{"wrong card", contract.CardMove, workboard.CardMoveAction, receipt.OperationID, "card-b", false},
 	}

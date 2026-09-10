@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "fb7b84c0befc54a34c0d7bcebb4bc9e036d6c30502019dfba71465e5df4dd7b2" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "90e217ae5bc0fb40a2164549c381cf9e21a014c22ea7977684fca26715543d48" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -374,6 +374,7 @@ func TestEmbeddedWorkboardMutationScaffoldsAreHiddenBoundedAndAccessible(t *test
 		`id="workboard-mutation-controls" class="workboard-mutation-controls" aria-label="Workboard actions" hidden`,
 		`id="board-create-dialog" class="workboard-dialog-backdrop" hidden`, `id="board-revise-dialog" class="workboard-dialog-backdrop" hidden`,
 		`id="board-archive-dialog" class="workboard-dialog-backdrop" hidden`, `id="card-create-dialog" class="workboard-dialog-backdrop" hidden`, `id="card-revise-dialog" class="workboard-dialog-backdrop" hidden`,
+		`id="dependency-change-dialog" class="workboard-dialog-backdrop" hidden`, `id="open-dependency-change" class="secondary" type="button"`,
 		`role="alertdialog" aria-modal="true" aria-labelledby="board-archive-title"`, `id="board-archive-confirm" type="checkbox" required`, `id="submit-board-archive" class="danger" type="button" disabled`,
 		`name="title" required maxlength="256" data-max-bytes="256"`, `name="description" maxlength="65536" data-max-bytes="65536"`,
 		`name="board_id" type="hidden"`, `name="card_id" type="hidden"`, `name="expected_board_revision" type="hidden"`, `name="expected_card_revision" type="hidden"`, `name="expected_graph_revision" type="hidden"`,
@@ -385,12 +386,13 @@ func TestEmbeddedWorkboardMutationScaffoldsAreHiddenBoundedAndAccessible(t *test
 		`name="criteria.id" required maxlength="128"`, `name="criteria.kind" required`, `name="criteria.required_source" required`, `name="criteria.validator_id" required maxlength="128"`,
 		`name="criteria.description" required maxlength="4096" data-max-bytes="4096"`, `name="criteria.required" type="checkbox"`,
 		`name="clear_parent" type="checkbox"`, `name="clear_assignee" type="checkbox"`, `class="mutation-form-status" role="status" aria-live="polite"`,
+		`id="dependency-change-mode" name="mode" required`, `id="dependency-change-id" name="dependency_id" required`, `id="dependency-card-revision"`, `id="dependency-graph-revision"`,
 	} {
 		if !strings.Contains(markup, required) {
 			t.Fatalf("workboard mutation scaffold missing %q", required)
 		}
 	}
-	for _, form := range []string{`id="board-create-form" class="mutation-form" role="form"`, `id="board-revise-form" class="mutation-form" role="form"`, `id="board-archive-form" class="mutation-form" role="form"`, `id="card-create-form" class="mutation-form mutation-form-grid" role="form"`, `id="card-revise-form" class="mutation-form mutation-form-grid" role="form"`} {
+	for _, form := range []string{`id="board-create-form" class="mutation-form" role="form"`, `id="board-revise-form" class="mutation-form" role="form"`, `id="board-archive-form" class="mutation-form" role="form"`, `id="card-create-form" class="mutation-form mutation-form-grid" role="form"`, `id="card-revise-form" class="mutation-form mutation-form-grid" role="form"`, `id="dependency-change-form" class="mutation-form" role="form"`} {
 		if !strings.Contains(markup, form) {
 			t.Fatal("missing inert mutation form region", form)
 		}
@@ -520,6 +522,13 @@ if (!client.captureCurrent(down,positionContext) || client.captureCurrent(down,{
 const moveIntent = {body:{action:"card.move",board_id:"board-a",card_id:"card-a"},capture:moved};
 const moveReceipt = {...receipt,card_id:"card-a",card_revision:5};
 if (!client.receiptMatches(moveReceipt,moveIntent) || client.receiptMatches({...moveReceipt,board_revision:4},moveIntent) || client.receiptMatches({...moveReceipt,card_revision:6},moveIntent) || client.receiptMatches({...moveReceipt,claim_revision:1},moveIntent)) process.exit(15);
+const dependencyCapture = {action:"dependency.change",boardID:"board-a",boardRevision:2,graphRevision:9,cardID:"card-a",cardRevision:4,dependencies:["card-c"]};
+const dependencyContext = {...positionContext,graphRevision:9,card:{id:"card-a",revision:4,dependencies:["card-c"]}};
+if (!client.captureCurrent(dependencyCapture,dependencyContext) || client.captureCurrent(dependencyCapture,{...dependencyContext,graphRevision:10}) || client.captureCurrent(dependencyCapture,{...dependencyContext,complete:false}) || client.captureCurrent(dependencyCapture,{...dependencyContext,card:{id:"card-a",revision:4,dependencies:[]}})) process.exit(16);
+const dependencyIntent = {body:{action:"dependency.add",board_id:"board-a",card_id:"card-a"},capture:dependencyCapture};
+const dependencyReceipt = {...receipt,card_id:"card-a",card_revision:5};
+if (!client.receiptMatches(dependencyReceipt,dependencyIntent) || !client.receiptMatches({...dependencyReceipt,board_revision:8},dependencyIntent) || client.receiptMatches({...dependencyReceipt,board_revision:2},dependencyIntent) || client.receiptMatches({...dependencyReceipt,card_revision:6},dependencyIntent) || client.receiptMatches({...dependencyReceipt,claim_revision:1},dependencyIntent)) process.exit(17);
+if (client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-b").action !== "dependency.add" || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-c").action !== "dependency.remove" || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-c") || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-b") || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-a")) process.exit(18);
 const ambiguous = client.mutationError({version:1,code:"workboard_unavailable",message:"Unavailable",retryable:true,operation_id:"op_1234567890123456"},503);
 const conflict = client.mutationError({version:1,code:"revision_conflict",message:"Conflict",retryable:true,current_revision:3},409);
 if (!ambiguous || ambiguous.definitive || ambiguous.operationID !== "op_1234567890123456" || !conflict || !conflict.definitive || client.mutationError({version:1,code:"workboard_unavailable",message:"\ud800",retryable:true},503)) process.exit(10);
@@ -559,7 +568,8 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`body.expected_graph_revision = activeCapture.graphRevision`, `client.receiptMatches(body, intent)`, `client.mutationError(body, response.status)`, `client.acknowledgeAllowed(pendingIntent`,
 		`action === "board.create" ? "/api/v1/workboards"`, `encodeURIComponent(body.board_id) + "/operations"`,
 		`expected_layout_revision: plan.layoutRevision`, `client.positionPlan(context, button.dataset.cardId, direction)`, `window.addEventListener("darwin:card-position"`,
-		`exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id`,
+		`exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id`, `"dependency.add", "dependency.remove"`,
+		`client.dependencyPlan(context, activeCapture`, `expected_graph_revision: activeCapture.graphRevision`, `activeCapture.dependencies.length >= 64`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)

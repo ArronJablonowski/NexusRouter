@@ -6069,3 +6069,41 @@ releasepack 479.584s, telemetry 478.995s, SDK 66.213s, CLI 64.987s, toolgate
 editing, lifecycle and acceptance controls, richer focus restoration,
 optimistic-but-uncommitted visual positioning, and broader browser end-to-end
 qualification remain later DAR-83/DAR-86 work.
+
+## 2026-09-10 — DAR-83 dependency editor checkpoint
+
+DAR-83 remains in progress. The authenticated Workboards view now opens one
+selected-card dependency editor inside the existing Kanban surface. Operators
+must explicitly choose add or remove and then select one card from the complete,
+unfiltered same-board snapshot. Add choices exclude the source and current
+prerequisites; removal choices contain only current prerequisites. The editor
+starts with a disabled empty prompt, enforces the 64-edge bound, and limits new
+dependencies on a Ready card to already-completed cards so it does not offer a
+known-illegal transition.
+
+Opening the editor freezes board identity/revision, selected-card identity and
+revision, graph revision, lifecycle state, and the exact dependency set. Any
+authoritative drift, filtering, or partial pagination makes the editor stale.
+Submission builds one closed `dependency.add` or `dependency.remove` request
+with only its required card and graph fences, then uses the existing CSRF,
+idempotency, global operation barrier, definitive-conflict refresh, and
+ambiguous no-replay path.
+
+Both browser and Go receipt checks now require the exact successor card
+revision, matching board/card identity, no claim revision, and one immutable
+event bound to the domain operation, dependency action, and card. Board revision
+is accepted at or above the captured successor because dependency requests do
+not carry a board-revision fence. Lost-ack journal reconciliation also requires
+the exact card subject. A browser-facade test proves the closed dependency body
+and both revision fences reach the service unchanged.
+
+Focused JavaScript syntax, executable browser-model, Web UI, browser-facade,
+application receipt/event, source/LOC, and diff checks pass. The
+repository-wide `make check` gate also passed: source formatting and the
+1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and `go
+build ./...`. The longest rebuilt packages were application 562.669s,
+telemetry 484.748s, releasepack 481.119s, SDK 65.750s, CLI 64.732s, toolgate
+31.029s, workers 10.170s, process guard 3.554s, browser BFF 3.389s, and Web UI
+3.253s. Lifecycle and acceptance controls, richer focus restoration,
+optimistic-but-uncommitted visual updates, and broader browser end-to-end
+qualification remain later DAR-83/DAR-86 work.

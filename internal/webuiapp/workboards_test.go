@@ -261,6 +261,28 @@ func TestBrowserWorkboardMutationsRequireCSRFAndBindPath(t *testing.T) {
 	}
 }
 
+func TestBrowserDependencyMutationPreservesClosedFences(t *testing.T) {
+	var got contract.BoardRequest
+	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(_ context.Context, _ string, input contract.BoardRequest) (contract.OperationReceipt, error) {
+		got = input
+		receipt := validBrowserReceipt(input.BoardID)
+		next := *input.ExpectedCardRevision + 1
+		receipt.CardID, receipt.CardRevision, receipt.BoardRevision = input.CardID, &next, 7
+		return receipt, nil
+	}})
+	cookie, csrf := authenticateBrowser(t, handler)
+	request := browserRequest(http.MethodPost, "/app/api/v1/workboards/board-a/operations",
+		`{"version":1,"action":"dependency.add","idempotency_key":"browser-workboard-key-01","board_id":"board-a","card_id":"card-a","dependency_id":"card-b","expected_card_revision":3,"expected_graph_revision":8}`)
+	request.AddCookie(cookie)
+	request.Header.Set("X-Darwin-CSRF", csrf)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || got.Action != contract.DependencyAdd || got.BoardID != "board-a" || got.CardID != "card-a" || got.DependencyID != "card-b" ||
+		got.ExpectedCardRevision == nil || *got.ExpectedCardRevision != 3 || got.ExpectedGraphRevision == nil || *got.ExpectedGraphRevision != 8 {
+		t.Fatalf("status=%d request=%+v body=%s", response.Code, got, response.Body.String())
+	}
+}
+
 func TestBrowserWorkboardRejectsWorkerActionBeforeCallback(t *testing.T) {
 	var calls atomic.Int32
 	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(context.Context, string, contract.BoardRequest) (contract.OperationReceipt, error) {

@@ -194,6 +194,7 @@
           <button id="open-board-revise" class="secondary" type="button">Edit board</button>
           <button id="open-card-create" type="button">Create card</button>
           <button id="open-card-revise" class="secondary" type="button">Edit selected card</button>
+          <button id="open-dependency-change" class="secondary" type="button">Edit selected dependencies</button>
           <button id="open-board-archive" class="danger" type="button">Archive board</button>
           <button id="reconcile-workboard-operations" class="secondary" type="button" hidden>Check operation status</button>
           <button id="acknowledge-workboard-operation" class="danger" type="button" hidden>Acknowledge unresolved outcome</button>
@@ -305,6 +306,22 @@
               </fieldset>
               <div class="button-row form-span"><button id="submit-card-revise" type="button">Save card</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
               <output class="mutation-form-status form-span" role="status" aria-live="polite"></output>
+            </div>
+          </section>
+        </div>
+        <div id="dependency-change-dialog" class="workboard-dialog-backdrop" hidden>
+          <section class="workboard-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-change-title" aria-describedby="dependency-change-help">
+            <h2 id="dependency-change-title">Edit card dependencies</h2>
+            <p id="dependency-change-help" class="help">Add one existing card as a prerequisite, or remove one current prerequisite. The displayed graph and card revisions are immutable conflict fences.</p>
+            <div id="dependency-change-form" class="mutation-form" role="form" aria-labelledby="dependency-change-title">
+              <p class="fence-summary">Expected card revision: <output id="dependency-card-revision">Not loaded</output> · graph revision: <output id="dependency-graph-revision">Not loaded</output></p>
+              <label for="dependency-change-mode">Change</label>
+              <select id="dependency-change-mode" name="mode" required><option value="add">Add prerequisite</option><option value="remove">Remove prerequisite</option></select>
+              <label for="dependency-change-id">Prerequisite card ID</label>
+              <select id="dependency-change-id" name="dependency_id" required aria-describedby="dependency-change-id-help"></select>
+              <p id="dependency-change-id-help" class="help">Choices come from this complete, unfiltered board snapshot. Remove mode lists only current prerequisites.</p>
+              <div class="button-row"><button id="submit-dependency-change" type="button">Apply dependency change</button><button class="secondary close-workboard-dialog" type="button">Cancel</button></div>
+              <output class="mutation-form-status" role="status" aria-live="polite"></output>
             </div>
           </section>
         </div>

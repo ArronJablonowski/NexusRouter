@@ -425,8 +425,12 @@ replays an ambiguous side effect. The current positioning slice adds native
 keyboard controls for adjacent same-lane reordering and legal Backlog/Ready
 movement. It fails closed under filters or partial pagination, freezes board,
 layout, and card revisions, and validates exact receipts plus immutable events.
-Dependency editing, lifecycle, acceptance controls, and broader browser
-qualification remain open. DAR-84 owns agent board tools.
+The dependency slice adds a selected-card editor that offers only explicit
+same-board choices from a complete, unfiltered snapshot and freezes card and
+graph revisions for one add/remove operation. Dependency receipts are bound to
+the exact card, action, operation, and immutable event before authoritative
+refresh. Lifecycle, acceptance controls, and broader browser qualification
+remain open. DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

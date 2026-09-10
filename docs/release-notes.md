@@ -17,8 +17,11 @@ supported-platform decision or publication approval is claimed.
   adjacent reordering and legal Backlog/Ready transitions. They require a full,
   unfiltered snapshot, freeze board/layout/card revision fences, validate the
   exact successor receipt and immutable event, and share the existing no-replay
-  ambiguity barrier. Dependency editing, lifecycle, acceptance, richer focus
-  restoration, and browser end-to-end qualification remain open.
+  ambiguity barrier. Operators can now add or remove one selected-card
+  prerequisite from an explicit same-board selector, with complete/unfiltered
+  snapshot gating, card/graph fences, exact dependency receipt/event binding,
+  and authoritative refresh. Lifecycle, acceptance, richer focus restoration,
+  and browser end-to-end qualification remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native

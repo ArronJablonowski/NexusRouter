@@ -11,11 +11,13 @@
 	const reconcile = document.querySelector("#reconcile-workboard-operations"), acknowledge = document.querySelector("#acknowledge-workboard-operation");
 	const openButtons = {
 		"board.create": document.querySelector("#open-board-create"), "board.revise": document.querySelector("#open-board-revise"),
-		"board.archive": document.querySelector("#open-board-archive"), "card.create": document.querySelector("#open-card-create"), "card.revise": document.querySelector("#open-card-revise")
+		"board.archive": document.querySelector("#open-board-archive"), "card.create": document.querySelector("#open-card-create"), "card.revise": document.querySelector("#open-card-revise"),
+		"dependency.change": document.querySelector("#open-dependency-change")
 	};
 	const dialogs = {
 		"board.create": document.querySelector("#board-create-dialog"), "board.revise": document.querySelector("#board-revise-dialog"),
-		"board.archive": document.querySelector("#board-archive-dialog"), "card.create": document.querySelector("#card-create-dialog"), "card.revise": document.querySelector("#card-revise-dialog")
+		"board.archive": document.querySelector("#board-archive-dialog"), "card.create": document.querySelector("#card-create-dialog"), "card.revise": document.querySelector("#card-revise-dialog"),
+		"dependency.change": document.querySelector("#dependency-change-dialog")
 	};
 	const closeButtons = Array.from(document.querySelectorAll(".close-workboard-dialog"));
 	const forms = Object.fromEntries(Object.entries(dialogs).map(([action, dialog]) => [action, dialog.querySelector("[role=form]")]));
@@ -43,6 +45,7 @@
 		for (const action of ["board.revise", "card.create"]) openButtons[action].disabled = blocked || !activeBoard;
 		openButtons["board.archive"].disabled = blocked || !activeBoard || context.board.active_claims !== 0;
 		openButtons["card.revise"].disabled = blocked || !activeBoard || !context.card;
+		openButtons["dependency.change"].disabled = blocked || !activeBoard || !context.card || !context.complete || !context.unfiltered;
 		for (const button of document.querySelectorAll(".card-position")) {
 			const direction = button.dataset.position, card = context.cards && context.cards.find(item => item.id === button.dataset.cardId);
 			button.hidden = (direction === "ready" && (!card || card.state !== "backlog")) || (direction === "backlog" && (!card || card.state !== "ready"));
@@ -80,8 +83,8 @@
 			if (generation !== scanGeneration) return;
 			unresolved = items.filter(item => item.state === "pending"); operationsReady = true;
 			const exact = pendingIntent && pendingIntent.operationID ? items.find(item => item.id === pendingIntent.operationID) : null;
-			const position = pendingIntent && (pendingIntent.body.action === "card.move" || pendingIntent.body.action === "card.reorder");
-			if (exact && exact.action === pendingIntent.body.action && (!position || exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id) && (exact.state === "committed" || exact.state === "rejected")) {
+			const cardScoped = pendingIntent && ["card.move", "card.reorder", "dependency.add", "dependency.remove"].includes(pendingIntent.body.action);
+			if (exact && exact.action === pendingIntent.body.action && (!cardScoped || exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id) && (exact.state === "committed" || exact.state === "rejected")) {
 				pendingIntent = null; inFlight = false; window.DarwinWorkboards.refresh(); const others = unresolved.length ? " Other pending operations still block writes." : ""; show((exact.state === "committed" ? "The exact operation committed. Authoritative state was refreshed." : "The exact operation was rejected. Authoritative state was refreshed.") + others, exact.state === "rejected" || unresolved.length > 0); return;
 			}
 			if (pendingIntent && !pendingIntent.operationID) { if (!unresolved.length) pendingIntent = Object.freeze({...pendingIntent, reconciledClean: true}); show(unresolved.length ? "The outcome is unknown and pending operations remain. Actions stay blocked." : "No matching operation was published in a clean bounded scan. You may acknowledge the local unknown outcome; the request will not be replayed.", true); }
@@ -100,9 +103,10 @@
 		const context = window.DarwinWorkboards.context(), board = context.board, card = context.card;
 		if (action === "board.create") return Object.freeze({action});
 		if (!board || board.state !== "active") return null;
-		if (action === "card.revise" && !card) return null;
+		if ((action === "card.revise" || action === "dependency.change") && !card) return null;
+		if (action === "dependency.change" && (!context.complete || !context.unfiltered)) return null;
 		if (action === "board.archive" && board.active_claims !== 0) return null;
-		return Object.freeze({action, boardID: board.id, boardRevision: board.revision, activeClaims: board.active_claims, graphRevision: context.graphRevision, cardID: card ? card.id : "", cardRevision: card ? card.revision : 0});
+		return Object.freeze({action, boardID: board.id, boardRevision: board.revision, activeClaims: board.active_claims, graphRevision: context.graphRevision, cardID: card ? card.id : "", cardRevision: card ? card.revision : 0, cardState: card ? card.state : "", dependencies: Object.freeze(card ? card.dependencies.slice() : [])});
 	}
 	function stale(action) {
 		if (!activeCapture || activeCapture.action !== action || action === "board.create") return false;
@@ -117,6 +121,15 @@
 		if (action === "board.archive") { writeHidden(form, "expected_board_revision", board.revision); document.querySelector("#board-archive-revision").textContent = String(board.revision); document.querySelector("#board-archive-confirm").checked = false; }
 		if (action === "card.create") { writeHidden(form, "expected_board_revision", board.revision); writeHidden(form, "expected_graph_revision", context.graphRevision); document.querySelector("#card-create-board-revision").textContent = String(board.revision); document.querySelector("#card-create-graph-revision").textContent = String(context.graphRevision); resetCardCreate(form); }
 		if (action === "card.revise") { writeHidden(form, "card_id", card.id); writeHidden(form, "expected_card_revision", card.revision); writeHidden(form, "expected_graph_revision", context.graphRevision); document.querySelector("#card-revise-revision").textContent = String(card.revision); document.querySelector("#card-revise-graph-revision").textContent = String(context.graphRevision); populateCardRevise(form, card); }
+		if (action === "dependency.change") { field(form, "mode").value = "add"; field(form, "dependency_id").value = ""; document.querySelector("#dependency-card-revision").textContent = String(card.revision); document.querySelector("#dependency-graph-revision").textContent = String(context.graphRevision); populateDependencyOptions(); }
+	}
+	function populateDependencyOptions() {
+		const form = forms["dependency.change"], context = window.DarwinWorkboards.context(), mode = field(form, "mode").value, options = field(form, "dependency_id"); options.replaceChildren();
+		if (!activeCapture || !context.cards) return;
+		const ids = mode === "remove" ? activeCapture.dependencies : activeCapture.dependencies.length >= 64 ? [] : context.cards.filter(card => card.id !== activeCapture.cardID && !activeCapture.dependencies.includes(card.id) && (activeCapture.cardState !== "ready" || card.state === "done")).map(card => card.id);
+		const prompt = document.createElement("option"); prompt.value = ""; prompt.disabled = true; prompt.selected = true; prompt.textContent = mode === "remove" ? "Choose a prerequisite to remove" : "Choose a prerequisite to add"; options.append(prompt);
+		for (const id of ids) { const option = document.createElement("option"); option.value = id; options.append(option); }
+		if (!ids.length) prompt.textContent = mode === "remove" ? "No prerequisites to remove" : "No eligible cards";
 	}
 	function focusable(dialog) { return Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled])")); }
 	function open(action) { if (barrier()) return; const next = capture(action); if (!next) return; activeAction = action; activeCapture = next; activeOpener = openButtons[action]; populate(action); dialogs[action].hidden = false; const nodes = focusable(dialogs[action]); if (nodes.length) nodes[0].focus(); updateControls(); }
@@ -147,6 +160,7 @@
 		if (action === "board.archive") { if (!document.querySelector("#board-archive-confirm").checked || activeCapture.activeClaims !== 0 || !board || board.active_claims !== 0) return null; body = {version: 1, action, idempotency_key: operationKey, board_id: activeCapture.boardID, expected_board_revision: activeCapture.boardRevision}; }
 		if (action === "card.create") { const title = field(form, "title").value, description = field(form, "description").value, priority = field(form, "priority").value, labels = lines(field(form, "labels").value, 32, 64, false), dependencies = lines(field(form, "dependencies").value, 64, 128, true), parent = field(form, "parent_id").value.trim(), assignee = field(form, "assignee_id").value.trim(), workBudget = budget(form, "", true), criteria = readCriteria(); if (!boundedText(title, 256, false) || !boundedText(description, 65536, true) || !["low", "normal", "high", "urgent"].includes(priority) || !labels || !dependencies || parent && !validID(parent) || assignee && !validID(assignee) || !workBudget || !criteria) return null; body = {version: 1, action, idempotency_key: operationKey, board_id: activeCapture.boardID, title, description, priority, labels, dependencies, criteria, budget: workBudget, expected_board_revision: activeCapture.boardRevision, expected_graph_revision: activeCapture.graphRevision}; if (parent) body.parent_id = parent; if (assignee) body.assignee_id = assignee; }
 		if (action === "card.revise") { body = {version: 1, action, idempotency_key: operationKey, board_id: activeCapture.boardID, card_id: activeCapture.cardID, expected_card_revision: activeCapture.cardRevision}; const title = field(form, "title").value, description = field(form, "description").value, priority = field(form, "priority").value, labels = lines(field(form, "labels").value, 32, 64, false), parent = field(form, "parent_id").value.trim(), assignee = field(form, "assignee_id").value.trim(), clearParent = field(form, "clear_parent").checked, clearAssignee = field(form, "clear_assignee").checked, workBudget = budget(form, "", false); if (!labels || parent && !validID(parent) || assignee && !validID(assignee) || clearParent && parent || clearAssignee && assignee || workBudget === null) return null; if (title !== card.title) { if (!boundedText(title, 256, false)) return null; body.title = title; } if (description !== card.description) { if (!boundedText(description, 65536, true)) return null; body.description = description; } if (priority !== card.priority) { if (!["low", "normal", "high", "urgent"].includes(priority)) return null; body.priority = priority; } if (JSON.stringify(labels) !== JSON.stringify(card.labels)) body.labels = labels; if (clearParent) body.clear_parent = true; else if (parent !== (card.parent_id || "")) { if (!parent) return null; body.parent_id = parent; } if (body.parent_id !== undefined || body.clear_parent) body.expected_graph_revision = activeCapture.graphRevision; if (clearAssignee) body.clear_assignee = true; else if (assignee !== (card.assignee_id || "")) { if (!assignee) return null; body.assignee_id = assignee; } const originalBudget = card.budget; if (workBudget && JSON.stringify(workBudget) !== JSON.stringify(originalBudget)) body.budget = workBudget; if (Object.keys(body).length === 6) return null; }
+		if (action === "dependency.change") { const plan = client.dependencyPlan(context, activeCapture, field(form, "mode").value, field(form, "dependency_id").value); if (!plan) return null; body = {version: 1, action: plan.action, idempotency_key: operationKey, board_id: activeCapture.boardID, card_id: activeCapture.cardID, dependency_id: plan.dependencyID, expected_card_revision: activeCapture.cardRevision, expected_graph_revision: activeCapture.graphRevision}; }
 		const path = action === "board.create" ? "/api/v1/workboards" : "/api/v1/workboards/" + encodeURIComponent(body.board_id) + "/operations";
 		return client.freezeIntent(path, body);
 	}
@@ -177,6 +191,7 @@
 	for (const [action, button] of Object.entries(submitButtons)) button.addEventListener("click", () => mutate(action));
 	window.addEventListener("darwin:card-position", event => { const detail = event.detail || {}, context = window.DarwinWorkboards.context(), plan = client.positionPlan(context, detail.cardID, detail.direction); if (!plan || barrier()) return; const built = buildPosition(plan); if (built) mutate(plan.action, built, plan); });
 	document.querySelector("#board-archive-confirm").addEventListener("change", updateControls);
+	document.querySelector("#dependency-change-mode").addEventListener("change", populateDependencyOptions);
 	document.querySelector("#add-card-create-criterion").addEventListener("click", () => { const rows = document.querySelectorAll("#card-create-criteria .criterion-row"); if (rows.length < 32) document.querySelector("#card-create-criteria").insertBefore(criterionRow(null), document.querySelector("#add-card-create-criterion")); });
 	for (const dialog of Object.values(dialogs)) dialog.addEventListener("keydown", event => { if (event.key === "Escape" && !inFlight) { event.preventDefault(); close(); return; } if (event.key !== "Tab") return; const nodes = focusable(dialog); if (!nodes.length) return; const first = nodes[0], last = nodes[nodes.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } });
 	reconcile.addEventListener("click", () => scanOperations("Checking the exact operation status…"));
