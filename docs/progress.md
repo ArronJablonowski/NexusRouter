@@ -6527,3 +6527,45 @@ race-enabled repetitions. An unchanged-tree `make check` rerun passed the
 format/LOC gate, vet, the complete race-enabled suite, and `go build ./...`.
 The longest rebuilt packages were application 549.356s, telemetry 465.617s,
 CLI 64.815s, SDK 64.597s, and toolgate 30.171s.
+
+## 2026-09-10 — DAR-85 durable recovery-to-reassignment lineage
+
+DAR-85 remains in progress. Schema 40 adds an immutable
+`workboard_reassignments` record keyed by the proof-gated recovery and bound by
+composite foreign keys to the exact predecessor attempt/claim and successor
+attempt/claim. The link is derived inside the successor claim transaction from
+canonical durable state; no API, browser, worker, or model input can nominate
+lineage. Recovery now clears the predecessor worker assignment when it returns
+the card to Ready, permitting a separately identified replacement worker while
+retaining the predecessor attempt as failed and its claim as released.
+
+Attempt snapshot, detail, and history reads validate normalized/body parity,
+immediate ordinal succession, predecessor failure and release, recovery and
+claim revisions, and timestamps before exposing lineage. Exact claim replay
+returns the original receipt without duplicating the link. A schema-39 upgrade
+backfills only an unambiguous same-card ordinal successor that began after the
+recovery; an unreassigned recovery stays unconsumed, while malformed or
+ambiguous state fails the serialized migration transaction.
+
+Focused normal and race-enabled tests cover restart replay, ordinary claims,
+late-transaction rollback and retry, attempt exhaustion, two-worker contention,
+reader projection and canonical drift, migration backfill, immutability, and
+corrupt/forged migration rollback. This checkpoint does not enable the stock
+daemon scheduler or authorize side-effect replay. Host-frozen inner runtime
+task/session attribution, transactional time/token/cost consumption, configured
+independent judging, and broader crash/lease/acceptance qualification remain.
+
+Repository verification exposed the pre-existing sensitivity of the two largest
+SQLite-heavy race suites to package-level CPU contention. The first parallel
+`make check` reached the ten-minute package ceiling in application and telemetry;
+the second reached it only in application, while telemetry passed in 563.108s.
+The exact reported application and telemetry fixtures each passed three isolated
+race-enabled repetitions, and the complete application suite passed independently
+in 558.261s. Schema-40 startup was then tightened so a base workboard schema
+already validated earlier in the same serialized migration transaction is not
+validated redundantly; retained or independently upgraded databases still take
+the full exact-schema path. A final `GOFLAGS='-p=1' make check` preserved every
+per-package ten-minute timeout and passed the source/LOC gate, vet, complete race
+suite, and `go build ./...`. Its longest rebuilt packages were application
+555.933s, releasepack 464.495s, telemetry 472.414s, CLI 64.239s, SDK 60.975s,
+and toolgate 29.396s.

@@ -15,6 +15,7 @@ import (
 var workboardTables = []string{
 	"workboard_events",
 	"workboard_operations",
+	"workboard_reassignments",
 	"workboard_recoveries",
 	"workboard_recovery_proofs",
 	"workboard_acceptances",

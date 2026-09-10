@@ -72,9 +72,16 @@ supported-platform decision or publication approval is claimed.
   WIP limit, schedules only ready cards, binds the authoritative card revision,
   joins cancellation, and contains trusted factory/runner failures. The worker
   runner's transactional claim remains the final duplicate-ownership fence.
-  The scheduler is not enabled in the stock daemon yet: runtime-task lineage,
-  transactional resource budgets, replacement-attempt linkage, and configured
-  independent judging remain open.
+  Schema 40 now adds an immutable recovery-to-replacement record derived inside
+  the successor claim transaction. It binds the exact recovery, predecessor
+  attempt/claim, and successor attempt/claim; clears stale predecessor worker
+  assignment on recovery; exposes validated lineage through attempt snapshot,
+  detail, and history reads; and conservatively backfills only unambiguous
+  legacy successors. Exact replay, competing replacement workers, rollback,
+  attempt exhaustion, restart, canonical drift, and migration corruption are
+  covered. The scheduler is not enabled in the stock daemon yet: inner runtime
+  task attribution, transactional resource budgets, and configured independent
+  judging remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native

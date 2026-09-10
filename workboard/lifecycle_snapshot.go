@@ -42,6 +42,7 @@ type AttemptSnapshot struct {
 	TaskIDs          []string
 	SessionIDs       []string
 	Claim            *ClaimSnapshot
+	Reassignment     *ReassignmentRecord
 	Candidate        *CandidateRecord
 	Evidence         []EvidenceRecord
 	Acceptance       *AcceptanceRecord
@@ -62,6 +63,12 @@ func (a AttemptSnapshot) Validate() error {
 		ValidateLease(Lease{BoardID: a.Claim.BoardID, CardID: a.Claim.CardID, AttemptID: a.Claim.AttemptID, ClaimID: a.Claim.ID,
 			Revision: a.Claim.Revision, State: LeaseState(a.Claim.State), OwnerID: a.Claim.OwnerID, ExpiresAt: a.Claim.ExpiresAt,
 			LastHeartbeat: a.Claim.LastHeartbeat, ReleasedAt: a.Claim.ReleasedAt}) != nil {
+		return fail(CodeInvalid, "attempt_snapshot")
+	}
+	if a.Reassignment != nil && (a.Reassignment.Validate() != nil || a.Ordinal < 2 ||
+		a.Reassignment.BoardID != a.BoardID || a.Reassignment.CardID != a.CardID ||
+		a.Reassignment.SuccessorAttemptID != a.ID || a.Reassignment.SuccessorClaimID != a.Claim.ID ||
+		!a.Reassignment.CreatedAt.Equal(a.StartedAt)) {
 		return fail(CodeInvalid, "attempt_snapshot")
 	}
 	for index, evidence := range a.Evidence {
@@ -129,20 +136,21 @@ func (o AttemptHistoryOptions) Validate() error {
 // AttemptHistoryRecord is deliberately compact. Full criteria, evidence,
 // candidate and claim state are returned only by the bounded detail read.
 type AttemptHistoryRecord struct {
-	Version          int        `json:"version"`
-	ID               string     `json:"id"`
-	BoardID          string     `json:"board_id"`
-	CardID           string     `json:"card_id"`
-	Ordinal          int        `json:"ordinal"`
-	Revision         int64      `json:"revision"`
-	State            string     `json:"state"`
-	WorkerID         string     `json:"worker_id"`
-	CriteriaRevision int64      `json:"criteria_revision"`
-	CheckpointCount  int        `json:"checkpoint_count"`
-	CandidateID      string     `json:"candidate_id,omitempty"`
-	AcceptanceID     string     `json:"acceptance_id,omitempty"`
-	StartedAt        time.Time  `json:"started_at"`
-	EndedAt          *time.Time `json:"ended_at,omitempty"`
+	Version          int                 `json:"version"`
+	ID               string              `json:"id"`
+	BoardID          string              `json:"board_id"`
+	CardID           string              `json:"card_id"`
+	Ordinal          int                 `json:"ordinal"`
+	Revision         int64               `json:"revision"`
+	State            string              `json:"state"`
+	WorkerID         string              `json:"worker_id"`
+	CriteriaRevision int64               `json:"criteria_revision"`
+	CheckpointCount  int                 `json:"checkpoint_count"`
+	CandidateID      string              `json:"candidate_id,omitempty"`
+	AcceptanceID     string              `json:"acceptance_id,omitempty"`
+	Reassignment     *ReassignmentRecord `json:"reassignment,omitempty"`
+	StartedAt        time.Time           `json:"started_at"`
+	EndedAt          *time.Time          `json:"ended_at,omitempty"`
 }
 
 func (r AttemptHistoryRecord) Validate() error {
@@ -154,6 +162,11 @@ func (r AttemptHistoryRecord) Validate() error {
 	}
 	if (r.CandidateID != "") != (r.State == "review" || r.State == "accepted" || r.State == "rejected") ||
 		(r.AcceptanceID != "") != (r.State == "accepted" || r.State == "rejected") {
+		return fail(CodeInvalid, "attempt_history")
+	}
+	if r.Reassignment != nil && (r.Reassignment.Validate() != nil || r.Ordinal < 2 ||
+		r.Reassignment.BoardID != r.BoardID || r.Reassignment.CardID != r.CardID || r.Reassignment.SuccessorAttemptID != r.ID ||
+		!r.Reassignment.CreatedAt.Equal(r.StartedAt)) {
 		return fail(CodeInvalid, "attempt_history")
 	}
 	return nil

@@ -125,6 +125,7 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 			return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "runtime_binding"}
 		}
 	}
+	predecessorAttemptID := body.CurrentAttemptID
 	attemptID, claimID := newWorkboardID(), newWorkboardID()
 	if attemptID == "" || claimID == "" {
 		return 0, 0, errors.New("secure identifier generation failed")
@@ -189,6 +190,10 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 		claim.ID, 1, mutation.Now.UnixNano(), claim.ExpiresAt.UnixNano(), mutation.Actor.ID, heartbeatBytes); err != nil {
 		return 0, 0, err
 	}
+	reassignmentBytes, err := insertDerivedReassignment(ctx, tx, mutation, predecessorAttemptID, attemptID, claimID)
+	if err != nil {
+		return 0, 0, err
+	}
 	body.CurrentAttemptID, body.CurrentClaimID, body.AssigneeID, body.State = attemptID, claimID, mutation.Actor.ID, string(workboard.InProgress)
 	card.CurrentAttemptID, card.CurrentClaimID, card.AssigneeID, card.State = attemptID, claimID, mutation.Actor.ID, workboard.InProgress
 	inProgressRank, err := appendRank(ctx, tx, board.ID, workboard.InProgress)
@@ -205,7 +210,7 @@ func applyClaim(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMut
 	if err != nil {
 		return 0, 0, fmt.Errorf("write claimed card: %w", err)
 	}
-	return 1, len(attemptBytes) + len(claimBytes) + len(heartbeatBytes) + cardBytes, err
+	return 1, len(attemptBytes) + len(claimBytes) + len(heartbeatBytes) + reassignmentBytes + cardBytes, err
 }
 
 func applyClaimHeartbeat(ctx context.Context, tx *sql.Tx, mutation workboard.LifecycleMutation, board *workboard.Board, card workboard.Card) (int64, int, error) {

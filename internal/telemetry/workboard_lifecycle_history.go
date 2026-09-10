@@ -178,6 +178,10 @@ func attemptHistoryRecord(a workboard.AttemptSnapshot, checkpoints int) workboar
 	if a.Acceptance != nil {
 		result.AcceptanceID = a.Acceptance.ID
 	}
+	if a.Reassignment != nil {
+		value := *a.Reassignment
+		result.Reassignment = &value
+	}
 	return result
 }
 
@@ -233,6 +237,13 @@ func readCanonicalAttemptSnapshot(ctx context.Context, tx *sql.Tx, boardID, card
 		return workboard.AttemptSnapshot{}, 0, ErrWorkboardCorrupt
 	}
 	attempt := attemptSnapshot(stored)
+	reassignment, reassigned, err := readSnapshotReassignment(ctx, tx, attempt)
+	if err != nil {
+		return workboard.AttemptSnapshot{}, 0, err
+	}
+	if reassigned {
+		attempt.Reassignment = &reassignment
+	}
 	candidate, candidateFound, err := readSnapshotCandidate(ctx, tx, boardID, cardID, attemptID)
 	if err != nil {
 		return workboard.AttemptSnapshot{}, 0, err

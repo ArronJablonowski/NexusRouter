@@ -28,7 +28,12 @@ func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 		// A deliberately lowered user_version may retain the complete later
 		// schema. It is safe to advance only after that exact shape validates.
 		if err := validateWorkboardSchema36(ctx, conn); err != nil {
-			return err
+			// A complete schema-40 workboard may be retained while a recovery
+			// rehearsal lowers user_version. Validate it exactly, then resume at
+			// 36 so non-workboard migrations still run in order.
+			if err = validateWorkboardSchema40(ctx, conn); err != nil {
+				return err
+			}
 		}
 		_, err := conn.ExecContext(ctx, "PRAGMA user_version=36")
 		return err
@@ -421,14 +426,22 @@ func migrateWorkboards(ctx context.Context, conn *sql.Conn) error {
 }
 
 func validateWorkboardSchema(ctx context.Context, conn *sql.Conn) error {
-	return validateWorkboardSchemaVersion(ctx, conn, false)
+	return validateWorkboardSchemaVersion(ctx, conn, false, false)
 }
 
 func validateWorkboardSchema36(ctx context.Context, conn *sql.Conn) error {
-	return validateWorkboardSchemaVersion(ctx, conn, true)
+	return validateWorkboardSchemaVersion(ctx, conn, true, false)
 }
 
-func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCardIdentity bool) error {
+func validateWorkboardSchema40(ctx context.Context, conn *sql.Conn) error {
+	return validateWorkboardSchemaVersion(ctx, conn, true, true)
+}
+
+func validateWorkboardSchema35WithReassignments(ctx context.Context, conn *sql.Conn) error {
+	return validateWorkboardSchemaVersion(ctx, conn, false, true)
+}
+
+func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCardIdentity, reassignments bool) error {
 	shapes := map[string]string{
 		"workboard_boards":              "id:TEXT:0:1,revision:INTEGER:1:0,layout_revision:INTEGER:1:0,event_sequence:INTEGER:1:0,graph_revision:INTEGER:1:0,graph_digest:TEXT:1:0,state:TEXT:1:0,title:TEXT:1:0,description:TEXT:1:0,card_count:INTEGER:1:0,active_claims:INTEGER:1:0,created_at:INTEGER:1:0,updated_at:INTEGER:1:0,body:BLOB:1:0",
 		"workboard_columns":             "board_id:TEXT:1:1,version:INTEGER:1:0,id:TEXT:1:0,state:TEXT:1:2,ordinal:INTEGER:1:0,rank:TEXT:1:0,title:TEXT:1:0",
@@ -454,18 +467,25 @@ func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCa
 	if eventCardIdentity {
 		shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0"
 	}
+	if reassignments {
+		shapes["workboard_reassignments"] = "recovery_id:TEXT:1:1,board_id:TEXT:1:0,card_id:TEXT:1:0,predecessor_attempt_id:TEXT:1:0,predecessor_claim_id:TEXT:1:0,successor_attempt_id:TEXT:1:0,successor_claim_id:TEXT:1:0,created_at:INTEGER:1:0,body:BLOB:1:0"
+	}
 	for table, shape := range shapes {
 		if !browserTableShape(ctx, conn, table, shape) {
 			return sql.ErrNoRows
 		}
 	}
-	if err := workboardNamedObjects(ctx, conn, "table", []string{
+	tables := []string{
 		"workboard_acceptances", "workboard_attempt_sessions", "workboard_attempt_tasks", "workboard_attempts",
 		"workboard_boards", "workboard_candidate_artifacts", "workboard_candidates", "workboard_card_labels",
 		"workboard_cards", "workboard_checkpoints", "workboard_claim_heartbeats", "workboard_claims", "workboard_columns",
 		"workboard_criteria", "workboard_dependencies", "workboard_events", "workboard_evidence",
 		"workboard_operations", "workboard_recoveries", "workboard_recovery_proofs",
-	}); err != nil {
+	}
+	if reassignments {
+		tables = append(tables[:18], append([]string{"workboard_reassignments"}, tables[18:]...)...)
+	}
+	if err := workboardNamedObjects(ctx, conn, "table", tables); err != nil {
 		return err
 	}
 	rules := map[string][]string{
@@ -486,16 +506,32 @@ func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCa
 	if eventCardIdentity {
 		rules["workboard_events"] = append(rules["workboard_events"], "foreignkey(board_id,card_id)referencesworkboard_cards(board_id,id)")
 	}
+	if reassignments {
+		rules["workboard_reassignments"] = []string{
+			"primarykey(recovery_id)",
+			"unique(board_id,card_id,successor_attempt_id)",
+			"unique(board_id,card_id,successor_claim_id)",
+			"foreignkey(board_id,card_id,predecessor_attempt_id,predecessor_claim_id,recovery_id)referencesworkboard_recoveries(board_id,card_id,attempt_id,old_claim_id,id)",
+			"foreignkey(board_id,card_id,predecessor_attempt_id,predecessor_claim_id)referencesworkboard_claims(board_id,card_id,attempt_id,id)",
+			"foreignkey(board_id,card_id,successor_attempt_id,successor_claim_id)referencesworkboard_claims(board_id,card_id,attempt_id,id)",
+			"check(predecessor_attempt_id!=successor_attempt_id)",
+			"check(predecessor_claim_id!=successor_claim_id)",
+		}
+	}
 	for table, expected := range rules {
 		if !browserTableRules(ctx, conn, table, expected) {
 			return sql.ErrNoRows
 		}
 	}
-	if err := workboardNamedObjects(ctx, conn, "index", []string{
+	indexes := []string{
 		"workboard_attempts_active", "workboard_cards_board_state_rank", "workboard_cards_parent",
 		"workboard_checkpoints_attempt", "workboard_claims_active", "workboard_claims_expiry", "workboard_dependencies_reverse",
 		"workboard_events_operation", "workboard_evidence_attempt", "workboard_operations_board_created",
-	}); err != nil {
+	}
+	if reassignments {
+		indexes = append(indexes, "workboard_reassignments_card", "workboard_recoveries_identity")
+	}
+	if err := workboardNamedObjects(ctx, conn, "index", indexes); err != nil {
 		return err
 	}
 	objects := map[string][]string{
@@ -521,12 +557,19 @@ func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCa
 		"workboard_candidate_artifact_limit": {"beforeinsertonworkboard_candidate_artifacts", "candidate_id=new.candidate_id)>=32"},
 		"workboard_checkpoint_limit":         {"beforeinsertonworkboard_checkpoints", "attempt_id=new.attempt_id)>=10000"},
 	}
+	if reassignments {
+		objects["workboard_reassignments_card"] = []string{"onworkboard_reassignments(board_id,card_id,created_at,recovery_id)"}
+		objects["workboard_recoveries_identity"] = []string{"uniqueindexworkboard_recoveries_identityonworkboard_recoveries(board_id,card_id,attempt_id,old_claim_id,id)"}
+		objects["workboard_reassignment_immutable_delete"] = []string{"beforedeleteonworkboard_reassignments", "raise(abort,'workboardreassignmentisimmutable')"}
+		objects["workboard_reassignment_immutable_update"] = []string{"beforeupdateonworkboard_reassignments", "raise(abort,'workboardreassignmentisimmutable')"}
+	}
 	for name, expected := range objects {
 		kind := "index"
 		if len(name) > len("workboard_") && (name == "workboard_board_limit" || name == "workboard_card_limit" ||
 			name == "workboard_dependency_limit" || name == "workboard_reverse_fanout_limit" || name == "workboard_criteria_limit" ||
 			name == "workboard_evidence_limit" || name == "workboard_label_limit" || name == "workboard_attempt_task_limit" ||
-			name == "workboard_attempt_session_limit" || name == "workboard_candidate_artifact_limit" || name == "workboard_checkpoint_limit") {
+			name == "workboard_attempt_session_limit" || name == "workboard_candidate_artifact_limit" || name == "workboard_checkpoint_limit" ||
+			name == "workboard_reassignment_immutable_delete" || name == "workboard_reassignment_immutable_update") {
 			kind = "trigger"
 		}
 		if !workboardObjectRules(ctx, conn, kind, name, expected) {
@@ -587,11 +630,20 @@ func workboardNamedObjects(ctx context.Context, conn *sql.Conn, kind string, exp
 		}
 	}
 	if kind == "index" {
-		return workboardNamedObjects(ctx, conn, "trigger", []string{
+		triggers := []string{
 			"workboard_attempt_session_limit", "workboard_attempt_task_limit", "workboard_board_limit",
 			"workboard_candidate_artifact_limit", "workboard_card_limit", "workboard_checkpoint_limit",
 			"workboard_criteria_limit", "workboard_dependency_limit", "workboard_evidence_limit", "workboard_label_limit", "workboard_reverse_fanout_limit",
-		})
+		}
+		for _, name := range expected {
+			if name == "workboard_reassignments_card" {
+				triggers = append(triggers[:10], append([]string{
+					"workboard_reassignment_immutable_delete", "workboard_reassignment_immutable_update",
+				}, triggers[10:]...)...)
+				break
+			}
+		}
+		return workboardNamedObjects(ctx, conn, "trigger", triggers)
 	}
 	return nil
 }

@@ -90,8 +90,12 @@ requested, acknowledged, and resume-requested phases. A bounded per-board
 scheduling cycle now reads the authoritative supervision projection before
 constructing tasks, accounts for existing work in its WIP ceiling, and sends
 only ready cards through the claim-fenced worker runner. Stock-daemon task
-construction, cross-attempt reassignment lineage, and configured workboard
-judging remain DAR-85 work; release-wide browser qualification remains DAR-86.
+construction and configured workboard judging remain DAR-85 work. Schema 40
+now binds each proof-gated recovery to its exact replacement attempt and claim
+inside the replacement claim transaction; recovery clears the predecessor's
+worker assignment so a distinct worker can claim the Ready card. The lineage
+is immutable, restart-safe, exposed in bounded attempt reads, and cannot be
+supplied by a client or model. Release-wide browser qualification remains DAR-86.
 Authoritative refetches now
 preserve a validated keyboard-focus identity across same-board and superseding
 refreshes, restoring the exact replacement control, its card toggle, or the
@@ -146,6 +150,8 @@ has explicit pause/cancellation request controls; verified stop finalization and
 general uncertain-effect recovery remain open. Review cards have evidence-first
 accept/reject controls with bounded candidate detail, explicit operator rationale, advisory
 model-audit labeling, and exact multi-event acceptance receipt correlation.
+Schema 40 adds immutable recovery-to-replacement lineage with conservative,
+unambiguous migration of existing recovered attempts.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).

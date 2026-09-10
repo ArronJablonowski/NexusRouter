@@ -98,6 +98,7 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	workboardSchemaValidated := false
 	if version == 0 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE task_heads (
 		 task_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, sequence INTEGER NOT NULL, state TEXT NOT NULL);
@@ -371,6 +372,7 @@ func (s *Store) initialize(ctx context.Context) error {
 		if err = migrateWorkboards(ctx, conn); err != nil {
 			return err
 		}
+		workboardSchemaValidated = true
 		if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 			return err
 		}
@@ -379,6 +381,7 @@ func (s *Store) initialize(ctx context.Context) error {
 		if err = migrateWorkboardEventCardIdentity(ctx, conn); err != nil {
 			return err
 		}
+		workboardSchemaValidated = true
 	}
 	if version < 37 {
 		if err = migrateWorkspaceIdentity(ctx, conn); err != nil {
@@ -392,6 +395,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 39 {
 		if err = migrateWorkboardPausePhase(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 40 {
+		if err = migrateWorkboardReassignments(ctx, conn, workboardSchemaValidated); err != nil {
 			return err
 		}
 	}

@@ -14,8 +14,16 @@ func migrateWorkboardEventCardIdentity(ctx context.Context, conn *sql.Conn) erro
 		_, err = conn.ExecContext(ctx, "PRAGMA user_version=36")
 		return err
 	}
-	if err := validateWorkboardSchema(ctx, conn); err != nil {
+	if err := validateWorkboardSchema40(ctx, conn); err == nil {
+		_, err = conn.ExecContext(ctx, "PRAGMA user_version=36")
 		return err
+	}
+	retainedReassignments := false
+	if err := validateWorkboardSchema(ctx, conn); err != nil {
+		if err = validateWorkboardSchema35WithReassignments(ctx, conn); err != nil {
+			return err
+		}
+		retainedReassignments = true
 	}
 	if _, err := conn.ExecContext(ctx, `ALTER TABLE workboard_events RENAME TO workboard_events_v35;
 		DROP INDEX workboard_events_operation;
@@ -39,7 +47,11 @@ func migrateWorkboardEventCardIdentity(ctx context.Context, conn *sql.Conn) erro
 		CREATE INDEX workboard_events_operation ON workboard_events(operation_id,sequence);`); err != nil {
 		return err
 	}
-	if err := validateWorkboardSchema36(ctx, conn); err != nil {
+	validate := validateWorkboardSchema36
+	if retainedReassignments {
+		validate = validateWorkboardSchema40
+	}
+	if err := validate(ctx, conn); err != nil {
 		return err
 	}
 	_, err := conn.ExecContext(ctx, "PRAGMA user_version=36")
