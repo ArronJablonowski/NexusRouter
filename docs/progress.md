@@ -6429,3 +6429,41 @@ requested/acknowledged/resume-requested phases, acknowledgement only at an
 explicit callback safe boundary, exact revision fences, continued heartbeat,
 cancellation precedence, restart and lease-loss tests, and distinct paused and
 resume UI states.
+
+## 2026-09-10 — DAR-83 completed browser qualification
+
+DAR-83's exact live Linear acceptance criteria are now satisfied. Four
+additional real-Chrome scenarios exercise the authenticated checked-in Web UI
+against bounded same-origin fixtures and, for rejection behavior, the actual
+browser BFF and session store.
+
+The populated-board scenario proves canonical Kanban lanes and counts, the
+canonical list alternative, blocker and dependency metadata, criteria, current
+attempt, claim owner/heartbeat/expiry and stale/orphan attention, keyboard
+reorder, an observable unsaved provisional position, exact mutation fences, and
+server-confirmed order/revision reconciliation. The filter/detail scenario
+proves state plus compound assignee/owner/claim filters, reset and focus,
+prerequisites, dependents, attempt history, checkpoints, attention leases, and
+deterministic plus user-feedback acceptance evidence. The successful-mutation
+scenario drives board create/revise/archive, card create/revise, and
+Backlog/Ready transitions through the real forms, CSRF bootstrap, validated
+receipts, unique idempotency keys, and authoritative refetch after every write.
+
+The rejection scenario drives a delayed stale reorder and a dependency cycle
+through real controls. It proves the provisional state is removed, the
+accessible status announces rejection and authoritative refresh, exact card and
+graph state is restored, and neither request is replayed. This scenario exposed
+and fixed a production defect: the dependency form lacked the hidden
+`board_id` required by its shared population path, so opening it could throw
+before the modal appeared.
+
+All five Chrome tests passed three repeated normal runs plus race-enabled runs.
+The full Web UI, browser adapter, and workboard packages also pass normally and
+under the race detector. An independent acceptance audit found no remaining
+DAR-83 blocker. The final `make check` passed source formatting and the
+1,000-line limit, `go vet ./...`, the complete race-enabled repository suite,
+and `go build ./...`; the longest rebuilt packages were application 572.599s,
+releasepack 516.037s, telemetry 480.882s, SDK 65.548s, CLI 64.688s, and toolgate
+31.509s. Safe-boundary pause/resume remains DAR-85; release-wide restart,
+security, lease-expiry, content-injection, zero-egress, and packaging browser
+qualification remains DAR-86/DAR-87.

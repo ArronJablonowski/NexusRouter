@@ -314,6 +314,7 @@
             <h2 id="dependency-change-title">Edit card dependencies</h2>
             <p id="dependency-change-help" class="help">Add one existing card as a prerequisite, or remove one current prerequisite. The displayed graph and card revisions are immutable conflict fences.</p>
             <div id="dependency-change-form" class="mutation-form" role="form" aria-labelledby="dependency-change-title">
+              <input type="hidden" name="board_id">
               <p class="fence-summary">Expected card revision: <output id="dependency-card-revision">Not loaded</output> · graph revision: <output id="dependency-graph-revision">Not loaded</output></p>
               <label for="dependency-change-mode">Change</label>
               <select id="dependency-change-mode" name="mode" required><option value="add">Add prerequisite</option><option value="remove">Remove prerequisite</option></select>

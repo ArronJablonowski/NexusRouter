@@ -103,9 +103,9 @@ workspace identity. Local root coordinators may opt into read-only board tools
 and separately enable approval-backed board/card creation, board revision and
 archive, rich card updates, backlog/ready transitions, same-lane card
 reordering, dependency changes, and pause/cancellation requests. Additional
-acceptance tools remain DAR-84 work,
-while the remaining interactive Kanban
-behavior remains DAR-83 work.
+acceptance tools remain future agent-tool work. DAR-83's integrated interactive
+Kanban is complete; release-wide browser hardening and qualification remain
+DAR-86 work.
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
@@ -1786,8 +1786,8 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Finish the remaining DAR-83 conflict, dependency-cycle, and populated-board browser cases now that lifecycle presentation, optimistic reconciliation, and the first real-Chrome qualification are in place.
-2. Connect durable board consumption/orchestration—including safe-boundary pause/resume acknowledgement—through DAR-85, then qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Connect durable board consumption/orchestration—including safe-boundary pause/resume acknowledgement—through DAR-85.
+2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 
