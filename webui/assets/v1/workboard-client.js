@@ -30,6 +30,59 @@
 		if (focused && cards.some(card => nodes.get(card.id).contains(focused))) focused.focus({preventScroll: true});
 		return true;
 	}
+	function focusKind(node) {
+		if (!node || !node.classList || typeof node.classList.contains !== "function") return null;
+		if (node.classList.contains("card-toggle") || node.classList.contains("attempt-toggle")) return Object.freeze({kind: "toggle", action: ""});
+		if (node.classList.contains("card-position") && ["up", "down", "ready", "backlog"].includes(node.dataset && node.dataset.position)) return Object.freeze({kind: "position", action: node.dataset.position});
+		if (node.classList.contains("card-control") && ["card.pause_request", "card.cancel_request"].includes(node.dataset && node.dataset.control)) return Object.freeze({kind: "control", action: node.dataset.control});
+		if (node.classList.contains("card-review")) return Object.freeze({kind: "review", action: ""});
+		return null;
+	}
+	function validFocusAnchor(anchor, boardID) {
+		return Boolean(anchor && exact(anchor, ["boardID", "cardID", "kind", "action"], []) && anchor.boardID === boardID && id(boardID) && id(anchor.cardID) &&
+			(anchor.kind === "toggle" && anchor.action === "" || anchor.kind === "review" && anchor.action === "" || anchor.kind === "position" && ["up", "down", "ready", "backlog"].includes(anchor.action) || anchor.kind === "control" && ["card.pause_request", "card.cancel_request"].includes(anchor.action)));
+	}
+	function refreshFocusAnchor(captured, pending, boardID, currentFocus, body) {
+		if (validFocusAnchor(captured, boardID)) return captured;
+		if (currentFocus && currentFocus !== body && currentFocus.isConnected !== false) return null;
+		return validFocusAnchor(pending, boardID) ? pending : null;
+	}
+	function captureFocusAnchor(focused, boardID, cardNodes) {
+		if (!focused || !id(boardID) || !(cardNodes instanceof Map) || cardNodes.size > 10000) return null;
+		const identity = focusKind(focused); if (!identity) return null;
+		for (const [cardID, cardNode] of cardNodes) {
+			if (!id(cardID) || !cardNode || typeof cardNode.contains !== "function") return null;
+			if (cardNode.contains(focused)) return Object.freeze({boardID, cardID, kind: identity.kind, action: identity.action});
+		}
+		return null;
+	}
+	function visibleFocusTarget(node, body) {
+		if (!node || typeof node.focus !== "function" || node.disabled || node.hidden || node.isConnected === false) return false;
+		let current = node, depth = 0;
+		while (current && current !== body && depth++ < 32) {
+			if (current.hidden) return false;
+			current = current.parentElement || current.parentNode || null;
+		}
+		return depth < 32 && (!body || current === body || typeof body.contains !== "function" || body.contains(node));
+	}
+	function matchingFocusTarget(anchor, cardNode) {
+		if (!cardNode || typeof cardNode.querySelector !== "function" || typeof cardNode.querySelectorAll !== "function") return null;
+		if (anchor.kind === "toggle") return cardNode.querySelector(".card-toggle");
+		if (anchor.kind === "review") return cardNode.querySelector(".card-review");
+		const selector = anchor.kind === "position" ? ".card-position" : ".card-control", nodes = cardNode.querySelectorAll(selector);
+		if (!nodes || nodes.length > 8) return null;
+		for (const node of nodes) if (focusKind(node) && (anchor.kind === "position" ? node.dataset.position : node.dataset.control) === anchor.action) return node;
+		return null;
+	}
+	function restoreFocusAnchor(anchor, boardID, cardNodes, fallback, currentFocus, body) {
+		if (currentFocus && currentFocus !== body && currentFocus.isConnected !== false) return false;
+		if (!validFocusAnchor(anchor, boardID) || !(cardNodes instanceof Map) || cardNodes.size > 10000) return false;
+		const cardNode = cardNodes.get(anchor.cardID), exactTarget = matchingFocusTarget(anchor, cardNode);
+		const cardToggle = cardNode && typeof cardNode.querySelector === "function" ? cardNode.querySelector(".card-toggle") : null;
+		const target = visibleFocusTarget(exactTarget, body) ? exactTarget : visibleFocusTarget(cardToggle, body) ? cardToggle : visibleFocusTarget(fallback, body) ? fallback : null;
+		if (!target) return false;
+		try { target.focus({preventScroll: true}); return true; } catch (_) { return false; }
+	}
 	function freezeIntent(path, body) {
 		const freeze = value => { if (value && typeof value === "object" && !Object.isFrozen(value)) { for (const item of Object.values(value)) freeze(item); Object.freeze(value); } return value; };
 		return Object.freeze({path, body: freeze(body), encoded: JSON.stringify(body)});
@@ -113,5 +166,5 @@
 		return Object.freeze({body, definitive: Boolean(expected && body.code === expected[0] && body.retryable === expected[1]), operationID: body.operation_id || ""});
 	}
 	function acknowledgeAllowed(intent, operationsReady, operationReadFailed, unresolvedCount) { return Boolean(intent && !intent.operationID && intent.reconciledClean && operationsReady && !operationReadFailed && unresolvedCount === 0); }
-	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent});
+	return Object.freeze({acceptancePlan, acknowledgeAllowed, canonical, captureCurrent, captureFocusAnchor, compareText, controlPlan, current, dependencyPlan, freezeIntent, mutationError, mutationResolution, positionPlan, receiptMatches, reparent, refreshFocusAnchor, restoreFocusAnchor});
 });

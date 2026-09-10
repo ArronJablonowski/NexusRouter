@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "4b0d37673751de5fc6266903f5536f515de5cee0281d635fa5f65dab2c733c79" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "4e5910739fa21fb17aabaa27feff2092b63c8eb50a8992502f9de03a6a69aa8d" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -292,6 +292,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`lifecycle.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
 		`"Review candidate"`, `"darwin:acceptance-review"`, `renderCandidateReview`, `"Advisory model audits"`, `"Model-audit evidence is advisory and does not independently authorize acceptance."`,
 		`card.current_attempt_id`, `page.attempt.state !== "review"`, `evidenceIDs.has(evidence.id)`, `criterionIDs.has(evidence.criterion_id)`,
+		`client.captureFocusAnchor(activeFocus, focusBoardID, cardNodes)`, `client.refreshFocusAnchor(capturedFocus, pendingFocusAnchor, boardID, activeFocus, document.body)`, `pendingFocusVersion === current`, `client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body)`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard client guard missing %q", required)
@@ -301,6 +302,16 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 	dispatched := strings.Index(body, `window.dispatchEvent(new CustomEvent("darwin:acceptance-review"`)
 	if rendered < 0 || dispatched <= rendered {
 		t.Fatal("acceptance review event can precede validated review rendering")
+	}
+	capturedFocus := strings.Index(body, `const capturedFocus = reset ? client.captureFocusAnchor`)
+	if capturedFocus < 0 {
+		t.Fatal("authoritative refresh does not capture the focused card control")
+	}
+	clearedCards := strings.Index(body[capturedFocus:], `clearCardState()`)
+	appendedCards := strings.Index(body[capturedFocus:], `appendCards(snapshot.cards, ranks)`)
+	restoredFocus := strings.Index(body[capturedFocus:], `client.restoreFocusAnchor(focusAnchor`)
+	if clearedCards < 0 || appendedCards < 0 || restoredFocus <= appendedCards || clearedCards >= appendedCards || strings.Count(body, `client.restoreFocusAnchor(focusAnchor`) != 2 {
+		t.Fatal("authoritative refresh does not capture focus before teardown and restore it after success or failure")
 	}
 	for _, forbidden := range []string{"innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "localStorage", "sessionStorage", "X-Darwin-CSRF", `method: "POST"`, `+ checkpoint.evidence`} {
 		if strings.Contains(body, forbidden) {
@@ -570,6 +581,72 @@ if (!client.reparent(first, nodes, () => lane, focused) || lane.children[0] !== 
 	command.Dir = "."
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("workboard client behavior failed: %v\n%s", err, output)
+	}
+}
+
+func TestWorkboardClientRestoresAuthoritativeRefreshFocusSafely(t *testing.T) {
+	nodeBinary, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is unavailable")
+	}
+	script := `
+const client = require(process.argv[1]);
+let focused = null;
+function control(kind, action = "") {
+  return {kind, action, disabled:false, hidden:false, isConnected:true,
+    dataset: kind === "position" ? {position:action} : kind === "control" ? {control:action} : {},
+    classList:{contains(name){return name === (kind === "toggle" ? "card-toggle" : kind === "attempt" ? "attempt-toggle" : kind === "review" ? "card-review" : kind === "position" ? "card-position" : kind === "control" ? "card-control" : "")}},
+    focus(options){focused={node:this,options}}};
+}
+function card(...children) {
+  const node = {children, isConnected:true,
+    contains(value){return value === this || children.includes(value)},
+    querySelector(selector){
+      if (selector === ".card-toggle") return children.find(item => item.kind === "toggle") || null;
+      if (selector === ".card-review") return children.find(item => item.kind === "review") || null;
+      const position = selector.match(/^\[data-position="([^"]+)"\]$/);
+      if (position) return children.find(item => item.kind === "position" && item.action === position[1]) || null;
+      const lifecycle = selector.match(/^\[data-control="([^"]+)"\]$/);
+      return lifecycle ? children.find(item => item.kind === "control" && item.action === lifecycle[1]) || null : null;
+	}, querySelectorAll(selector){return children.filter(item => selector === ".card-position" ? item.kind === "position" : selector === ".card-control" && item.kind === "control")}};
+  for (const child of children) { child.card = node; child.parentNode = node; }
+  return node;
+}
+const body = {isConnected:true,contains(node){return node && node.isConnected === true}}, refresh = control("refresh"), toggle = control("toggle"), pause = control("control", "card.pause_request"), down = control("position", "down"), review = control("review"), attempt = control("attempt");
+const cardA = card(toggle, pause, down, review), cards = new Map([["card-a", cardA]]);
+const exact = client.captureFocusAnchor(pause, "board-a", cards);
+if (!exact || !Object.isFrozen(exact) || exact.boardID !== "board-a" || exact.cardID !== "card-a" || exact.kind !== "control" || exact.action !== "card.pause_request") process.exit(1);
+if (!client.restoreFocusAnchor(exact, "board-a", cards, refresh, body, body) || focused.node !== pause || focused.options.preventScroll !== true) process.exit(2);
+focused = null; pause.disabled = true;
+if (!client.restoreFocusAnchor(exact, "board-a", cards, refresh, null, body) || focused.node !== toggle) process.exit(3);
+focused = null; pause.disabled = false; pause.hidden = true;
+if (!client.restoreFocusAnchor(exact, "board-a", cards, refresh, body, body) || focused.node !== toggle) process.exit(4);
+focused = null;
+if (!client.restoreFocusAnchor({...exact, cardID:"card-missing"}, "board-a", cards, refresh, body, body) || focused.node !== refresh) process.exit(5);
+focused = null;
+for (const invalid of [null, {}, {...exact, boardID:"board-other"}, {...exact, cardID:"bad/card"}, {...exact, kind:"control", action:"card.delete"}]) {
+  if (client.restoreFocusAnchor(invalid, "board-a", cards, refresh, body, body) || focused) process.exit(6);
+}
+const liveFocus = control("unrelated"); focused = null;
+if (client.restoreFocusAnchor(exact, "board-a", cards, refresh, liveFocus, body) || focused) process.exit(7);
+const foreign = control("control", "card.pause_request");
+if (client.captureFocusAnchor(foreign, "board-a", cards) || client.captureFocusAnchor(pause, "bad/board", cards)) process.exit(8);
+const bad = control("control", "card.delete"), badCard = card(control("toggle"), bad);
+if (client.captureFocusAnchor(bad, "board-a", new Map([["card-b", badCard]]))) process.exit(9);
+focused = null; refresh.disabled = true;
+if (client.restoreFocusAnchor({...exact, cardID:"card-missing"}, "board-a", cards, refresh, body, body) || focused) process.exit(10);
+const attemptCard = card(control("toggle"), attempt), attemptAnchor = client.captureFocusAnchor(attempt, "board-a", new Map([["card-attempt", attemptCard]]));
+if (!attemptAnchor || attemptAnchor.kind !== "toggle" || attemptAnchor.action !== "") process.exit(11);
+pause.isConnected = false;
+const carried = client.refreshFocusAnchor(null, exact, "board-a", pause, body);
+if (carried !== exact || client.refreshFocusAnchor(null, exact, "board-other", body, body) || client.refreshFocusAnchor(null, exact, "board-a", refresh, body)) process.exit(12);
+const nextToggle = control("toggle"), nextPause = control("control", "card.pause_request"), nextCard = card(nextToggle, nextPause), nextCards = new Map([["card-a", nextCard]]);
+refresh.disabled = false; focused = null;
+if (!client.restoreFocusAnchor(carried, "board-a", nextCards, refresh, body, body) || focused.node !== nextPause) process.exit(13);`
+	command := exec.Command(nodeBinary, "-e", script, "./assets/v1/workboard-client.js")
+	command.Dir = "."
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("workboard authoritative focus restoration failed: %v\n%s", err, output)
 	}
 }
 

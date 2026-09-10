@@ -438,8 +438,13 @@ candidate review dialog inside the Kanban, renders criterion provenance and
 keeps model-audit evidence advisory, then permits only evidence-eligible accept
 or reject decisions with exact card/attempt/candidate/digest fences. Acceptance
 fanout receipts validate the primary decision plus every bounded successor
-event before authoritative refresh. Worker-side pause/cancel consumption,
-richer focus restoration, and broader browser qualification remain open.
+event before authoritative refresh. Authoritative card refetches now carry a
+bounded, validated keyboard-focus anchor across superseding same-board
+refreshes. The replacement DOM restores the exact enabled control, then the
+card toggle, then the stable Refresh control, without retaining stale nodes or
+stealing focus after the operator moves elsewhere. Worker-side pause/cancel
+consumption, selected/expanded-card context restoration, and broader browser
+qualification remain open.
 DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so

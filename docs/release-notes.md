@@ -28,8 +28,12 @@ supported-platform decision or publication approval is claimed.
   decision dialog. Model audits are explicitly advisory; eligible accept/reject
   requests require operator rationale and freeze the card, attempt, candidate,
   evidence, criteria, and policy fences. Acceptance receipts validate the
-  bounded primary-plus-successor event range. Worker control consumption,
-  richer focus restoration, and browser end-to-end qualification remain open.
+  bounded primary-plus-successor event range. Authoritative card refetches now
+  preserve a bounded keyboard-focus identity across superseding same-board
+  refreshes and restore the exact replacement control, its card toggle, or the
+  stable Refresh control without retaining stale DOM or stealing newer focus.
+  Worker control consumption, selected/expanded-card restoration, and browser
+  end-to-end qualification remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native

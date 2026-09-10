@@ -81,8 +81,12 @@ evidence, and separately labelled advisory model audits. Accept/reject remains
 disabled unless the displayed deterministic and subjective-evidence rules can
 satisfy the durable decision, and each request freezes the exact card, attempt,
 candidate, evidence head, and configuration digests. Remaining lifecycle
-finalization, worker control consumption, richer focus restoration, and browser
-end-to-end qualification remain open. The lifecycle layer now also covers candidate
+finalization, worker control consumption, selected/expanded-card restoration,
+and browser end-to-end qualification remain open. Authoritative refetches now
+preserve a validated keyboard-focus identity across same-board and superseding
+refreshes, restoring the exact replacement control, its card toggle, or the
+stable Refresh control without retaining stale DOM or stealing newer focus.
+The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
 attention. Bounded in-process workers are atomically bound to claims and runtime

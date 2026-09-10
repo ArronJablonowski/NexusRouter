@@ -6194,3 +6194,40 @@ the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
 releasepack 482.916s, telemetry 481.027s, SDK 66.406s, CLI 65.123s, toolgate
 31.192s, workers 10.122s, process guard 3.392s, browser BFF 3.398s, and Web UI
 3.244s.
+
+## 2026-09-10 — DAR-83 authoritative-refresh focus checkpoint
+
+DAR-83 remains in progress. The integrated Kanban now captures a closed,
+allowlisted focus identity before an authoritative card reset and restores it
+only after the successor snapshot is validated, attached, and its controls are
+re-enabled. Supported identities cover the card toggle, position controls,
+pause/cancellation controls, candidate review, and attempt toggles; an attempt
+toggle intentionally falls back to its replacement card toggle.
+
+Restoration prefers the exact enabled and visible replacement control, then the
+same card's toggle, then the stable Workboards Refresh control when the card is
+filtered out or removed. It never retains an old DOM node. Same-board refreshes
+that supersede an in-flight reset inherit only the validated identity and bind
+it to the newest request generation. A newly focused connected control cancels
+that carry, preventing delayed network completion from stealing operator focus.
+Cross-board, malformed, unknown-action, detached, hidden, disabled, and
+over-limit inputs fail closed.
+
+Node-backed behavior coverage exercises exact restoration, teardown and
+replacement nodes, superseding-refresh carry selection, operator focus changes,
+attempt-toggle fallback, missing-card fallback, document containment, and
+invalid anchors. Static integration coverage requires capture before card-state
+teardown and generation-gated restoration after success or failure. Remaining
+DAR-83 work includes selected/expanded-card context restoration, ordinary modal
+background isolation, proof-gated cancellation finalization after worker-side
+control consumption, richer lifecycle presentation, and browser end-to-end
+qualification.
+
+The exact tree passed repository-wide `make check`: source formatting and the
+1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
+`go build ./...`. The longest rebuilt packages were application 548.658s,
+telemetry 462.330s, CLI 64.942s, SDK 64.333s, toolgate 29.362s, and workers
+8.863s. The first full run encountered one pre-existing `SQLITE_BUSY` collision
+between application fixtures and subsequently reached the package timeout; the
+two named tests passed together under the race detector in 3.698s, and the
+complete clean retry passed.

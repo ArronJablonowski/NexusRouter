@@ -22,6 +22,7 @@
 	let boardSource = null, streamBoard = "", streamRevision = 0, streamFailures = 0, invalidationTimer = 0, snapshotGraphRevision = 0, snapshotGraphDigest = "";
 	let loadedCards = [], visibleColumns = [], presentation = "kanban", appliedBoardState = "active", appliedFilters = Object.freeze({state: "", assignee: "", owner: "", claim: ""});
 	let currentBoard = null, selectedCard = null;
+	let pendingFocusAnchor = null, pendingFocusVersion = 0;
 	const contextObservers = new Set();
 	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map();
 	chat.hidden = true;
@@ -410,9 +411,13 @@
 	}
 	function loadBoard(boardID, after, reset) {
 		if (!idPattern.test(boardID)) { notice(stateNode, "The workboard address is invalid.", true); return; }
+		const activeFocus = document.activeElement, focusBoardID = currentBoard && currentBoard.id || selectedID;
+		const capturedFocus = reset ? client.captureFocusAnchor(activeFocus, focusBoardID, cardNodes) : null;
+		const focusAnchor = reset ? client.refreshFocusAnchor(capturedFocus, pendingFocusAnchor, boardID, activeFocus, document.body) : null;
 		selectedID = boardID;
 		const current = ++cardRequestVersion;
 		if (reset) {
+			pendingFocusAnchor = focusAnchor; pendingFocusVersion = current;
 			clearCardState();
 			selectedTitle.textContent = "Loading workboard…"; selectedMeta.textContent = "";
 			notice(stateNode, "Loading cards and lanes…", false);
@@ -439,6 +444,7 @@
 			selectedTitle.textContent = snapshot.board.title;
 			currentBoard = Object.freeze({...snapshot.board});
 			for (const observer of contextObservers) observer();
+			if (reset && pendingFocusVersion === current) { client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body); pendingFocusAnchor = null; pendingFocusVersion = 0; }
 			const filtered = appliedFilters.state || appliedFilters.assignee || appliedFilters.owner || appliedFilters.claim;
 			const positionState = !filtered && !snapshot.has_more && cardTotal === snapshot.board.card_count ? " · position controls ready" : " · position controls require all cards loaded and filters clear";
 			selectedMeta.textContent = snapshot.board.state + " board · " + String(cardTotal) + " matching cards loaded · " + String(snapshot.board.card_count) + " total on board" + (snapshot.has_more ? " · more matching available" : "") + positionState;
@@ -451,6 +457,7 @@
 			kanban.setAttribute("aria-busy", "false"); cardList.setAttribute("aria-busy", "false"); kanban.hidden = true; cardList.hidden = true;
 			notice(stateNode, "This workboard could not be loaded. Use Refresh to try again.", true);
 			loadMoreCards.hidden = true;
+			if (reset && pendingFocusVersion === current) { client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body); pendingFocusAnchor = null; pendingFocusVersion = 0; }
 		});
 	}
 	window.DarwinWorkboards = Object.freeze({
