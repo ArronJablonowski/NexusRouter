@@ -83,9 +83,15 @@ satisfy the durable decision, and each request freezes the exact card, attempt,
 candidate, evidence head, and configuration digests. Running workers now
 consume a durable cancellation request after an exact heartbeat, cancel and
 join the supervisor-owned callback, persist runtime cancellation, and retain
-the workboard claim for independently proven finalization. Durable pause and
-resume acknowledgement at explicit worker safe boundaries remains DAR-85
-supervision work; full browser end-to-end qualification remains DAR-86 work.
+the workboard claim for independently proven finalization. They acknowledge
+pause and resume only at exact-fenced safe boundaries while retaining their
+heartbeat, claim, and supervisor slot. The integrated Kanban distinguishes
+requested, acknowledged, and resume-requested phases. A bounded per-board
+scheduling cycle now reads the authoritative supervision projection before
+constructing tasks, accounts for existing work in its WIP ceiling, and sends
+only ready cards through the claim-fenced worker runner. Stock-daemon task
+construction, cross-attempt reassignment lineage, and configured workboard
+judging remain DAR-85 work; release-wide browser qualification remains DAR-86.
 Authoritative refetches now
 preserve a validated keyboard-focus identity across same-board and superseding
 refreshes, restoring the exact replacement control, its card toggle, or the
@@ -137,8 +143,8 @@ also have accessible move-up, move-down, and legal Backlog/Ready controls using
 the same no-replay mutation barrier. Selected-card dependency add/remove uses a
 complete, unfiltered same-board selector and the same journal. Active work also
 has explicit pause/cancellation request controls; verified stop finalization and
-worker consumption remain open. Review cards have evidence-first accept/reject
-controls with bounded candidate detail, explicit operator rationale, advisory
+general uncertain-effect recovery remain open. Review cards have evidence-first
+accept/reject controls with bounded candidate detail, explicit operator rationale, advisory
 model-audit labeling, and exact multi-event acceptance receipt correlation.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
@@ -1788,7 +1794,7 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Connect durable board consumption/orchestration—including safe-boundary pause/resume acknowledgement—through DAR-85.
+1. Finish daemon workboard execution binding, recovery-to-reassignment lineage, and configured acceptance judging through DAR-85.
 2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

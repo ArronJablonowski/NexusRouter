@@ -416,7 +416,14 @@ later recoverable work. Schema 37 persists a non-secret workspace identity and
 schema 38 preserves initiating and recovery-session attribution for exact
 browser reconciliation, including legacy pending operations. Schema 39 adds a
 durable cooperative pause lifecycle whose worker acknowledgement is accepted
-only at an exact-fenced safe boundary. DAR-83 owns the
+only at an exact-fenced safe boundary. DAR-85 now also has a bounded per-board
+scheduling cycle that fully reads the authoritative supervision snapshot before
+task construction, subtracts existing running/stalled/orphaned claims from its
+WIP ceiling, and sends only ready cards through the durable claim-fenced worker
+runner. The cycle is intentionally dependency-injected and is not yet stock-
+daemon execution: atomic inner runtime-task attribution, durable resource-budget
+consumption, recovery-to-replacement lineage, and the configured acceptance
+judge remain required before unattended scheduling is enabled. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,

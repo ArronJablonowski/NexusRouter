@@ -6492,3 +6492,38 @@ pass normally; the domain/telemetry and Web UI suites also pass under the race
 detector. Production ready-card scheduling, explicit reassignment linkage,
 configured independent judging, and broader crash/security qualification remain
 open before DAR-85 can be marked Done.
+
+## 2026-09-10 — DAR-85 bounded ready-card scheduling cycle
+
+DAR-85 remains in progress. A new per-board scheduling primitive now consumes
+only the authoritative supervision projection. It reads every page within an
+explicit 10,000-item maximum before constructing work, fails closed without
+partial dispatch when that bound is insufficient, counts running, stalled, and
+orphaned claims against the configured WIP ceiling, and launches only ready
+cards through an injected `WorkboardTaskRunner`. The scheduler overwrites board,
+card, and expected-revision fields with the durable observation so an injected
+factory cannot substitute its own card authority. One scheduler instance
+serializes cycles, cancellation joins every launched runner, and factory or
+runner errors and panics are contained in non-sensitive cycle counts.
+
+The existing `WorkboardWorkerRunner` remains the required production execution
+boundary: its transactional claim is the final same-card ownership fence and
+provider/tool execution begins only after that claim succeeds. Separate
+scheduler instances are tested against a claim-CAS runner; this prevents
+duplicate ownership of one card but is not an atomic board-wide WIP reservation.
+The stock daemon therefore does not enable this cycle yet. Before unattended
+execution, DAR-85 still needs host-frozen inner runtime task/session attribution,
+transactional time/token/cost consumption, daemon configuration and health
+wiring, explicit recovered-attempt to replacement-attempt lineage, configured
+independent judging, and the focused crash/lease/acceptance qualification.
+
+Focused scheduler tests passed three normal and two race-enabled repetitions,
+including a real SQLite/WAL composition that reaches the existing durable
+claim, heartbeat, validation, candidate, Review, and claim-release lifecycle
+exactly once. The first repository-wide `make check` reached the ten-minute Go
+package timeout when an unrelated submission-cancellation fixture left its
+loopback connection active; that exact fixture then passed five isolated
+race-enabled repetitions. An unchanged-tree `make check` rerun passed the
+format/LOC gate, vet, the complete race-enabled suite, and `go build ./...`.
+The longest rebuilt packages were application 549.356s, telemetry 465.617s,
+CLI 64.815s, SDK 64.597s, and toolgate 30.171s.

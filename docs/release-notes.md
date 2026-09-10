@@ -37,10 +37,12 @@ supported-platform decision or publication approval is claimed.
   Running workers consume exact durable cancellation after a successful
   heartbeat, cancel and join the supervisor callback, persist runtime
   cancellation, and preserve the workboard claim for independent finalization.
-  Pause consumption, trusted same-daemon stop acknowledgement, and browser
-  end-to-end qualification remain open. Same-board authoritative refresh now
-  restores one validated selected/expanded-card anchor and fresh detail state
-  without moving focus; board switches and confirmed deletion clear it.
+  Cooperative pause/resume is now acknowledged only at exact-fenced worker
+  safe boundaries while the claim, heartbeat, and supervisor slot remain live.
+  Browser end-to-end qualification remains open. Same-board authoritative
+  refresh now restores one validated selected/expanded-card anchor and fresh
+  detail state without moving focus; board switches and confirmed deletion
+  clear it.
 
 - DAR-84 now has its first provider-neutral agent-facing Kanban slice. An
   explicit `tools.workboard_read_enabled` gate exposes bounded
@@ -63,6 +65,16 @@ supported-platform decision or publication approval is claimed.
   approval binding. Acceptance, proposal-gated criteria changes,
   durable headless approval presentation, and real-provider UX qualification
   remain open.
+
+- DAR-85 now includes a bounded per-board scheduling cycle over the durable
+  supervision projection. It scans the complete configured observation before
+  task construction, counts running, stalled, and orphaned claims against its
+  WIP limit, schedules only ready cards, binds the authoritative card revision,
+  joins cancellation, and contains trusted factory/runner failures. The worker
+  runner's transactional claim remains the final duplicate-ownership fence.
+  The scheduler is not enabled in the stock daemon yet: runtime-task lineage,
+  transactional resource budgets, replacement-attempt linkage, and configured
+  independent judging remain open.
 
 - Independent post-publication verification can now reserve durable evidence,
   install through pinned private directories, and retain canonical native
