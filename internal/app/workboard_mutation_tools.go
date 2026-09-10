@@ -24,11 +24,16 @@ const (
 func workboardMutationSpecs() []providers.Tool {
 	return []providers.Tool{
 		{Name: "workboard_create_board", Description: "Create a local DarwinRouter Kanban board after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536}},"required":["idempotency_key","title"],"additionalProperties":false}`)},
+		workboardBoardReviseMutationSpec(),
+		workboardBoardArchiveMutationSpec(),
 		{Name: "workboard_create_card", Description: "Create a bounded card with explicit acceptance criteria on one local Kanban board after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"board_id":` + workboardIDSchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536},"priority":{"enum":["low","normal","high","urgent"]},"parent_id":` + workboardIDSchema + `,"assignee_id":` + workboardIDSchema + `,"labels":` + workboardLabelsSchema + `,"dependencies":` + workboardIDsSchema + `,"budget":` + workboardBudgetSchema + `,"criteria":{"type":"array","minItems":1,"maxItems":32,"items":` + workboardCriterionSchema + `},"expected_board_revision":{"type":"integer","minimum":1},"expected_graph_revision":{"type":"integer","minimum":1}},"required":["idempotency_key","board_id","title","criteria","expected_board_revision","expected_graph_revision"],"additionalProperties":false}`)},
 		{Name: "workboard_update_card", Description: "Update bounded card fields using exact card and conditional graph revisions after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"board_id":` + workboardIDSchema + `,"card_id":` + workboardIDSchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536},"priority":{"enum":["low","normal","high","urgent"]},"parent_id":` + workboardIDSchema + `,"assignee_id":` + workboardIDSchema + `,"clear_parent":{"const":true},"clear_assignee":{"const":true},"labels":` + workboardLabelsSchema + `,"budget":` + workboardBudgetSchema + `,"expected_card_revision":{"type":"integer","minimum":1},"expected_graph_revision":{"type":"integer","minimum":1}},"required":["idempotency_key","board_id","card_id","expected_card_revision"],"additionalProperties":false,"anyOf":[{"required":["title"]},{"required":["description"]},{"required":["priority"]},{"required":["parent_id"]},{"required":["assignee_id"]},{"required":["clear_parent"]},{"required":["clear_assignee"]},{"required":["labels"]},{"required":["budget"]}],"allOf":[{"not":{"required":["parent_id","clear_parent"]}},{"not":{"required":["assignee_id","clear_assignee"]}},{"if":{"anyOf":[{"required":["parent_id"]},{"required":["clear_parent"]}]},"then":{"required":["expected_graph_revision"]},"else":{"not":{"required":["expected_graph_revision"]}}}]}`)},
 		{Name: "workboard_transition_card", Description: "Move a card to Backlog or Ready using exact board, layout, and card revisions after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"board_id":` + workboardIDSchema + `,"card_id":` + workboardIDSchema + `,"target_state":{"enum":["backlog","ready"]},"before_card_id":` + workboardIDSchema + `,"after_card_id":` + workboardIDSchema + `,"expected_board_revision":{"type":"integer","minimum":1},"expected_layout_revision":{"type":"integer","minimum":1},"expected_card_revision":{"type":"integer","minimum":1}},"required":["idempotency_key","board_id","card_id","target_state","expected_board_revision","expected_layout_revision","expected_card_revision"],"additionalProperties":false,"not":{"required":["before_card_id","after_card_id"]}}`)},
+		workboardReorderMutationSpec(),
 		{Name: "workboard_add_dependency", Description: "Add one same-board card dependency using exact card and graph revisions after operator approval.", Parameters: workboardDependencyMutationSchema()},
 		{Name: "workboard_remove_dependency", Description: "Remove one same-board card dependency using exact card and graph revisions after operator approval.", Parameters: workboardDependencyMutationSchema()},
+		workboardControlMutationSpec("workboard_request_pause"),
+		workboardControlMutationSpec("workboard_request_cancel"),
 	}
 }
 
@@ -64,9 +69,12 @@ func registerWorkboardMutationTools(registry *tools.Registry, bridge *WorkboardB
 
 func workboardMutationAction(name string) (webui.BoardAction, bool) {
 	actions := map[string]webui.BoardAction{
-		"workboard_create_board": webui.BoardCreate, "workboard_create_card": webui.CardCreate,
+		"workboard_create_board": webui.BoardCreate, "workboard_revise_board": webui.BoardRevise,
+		"workboard_archive_board": webui.BoardArchive, "workboard_create_card": webui.CardCreate,
 		"workboard_update_card": webui.CardRevise, "workboard_transition_card": webui.CardMove,
+		"workboard_reorder_card":   webui.CardReorder,
 		"workboard_add_dependency": webui.DependencyAdd, "workboard_remove_dependency": webui.DependencyRemove,
+		"workboard_request_pause": webui.CardPauseRequest, "workboard_request_cancel": webui.CardCancelRequest,
 	}
 	action, ok := actions[name]
 	return action, ok

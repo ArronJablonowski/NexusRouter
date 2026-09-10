@@ -157,6 +157,23 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 	changeDependency("remove-one", "workboard_remove_dependency", "agent-remove-key-001")
 	changeDependency("add-one", "workboard_add_dependency", "agent-add-key-000001")
 	changeDependency("remove-two", "workboard_remove_dependency", "agent-remove-key-002")
+	reorderArgs := map[string]any{
+		"idempotency_key": "agent-reorder-key-01", "board_id": board.BoardID, "card_id": rich.ID, "before_card_id": base.CardID,
+		"expected_board_revision": snapshot.Board.Revision, "expected_layout_revision": snapshot.Board.LayoutRevision, "expected_card_revision": rich.Revision,
+	}
+	reordered, err := executeWorkboardMutation(t, executor, "reorder-call", "workboard_reorder_card", reorderArgs)
+	if err != nil || reordered.Effect != runtime.ConfirmedEffect {
+		t.Fatalf("reorder card: out=%+v err=%v", reordered, err)
+	}
+	reorderReplay, err := executeWorkboardMutation(t, executor, "reorder-replay", "workboard_reorder_card", reorderArgs)
+	if err != nil || reorderReplay.Effect != runtime.ConfirmedEffect || reorderReplay.Content != reordered.Content {
+		t.Fatalf("reorder replay: out=%+v err=%v", reorderReplay, err)
+	}
+	snapshot, err = bridge.RootAgentRead(ctx, board.BoardID, webui.BoardSnapshotOptions{Limit: 100})
+	if err != nil || len(snapshot.Cards) != 2 || snapshot.Cards[0].ID != rich.ID || snapshot.Cards[1].ID != base.CardID {
+		t.Fatalf("reordered snapshot=%+v err=%v", snapshot.Cards, err)
+	}
+	rich = snapshot.Cards[0]
 	moveOut, err := executeWorkboardMutation(t, executor, "move-call", "workboard_transition_card", map[string]any{
 		"idempotency_key": "agent-move-key-00001", "board_id": board.BoardID, "card_id": rich.ID, "target_state": "ready",
 		"expected_board_revision": snapshot.Board.Revision, "expected_layout_revision": snapshot.Board.LayoutRevision, "expected_card_revision": rich.Revision,
@@ -164,11 +181,11 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 	if err != nil || moveOut.Effect != runtime.ConfirmedEffect {
 		t.Fatalf("transition card: out=%+v err=%v", moveOut, err)
 	}
-	if len(authority.scopes) != 9 || authority.scopes[0] != "workboards" || authority.scopes[1] != "workboard:"+board.BoardID || authority.scopes[8] != "workboard:"+board.BoardID {
+	if len(authority.scopes) != 11 || authority.scopes[0] != "workboards" || authority.scopes[1] != "workboard:"+board.BoardID || authority.scopes[10] != "workboard:"+board.BoardID {
 		t.Fatalf("approval scopes = %v", authority.scopes)
 	}
 	events, err := bridge.NativeEvents(ctx, board.BoardID, webui.BoardEventOptions{Limit: 100})
-	if err != nil || len(events.Items) != 8 {
+	if err != nil || len(events.Items) != 9 {
 		t.Fatalf("events=%+v err=%v", events, err)
 	}
 	var actorID string
@@ -180,6 +197,94 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 			actorID = event.ActorID
 		} else if event.ActorID != actorID {
 			t.Fatalf("one task used multiple model actors: first=%q event=%+v", actorID, event)
+		}
+	}
+}
+
+func TestRootAgentWorkboardMutationToolsReviseAndArchiveBoard(t *testing.T) {
+	ctx := context.Background()
+	store, err := telemetry.Open(ctx, filepath.Join(t.TempDir(), "workboards.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	bridge, err := NewWorkboardBridge(store, store, defaultWorkboardNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := &tools.Registry{}
+	if err = registerWorkboardMutationTools(registry, bridge); err != nil {
+		t.Fatal(err)
+	}
+	authority := &workboardMutationAuthority{t: t, allowed: true}
+	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy(), Authority: authority}
+
+	created, err := executeWorkboardMutation(t, executor, "create-board", "workboard_create_board", map[string]any{
+		"idempotency_key": "board-lifecycle-create-01", "title": "Initial", "description": "Initial description",
+	})
+	if err != nil || created.Effect != runtime.ConfirmedEffect {
+		t.Fatalf("create: out=%+v err=%v", created, err)
+	}
+	var createReceipt webui.OperationReceipt
+	if json.Unmarshal([]byte(created.Content), &createReceipt) != nil || createReceipt.Validate() != nil {
+		t.Fatalf("create receipt = %s", created.Content)
+	}
+	reviseArgs := map[string]any{"idempotency_key": "board-lifecycle-revise-01", "board_id": createReceipt.BoardID,
+		"title": "Revised", "description": "", "expected_board_revision": createReceipt.BoardRevision}
+	revised, err := executeWorkboardMutation(t, executor, "revise-board", "workboard_revise_board", reviseArgs)
+	if err != nil || revised.Effect != runtime.ConfirmedEffect {
+		t.Fatalf("revise: out=%+v err=%v", revised, err)
+	}
+	replayed, err := executeWorkboardMutation(t, executor, "replay-revise", "workboard_revise_board", reviseArgs)
+	if err != nil || replayed.Effect != runtime.ConfirmedEffect || replayed.Content != revised.Content {
+		t.Fatalf("revise replay: out=%+v err=%v", replayed, err)
+	}
+	var reviseReceipt webui.OperationReceipt
+	if json.Unmarshal([]byte(revised.Content), &reviseReceipt) != nil || reviseReceipt.BoardRevision != createReceipt.BoardRevision+1 {
+		t.Fatalf("revise receipt = %s", revised.Content)
+	}
+	snapshot, err := bridge.RootAgentRead(ctx, createReceipt.BoardID, webui.BoardSnapshotOptions{Limit: 10})
+	if err != nil || snapshot.Board.Title != "Revised" || snapshot.Board.Description != "" {
+		t.Fatalf("revised board=%+v err=%v", snapshot.Board, err)
+	}
+	stale, err := executeWorkboardMutation(t, executor, "stale-archive", "workboard_archive_board", map[string]any{
+		"idempotency_key": "board-lifecycle-stale-01", "board_id": createReceipt.BoardID, "expected_board_revision": createReceipt.BoardRevision,
+	})
+	if err != nil || !stale.Failed || !stale.Recoverable || stale.Effect != runtime.NoEffect {
+		t.Fatalf("stale archive: out=%+v err=%v", stale, err)
+	}
+	archived, err := executeWorkboardMutation(t, executor, "archive-board", "workboard_archive_board", map[string]any{
+		"idempotency_key": "board-lifecycle-archive-01", "board_id": createReceipt.BoardID, "expected_board_revision": reviseReceipt.BoardRevision,
+	})
+	if err != nil || archived.Effect != runtime.ConfirmedEffect {
+		t.Fatalf("archive: out=%+v err=%v", archived, err)
+	}
+	archiveReplay, err := executeWorkboardMutation(t, executor, "replay-archive", "workboard_archive_board", map[string]any{
+		"idempotency_key": "board-lifecycle-archive-01", "board_id": createReceipt.BoardID, "expected_board_revision": reviseReceipt.BoardRevision,
+	})
+	if err != nil || archiveReplay.Effect != runtime.ConfirmedEffect || archiveReplay.Content != archived.Content {
+		t.Fatalf("archive replay: out=%+v err=%v", archiveReplay, err)
+	}
+	page, err := bridge.RootAgentList(ctx, webui.BoardListOptions{Limit: 10, State: "archived"})
+	if err != nil || len(page.Items) != 1 || page.Items[0].ID != createReceipt.BoardID || page.Items[0].State != "archived" {
+		t.Fatalf("archived page=%+v err=%v", page, err)
+	}
+	wantScope := "workboard:" + createReceipt.BoardID
+	if len(authority.scopes) != 6 || authority.scopes[0] != "workboards" {
+		t.Fatalf("approval scopes = %v", authority.scopes)
+	}
+	for _, scope := range authority.scopes[1:] {
+		if scope != wantScope {
+			t.Fatalf("approval scopes = %v", authority.scopes)
+		}
+	}
+	events, err := bridge.NativeEvents(ctx, createReceipt.BoardID, webui.BoardEventOptions{Limit: 10})
+	if err != nil || len(events.Items) != 3 {
+		t.Fatalf("events=%+v err=%v", events, err)
+	}
+	for _, event := range events.Items {
+		if event.ActorType != "model" || event.ActorID == "" || event.ActorID == "darwin_root_agent" {
+			t.Fatalf("event attribution = %+v", event)
 		}
 	}
 }
@@ -304,10 +409,12 @@ func TestRootAgentWorkboardMutationSchemasAreClosedAndBounded(t *testing.T) {
 	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy(), Authority: authority}
 	for index, arguments := range []map[string]any{
 		{"idempotency_key": "bad-extra-key-0001", "title": "Board", "actor_id": "operator"},
+		{"idempotency_key": "bad-revise-key-0001", "board_id": "board", "expected_board_revision": 1},
+		{"idempotency_key": "bad-archive-key-001", "board_id": "board", "expected_board_revision": 1, "reason": "done"},
 		{"idempotency_key": "bad-labels-key-001", "board_id": "board", "card_id": "card", "expected_card_revision": 1, "labels": make([]string, 33)},
 		{"idempotency_key": "bad-parent-key-001", "board_id": "board", "card_id": "card", "expected_card_revision": 1, "parent_id": "parent"},
 	} {
-		name := []string{"workboard_create_board", "workboard_update_card", "workboard_update_card"}[index]
+		name := []string{"workboard_create_board", "workboard_revise_board", "workboard_archive_board", "workboard_update_card", "workboard_update_card"}[index]
 		if _, err := executeWorkboardMutation(t, executor, "bad-call", name, arguments); !errors.Is(err, tools.ErrArguments) {
 			t.Fatalf("case %d accepted: %v", index, err)
 		}
@@ -335,15 +442,16 @@ func TestRootAgentWorkboardMutationSemanticValidationIsRecoverableAndEffectFree(
 	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy(), Authority: authority}
 	for index, arguments := range []map[string]any{
 		{"idempotency_key": "semantic-title-key-01", "title": strings.Repeat("🙂", 200)},
+		{"idempotency_key": "semantic-revise-key-1", "board_id": "missing_board", "title": strings.Repeat("🙂", 200), "expected_board_revision": 1},
 		{"idempotency_key": "semantic-label-key-01", "board_id": "missing_board", "card_id": "card", "expected_card_revision": 1, "labels": []string{"Runtime", " runtime "}},
 	} {
-		name := []string{"workboard_create_board", "workboard_update_card"}[index]
+		name := []string{"workboard_create_board", "workboard_revise_board", "workboard_update_card"}[index]
 		out, executeErr := executeWorkboardMutation(t, executor, "semantic-call-"+string(rune('1'+index)), name, arguments)
 		if executeErr != nil || !out.Failed || !out.Recoverable || out.Effect != runtime.NoEffect || out.Content != `{"error":"workboard_mutation_invalid"}` {
 			t.Fatalf("case %d: out=%+v err=%v", index, out, executeErr)
 		}
 	}
-	if len(authority.scopes) != 2 || authority.scopes[0] != "workboards" || authority.scopes[1] != "workboard:missing_board" {
+	if len(authority.scopes) != 3 || authority.scopes[0] != "workboards" || authority.scopes[1] != "workboard:missing_board" || authority.scopes[2] != "workboard:missing_board" {
 		t.Fatalf("semantic validation did not remain behind approval: %v", authority.scopes)
 	}
 	page, err := bridge.RootAgentList(context.Background(), webui.BoardListOptions{Limit: 10})

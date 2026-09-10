@@ -116,7 +116,7 @@ func TestExtensionRejectsDefinitions(t *testing.T) {
 		"effecting":           func(d *Definition) { d.ReadOnly = false },
 		"nil handler":         func(d *Definition) { d.Handler = nil },
 	}
-	for _, name := range []string{"read_file", "workboard_list", "workboard_read", "delegate", "delegate_batch"} {
+	for _, name := range []string{"read_file", "workboard_list", "workboard_read", "workboard_revise_board", "workboard_archive_board", "workboard_reorder_card", "workboard_request_pause", "workboard_request_cancel", "delegate", "delegate_batch"} {
 		cases["reserved "+name] = func(d *Definition) { d.Tool.Name = name }
 	}
 	for name, mutate := range cases {

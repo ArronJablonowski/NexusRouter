@@ -132,11 +132,16 @@ func TestApplicationToolPolicyUsesConfiguredWriteDecision(t *testing.T) {
 		policy := applicationToolPolicyFor(test.configured)
 		for _, target := range []struct{ tool, scope string }{
 			{"workboard_create_board", "workboards"},
+			{"workboard_revise_board", "workboard:board_a"},
+			{"workboard_archive_board", "workboard:board_a"},
 			{"workboard_create_card", "workboard:board_a"},
 			{"workboard_update_card", "workboard:board_a"},
 			{"workboard_transition_card", "workboard:board_a"},
+			{"workboard_reorder_card", "workboard:board_a"},
 			{"workboard_add_dependency", "workboard:board_a"},
 			{"workboard_remove_dependency", "workboard:board_a"},
+			{"workboard_request_pause", "workboard:board_a"},
+			{"workboard_request_cancel", "workboard:board_a"},
 		} {
 			if got := policy.Decide(target.tool, target.scope); got != test.want {
 				t.Fatalf("configured=%q tool=%q scope=%q got=%q want=%q", test.configured, target.tool, target.scope, got, test.want)

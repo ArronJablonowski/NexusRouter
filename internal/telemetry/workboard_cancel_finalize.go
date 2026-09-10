@@ -133,7 +133,7 @@ func validateControlMutation(m workboard.ControlMutation, applying bool) error {
 	}
 	switch m.Kind {
 	case workboard.ControlPauseRequest, workboard.ControlCancelRequest:
-		if m.Actor.Type != "operator" || m.AttemptID != "" || m.ClaimID != "" || m.ExpectedCardRevision < 1 ||
+		if m.Actor.Type != "operator" && m.Actor.Type != "model" || m.AttemptID != "" || m.ClaimID != "" || m.ExpectedCardRevision < 1 ||
 			m.ExpectedClaimRevision != 0 || m.ReasonCode != "" || m.Stop != nil || m.Verified != nil {
 			return invalidWorkboard("control_request")
 		}

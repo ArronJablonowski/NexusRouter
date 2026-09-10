@@ -51,14 +51,17 @@ supported-platform decision or publication approval is claimed.
   existing context/turn limits. Delegated children receive neither tool, and
   extension code cannot shadow their reserved names. A separate
   `tools.workboard_write_enabled` gate adds approval-backed board/card creation,
-  rich card updates, backlog/ready transitions, and dependency changes. Exact
+  board revision/archive, rich card updates, backlog/ready transitions,
+  same-lane card reordering, dependency changes, and pause/cancellation requests. Exact
   argument-derived board scopes drive configured policy, approvals, and writer
   leases; caller keys make domain replay idempotent without permitting tool-call
   retries. Proven pre-commit conflicts are recoverable no-effect results, while
   invalid replay receipts and storage ambiguity remain uncertain. Workboard
   events distinguish deterministic task-bound model actors, with selected-model
-  provenance retained in the corresponding task journal. Additional
-  board lifecycle, criteria, acceptance, and durable headless approval tools
+  provenance retained in the corresponding task journal. Interactive terminal
+  chat now presents the exact credential-screened Kanban proposal and one-use
+  approval binding. Acceptance, proposal-gated criteria changes,
+  durable headless approval presentation, and real-provider UX qualification
   remain open.
 
 - Independent post-publication verification can now reserve durable evidence,

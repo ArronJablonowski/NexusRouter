@@ -99,9 +99,11 @@ tasks; stop-proof recovery is independently derived from durable task, process,
 and effect evidence; lifecycle and dependency history is paginated; and exact
 browser recovery survives restart and credential rotation through a persistent
 workspace identity. Local root coordinators may opt into read-only board tools
-and separately enable approval-backed board/card creation, rich card updates,
-backlog/ready transitions, and dependency changes. Additional lifecycle and
-acceptance tools remain DAR-84 work, while the remaining interactive Kanban
+and separately enable approval-backed board/card creation, board revision and
+archive, rich card updates, backlog/ready transitions, same-lane card
+reordering, dependency changes, and pause/cancellation requests. Additional
+acceptance tools remain DAR-84 work,
+while the remaining interactive Kanban
 behavior remains DAR-83 work.
 
 The browser/workboard boundary is now specified in
@@ -1218,15 +1220,25 @@ Board listing uses the global `workboards` reader scope; a board read uses the
 same exact `workboard:<board_id>` scope as writes so same-board readers and the
 single writer cannot overlap. They are available only to local root execution and
 are never inherited by delegated workers. Setting `workboard_write_enabled`
-also requires reads and exposes six local-root-only mutation tools for board and
-card creation, rich card updates, backlog/ready transitions, and dependency
-add/remove. Every write requires durable approval authority, obeys
+also requires reads and exposes eleven local-root-only mutation tools for board and
+card creation, board revision/archive, rich card updates, backlog/ready
+transitions, same-lane card reordering, dependency add/remove, and
+pause/cancellation requests. Every write
+requires durable approval authority, obeys
 `security.default_tool_policy`, binds the approval and single-writer lease to
 `workboards` or the exact argument-derived `workboard:<board_id>` scope, and
 uses a caller-supplied idempotency key without authorizing automatic retry.
 Mutation events carry a deterministic task-bound model actor; the task journal
 retains the selected provider/model provenance without placing it in tool input.
 Returned board/card content becomes sensitive durable session content.
+Interactive `darwin chat` displays the exact model arguments, digest, tool,
+action, scope, behavior, and no-replay warning using an ASCII-safe terminal
+preview before accepting `/approve REQUEST_ID` or `/deny REQUEST_ID`. The
+preview rejects configured credentials even when JSON escaping hides their raw
+byte representation. Daemon/headless approval presentation remains separate and
+unfinished. Criteria revision is intentionally not a root-model tool: the
+current domain operation is operator-only, and a future proposal/application
+protocol must preserve distinct model-proposer and operator-approver evidence.
 
 Use `--model auto` (or API model `auto`) to select an eligible model using durable domain fitness. Configure each model's `context_tokens`, `estimated_cost`, and local `ram_bytes`; missing metadata fails closed. Current immutable evaluation and advisory-audit observations are decayed individually by source time before aggregation. `routing.decay_half_life` supplies the default and exact `routing.decay_overrides` domain/profile entries may replace it. Persisted route explanations report raw/effective samples, average decay contribution and source-time windows without prompts or outputs; see [fitness observation decay](docs/fitness-decay.md). Context admission currently estimates serialized input bytes plus a 1,024-token reserve. Cost and memory estimates are trusted operator inputs, not measured guarantees. Successful model discovery is cached for up to five seconds per provider/endpoint/credential/privacy identity; execution failures invalidate it. Failed discovery is not cached. Explicit and automatic local reservations share one application service; discovery caches are also service-local. Neither is shared across separate processes.
 
@@ -1773,7 +1785,7 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Finish DAR-83 pause semantics and browser qualification, then complete the remaining policy-gated board lifecycle and acceptance tools in DAR-84.
+1. Finish DAR-83 pause semantics and browser qualification, then add proposal-gated criteria revision, acceptance, and durable daemon approval presentation after DAR-84's core acceptance reconciliation.
 2. Connect durable board consumption/orchestration through DAR-85, then qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

@@ -6335,3 +6335,51 @@ telemetry 485.657s, releasepack 481.899s, SDK 65.383s, CLI 64.670s, toolgate
 31.152s, workers 11.039s, Web UI 4.030s, process guard 4.071s, and browser BFF
 3.468s. A separate final `go build ./...`, source/LOC check, and diff check also
 passed after recording these timings.
+
+## 2026-09-10 — DAR-82 reconciliation and DAR-84 lifecycle/approval checkpoint
+
+The authenticated native Linear workspace was re-read against repository
+evidence. DAR-82's five acceptance criteria are satisfied by the released board
+domain, storage, native/browser transports, concurrency and failure tests, so
+the issue was moved from In Progress to Done. Linear removed DAR-82 as a blocker
+for DAR-83 and DAR-84, and DAR-84 was moved from Todo to In Progress. This is an
+acceptance reconciliation of already-pushed behavior, not a claim that the full
+Web UI or PRD is complete.
+
+DAR-84 now extends the local-root mutation catalog with exact-revision board
+metadata revision and archive operations, same-lane card reordering, plus pause
+and cancellation requests. All five use closed schemas, task-derived model attribution, configured
+allow/deny/ask policy, caller idempotency, exact per-board writer scopes, and the
+existing durable approval/tool/lease lifecycle. Stale pre-commit conflicts are
+recoverable no-effect results; ambiguous acknowledgements remain uncertain and
+cannot be automatically replayed. Pause/cancel request records may be attributed
+to a trusted model proposer, while worker/system callers remain rejected and
+proof-gated cancellation finalization stays operator-only.
+
+Interactive `darwin chat` can now present every supported workboard mutation as
+an exact ASCII-safe approval preview. It binds the tool, interpreted action,
+exact resource scope, original argument bytes and SHA-256, declared behavior,
+and one-use request ID. Duplicate/unknown fields, semantic contract failures,
+scope drift, digest drift, disabled configuration, unsupported tools, and
+configured credentials—including JSON-escaped credential values—fail closed.
+
+Criteria revision was audited but deliberately not exposed. The domain requires
+operator authority, while the root tool path correctly identifies a model
+proposer and the generic approval handler does not receive authenticated
+approver identity. Relaxing that boundary would let a model rewrite its own
+acceptance gate or falsely attribute the edit. The required follow-up is a
+durable two-stage `criteria.propose`/operator-apply protocol (or an equivalent
+approval-grant context) that records both identities and binds the exact proposal
+digest. Candidate decision tools, durable daemon/headless approval
+presentation, real-provider approval UX, pause acknowledgement, and broader
+browser qualification remain open.
+
+The completed same-lane reorder path is revision-fenced, approval-backed,
+single-writer scoped, task-attributed, and domain-idempotent; exact replay
+returns the original receipt without redispatching a spent tool call. Focused
+normal and race-enabled application, CLI, policy, workboard, and telemetry tests
+passed. An independent DAR-84 acceptance audit found no remaining blocker. The
+final `make check` passed source formatting and the 1,000-line limit, `go vet
+./...`, the complete race-enabled suite, and `go build ./...`; the longest
+rebuilt packages were application 578.941s, releasepack 504.639s, telemetry
+482.674s, SDK 66.622s, CLI 65.154s, and toolgate 32.250s.

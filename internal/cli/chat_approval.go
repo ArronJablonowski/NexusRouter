@@ -86,6 +86,9 @@ func chatApprovalPreview(settings config.Settings, secret func(string) string, p
 	if p.Request.ToolName == "replace_file" {
 		return chatReplaceApprovalPreview(settings, secret, p)
 	}
+	if strings.HasPrefix(p.Request.ToolName, "workboard_") {
+		return chatWorkboardApprovalPreview(settings, secret, p)
+	}
 	if p.Request.Validate() != nil || p.Request.ToolName != "create_file" || len(p.Arguments) > 1<<20 || !utf8.Valid(p.Arguments) {
 		return "", tools.ErrDenied
 	}

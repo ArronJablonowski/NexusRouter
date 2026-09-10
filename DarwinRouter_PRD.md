@@ -459,8 +459,10 @@ bounded projections, closed schemas, durable read events, a global list scope,
 and exact per-board reader scopes shared with writers; they are excluded from
 child catalogs. An additional
 `tools.workboard_write_enabled` gate, which requires reads, exposes approval-
-backed board/card creation, rich card updates, backlog/ready transitions, and
-dependency add/remove tools. Mutations use closed schemas, caller idempotency
+backed board/card creation, board metadata revision/archive, rich card updates,
+backlog/ready transitions, same-lane card reordering, dependency add/remove, and
+pause/cancellation request
+tools. Mutations use closed schemas, caller idempotency
 keys, trusted model attribution, configured allow/deny/ask policy, and exact
 argument-derived `workboard:<board_id>` writer leases; board creation uses the
 global `workboards` writer scope. Only proven pre-commit conflicts are returned
@@ -468,9 +470,14 @@ as recoverable no-effect results. Invalid durable replay receipts and ambiguous
 storage acknowledgements remain uncertain and are never automatically retried.
 Mutation events use a deterministic task-bound model actor while the task
 journal retains selected provider/model provenance. Child workers cannot
-inherit these tools. Board revise/archive, card reorder,
-criteria revision, acceptance, lifecycle control, and durable headless approval
-presentation remain DAR-84 work.
+inherit these tools. Interactive terminal chat renders an exact ASCII-safe,
+credential-screened preview for each supported workboard proposal before an
+operator can approve its one-use authority. Acceptance decisions,
+durable daemon/headless approval presentation, and real-provider approval UX
+qualification remain. Acceptance-criteria changes must use a future two-party
+proposal/application protocol that durably preserves both the model proposer and
+authenticated operator approver; a model must never rewrite its own acceptance
+gate merely because an outer tool approval was consumed.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

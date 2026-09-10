@@ -90,12 +90,26 @@ func (s *ControlService) request(ctx context.Context, kind ControlKind, request 
 	if !validID(request.BoardID) || !validID(request.CardID) || !validKey(request.IdempotencyKey) || request.ExpectedCardRevision < 1 {
 		return OperationReceipt{}, fail(CodeInvalid, "control")
 	}
-	actor, err := s.authorize(ctx, "operator")
+	actor, err := s.authorizeRequester(ctx)
 	if err != nil {
 		return OperationReceipt{}, err
 	}
 	return s.execute(ctx, ControlMutation{Version: 1, Kind: kind, BoardID: request.BoardID, CardID: request.CardID,
 		IdempotencyKey: request.IdempotencyKey, Actor: actor, ExpectedCardRevision: request.ExpectedCardRevision, Now: s.now().UTC()})
+}
+
+// Agent control requests remain authority-gated: a model actor is accepted
+// only when a trusted adapter installed that identity after its approval gate.
+// Verified cancellation finalization remains operator-only.
+func (s *ControlService) authorizeRequester(ctx context.Context) (Actor, error) {
+	authority, err := s.authority.WorkboardAuthority(ctx)
+	if err != nil {
+		return Actor{}, err
+	}
+	if authority.Validate() != nil || authority.Actor.Type != "operator" && authority.Actor.Type != "model" {
+		return Actor{}, fail(CodeInvalid, "authority")
+	}
+	return authority.Actor, nil
 }
 
 func (s *ControlService) Block(ctx context.Context, request ClaimCardControl) (OperationReceipt, error) {
