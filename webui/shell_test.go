@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "90e217ae5bc0fb40a2164549c381cf9e21a014c22ea7977684fca26715543d48" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "095e7a6387d39c69d72588691671bd418077833f2af9c18c1e979333d9f61347" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -289,6 +289,7 @@ func TestEmbeddedWorkboardKanbanIsBoundedInertAndAccessible(t *testing.T) {
 		`direction: "prerequisites"`, `direction: "dependents"`, `"/attempts?"`, `validAttemptRecord`, `validAttempt(value.attempt`,
 		`"Prerequisites preview"`, `"Attempt history preview"`, `delete target.dataset.loaded`, `checkpoint.created_at`,
 		`position.setAttribute("role", "group")`, `button.dataset.position = direction`, `new CustomEvent("darwin:card-position"`, `complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count)`,
+		`lifecycle.setAttribute("role", "group")`, `button.dataset.control = action`, `new CustomEvent("darwin:card-control"`, `"pause requested"`, `"cancel requested"`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard client guard missing %q", required)
@@ -357,7 +358,7 @@ func TestEmbeddedWorkboardFiltersAndPresentationsAreBoundedAndReadOnly(t *testin
 		t.Fatal(err)
 	}
 	css := string(styles)
-	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`, `.card-position-controls { display: flex;`, `.card-position-controls button { min-height: 2.75rem;`} {
+	for _, required := range []string{`@media (max-width: 78rem)`, `.workboard-layout { grid-template-columns: 1fr; }`, `.workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }`, `.card-position-controls, .card-lifecycle-controls { display: flex;`, `.card-position-controls button, .card-lifecycle-controls button { min-height: 2.75rem;`} {
 		if !strings.Contains(css, required) {
 			t.Fatalf("responsive workboard layout missing %q", required)
 		}
@@ -529,6 +530,12 @@ const dependencyIntent = {body:{action:"dependency.add",board_id:"board-a",card_
 const dependencyReceipt = {...receipt,card_id:"card-a",card_revision:5};
 if (!client.receiptMatches(dependencyReceipt,dependencyIntent) || !client.receiptMatches({...dependencyReceipt,board_revision:8},dependencyIntent) || client.receiptMatches({...dependencyReceipt,board_revision:2},dependencyIntent) || client.receiptMatches({...dependencyReceipt,card_revision:6},dependencyIntent) || client.receiptMatches({...dependencyReceipt,claim_revision:1},dependencyIntent)) process.exit(17);
 if (client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-b").action !== "dependency.add" || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-c").action !== "dependency.remove" || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-c") || client.dependencyPlan(dependencyContext,dependencyCapture,"remove","card-b") || client.dependencyPlan(dependencyContext,dependencyCapture,"add","card-a")) process.exit(18);
+const controlContext = {board:{id:"board-a",state:"active",revision:11},cards:[{id:"card-run",state:"in_progress",rank:"a",revision:4,current_claim_id:"claim-a",pause_requested:false,cancel_requested:false}]};
+const pause = client.controlPlan(controlContext,"card-run","card.pause_request"), cancel = client.controlPlan(controlContext,"card-run","card.cancel_request");
+if (!pause || !cancel || pause.cardRevision !== 4 || client.controlPlan({...controlContext,board:{...controlContext.board,state:"archived"}},"card-run","card.pause_request") || client.controlPlan({...controlContext,cards:[{...controlContext.cards[0],pause_requested:true}]},"card-run","card.pause_request") || !client.controlPlan({...controlContext,cards:[{...controlContext.cards[0],pause_requested:true}]},"card-run","card.cancel_request")) process.exit(19);
+if (!client.captureCurrent(pause,controlContext) || client.captureCurrent(pause,{...controlContext,board:{...controlContext.board,revision:12}}) || client.captureCurrent(pause,{...controlContext,cards:[{...controlContext.cards[0],cancel_requested:true}]})) process.exit(20);
+const controlIntent = {body:{action:"card.pause_request",board_id:"board-a",card_id:"card-run"},capture:pause}, controlReceipt = {...receipt,board_revision:12,card_id:"card-run",card_revision:5};
+if (!client.receiptMatches(controlReceipt,controlIntent) || !client.receiptMatches({...controlReceipt,board_revision:20},controlIntent) || client.receiptMatches({...controlReceipt,board_revision:11},controlIntent) || client.receiptMatches({...controlReceipt,card_revision:6},controlIntent) || client.receiptMatches({...controlReceipt,claim_revision:2},controlIntent)) process.exit(21);
 const ambiguous = client.mutationError({version:1,code:"workboard_unavailable",message:"Unavailable",retryable:true,operation_id:"op_1234567890123456"},503);
 const conflict = client.mutationError({version:1,code:"revision_conflict",message:"Conflict",retryable:true,current_revision:3},409);
 if (!ambiguous || ambiguous.definitive || ambiguous.operationID !== "op_1234567890123456" || !conflict || !conflict.definitive || client.mutationError({version:1,code:"workboard_unavailable",message:"\ud800",retryable:true},503)) process.exit(10);
@@ -570,6 +577,8 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`expected_layout_revision: plan.layoutRevision`, `client.positionPlan(context, button.dataset.cardId, direction)`, `window.addEventListener("darwin:card-position"`,
 		`exact.subjectType === "card" && exact.subjectID === pendingIntent.body.card_id`, `"dependency.add", "dependency.remove"`,
 		`client.dependencyPlan(context, activeCapture`, `expected_graph_revision: activeCapture.graphRevision`, `activeCapture.dependencies.length >= 64`,
+		`client.controlPlan(context, button.dataset.cardId, button.dataset.control)`, `window.addEventListener("darwin:card-control"`, `window.confirm(warning)`,
+		`Cancellation is not final until verified stop finalization`, `expected_card_revision: plan.cardRevision`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("workboard mutation safety guard missing %q", required)

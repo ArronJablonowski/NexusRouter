@@ -283,6 +283,28 @@ func TestBrowserDependencyMutationPreservesClosedFences(t *testing.T) {
 	}
 }
 
+func TestBrowserCardControlMutationPreservesClosedFence(t *testing.T) {
+	var got contract.BoardRequest
+	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(_ context.Context, _ string, input contract.BoardRequest) (contract.OperationReceipt, error) {
+		got = input
+		receipt := validBrowserReceipt(input.BoardID)
+		next := *input.ExpectedCardRevision + 1
+		receipt.CardID, receipt.CardRevision, receipt.BoardRevision = input.CardID, &next, 9
+		return receipt, nil
+	}})
+	cookie, csrf := authenticateBrowser(t, handler)
+	request := browserRequest(http.MethodPost, "/app/api/v1/workboards/board-a/operations",
+		`{"version":1,"action":"card.cancel_request","idempotency_key":"browser-workboard-key-01","board_id":"board-a","card_id":"card-a","expected_card_revision":6}`)
+	request.AddCookie(cookie)
+	request.Header.Set("X-Darwin-CSRF", csrf)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || got.Action != contract.CardCancelRequest || got.BoardID != "board-a" || got.CardID != "card-a" ||
+		got.ExpectedCardRevision == nil || *got.ExpectedCardRevision != 6 {
+		t.Fatalf("status=%d request=%+v body=%s", response.Code, got, response.Body.String())
+	}
+}
+
 func TestBrowserWorkboardRejectsWorkerActionBeforeCallback(t *testing.T) {
 	var calls atomic.Int32
 	handler := browserWorkboardHandler(t, WorkboardServices{Mutate: func(context.Context, string, contract.BoardRequest) (contract.OperationReceipt, error) {

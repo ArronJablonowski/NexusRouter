@@ -6107,3 +6107,44 @@ telemetry 484.748s, releasepack 481.119s, SDK 65.750s, CLI 64.732s, toolgate
 3.253s. Lifecycle and acceptance controls, richer focus restoration,
 optimistic-but-uncommitted visual updates, and broader browser end-to-end
 qualification remain later DAR-83/DAR-86 work.
+
+## 2026-09-10 — DAR-83 pause and cancellation request checkpoint
+
+DAR-83 remains in progress. Visible claimed cards in `in_progress` or `blocked`
+now expose native pause-request and cancellation-request buttons inside both the
+Kanban and canonical-list presentations. Each button has an action-specific
+accessible name and an explicit confirmation. Pause becomes unavailable after
+either pause or cancellation is requested; cancellation remains available after
+a pause request because it is an escalation. Authoritative card projections
+show persistent pause/cancellation-request badges after refresh.
+
+These controls deliberately record requests only. They do not release a claim,
+change lifecycle state, undo committed tool effects, or claim that a worker has
+stopped. The committed status text says pause may still be pending and that
+cancellation is not final until separate verified-stop finalization. The current
+workboard worker runner does not yet consume these flags end to end, so live
+worker compliance remains open rather than inferred from persistence.
+
+Each activation derives a fresh plan from the validated card projection,
+captures board/card/state/claim/flag evidence, confirms the operator's intent,
+and freezes one closed `card.pause_request` or `card.cancel_request` body with
+the exact card revision. The request uses the existing CSRF, global operation
+barrier, durable idempotency, conflict refresh, and ambiguous no-replay path.
+Filtered or partial boards remain eligible because the mutation is card-local.
+
+Browser and Go receipt checks require the exact successor card revision, no
+claim revision, and one immutable event bound to operation, action, and card.
+Board revision may exceed the captured successor because these controls do not
+carry board CAS and claim heartbeats can advance it concurrently. Lost-ack
+reconciliation requires the exact card subject. Focused browser-model, Web UI,
+browser-facade, application receipt/event, source/LOC, and diff checks pass.
+Proof-gated cancellation finalization, live worker flag consumption, acceptance
+controls, richer focus restoration, and browser end-to-end qualification remain
+later DAR-83/DAR-86 work.
+
+Repository-wide `make check` passed for this checkpoint: source formatting and
+the 1,000-line limit, `go vet ./...`, the complete race-enabled test suite, and
+`go build ./...`. The longest rebuilt packages were application 569.150s,
+releasepack 479.597s, telemetry 478.719s, SDK 66.402s, CLI 64.645s, toolgate
+31.113s, workers 10.315s, process guard 3.600s, browser BFF 3.419s, and Web UI
+3.277s.

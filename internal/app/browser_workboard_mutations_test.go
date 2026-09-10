@@ -74,6 +74,15 @@ func TestBrowserWorkboardReceiptCorrelationRejectsCrossActionRevisions(t *testin
 			got.ClaimRevision = &claimOne
 			return got
 		}(), false},
+		{"pause request", contract.BoardRequest{Action: contract.CardPauseRequest, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFive), true},
+		{"cancel request unrelated board revision", contract.BoardRequest{Action: contract.CardCancelRequest, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(2, "card-a", &cardFive), true},
+		{"control wrong card revision", contract.BoardRequest{Action: contract.CardPauseRequest, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", &cardFour), false},
+		{"control missing card revision", contract.BoardRequest{Action: contract.CardCancelRequest, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, receipt(9, "card-a", nil), false},
+		{"control claim revision", contract.BoardRequest{Action: contract.CardCancelRequest, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &revision}, func() contract.OperationReceipt {
+			got := receipt(9, "card-a", &cardFive)
+			got.ClaimRevision = &claimOne
+			return got
+		}(), false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -95,7 +104,7 @@ func TestBrowserWorkboardCardMutationReceiptsRequireExactEvent(t *testing.T) {
 		result := contract.BoardRequest{Action: action, BoardID: "board-a", CardID: "card-a", ExpectedCardRevision: &cardRevision}
 		if action == contract.DependencyAdd || action == contract.DependencyRemove {
 			result.DependencyID, result.ExpectedGraphRevision = "card-b", &boardRevision
-		} else {
+		} else if action != contract.CardPauseRequest && action != contract.CardCancelRequest {
 			result.ExpectedBoardRevision = &boardRevision
 		}
 		return result
@@ -112,8 +121,11 @@ func TestBrowserWorkboardCardMutationReceiptsRequireExactEvent(t *testing.T) {
 		{"reorder", contract.CardReorder, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, true},
 		{"dependency add", contract.DependencyAdd, workboard.CardDependencyAddAction, receipt.OperationID, receipt.CardID, true},
 		{"dependency remove", contract.DependencyRemove, workboard.CardDependencyRemoveAction, receipt.OperationID, receipt.CardID, true},
+		{"pause request", contract.CardPauseRequest, workboard.CardPauseRequestAction, receipt.OperationID, receipt.CardID, true},
+		{"cancel request", contract.CardCancelRequest, workboard.CardCancelRequestAction, receipt.OperationID, receipt.CardID, true},
 		{"wrong action", contract.CardMove, workboard.CardReorderAction, receipt.OperationID, receipt.CardID, false},
 		{"dependency wrong action", contract.DependencyAdd, workboard.CardDependencyRemoveAction, receipt.OperationID, receipt.CardID, false},
+		{"control wrong action", contract.CardPauseRequest, workboard.CardCancelRequestAction, receipt.OperationID, receipt.CardID, false},
 		{"wrong operation", contract.CardMove, workboard.CardMoveAction, "other-operation-0001", receipt.CardID, false},
 		{"wrong card", contract.CardMove, workboard.CardMoveAction, receipt.OperationID, "card-b", false},
 	}

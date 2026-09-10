@@ -316,6 +316,8 @@
 		meta.append(element("span", "", "revision " + String(card.revision)));
 		if (card.remaining_dependencies > 0) meta.append(element("span", "card-alert", String(card.remaining_dependencies) + " dependencies remaining"));
 		if (card.assignee_id && idPattern.test(card.assignee_id)) meta.append(element("span", "", "assigned " + card.assignee_id));
+		if (card.pause_requested) meta.append(element("span", "card-alert", "pause requested"));
+		if (card.cancel_requested) meta.append(element("span", "card-alert", "cancel requested"));
 		const position = element("div", "card-position-controls"); position.setAttribute("role", "group"); position.setAttribute("aria-label", "Position " + card.title);
 		for (const [direction, label] of [["up", "Move up"], ["down", "Move down"], ["ready", "Move to Ready"], ["backlog", "Move to Backlog"]]) {
 			const button = element("button", "secondary card-position", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.position = direction;
@@ -323,13 +325,18 @@
 			button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-position", {detail: Object.freeze({cardID: card.id, direction})})));
 			position.append(button);
 		}
+		const lifecycle = element("div", "card-lifecycle-controls"); lifecycle.setAttribute("role", "group"); lifecycle.setAttribute("aria-label", "Control " + card.title);
+		for (const [action, label] of [["card.pause_request", "Request pause"], ["card.cancel_request", "Request cancellation"]]) {
+			const button = element("button", action === "card.cancel_request" ? "danger card-control" : "secondary card-control", label); button.type = "button"; button.disabled = true; button.dataset.cardId = card.id; button.dataset.control = action;
+			button.setAttribute("aria-label", label + ": " + card.title); button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("darwin:card-control", {detail: Object.freeze({cardID: card.id, action})}))); lifecycle.append(button);
+		}
 		const details = element("div", "card-details"); details.hidden = true;
 		if (card.description) details.append(element("p", "", card.description));
 		details.append(element("p", "", card.assignee_id && idPattern.test(card.assignee_id) ? "Assignee: " + card.assignee_id : "Unassigned"));
 		details.append(element("p", "", "Attempts: " + String(card.attempt_count) + (card.current_claim_id && idPattern.test(card.current_claim_id) ? " · active claim " + card.current_claim_id : " · no active claim")));
 		details.append(element("p", "", card.labels.length ? "Labels: " + card.labels.join(", ") : "No labels"));
 		toggle.addEventListener("click", () => { for (const node of cardNodes.values()) { node.classList.remove("selected-card"); const prior = node.querySelector(".card-toggle"); if (prior) prior.setAttribute("aria-pressed", "false"); } item.classList.add("selected-card"); toggle.setAttribute("aria-pressed", "true"); selectedCard = Object.freeze({...card, labels: Object.freeze(card.labels.slice()), dependencies: Object.freeze(card.dependencies.slice()), criteria: Object.freeze(card.criteria.map(item => Object.freeze({...item}))), budget: Object.freeze({...card.budget})}); for (const observer of contextObservers) observer(); const expanded = toggle.getAttribute("aria-expanded") === "true"; toggle.setAttribute("aria-expanded", expanded ? "false" : "true"); details.hidden = expanded; if (!expanded && !details.dataset.loaded) { details.dataset.loaded = "true"; loadCardDetails(card, details); } });
-		article.append(toggle, meta, position, details); item.append(article);
+		article.append(toggle, meta, position, lifecycle, details); item.append(article);
 		return item;
 	}
 	function validateCardBatch(cards, reset) {
@@ -396,7 +403,7 @@
 	window.DarwinWorkboards = Object.freeze({
 		context: () => Object.freeze({
 			board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision,
-			cards: Object.freeze(loadedCards.map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, remaining_dependencies: card.remaining_dependencies, current_claim_id: card.current_claim_id || ""}))),
+			cards: Object.freeze(loadedCards.map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, remaining_dependencies: card.remaining_dependencies, current_claim_id: card.current_claim_id || "", pause_requested: card.pause_requested, cancel_requested: card.cancel_requested}))),
 			complete: Boolean(currentBoard && !cardCursor && cardTotal === currentBoard.card_count),
 			unfiltered: !appliedFilters.state && !appliedFilters.assignee && !appliedFilters.owner && !appliedFilters.claim
 		}),

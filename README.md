@@ -72,8 +72,11 @@ is disabled until the unfiltered board is fully loaded, freezes board/layout/car
 revision fences, validates the exact receipt and event, and never retries an
 ambiguous side effect. A selected-card dependency editor now adds or removes one
 prerequisite from an explicit same-board choice list using card/graph revision
-fences and exact dependency-event correlation. Lifecycle, acceptance, richer
-focus restoration, and browser end-to-end qualification remain open. The lifecycle layer now also covers candidate
+fences and exact dependency-event correlation. In-progress and blocked cards
+also expose confirmed pause/cancellation request controls with persistent request
+badges; these record intent and never claim that a worker has already stopped.
+Remaining lifecycle finalization, acceptance, richer focus restoration, and
+browser end-to-end qualification remain open. The lifecycle layer now also covers candidate
 submission, evidence-based acceptance/rejection, pause/cancel requests,
 block/unblock, bounded lifecycle projections, and observation-driven stale-claim
 attention. Bounded in-process workers are atomically bound to claims and runtime
@@ -109,7 +112,8 @@ canonical list presentation, card selection, and the first operator mutation
 slice for board and card creation/revision plus confirmed board archival. Cards
 also have accessible move-up, move-down, and legal Backlog/Ready controls using
 the same no-replay mutation barrier. Selected-card dependency add/remove uses a
-complete, unfiltered same-board selector and the same journal. Lifecycle and
+complete, unfiltered same-board selector and the same journal. Active work also
+has explicit pause/cancellation request controls; verified stop finalization and
 acceptance workflows remain open.
 
 DarwinRouter is licensed under the [MIT License](LICENSE), matching the license

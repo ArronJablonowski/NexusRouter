@@ -429,8 +429,12 @@ The dependency slice adds a selected-card editor that offers only explicit
 same-board choices from a complete, unfiltered snapshot and freezes card and
 graph revisions for one add/remove operation. Dependency receipts are bound to
 the exact card, action, operation, and immutable event before authoritative
-refresh. Lifecycle, acceptance controls, and broader browser qualification
-remain open. DAR-84 owns agent board tools.
+refresh. The current lifecycle-control slice adds explicit, confirmed pause and
+cancellation requests for claimed in-progress or blocked cards, persistent
+request badges, exact successor-card/event validation, and wording that does
+not misrepresent a request as completed worker stop. Proof-gated cancellation
+finalization, acceptance controls, and broader browser qualification remain
+open. DAR-84 owns agent board tools.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the
