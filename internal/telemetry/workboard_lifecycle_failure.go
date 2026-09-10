@@ -85,7 +85,7 @@ func applyClaimFailure(ctx context.Context, tx *sql.Tx, mutation workboard.Lifec
 		return 0, 0, err
 	}
 	card.State, card.Rank, card.AssigneeID, card.CurrentClaimID = workboard.Ready, readyRank, "", ""
-	card.BlockReason, card.CancelRequested, card.PauseRequested = "", false, false
+	card.BlockReason, card.CancelRequested, card.PauseRequested, card.PausePhase = "", false, false, workboard.PauseNone
 	card.Revision++
 	card.UpdatedAt = mutation.Now
 	*body = updateStoredBody(*body, *card)

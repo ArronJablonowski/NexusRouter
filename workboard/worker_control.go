@@ -28,6 +28,7 @@ type WorkerControlObservation struct {
 	BoardID, CardID, AttemptID, ClaimID, WorkerID, TaskID string
 	CardRevision, ClaimRevision                           int64
 	CancelRequested, PauseRequested                       bool
+	PausePhase                                            PausePhase
 }
 
 func (o WorkerControlObservation) Validate(target WorkerControlTarget) error {
@@ -35,6 +36,9 @@ func (o WorkerControlObservation) Validate(target WorkerControlTarget) error {
 		o.BoardID != target.BoardID || o.CardID != target.CardID || o.AttemptID != target.AttemptID ||
 		o.ClaimID != target.ClaimID || o.WorkerID != target.WorkerID || o.TaskID != target.TaskID ||
 		o.CardRevision != target.CardRevision || o.ClaimRevision != target.ClaimRevision {
+		return fail(CodeInvalid, "worker_control_observation")
+	}
+	if !validPausePhase(o.PausePhase) || o.PauseRequested != (o.PausePhase != PauseNone) {
 		return fail(CodeInvalid, "worker_control_observation")
 	}
 	return nil

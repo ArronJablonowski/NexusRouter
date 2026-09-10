@@ -44,6 +44,7 @@ type Card struct {
 	BlockReason           string
 	CancelRequested       bool
 	PauseRequested        bool
+	PausePhase            PausePhase
 	Budget                WorkBudget
 	Criteria              []AcceptanceCriterion
 	CreatedAt             time.Time
@@ -62,7 +63,8 @@ func (c Card) Validate() error {
 		return fail(CodeInvalid, "card")
 	}
 	if c.RemainingDependencies > 0 && c.State == Ready || c.State != Blocked && c.BlockReason != "" ||
-		(c.CancelRequested || c.PauseRequested) && c.State != InProgress && c.State != Blocked {
+		(c.CancelRequested || c.PauseRequested) && c.State != InProgress && c.State != Blocked ||
+		!validPausePhase(c.PausePhase) || c.PauseRequested != (c.PausePhase != PauseNone) {
 		return fail(CodeInvalid, "card_lifecycle")
 	}
 	switch c.State {

@@ -43,8 +43,12 @@ func (s *Store) ApplyControlMutation(ctx context.Context, mutation workboard.Con
 	var claimRevision *int64
 	var durableBytes int
 	switch mutation.Kind {
-	case workboard.ControlPauseRequest, workboard.ControlCancelRequest:
+	case workboard.ControlPauseRequest, workboard.ControlResumeRequest, workboard.ControlCancelRequest:
 		claimRevision, durableBytes, err = requestStoredControl(ctx, tx, mutation, &card, &body)
+	case workboard.ControlPauseAck, workboard.ControlResumeAck:
+		var revision int64
+		revision, durableBytes, err = acknowledgeStoredPause(ctx, tx, mutation, &card, &body)
+		claimRevision = &revision
 	case workboard.ControlBlock, workboard.ControlUnblock:
 		var revision int64
 		revision, durableBytes, err = transitionStoredBlock(ctx, tx, mutation, &card, &body)
@@ -109,16 +113,24 @@ func requestStoredControl(ctx context.Context, tx *sql.Tx, mutation workboard.Co
 	if card.State != workboard.InProgress && card.State != workboard.Blocked || card.CurrentClaimID == "" || body.CurrentAttemptID == "" {
 		return nil, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "control"}
 	}
-	if mutation.Kind == workboard.ControlPauseRequest {
-		if card.PauseRequested {
+	switch mutation.Kind {
+	case workboard.ControlPauseRequest:
+		if card.PausePhase != workboard.PauseNone || card.CancelRequested {
 			return nil, 0, &workboard.Violation{Code: workboard.CodeInvalid, Field: "pause_requested"}
 		}
-		card.PauseRequested = true
-	} else {
+		card.PauseRequested, card.PausePhase = true, workboard.PauseRequested
+		body.PauseRequested, body.PausePhase = true, workboard.PauseRequested
+	case workboard.ControlResumeRequest:
+		if card.PausePhase != workboard.PauseAcknowledged || card.CancelRequested {
+			return nil, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "pause_phase"}
+		}
+		card.PausePhase, body.PausePhase = workboard.ResumeRequested, workboard.ResumeRequested
+	case workboard.ControlCancelRequest:
 		if card.CancelRequested {
 			return nil, 0, &workboard.Violation{Code: workboard.CodeInvalid, Field: "cancel_requested"}
 		}
 		card.CancelRequested = true
+		body.CancelRequested = true
 	}
 	lease, _, err := readLifecycleClaim(ctx, tx, card.BoardID, card.ID, body.CurrentAttemptID, card.CurrentClaimID)
 	if err != nil {
@@ -131,11 +143,46 @@ func requestStoredControl(ctx context.Context, tx *sql.Tx, mutation workboard.Co
 	return nil, bytes, err
 }
 
+func acknowledgeStoredPause(ctx context.Context, tx *sql.Tx, mutation workboard.ControlMutation, card *workboard.Card, body *storedWorkboardCard) (int64, int, error) {
+	if card.Revision != mutation.ExpectedCardRevision {
+		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "card_revision"}
+	}
+	if card.CancelRequested || card.CurrentAttemptID != mutation.AttemptID || card.CurrentClaimID != mutation.ClaimID ||
+		mutation.Kind == workboard.ControlPauseAck && card.PausePhase != workboard.PauseRequested ||
+		mutation.Kind == workboard.ControlResumeAck && card.PausePhase != workboard.ResumeRequested {
+		return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "pause_phase"}
+	}
+	lease, _, err := readLifecycleClaim(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if lease.Revision != mutation.ExpectedClaimRevision {
+		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "claim_revision"}
+	}
+	if lease.OwnerID != mutation.Actor.ID {
+		return 0, 0, &workboard.Violation{Code: workboard.CodeLeaseOwner, Field: "owner"}
+	}
+	if lease.State != workboard.LeaseActive || !mutation.Now.Before(lease.ExpiresAt) {
+		return 0, 0, &workboard.Violation{Code: workboard.CodeLeaseExpired, Field: "claim"}
+	}
+	if mutation.Kind == workboard.ControlPauseAck {
+		card.PausePhase, body.PausePhase = workboard.PauseAcknowledged, workboard.PauseAcknowledged
+	} else {
+		card.PauseRequested, card.PausePhase = false, workboard.PauseNone
+		body.PauseRequested, body.PausePhase = false, workboard.PauseNone
+	}
+	card.Revision++
+	card.UpdatedAt = mutation.Now
+	bytes, err := writeLifecycleCard(ctx, tx, *card, *body, mutation.ExpectedCardRevision)
+	return lease.Revision, bytes, err
+}
+
 func transitionStoredBlock(ctx context.Context, tx *sql.Tx, mutation workboard.ControlMutation, card *workboard.Card, body *storedWorkboardCard) (int64, int, error) {
 	if card.Revision != mutation.ExpectedCardRevision {
 		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "card_revision"}
 	}
-	if card.CurrentAttemptID != mutation.AttemptID || card.CurrentClaimID != mutation.ClaimID ||
+	if card.PausePhase == workboard.PauseAcknowledged || card.PausePhase == workboard.ResumeRequested ||
+		card.CurrentAttemptID != mutation.AttemptID || card.CurrentClaimID != mutation.ClaimID ||
 		mutation.Kind == workboard.ControlBlock && card.State != workboard.InProgress ||
 		mutation.Kind == workboard.ControlUnblock && (card.State != workboard.Blocked || card.BlockReason != mutation.ReasonCode) {
 		return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "state"}

@@ -140,7 +140,8 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if card.Revision != m.ExpectedCardRevision {
 		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "card_revision"}
 	}
-	if card.State != workboard.InProgress || card.CurrentAttemptID != m.AttemptID || card.CurrentClaimID != m.ClaimID || card.CriteriaRevision != m.CriteriaRevision {
+	if card.State != workboard.InProgress || card.CurrentAttemptID != m.AttemptID || card.CurrentClaimID != m.ClaimID || card.CriteriaRevision != m.CriteriaRevision ||
+		card.CancelRequested || card.PausePhase == workboard.PauseAcknowledged || card.PausePhase == workboard.ResumeRequested {
 		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "candidate"}
 	}
 	lease, claim, err := readLifecycleClaim(ctx, tx, m.BoardID, m.CardID, m.AttemptID, m.ClaimID)
@@ -223,11 +224,13 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 		}
 	}
 	card.State, card.CurrentClaimID, card.Revision, card.UpdatedAt = workboard.Review, "", card.Revision+1, m.Now
+	card.PauseRequested, card.PausePhase = false, workboard.PauseNone
 	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Review)
 	if err != nil {
 		return 0, 0, evaluationStoredResult{}, err
 	}
 	cardBody.State, cardBody.CurrentClaimID = string(workboard.Review), ""
+	cardBody.PauseRequested, cardBody.PausePhase = false, workboard.PauseNone
 	*cardBody = updateStoredBody(*cardBody, *card)
 	cardBytes, err := writeEvaluationCard(ctx, tx, *card, *cardBody, m.ExpectedCardRevision)
 	if err != nil {

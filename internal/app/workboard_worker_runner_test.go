@@ -400,6 +400,107 @@ func TestWorkboardWorkerRunnerDoesNotConsumePauseAsCancellation(t *testing.T) {
 	}
 }
 
+type failingWorkerControlRepository struct {
+	*telemetry.Store
+	failed chan struct{}
+	once   atomic.Bool
+}
+
+func (r *failingWorkerControlRepository) ReadWorkerControl(context.Context,
+	workboard.WorkerControlTarget,
+) (workboard.WorkerControlObservation, error) {
+	if r.once.CompareAndSwap(false, true) {
+		close(r.failed)
+	}
+	return workboard.WorkerControlObservation{}, errors.New("injected worker control observation failure")
+}
+
+func TestWorkboardWorkerRunnerRevokesCapabilityBeforeObservationFailureCleanup(t *testing.T) {
+	ctx := context.Background()
+	store, boardID, cardID, cardRevision := readyWorkboardCard(t)
+	defer store.Close()
+	repository := &failingWorkerControlRepository{Store: store, failed: make(chan struct{})}
+	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := NewWorkboardWorkerRunner(supervisor, repository, &capturingWorkboardEvaluator{}, strings.Repeat("7", 64),
+		20*time.Millisecond, 500*time.Millisecond, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	cleanupMutations := make(chan []error, 1)
+	done := make(chan error, 1)
+	go func() {
+		_, runErr := runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: "observation-failure-task",
+			SessionID: "observation-failure-session", ParentTaskID: "board-parent", Scope: "board-card-" + cardID,
+			ExpectedCardRevision: cardRevision, FailureEffect: runtime.NoEffect,
+			Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+				close(entered)
+				<-run.Done()
+				cleanupMutations <- []error{
+					handle.AppendCheckpoint(context.Background(), "escaped observation cleanup"),
+					handle.Block(context.Background(), "escaped-observation-block"),
+					handle.Unblock(context.Background(), "escaped-observation-unblock"),
+				}
+				<-release
+				return WorkboardCandidate{}, run.Err()
+			},
+			Validate: func(context.Context, WorkboardCandidate) error { return nil },
+		})
+		done <- runErr
+	}()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker callback did not start")
+	}
+	select {
+	case <-repository.failed:
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker control observation did not fail")
+	}
+	var mutationErrors []error
+	select {
+	case mutationErrors = <-cleanupMutations:
+	case <-time.After(3 * time.Second):
+		t.Fatal("callback cleanup was not awakened")
+	}
+	for index, mutationErr := range mutationErrors {
+		if !errors.Is(mutationErr, ErrAdmission) {
+			t.Fatalf("cleanup mutation %d retained capability after observation failure: %v", index, mutationErr)
+		}
+	}
+	select {
+	case err = <-done:
+		t.Fatalf("runner released before callback cleanup joined: %v", err)
+	default:
+	}
+	before, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	lifecycle := before[cardID]
+	if err != nil || lifecycle.Attempt == nil || lifecycle.Attempt.Claim == nil || lifecycle.CheckpointCount != 0 ||
+		lifecycle.Attempt.State != "running" || lifecycle.Attempt.Claim.State != "active" || lifecycle.Attempt.Claim.Revision < 2 {
+		t.Fatalf("observation failure changed durable claim: lifecycle=%+v err=%v", lifecycle, err)
+	}
+	claimRevision := lifecycle.Attempt.Claim.Revision
+	close(release)
+	select {
+	case err = <-done:
+		if err == nil {
+			t.Fatal("observation failure unexpectedly succeeded")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker did not finish after callback joined")
+	}
+	after, err := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	if err != nil || after[cardID].Attempt == nil || after[cardID].Attempt.Claim == nil || after[cardID].CheckpointCount != 0 ||
+		after[cardID].Attempt.State != "running" || after[cardID].Attempt.Claim.State != "active" ||
+		after[cardID].Attempt.Claim.Revision != claimRevision {
+		t.Fatalf("runner mutated claim after observation failure: before=%+v after=%+v err=%v", lifecycle, after[cardID], err)
+	}
+}
+
 func TestWorkboardWorkerRunnerFinalizesEffectFreeExecuteAndValidationFailures(t *testing.T) {
 	for _, mode := range []string{"execute", "validate"} {
 		t.Run(mode, func(t *testing.T) {

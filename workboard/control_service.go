@@ -12,13 +12,26 @@ const ControlMutationVersion = 1
 
 type ControlKind string
 
+type PausePhase string
+
 const (
+	PauseNone             PausePhase  = ""
+	PauseRequested        PausePhase  = "requested"
+	PauseAcknowledged     PausePhase  = "acknowledged"
+	ResumeRequested       PausePhase  = "resume_requested"
 	ControlPauseRequest   ControlKind = "card.pause_request"
+	ControlPauseAck       ControlKind = "card.pause_acknowledge"
+	ControlResumeRequest  ControlKind = "card.resume_request"
+	ControlResumeAck      ControlKind = "card.resume_acknowledge"
 	ControlCancelRequest  ControlKind = "card.cancel_request"
 	ControlCancelFinalize ControlKind = "card.cancel_finalize"
 	ControlBlock          ControlKind = "card.block"
 	ControlUnblock        ControlKind = "card.unblock"
 )
+
+func validPausePhase(phase PausePhase) bool {
+	return phase == PauseNone || phase == PauseRequested || phase == PauseAcknowledged || phase == ResumeRequested
+}
 
 type ControlMutation struct {
 	Version               int             `json:"version"`
@@ -47,6 +60,11 @@ type ClaimCardControl struct {
 	BoardID, CardID, AttemptID, ClaimID, IdempotencyKey string
 	ExpectedCardRevision, ExpectedClaimRevision         int64
 	ReasonCode                                          string
+}
+
+type ClaimPauseControl struct {
+	BoardID, CardID, AttemptID, ClaimID, IdempotencyKey string
+	ExpectedCardRevision, ExpectedClaimRevision         int64
 }
 
 type FinalizeCancelRequest struct {
@@ -84,6 +102,32 @@ func (s *ControlService) RequestPause(ctx context.Context, request RequestCardCo
 
 func (s *ControlService) RequestCancel(ctx context.Context, request RequestCardControl) (OperationReceipt, error) {
 	return s.request(ctx, ControlCancelRequest, request)
+}
+
+func (s *ControlService) RequestResume(ctx context.Context, request RequestCardControl) (OperationReceipt, error) {
+	return s.request(ctx, ControlResumeRequest, request)
+}
+
+func (s *ControlService) AcknowledgePause(ctx context.Context, request ClaimPauseControl) (OperationReceipt, error) {
+	return s.pauseControl(ctx, ControlPauseAck, request)
+}
+
+func (s *ControlService) AcknowledgeResume(ctx context.Context, request ClaimPauseControl) (OperationReceipt, error) {
+	return s.pauseControl(ctx, ControlResumeAck, request)
+}
+
+func (s *ControlService) pauseControl(ctx context.Context, kind ControlKind, request ClaimPauseControl) (OperationReceipt, error) {
+	if !validLifecycleIDs(request.BoardID, request.CardID, request.AttemptID, request.ClaimID) || !validKey(request.IdempotencyKey) ||
+		request.ExpectedCardRevision < 1 || request.ExpectedClaimRevision < 1 {
+		return OperationReceipt{}, fail(CodeInvalid, "pause_control")
+	}
+	actor, err := s.authorize(ctx, "worker")
+	if err != nil {
+		return OperationReceipt{}, err
+	}
+	return s.execute(ctx, ControlMutation{Version: 1, Kind: kind, BoardID: request.BoardID, CardID: request.CardID,
+		AttemptID: request.AttemptID, ClaimID: request.ClaimID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
+		ExpectedCardRevision: request.ExpectedCardRevision, ExpectedClaimRevision: request.ExpectedClaimRevision, Now: s.now().UTC()})
 }
 
 func (s *ControlService) request(ctx context.Context, kind ControlKind, request RequestCardControl) (OperationReceipt, error) {

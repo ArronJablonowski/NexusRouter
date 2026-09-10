@@ -410,6 +410,7 @@ func updateStoredBody(body storedWorkboardCard, card workboard.Card) storedWorkb
 	body.CriteriaRevision, body.AttemptCount = card.CriteriaRevision, card.AttemptCount
 	body.CurrentAttemptID, body.CurrentClaimID, body.AcceptanceID = card.CurrentAttemptID, card.CurrentClaimID, card.AcceptanceID
 	body.BlockReason, body.CancelRequested, body.PauseRequested = card.BlockReason, card.CancelRequested, card.PauseRequested
+	body.PausePhase = card.PausePhase
 	body.Budget, body.Criteria = storedCardBudget(card.Budget), storedCardCriteria(card.Criteria)
 	body.CreatedAt, body.UpdatedAt = card.CreatedAt, card.UpdatedAt
 	return body

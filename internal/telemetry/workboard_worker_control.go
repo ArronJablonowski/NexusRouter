@@ -39,7 +39,7 @@ func (s *Store) ReadWorkerControl(ctx context.Context, target workboard.WorkerCo
 	result := workboard.WorkerControlObservation{Version: workboard.WorkerControlObservationVersion,
 		BoardID: target.BoardID, CardID: target.CardID, AttemptID: target.AttemptID, ClaimID: target.ClaimID,
 		WorkerID: target.WorkerID, TaskID: target.TaskID, CardRevision: card.Revision, ClaimRevision: claim.Revision,
-		CancelRequested: card.CancelRequested, PauseRequested: card.PauseRequested}
+		CancelRequested: card.CancelRequested, PauseRequested: card.PauseRequested, PausePhase: card.PausePhase}
 	if result.Validate(target) != nil {
 		return zero, ErrWorkboardCorrupt
 	}

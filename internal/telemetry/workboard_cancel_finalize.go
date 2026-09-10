@@ -63,9 +63,9 @@ func finalizeStoredCancel(ctx context.Context, tx *sql.Tx, mutation workboard.Co
 		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "attempt_revision"}
 	}
 	body.State, body.CurrentClaimID, body.BlockReason = string(workboard.Canceled), "", ""
-	body.CancelRequested, body.PauseRequested = false, false
+	body.CancelRequested, body.PauseRequested, body.PausePhase = false, false, workboard.PauseNone
 	card.State, card.CurrentClaimID, card.BlockReason = workboard.Canceled, "", ""
-	card.CancelRequested, card.PauseRequested = false, false
+	card.CancelRequested, card.PauseRequested, card.PausePhase = false, false, workboard.PauseNone
 	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Canceled)
 	if err != nil {
 		return 0, 0, err
@@ -132,10 +132,15 @@ func validateControlMutation(m workboard.ControlMutation, applying bool) error {
 		}
 	}
 	switch m.Kind {
-	case workboard.ControlPauseRequest, workboard.ControlCancelRequest:
+	case workboard.ControlPauseRequest, workboard.ControlResumeRequest, workboard.ControlCancelRequest:
 		if m.Actor.Type != "operator" && m.Actor.Type != "model" || m.AttemptID != "" || m.ClaimID != "" || m.ExpectedCardRevision < 1 ||
 			m.ExpectedClaimRevision != 0 || m.ReasonCode != "" || m.Stop != nil || m.Verified != nil {
 			return invalidWorkboard("control_request")
+		}
+	case workboard.ControlPauseAck, workboard.ControlResumeAck:
+		if m.Actor.Type != "worker" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) || m.ExpectedCardRevision < 1 ||
+			m.ExpectedClaimRevision < 1 || m.ReasonCode != "" || m.Stop != nil || m.Verified != nil {
+			return invalidWorkboard("pause_control")
 		}
 	case workboard.ControlBlock, workboard.ControlUnblock:
 		if m.Actor.Type != "worker" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) || m.ExpectedCardRevision < 1 ||
@@ -167,6 +172,12 @@ func controlAction(kind workboard.ControlKind) workboard.BoardAction {
 	switch kind {
 	case workboard.ControlPauseRequest:
 		return workboard.CardPauseRequestAction
+	case workboard.ControlPauseAck:
+		return workboard.CardPauseAckAction
+	case workboard.ControlResumeRequest:
+		return workboard.CardResumeRequestAction
+	case workboard.ControlResumeAck:
+		return workboard.CardResumeAckAction
 	case workboard.ControlCancelRequest:
 		return workboard.CardCancelRequestAction
 	case workboard.ControlCancelFinalize:

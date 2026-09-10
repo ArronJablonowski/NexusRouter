@@ -33,6 +33,7 @@ type storedWorkboardCard struct {
 	BlockReason           string                     `json:"block_reason,omitempty"`
 	CancelRequested       bool                       `json:"cancel_requested"`
 	PauseRequested        bool                       `json:"pause_requested"`
+	PausePhase            workboard.PausePhase       `json:"pause_phase,omitempty"`
 	Budget                storedWorkboardBudget      `json:"budget"`
 	Criteria              []storedWorkboardCriterion `json:"criteria"`
 	CreatedAt             time.Time                  `json:"created_at"`
@@ -96,7 +97,15 @@ func scanWorkboardCard(row rowScanner, boardID string) (workboard.Card, cardPage
 		return workboard.Card{}, cardPageCursor{}, err
 	}
 	var body storedWorkboardCard
-	if strictJSON(bodyBytes, &body) != nil || !storedCardMatches(index, body, boardID) {
+	if strictJSON(bodyBytes, &body) != nil {
+		return workboard.Card{}, cardPageCursor{}, ErrWorkboardCorrupt
+	}
+	// Schema 35-38 represented the requested phase with the compatibility
+	// boolean alone. Missing phase therefore has exactly one legacy meaning.
+	if body.PausePhase == workboard.PauseNone && body.PauseRequested {
+		body.PausePhase = workboard.PauseRequested
+	}
+	if !storedCardMatches(index, body, boardID) {
 		return workboard.Card{}, cardPageCursor{}, ErrWorkboardCorrupt
 	}
 	card := workboard.Card{ID: body.ID, BoardID: body.BoardID, Revision: body.Revision, State: workboard.State(body.State), Rank: body.Rank,
@@ -105,7 +114,7 @@ func scanWorkboardCard(row rowScanner, boardID string) (workboard.Card, cardPage
 		AssigneeID: body.AssigneeID, ParentID: body.ParentID, Dependencies: append([]string{}, body.Dependencies...),
 		RemainingDependencies: body.RemainingDependencies, AttemptCount: body.AttemptCount, CurrentAttemptID: body.CurrentAttemptID,
 		CurrentClaimID: body.CurrentClaimID, AcceptanceID: body.AcceptanceID, BlockReason: body.BlockReason,
-		CancelRequested: body.CancelRequested, PauseRequested: body.PauseRequested, Budget: domainWorkboardBudget(body.Budget),
+		CancelRequested: body.CancelRequested, PauseRequested: body.PauseRequested, PausePhase: body.PausePhase, Budget: domainWorkboardBudget(body.Budget),
 		Criteria:  domainWorkboardCriteria(body.Criteria),
 		CreatedAt: body.CreatedAt, UpdatedAt: body.UpdatedAt}
 	if card.Validate() != nil {
@@ -151,8 +160,13 @@ func storedCardMatches(index workboardCardIndex, body storedWorkboardCard, board
 		body.Budget.TokenLimit == index.TokenLimit && body.Budget.CostMicros == index.CostMicros &&
 		body.CurrentAttemptID == nullString(index.CurrentAttemptID) && body.CurrentClaimID == nullString(index.CurrentClaimID) &&
 		body.AcceptanceID == nullString(index.AcceptanceID) && boolInt(body.CancelRequested) == index.CancelRequested &&
-		boolInt(body.PauseRequested) == index.PauseRequested && body.CreatedAt.Equal(time.Unix(0, index.CreatedAt).UTC()) &&
+		boolInt(body.PauseRequested) == index.PauseRequested && body.PauseRequested == (body.PausePhase != workboard.PauseNone) &&
+		validStoredPausePhase(body.PausePhase) && body.CreatedAt.Equal(time.Unix(0, index.CreatedAt).UTC()) &&
 		body.UpdatedAt.Equal(time.Unix(0, index.UpdatedAt).UTC()) && validStoredCardReferences(body)
+}
+
+func validStoredPausePhase(phase workboard.PausePhase) bool {
+	return phase == workboard.PauseNone || phase == workboard.PauseRequested || phase == workboard.PauseAcknowledged || phase == workboard.ResumeRequested
 }
 
 func validStoredCardReferences(body storedWorkboardCard) bool {

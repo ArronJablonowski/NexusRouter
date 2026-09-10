@@ -32,6 +32,9 @@ const (
 	AcceptanceAcceptAction     BoardAction = "acceptance.accept"
 	AcceptanceRejectAction     BoardAction = "acceptance.reject"
 	CardPauseRequestAction     BoardAction = "card.pause_request"
+	CardPauseAckAction         BoardAction = "card.pause_acknowledge"
+	CardResumeRequestAction    BoardAction = "card.resume_request"
+	CardResumeAckAction        BoardAction = "card.resume_acknowledge"
 	CardCancelRequestAction    BoardAction = "card.cancel_request"
 	CardCancelFinalizeAction   BoardAction = "card.cancel_finalize"
 	CardBlockAction            BoardAction = "card.block"
@@ -270,7 +273,8 @@ func boardActionRequiresCard(action BoardAction) bool {
 	case CardCreateAction, CardReviseAction, CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
 		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimFailAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
 		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
-		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
+		CardPauseRequestAction, CardPauseAckAction, CardResumeRequestAction, CardResumeAckAction,
+		CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true
 	default:
 		return false
@@ -329,7 +333,8 @@ func validBoardAction(action BoardAction) bool {
 		CardMoveAction, CardReorderAction, CardDependencyAddAction, CardDependencyRemoveAction,
 		CardClaimAction, ClaimHeartbeatAction, ClaimRecoverAction, ClaimFailAction, ClaimAttentionAction, CriteriaReviseAction, CheckpointAppendAction,
 		CandidateSubmitAction, AcceptanceAcceptAction, AcceptanceRejectAction,
-		CardPauseRequestAction, CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
+		CardPauseRequestAction, CardPauseAckAction, CardResumeRequestAction, CardResumeAckAction,
+		CardCancelRequestAction, CardCancelFinalizeAction, CardBlockAction, CardUnblockAction:
 		return true
 	default:
 		return false

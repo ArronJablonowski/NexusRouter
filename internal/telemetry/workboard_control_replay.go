@@ -24,7 +24,8 @@ func (s *Store) ReplayControlMutation(ctx context.Context, mutation workboard.Co
 	if err != nil || !found {
 		return workboard.OperationReceipt{}, found, err
 	}
-	wantsClaim := mutation.Kind == workboard.ControlBlock || mutation.Kind == workboard.ControlUnblock || mutation.Kind == workboard.ControlCancelFinalize
+	wantsClaim := mutation.Kind == workboard.ControlPauseAck || mutation.Kind == workboard.ControlResumeAck ||
+		mutation.Kind == workboard.ControlBlock || mutation.Kind == workboard.ControlUnblock || mutation.Kind == workboard.ControlCancelFinalize
 	if receipt.CardID != mutation.CardID || receipt.CardRevision == nil || wantsClaim != (receipt.ClaimRevision != nil) {
 		return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 	}

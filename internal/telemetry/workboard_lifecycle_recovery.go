@@ -79,8 +79,9 @@ func applyClaimRecovery(ctx context.Context, tx *sql.Tx, mutation workboard.Life
 		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "attempt_revision"}
 	}
 	body.State, body.CurrentClaimID = string(workboard.Ready), ""
-	body.BlockReason, body.CancelRequested, body.PauseRequested = "", false, false
+	body.BlockReason, body.CancelRequested, body.PauseRequested, body.PausePhase = "", false, false, workboard.PauseNone
 	card.State, card.CurrentClaimID = workboard.Ready, ""
+	card.CancelRequested, card.PauseRequested, card.PausePhase = false, false, workboard.PauseNone
 	card.Rank, err = appendRank(ctx, tx, board.ID, workboard.Ready)
 	if err != nil {
 		return 0, 0, err

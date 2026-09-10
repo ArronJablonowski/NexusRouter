@@ -14,7 +14,8 @@ func appendStoredCheckpoint(ctx context.Context, tx *sql.Tx, mutation workboard.
 	if card.Revision != mutation.ExpectedCardRevision {
 		return 0, 0, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "card_revision"}
 	}
-	if card.State != workboard.InProgress && card.State != workboard.Blocked || card.CurrentAttemptID != mutation.AttemptID ||
+	if card.PausePhase == workboard.PauseAcknowledged || card.PausePhase == workboard.ResumeRequested ||
+		card.State != workboard.InProgress && card.State != workboard.Blocked || card.CurrentAttemptID != mutation.AttemptID ||
 		card.CurrentClaimID != mutation.ClaimID || card.CriteriaRevision != mutation.CriteriaRevision {
 		return 0, 0, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "checkpoint"}
 	}

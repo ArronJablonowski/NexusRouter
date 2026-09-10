@@ -2,4 +2,4 @@
 // runtime storage and release evidence.
 package stateschema
 
-const Current = 38
+const Current = 39

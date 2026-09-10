@@ -12,6 +12,18 @@ type attentionRepositoryStub struct {
 	items []ClaimAttention
 }
 
+type supervisionRepositoryStub struct {
+	queries int
+	last    SupervisionQuery
+	page    SupervisionPage
+}
+
+func (r *supervisionRepositoryStub) ReadSupervisionPage(_ context.Context, query SupervisionQuery) (SupervisionPage, error) {
+	r.queries++
+	r.last = query
+	return r.page, nil
+}
+
 func (r *attentionRepositoryStub) ObserveClaimAttention(_ context.Context, scan AttentionScan) ([]ClaimAttention, error) {
 	r.scans++
 	r.last = scan
@@ -62,5 +74,50 @@ func TestAttentionObservationDoesNotReleaseOrReassign(t *testing.T) {
 	}
 	if _, err = MarkAttentionFromObservation(lease, 3, heartbeat.Add(30*time.Second), heartbeat.Add(-30*time.Second)); err == nil {
 		t.Fatal("fresh live claim marked attention")
+	}
+}
+
+func TestSupervisionServiceBindsObservationAndBounds(t *testing.T) {
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	repository := &supervisionRepositoryStub{page: SupervisionPage{Version: 1, BoardID: "board-a", BoardRevision: 1, ObservedAt: now, Items: []SupervisionItem{}}}
+	service, err := NewSupervisionService(repository, boardAuthorityStub{authority: Authority{
+		CreationScope: "inspection", Actor: Actor{ID: "operator", Type: "operator"},
+	}}, func() time.Time { return now }, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.Read(context.Background(), "board-a", SupervisionOptions{Limit: 25})
+	if err != nil || page.Validate() != nil || repository.queries != 1 || repository.last.BoardID != "board-a" || repository.last.Limit != 25 ||
+		!repository.last.ObservedAt.Equal(now) || !repository.last.StaleBefore.Equal(now.Add(-time.Minute)) {
+		t.Fatalf("query=%+v page=%+v err=%v", repository.last, page, err)
+	}
+	if _, err = service.Read(context.Background(), "board-a", SupervisionOptions{Limit: MaxSupervisionPageItems + 1}); err == nil || repository.queries != 1 {
+		t.Fatalf("unbounded read dispatched: calls=%d err=%v", repository.queries, err)
+	}
+}
+
+func TestSupervisionProjectionValidationRejectsUnsafeActions(t *testing.T) {
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	running := SupervisionItem{Version: 1, BoardID: "board-a", CardID: "card-a", CardRevision: 2,
+		State: SupervisionRunning, Reason: SupervisionLeaseHealthy, AttemptID: "attempt-a", ClaimID: "claim-a",
+		ClaimRevision: 1, WorkerID: "worker-a", LastHeartbeat: now, ExpiresAt: now.Add(time.Minute),
+		Actions: SupervisionActions{PauseRequest: true, CancelRequest: true}}
+	if err := running.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	unsafe := running
+	unsafe.Actions.RecoveryCheck = true
+	if unsafe.Validate() == nil {
+		t.Fatal("healthy running claim advertised recovery")
+	}
+	orphaned := running
+	orphaned.State, orphaned.Reason, orphaned.TaskID = SupervisionOrphaned, SupervisionTaskFailed, "task-a"
+	orphaned.Actions = SupervisionActions{CancelRequest: true, RecoveryCheck: true}
+	if err := orphaned.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	orphaned.TaskID = ""
+	if orphaned.Validate() == nil {
+		t.Fatal("orphaned state lacked a terminal task binding")
 	}
 }

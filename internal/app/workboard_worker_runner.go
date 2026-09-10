@@ -328,6 +328,13 @@ func (h *WorkboardWorkerHandle) heartbeat(ctx context.Context, interval time.Dur
 				return
 			}
 		}
+		if err != nil {
+			// Any loss of the durable heartbeat/control fence revokes this
+			// capability before callback cleanup is awakened. A callback may
+			// replace the canceled context while unwinding, but it must not be
+			// able to mutate a claim whose ownership can no longer be proven.
+			h.active = false
+		}
 		h.mu.Unlock()
 		if err != nil {
 			cancel()
