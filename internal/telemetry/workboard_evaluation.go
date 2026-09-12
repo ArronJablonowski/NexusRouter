@@ -39,7 +39,123 @@ type storedEvaluationAttempt struct {
 	EndedAt                  *time.Time                 `json:"ended_at,omitempty"`
 }
 
-func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.EvaluationMutation) (workboard.OperationReceipt, error) {
+// PrepareCandidateEvaluation freezes the exact durable attempt, claim,
+// criteria, and runtime binding before any external evaluator is called. The
+// later mutation transaction rechecks the same fences, so a concurrent board
+// change cannot commit evidence produced for a stale snapshot.
+func (s *Store) PrepareCandidateEvaluation(ctx context.Context, mutation workboard.EvaluationMutation) (workboard.CandidateEvaluationRequest, error) {
+	if err := validateEvaluationMutation(mutation, false); err != nil || mutation.Kind != workboard.EvaluationCandidateSubmit {
+		return workboard.CandidateEvaluationRequest{}, invalidWorkboard("candidate_evaluation")
+	}
+	want, err := workboard.EvaluationDigest(mutation)
+	if err != nil || want != mutation.RequestDigest {
+		return workboard.CandidateEvaluationRequest{}, invalidWorkboard("request_digest")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	defer tx.Rollback()
+	board, _, _, err := readBoardRow(ctx, tx, mutation.BoardID)
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	card, _, err := readStoredCard(ctx, tx, mutation.BoardID, mutation.CardID)
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	if board.State != "active" || card.Revision != mutation.ExpectedCardRevision || card.State != workboard.InProgress ||
+		card.CurrentAttemptID != mutation.AttemptID || card.CurrentClaimID != mutation.ClaimID ||
+		card.CriteriaRevision != mutation.CriteriaRevision || card.CancelRequested ||
+		card.PausePhase == workboard.PauseAcknowledged || card.PausePhase == workboard.ResumeRequested {
+		return workboard.CandidateEvaluationRequest{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "candidate_evaluation"}
+	}
+	lease, claim, err := readLifecycleClaim(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID)
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	if lease.Revision != mutation.ExpectedClaimRevision || lease.OwnerID != mutation.Actor.ID ||
+		lease.State != workboard.LeaseActive || !mutation.Now.Before(lease.ExpiresAt) {
+		return workboard.CandidateEvaluationRequest{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "candidate_claim"}
+	}
+	attempt, _, err := readRunningEvaluationAttempt(ctx, tx, mutation, claim)
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	sourceTask, sourceSession, ok := evaluationSource(attempt.TaskIDs, attempt.SessionIDs, claim.TaskID)
+	if !ok {
+		return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
+	}
+	bindingKind, admissionID, admissionDigest := "legacy", "", ""
+	sourceModel, sourceProvider, configID := "", "", ""
+	sourceTimeLimit, sourceTokenLimit, sourceCost := int64(0), int64(0), int64(0)
+	if sourceTask != "" {
+		bindingKind = "runtime_unbudgeted"
+	}
+	indexedAdmission, canonicalAdmission, found, err := readExecutionAdmission(ctx, tx, sourceTask)
+	if err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	if found {
+		if indexedAdmission != canonicalAdmission || canonicalAdmission.BoardID != mutation.BoardID ||
+			canonicalAdmission.CardID != mutation.CardID || canonicalAdmission.AttemptID != mutation.AttemptID ||
+			canonicalAdmission.ClaimID != mutation.ClaimID || canonicalAdmission.WorkerID != mutation.Actor.ID ||
+			canonicalAdmission.SessionID != sourceSession || canonicalAdmission.PolicyDigest != attempt.PolicyDigest {
+			return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
+		}
+		proof, proofErr := readExecutionTerminalProof(ctx, tx, canonicalAdmission)
+		if proofErr != nil {
+			return workboard.CandidateEvaluationRequest{}, proofErr
+		}
+		if proof.event.Kind != runtime.TaskCompleted {
+			return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
+		}
+		if budgetErr := enforceSuccessfulExecutionReservation(canonicalAdmission, proof, true); budgetErr != nil {
+			return workboard.CandidateEvaluationRequest{}, budgetErr
+		}
+		bindingKind, admissionID, admissionDigest = "runtime_budgeted", canonicalAdmission.AdmissionID, canonicalAdmission.AdmissionDigest
+		sourceModel, sourceProvider, configID = canonicalAdmission.ModelID, canonicalAdmission.ProviderID, canonicalAdmission.ConfigID
+		sourceTimeLimit, sourceTokenLimit, sourceCost = canonicalAdmission.TimeLimitMS, canonicalAdmission.TokenLimit, canonicalAdmission.CostMicros
+	}
+	frozen := workboard.CandidateEvaluationRequest{Version: workboard.SchemaVersion, BoardID: mutation.BoardID, CardID: mutation.CardID,
+		AttemptID: mutation.AttemptID, ClaimID: mutation.ClaimID, CandidateID: mutation.CandidateID, SourceTaskID: sourceTask,
+		SourceSessionID: sourceSession, BindingKind: bindingKind, AdmissionID: admissionID, AdmissionDigest: admissionDigest,
+		SourceModelID: sourceModel, SourceProviderID: sourceProvider, ConfigID: configID, SourceTimeLimitMS: sourceTimeLimit,
+		SourceTokenLimit: sourceTokenLimit, SourceCostMicros: sourceCost, WorkerID: mutation.Actor.ID, ExpectedCardRevision: mutation.ExpectedCardRevision,
+		ExpectedClaimRevision: mutation.ExpectedClaimRevision, CriteriaRevision: attempt.CriteriaRevision,
+		CandidateDigest: mutation.CandidateDigest, CriteriaDigest: attempt.CriteriaDigest, PolicyDigest: attempt.PolicyDigest,
+		Summary: mutation.Summary, ArtifactRefs: append([]string{}, mutation.ArtifactRefs...), Criteria: domainWorkboardCriteria(attempt.Criteria)}
+	if frozen.Validate() != nil {
+		return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.CandidateEvaluationRequest{}, err
+	}
+	return frozen, nil
+}
+
+func evaluationSource(tasks, sessions []string, claimTask string) (string, string, bool) {
+	if len(tasks) != len(sessions) {
+		return "", "", false
+	}
+	// Legacy/manual lifecycle claims predate runtime-task binding. They remain
+	// valid for operator-driven evaluation, while the production scheduler path
+	// always supplies and verifies an exact task/session pair.
+	if len(tasks) == 0 && claimTask == "" {
+		return "", "", true
+	}
+	for i := len(tasks) - 1; i >= 0; i-- {
+		if tasks[i] == claimTask {
+			return tasks[i], sessions[i], true
+		}
+	}
+	return "", "", false
+}
+
+func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.EvaluationMutation, now func() time.Time) (workboard.OperationReceipt, error) {
+	if now == nil {
+		return workboard.OperationReceipt{}, invalidWorkboard("clock")
+	}
 	if err := validateEvaluationMutation(mutation, true); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
@@ -53,6 +169,13 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	}
 	defer tx.Rollback()
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	// Sample the trusted service clock only after acquiring the serialized
+	// writer boundary. A process stall or lock wait before this point therefore
+	// cannot authorize a commit using an already-expired lease observation.
+	mutation.Now = now().UTC()
+	if err = validateEvaluationMutation(mutation, true); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
 	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
@@ -162,11 +285,10 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if err != nil {
 		return 0, 0, evaluationStoredResult{}, err
 	}
-	candidateID := newWorkboardID()
-	if candidateID == "" {
-		return 0, 0, evaluationStoredResult{}, errors.New("secure identifier generation failed")
+	candidateID, candidateDigest := m.CandidateID, m.CandidateDigest
+	if candidateDigest != workboard.CandidateContentDigest(m.Summary, m.ArtifactRefs) {
+		return 0, 0, evaluationStoredResult{}, invalidWorkboard("candidate_digest")
 	}
-	candidateDigest := workboard.CandidateContentDigest(m.Summary, m.ArtifactRefs)
 	evidence, err := buildCandidateEvidence(m, candidateID, candidateDigest, base)
 	if err != nil {
 		return 0, 0, evaluationStoredResult{}, err

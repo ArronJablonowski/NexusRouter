@@ -327,9 +327,9 @@ func TestOrphanWorkerRecoveryRejectsUnsafeCandidates(t *testing.T) {
 				}
 				err = os.Remove(filepath.Join(candidate.Reference.Directory, "owner.lock"))
 			case "missing_origin":
-				_, err = s.db.Exec(`UPDATE events SET body=json_remove(body,'$.data.delegation_origin') WHERE task_id='work' AND sequence=1`)
+				rewriteCanonicalEventForTest(t, s, "work", 1, func(event *runtime.Event) { event.Data.DelegationOrigin = nil })
 			case "wrong_origin":
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.delegation_origin.tool_call_id','other') WHERE task_id='work' AND sequence=1`)
+				rewriteCanonicalEventForTest(t, s, "work", 1, func(event *runtime.Event) { event.Data.DelegationOrigin.ToolCallID = "other" })
 			case "wrong_owner":
 				_, err = s.db.Exec(`UPDATE resource_leases SET owner='other'`)
 			case "extra_owner":

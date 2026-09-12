@@ -147,19 +147,15 @@ func TestInterruptedDelegationRecoveryGuardsAndRollback(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "missing_origin":
-				if _, err := db.db.Exec(`UPDATE events SET body=json_remove(body,'$.data.delegation_origin') WHERE task_id='work' AND sequence=1`); err != nil {
-					t.Fatal(err)
-				}
+				rewriteCanonicalEventForTest(t, db, "work", 1, func(event *runtime.Event) { event.Data.DelegationOrigin = nil })
 			case "wrong_origin":
-				if _, err := db.db.Exec(`UPDATE events SET body=json_set(body,'$.data.delegation_origin.tool_call_id','other') WHERE task_id='work' AND sequence=1`); err != nil {
-					t.Fatal(err)
-				}
+				rewriteCanonicalEventForTest(t, db, "work", 1, func(event *runtime.Event) { event.Data.DelegationOrigin.ToolCallID = "other" })
 			case "invalid_token":
 				if _, err := db.db.Exec(`UPDATE submissions SET token=''`); err != nil {
 					t.Fatal(err)
 				}
 			case "aggregate":
-				if _, err := db.db.Exec(`UPDATE events SET body=json_set(body,'$.fixture_padding',printf('%.*c',?,'x')) WHERE sequence=1`, 3<<20); err != nil {
+				if _, err := db.db.Exec(`UPDATE events SET body=json_set(body,'$.fixture_padding',printf('%.*c',?,'x')) WHERE task_id='child' AND sequence=1`, 3<<20); err != nil {
 					t.Fatal(err)
 				}
 			case "continuation":

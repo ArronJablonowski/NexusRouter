@@ -42,13 +42,7 @@ func createProcedureFixture(t *testing.T, s *Store, task string, failed bool) {
 				}
 			}
 		}
-		body, err := json.Marshal(e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = s.db.Exec("UPDATE events SET body=? WHERE task_id=? AND sequence=?", string(body), task, e.Sequence); err != nil {
-			t.Fatal(err)
-		}
+		rewriteCanonicalEventForTest(t, s, task, e.Sequence, func(event *runtime.Event) { *event = e })
 	}
 }
 

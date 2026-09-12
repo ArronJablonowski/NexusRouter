@@ -136,17 +136,17 @@ func TestOrphanReadOnlyRecoveryRejectsAmbiguousToolsAndLease(t *testing.T) {
 				}
 				_, err = s.db.Exec(`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,released,process_id) SELECT 'child-token','child','child-owner','child-scope',0,?,0,process_id FROM resource_leases WHERE token=?`, expires, token)
 			case "legacy_start":
-				_, err = s.db.Exec(`UPDATE events SET body=json_remove(body,'$.data.tool_behavior') WHERE task_id='child' AND sequence=4`)
+				rewriteCanonicalEventForTest(t, s, "child", 4, func(event *runtime.Event) { event.Data.ToolBehavior = "" })
 			case "legacy_end":
-				_, err = s.db.Exec(`UPDATE events SET body=json_remove(body,'$.data.tool_behavior') WHERE task_id='child' AND sequence=5`)
+				rewriteCanonicalEventForTest(t, s, "child", 5, func(event *runtime.Event) { event.Data.ToolBehavior = "" })
 			case "write_start":
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.tool_behavior','idempotent_write') WHERE task_id='child' AND sequence=4`)
+				rewriteCanonicalEventForTest(t, s, "child", 4, func(event *runtime.Event) { event.Data.ToolBehavior = runtime.BehaviorIdempotentWrite })
 			case "confirmed", "uncertain":
 				effect := runtime.ConfirmedEffect
 				if mode == "uncertain" {
 					effect = runtime.UncertainEffect
 				}
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.effect',?) WHERE task_id='child' AND sequence=5`, effect)
+				rewriteCanonicalEventForTest(t, s, "child", 5, func(event *runtime.Event) { event.Data.Effect = effect })
 			case "missing_terminal":
 				_, err = s.db.Exec(`DELETE FROM submission_stream_events WHERE task_id='child' AND task_sequence>=5; DELETE FROM events WHERE task_id='child' AND sequence>=5`)
 				if err == nil {
@@ -157,6 +157,12 @@ func TestOrphanReadOnlyRecoveryRejectsAmbiguousToolsAndLease(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatal(err)
+			}
+			if mode == "missing_terminal" {
+				if changed, _ := s.RecoverOrphanWorker(context.Background(), token, time.Now()); changed {
+					t.Fatal("noncanonical missing terminal was recovered")
+				}
+				return
 			}
 			before := orphanHistories(t, s)
 			if changed, _ := s.RecoverOrphanWorker(context.Background(), token, time.Now()); changed {

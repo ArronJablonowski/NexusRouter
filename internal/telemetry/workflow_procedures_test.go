@@ -79,13 +79,7 @@ func TestWorkflowProceduresActualToolsAndReadOnlyProvenance(t *testing.T) {
 	}
 	e := events[0]
 	e.Data.Messages = append(e.Data.Messages, providers.Message{Role: "assistant", ToolCalls: []providers.ToolCall{{ID: "imported", Name: "shell", Arguments: json.RawMessage(`{}`)}}}, providers.Message{Role: "tool", ToolCallID: "imported", Content: "claimed shell success"})
-	body, err := json.Marshal(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.db.Exec(`UPDATE events SET body=? WHERE task_id='task-b' AND sequence=1`, string(body)); err != nil {
-		t.Fatal(err)
-	}
+	rewriteCanonicalEventForTest(t, s, "task-b", 1, func(event *runtime.Event) { *event = e })
 	before := workflowSourceRawBodies(t, s)
 	ro, err := OpenReadOnly(ctx, path)
 	if err != nil {
@@ -204,13 +198,7 @@ func TestWorkflowGroupSourcesRechecksActualExecution(t *testing.T) {
 	}
 	e := events[6]
 	e.Data.Code = "tool_failed"
-	body, err := json.Marshal(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.db.Exec(`UPDATE events SET body=? WHERE task_id='task-b' AND sequence=7`, string(body)); err != nil {
-		t.Fatal(err)
-	}
+	rewriteCanonicalEventForTest(t, s, "task-b", 7, func(event *runtime.Event) { *event = e })
 	if _, err = s.SkillWorkflowSources(ctx, ids); err != nil {
 		t.Fatal("accepted task source should still be inspectable", err)
 	}

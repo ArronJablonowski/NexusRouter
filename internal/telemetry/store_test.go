@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -14,6 +15,67 @@ import (
 
 func event(id string, sequence int64, kind runtime.Kind) runtime.Event {
 	return runtime.Event{Version: 1, ID: id, TaskID: "task", SessionID: "session", CorrelationID: "correlation", Sequence: sequence, Time: time.Unix(100, 0), Kind: kind}
+}
+
+// rewriteCanonicalEventForTest keeps the immutable ledger binding coherent for
+// fixtures that intentionally model a different, otherwise legitimate event.
+func rewriteCanonicalEventForTest(t *testing.T, store *Store, task string, sequence int64, mutate func(*runtime.Event)) {
+	t.Helper()
+	var body []byte
+	if err := store.db.QueryRow(`SELECT body FROM events WHERE task_id=? AND sequence=?`, task, sequence).Scan(&body); err != nil {
+		t.Fatal(err)
+	}
+	var event runtime.Event
+	if err := json.Unmarshal(body, &event); err != nil {
+		t.Fatal(err)
+	}
+	mutate(&event)
+	body, err := event.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := store.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`UPDATE events SET body=? WHERE task_id=? AND sequence=?`, body, task, sequence); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(`UPDATE event_log SET body_digest=? WHERE task_id=? AND task_sequence=?`, streamBodyDigest(body), task, sequence); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(`UPDATE submission_stream_events SET body_digest=? WHERE task_id=? AND task_sequence=?`, streamBodyDigest(body), task, sequence); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertCanonicalEventForTest(t *testing.T, store *Store, event runtime.Event, state string) {
+	t.Helper()
+	body, err := event.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := store.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`INSERT INTO events(id,task_id,sequence,body) VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, body); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(`INSERT INTO event_log(event_id,task_id,task_sequence,body_digest) VALUES(?,?,?,?)`, event.ID, event.TaskID, event.Sequence, streamBodyDigest(body)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(`UPDATE task_heads SET sequence=?,state=? WHERE task_id=?`, event.Sequence, state, event.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRecoveryIdempotencyAndTerminalState(t *testing.T) {

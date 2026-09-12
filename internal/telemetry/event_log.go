@@ -178,6 +178,31 @@ func readEventLogByPosition(ctx context.Context, tx *sql.Tx, position int64, id 
 	return entry, body, nil
 }
 
+// readTaskEventLogByPosition additionally proves that the selected ledger row
+// has its canonical global position and per-task order. This keeps task-scoped
+// readers strict without making an unrelated task's corruption part of their
+// read boundary.
+func readTaskEventLogByPosition(ctx context.Context, tx *sql.Tx, position int64, id string) (eventLogEntry, []byte, error) {
+	entry, body, err := readEventLogByPosition(ctx, tx, position, id)
+	if err != nil {
+		return eventLogEntry{}, nil, err
+	}
+	var hasGlobalPredecessor bool
+	var taskPredecessor, taskMinimum int64
+	err = tx.QueryRowContext(ctx, `SELECT
+		EXISTS(SELECT 1 FROM event_log WHERE position=?),
+		COALESCE((SELECT position FROM event_log WHERE task_id=? AND task_sequence=?),0),
+		COALESCE((SELECT min(position) FROM event_log WHERE task_id=?),0)`, position-1, entry.taskID, entry.taskSequence-1, entry.taskID).
+		Scan(&hasGlobalPredecessor, &taskPredecessor, &taskMinimum)
+	if err != nil {
+		return eventLogEntry{}, nil, err
+	}
+	if position != 1 && !hasGlobalPredecessor || entry.taskSequence == 1 && taskMinimum != position || entry.taskSequence > 1 && (taskPredecessor < 1 || taskPredecessor >= position) {
+		return eventLogEntry{}, nil, sessions.ErrEventLog
+	}
+	return entry, body, nil
+}
+
 func validateEventLogCompleteness(ctx context.Context, tx *sql.Tx) error {
 	var schema int
 	var tableSQL string

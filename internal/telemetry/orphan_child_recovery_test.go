@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
@@ -18,9 +19,10 @@ import (
 // a crash after a partial model stream instead of after TurnCompleted.
 func orphanChildStreamPrefix(t *testing.T, s *Store) {
 	t.Helper()
-	if _, err := s.db.Exec(`UPDATE events SET body=json_remove(json_set(body,'$.kind','model.delta'),'$.data.finish_reason') WHERE task_id='child' AND sequence=3`); err != nil {
-		t.Fatal(err)
-	}
+	rewriteCanonicalEventForTest(t, s, "child", 3, func(event *runtime.Event) {
+		event.Kind = runtime.ModelDelta
+		event.Data.FinishReason = ""
+	})
 }
 
 func assertRecoveredOrphanChild(t *testing.T, s *Store, token string, before map[string][]runtime.Event, interrupted bool) []byte {
@@ -213,7 +215,10 @@ func TestOrphanChildRecoveryRejectsNonModelEvidence(t *testing.T) {
 			case "child_lease":
 				_, err = s.db.Exec(`INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,released,process_id) SELECT 'child-token','child','child-owner','child-scope',0,expires,0,process_id FROM resource_leases WHERE token=?`, token)
 			case "tool_call":
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.tool_calls',json('[{"id":"effect","name":"tool","arguments":{}}]'),'$.data.finish_reason','tool_calls') WHERE task_id='child' AND sequence=3`)
+				rewriteCanonicalEventForTest(t, s, "child", 3, func(event *runtime.Event) {
+					event.Data.ToolCalls = []providers.ToolCall{{ID: "effect", Name: "tool", Arguments: json.RawMessage(`{}`)}}
+					event.Data.FinishReason = "tool_calls"
+				})
 			case "evaluation":
 				history := orphanHistories(t, s)["child"]
 				e := history[len(history)-1]
@@ -221,14 +226,7 @@ func TestOrphanChildRecoveryRejectsNonModelEvidence(t *testing.T) {
 				e.Time = e.Time.Add(time.Millisecond)
 				yes := true
 				e.Data = runtime.Data{ProviderID: "fixture", ModelID: "model", Accepted: &yes, Code: "deterministic.nonempty_text.v1"}
-				body, encodeErr := e.Encode()
-				if encodeErr != nil {
-					t.Fatal(encodeErr)
-				}
-				_, err = s.db.Exec(`INSERT INTO events VALUES(?,?,?,?)`, e.ID, e.TaskID, e.Sequence, body)
-				if err == nil {
-					_, err = s.db.Exec(`UPDATE task_heads SET sequence=4 WHERE task_id='child'`)
-				}
+				insertCanonicalEventForTest(t, s, e, "running")
 			}
 			if err != nil {
 				t.Fatal(err)

@@ -48,7 +48,8 @@ func readEvaluationReplay(ctx context.Context, tx *sql.Tx, m workboard.Evaluatio
 	}
 	if m.Kind == workboard.EvaluationCandidateSubmit {
 		candidate, err := readEvaluationCandidate(ctx, tx, m.BoardID, m.CardID, m.AttemptID)
-		if err != nil || candidate.SubmittedBy != m.Actor.ID || candidate.Summary != m.Summary || !reflect.DeepEqual(candidate.ArtifactRefs, m.ArtifactRefs) {
+		if err != nil || candidate.ID != m.CandidateID || candidate.Digest != m.CandidateDigest || candidate.SubmittedBy != m.Actor.ID ||
+			candidate.Summary != m.Summary || !reflect.DeepEqual(candidate.ArtifactRefs, m.ArtifactRefs) {
 			return workboard.OperationReceipt{}, true, ErrWorkboardCorrupt
 		}
 		evidence, evidenceErr := readEvaluationEvidence(ctx, tx, m.BoardID, m.CardID, m.AttemptID, candidate)
@@ -311,8 +312,9 @@ func validateEvaluationMutation(m workboard.EvaluationMutation, requireEvaluatio
 	}
 	switch m.Kind {
 	case workboard.EvaluationCandidateSubmit:
-		if m.Actor.Type != "worker" || !validWorkboardID(m.ClaimID) || m.CandidateID != "" || m.ExpectedClaimRevision < 1 || m.EvidenceHeadRevision != 0 ||
-			m.CandidateDigest != "" || m.CriteriaDigest != "" || m.EvidenceSetDigest != "" || m.PolicyDigest != "" || m.DecisionAuthorityID != "" ||
+		if m.Actor.Type != "worker" || !validWorkboardID(m.ClaimID) || !validWorkboardID(m.CandidateID) || m.ExpectedClaimRevision < 1 || m.EvidenceHeadRevision != 0 ||
+			!validDigest(m.CandidateDigest) || m.CandidateDigest != workboard.CandidateContentDigest(m.Summary, m.ArtifactRefs) ||
+			m.CriteriaDigest != "" || m.EvidenceSetDigest != "" || m.PolicyDigest != "" || m.DecisionAuthorityID != "" ||
 			m.Summary == "" || len(m.ArtifactRefs) > workboard.MaxCandidateArtifacts || requireEvaluation && len(m.Evaluated) > workboard.MaxEvaluationEvidence || !requireEvaluation && m.Evaluated != nil {
 			return invalidWorkboard("candidate")
 		}

@@ -113,8 +113,8 @@ func TestSkillComparisonSelectionDoesNotFilterRunningOrOtherExecution(t *testing
 	s, _ := generationStore(t)
 	p := selectionStorePolicy()
 	selectionStoreTask(t, s, "other-execution", p.Comparison.BaselineVersion, p.Privacy, nil)
-	if _, err := s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.model_id','other-model') WHERE task_id='other-execution' AND sequence IN (1,2)`); err != nil {
-		t.Fatal(err)
+	for _, sequence := range []int64{1, 2} {
+		rewriteCanonicalEventForTest(t, s, "other-execution", sequence, func(event *runtime.Event) { event.Data.ModelID = "other-model" })
 	}
 	start := runtime.Event{Version: 1, ID: "running-start", TaskID: "running", SessionID: "running-session", CorrelationID: "running", Sequence: 1, Time: time.Unix(100, 0).UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{Privacy: p.Privacy, SkillContext: &runtime.SkillContextUse{Version: 1, Complete: true, References: []runtime.SkillReference{{Scope: "project", Name: "lookup", Version: p.Comparison.CandidateVersion, Digest: strings.Repeat("d", 64)}}}}}
 	if err := s.Append(context.Background(), 0, start); err != nil {

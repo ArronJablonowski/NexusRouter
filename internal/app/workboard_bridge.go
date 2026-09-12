@@ -37,7 +37,7 @@ func (unavailableControlVerifier) VerifyControlStop(context.Context, workboard.F
 
 type unavailableCandidateEvaluator struct{}
 
-func (unavailableCandidateEvaluator) EvaluateCandidate(context.Context, workboard.SubmitCandidateRequest, workboard.Actor) ([]workboard.EvidenceInput, error) {
+func (unavailableCandidateEvaluator) EvaluateCandidate(context.Context, workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
 	return nil, errors.New("workboard candidate evaluation unavailable")
 }
 

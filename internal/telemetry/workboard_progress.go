@@ -149,9 +149,5 @@ func reviseStoredCriteria(ctx context.Context, tx *sql.Tx, mutation workboard.Pr
 }
 
 func criteriaDigest(criteria []workboard.AcceptanceCriterion) string {
-	body, err := json.Marshal(criteria)
-	if err != nil {
-		return ""
-	}
-	return digestBytes(body)
+	return workboard.AcceptanceCriteriaDigest(criteria)
 }

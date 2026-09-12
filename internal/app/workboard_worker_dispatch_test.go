@@ -15,14 +15,14 @@ import (
 )
 
 type capturingWorkboardEvaluator struct {
-	request workboard.SubmitCandidateRequest
+	request workboard.CandidateEvaluationRequest
 	actor   workboard.Actor
 }
 
-func (e *capturingWorkboardEvaluator) EvaluateCandidate(_ context.Context, request workboard.SubmitCandidateRequest, actor workboard.Actor) ([]workboard.EvidenceInput, error) {
+func (e *capturingWorkboardEvaluator) EvaluateCandidate(_ context.Context, request workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
 	e.request = request
 	e.request.ArtifactRefs = append([]string{}, request.ArtifactRefs...)
-	e.actor = actor
+	e.actor = workboard.Actor{ID: request.WorkerID, Type: "worker"}
 	return []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "passed", ActorID: "go-test", ActorType: "validator", Reference: "focused-test-report"}}, nil
 }
 
@@ -138,7 +138,13 @@ func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {
 		ExpectedCardRevision: latest.Revision, ExpectedClaimRevision: claimRevision, CriteriaRevision: latest.CriteriaRevision,
 		Summary: summary, ArtifactRefs: artifacts})
 	if err != nil || submitted.Validate() != nil || evaluator.actor.ID != "worker-a" || evaluator.actor.Type != "worker" ||
-		evaluator.request.Summary != summary || !reflect.DeepEqual(evaluator.request.ArtifactRefs, artifacts) {
+		evaluator.request.Validate() != nil || evaluator.request.Summary != summary || !reflect.DeepEqual(evaluator.request.ArtifactRefs, artifacts) ||
+		evaluator.request.BoardID != board.BoardID || evaluator.request.CardID != latest.ID ||
+		evaluator.request.AttemptID != latest.CurrentAttemptID || evaluator.request.ClaimID != latest.CurrentClaimID ||
+		evaluator.request.SourceTaskID != "dispatch-task" || evaluator.request.SourceSessionID != "dispatch-session" ||
+		evaluator.request.BindingKind != "runtime_unbudgeted" || evaluator.request.ConfigID != "" || evaluator.request.CriteriaRevision != latest.CriteriaRevision ||
+		evaluator.request.CandidateDigest != workboard.CandidateContentDigest(summary, artifacts) ||
+		len(evaluator.request.Criteria) != 1 || evaluator.request.Criteria[0].ID != "tests" {
 		t.Fatalf("candidate=%+v evaluator=%+v/%+v err=%v", submitted, evaluator.actor, evaluator.request, err)
 	}
 	review, err := bridge.NativeRead(ctx, board.BoardID, webui.BoardSnapshotOptions{Limit: 100})
@@ -146,6 +152,10 @@ func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {
 		t.Fatalf("candidate lifecycle=%+v err=%v", review.Lifecycle, err)
 	}
 	candidate := review.Lifecycle[0].Attempt.Candidate
+	if candidate.ID != evaluator.request.CandidateID || candidate.Digest != evaluator.request.CandidateDigest ||
+		candidate.CriteriaDigest != evaluator.request.CriteriaDigest || candidate.PolicyDigest != evaluator.request.PolicyDigest {
+		t.Fatalf("candidate was not bound to frozen evaluator input: candidate=%+v evaluator=%+v", candidate, evaluator.request)
+	}
 	evidence := review.Lifecycle[0].Attempt.Evidence
 	clock = clock.Add(time.Second)
 	accepted, err := bridge.BrowserMutate(ctx, strings.Repeat("b", 64), webui.BoardRequest{Version: 1, Action: webui.AcceptanceAccept,

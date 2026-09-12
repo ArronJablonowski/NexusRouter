@@ -70,11 +70,11 @@ func TestOrphanWithoutChildRejectsUnsafeSource(t *testing.T) {
 			var err error
 			switch mode {
 			case "legacy-parent":
-				_, err = s.db.Exec(`UPDATE events SET body=json_remove(body,'$.data.tool_behavior') WHERE task_id='parent' AND sequence=4`)
+				rewriteCanonicalEventForTest(t, s, "parent", 4, func(event *runtime.Event) { event.Data.ToolBehavior = "" })
 			case "write-parent":
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.tool_behavior','non_idempotent_write') WHERE task_id='parent' AND sequence=4`)
+				rewriteCanonicalEventForTest(t, s, "parent", 4, func(event *runtime.Event) { event.Data.ToolBehavior = runtime.BehaviorNonIdempotentWrite })
 			case "preaccepted":
-				_, err = s.db.Exec(`UPDATE events SET body=json_set(body,'$.data.accepted',json('true')) WHERE task_id='work' AND sequence=2`)
+				rewriteCanonicalEventForTest(t, s, "work", 2, func(event *runtime.Event) { accepted := true; event.Data.Accepted = &accepted })
 			case "linked-nonstart", "linked-invalid-kind":
 				kind := "worker.started"
 				if mode == "linked-invalid-kind" {

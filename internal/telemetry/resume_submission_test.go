@@ -123,15 +123,7 @@ func recoveredModelSource(t *testing.T, db *Store, privacy string) submissions.R
 	claim := claimSubmission(t, db)
 	events := interruptedModelFixture(t, db, claim, "")
 	if privacy != "cloud_allowed" {
-		start := events[0]
-		start.Data.Privacy = privacy
-		body, err := start.Encode()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = db.db.Exec(`UPDATE events SET body=? WHERE task_id=? AND sequence=1`, body, start.TaskID); err != nil {
-			t.Fatal(err)
-		}
+		rewriteCanonicalEventForTest(t, db, events[0].TaskID, 1, func(event *runtime.Event) { event.Data.Privacy = privacy })
 	}
 	if ok, err := db.RecoverInterruptedModel(context.Background(), job.ID, submitDigest("config"), time.Now().Add(2*time.Minute)); err != nil || !ok {
 		t.Fatal(ok, err)

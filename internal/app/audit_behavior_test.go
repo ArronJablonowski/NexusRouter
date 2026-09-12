@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,14 +33,11 @@ func TestAuditTaskPreservesDeclaredToolBehaviorInReviewerEvidence(t *testing.T) 
 				task = "success-parent"
 				// Match both ends of the already paired delegation, as produced by
 				// the runtime. This is metadata, not a new execution or authority.
-				raw, err := sql.Open("sqlite", svc.settings.Telemetry.Database)
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = raw.Exec(`UPDATE events SET body=json_set(body,'$.data.tool_behavior',?) WHERE task_id=? AND json_extract(body,'$.kind') IN ('tool.started','tool.completed')`, string(behavior), task)
-				raw.Close()
-				if err != nil {
-					t.Fatal(err)
+				changed := rewriteCanonicalAppEventsForTest(t, svc.settings.Telemetry.Database, task, func(event runtime.Event) bool {
+					return event.Kind == runtime.ToolStarted || event.Kind == runtime.ToolCompleted
+				}, func(event *runtime.Event) { event.Data.ToolBehavior = behavior })
+				if changed != 2 {
+					t.Fatalf("changed %d delegation events", changed)
 				}
 			} else {
 				var err error

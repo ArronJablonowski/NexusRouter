@@ -18,17 +18,27 @@ import (
 type evaluationFixture struct {
 	mu       sync.Mutex
 	evidence []workboard.EvidenceInput
+	request  workboard.CandidateEvaluationRequest
 	calls    int
 }
 
-func (e *evaluationFixture) EvaluateCandidate(context.Context, workboard.SubmitCandidateRequest, workboard.Actor) ([]workboard.EvidenceInput, error) {
+func (e *evaluationFixture) EvaluateCandidate(_ context.Context, request workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.calls++
+	e.request = request
+	e.request.ArtifactRefs = append([]string{}, request.ArtifactRefs...)
+	e.request.Criteria = append([]workboard.AcceptanceCriterion{}, request.Criteria...)
 	return append([]workboard.EvidenceInput{}, e.evidence...), nil
 }
 
 func (e *evaluationFixture) count() int { e.mu.Lock(); defer e.mu.Unlock(); return e.calls }
+
+func (e *evaluationFixture) frozen() workboard.CandidateEvaluationRequest {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.request
+}
 
 type barrierEvaluationFixture struct {
 	mu       sync.Mutex
@@ -38,7 +48,7 @@ type barrierEvaluationFixture struct {
 	release  chan struct{}
 }
 
-func (e *barrierEvaluationFixture) EvaluateCandidate(ctx context.Context, _ workboard.SubmitCandidateRequest, _ workboard.Actor) ([]workboard.EvidenceInput, error) {
+func (e *barrierEvaluationFixture) EvaluateCandidate(ctx context.Context, _ workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
 	e.mu.Lock()
 	e.calls++
 	if e.calls == 2 {

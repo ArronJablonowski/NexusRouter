@@ -14,6 +14,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	_ "modernc.org/sqlite"
 )
 
@@ -604,25 +605,69 @@ func (s *Store) Read(ctx context.Context, task string, after int64, limit int) (
 	if after < 0 || limit < 1 || limit > 1000 {
 		return nil, errors.New("invalid event page")
 	}
-	rows, err := s.db.QueryContext(ctx, "SELECT body FROM events WHERE task_id=? AND sequence>? ORDER BY sequence LIMIT ?", task, after, limit)
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	events := make([]runtime.Event, 0)
-	for rows.Next() {
-		var body []byte
-		var e runtime.Event
-		if err = rows.Scan(&body); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(body, &e); err != nil {
-			return nil, err
-		}
-		if err = e.Validate(); err != nil {
-			return nil, err
-		}
-		events = append(events, e)
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(e.id AS BLOB))<=128 THEN e.id END,e.sequence,length(CAST(e.body AS BLOB)),l.position,l.event_id
+		FROM events e LEFT JOIN event_log l ON l.event_id=e.id AND l.task_id=e.task_id AND l.task_sequence=e.sequence
+		WHERE e.task_id=? AND e.sequence>? ORDER BY e.sequence LIMIT ?`, task, after, limit)
+	if err != nil {
+		return nil, err
 	}
-	return events, rows.Err()
+	type entry struct {
+		id             string
+		sequence, size int64
+		position       int64
+	}
+	entries := make([]entry, 0)
+	total := int64(0)
+	for rows.Next() {
+		var item entry
+		var id, ledgerID sql.NullString
+		var position sql.NullInt64
+		if err = rows.Scan(&id, &item.sequence, &item.size, &position, &ledgerID); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if !id.Valid || !position.Valid || !ledgerID.Valid || id.String != ledgerID.String ||
+			!sessions.ValidEventLogEventID(id.String) || item.sequence != after+int64(len(entries))+1 || item.size < 1 ||
+			item.size > int64(sessions.MaxEventPageBytes)-total {
+			rows.Close()
+			if len(entries) == 0 && item.size > sessions.MaxEventPageBytes {
+				return nil, sessions.ErrEventTooLarge
+			}
+			return nil, sessions.ErrEventLog
+		}
+		item.id, item.position = id.String, position.Int64
+		total += item.size
+		entries = append(entries, item)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	events := make([]runtime.Event, 0, len(entries))
+	for _, item := range entries {
+		ledger, body, readErr := readTaskEventLogByPosition(ctx, tx, item.position, item.id)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if ledger.taskID != task || ledger.taskSequence != item.sequence || ledger.size != item.size {
+			return nil, sessions.ErrEventLog
+		}
+		var event runtime.Event
+		if json.Unmarshal(body, &event) != nil {
+			return nil, sessions.ErrEventLog
+		}
+		events = append(events, event)
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }

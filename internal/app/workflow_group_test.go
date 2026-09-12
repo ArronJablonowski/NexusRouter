@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
@@ -167,17 +167,11 @@ func TestGroupedGenerationRechecksChangedToolOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := sql.Open("sqlite", svc.settings.Telemetry.Database)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer raw.Close()
-	changed, err := raw.Exec(`UPDATE events SET body=json_set(body,'$.data.code','tool_failed') WHERE task_id=? AND json_extract(body,'$.kind')='tool.completed'`, tasks[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count, err := changed.RowsAffected(); err != nil || count != 1 {
-		t.Fatal("fixture did not alter completion", count, err)
+	changed := rewriteCanonicalAppEventsForTest(t, svc.settings.Telemetry.Database, tasks[0], func(event runtime.Event) bool {
+		return event.Kind == runtime.ToolCompleted
+	}, func(event *runtime.Event) { event.Data.Code = "tool_failed" })
+	if changed != 1 {
+		t.Fatal("fixture did not alter completion", changed)
 	}
 	db, err := telemetry.OpenReadOnly(ctx, svc.settings.Telemetry.Database)
 	if err != nil {

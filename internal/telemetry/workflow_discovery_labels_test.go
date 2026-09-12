@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -30,13 +29,7 @@ func TestWorkflowDiscoverySkipsUnsupportedValidLabels(t *testing.T) {
 				}
 				e := events[0]
 				e.Data.Profile = label
-				body, err := json.Marshal(e)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if _, err = s.db.Exec(`UPDATE events SET body=? WHERE task_id=? AND sequence=1`, string(body), "task-a"); err != nil {
-					t.Fatal(err)
-				}
+				rewriteCanonicalEventForTest(t, s, "task-a", 1, func(event *runtime.Event) { *event = e })
 			}
 			workflowSourceFixture(t, s, "task-b", "session-b", "creative", runtime.TaskCompleted, evaluation.Deterministic, true, true)
 			page, err := s.DiscoverSkillWorkflows(context.Background(), "creative", "", 2)
@@ -61,13 +54,7 @@ func TestWorkflowDiscoverySkipsLargeValidSource(t *testing.T) {
 	}
 	e := events[0]
 	e.Data.Messages[1].Content = strings.Repeat("x", 257<<10)
-	body, err := json.Marshal(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = s.db.Exec(`UPDATE events SET body=? WHERE task_id=? AND sequence=1`, string(body), "task-a"); err != nil {
-		t.Fatal(err)
-	}
+	rewriteCanonicalEventForTest(t, s, "task-a", 1, func(event *runtime.Event) { *event = e })
 	if _, err = s.TaskSnapshot(ctx, "task-a"); err != nil {
 		t.Fatal("large fixture is invalid", err)
 	}

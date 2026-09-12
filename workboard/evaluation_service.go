@@ -154,6 +154,60 @@ type SubmitCandidateRequest struct {
 	ArtifactRefs                                                  []string
 }
 
+// CandidateEvaluationRequest is the immutable, host-derived snapshot an
+// evaluator receives. It binds the exact candidate content to the durable
+// worker attempt and acceptance policy; evaluators never derive identity from
+// model output or transport input.
+type CandidateEvaluationRequest struct {
+	Version                                               int
+	BoardID, CardID, AttemptID, ClaimID, CandidateID      string
+	BindingKind                                           string
+	SourceTaskID, SourceSessionID                         string
+	AdmissionID, AdmissionDigest                          string
+	SourceModelID, SourceProviderID, ConfigID             string
+	SourceTimeLimitMS, SourceTokenLimit, SourceCostMicros int64
+	WorkerID                                              string
+	ExpectedCardRevision, ExpectedClaimRevision           int64
+	CriteriaRevision                                      int64
+	CandidateDigest, CriteriaDigest, PolicyDigest         string
+	Summary                                               string
+	ArtifactRefs                                          []string
+	Criteria                                              []AcceptanceCriterion
+}
+
+func (r CandidateEvaluationRequest) Validate() error {
+	if r.Version != SchemaVersion || !validLifecycleIDs(r.BoardID, r.CardID, r.AttemptID, r.ClaimID, r.CandidateID, r.WorkerID) ||
+		(r.SourceTaskID == "") != (r.SourceSessionID == "") ||
+		(r.SourceTaskID != "" && !validLifecycleIDs(r.SourceTaskID, r.SourceSessionID)) || r.ExpectedCardRevision < 1 || r.ExpectedClaimRevision < 1 ||
+		r.CriteriaRevision < 1 || !digest(r.CandidateDigest) || !digest(r.CriteriaDigest) || !digest(r.PolicyDigest) ||
+		(r.ConfigID != "" && !digest(r.ConfigID)) || !boundedText(r.Summary, MaxDescriptionBytes, false) ||
+		!validIDs(r.ArtifactRefs, MaxCandidateArtifacts) || validateAcceptanceCriteria(r.Criteria, r.CriteriaRevision) != nil ||
+		CandidateContentDigest(r.Summary, r.ArtifactRefs) != r.CandidateDigest || AcceptanceCriteriaDigest(r.Criteria) != r.CriteriaDigest {
+		return fail(CodeInvalid, "candidate_evaluation")
+	}
+	switch r.BindingKind {
+	case "legacy":
+		if r.SourceTaskID != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
+			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
+			return fail(CodeInvalid, "candidate_evaluation")
+		}
+	case "runtime_unbudgeted":
+		if r.SourceTaskID == "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
+			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
+			return fail(CodeInvalid, "candidate_evaluation")
+		}
+	case "runtime_budgeted":
+		if r.SourceTaskID == "" || !validLifecycleIDs(r.AdmissionID, r.SourceProviderID) || !boundedText(r.SourceModelID, MaxExecutionModelBytes, false) ||
+			!digest(r.AdmissionDigest) || !digest(r.ConfigID) || r.SourceTimeLimitMS < 0 || r.SourceTimeLimitMS > MaxWorkDurationMillis ||
+			r.SourceTokenLimit < 0 || r.SourceTokenLimit > MaxWorkTokens || r.SourceCostMicros < 0 || r.SourceCostMicros > MaxWorkCostMicros {
+			return fail(CodeInvalid, "candidate_evaluation")
+		}
+	default:
+		return fail(CodeInvalid, "candidate_evaluation")
+	}
+	return nil
+}
+
 type DecideCandidateRequest struct {
 	BoardID, CardID, AttemptID, CandidateID, IdempotencyKey          string
 	ExpectedCardRevision, CriteriaRevision, EvidenceHeadRevision     int64
@@ -189,10 +243,11 @@ type EvaluationMutation struct {
 }
 
 type CandidateEvaluator interface {
-	EvaluateCandidate(context.Context, SubmitCandidateRequest, Actor) ([]EvidenceInput, error)
+	EvaluateCandidate(context.Context, CandidateEvaluationRequest) ([]EvidenceInput, error)
 }
 type EvaluationRepository interface {
-	ApplyEvaluationMutation(context.Context, EvaluationMutation) (OperationReceipt, error)
+	PrepareCandidateEvaluation(context.Context, EvaluationMutation) (CandidateEvaluationRequest, error)
+	ApplyEvaluationMutation(context.Context, EvaluationMutation, func() time.Time) (OperationReceipt, error)
 	ReplayEvaluationMutation(context.Context, EvaluationMutation) (OperationReceipt, bool, error)
 }
 
@@ -206,9 +261,10 @@ type EvaluationService struct {
 }
 
 type evaluationCall struct {
-	done    chan struct{}
-	receipt OperationReceipt
-	err     error
+	done          chan struct{}
+	requestDigest string
+	receipt       OperationReceipt
+	err           error
 }
 
 func NewEvaluationService(repository EvaluationRepository, authority AuthoritySource, evaluator CandidateEvaluator, now func() time.Time) (*EvaluationService, error) {
@@ -234,6 +290,8 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		ClaimID: request.ClaimID, IdempotencyKey: request.IdempotencyKey, Actor: authority.Actor, ExpectedCardRevision: request.ExpectedCardRevision,
 		ExpectedClaimRevision: request.ExpectedClaimRevision, CriteriaRevision: request.CriteriaRevision, Summary: request.Summary,
 		ArtifactRefs: append([]string{}, request.ArtifactRefs...), Now: s.now().UTC()}
+	mutation.CandidateID = candidateIdentity(mutation)
+	mutation.CandidateDigest = CandidateContentDigest(mutation.Summary, mutation.ArtifactRefs)
 	mutation.RequestDigest, err = EvaluationDigest(mutation)
 	if err != nil {
 		return OperationReceipt{}, err
@@ -242,6 +300,9 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 	s.mu.Lock()
 	if active := s.inflight[flightKey]; active != nil {
 		s.mu.Unlock()
+		if active.requestDigest != mutation.RequestDigest {
+			return OperationReceipt{}, fail(CodeInvalid, "idempotency_key")
+		}
 		select {
 		case <-ctx.Done():
 			return OperationReceipt{}, ctx.Err()
@@ -249,7 +310,7 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 			return active.receipt, active.err
 		}
 	}
-	active := &evaluationCall{done: make(chan struct{})}
+	active := &evaluationCall{done: make(chan struct{}), requestDigest: mutation.RequestDigest}
 	s.inflight[flightKey] = active
 	s.mu.Unlock()
 	defer func() {
@@ -262,7 +323,19 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		active.receipt, active.err = receipt, replayErr
 		return receipt, replayErr
 	}
-	mutation.Evaluated, err = s.evaluator.EvaluateCandidate(ctx, request, authority.Actor)
+	frozen, err := s.repository.PrepareCandidateEvaluation(ctx, mutation)
+	if err != nil || frozen.Validate() != nil || frozen.CandidateID != mutation.CandidateID || frozen.CandidateDigest != mutation.CandidateDigest ||
+		frozen.WorkerID != authority.Actor.ID || frozen.BoardID != request.BoardID || frozen.CardID != request.CardID ||
+		frozen.AttemptID != request.AttemptID || frozen.ClaimID != request.ClaimID || frozen.ExpectedCardRevision != request.ExpectedCardRevision ||
+		frozen.ExpectedClaimRevision != request.ExpectedClaimRevision || frozen.CriteriaRevision != request.CriteriaRevision ||
+		frozen.Summary != request.Summary || !sameStrings(frozen.ArtifactRefs, request.ArtifactRefs) {
+		if err == nil {
+			err = fail(CodeInvalid, "candidate_evaluation")
+		}
+		active.err = err
+		return OperationReceipt{}, err
+	}
+	mutation.Evaluated, err = s.evaluator.EvaluateCandidate(ctx, frozen)
 	if err != nil {
 		active.err = err
 		return OperationReceipt{}, err
@@ -276,6 +349,10 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 			return OperationReceipt{}, active.err
 		}
 	}
+	// The evaluator may have taken long enough for the claim to expire or for
+	// operator control to advance the card. Commit against fresh trusted time;
+	// repositories recheck every revision and lease fence transactionally.
+	mutation.Now = s.now().UTC()
 	active.receipt, active.err = s.apply(ctx, mutation)
 	return active.receipt, active.err
 }
@@ -313,7 +390,7 @@ func (s *EvaluationService) decide(ctx context.Context, kind EvaluationKind, req
 }
 
 func (s *EvaluationService) apply(ctx context.Context, mutation EvaluationMutation) (OperationReceipt, error) {
-	receipt, err := s.repository.ApplyEvaluationMutation(ctx, mutation)
+	receipt, err := s.repository.ApplyEvaluationMutation(ctx, mutation, s.now)
 	if err != nil {
 		return OperationReceipt{}, err
 	}
@@ -334,8 +411,26 @@ func EvaluationDigest(m EvaluationMutation) (string, error) {
 }
 
 func evaluationFlightKey(m EvaluationMutation) string {
-	sum := sha256.Sum256([]byte(m.BoardID + "\x00" + m.Actor.ID + "\x00" + m.Actor.Type + "\x00" + m.IdempotencyKey + "\x00" + m.RequestDigest))
+	sum := sha256.Sum256([]byte(m.BoardID + "\x00" + m.Actor.ID + "\x00" + m.Actor.Type + "\x00" + m.IdempotencyKey))
 	return hex.EncodeToString(sum[:])
+}
+
+func candidateIdentity(m EvaluationMutation) string {
+	sum := sha256.Sum256([]byte(m.BoardID + "\x00" + m.CardID + "\x00" + m.AttemptID + "\x00" + m.ClaimID + "\x00" +
+		m.Actor.ID + "\x00" + m.IdempotencyKey))
+	return "candidate-" + hex.EncodeToString(sum[:20])
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func CandidateContentDigest(summary string, artifacts []string) string {

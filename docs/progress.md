@@ -6749,3 +6749,57 @@ fields, omitted zero values, invalid bounds, multi-turn reduction, unknown
 usage before effects, trusted Workboard propagation, and fail-closed unsupported
 adapters. Production scheduler composition, configured independent acceptance
 judging, and the broader crash/lease/acceptance qualification remain open.
+
+## 2026-09-12 — DAR-90 frozen Workboard candidate evaluation checkpoint
+
+DAR-85 is now decomposed into DAR-90 through DAR-96; DAR-90 remains in
+progress until its durable review-admission dependency is complete. Candidate
+submission now derives a deterministic host-owned candidate identity and
+canonical content digest before evaluator dispatch. The evaluator receives a
+validated frozen snapshot binding the exact board, card, attempt, claim,
+worker, revisions, criteria content and digest, policy digest, candidate
+content, and source runtime task/session. Budgeted runtime work additionally
+binds the immutable execution-admission identity and digest, actual source
+model/provider/configuration, and reserved time/token/cost limits. Legacy and
+runtime-bound-but-unbudgeted claims are explicitly distinguished rather than
+silently appearing equivalent to configured scheduler work.
+
+Before a budgeted candidate reaches an evaluator, the store proves a canonical
+successful terminal runtime and rejects missing, failed, canceled, malformed,
+or known-over-budget execution. Candidate commit then rechecks every durable
+card, attempt, claim, criteria, and lease fence transactionally. Its trusted
+clock is sampled only after the serialized writer boundary is acquired, so a
+slow evaluator or writer-lock wait cannot reuse a pre-expiry timestamp.
+Process-local duplicate calls now coalesce by idempotency scope; a concurrent
+same-key request with different content is rejected before a second evaluator
+is dispatched. Restart replay validates the preassigned candidate identity and
+digest against the durable candidate row.
+
+Focused tests cover exact budgeted admission provenance, terminal and token
+preflight denial before evaluator dispatch, lease expiry during evaluation,
+writer-wait clock sampling, concurrent idempotency payload drift, criteria
+content/digest tampering, durable candidate binding, and existing restart
+replay. This checkpoint does not yet authorize a paid model reviewer:
+cross-process review admission/deduplication, reviewer budget settlement,
+reviewer independence/locality, and crash-safe no-redispatch behavior belong
+to DAR-91. The stock daemon scheduler enablement guard remains unchanged.
+
+## 2026-09-12 — DAR-89 generic event replay integrity checkpoint
+
+DAR-89 is in progress pending the repository-wide qualification gate. Generic
+`Store.Read` and `TaskSnapshot` replay now use read transactions and require
+every returned event to have an exact committed-ledger membership row,
+canonical body digest and encoding, matching event/task/session/sequence
+envelope, contiguous requested task order, and a valid global predecessor
+position. Both readers preflight bounded metadata and aggregate bytes before
+decoding, and return no partial page or snapshot when any event is corrupt.
+
+Test-only fixture rewrites that intentionally create a different but legitimate
+history now update the canonical event body and dependent ledger/submission
+digests transactionally. Deliberate corruption fixtures continue to leave the
+ledger stale. New adversarial tests cover missing membership, position gaps,
+wrong digests, noncanonical JSON with a recomputed digest, no-partial-result
+behavior, and successful canonical paging. This boundary detects storage
+corruption and body-only mutation; it does not claim protection against an
+attacker who can coherently rewrite both the event body and all trusted ledger
+facts.

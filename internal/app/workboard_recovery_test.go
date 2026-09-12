@@ -24,7 +24,7 @@ const (
 
 type coordinatorEvaluator struct{}
 
-func (coordinatorEvaluator) EvaluateCandidate(context.Context, workboard.SubmitCandidateRequest, workboard.Actor) ([]workboard.EvidenceInput, error) {
+func (coordinatorEvaluator) EvaluateCandidate(context.Context, workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
 	return nil, ErrAdmission
 }
 

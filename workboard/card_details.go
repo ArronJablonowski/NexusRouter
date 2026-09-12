@@ -1,6 +1,10 @@
 package workboard
 
-import "encoding/json"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+)
 
 const (
 	MaxAttemptsPerCard    = 32
@@ -75,4 +79,15 @@ func validateAcceptanceCriteria(criteria []AcceptanceCriterion, revision int64) 
 
 func copyCriteria(criteria []AcceptanceCriterion) []AcceptanceCriterion {
 	return append([]AcceptanceCriterion{}, criteria...)
+}
+
+// AcceptanceCriteriaDigest is the canonical content identity used to bind an
+// evaluator to one immutable criteria revision.
+func AcceptanceCriteriaDigest(criteria []AcceptanceCriterion) string {
+	body, err := json.Marshal(criteria)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }

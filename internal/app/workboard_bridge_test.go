@@ -87,12 +87,15 @@ func (r *bridgeBoardRepository) ApplyControlMutation(_ context.Context, mutation
 func (r *bridgeBoardRepository) ReplayControlMutation(context.Context, workboard.ControlMutation) (workboard.OperationReceipt, bool, error) {
 	return workboard.OperationReceipt{}, false, nil
 }
-func (r *bridgeBoardRepository) ApplyEvaluationMutation(_ context.Context, mutation workboard.EvaluationMutation) (workboard.OperationReceipt, error) {
+func (r *bridgeBoardRepository) ApplyEvaluationMutation(_ context.Context, mutation workboard.EvaluationMutation, _ func() time.Time) (workboard.OperationReceipt, error) {
 	r.evaluation = mutation
 	return workboard.OperationReceipt{}, errors.New("evaluation sentinel")
 }
 func (r *bridgeBoardRepository) ReplayEvaluationMutation(context.Context, workboard.EvaluationMutation) (workboard.OperationReceipt, bool, error) {
 	return workboard.OperationReceipt{}, false, nil
+}
+func (r *bridgeBoardRepository) PrepareCandidateEvaluation(context.Context, workboard.EvaluationMutation) (workboard.CandidateEvaluationRequest, error) {
+	return workboard.CandidateEvaluationRequest{}, errors.New("evaluation preparation sentinel")
 }
 
 func TestWorkboardBridgeMapsTrustedListAndEvents(t *testing.T) {

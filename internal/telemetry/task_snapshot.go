@@ -54,29 +54,34 @@ func taskSnapshotWithEvents(ctx context.Context, tx *sql.Tx, task string, captur
 	default:
 		return zero, sessions.ErrHistory
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(id AS BLOB))<=128 THEN id END,sequence,length(CAST(body AS BLOB)) FROM events WHERE task_id=? ORDER BY sequence LIMIT 10001`, task)
+	rows, err := tx.QueryContext(ctx, `SELECT CASE WHEN length(CAST(e.id AS BLOB))<=128 THEN e.id END,e.sequence,length(CAST(e.body AS BLOB)),l.position,l.event_id
+		FROM events e LEFT JOIN event_log l ON l.event_id=e.id AND l.task_id=e.task_id AND l.task_sequence=e.sequence
+		WHERE e.task_id=? ORDER BY e.sequence LIMIT 10001`, task)
 	if err != nil {
 		return zero, err
 	}
 	type entry struct {
 		id             string
 		sequence, size int64
+		position       int64
 	}
 	entries := []entry{}
 	var total int64
 	for rows.Next() {
-		var id sql.NullString
+		var id, ledgerID sql.NullString
+		var position sql.NullInt64
 		var sequence, size int64
-		if err = rows.Scan(&id, &sequence, &size); err != nil {
+		if err = rows.Scan(&id, &sequence, &size, &position, &ledgerID); err != nil {
 			rows.Close()
 			return zero, err
 		}
-		if !id.Valid || id.String == "" || sequence != int64(len(entries)+1) || len(entries) >= sessions.MaxTaskEvents || size < 1 || size > int64(sessions.MaxEventPageBytes)-total {
+		if !id.Valid || !position.Valid || !ledgerID.Valid || id.String != ledgerID.String || !sessions.ValidEventLogEventID(id.String) ||
+			sequence != int64(len(entries)+1) || len(entries) >= sessions.MaxTaskEvents || size < 1 || size > int64(sessions.MaxEventPageBytes)-total {
 			rows.Close()
 			return zero, sessions.ErrHistory
 		}
 		total += size
-		entries = append(entries, entry{id.String, sequence, size})
+		entries = append(entries, entry{id: id.String, sequence: sequence, size: size, position: position.Int64})
 	}
 	err = rows.Err()
 	rows.Close()
@@ -88,12 +93,12 @@ func taskSnapshotWithEvents(ctx context.Context, tx *sql.Tx, task string, captur
 	}
 	events := make(snapshotEvents, 0, len(entries))
 	for _, entry := range entries {
-		var body []byte
-		if err = tx.QueryRowContext(ctx, `SELECT body FROM events WHERE task_id=? AND sequence=?`, task, entry.sequence).Scan(&body); err != nil {
-			return zero, err
+		ledger, body, readErr := readTaskEventLogByPosition(ctx, tx, entry.position, entry.id)
+		if readErr != nil {
+			return zero, sessions.ErrHistory
 		}
 		var event runtime.Event
-		if int64(len(body)) != entry.size || json.Unmarshal(body, &event) != nil || event.Validate() != nil || event.ID != entry.id || event.TaskID != task || event.SessionID != session.String || event.Sequence != entry.sequence {
+		if ledger.taskID != task || ledger.taskSequence != entry.sequence || ledger.size != entry.size || json.Unmarshal(body, &event) != nil {
 			return zero, sessions.ErrHistory
 		}
 		events = append(events, event)

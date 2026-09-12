@@ -129,10 +129,7 @@ func TestWorkflowConsumptionRefreshesEvidenceAndActualToolResults(t *testing.T) 
 				}
 				e := events[6]
 				e.Data.Code = "tool_failed"
-				body, _ := json.Marshal(e)
-				if _, err = s.db.Exec(`UPDATE events SET body=? WHERE task_id='task' AND sequence=7`, body); err != nil {
-					t.Fatal(err)
-				}
+				rewriteCanonicalEventForTest(t, s, "task", 7, func(event *runtime.Event) { *event = e })
 			case "corrupt":
 				if _, err := s.db.Exec(`UPDATE events SET body='{}' WHERE task_id='task' AND sequence=2`); err != nil {
 					t.Fatal(err)
