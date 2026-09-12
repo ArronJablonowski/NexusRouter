@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -113,6 +114,101 @@ func TestAuxiliaryReviewAdmissionAndSettlementReplay(t *testing.T) {
 	if _, _, err = store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
 		AuxiliaryReviewMeasurements{}, settledAt); !errors.Is(err, ErrConflict) {
 		t.Fatalf("terminal drift accepted: %v", err)
+	}
+}
+
+func TestAuxiliaryReviewRestartReplayHasNoDispatchAuthorityAndSettlesConservatively(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "auxiliary-review-restart.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen, reservation, submitted, release := prepareAuxiliaryReviewCandidate(t, ctx, store, "restart")
+	admissionTime := time.Date(2026, 9, 12, 15, 0, 4, 0, time.UTC)
+	admission, created, err := store.AdmitAuxiliaryReview(ctx, frozen, reservation, "auxiliary-operation-restart", func() time.Time {
+		return admissionTime
+	})
+	if err != nil || !created {
+		t.Fatalf("initial admission=%+v created=%v err=%v", admission, created, err)
+	}
+	// Model dispatch has happened once after this durable pre-dispatch fact. The
+	// candidate may commit, but the process crashes before terminal accounting.
+	release()
+	if err = <-submitted; err != nil {
+		t.Fatal("candidate commit", err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	restarted, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = restarted.Close() }()
+	replayed, dispatchAuthorized, err := restarted.AdmitAuxiliaryReview(ctx, frozen, reservation, admission.OperationID, func() time.Time {
+		panic("durable replay must neither resample time nor authorize redispatch")
+	})
+	if err != nil || dispatchAuthorized || replayed != admission {
+		t.Fatalf("restart replay=%+v dispatch_authorized=%v err=%v", replayed, dispatchAuthorized, err)
+	}
+	if _, _, err = restarted.AdmitAuxiliaryReview(ctx, frozen, reservation, "auxiliary-operation-restart-drift", time.Now); !errors.Is(err, ErrConflict) {
+		t.Fatalf("new operation identity authorized duplicate review after restart: %v", err)
+	}
+	tx, err := restarted.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settledCharges, unresolvedCharges, err := auxiliaryReviewCardCharges(ctx, tx, frozen.BoardID, frozen.CardID)
+	_ = tx.Rollback()
+	if err != nil || settledCharges != (executionCharges{}) || unresolvedCharges.timeMS != admission.TimeLimitMS ||
+		unresolvedCharges.tokens != admission.TokenLimit || unresolvedCharges.costMicros != admission.CostMicros {
+		t.Fatalf("restart lost conservative unresolved charge: settled=%+v unresolved=%+v err=%v", settledCharges, unresolvedCharges, err)
+	}
+
+	settledAt := admission.AdmittedAt.Add(time.Minute)
+	settlement, settled, err := restarted.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
+		AuxiliaryReviewMeasurements{}, settledAt)
+	if err != nil || !settled || settlement.Validate() != nil {
+		t.Fatalf("conservative settlement=%+v settled=%v err=%v", settlement, settled, err)
+	}
+	if settlement.ChargedTimeMS != admission.TimeLimitMS || settlement.ChargedTokens != admission.TokenLimit ||
+		settlement.ChargedCostMicros != admission.CostMicros || settlement.TimeChargeMode != workboard.AuxiliaryReviewConservative ||
+		settlement.TokenChargeMode != workboard.AuxiliaryReviewConservative || settlement.CostChargeMode != workboard.AuxiliaryReviewConservative {
+		t.Fatalf("unknown terminal usage did not charge reservation ceilings: %+v", settlement)
+	}
+	if err = restarted.Close(); err != nil {
+		t.Fatal(err)
+	}
+	restarted, err = Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayedSettlement, wrote, err := restarted.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
+		AuxiliaryReviewMeasurements{}, settledAt.Add(time.Hour))
+	if err != nil || wrote || replayedSettlement != settlement {
+		t.Fatalf("terminal restart replay=%+v wrote=%v err=%v", replayedSettlement, wrote, err)
+	}
+	var admissions, settlements int
+	if err = restarted.db.QueryRow(`SELECT count(*) FROM workboard_auxiliary_review_admissions WHERE operation_id=?`, admission.OperationID).Scan(&admissions); err != nil {
+		t.Fatal(err)
+	}
+	if err = restarted.db.QueryRow(`SELECT count(*) FROM workboard_auxiliary_review_settlements WHERE operation_id=?`, admission.OperationID).Scan(&settlements); err != nil {
+		t.Fatal(err)
+	}
+	if admissions != 1 || settlements != 1 {
+		t.Fatalf("restart duplicated durable accounting: admissions=%d settlements=%d", admissions, settlements)
+	}
+	tx, err = restarted.db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settledCharges, unresolvedCharges, err = auxiliaryReviewCardCharges(ctx, tx, frozen.BoardID, frozen.CardID)
+	_ = tx.Rollback()
+	if err != nil || unresolvedCharges != (executionCharges{}) || settledCharges.timeMS != admission.TimeLimitMS ||
+		settledCharges.tokens != admission.TokenLimit || settledCharges.costMicros != admission.CostMicros {
+		t.Fatalf("terminal charge did not remain conservative after restart: settled=%+v unresolved=%+v err=%v", settledCharges, unresolvedCharges, err)
 	}
 }
 

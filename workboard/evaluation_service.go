@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 )
@@ -245,6 +246,33 @@ type EvaluationMutation struct {
 type CandidateEvaluator interface {
 	EvaluateCandidate(context.Context, CandidateEvaluationRequest) ([]EvidenceInput, error)
 }
+
+// BudgetedCandidateEvaluation is the terminal result of one independently
+// budgeted advisory review. Measurements are trusted host/provider facts, not
+// evaluator-authored output.
+type BudgetedCandidateEvaluation struct {
+	Evidence     []EvidenceInput
+	Measurements AuxiliaryReviewMeasurements
+}
+
+// BudgetedCandidateEvaluator opts a candidate evaluator into durable review
+// admission. EvaluateCandidate remains part of the interface for compatibility
+// with callers that use the evaluator outside this service; this service calls
+// only EvaluateBudgetedCandidate after admission succeeds.
+type BudgetedCandidateEvaluator interface {
+	CandidateEvaluator
+	AuxiliaryReviewReservation(CandidateEvaluationRequest) (AuxiliaryReviewReservation, error)
+	EvaluateBudgetedCandidate(context.Context, CandidateEvaluationRequest) (BudgetedCandidateEvaluation, error)
+}
+
+type AuxiliaryReviewRepository interface {
+	AdmitAuxiliaryReview(context.Context, CandidateEvaluationRequest, AuxiliaryReviewReservation, string, func() time.Time) (AuxiliaryReviewAdmissionRecord, bool, error)
+	ReplayAuxiliaryReviewAdmission(context.Context, string) (AuxiliaryReviewAdmissionRecord, bool, error)
+	SettleAuxiliaryReview(context.Context, string, AuxiliaryReviewDisposition, AuxiliaryReviewMeasurements, time.Time) (AuxiliaryReviewSettlementRecord, bool, error)
+	ReplayAuxiliaryReviewSettlement(context.Context, string, AuxiliaryReviewDisposition) (AuxiliaryReviewSettlementRecord, bool, error)
+	ApplyEvaluationMutationAndSettleAuxiliaryReview(context.Context, EvaluationMutation, func() time.Time, string, AuxiliaryReviewMeasurements) (OperationReceipt, AuxiliaryReviewSettlementRecord, error)
+}
+
 type EvaluationRepository interface {
 	PrepareCandidateEvaluation(context.Context, EvaluationMutation) (CandidateEvaluationRequest, error)
 	ApplyEvaluationMutation(context.Context, EvaluationMutation, func() time.Time) (OperationReceipt, error)
@@ -255,6 +283,7 @@ type EvaluationService struct {
 	repository EvaluationRepository
 	authority  AuthoritySource
 	evaluator  CandidateEvaluator
+	auxiliary  AuxiliaryReviewRepository
 	now        func() time.Time
 	mu         sync.Mutex
 	inflight   map[string]*evaluationCall
@@ -271,7 +300,15 @@ func NewEvaluationService(repository EvaluationRepository, authority AuthoritySo
 	if repository == nil || authority == nil || evaluator == nil || now == nil {
 		return nil, fail(CodeInvalid, "service")
 	}
-	return &EvaluationService{repository: repository, authority: authority, evaluator: evaluator, now: now, inflight: map[string]*evaluationCall{}}, nil
+	var auxiliary AuxiliaryReviewRepository
+	if _, budgeted := evaluator.(BudgetedCandidateEvaluator); budgeted {
+		var ok bool
+		auxiliary, ok = repository.(AuxiliaryReviewRepository)
+		if !ok {
+			return nil, fail(CodeInvalid, "auxiliary_review_repository")
+		}
+	}
+	return &EvaluationService{repository: repository, authority: authority, evaluator: evaluator, auxiliary: auxiliary, now: now, inflight: map[string]*evaluationCall{}}, nil
 }
 
 func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitCandidateRequest) (OperationReceipt, error) {
@@ -320,6 +357,9 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		s.mu.Unlock()
 	}()
 	if receipt, found, replayErr := s.repository.ReplayEvaluationMutation(ctx, mutation); found || replayErr != nil {
+		if found && replayErr == nil {
+			replayErr = s.reconcileAuxiliaryReview(ctx, mutation)
+		}
 		active.receipt, active.err = receipt, replayErr
 		return receipt, replayErr
 	}
@@ -335,8 +375,60 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		active.err = err
 		return OperationReceipt{}, err
 	}
-	mutation.Evaluated, err = s.evaluator.EvaluateCandidate(ctx, frozen)
+	var reviewOperation string
+	var reviewReservation AuxiliaryReviewReservation
+	var measurements AuxiliaryReviewMeasurements
+	if budgeted, ok := s.evaluator.(BudgetedCandidateEvaluator); ok {
+		reservation, reserveErr := prepareAuxiliaryReviewReservation(budgeted, frozen)
+		if reserveErr != nil || reservation.Validate() != nil || !auxiliaryReservationMatchesFrozen(reservation, frozen) {
+			if reserveErr == nil {
+				reserveErr = fail(CodeInvalid, "auxiliary_review_reservation")
+			}
+			active.err = reserveErr
+			return OperationReceipt{}, reserveErr
+		}
+		reviewReservation = reservation
+		reviewOperation = auxiliaryReviewOperationID(frozen)
+		_, created, admitErr := s.auxiliary.AdmitAuxiliaryReview(ctx, frozen, reservation, reviewOperation, s.now)
+		if admitErr != nil {
+			active.err = admitErr
+			return OperationReceipt{}, admitErr
+		}
+		if !created {
+			active.err = fail(CodeIllegalTransition, "auxiliary_review_inflight")
+			return OperationReceipt{}, active.err
+		}
+		reviewCtx, cancelReview := context.WithTimeout(ctx, time.Duration(reservation.TimeLimitMS)*time.Millisecond)
+		result, evaluateErr := invokeBudgetedCandidateEvaluator(reviewCtx, budgeted, frozen)
+		reviewDeadlineErr := reviewCtx.Err()
+		cancelReview()
+		if evaluateErr == nil && reviewDeadlineErr != nil {
+			evaluateErr = reviewDeadlineErr
+		}
+		if evaluateErr == nil && !auxiliaryMeasurementsWithinReservation(result.Measurements, reservation) {
+			evaluateErr = fail(CodeLimitExceeded, "auxiliary_review_measurements")
+		}
+		mutation.Evaluated, measurements, err = result.Evidence, result.Measurements, evaluateErr
+	} else {
+		mutation.Evaluated, err = s.evaluator.EvaluateCandidate(ctx, frozen)
+	}
+	if err == nil && reviewOperation != "" {
+		for _, evidence := range mutation.Evaluated {
+			if evidence.Source == "user_feedback" ||
+				evidence.Source == "model_audit" && evidence.ActorID != reviewReservation.ReviewerID {
+				err = fail(CodeInvalid, "evidence")
+				break
+			}
+		}
+	}
 	if err != nil {
+		if reviewOperation != "" {
+			disposition := AuxiliaryReviewFailed
+			if ctx.Err() != nil {
+				disposition = AuxiliaryReviewCanceled
+			}
+			err = errors.Join(err, s.settleAuxiliaryReview(ctx, reviewOperation, disposition, measurements))
+		}
 		active.err = err
 		return OperationReceipt{}, err
 	}
@@ -353,8 +445,103 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 	// operator control to advance the card. Commit against fresh trusted time;
 	// repositories recheck every revision and lease fence transactionally.
 	mutation.Now = s.now().UTC()
-	active.receipt, active.err = s.apply(ctx, mutation)
+	if reviewOperation != "" {
+		var settlement AuxiliaryReviewSettlementRecord
+		active.receipt, settlement, active.err = s.auxiliary.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, s.now, reviewOperation, measurements)
+		if active.err != nil {
+			active.err = errors.Join(active.err, s.settleAuxiliaryReview(ctx, reviewOperation, AuxiliaryReviewFailed, measurements))
+		} else if active.receipt.Validate() != nil || active.receipt.BoardID != mutation.BoardID || active.receipt.CardID != mutation.CardID ||
+			settlement.Validate() != nil || settlement.OperationID != reviewOperation || settlement.Disposition != AuxiliaryReviewCompleted ||
+			settlement.BoardID != mutation.BoardID || settlement.CardID != mutation.CardID || settlement.AttemptID != mutation.AttemptID ||
+			settlement.ClaimID != mutation.ClaimID || settlement.CandidateID != mutation.CandidateID || settlement.CandidateDigest != mutation.CandidateDigest {
+			active.receipt = OperationReceipt{}
+			active.err = fail(CodeInvalid, "stored_auxiliary_review_commit")
+		}
+	} else {
+		active.receipt, active.err = s.apply(ctx, mutation)
+	}
 	return active.receipt, active.err
+}
+
+func invokeBudgetedCandidateEvaluator(ctx context.Context, evaluator BudgetedCandidateEvaluator,
+	frozen CandidateEvaluationRequest,
+) (result BudgetedCandidateEvaluation, err error) {
+	defer func() {
+		if recover() != nil {
+			result, err = BudgetedCandidateEvaluation{}, fail(CodeInvalid, "auxiliary_review_panic")
+		}
+	}()
+	return evaluator.EvaluateBudgetedCandidate(ctx, frozen)
+}
+
+func prepareAuxiliaryReviewReservation(evaluator BudgetedCandidateEvaluator,
+	frozen CandidateEvaluationRequest,
+) (reservation AuxiliaryReviewReservation, err error) {
+	defer func() {
+		if recover() != nil {
+			reservation, err = AuxiliaryReviewReservation{}, fail(CodeInvalid, "auxiliary_review_reservation_panic")
+		}
+	}()
+	return evaluator.AuxiliaryReviewReservation(frozen)
+}
+
+func auxiliaryMeasurementsWithinReservation(m AuxiliaryReviewMeasurements, r AuxiliaryReviewReservation) bool {
+	return optionalAuxiliaryMeasurementWithin(m.TimeMS, r.TimeLimitMS) &&
+		optionalAuxiliaryMeasurementWithin(m.Tokens, r.TokenLimit) &&
+		optionalAuxiliaryMeasurementWithin(m.CostMicros, r.CostMicros)
+}
+
+func optionalAuxiliaryMeasurementWithin(measured *int64, limit int64) bool {
+	return measured == nil || *measured >= 0 && *measured <= limit
+}
+
+func safeAuxiliaryMeasurements(m AuxiliaryReviewMeasurements) AuxiliaryReviewMeasurements {
+	if m.TimeMS != nil && (*m.TimeMS < 0 || *m.TimeMS > MaxAuxiliaryReviewDurationMillis) {
+		m.TimeMS = nil
+	}
+	if m.Tokens != nil && (*m.Tokens < 0 || *m.Tokens > MaxWorkTokens) {
+		m.Tokens = nil
+	}
+	if m.CostMicros != nil && (*m.CostMicros < 0 || *m.CostMicros > MaxWorkCostMicros) {
+		m.CostMicros = nil
+	}
+	return m
+}
+
+func auxiliaryReviewOperationID(frozen CandidateEvaluationRequest) string {
+	return "candidate-review-" + frozen.CandidateID
+}
+
+func auxiliaryReservationMatchesFrozen(r AuxiliaryReviewReservation, f CandidateEvaluationRequest) bool {
+	return r.BoardID == f.BoardID && r.CardID == f.CardID && r.AttemptID == f.AttemptID && r.ClaimID == f.ClaimID &&
+		r.CandidateID == f.CandidateID && r.CandidateDigest == f.CandidateDigest && r.CriteriaDigest == f.CriteriaDigest &&
+		r.PolicyDigest == f.PolicyDigest
+}
+
+func (s *EvaluationService) settleAuxiliaryReview(ctx context.Context, operation string, disposition AuxiliaryReviewDisposition,
+	measurements AuxiliaryReviewMeasurements,
+) error {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, _, err := s.auxiliary.SettleAuxiliaryReview(cleanup, operation, disposition, safeAuxiliaryMeasurements(measurements), s.now().UTC())
+	return err
+}
+
+func (s *EvaluationService) reconcileAuxiliaryReview(ctx context.Context, mutation EvaluationMutation) error {
+	if s.auxiliary == nil {
+		return nil
+	}
+	operation := "candidate-review-" + mutation.CandidateID
+	if _, admitted, err := s.auxiliary.ReplayAuxiliaryReviewAdmission(ctx, operation); err != nil || !admitted {
+		return err
+	}
+	if _, found, err := s.auxiliary.ReplayAuxiliaryReviewSettlement(ctx, operation, AuxiliaryReviewCompleted); err != nil || found {
+		return err
+	}
+	// Candidate commit proves the review reached the application boundary. If a
+	// crash lost terminal measurements, repair accounting conservatively without
+	// ever redispatching the reviewer.
+	return s.settleAuxiliaryReview(ctx, operation, AuxiliaryReviewCompleted, AuxiliaryReviewMeasurements{})
 }
 
 func (s *EvaluationService) AcceptCandidate(ctx context.Context, request DecideCandidateRequest) (OperationReceipt, error) {

@@ -121,6 +121,16 @@ const (
 	AuxiliaryReviewConservative AuxiliaryReviewChargeMode = "conservative"
 )
 
+// AuxiliaryReviewMeasurements contains trusted terminal resource
+// measurements. A nil quantity is unknown and is conservatively charged at
+// the admitted reservation ceiling. It lives in the provider-neutral domain
+// package so evaluation orchestration does not depend on a storage adapter.
+type AuxiliaryReviewMeasurements struct {
+	TimeMS     *int64
+	Tokens     *int64
+	CostMicros *int64
+}
+
 // AuxiliaryReviewSettlementRecord is the immutable terminal accounting fact
 // for an auxiliary review. Each resource states whether its charge was measured
 // or conservatively substituted from the reservation.

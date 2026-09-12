@@ -171,6 +171,110 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
+	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, now)
+	if err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	return receipt, nil
+}
+
+// ApplyEvaluationMutationAndSettleAuxiliaryReview commits candidate evidence
+// and completed auxiliary-review accounting under one SQLite writer
+// transaction. A crash can expose neither half independently.
+func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Context, mutation workboard.EvaluationMutation,
+	now func() time.Time, operationID string, measurements workboard.AuxiliaryReviewMeasurements,
+) (workboard.OperationReceipt, workboard.AuxiliaryReviewSettlementRecord, error) {
+	if ctx == nil || s == nil || s.db == nil || mutation.Kind != workboard.EvaluationCandidateSubmit || now == nil ||
+		!validWorkboardID(operationID) || !validAuxiliaryReviewMeasurements(measurements) {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, invalidWorkboard("auxiliary_review_commit")
+	}
+	if err := validateEvaluationMutation(mutation, true); err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	want, err := workboard.EvaluationDigest(mutation)
+	if err != nil || want != mutation.RequestDigest {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, invalidWorkboard("request_digest")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	defer tx.Rollback()
+	if err = reserveWorkboardWriter(ctx, tx); err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	admission, found, err := readAuxiliaryReviewAdmissionByOperation(ctx, tx, operationID)
+	if err != nil || !found {
+		if err == nil {
+			err = sql.ErrNoRows
+		}
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	if admission.BoardID != mutation.BoardID || admission.CardID != mutation.CardID || admission.AttemptID != mutation.AttemptID ||
+		admission.ClaimID != mutation.ClaimID || admission.CandidateID != mutation.CandidateID ||
+		admission.CandidateDigest != mutation.CandidateDigest {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	}
+	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
+	replayed, candidateFound, replayErr := readEvaluationReplay(ctx, tx, mutation, keyDigest, want)
+	if replayErr != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, replayErr
+	}
+	if prior, settled, readErr := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID); readErr != nil || settled {
+		if readErr != nil {
+			return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, readErr
+		}
+		if !candidateFound || prior.Disposition != workboard.AuxiliaryReviewCompleted {
+			return workboard.OperationReceipt{}, prior, ErrConflict
+		}
+		expected, buildErr := auxiliaryReviewSettlementRecord(admission, prior.SettlementID, workboard.AuxiliaryReviewCompleted, measurements, prior.SettledAt)
+		if buildErr != nil || expected.SettlementDigest != prior.SettlementDigest {
+			return workboard.OperationReceipt{}, prior, ErrConflict
+		}
+		return replayed, prior, nil
+	}
+	if candidateFound {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	}
+	var committedAt time.Time
+	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, func() time.Time {
+		committedAt = now().UTC()
+		return committedAt
+	})
+	if err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.Join(errors.New("atomic candidate mutation failed"), err)
+	}
+	settlementID := newWorkboardID()
+	if settlementID == "" {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.New("secure identifier generation failed")
+	}
+	settlement, err := auxiliaryReviewSettlementRecord(admission, settlementID, workboard.AuxiliaryReviewCompleted, measurements, committedAt)
+	if err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.Join(errors.New("atomic review settlement build failed"), err)
+	}
+	if err = insertAuxiliaryReviewSettlementTx(ctx, tx, settlement); err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+	}
+	return receipt, settlement, nil
+}
+
+func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.EvaluationMutation, now func() time.Time) (workboard.OperationReceipt, error) {
+	if now == nil {
+		return workboard.OperationReceipt{}, invalidWorkboard("clock")
+	}
+	if err := validateEvaluationMutation(mutation, true); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	want, err := workboard.EvaluationDigest(mutation)
+	if err != nil || want != mutation.RequestDigest {
+		return workboard.OperationReceipt{}, invalidWorkboard("request_digest")
+	}
 	// Sample the trusted service clock only after acquiring the serialized
 	// writer boundary. A process stall or lock wait before this point therefore
 	// cannot authorize a commit using an already-expired lease observation.
@@ -253,9 +357,6 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 		if err = insertWorkboardEvent(ctx, tx, event.ID, board.ID, event.Sequence, operationID, string(event.Kind), event.CardID, mutation.Actor, mutation.Now, eventBodies[index]); err != nil {
 			return workboard.OperationReceipt{}, err
 		}
-	}
-	if err = tx.Commit(); err != nil {
-		return workboard.OperationReceipt{}, err
 	}
 	return receipt, nil
 }

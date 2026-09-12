@@ -6837,3 +6837,41 @@ production candidate reviewer do not yet atomically consume these admission
 and settlement primitives with advisory evidence. Until that integration and
 its crash/no-redispatch tests land, the stock daemon continues to reject
 `workboard.scheduler.enabled: true`.
+
+## 2026-09-12 — DAR-91 durable evaluation/accounting integration
+
+DAR-91 remains in progress. A budget-aware candidate evaluator now reserves
+card-owned review capacity durably before dispatch. The evaluation service
+enforces the reserved deadline, rejects measurement overruns, binds advisory
+`model_audit` evidence to the admitted reviewer identity, and never permits a
+reviewer to manufacture operator-owned feedback. Failures, cancellation,
+panics, malformed evidence, and overruns receive terminal accounting without
+creating a candidate.
+
+Successful candidate/evidence persistence and completed review settlement now
+share one serialized SQLite transaction. Exact atomic acknowledgement-loss
+replay returns the original receipt and settlement only when the immutable
+request and measurements match; drift and torn composite state fail closed.
+Legacy candidate replay remains compatible when no auxiliary admission exists,
+while an admitted review is never redispatched after restart. Focused race
+tests cover atomic rollback, replay, deadline enforcement, reviewer spoofing,
+conservative restart recovery, admission races, and writer-owned clock
+sampling.
+
+The complete telemetry race package had already reached approximately the
+former 15-minute per-package timeout as its migration and restart matrix grew.
+This checkpoint's additional recovery coverage crossed that ceiling without a
+test assertion failure, so the repository's `check` and `test` targets now use
+a bounded 20-minute package timeout. No test is skipped or split out of the
+required gate.
+
+This is not production completion. The current worker runner stops heartbeat
+renewal before candidate evaluation, while the ordinary candidate commit still
+correctly requires a live, exact claim revision. A review that crosses the
+claim TTL therefore cannot commit. DAR-91 must add a durable successor review
+fence bound to the exact admitted card, claim, criteria, candidate, policy, and
+revision state; only that fence may authorize a completion after wall-clock
+claim expiry, and only within the review deadline when no heartbeat, pause,
+cancel, recovery, or reassignment changed the durable state. The production
+reviewer adapter and atomic structured audit record also remain open. The stock
+daemon scheduler enablement guard is unchanged.

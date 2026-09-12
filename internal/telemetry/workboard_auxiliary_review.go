@@ -10,13 +10,9 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
-// AuxiliaryReviewMeasurements contains trusted terminal measurements. A nil
-// quantity is unknown and is conservatively settled at its reserved ceiling.
-type AuxiliaryReviewMeasurements struct {
-	TimeMS     *int64
-	Tokens     *int64
-	CostMicros *int64
-}
+// AuxiliaryReviewMeasurements remains an alias for compatibility with storage
+// callers. The provider-neutral contract is owned by workboard.
+type AuxiliaryReviewMeasurements = workboard.AuxiliaryReviewMeasurements
 
 // AdmitAuxiliaryReview atomically reserves card-owned capacity for one frozen
 // candidate review. Exact operation replays return the original admission;
@@ -90,10 +86,31 @@ func (s *Store) AdmitAuxiliaryReview(ctx context.Context, frozen workboard.Candi
 	return record, true, nil
 }
 
+// ReplayAuxiliaryReviewAdmission reports whether an operation was durably
+// admitted without granting dispatch authority.
+func (s *Store) ReplayAuxiliaryReviewAdmission(ctx context.Context, operationID string) (workboard.AuxiliaryReviewAdmissionRecord, bool, error) {
+	if ctx == nil || s == nil || s.db == nil || !validWorkboardID(operationID) {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, false, invalidWorkboard("auxiliary_review_admission")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
+	}
+	defer tx.Rollback()
+	record, found, err := readAuxiliaryReviewAdmissionByOperation(ctx, tx, operationID)
+	if err != nil || !found {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, found, err
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
+	}
+	return record, true, nil
+}
+
 // SettleAuxiliaryReview writes one terminal accounting fact. Exact terminal
 // retries are idempotent; changed measurements or disposition conflict.
 func (s *Store) SettleAuxiliaryReview(ctx context.Context, operationID string, disposition workboard.AuxiliaryReviewDisposition,
-	measurements AuxiliaryReviewMeasurements, settledAt time.Time,
+	measurements workboard.AuxiliaryReviewMeasurements, settledAt time.Time,
 ) (workboard.AuxiliaryReviewSettlementRecord, bool, error) {
 	if ctx == nil || s == nil || s.db == nil || !validWorkboardID(operationID) || !validAuxiliaryReviewTime(settledAt) ||
 		!validAuxiliaryReviewDisposition(disposition) || !validAuxiliaryReviewMeasurements(measurements) {
@@ -145,6 +162,37 @@ func (s *Store) SettleAuxiliaryReview(ctx context.Context, operationID string, d
 	return record, true, nil
 }
 
+// ReplayAuxiliaryReviewSettlement returns the immutable terminal accounting
+// fact without inventing new measurements. It is used to distinguish an
+// acknowledged terminal review from the crash window after candidate commit.
+func (s *Store) ReplayAuxiliaryReviewSettlement(ctx context.Context, operationID string,
+	disposition workboard.AuxiliaryReviewDisposition,
+) (workboard.AuxiliaryReviewSettlementRecord, bool, error) {
+	if ctx == nil || s == nil || s.db == nil || !validWorkboardID(operationID) || !validAuxiliaryReviewDisposition(disposition) {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, invalidWorkboard("auxiliary_review_settlement")
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, err
+	}
+	defer tx.Rollback()
+	admission, found, err := readAuxiliaryReviewAdmissionByOperation(ctx, tx, operationID)
+	if err != nil || !found {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, err
+	}
+	record, found, err := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID)
+	if err != nil || !found {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, err
+	}
+	if record.Disposition != disposition {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, ErrConflict
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.AuxiliaryReviewSettlementRecord{}, false, err
+	}
+	return record, true, nil
+}
+
 func auxiliaryReviewMatchesFrozen(r workboard.AuxiliaryReviewReservation, f workboard.CandidateEvaluationRequest) bool {
 	return r.BoardID == f.BoardID && r.CardID == f.CardID && r.AttemptID == f.AttemptID && r.ClaimID == f.ClaimID &&
 		r.CandidateID == f.CandidateID && r.CandidateDigest == f.CandidateDigest && r.CriteriaDigest == f.CriteriaDigest &&
@@ -160,7 +208,7 @@ func validAuxiliaryReviewDisposition(value workboard.AuxiliaryReviewDisposition)
 	return value == workboard.AuxiliaryReviewCompleted || value == workboard.AuxiliaryReviewFailed || value == workboard.AuxiliaryReviewCanceled
 }
 
-func validAuxiliaryReviewMeasurements(value AuxiliaryReviewMeasurements) bool {
+func validAuxiliaryReviewMeasurements(value workboard.AuxiliaryReviewMeasurements) bool {
 	return validOptionalAuxiliaryReviewMeasurement(value.TimeMS, workboard.MaxAuxiliaryReviewDurationMillis) &&
 		validOptionalAuxiliaryReviewMeasurement(value.Tokens, workboard.MaxWorkTokens) &&
 		validOptionalAuxiliaryReviewMeasurement(value.CostMicros, workboard.MaxWorkCostMicros)
@@ -330,7 +378,7 @@ func readAuxiliaryReviewAdmission(ctx context.Context, tx *sql.Tx, predicate str
 }
 
 func auxiliaryReviewSettlementRecord(admission workboard.AuxiliaryReviewAdmissionRecord, settlementID string,
-	disposition workboard.AuxiliaryReviewDisposition, measured AuxiliaryReviewMeasurements, settledAt time.Time,
+	disposition workboard.AuxiliaryReviewDisposition, measured workboard.AuxiliaryReviewMeasurements, settledAt time.Time,
 ) (workboard.AuxiliaryReviewSettlementRecord, error) {
 	if admission.Validate() != nil || settledAt.Before(admission.AdmittedAt) {
 		return workboard.AuxiliaryReviewSettlementRecord{}, invalidWorkboard("auxiliary_review_settlement")
