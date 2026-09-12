@@ -113,3 +113,25 @@ func TestReviewerAdmissionAndCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestReviewerPinsAndVerifiesOutputTokenCeiling(t *testing.T) {
+	requests := 0
+	v := reviewer(reviewProvider(func(_ context.Context, request providers.Request, emit func(providers.Chunk) error) error {
+		requests++
+		if request.MaxOutputTokens != 7 {
+			t.Fatalf("output ceiling not pinned: %d", request.MaxOutputTokens)
+		}
+		if err := emit(providers.Chunk{Text: reviewOutput("abstain")}); err != nil {
+			return err
+		}
+		return emit(providers.Chunk{Done: true, FinishReason: "stop", Usage: &providers.Usage{OutputTokens: 8}})
+	}))
+	v.MaxOutputTokens = 7
+	if _, err := v.Review(context.Background(), ReviewRequest{Domain: "creative", Requirements: "Write"}); err == nil || requests != 1 {
+		t.Fatalf("reported token overrun accepted: calls=%d err=%v", requests, err)
+	}
+	v.MaxOutputTokens = providers.MaxOutputTokens + 1
+	if _, err := v.Review(context.Background(), ReviewRequest{Domain: "creative", Requirements: "Write"}); !errors.Is(err, ErrAudit) || requests != 1 {
+		t.Fatalf("invalid token ceiling dispatched: calls=%d err=%v", requests, err)
+	}
+}

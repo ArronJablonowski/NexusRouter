@@ -11,6 +11,15 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
 
+// MaxReviewDuration is the single upper bound shared by reviewer execution,
+// durable attempts, audit records, and public status projections. Keep this in
+// sync with the Workboard acceptance-judge configuration boundary.
+const MaxReviewDuration = 5 * time.Minute
+
+// MaxReviewCost is the largest floating-point cost that can be converted to
+// DarwinRouter's integer micro-cost ledger without overflow.
+const MaxReviewCost = 1_000_000
+
 // ReviewEvidence is caller-attributed material, not evaluator-generated proof.
 type ReviewEvidence struct {
 	ID      string `json:"id"`
@@ -43,6 +52,7 @@ type Reviewer struct {
 	Provider               providers.Provider
 	Model, EvaluatorID     string
 	ContextTokens          int
+	MaxOutputTokens        int64
 	Timeout                time.Duration
 	EstimatedCost, MaxCost float64
 }
@@ -55,7 +65,9 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 	if ctx == nil {
 		return ReviewResult{}, ErrAudit
 	}
-	if v.Provider == nil || !auditLabel(v.Model) || !auditLabel(v.EvaluatorID) || !auditLabel(input.Domain) || v.ContextTokens < 1 || v.Timeout <= 0 || v.Timeout > time.Minute || !reviewCost(v.EstimatedCost) || !reviewCost(v.MaxCost) || v.EstimatedCost > v.MaxCost || strings.TrimSpace(input.Requirements) == "" || len(input.Evidence) > 254 {
+	if v.Provider == nil || !auditLabel(v.Model) || !auditLabel(v.EvaluatorID) || !auditLabel(input.Domain) || v.ContextTokens < 1 ||
+		v.MaxOutputTokens < 0 || v.MaxOutputTokens > providers.MaxOutputTokens || v.Timeout <= 0 || v.Timeout > MaxReviewDuration ||
+		!reviewCost(v.EstimatedCost) || !reviewCost(v.MaxCost) || v.EstimatedCost > v.MaxCost || strings.TrimSpace(input.Requirements) == "" || len(input.Evidence) > 254 {
 		return ReviewResult{}, ErrAudit
 	}
 	refs := []string{"requirements", "candidate"}
@@ -79,7 +91,7 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 	if err != nil || len(body) > 1<<20 {
 		return ReviewResult{}, ErrAudit
 	}
-	request := providers.Request{Model: v.Model, Messages: []providers.Message{{Role: "system", Content: reviewInstructions}, {Role: "user", Content: string(body)}}}
+	request := providers.Request{Model: v.Model, Messages: []providers.Message{{Role: "system", Content: reviewInstructions}, {Role: "user", Content: string(body)}}, MaxOutputTokens: v.MaxOutputTokens}
 	if v.StructuredOutput {
 		request.JSONSchema = reviewOutputSchema(trusted)
 	}
@@ -114,7 +126,8 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 		}
 		output.WriteString(chunk.Text)
 		if chunk.Usage != nil {
-			if usage != nil || chunk.Usage.InputTokens < 0 || chunk.Usage.OutputTokens < 0 {
+			if usage != nil || chunk.Usage.InputTokens < 0 || chunk.Usage.OutputTokens < 0 ||
+				(v.MaxOutputTokens > 0 && chunk.Usage.OutputTokens > v.MaxOutputTokens) {
 				callbackErr = ErrAudit
 				return callbackErr
 			}
@@ -155,4 +168,6 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 	return ReviewResult{Audit: audit, Usage: usage, Elapsed: time.Since(start)}, nil
 }
 
-func reviewCost(n float64) bool { return n >= 0 && !math.IsNaN(n) && !math.IsInf(n, 0) }
+func reviewCost(n float64) bool {
+	return n >= 0 && n <= MaxReviewCost && !math.IsNaN(n) && !math.IsInf(n, 0)
+}

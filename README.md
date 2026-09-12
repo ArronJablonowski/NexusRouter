@@ -534,6 +534,7 @@ workboard:
       enabled: false
       reviewer_model: local-reviewer
       max_cost: 0.01
+      max_output_tokens: 4096
       timeout: 30s
 ```
 
@@ -544,8 +545,10 @@ configured, mode-eligible model with positive context capacity and a configured
 cost estimate. It also requires the global LLM-judge gate and the nested
 acceptance judge. `reviewer_model` must resolve to a local, mode-eligible model
 with positive context capacity and a configured estimate no greater than
-`max_cost`; its provider/model identity must differ from the worker's. Judge
-timeouts are bounded from `100ms` through `5m`. These are configuration
+`max_cost`; its provider/model identity must differ from the worker's. An
+enabled judge also requires a positive `max_output_tokens` provider ceiling.
+Judge costs are bounded by the card ledger's $1,000,000 representable maximum,
+and timeouts are bounded from `100ms` through `5m`. These are configuration
 admission checks, not evidence that review dispatch is composed. The stock
 daemon currently rejects `workboard.scheduler.enabled: true` before opening
 storage, binding its listener, or constructing providers; it will not silently

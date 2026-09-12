@@ -161,7 +161,16 @@ func TestRecoveryAdvancesOneBoundedPageAtATime(t *testing.T) {
 	defer cancel()
 	s, db, _ := recoveryFixture(t)
 	for i := 0; i < 101; i++ {
-		if _, err := s.Submit(ctx, fmt.Sprintf("key-%016d", i), Request{ModelID: "chat", Prompt: "hello"}); err != nil {
+		key := fmt.Sprintf("key-%016d", i)
+		keyDigest, requestDigest, body, err := s.submissionPayload(key, Request{ModelID: "chat", Prompt: "hello"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// This test exercises bounded recovery pagination, not the public
+		// submission adapter. Reuse the fixture's already-open store so schema
+		// validation and WAL setup do not consume the test's recovery deadline
+		// once per seeded row.
+		if _, err := db.CreateSubmission(ctx, keyDigest, requestDigest, s.submissionConfigDigest(), body); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := db.ClaimSubmission(ctx, s.submissionConfigDigest(), time.Now().UTC(), 30*time.Second); err != nil {

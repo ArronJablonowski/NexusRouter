@@ -3,7 +3,12 @@ package config
 import (
 	"errors"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
+
+const maxWorkboardJudgeCost = float64(workboard.MaxWorkCostMicros) / 1_000_000
 
 // validateWorkboardSchedulerModels keeps unattended Workboard execution
 // fail-closed. The scheduler is not allowed to select either participant via
@@ -16,8 +21,11 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if timeoutErr != nil || timeout < 100*time.Millisecond || timeout > 5*time.Minute {
 		return errors.New("invalid workboard acceptance judge timeout")
 	}
-	if !finite(judge.MaxCost) || judge.MaxCost < 0 {
+	if !finite(judge.MaxCost) || judge.MaxCost < 0 || judge.MaxCost > maxWorkboardJudgeCost {
 		return errors.New("invalid workboard acceptance judge cost ceiling")
+	}
+	if judge.MaxOutputTokens < 0 || judge.MaxOutputTokens > providers.MaxOutputTokens {
+		return errors.New("invalid workboard acceptance judge output-token ceiling")
 	}
 	if judge.Enabled && !scheduler.Enabled {
 		return errors.New("workboard acceptance judge requires enabled scheduler")
@@ -37,7 +45,7 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if !scheduler.Enabled {
 		return nil
 	}
-	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 {
+	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 || judge.MaxOutputTokens <= 0 {
 		return errors.New("enabled workboard scheduler requires bounded worker and acceptance reviewer")
 	}
 	if !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
@@ -45,8 +53,18 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 		return errors.New("workboard scheduler worker unavailable within configured limits")
 	}
 	if reviewer.Locality != "local" || !modelAvailableInMode(reviewer, s.Mode) || reviewer.ContextTokens < 1 || reviewer.EstimatedCost == nil ||
-		!finite(*reviewer.EstimatedCost) || *reviewer.EstimatedCost < 0 || *reviewer.EstimatedCost > judge.MaxCost {
+		!finite(*reviewer.EstimatedCost) || *reviewer.EstimatedCost < 0 || *reviewer.EstimatedCost > maxWorkboardJudgeCost || *reviewer.EstimatedCost > judge.MaxCost {
 		return errors.New("workboard acceptance reviewer unavailable within configured limits")
+	}
+	providerKind := ""
+	for _, provider := range s.Providers {
+		if provider.ID == reviewer.Provider {
+			providerKind = provider.Kind
+			break
+		}
+	}
+	if providerKind != "ollama" && providerKind != "openai_compatible" {
+		return errors.New("workboard acceptance reviewer cannot enforce output-token ceiling")
 	}
 	if worker.Provider == reviewer.Provider && worker.Model == reviewer.Model {
 		return errors.New("workboard worker and acceptance reviewer must be independent models")

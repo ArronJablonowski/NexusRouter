@@ -11,6 +11,7 @@ func TestWorkboardSchedulerDefaultsAndOverrides(t *testing.T) {
 		defaults.Workboard.Scheduler.MaxActiveClaims != 3 || defaults.Workboard.Scheduler.CardScanLimit != 10000 ||
 		defaults.Workboard.Scheduler.WorkerModel != "" || defaults.Workboard.Scheduler.AcceptanceJudge.Enabled ||
 		defaults.Workboard.Scheduler.AcceptanceJudge.ReviewerModel != "" || defaults.Workboard.Scheduler.AcceptanceJudge.MaxCost != 0 ||
+		defaults.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens != 0 ||
 		defaults.Workboard.Scheduler.AcceptanceJudge.Timeout != "30s" {
 		t.Fatalf("unexpected workboard defaults: %+v", defaults.Workboard)
 	}
@@ -23,11 +24,12 @@ func TestWorkboardSchedulerDefaultsAndOverrides(t *testing.T) {
 		t.Fatalf("valid workboard scalar overrides rejected: %+v %v", settings.Workboard, err)
 	}
 	settings, err = Load(Options{Env: map[string]string{
-		"workboard.scheduler.acceptance_judge.enabled":  "false",
-		"workboard.scheduler.acceptance_judge.max_cost": "1",
-		"workboard.scheduler.acceptance_judge.timeout":  "45s",
+		"workboard.scheduler.acceptance_judge.enabled":           "false",
+		"workboard.scheduler.acceptance_judge.max_cost":          "1",
+		"workboard.scheduler.acceptance_judge.max_output_tokens": "4096",
+		"workboard.scheduler.acceptance_judge.timeout":           "45s",
 	}})
-	if err != nil || settings.Workboard.Scheduler.AcceptanceJudge.Enabled || settings.Workboard.Scheduler.AcceptanceJudge.MaxCost != 1 || settings.Workboard.Scheduler.AcceptanceJudge.Timeout != "45s" {
+	if err != nil || settings.Workboard.Scheduler.AcceptanceJudge.Enabled || settings.Workboard.Scheduler.AcceptanceJudge.MaxCost != 1 || settings.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens != 4096 || settings.Workboard.Scheduler.AcceptanceJudge.Timeout != "45s" {
 		t.Fatalf("valid nested scalar overrides rejected: %+v %v", settings.Workboard.Scheduler.AcceptanceJudge, err)
 	}
 }
@@ -59,6 +61,10 @@ func TestEnabledWorkboardSchedulerRequiresExplicitIndependentLocalJudge(t *testi
 		"zero judge cost":         func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = 0 },
 		"negative judge cost":     func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = -1 },
 		"non-finite judge cost":   func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = math.Inf(1) },
+		"excess judge cost":       func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = maxWorkboardJudgeCost + 1 },
+		"zero output ceiling":     func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens = 0 },
+		"negative output ceiling": func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens = -1 },
+		"large output ceiling":    func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens = 1_000_000_001 },
 		"short judge timeout":     func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Timeout = "99ms" },
 		"long judge timeout":      func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Timeout = "5m1ns" },
 		"invalid judge timeout":   func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Timeout = "later" },
@@ -102,13 +108,14 @@ workboard:
       enabled: true
       reviewer_model: reviewer
       max_cost: 0.25
+      max_output_tokens: 4096
       timeout: 30s
 `
 	s, err := Load(Options{ProjectFile: file(t, body)})
 	if err != nil {
 		t.Fatalf("valid scheduler YAML rejected: %v", err)
 	}
-	if s.Workboard.Scheduler.WorkerModel != "worker" || s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel != "reviewer" || s.Workboard.Scheduler.AcceptanceJudge.MaxCost != .25 {
+	if s.Workboard.Scheduler.WorkerModel != "worker" || s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel != "reviewer" || s.Workboard.Scheduler.AcceptanceJudge.MaxCost != .25 || s.Workboard.Scheduler.AcceptanceJudge.MaxOutputTokens != 4096 {
 		t.Fatalf("scheduler YAML decoded incorrectly: %+v", s.Workboard.Scheduler)
 	}
 }
@@ -117,7 +124,7 @@ func TestWorkboardSchedulerJudgeCostAndTimeoutBoundaries(t *testing.T) {
 	for _, test := range []struct {
 		cost    float64
 		timeout string
-	}{{math.SmallestNonzeroFloat64, "100ms"}, {math.MaxFloat64, "5m"}} {
+	}{{math.SmallestNonzeroFloat64, "100ms"}, {maxWorkboardJudgeCost, "5m"}} {
 		s := validWorkboardSchedulerSettings()
 		s.Workboard.Scheduler.AcceptanceJudge.MaxCost = test.cost
 		*s.Models[1].EstimatedCost = 0
@@ -158,7 +165,7 @@ func validWorkboardSchedulerSettings() Settings {
 	s.Workboard.Scheduler.Enabled = true
 	s.Workboard.Scheduler.WorkerModel = "worker"
 	s.Workboard.Scheduler.AcceptanceJudge = WorkboardAcceptanceJudge{
-		Enabled: true, ReviewerModel: "reviewer", MaxCost: .25, Timeout: "30s",
+		Enabled: true, ReviewerModel: "reviewer", MaxCost: .25, MaxOutputTokens: 4096, Timeout: "30s",
 	}
 	return s
 }

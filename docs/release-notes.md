@@ -481,7 +481,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 42. Schema 30 added the immutable
+The current durable store uses SQLite schema 43. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -504,7 +504,9 @@ immutable recovery-to-replacement link bound to exact predecessor and successor
 attempt/claim identities; conservative upgrade backfill links only unambiguous
 successors. Schema 41 atomically binds the first runtime event to the Workboard
 claim, and schema 42 adds immutable execution admission and settlement records
-for time, token, cost, route, configuration, and WIP budgets. Browser sessions
+for time, token, cost, route, configuration, and WIP budgets. Schema 43 adds
+immutable card-owned auxiliary-review admissions and settlements bound to the
+candidate, reviewer, configuration, and time/output-token/cost ceilings. Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules

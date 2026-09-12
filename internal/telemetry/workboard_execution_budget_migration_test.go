@@ -20,7 +20,9 @@ func TestWorkboardExecutionBudgetSchema41MigrationIsEmptyAndRestartSafe(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.db.Exec(`DROP TABLE workboard_execution_settlements;
+	if _, err = store.db.Exec(`DROP TABLE workboard_auxiliary_review_settlements;
+		DROP TABLE workboard_auxiliary_review_admissions;
+		DROP TABLE workboard_execution_settlements;
 		DROP TABLE workboard_execution_admissions; PRAGMA user_version=41`); err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +38,7 @@ func TestWorkboardExecutionBudgetSchema41MigrationIsEmptyAndRestartSafe(t *testi
 	if err = store.db.QueryRow(`SELECT
 		(SELECT user_version FROM pragma_user_version),
 		(SELECT count(*) FROM workboard_execution_admissions),
-		(SELECT count(*) FROM workboard_execution_settlements)`).Scan(&version, &admissions, &settlements); err != nil || version != 42 || admissions != 0 || settlements != 0 {
+		(SELECT count(*) FROM workboard_execution_settlements)`).Scan(&version, &admissions, &settlements); err != nil || version != currentStorageSchema || admissions != 0 || settlements != 0 {
 		t.Fatalf("schema=%d admissions=%d settlements=%d err=%v", version, admissions, settlements, err)
 	}
 }

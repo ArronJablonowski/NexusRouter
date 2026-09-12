@@ -104,6 +104,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version == 43 {
+		if err = validateWorkboardAuxiliaryReviewSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	workboardSchemaValidated := false
 	if version == 0 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE task_heads (
@@ -416,6 +421,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 42 {
 		if err = migrateWorkboardExecutionBudgets(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 43 {
+		if err = migrateWorkboardAuxiliaryReviews(ctx, conn); err != nil {
 			return err
 		}
 	}

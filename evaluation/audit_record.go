@@ -22,7 +22,7 @@ type AuditRecord struct {
 }
 
 func (r AuditRecord) Validate() error {
-	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.Time.IsZero() || r.Elapsed < 0 || r.Elapsed > time.Minute {
+	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.Time.IsZero() || r.Elapsed < 0 || r.Elapsed > MaxReviewDuration {
 		return ErrAudit
 	}
 	if r.Usage != nil && (r.Usage.InputTokens < 0 || r.Usage.OutputTokens < 0) {

@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"encoding/json"
-	"math"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -21,7 +20,7 @@ type AuditRequest struct {
 }
 
 func (r AuditRequest) Validate() error {
-	if r.Version != 1 || !auditIdempotencyKey(r.IdempotencyKey) || !ValidAuditOperationID(r.TaskID) || !ValidAuditOperationID(r.ReviewerModelID) || math.IsNaN(r.MaxCost) || math.IsInf(r.MaxCost, 0) || r.MaxCost < 0 {
+	if r.Version != 1 || !auditIdempotencyKey(r.IdempotencyKey) || !ValidAuditOperationID(r.TaskID) || !ValidAuditOperationID(r.ReviewerModelID) || !reviewCost(r.MaxCost) {
 		return ErrAudit
 	}
 	return nil
@@ -101,7 +100,7 @@ func validAuditPublicStatus(s string) bool {
 }
 
 func (s AuditStatus) Validate() error {
-	if s.Version != 1 || !ValidAuditOperationID(s.ID) || !ValidAuditOperationID(s.TaskID) || !ValidAuditOperationID(s.SourceAttemptID) || !validAuditPublicStatus(s.Status) || !ValidAuditOperationID(s.ReviewerID) || !auditLabel(s.EvaluatorModel) || !auditLabel(s.EvaluatorProvider) || s.Findings == nil || s.EvidenceRefs == nil || len(s.Findings) > 64 || len(s.EvidenceRefs) > 256 || len(s.EvidencePrecedence) != len(fixedAuditEvidencePrecedence) || s.StartedAt == nil || s.StartedAt.IsZero() || s.StartedAt.Location() != time.UTC || s.ElapsedMillis < 0 || s.ElapsedMillis > time.Minute.Milliseconds() {
+	if s.Version != 1 || !ValidAuditOperationID(s.ID) || !ValidAuditOperationID(s.TaskID) || !ValidAuditOperationID(s.SourceAttemptID) || !validAuditPublicStatus(s.Status) || !ValidAuditOperationID(s.ReviewerID) || !auditLabel(s.EvaluatorModel) || !auditLabel(s.EvaluatorProvider) || s.Findings == nil || s.EvidenceRefs == nil || len(s.Findings) > 64 || len(s.EvidenceRefs) > 256 || len(s.EvidencePrecedence) != len(fixedAuditEvidencePrecedence) || s.StartedAt == nil || s.StartedAt.IsZero() || s.StartedAt.Location() != time.UTC || s.ElapsedMillis < 0 || s.ElapsedMillis > MaxReviewDuration.Milliseconds() {
 		return ErrAudit
 	}
 	for i, source := range fixedAuditEvidencePrecedence {

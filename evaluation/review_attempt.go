@@ -2,7 +2,6 @@ package evaluation
 
 import (
 	"encoding/hex"
-	"math"
 	"strings"
 	"time"
 
@@ -28,7 +27,7 @@ type ReviewAttempt struct {
 }
 
 func (r ReviewAttempt) Validate() error {
-	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.StartedAt.IsZero() || r.EstimatedCost < 0 || math.IsNaN(r.EstimatedCost) || math.IsInf(r.EstimatedCost, 0) {
+	if r.Version != 1 || !auditLabel(r.ID) || !auditLabel(r.TaskID) || !auditLabel(r.AttemptID) || !auditLabel(r.EvaluatorModel) || !auditLabel(r.EvaluatorProvider) || r.StartedAt.IsZero() || !reviewCost(r.EstimatedCost) {
 		return ErrAudit
 	}
 	// Both fields are absent on rows written before public audit operations.
@@ -50,7 +49,7 @@ func (r ReviewAttempt) Validate() error {
 			return ErrAudit
 		}
 	case "failed":
-		if r.FinishedAt.IsZero() || r.FinishedAt.Before(r.StartedAt) || r.AuditID != "" || (r.Code != "review_failed" && r.Code != "canceled" && r.Code != "persistence_failed") || r.Elapsed < 0 || r.Elapsed > time.Minute || r.Elapsed > r.FinishedAt.Sub(r.StartedAt) || (r.Usage != nil && (r.Usage.InputTokens < 0 || r.Usage.OutputTokens < 0)) || (r.Usage == nil && r.Elapsed != 0) || (r.Code == "canceled" && (r.Usage != nil || r.Elapsed != 0)) {
+		if r.FinishedAt.IsZero() || r.FinishedAt.Before(r.StartedAt) || r.AuditID != "" || (r.Code != "review_failed" && r.Code != "canceled" && r.Code != "persistence_failed") || r.Elapsed < 0 || r.Elapsed > MaxReviewDuration || r.Elapsed > r.FinishedAt.Sub(r.StartedAt) || (r.Usage != nil && (r.Usage.InputTokens < 0 || r.Usage.OutputTokens < 0)) || (r.Usage == nil && r.Elapsed != 0) || (r.Code == "canceled" && (r.Usage != nil || r.Elapsed != 0)) {
 			return ErrAudit
 		}
 	default:

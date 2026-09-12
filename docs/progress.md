@@ -6752,8 +6752,8 @@ judging, and the broader crash/lease/acceptance qualification remain open.
 
 ## 2026-09-12 — DAR-90 frozen Workboard candidate evaluation checkpoint
 
-DAR-85 is now decomposed into DAR-90 through DAR-96; DAR-90 remains in
-progress until its durable review-admission dependency is complete. Candidate
+DAR-85 is now decomposed into DAR-90 through DAR-96; DAR-90 is complete and its
+durable review-admission successor is tracked separately as DAR-91. Candidate
 submission now derives a deterministic host-owned candidate identity and
 canonical content digest before evaluator dispatch. The evaluator receives a
 validated frozen snapshot binding the exact board, card, attempt, claim,
@@ -6786,7 +6786,7 @@ to DAR-91. The stock daemon scheduler enablement guard remains unchanged.
 
 ## 2026-09-12 — DAR-89 generic event replay integrity checkpoint
 
-DAR-89 is in progress pending the repository-wide qualification gate. Generic
+DAR-89 is complete after the repository-wide qualification gate passed. Generic
 `Store.Read` and `TaskSnapshot` replay now use read transactions and require
 every returned event to have an exact committed-ledger membership row,
 canonical body digest and encoding, matching event/task/session/sequence
@@ -6803,3 +6803,37 @@ behavior, and successful canonical paging. This boundary detects storage
 corruption and body-only mutation; it does not claim protection against an
 attacker who can coherently rewrite both the event body and all trusted ledger
 facts.
+
+## 2026-09-12 — DAR-91 auxiliary review budget foundation
+
+DAR-91 remains in progress. Schema 43 adds separate append-only Workboard
+auxiliary-review admissions and settlements rather than weakening the runtime
+execution ledger. A host-validated frozen candidate can now reserve the owning
+card's remaining time, output-token, and micro-cost capacity before review.
+Admission is serialized at the database writer boundary, revalidates the live
+card, attempt, claim, lease, candidate/criteria/policy digests, and rejects an
+exact source/reviewer model match. Concurrent processes converge on one
+admission; an unresolved admission remains fully charged after restart and is
+never treated as retry authority.
+
+Terminal settlement records measured values when trustworthy and substitutes
+the full reservation for unknown values. Exact acknowledgement-loss replays
+return the original admission or settlement without comparing newly sampled
+timestamps, while changed intent, measurements, or disposition conflict. The
+schema binds canonical bodies to indexed identities, prevents a second review
+for the same frozen candidate slot, requires completed settlement to reference
+the committed candidate, and rejects mutation/deletion or forged triggers.
+
+The shared evaluation contract now represents the configured 100ms–5m review
+window consistently. Review requests carry a provider-enforced output-token
+ceiling, reject reported overruns, and cap floating-point review cost at the
+integer micro-cost ledger's $1,000,000 maximum. An enabled Workboard judge must
+configure a positive ceiling and use an HTTP/Ollama adapter that can enforce
+it; the zero default remains omitted from the settings digest for disabled and
+legacy configurations.
+
+This checkpoint does not complete DAR-91: `EvaluationService` and the
+production candidate reviewer do not yet atomically consume these admission
+and settlement primitives with advisory evidence. Until that integration and
+its crash/no-redispatch tests land, the stock daemon continues to reject
+`workboard.scheduler.enabled: true`.

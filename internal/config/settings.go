@@ -60,10 +60,11 @@ type WorkboardScheduler struct {
 	AcceptanceJudge WorkboardAcceptanceJudge `yaml:"acceptance_judge" json:"acceptance_judge"`
 }
 type WorkboardAcceptanceJudge struct {
-	Enabled       bool    `yaml:"enabled" json:"enabled"`
-	ReviewerModel string  `yaml:"reviewer_model" json:"reviewer_model"`
-	MaxCost       float64 `yaml:"max_cost" json:"max_cost"`
-	Timeout       string  `yaml:"timeout" json:"timeout"`
+	Enabled         bool    `yaml:"enabled" json:"enabled"`
+	ReviewerModel   string  `yaml:"reviewer_model" json:"reviewer_model"`
+	MaxCost         float64 `yaml:"max_cost" json:"max_cost"`
+	MaxOutputTokens int64   `yaml:"max_output_tokens" json:"max_output_tokens,omitempty"`
+	Timeout         string  `yaml:"timeout" json:"timeout"`
 }
 type Hardware struct {
 	AutoProfile         bool    `yaml:"auto_profile" json:"auto_profile"`

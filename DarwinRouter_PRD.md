@@ -597,6 +597,7 @@ workboard:
       enabled: false
       reviewer_model: local-reviewer
       max_cost: 0.01
+      max_output_tokens: 4096
       timeout: 30s
 
 hardware:

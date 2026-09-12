@@ -105,7 +105,7 @@ func DescribeEvaluator(evaluator Evaluator) (descriptor EvaluatorDescriptor, err
 // cooperative timeout, rejects typed nils and untrusted errors, pins descriptor
 // stability, and returns only host-owned validated data.
 func InvokeEvaluator(ctx context.Context, evaluator Evaluator, request EvaluatorRequest, timeout time.Duration) (result EvaluatorResult, err error) {
-	if ctx == nil || nilEvaluator(evaluator) || timeout <= 0 || timeout > time.Minute || request.Validate() != nil {
+	if ctx == nil || nilEvaluator(evaluator) || timeout <= 0 || timeout > MaxReviewDuration || request.Validate() != nil {
 		return EvaluatorResult{}, ErrEvaluator
 	}
 	bounded, cancel := context.WithTimeout(ctx, timeout)
