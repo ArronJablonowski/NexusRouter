@@ -137,6 +137,52 @@ func TestAuthenticationOriginsAndSafeErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthenticationRejectsAmbiguousBearerHeaders(t *testing.T) {
+	cases := map[string]func(*http.Request){
+		"duplicate": func(r *http.Request) { r.Header.Add("Authorization", "Bearer "+token) },
+		"case-duplicate": func(r *http.Request) {
+			r.Header["authorization"] = []string{"Bearer " + token}
+		},
+		"empty-case-duplicate": func(r *http.Request) {
+			r.Header["Authorization"] = nil
+			r.Header["authorization"] = []string{"Bearer " + token}
+		},
+		"comma-folded":   func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token+",Bearer "+token) },
+		"extra-space":    func(r *http.Request) { r.Header.Set("Authorization", "Bearer  "+token) },
+		"trailing-space": func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token+" ") },
+		"lowercase-scheme": func(r *http.Request) {
+			r.Header.Set("Authorization", "bearer "+token)
+		},
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			calls := 0
+			s := services()
+			s.Run = func(context.Context, app.Request) (app.Result, error) {
+				calls++
+				return app.Result{TaskID: "task", Turns: 1}, nil
+			}
+			s.RunSubmission = fixedIdempotent(s.Run)
+			h, _ := New(token, 1, s)
+			r := request(http.MethodPost, "/v1/tasks", `{"model_id":"m","prompt":"hi"}`)
+			mutate(r)
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != http.StatusUnauthorized || calls != 0 || w.Header().Get("WWW-Authenticate") != "Bearer" {
+				t.Fatal(w.Code, calls, w.Header(), w.Body.String())
+			}
+		})
+	}
+}
+
+func TestNewRejectsNonCanonicalBearerSecret(t *testing.T) {
+	for _, value := range []string{strings.Repeat("a", 31), strings.Repeat("a", 8193), strings.Repeat("a", 32) + " ", strings.Repeat("a", 32) + ",", strings.Repeat("a", 32) + "\u0080"} {
+		if _, err := New(value, 1, services()); err == nil {
+			t.Fatal("non-canonical API secret accepted")
+		}
+	}
+}
 func TestConcurrencyAndCancellation(t *testing.T) {
 	s := services()
 	started := make(chan struct{})

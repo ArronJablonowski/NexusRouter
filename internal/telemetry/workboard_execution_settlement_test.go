@@ -198,6 +198,52 @@ func TestExecutionSettlementUnknownUsageAndInvalidTimeChargeReservation(t *testi
 	}
 }
 
+func TestExecutionSettlementEffectFreeWorkerFailureAcceptsCanceledRuntime(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 10, 16, 20, 0, 0, time.UTC)
+	card, boardID := createReadyBudgetCard(t, ctx, store, clock, "worker-canceled", workboardTestBudget())
+	clock = card.UpdatedAt.Add(time.Second)
+	start := budgetedStart("canceled-worker", "canceled-task", "canceled-session", clock, .0007)
+	reservation := executionReservation(start, 3_000, 900, 700, 2, 1)
+	claimed, err := claimBudgetedStart(t, ctx, store, &clock, card, boardID, start, reservation, "canceled-worker-claim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	terminal := runtime.Event{Version: 1, ID: start.TaskID + "-terminal", TaskID: start.TaskID, SessionID: start.SessionID,
+		CorrelationID: start.TaskID, WorkerID: start.WorkerID, Sequence: 2, Time: start.Time.Add(time.Second), Kind: runtime.TaskCanceled,
+		Data: runtime.Data{Code: "canceled"}}
+	if err = store.Append(ctx, 1, terminal); err != nil {
+		t.Fatal(err)
+	}
+	clock = terminal.Time.Add(time.Second)
+	lifecycle := newTestLifecycleService(t, store, workboard.Actor{ID: start.WorkerID, Type: "worker"},
+		verifiedLifecycleRecovery("unused-canceled-proof", workboard.EffectFree), &clock)
+	request := workboard.FailClaimRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
+		IdempotencyKey: "canceled-worker-fail", ExpectedCardRevision: *claimed.CardRevision,
+		ExpectedClaimRevision: *claimed.ClaimRevision, EffectResolution: workboard.EffectFree}
+	failed, err := lifecycle.Fail(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settlement := executionSettlementByTask(t, store, start.TaskID)
+	if settlement.TerminalKind != runtime.TaskCanceled || settlement.ChargedTimeMS != 1_000 ||
+		settlement.ChargedTokens != reservation.TokenLimit || settlement.ChargedCostMicros != reservation.CostMicros || settlement.TokenUsageKnown {
+		t.Fatalf("canceled settlement=%+v", settlement)
+	}
+	current, err := store.GetCard(ctx, boardID, card.ID)
+	if err != nil || current.State != workboard.Ready || current.CurrentClaimID != "" {
+		t.Fatalf("released card=%+v err=%v", current, err)
+	}
+	clock = clock.Add(time.Hour)
+	replayed, err := lifecycle.Fail(ctx, request)
+	if err != nil || replayed.OperationID != failed.OperationID {
+		t.Fatalf("canceled failure replay=%+v want=%+v err=%v", replayed, failed, err)
+	}
+}
+
 func TestExecutionSettlementFailureRollsBackAttemptFinalization(t *testing.T) {
 	ctx := context.Background()
 	store := openExecutionAdmissionStore(t, ctx)

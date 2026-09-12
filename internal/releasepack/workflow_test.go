@@ -3,9 +3,11 @@ package releasepack
 import (
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -126,6 +128,8 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		!strings.Contains(native.Run, "verify-install-rehearsal") ||
 		!strings.Contains(native.Run, `test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"`) ||
 		!strings.Contains(native.Run, `test "${record_value#record_sha256=}" = "$install_record_sha256"`) ||
+		!strings.Contains(native.Run, `test "$source_schema" = 29`) ||
+		!strings.Contains(native.Run, `test "$current_schema" = `+strconv.Itoa(stateschema.Current)) ||
 		!strings.Contains(native.Run, "install_verification_sha256") || !strings.Contains(native.Run, "backup_sha256") ||
 		!strings.Contains(native.Run, `> "$transcript" 2>&1`) || !strings.Contains(native.Run, "record_sha256") ||
 		!strings.Contains(native.Run, "transcript_sha256") || !strings.Contains(native.Run, "2099200") {
@@ -173,7 +177,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		"exact six-member schema-2 collateral",
 		"target-specific dependency notices",
 		"disposable native install",
-		"schema-29-to-33 migration",
+		"schema-29-to-" + strconv.Itoa(stateschema.Current) + " migration",
 		"backup and rollback rehearsal",
 		"installation outside the disposable runner-local rehearsal",
 		"All four successful matrix jobs are required for four-target native evidence",

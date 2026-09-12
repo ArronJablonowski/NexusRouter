@@ -47,7 +47,10 @@ func readLifecycleReplay(ctx context.Context, tx *sql.Tx, mutation workboard.Lif
 	if mutation.Kind == workboard.LifecycleFail || mutation.Kind == workboard.LifecycleRecover {
 		expectedKind := runtime.Kind("")
 		if mutation.Kind == workboard.LifecycleFail {
-			expectedKind = runtime.TaskFailed
+			if err := validateExecutionFailureSettlementReplay(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID); err != nil {
+				return workboard.OperationReceipt{}, true, err
+			}
+			return receipt, true, nil
 		}
 		if err := validateExecutionSettlementReplay(ctx, tx, mutation.BoardID, mutation.CardID, mutation.AttemptID, mutation.ClaimID, expectedKind, false); err != nil {
 			return workboard.OperationReceipt{}, true, err

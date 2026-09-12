@@ -53,7 +53,7 @@ func (h *Handler) serveTaskUsage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if totals.Validate() != nil || totals.Scope.TaskID != task || totals.Scope.SessionID == "" || usageContainsSecret(totals, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")) {
+	if totals.Validate() != nil || totals.Scope.TaskID != task || totals.Scope.SessionID == "" || usageContainsSecret(totals, admittedBearerToken(r)) {
 		failure(w, http.StatusInternalServerError, "invalid_usage_totals")
 		return
 	}

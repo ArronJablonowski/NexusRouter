@@ -111,6 +111,51 @@ func TestWorkboardWorkerRunnerTimeLimitBeforeTaskStartLeavesNoLifecycle(t *testi
 	assertBudgetRows(t, database, "prestart-timeout-task", 0, 0)
 }
 
+func TestWorkboardWorkerRunnerTimeLimitAfterTaskStartSettlesCanceledRuntime(t *testing.T) {
+	ctx := context.Background()
+	database := filepath.Join(t.TempDir(), "poststart-timeout.db")
+	store, boardID, cardID, cardRevision := readyWorkboardCardAt(t, database)
+	defer store.Close()
+	runner := budgetedWorkboardRunner(t, store)
+	const taskID = "poststart-timeout-task"
+	reservation := workboard.ExecutionReservation{Version: 1, ModelID: "timeout-model", ProviderID: "timeout-provider",
+		ConfigID: strings.Repeat("8", 64), TimeLimitMS: 250, TokenLimit: 1_000, CostMicros: 500,
+		GlobalWIPLimit: 2, BoardWIPLimit: 1}
+	_, err := runner.Run(ctx, WorkboardWorkerTask{BoardID: boardID, CardID: cardID, TaskID: taskID,
+		SessionID: "poststart-timeout-session", WorkerID: "poststart-timeout-worker", Scope: "board-card-" + cardID,
+		ExpectedCardRevision: cardRevision, Reservation: &reservation, FailureEffect: runtime.NoEffect,
+		Execute: func(run context.Context, handle *WorkboardWorkerHandle) (WorkboardCandidate, error) {
+			started := time.Now().UTC()
+			if bindErr := bindBudgetedWorkboardRuntime(run, handle, reservation.ModelID, reservation.ProviderID,
+				reservation.ConfigID, .0005, started); bindErr != nil {
+				return WorkboardCandidate{}, bindErr
+			}
+			<-run.Done()
+			terminal := runtime.Event{Version: 1, ID: taskID + "-canceled", TaskID: taskID,
+				SessionID: "poststart-timeout-session", CorrelationID: taskID, WorkerID: "poststart-timeout-worker",
+				Sequence: 2, Time: time.Now().UTC(), Kind: runtime.TaskCanceled, Data: runtime.Data{Code: "canceled"}}
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(run), time.Second)
+			defer cancel()
+			if appendErr := store.Append(cleanup, 1, terminal); appendErr != nil {
+				return WorkboardCandidate{}, appendErr
+			}
+			return WorkboardCandidate{}, run.Err()
+		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("time-limited callback err=%v", err)
+	}
+	assertBudgetRows(t, database, taskID, 1, 1)
+	lifecycle, readErr := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
+	attempt := lifecycle[cardID].Attempt
+	if readErr != nil || attempt == nil || attempt.Claim == nil || attempt.State != "failed" || attempt.Claim.State != "released" {
+		t.Fatalf("released canceled attempt=%+v err=%v", lifecycle, readErr)
+	}
+	card, readErr := store.GetCard(ctx, boardID, cardID)
+	if readErr != nil || card.State != workboard.Ready || card.CurrentClaimID != "" {
+		t.Fatalf("released canceled card=%+v err=%v", card, readErr)
+	}
+}
+
 func budgetedWorkboardRunner(t *testing.T, store *telemetry.Store) *WorkboardWorkerRunner {
 	t.Helper()
 	supervisor, err := workers.New(1, 20*time.Millisecond, 500*time.Millisecond, store, store)

@@ -70,6 +70,42 @@ func settleExecutionAttempt(ctx context.Context, tx *sql.Tx, boardID, cardID, at
 	return len(body), nil
 }
 
+// settleExecutionFailureAttempt is the worker-owned, effect-free terminal
+// path. A cooperative runtime cancellation is still a failed Workboard attempt:
+// the callback has joined and the trusted host has classified it as effect-free,
+// so it may release its own claim without the stronger orphan-recovery proof.
+// Successful runtime completion remains ineligible for this transition.
+func settleExecutionFailureAttempt(ctx context.Context, tx *sql.Tx, boardID, cardID, attemptID, claimID string, settledAt time.Time) (int, error) {
+	kind, found, err := executionFailureTerminalKind(ctx, tx, boardID, cardID, attemptID, claimID)
+	if err != nil || !found {
+		return 0, err
+	}
+	return settleExecutionAttempt(ctx, tx, boardID, cardID, attemptID, claimID, kind, false, settledAt)
+}
+
+func validateExecutionFailureSettlementReplay(ctx context.Context, tx *sql.Tx, boardID, cardID, attemptID, claimID string) error {
+	kind, found, err := executionFailureTerminalKind(ctx, tx, boardID, cardID, attemptID, claimID)
+	if err != nil || !found {
+		return err
+	}
+	return validateExecutionSettlementReplay(ctx, tx, boardID, cardID, attemptID, claimID, kind, false)
+}
+
+func executionFailureTerminalKind(ctx context.Context, tx *sql.Tx, boardID, cardID, attemptID, claimID string) (runtime.Kind, bool, error) {
+	admission, found, err := executionAdmissionForAttempt(ctx, tx, boardID, cardID, attemptID, claimID)
+	if err != nil || !found {
+		return "", found, err
+	}
+	proof, err := readExecutionTerminalProof(ctx, tx, admission)
+	if err != nil {
+		return "", true, err
+	}
+	if proof.event.Kind != runtime.TaskFailed && proof.event.Kind != runtime.TaskCanceled {
+		return "", true, ErrWorkboardCorrupt
+	}
+	return proof.event.Kind, true, nil
+}
+
 // validateExecutionSettlementReplay makes the immutable accounting fact part
 // of exact mutation replay. An admitted attempt cannot be replayed if its
 // settlement or the runtime evidence supporting it is missing or altered.

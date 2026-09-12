@@ -1,10 +1,12 @@
 # DarwinRouter release notes — unreleased
 
-This is a development summary, not a v1.0.0 release announcement. The
+This is a development summary, not a completed v1.0.0 release announcement. The
 deterministic testable-MVP gate passes and 41 of the original 42 MVP issues are
 complete, but DAR-46 remains open. The newly required Web UI and integrated
-Kanban backlog is also unfinished. No signed production release, release tag,
-supported-platform decision or publication approval is claimed.
+Kanban backlog is also unfinished. A premature annotated `v1.0.0` tag was pushed
+outside the guarded publisher and is quarantined; no GitHub Release, signed
+production assets, supported-platform decision or canonical publication
+approval is claimed.
 
 - DAR-83 now adds the first operator mutation controls directly to the
   authenticated Kanban. Operators can create, revise, and archive boards and
@@ -479,7 +481,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 40. Schema 30 added the immutable
+The current durable store uses SQLite schema 42. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -500,7 +502,10 @@ version-1 `pause_requested` compatibility bit; legacy true values migrate only
 to requested, never to an unproven worker acknowledgement. Schema 40 adds an
 immutable recovery-to-replacement link bound to exact predecessor and successor
 attempt/claim identities; conservative upgrade backfill links only unambiguous
-successors. Browser sessions remain process-local and are revoked on restart
+successors. Schema 41 atomically binds the first runtime event to the Workboard
+claim, and schema 42 adds immutable execution admission and settlement records
+for time, token, cost, route, configuration, and WIP budgets. Browser sessions
+remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules
 and fails closed on inconsistent partial objects. Schema-29-and-newer stores

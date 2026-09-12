@@ -403,9 +403,8 @@ func auditResponseSecrets(r *http.Request, idempotencyKey string) []string {
 	if idempotencyKey != "" {
 		secrets = append(secrets, idempotencyKey)
 	}
-	auth := r.Header.Get("Authorization")
-	if strings.HasPrefix(auth, "Bearer ") && len(strings.TrimPrefix(auth, "Bearer ")) >= 16 {
-		secrets = append(secrets, strings.TrimPrefix(auth, "Bearer "))
+	if bearer := admittedBearerToken(r); bearer != "" {
+		secrets = append(secrets, bearer)
 	}
 	return secrets
 }

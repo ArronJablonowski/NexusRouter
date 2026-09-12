@@ -126,8 +126,10 @@ type Handler struct {
 	taskWaitTimeout  time.Duration
 }
 
+type bearerTokenContextKey struct{}
+
 func New(token string, concurrent int, s Services) (*Handler, error) {
-	if len(token) < 32 || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
+	if !canonicalBearerToken(token) || concurrent < 1 || concurrent > 64 || s.Run == nil || s.Inspect == nil || s.Health == nil {
 		return nil, errors.New("invalid API configuration")
 	}
 	return &Handler{modelSlots: make(chan struct{}, 1), memorySlots: make(chan struct{}, 2), deprecationSlots: make(chan struct{}, 1), secret: sha256.Sum256([]byte(token)), services: s, slots: make(chan struct{}, concurrent), controls: make(chan struct{}, 2), intake: make(chan struct{}, 2), healthSlots: make(chan struct{}, 1), metricsSlots: make(chan struct{}, 1), steeringSlots: make(chan struct{}, 2), approvalSlots: make(chan struct{}, 2), workboardSlots: make(chan struct{}, 4), workboardWrites: make(chan struct{}, 1), taskWaitTimeout: 5 * time.Minute}, nil
@@ -157,13 +159,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(http.StatusInternalServerError, "internal_error")
 		}
 	}()
-	auth := r.Header.Get("Authorization")
-	candidate := sha256.Sum256([]byte(strings.TrimPrefix(auth, "Bearer ")))
-	if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare(candidate[:], h.secret[:]) != 1 {
+	bearer, ok := exactBearerToken(r.Header)
+	candidate := sha256.Sum256([]byte(bearer))
+	if !ok || subtle.ConstantTimeCompare(candidate[:], h.secret[:]) != 1 {
 		w.Header().Set("WWW-Authenticate", "Bearer")
 		fail(401, "unauthorized")
 		return
 	}
+	// Downstream response validation uses the exact credential admitted here,
+	// never another interpretation of the request's header collection.
+	r = r.WithContext(context.WithValue(r.Context(), bearerTokenContextKey{}, bearer))
 	if r.Header.Get("Origin") != "" {
 		fail(403, "browser_origin_denied")
 		return
@@ -285,6 +290,46 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		fail(404, "not_found")
 	}
+}
+
+func exactBearerToken(header http.Header) (string, bool) {
+	var values []string
+	seen := false
+	for name, items := range header {
+		if !strings.EqualFold(name, "Authorization") {
+			continue
+		}
+		if seen {
+			return "", false
+		}
+		seen = true
+		values = items
+	}
+	if len(values) != 1 || !strings.HasPrefix(values[0], "Bearer ") {
+		return "", false
+	}
+	token := strings.TrimPrefix(values[0], "Bearer ")
+	return token, values[0] == "Bearer "+token && canonicalBearerToken(token)
+}
+
+func canonicalBearerToken(token string) bool {
+	if len(token) < 32 || len(token) > 8192 {
+		return false
+	}
+	for index := range len(token) {
+		if token[index] <= ' ' || token[index] >= 0x7f || token[index] == ',' {
+			return false
+		}
+	}
+	return true
+}
+
+func admittedBearerToken(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	token, _ := r.Context().Value(bearerTokenContextKey{}).(string)
+	return token
 }
 func failure(w http.ResponseWriter, status int, code string) {
 	writeJSON(w, status, map[string]string{"error": code})
