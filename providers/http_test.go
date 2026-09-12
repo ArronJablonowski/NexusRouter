@@ -89,6 +89,83 @@ func TestOllamaStreamAndToolHandoff(t *testing.T) {
 	}
 }
 
+func TestOutputTokenCeilingWireFormat(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kind string
+	}{
+		{name: "openai compatible", kind: "openai_compatible"},
+		{name: "ollama", kind: "ollama"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, limit := range []int64{0, 73, MaxOutputTokens} {
+				t.Run(fmt.Sprint(limit), func(t *testing.T) {
+					p := fixtureProvider(t, tc.kind, func(w http.ResponseWriter, r *http.Request) {
+						var body struct {
+							MaxTokens *int64 `json:"max_tokens"`
+							Options   *struct {
+								NumPredict *int64 `json:"num_predict"`
+							} `json:"options"`
+						}
+						if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+							t.Fatal(err)
+						}
+						if tc.kind == "openai_compatible" {
+							if body.Options != nil {
+								t.Fatalf("unexpected Ollama options: %+v", body.Options)
+							}
+							if limit == 0 && body.MaxTokens != nil {
+								t.Fatalf("zero ceiling sent as %d", *body.MaxTokens)
+							}
+							if limit > 0 && (body.MaxTokens == nil || *body.MaxTokens != limit) {
+								t.Fatalf("max_tokens = %v, want %d", body.MaxTokens, limit)
+							}
+							fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+							return
+						}
+						if body.MaxTokens != nil {
+							t.Fatalf("unexpected max_tokens: %d", *body.MaxTokens)
+						}
+						if limit == 0 && body.Options != nil {
+							t.Fatalf("zero ceiling sent as options: %+v", body.Options)
+						}
+						if limit > 0 && (body.Options == nil || body.Options.NumPredict == nil || *body.Options.NumPredict != limit) {
+							t.Fatalf("options.num_predict = %+v, want %d", body.Options, limit)
+						}
+						fmt.Fprintln(w, `{"message":{"content":""},"done":true,"done_reason":"stop"}`)
+					})
+					r := request()
+					r.MaxOutputTokens = limit
+					if err := p.Stream(context.Background(), r, func(Chunk) error { return nil }); err != nil {
+						t.Fatal(err)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestInvalidOutputTokenCeilingNeverSent(t *testing.T) {
+	for _, kind := range []string{"openai_compatible", "ollama"} {
+		t.Run(kind, func(t *testing.T) {
+			requests := 0
+			p := fixtureProvider(t, kind, func(http.ResponseWriter, *http.Request) { requests++ })
+			for _, limit := range []int64{-1, MaxOutputTokens + 1} {
+				r := request()
+				r.MaxOutputTokens = limit
+				err := p.Stream(context.Background(), r, func(Chunk) error { return nil })
+				var failure *Failure
+				if !errors.As(err, &failure) || failure.Code != "invalid_request" {
+					t.Fatalf("limit %d returned %v", limit, err)
+				}
+			}
+			if requests != 0 {
+				t.Fatalf("sent %d invalid requests", requests)
+			}
+		})
+	}
+}
+
 func TestDiscovery(t *testing.T) {
 	for _, kind := range []string{"ollama", "openai_compatible"} {
 		t.Run(kind, func(t *testing.T) {

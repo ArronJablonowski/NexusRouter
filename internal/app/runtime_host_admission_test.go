@@ -137,6 +137,8 @@ func TestWithRuntimeHostAdmissionRejectsPublicAndMalformedIdentity(t *testing.T)
 		{name: "worker", a: func() runtimeHostAdmission { a := valid; a.workerID = "bad worker"; return a }()},
 		{name: "store", a: func() runtimeHostAdmission { a := valid; a.store = nil; return a }()},
 		{name: "callback", a: func() runtimeHostAdmission { a := valid; a.commitFirst = nil; return a }()},
+		{name: "negative output tokens", a: func() runtimeHostAdmission { a := valid; a.maxOutputTokens = -1; return a }()},
+		{name: "excess output tokens", a: func() runtimeHostAdmission { a := valid; a.maxOutputTokens = providers.MaxOutputTokens + 1; return a }()},
 		{name: "continuation", r: Request{ContinueTaskID: "old"}, a: valid},
 		{name: "compaction", r: Request{Compaction: &sessions.CompactionRequest{}}, a: valid},
 		{name: "summary", r: Request{SummaryAttemptID: "summary"}, a: valid},

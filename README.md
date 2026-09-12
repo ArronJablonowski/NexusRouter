@@ -119,10 +119,12 @@ first runtime event, claim, model/provider, effective configuration digest,
 resource reservation, and global/per-board WIP admission; proof-bearing
 finalization writes an immutable settlement in the same transaction. Known
 usage and actual elapsed time are charged, ambiguous measurements consume the
-reservation, and an over-budget successful run cannot enter Review. Provider-
-side hard token ceilings, configured independent acceptance-review dispatch,
-stock-daemon composition, and broader crash/lease/acceptance qualification
-remain open before DAR-85 can be marked Done. Schema 40
+reservation, and an over-budget successful run cannot enter Review. Budgeted
+HTTP providers receive a hard output-token ceiling that shrinks across tool
+turns; an adapter that cannot prove enforcement is rejected. Configured
+independent acceptance-review dispatch, stock-daemon composition, and broader
+crash/lease/acceptance qualification remain open before DAR-85 can be marked
+Done. Schema 40
 now binds each proof-gated recovery to its exact replacement attempt and claim
 inside the replacement claim transaction; recovery clears the predecessor's
 worker assignment so a distinct worker can claim the Ready card. The lineage

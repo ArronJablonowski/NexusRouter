@@ -262,7 +262,15 @@ func (h *WorkboardWorkerHandle) BindRuntimeRequest(request Request) (Request, er
 	}
 	h.bound = true
 	return withRuntimeHostAdmission(request, runtimeHostAdmission{taskID: h.taskID, sessionID: h.sessionID,
-		parentTaskID: h.parentTaskID, workerID: h.workerID, store: h.runtimeStore, commitFirst: h.commitFirst})
+		parentTaskID: h.parentTaskID, workerID: h.workerID, maxOutputTokens: executionTokenLimit(h.reservation),
+		store: h.runtimeStore, commitFirst: h.commitFirst})
+}
+
+func executionTokenLimit(reservation *workboard.ExecutionReservation) int64 {
+	if reservation == nil {
+		return 0
+	}
+	return reservation.TokenLimit
 }
 
 func (h *WorkboardWorkerHandle) claimTaskStart(ctx context.Context, event runtime.Event, run context.Context,

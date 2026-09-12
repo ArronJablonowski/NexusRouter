@@ -73,6 +73,7 @@ type Request struct {
 // Copies share state and therefore cannot reuse the one-shot callback.
 type runtimeHostAdmission struct {
 	taskID, sessionID, parentTaskID, workerID string
+	maxOutputTokens                           int64
 	store                                     *telemetry.Store
 	commitFirst                               func(context.Context, runtime.Event) error
 	state                                     *runtimeHostAdmissionState
@@ -90,7 +91,7 @@ func withRuntimeHostAdmission(r Request, admission runtimeHostAdmission) (Reques
 	if r.runtimeHostAdmission != nil || admission.state != nil || admission.store == nil || admission.commitFirst == nil ||
 		!sessions.ValidEventPageID(admission.taskID) || !sessions.ValidEventPageID(admission.sessionID) ||
 		(admission.parentTaskID != "" && !sessions.ValidEventPageID(admission.parentTaskID)) ||
-		!validRuntimeHostWorkerID(admission.workerID) ||
+		!validRuntimeHostWorkerID(admission.workerID) || admission.maxOutputTokens < 0 || admission.maxOutputTokens > providers.MaxOutputTokens ||
 		invalidRuntimeHostRequestState(r) {
 		return Request{}, ErrAdmission
 	}
@@ -456,6 +457,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.runtimeHostAdmission != nil {
 		parentID = r.runtimeHostAdmission.parentTaskID
 		workerID = r.runtimeHostAdmission.workerID
+		inference.MaxOutputTokens = r.runtimeHostAdmission.maxOutputTokens
 	}
 	var compaction *runtime.ContextCompaction
 	if r.continuation != nil {

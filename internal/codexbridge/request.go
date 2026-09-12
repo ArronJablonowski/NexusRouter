@@ -10,6 +10,12 @@ import (
 // Invalid UTF-8 must not become equal to a different, replacement-character
 // string through encoding/json's lossy normalization.
 func validRequest(r providers.Request) bool {
+	// Codex app-server does not currently expose a verified hard output-token
+	// ceiling. Reject every bounded request at this boundary instead of silently
+	// accepting a budget that the bridge cannot enforce.
+	if r.MaxOutputTokens != 0 {
+		return false
+	}
 	remaining := maxExchangeBytes
 	reserve := func(n int) bool {
 		if n > remaining {

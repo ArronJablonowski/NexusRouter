@@ -158,7 +158,7 @@ func (p guardedProvider) Stream(ctx context.Context, input Request, emit func(Ch
 	}
 	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
-	if ValidateMessages(input.Messages) != nil || !factoryLabel(input.Model) {
+	if ValidateMessages(input.Messages) != nil || !factoryLabel(input.Model) || !validMaxOutputTokens(input.MaxOutputTokens) {
 		return adapterFailure(false)
 	}
 	body, err := json.Marshal(input)

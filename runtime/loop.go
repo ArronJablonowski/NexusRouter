@@ -134,7 +134,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		return Result{}, ErrInvalidRun
 	}
 	if r.MaxContextTokens < 0 || (l.ContextEstimator != nil && r.MaxContextTokens == 0) || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) ||
-		(r.ConfigID != "" && !validConfigID(r.ConfigID)) {
+		(r.ConfigID != "" && !validConfigID(r.ConfigID)) || r.Inference.MaxOutputTokens < 0 || r.Inference.MaxOutputTokens > providers.MaxOutputTokens {
 		return Result{}, ErrInvalidRun
 	}
 	if l.Provider == nil || l.Journal == nil || r.TaskID == "" || r.SessionID == "" || r.ProviderID == "" || r.Inference.Model == "" || len(r.Inference.Messages) == 0 || r.MaxTurns < 1 || r.MaxTurns > 1000 || r.MaxOutputBytes < 1 || r.MaxOutputBytes > 16<<20 {
@@ -405,6 +405,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	used := 0
 	usageComplete := true
 	totalUsage := providers.Usage{}
+	outputTokenBudget := inference.MaxOutputTokens
 	seen := map[string]bool{}
 	for n := 0; n < r.MaxTurns; n++ {
 		if ctx.Err() != nil {
@@ -422,6 +423,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if fitErr != nil {
 				return fail(fitErr)
 			}
+		}
+		if outputTokenBudget > 0 {
+			if !usageComplete || totalUsage.OutputTokens >= outputTokenBudget {
+				return fail(ErrLimit)
+			}
+			inference.MaxOutputTokens = outputTokenBudget - totalUsage.OutputTokens
 		}
 		turn = rand.Text()
 		attempt = rand.Text()
@@ -533,6 +540,14 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		} else {
 			totalUsage.InputTokens += usage.InputTokens
 			totalUsage.OutputTokens += usage.OutputTokens
+		}
+		if outputTokenBudget > 0 && usageComplete && totalUsage.OutputTokens > outputTokenBudget {
+			return fail(ErrLimit)
+		}
+		// A bounded task cannot safely perform tools when it cannot prove enough
+		// output capacity remains to consume their results on another turn.
+		if len(calls) > 0 && outputTokenBudget > 0 && (!usageComplete || totalUsage.OutputTokens >= outputTokenBudget) {
+			return fail(ErrLimit)
 		}
 		if len(calls) == 0 {
 			inference.Messages = append(inference.Messages, providers.Message{Role: "assistant", Content: text.String()})

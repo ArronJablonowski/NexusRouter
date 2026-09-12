@@ -152,7 +152,7 @@ func (p *HTTP) Models(ctx context.Context) ([]string, error) {
 }
 
 func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) error {
-	if r.Model == "" || len(r.Messages) == 0 || emit == nil {
+	if r.Model == "" || len(r.Messages) == 0 || emit == nil || !validMaxOutputTokens(r.MaxOutputTokens) {
 		return &Failure{Code: "invalid_request"}
 	}
 	if ValidateMessages(r.Messages) != nil {
@@ -209,8 +209,14 @@ func (p *HTTP) Stream(ctx context.Context, r Request, emit func(Chunk) error) er
 	path := "/chat/completions"
 	if p.kind == "ollama" {
 		path = "/api/chat"
+		if r.MaxOutputTokens > 0 {
+			body["options"] = map[string]int64{"num_predict": r.MaxOutputTokens}
+		}
 	} else {
 		body["stream_options"] = map[string]bool{"include_usage": true}
+		if r.MaxOutputTokens > 0 {
+			body["max_tokens"] = r.MaxOutputTokens
+		}
 	}
 	if len(r.JSONSchema) > 0 {
 		if !jsonObject(r.JSONSchema) {

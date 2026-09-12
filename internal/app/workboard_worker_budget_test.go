@@ -176,6 +176,13 @@ func bindBudgetedWorkboardRuntime(ctx context.Context, handle *WorkboardWorkerHa
 		return errors.Join(ErrAdmission, err)
 	}
 	admission := request.runtimeHostAdmission
+	wantTokens := int64(0)
+	if handle.reservation != nil {
+		wantTokens = handle.reservation.TokenLimit
+	}
+	if admission.maxOutputTokens != wantTokens {
+		return ErrAdmission
+	}
 	return admission.commit(ctx, runtime.Event{Version: 1, ID: admission.taskID + "-started", TaskID: admission.taskID,
 		SessionID: admission.sessionID, CorrelationID: admission.taskID, WorkerID: admission.workerID,
 		Sequence: 1, Time: at.UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{ParentTaskID: admission.parentTaskID,

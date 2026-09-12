@@ -28,7 +28,19 @@ type Request struct {
 	Messages   []Message
 	Tools      []Tool
 	JSONSchema json.RawMessage
+	// MaxOutputTokens is a provider-enforced generation ceiling. Zero leaves
+	// the provider default in effect.
+	MaxOutputTokens int64
 }
+
+// MaxOutputTokens is the largest generation ceiling accepted by the provider
+// boundary.
+const MaxOutputTokens int64 = 1_000_000_000
+
+func validMaxOutputTokens(limit int64) bool {
+	return limit >= 0 && limit <= MaxOutputTokens
+}
+
 type Usage struct {
 	InputTokens  int64
 	OutputTokens int64

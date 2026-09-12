@@ -6724,3 +6724,28 @@ required to consume the same card budget, but its production dispatch is not
 yet composed. Provider-side hard token ceilings, scheduler enablement, and the
 remaining DAR-85 lifecycle qualification should not be inferred from this
 checkpoint.
+
+## 2026-09-12 — DAR-85 provider-enforced output-token ceiling
+
+DAR-85 remains in progress. A budgeted Workboard request now carries its
+trusted execution reservation into the private runtime-host admission and sets
+a provider generation ceiling that public task input cannot supply. The
+provider-neutral request contract bounds the value to one billion tokens.
+OpenAI-compatible requests send `max_tokens`; Ollama requests send
+`options.num_predict`; zero remains an omitted, unbounded provider default.
+The guarded provider boundary validates the limit before adapter dispatch.
+
+Across tool turns, the runtime subtracts verified output usage from the next
+generation ceiling. It fails before executing a proposed tool when usage is
+unknown or no output capacity remains, and it rejects a provider-reported
+overrun in addition to retaining transactional settlement enforcement. The
+Codex CLI bridge currently has no verified hard generation-cap control, so it
+fails closed for every nonzero ceiling without starting or writing to a Codex
+session. This is an explicit compatibility limit, not silent best-effort
+budgeting.
+
+Focused provider, runtime, Codex bridge, and application tests cover exact wire
+fields, omitted zero values, invalid bounds, multi-turn reduction, unknown
+usage before effects, trusted Workboard propagation, and fail-closed unsupported
+adapters. Production scheduler composition, configured independent acceptance
+judging, and the broader crash/lease/acceptance qualification remain open.

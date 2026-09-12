@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -147,6 +148,24 @@ func TestSessionFinalAnswerAndHandshake(t *testing.T) {
 	tool := thread.DynamicTools[0].Tools[0]
 	if tool.Type != "function" || tool.Name != "delegate" || tool.Description != req.Tools[0].Description || string(tool.InputSchema) != string(req.Tools[0].Parameters) {
 		t.Fatalf("incorrect nested tool definition: %s", writes[2].Params)
+	}
+}
+
+func TestSessionRejectsOutputTokenCeilingBeforeWriting(t *testing.T) {
+	for _, limit := range []int64{-1, 1, providers.MaxOutputTokens} {
+		t.Run(fmt.Sprintf("limit_%d", limit), func(t *testing.T) {
+			s, w, req := newSessionFixture(t, append(sessionPrefix(), sessionFinal()...))
+			req.MaxOutputTokens = limit
+			if err := s.Stream(context.Background(), req, func(providers.Chunk) error {
+				t.Fatal("unsupported bounded request emitted output")
+				return nil
+			}); err == nil {
+				t.Fatal("unsupported output-token ceiling accepted")
+			}
+			if writes := w.sent(); len(writes) != 0 {
+				t.Fatalf("unsupported output-token ceiling wrote to Codex: %+v", writes)
+			}
+		})
 	}
 }
 func TestSessionToolPausesUntilMatchingContinuation(t *testing.T) {
