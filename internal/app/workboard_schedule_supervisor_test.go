@@ -3,11 +3,15 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/webui"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
@@ -15,7 +19,7 @@ func TestWorkboardScheduleSupervisorRunsImmediateDynamicPassesWithoutOverlap(t *
 	lister := &supervisorBoardLister{boards: [][]workboard.Board{{supervisorBoard("board-a"), supervisorBoard("board-c")}, {supervisorBoard("board-b")}}}
 	firstEntered := make(chan struct{})
 	releaseFirst := make(chan struct{})
-	serialEntered := make(chan struct{})
+	concurrentEntered := make(chan struct{})
 	secondEntered := make(chan struct{})
 	var active, maximum atomic.Int32
 	runner := WorkboardCycleRunnerFunc(func(ctx context.Context, boardID string) (WorkboardScheduleResult, error) {
@@ -34,7 +38,12 @@ func TestWorkboardScheduleSupervisorRunsImmediateDynamicPassesWithoutOverlap(t *
 		case "board-b":
 			close(secondEntered)
 		case "board-c":
-			close(serialEntered)
+			close(concurrentEntered)
+			select {
+			case <-releaseFirst:
+			case <-ctx.Done():
+				return WorkboardScheduleResult{}, ctx.Err()
+			}
 		}
 		return WorkboardScheduleResult{}, nil
 	})
@@ -55,22 +64,17 @@ func TestWorkboardScheduleSupervisorRunsImmediateDynamicPassesWithoutOverlap(t *
 		t.Fatalf("blocked pass overlapped or accumulated ticks: %d list calls", got)
 	}
 	select {
-	case <-serialEntered:
-		t.Fatal("boards within one pass overlapped")
-	default:
+	case <-concurrentEntered:
+	case <-time.After(time.Second):
+		t.Fatal("blocked board starved another board in the same pass")
 	}
 	close(releaseFirst)
-	select {
-	case <-serialEntered:
-	case <-time.After(time.Second):
-		t.Fatal("second board in the pass did not run serially")
-	}
 	select {
 	case <-secondEntered:
 	case <-time.After(time.Second):
 		t.Fatal("next pass did not rediscover the dynamic board list")
 	}
-	if maximum.Load() != 1 || lister.callsCount() != 2 {
+	if maximum.Load() != 2 || lister.callsCount() != 2 {
 		t.Fatalf("passes overlapped or board snapshot was not refreshed: max=%d lists=%d", maximum.Load(), lister.callsCount())
 	}
 }
@@ -82,8 +86,7 @@ func TestWorkboardScheduleSupervisorValidatesCompleteActiveSnapshotBeforeCycles(
 			board.State = "archived"
 			return board
 		}()}},
-		"additional page": {Version: workboard.SchemaVersion, Items: []workboard.Board{supervisorBoard("board-a")}, HasMore: true, NextCursor: "next"},
-		"malformed":       {Version: workboard.SchemaVersion + 1, Items: []workboard.Board{supervisorBoard("board-a")}},
+		"malformed": {Version: workboard.SchemaVersion + 1, Items: []workboard.Board{supervisorBoard("board-a")}},
 	}
 	for name, page := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -101,6 +104,115 @@ func TestWorkboardScheduleSupervisorValidatesCompleteActiveSnapshotBeforeCycles(
 			awaitSupervisorHealth(t, supervisor, "degraded", "supervisor_error")
 			if cycles.Load() != 0 {
 				t.Fatalf("invalid board snapshot launched %d cycles", cycles.Load())
+			}
+		})
+	}
+}
+
+func TestWorkboardScheduleSupervisorDiscoversBoundedPagesBeforeRunning(t *testing.T) {
+	lister := &supervisorBoardLister{pages: []workboard.BoardPage{
+		{Version: workboard.SchemaVersion, Items: []workboard.Board{supervisorBoard("board-a")}, HasMore: true, NextCursor: "page-two"},
+		{Version: workboard.SchemaVersion, Items: []workboard.Board{supervisorBoard("board-b")}},
+	}}
+	var mu sync.Mutex
+	var boards []string
+	runner := WorkboardCycleRunnerFunc(func(_ context.Context, boardID string) (WorkboardScheduleResult, error) {
+		mu.Lock()
+		boards = append(boards, boardID)
+		mu.Unlock()
+		return WorkboardScheduleResult{}, nil
+	})
+	if err := runWorkboardSchedulePass(context.Background(), lister, runner); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(boards) != 2 || !containsExact(boards, "board-a") || !containsExact(boards, "board-b") {
+		t.Fatalf("scheduled boards=%q", boards)
+	}
+	if got := lister.aftersSnapshot(); len(got) != 2 || got[0] != "" || got[1] != "page-two" {
+		t.Fatalf("board cursors=%q", got)
+	}
+}
+
+func TestWorkboardScheduleSupervisorDiscoversDurableBoardsAcrossRestart(t *testing.T) {
+	ctx := context.Background()
+	database := filepath.Join(t.TempDir(), "boards.db")
+	store, err := telemetry.Open(ctx, database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridge, err := NewWorkboardBridge(store, store, time.Now)
+	if err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+	for index := range 26 {
+		title := fmt.Sprintf("Board %02d", index)
+		_, err = bridge.NativeMutate(ctx, webui.BoardRequest{Version: webui.ContractVersion, Action: webui.BoardCreate,
+			IdempotencyKey: fmt.Sprintf("scheduler-durable-board-%02d", index), Title: &title})
+		if err != nil {
+			store.Close()
+			t.Fatal(index, err)
+		}
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = telemetry.Open(ctx, database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	seen := make(map[string]bool)
+	var seenMu sync.Mutex
+	err = runWorkboardSchedulePass(ctx, store, WorkboardCycleRunnerFunc(func(_ context.Context, boardID string) (WorkboardScheduleResult, error) {
+		seenMu.Lock()
+		seen[boardID] = true
+		seenMu.Unlock()
+		return WorkboardScheduleResult{}, nil
+	}))
+	if err != nil || len(seen) != 26 {
+		t.Fatalf("durable boards=%d err=%v", len(seen), err)
+	}
+}
+
+func TestWorkboardScheduleSupervisorRejectsCrossPageDriftAndLimitBeforeRunning(t *testing.T) {
+	full := make([]workboard.Board, 25)
+	for index := range full {
+		full[index] = supervisorBoard(fmt.Sprintf("board-%02d", index))
+	}
+	tests := map[string][]workboard.BoardPage{
+		"duplicate": {
+			{Version: workboard.SchemaVersion, Items: []workboard.Board{supervisorBoard("board-a")}, HasMore: true, NextCursor: "next"},
+			{Version: workboard.SchemaVersion, Items: []workboard.Board{supervisorBoard("board-a")}},
+		},
+		"limit": {
+			{Version: workboard.SchemaVersion, Items: full, HasMore: true, NextCursor: "page-2"},
+			{Version: workboard.SchemaVersion, Items: full, HasMore: true, NextCursor: "page-3"},
+			{Version: workboard.SchemaVersion, Items: full, HasMore: true, NextCursor: "page-4"},
+			{Version: workboard.SchemaVersion, Items: full, HasMore: true, NextCursor: "page-5"},
+		},
+	}
+	for name, pages := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Give each page distinct valid boards in the limit fixture.
+			if name == "limit" {
+				for page := range pages {
+					pages[page].Items = make([]workboard.Board, 25)
+					for item := range pages[page].Items {
+						pages[page].Items[item] = supervisorBoard(fmt.Sprintf("board-%03d", page*25+item))
+					}
+				}
+			}
+			var cycles atomic.Int32
+			err := runWorkboardSchedulePass(context.Background(), &supervisorBoardLister{pages: pages},
+				WorkboardCycleRunnerFunc(func(context.Context, string) (WorkboardScheduleResult, error) {
+					cycles.Add(1)
+					return WorkboardScheduleResult{}, nil
+				}))
+			if err == nil || cycles.Load() != 0 {
+				t.Fatalf("err=%v cycles=%d", err, cycles.Load())
 			}
 		})
 	}
@@ -177,11 +289,15 @@ func TestWorkboardScheduleSupervisorFailureDoesNotStarveLaterBoards(t *testing.T
 
 func TestWorkboardScheduleSupervisorCloseCancelsJoinsAndIsConcurrentSafe(t *testing.T) {
 	entered := make(chan struct{})
+	canceled := make(chan struct{})
+	release := make(chan struct{})
 	returned := make(chan struct{})
 	lister := &supervisorBoardLister{boards: [][]workboard.Board{{supervisorBoard("board-a")}}}
 	runner := WorkboardCycleRunnerFunc(func(ctx context.Context, _ string) (WorkboardScheduleResult, error) {
 		close(entered)
 		<-ctx.Done()
+		close(canceled)
+		<-release
 		close(returned)
 		return WorkboardScheduleResult{}, ctx.Err()
 	})
@@ -199,6 +315,13 @@ func TestWorkboardScheduleSupervisorCloseCancelsJoinsAndIsConcurrentSafe(t *test
 	for range callers {
 		go func() { errs <- supervisor.Close() }()
 	}
+	select {
+	case <-canceled:
+	case <-time.After(time.Second):
+		t.Fatal("cycle did not observe cancellation")
+	}
+	awaitSupervisorHealth(t, supervisor, "unavailable", "supervisor_stopping")
+	close(release)
 	for range callers {
 		if err = <-errs; err != nil {
 			t.Fatal(err)
@@ -215,6 +338,30 @@ func TestWorkboardScheduleSupervisorCloseCancelsJoinsAndIsConcurrentSafe(t *test
 	awaitSupervisorHealth(t, supervisor, "unavailable", "supervisor_stopped")
 }
 
+func TestWorkboardScheduleSupervisorReportsStallAndRecovers(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	runner := WorkboardCycleRunnerFunc(func(ctx context.Context, _ string) (WorkboardScheduleResult, error) {
+		close(entered)
+		select {
+		case <-release:
+			return WorkboardScheduleResult{}, nil
+		case <-ctx.Done():
+			return WorkboardScheduleResult{}, ctx.Err()
+		}
+	})
+	supervisor, err := StartWorkboardScheduleSupervisor(context.Background(),
+		&supervisorBoardLister{boards: [][]workboard.Board{{supervisorBoard("board-a")}}}, runner, 20*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer supervisor.Close()
+	<-entered
+	awaitSupervisorHealth(t, supervisor, "degraded", "supervisor_stalled")
+	close(release)
+	awaitSupervisorHealth(t, supervisor, "healthy", "supervisor_ok")
+}
+
 type WorkboardCycleRunnerFunc func(context.Context, string) (WorkboardScheduleResult, error)
 
 func (f WorkboardCycleRunnerFunc) RunCycle(ctx context.Context, boardID string) (WorkboardScheduleResult, error) {
@@ -224,6 +371,7 @@ func (f WorkboardCycleRunnerFunc) RunCycle(ctx context.Context, boardID string) 
 type supervisorBoardLister struct {
 	mu         sync.Mutex
 	calls      int
+	afters     []string
 	boards     [][]workboard.Board
 	pages      []workboard.BoardPage
 	failures   []error
@@ -234,8 +382,9 @@ func (s *supervisorBoardLister) ListWorkboards(_ context.Context, options workbo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls++
+	s.afters = append(s.afters, options.After)
 	call := s.calls
-	if options != (workboard.BoardListOptions{Limit: workboard.MaxPageItems, State: "active"}) {
+	if options.Limit != 25 || options.State != "active" {
 		return workboard.BoardPage{}, errors.New("unexpected list options")
 	}
 	if s.panicCalls[call] {
@@ -254,6 +403,12 @@ func (s *supervisorBoardLister) ListWorkboards(_ context.Context, options workbo
 		boards = s.boards[index]
 	}
 	return workboard.BoardPage{Version: workboard.SchemaVersion, Items: boards}, nil
+}
+
+func (s *supervisorBoardLister) aftersSnapshot() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.afters...)
 }
 
 func (s *supervisorBoardLister) callsCount() int {

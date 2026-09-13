@@ -73,7 +73,23 @@ type WorkboardScheduler struct {
 	factory WorkboardTaskFactory
 	runner  WorkboardTaskRunner
 	limits  WorkboardScheduleLimits
-	gate    chan struct{}
+	cycles  *workboardCycleGate
+}
+
+// workboardCycleGate serializes duplicate cycles for one board without making
+// unrelated boards wait behind it. The entry set and simultaneously admitted
+// cycles are both bounded by the durable Workboard board limit. Entries are
+// removed after their final holder or waiter leaves, so arbitrary rejected IDs
+// cannot accumulate process-lifetime state.
+type workboardCycleGate struct {
+	mu      sync.Mutex
+	entries map[string]*workboardCycleGateEntry
+	slots   chan struct{}
+}
+
+type workboardCycleGateEntry struct {
+	token chan struct{}
+	refs  int
 }
 
 func NewWorkboardScheduler(reader WorkboardSupervisionReader, factory WorkboardTaskFactory,
@@ -83,7 +99,8 @@ func NewWorkboardScheduler(reader WorkboardSupervisionReader, factory WorkboardT
 		limits.ScanLimit < 1 || limits.ScanLimit > maxWorkboardScheduleScan {
 		return nil, ErrAdmission
 	}
-	return &WorkboardScheduler{reader: reader, factory: factory, runner: runner, limits: limits, gate: make(chan struct{}, 1)}, nil
+	return &WorkboardScheduler{reader: reader, factory: factory, runner: runner, limits: limits,
+		cycles: &workboardCycleGate{entries: make(map[string]*workboardCycleGateEntry), slots: make(chan struct{}, workboard.MaxBoards)}}, nil
 }
 
 func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (WorkboardScheduleResult, error) {
@@ -91,12 +108,11 @@ func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (Work
 	if s == nil || ctx == nil || boardID == "" {
 		return result, ErrAdmission
 	}
-	select {
-	case s.gate <- struct{}{}:
-		defer func() { <-s.gate }()
-	case <-ctx.Done():
-		return result, ctx.Err()
+	release, err := s.cycles.acquire(ctx, boardID)
+	if err != nil {
+		return result, err
 	}
+	defer release()
 
 	ready, err := s.discover(ctx, boardID, &result)
 	if err != nil {
@@ -155,6 +171,51 @@ func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (Work
 		return result, ctx.Err()
 	}
 	return result, nil
+}
+
+func (g *workboardCycleGate) acquire(ctx context.Context, boardID string) (func(), error) {
+	if g == nil || ctx == nil || boardID == "" {
+		return nil, ErrAdmission
+	}
+	g.mu.Lock()
+	entry := g.entries[boardID]
+	if entry == nil {
+		if len(g.entries) >= workboard.MaxBoards {
+			g.mu.Unlock()
+			return nil, ErrWorkboardScheduleLimit
+		}
+		entry = &workboardCycleGateEntry{token: make(chan struct{}, 1)}
+		g.entries[boardID] = entry
+	}
+	entry.refs++
+	g.mu.Unlock()
+
+	forget := func() {
+		g.mu.Lock()
+		entry.refs--
+		if entry.refs == 0 {
+			delete(g.entries, boardID)
+		}
+		g.mu.Unlock()
+	}
+	select {
+	case entry.token <- struct{}{}:
+	case <-ctx.Done():
+		forget()
+		return nil, ctx.Err()
+	}
+	select {
+	case g.slots <- struct{}{}:
+	case <-ctx.Done():
+		<-entry.token
+		forget()
+		return nil, ctx.Err()
+	}
+	return func() {
+		<-g.slots
+		<-entry.token
+		forget()
+	}, nil
 }
 
 func buildScheduledWorkboardTask(ctx context.Context, factory WorkboardTaskFactory, item workboard.SupervisionItem) (task WorkboardWorkerTask, err error) {

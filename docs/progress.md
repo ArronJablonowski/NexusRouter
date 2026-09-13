@@ -7109,5 +7109,34 @@ race tests pass. A second DAR-94 audit found the behavior acceptance-ready; its
 remaining explicit model-drift and host-identity test gaps were then added,
 including proof that drift opens neither provider nor durable claim. DAR-92
 still lacks a general host validator/tool registry and broad semantic
-meaningfulness detection. The complete race/build gate has not yet run for
-this checkpoint.
+meaningfulness detection. The complete serialized race/build gate passed
+before checkpoint `ef70f69` was pushed to GitHub; `internal/app` completed in
+1137.454 seconds and `internal/telemetry` in 1188.106 seconds.
+
+## 2026-09-13 — DAR-95 bounded multi-board supervision slice
+
+The application scheduler now discovers a complete stable active-board
+snapshot through bounded cursor pages before dispatching any cycle. It rejects
+duplicate board identities, cursor drift, and snapshots beyond the durable
+100-board limit. Distinct board cycles run concurrently and join as one pass,
+so a blocked board cannot prevent another discovered board from entering its
+cycle. A keyed, bounded scheduler gate still serializes duplicate cycles for
+the same board while allowing different boards to proceed; durable claim CAS,
+not that process-local gate, remains ownership authority across processes and
+restarts. Board-cycle goroutines are capped by the board limit, per-cycle task
+goroutines by configured WIP, and provider callbacks by the shared worker
+supervisor.
+
+Scheduler health now distinguishes starting, ok, stalled, error, stopping, and
+stopped. A pass exceeding the configured interval is reported as stalled only
+as a progress signal; it grants no retry or recovery authority. Close publishes
+stopping, cancels the active pass, joins every board cycle, and publishes
+stopped before storage may be closed. Shared daemon health and CLI conversion
+accept the expanded bounded states. Focused race tests cover multi-page SQLite
+discovery after reopen, cross-page drift and bounds, slow-board fairness,
+same-board exclusion, distinct-board concurrency, cancellation cleanup,
+capacity cleanup, stall recovery, and joined shutdown.
+
+DAR-95 still needs configured real-store tests for competing scheduler
+instances, pre-existing healthy/stale/orphaned claims, and subprocess crash
+recovery. The production daemon enablement guard remains intact for DAR-96.

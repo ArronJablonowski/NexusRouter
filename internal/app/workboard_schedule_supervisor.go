@@ -9,9 +9,9 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
-// WorkboardBoardLister supplies the complete active-board snapshot for one
-// supervisor pass. The supervisor deliberately accepts only one bounded page;
-// a larger deployment must not silently schedule an incomplete board set.
+// WorkboardBoardLister supplies stable cursor pages for one bounded active-board
+// snapshot. The supervisor reads and validates the complete snapshot before it
+// permits any board cycle to mutate durable state.
 type WorkboardBoardLister interface {
 	ListWorkboards(context.Context, workboard.BoardListOptions) (workboard.BoardPage, error)
 }
@@ -23,8 +23,9 @@ type WorkboardCycleRunner interface {
 }
 
 // WorkboardScheduleSupervisor owns repeated application-level scheduling
-// passes. Each pass discovers the current active boards and visits them
-// serially. It is intentionally not wired into the stock daemon yet.
+// passes. Each pass discovers the current active boards and starts one bounded
+// cycle per board so a slow board cannot prevent another from progressing. It
+// is intentionally not wired into the stock daemon yet.
 type WorkboardScheduleSupervisor struct {
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -45,7 +46,9 @@ type WorkboardScheduleHealth struct {
 func (h WorkboardScheduleHealth) Validate() error {
 	if h.Status == "unknown" && h.Code == "supervisor_starting" ||
 		h.Status == "healthy" && h.Code == "supervisor_ok" ||
+		h.Status == "degraded" && h.Code == "supervisor_stalled" ||
 		h.Status == "degraded" && h.Code == "supervisor_error" ||
+		h.Status == "unavailable" && h.Code == "supervisor_stopping" ||
 		h.Status == "unavailable" && h.Code == "supervisor_stopped" {
 		return nil
 	}
@@ -76,8 +79,19 @@ func (s *WorkboardScheduleSupervisor) run(ctx context.Context, lister WorkboardB
 		if ctx.Err() != nil {
 			return
 		}
-		err := runWorkboardSchedulePass(ctx, lister, cycles)
+		result := make(chan error, 1)
+		go func() { result <- runWorkboardSchedulePass(ctx, lister, cycles) }()
+		stall := time.NewTimer(interval)
+		var err error
+		select {
+		case err = <-result:
+			stall.Stop()
+		case <-stall.C:
+			s.setHealth("degraded", "supervisor_stalled")
+			err = <-result
+		}
 		if ctx.Err() != nil {
+			s.setHealth("unavailable", "supervisor_stopping")
 			return
 		}
 		if err != nil {
@@ -96,29 +110,25 @@ func (s *WorkboardScheduleSupervisor) run(ctx context.Context, lister WorkboardB
 }
 
 func runWorkboardSchedulePass(ctx context.Context, lister WorkboardBoardLister, cycles WorkboardCycleRunner) error {
-	page, err := listScheduledWorkboards(ctx, lister)
+	boards, err := listScheduledWorkboards(ctx, lister)
 	if err != nil {
 		return errors.Join(ErrWorkboardSchedule, err)
 	}
-	// Validate the entire active-board snapshot before any cycle can mutate
-	// durable state. Pagination is rejected rather than scheduling a prefix.
-	if page.Validate() != nil || page.HasMore || page.NextCursor != "" {
-		return ErrWorkboardSchedule
-	}
-	for _, board := range page.Items {
-		if board.State != "active" {
-			return ErrWorkboardSchedule
-		}
+	results := make(chan error, len(boards))
+	for _, board := range boards {
+		go func(boardID string) {
+			_, cycleErr := runScheduledWorkboardCycle(ctx, cycles, boardID)
+			results <- cycleErr
+		}(board.ID)
 	}
 	var passErr error
-	for _, board := range page.Items {
-		_, err = runScheduledWorkboardCycle(ctx, cycles, board.ID)
-		if ctx.Err() != nil {
-			return ctx.Err()
+	for range boards {
+		if cycleErr := <-results; cycleErr != nil {
+			passErr = errors.Join(passErr, cycleErr)
 		}
-		if err != nil {
-			passErr = errors.Join(passErr, err)
-		}
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	if passErr != nil {
 		return errors.Join(ErrWorkboardSchedule, passErr)
@@ -126,13 +136,52 @@ func runWorkboardSchedulePass(ctx context.Context, lister WorkboardBoardLister, 
 	return nil
 }
 
-func listScheduledWorkboards(ctx context.Context, lister WorkboardBoardLister) (page workboard.BoardPage, err error) {
+func listScheduledWorkboards(ctx context.Context, lister WorkboardBoardLister) ([]workboard.Board, error) {
+	const pageLimit = 25
+	boards := make([]workboard.Board, 0, workboard.MaxBoards)
+	seen := make(map[string]bool, workboard.MaxBoards)
+	after := ""
+	for {
+		page, err := listScheduledWorkboardPage(ctx, lister,
+			workboard.BoardListOptions{After: after, Limit: pageLimit, State: "active"})
+		if err != nil {
+			return nil, errors.Join(ErrWorkboardSchedule, err)
+		}
+		if page.Validate() != nil {
+			return nil, ErrWorkboardSchedule
+		}
+		for _, board := range page.Items {
+			if board.State != "active" || seen[board.ID] {
+				return nil, ErrWorkboardSchedule
+			}
+			if len(boards) >= workboard.MaxBoards {
+				return nil, ErrWorkboardScheduleLimit
+			}
+			seen[board.ID] = true
+			boards = append(boards, board)
+		}
+		if !page.HasMore {
+			return boards, nil
+		}
+		if len(boards) >= workboard.MaxBoards {
+			return nil, ErrWorkboardScheduleLimit
+		}
+		if page.NextCursor == after {
+			return nil, ErrWorkboardSchedule
+		}
+		after = page.NextCursor
+	}
+}
+
+func listScheduledWorkboardPage(ctx context.Context, lister WorkboardBoardLister,
+	options workboard.BoardListOptions,
+) (page workboard.BoardPage, err error) {
 	defer func() {
 		if recover() != nil {
 			page, err = workboard.BoardPage{}, ErrWorkboardSchedule
 		}
 	}()
-	return lister.ListWorkboards(ctx, workboard.BoardListOptions{Limit: workboard.MaxPageItems, State: "active"})
+	return lister.ListWorkboards(ctx, options)
 }
 
 func runScheduledWorkboardCycle(ctx context.Context, cycles WorkboardCycleRunner, boardID string) (result WorkboardScheduleResult, err error) {
@@ -170,6 +219,7 @@ func (s *WorkboardScheduleSupervisor) Close() error {
 		return nil
 	}
 	s.once.Do(func() {
+		s.setHealth("unavailable", "supervisor_stopping")
 		s.cancel()
 		<-s.done
 	})

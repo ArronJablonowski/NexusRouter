@@ -58,7 +58,7 @@ func (c Check) Validate() error {
 		return ErrInvalid
 	}
 	if c.Component == "workboard_scheduler" && c.Code != "supervisor_ok" && c.Code != "supervisor_starting" &&
-		c.Code != "supervisor_stopped" && c.Code != "supervisor_error" {
+		c.Code != "supervisor_stalled" && c.Code != "supervisor_error" && c.Code != "supervisor_stopping" && c.Code != "supervisor_stopped" {
 		return ErrInvalid
 	}
 	validState := false

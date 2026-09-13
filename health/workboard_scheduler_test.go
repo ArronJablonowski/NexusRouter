@@ -10,7 +10,9 @@ func TestWorkboardSchedulerHealthParticipatesInReadinessWhenPresent(t *testing.T
 	for _, check := range []Check{
 		{Component: "workboard_scheduler", Status: "healthy", Code: "supervisor_ok"},
 		{Component: "workboard_scheduler", Status: "unknown", Code: "supervisor_starting"},
+		{Component: "workboard_scheduler", Status: "degraded", Code: "supervisor_stalled"},
 		{Component: "workboard_scheduler", Status: "degraded", Code: "supervisor_error"},
+		{Component: "workboard_scheduler", Status: "unavailable", Code: "supervisor_stopping"},
 		{Component: "workboard_scheduler", Status: "unavailable", Code: "supervisor_stopped"},
 	} {
 		report := Report{Version: 1, CheckedAt: time.Now().UTC(), Checks: append(append([]Check(nil), base...), check)}

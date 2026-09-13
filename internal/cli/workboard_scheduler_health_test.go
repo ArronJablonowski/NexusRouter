@@ -14,7 +14,9 @@ func TestWorkboardSchedulerHealthConversionAndMerge(t *testing.T) {
 	for _, state := range []app.WorkboardScheduleHealth{
 		{Status: "healthy", Code: "supervisor_ok"},
 		{Status: "unknown", Code: "supervisor_starting"},
+		{Status: "degraded", Code: "supervisor_stalled"},
 		{Status: "degraded", Code: "supervisor_error"},
+		{Status: "unavailable", Code: "supervisor_stopping"},
 		{Status: "unavailable", Code: "supervisor_stopped"},
 	} {
 		out, err := withWorkboardSchedulerHealth(report, state)

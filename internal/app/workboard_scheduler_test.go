@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -266,7 +267,7 @@ func TestWorkboardSchedulerCancellationJoinsLaunchedWork(t *testing.T) {
 	}
 }
 
-func TestWorkboardSchedulerSerializesSameInstanceCycles(t *testing.T) {
+func TestWorkboardSchedulerSerializesSameBoardCycles(t *testing.T) {
 	reader := &gatedSchedulerReader{entered: make(chan struct{}, 2), release: make(chan struct{}, 2)}
 	scheduler, err := NewWorkboardScheduler(reader, &schedulerFactoryStub{}, &schedulerRunnerStub{},
 		WorkboardScheduleLimits{MaxInFlight: 1, ScanLimit: 10})
@@ -304,6 +305,125 @@ func TestWorkboardSchedulerSerializesSameInstanceCycles(t *testing.T) {
 	}
 	if reader.maximum.Load() != 1 {
 		t.Fatalf("maximum concurrent reads=%d", reader.maximum.Load())
+	}
+	if entries := schedulerCycleGateEntries(scheduler); entries != 0 {
+		t.Fatalf("cycle gate retained %d entries", entries)
+	}
+}
+
+func TestWorkboardSchedulerRunsDistinctBoardCyclesConcurrently(t *testing.T) {
+	reader := &gatedSchedulerReader{entered: make(chan struct{}, 2), release: make(chan struct{}, 2)}
+	scheduler, err := NewWorkboardScheduler(reader, &schedulerFactoryStub{}, &schedulerRunnerStub{},
+		WorkboardScheduleLimits{MaxInFlight: 1, ScanLimit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 2)
+	for _, boardID := range []string{"board-a", "board-b"} {
+		go func() {
+			_, cycleErr := scheduler.RunCycle(context.Background(), boardID)
+			done <- cycleErr
+		}()
+	}
+	for range 2 {
+		select {
+		case <-reader.entered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("distinct board cycle was serialized")
+		}
+	}
+	if reader.maximum.Load() != 2 {
+		t.Fatalf("maximum concurrent reads=%d", reader.maximum.Load())
+	}
+	reader.release <- struct{}{}
+	reader.release <- struct{}{}
+	for range 2 {
+		if cycleErr := <-done; cycleErr != nil {
+			t.Fatal(cycleErr)
+		}
+	}
+	if entries := schedulerCycleGateEntries(scheduler); entries != 0 {
+		t.Fatalf("cycle gate retained %d entries", entries)
+	}
+}
+
+func TestWorkboardSchedulerCanceledSameBoardWaiterDoesNotLoseExclusion(t *testing.T) {
+	reader := &gatedSchedulerReader{entered: make(chan struct{}, 2), release: make(chan struct{}, 2)}
+	scheduler, err := NewWorkboardScheduler(reader, &schedulerFactoryStub{}, &schedulerRunnerStub{},
+		WorkboardScheduleLimits{MaxInFlight: 1, ScanLimit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := make(chan error, 1)
+	go func() {
+		_, cycleErr := scheduler.RunCycle(context.Background(), "board-a")
+		first <- cycleErr
+	}()
+	select {
+	case <-reader.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first cycle did not enter read")
+	}
+	waitCtx, cancel := context.WithCancel(context.Background())
+	waiting := make(chan error, 1)
+	go func() {
+		_, cycleErr := scheduler.RunCycle(waitCtx, "board-a")
+		waiting <- cycleErr
+	}()
+	cancel()
+	if err = <-waiting; !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled waiter err=%v", err)
+	}
+	third := make(chan error, 1)
+	go func() {
+		_, cycleErr := scheduler.RunCycle(context.Background(), "board-a")
+		third <- cycleErr
+	}()
+	select {
+	case <-reader.entered:
+		t.Fatal("third same-board cycle bypassed the active owner")
+	case <-time.After(75 * time.Millisecond):
+	}
+	reader.release <- struct{}{}
+	if err = <-first; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-reader.entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("third cycle did not proceed after owner release")
+	}
+	reader.release <- struct{}{}
+	if err = <-third; err != nil {
+		t.Fatal(err)
+	}
+	if entries := schedulerCycleGateEntries(scheduler); entries != 0 {
+		t.Fatalf("cycle gate retained %d entries", entries)
+	}
+}
+
+func TestWorkboardSchedulerBoundsConcurrentBoardCycleGates(t *testing.T) {
+	scheduler, err := NewWorkboardScheduler(&schedulerReaderStub{}, &schedulerFactoryStub{}, &schedulerRunnerStub{},
+		WorkboardScheduleLimits{MaxInFlight: 1, ScanLimit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	releases := make([]func(), 0, workboard.MaxBoards)
+	for index := range workboard.MaxBoards {
+		release, acquireErr := scheduler.cycles.acquire(context.Background(), fmt.Sprintf("board-%03d", index))
+		if acquireErr != nil {
+			t.Fatalf("gate %d: %v", index, acquireErr)
+		}
+		releases = append(releases, release)
+	}
+	if release, acquireErr := scheduler.cycles.acquire(context.Background(), "board-over-limit"); !errors.Is(acquireErr, ErrWorkboardScheduleLimit) || release != nil {
+		t.Fatalf("over-limit gate release=%v err=%v", release != nil, acquireErr)
+	}
+	for _, release := range releases {
+		release()
+	}
+	if entries := schedulerCycleGateEntries(scheduler); entries != 0 {
+		t.Fatalf("cycle gate retained %d entries", entries)
 	}
 }
 
@@ -437,6 +557,12 @@ type gatedSchedulerReader struct {
 	entered, release chan struct{}
 	active           atomic.Int32
 	maximum          atomic.Int32
+}
+
+func schedulerCycleGateEntries(scheduler *WorkboardScheduler) int {
+	scheduler.cycles.mu.Lock()
+	defer scheduler.cycles.mu.Unlock()
+	return len(scheduler.cycles.entries)
 }
 
 func (s *gatedSchedulerReader) Read(ctx context.Context, boardID string, _ workboard.SupervisionOptions) (workboard.SupervisionPage, error) {
