@@ -478,6 +478,9 @@ func readAuxiliaryReviewSettlement(ctx context.Context, tx *sql.Tx, admissionID 
 }
 
 func auxiliaryReviewCardCharges(ctx context.Context, tx *sql.Tx, boardID, cardID string) (executionCharges, executionCharges, error) {
+	if err := validateCanonicalTriggerDefinitions(ctx, tx, canonicalAuxiliaryReviewAccountingGuardDefinitions()); err != nil {
+		return executionCharges{}, executionCharges{}, err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT admission_id FROM workboard_auxiliary_review_admissions
 		WHERE board_id=? AND card_id=? ORDER BY admitted_at,admission_id`, boardID, cardID)
 	if err != nil {
@@ -496,6 +499,7 @@ func auxiliaryReviewCardCharges(ctx context.Context, tx *sql.Tx, boardID, cardID
 		return executionCharges{}, executionCharges{}, rows.Err()
 	}
 	var settled, unresolved executionCharges
+	settlementCount := 0
 	for _, id := range ids {
 		admission, found, readErr := readAuxiliaryReviewAdmission(ctx, tx, `admission_id=?`, id)
 		if readErr != nil || !found {
@@ -509,9 +513,10 @@ func auxiliaryReviewCardCharges(ctx context.Context, tx *sql.Tx, boardID, cardID
 			return settled, unresolved, readErr
 		}
 		if terminal {
-			if settlement.AdmissionDigest != admission.AdmissionDigest {
+			if !auxiliaryReviewSettlementMatchesAdmission(settlement, admission) {
 				return settled, unresolved, ErrWorkboardCorrupt
 			}
+			settlementCount++
 			readErr = addExecutionCharge(&settled, settlement.ChargedTimeMS, settlement.ChargedTokens, settlement.ChargedCostMicros)
 		} else {
 			readErr = addExecutionCharge(&unresolved, admission.TimeLimitMS, admission.TokenLimit, admission.CostMicros)
@@ -520,5 +525,63 @@ func auxiliaryReviewCardCharges(ctx context.Context, tx *sql.Tx, boardID, cardID
 			return settled, unresolved, readErr
 		}
 	}
+	var storedSettlements int
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM workboard_auxiliary_review_settlements WHERE board_id=? AND card_id=?`, boardID, cardID).Scan(&storedSettlements); err != nil {
+		return settled, unresolved, err
+	}
+	if storedSettlements != settlementCount {
+		return settled, unresolved, ErrWorkboardCorrupt
+	}
 	return settled, unresolved, nil
+}
+
+func auxiliaryReviewSettlementMatchesAdmission(s workboard.AuxiliaryReviewSettlementRecord, a workboard.AuxiliaryReviewAdmissionRecord) bool {
+	return s.AdmissionID == a.AdmissionID && s.AdmissionDigest == a.AdmissionDigest && s.ReservationDigest == a.ReservationDigest &&
+		s.OperationID == a.OperationID && s.BoardID == a.BoardID && s.CardID == a.CardID && s.AttemptID == a.AttemptID &&
+		s.ClaimID == a.ClaimID && s.CandidateID == a.CandidateID && s.CandidateDigest == a.CandidateDigest &&
+		s.CriteriaDigest == a.CriteriaDigest && s.PolicyDigest == a.PolicyDigest && s.ReviewerID == a.ReviewerID &&
+		s.ModelID == a.ModelID && s.ProviderID == a.ProviderID && s.ConfigID == a.ConfigID &&
+		s.TimeLimitMS == a.TimeLimitMS && s.TokenLimit == a.TokenLimit && s.CostMicros == a.CostMicros && s.AdmittedAt.Equal(a.AdmittedAt)
+}
+
+func canonicalAuxiliaryReviewAccountingGuardDefinitions() map[string]string {
+	raw := auxiliaryReviewAccountingGuardSQL()
+	for name, definition := range raw {
+		raw[name] = normalizeTriggerDefinition(definition)
+	}
+	return raw
+}
+
+func auxiliaryReviewAccountingGuardSQL() map[string]string {
+	return map[string]string{
+		"workboard_auxiliary_review_admission_binding": `CREATE TRIGGER workboard_auxiliary_review_admission_binding BEFORE INSERT ON workboard_auxiliary_review_admissions
+			WHEN NOT EXISTS(SELECT 1 FROM workboard_cards k
+				JOIN workboard_attempts a ON a.board_id=k.board_id AND a.card_id=k.id
+				JOIN workboard_claims c ON c.board_id=a.board_id AND c.card_id=a.card_id AND c.attempt_id=a.id
+				WHERE k.board_id=NEW.board_id AND k.id=NEW.card_id AND k.state='in_progress'
+				AND k.current_attempt_id=NEW.attempt_id AND k.current_claim_id=NEW.claim_id
+				AND a.id=NEW.attempt_id AND a.state='running' AND a.criteria_digest=NEW.criteria_digest
+				AND a.policy_digest=NEW.policy_digest AND c.id=NEW.claim_id AND c.state='active')
+			BEGIN SELECT RAISE(ABORT,'workboard auxiliary review admission binding mismatch'); END`,
+		"workboard_auxiliary_review_settlement_binding": `CREATE TRIGGER workboard_auxiliary_review_settlement_binding BEFORE INSERT ON workboard_auxiliary_review_settlements
+			WHEN NOT EXISTS(SELECT 1 FROM workboard_auxiliary_review_admissions a
+				WHERE a.admission_id=NEW.admission_id AND a.admission_digest=NEW.admission_digest
+				AND a.reservation_digest=NEW.reservation_digest AND a.operation_id=NEW.operation_id
+				AND a.board_id=NEW.board_id AND a.card_id=NEW.card_id AND a.attempt_id=NEW.attempt_id
+				AND a.claim_id=NEW.claim_id AND a.candidate_id=NEW.candidate_id AND a.candidate_digest=NEW.candidate_digest
+				AND a.criteria_digest=NEW.criteria_digest AND a.policy_digest=NEW.policy_digest
+				AND a.reviewer_id=NEW.reviewer_id AND a.model_id=NEW.model_id AND a.provider_id=NEW.provider_id
+				AND a.config_id=NEW.config_id AND a.time_limit_ms=NEW.time_limit_ms
+				AND a.token_limit=NEW.token_limit AND a.cost_micros=NEW.cost_micros AND a.admitted_at=NEW.admitted_at)
+			OR (NEW.disposition='completed' AND NOT EXISTS(SELECT 1 FROM workboard_candidates c
+				WHERE c.board_id=NEW.board_id AND c.card_id=NEW.card_id AND c.attempt_id=NEW.attempt_id
+				AND c.id=NEW.candidate_id AND c.digest=NEW.candidate_digest
+				AND c.criteria_digest=NEW.criteria_digest AND c.policy_digest=NEW.policy_digest))
+			BEGIN SELECT RAISE(ABORT,'workboard auxiliary review settlement binding mismatch'); END`,
+		"workboard_auxiliary_review_admission_immutable_update":  `CREATE TRIGGER workboard_auxiliary_review_admission_immutable_update BEFORE UPDATE ON workboard_auxiliary_review_admissions BEGIN SELECT RAISE(ABORT,'workboard auxiliary review admission is immutable'); END`,
+		"workboard_auxiliary_review_admission_immutable_delete":  `CREATE TRIGGER workboard_auxiliary_review_admission_immutable_delete BEFORE DELETE ON workboard_auxiliary_review_admissions BEGIN SELECT RAISE(ABORT,'workboard auxiliary review admission is immutable'); END`,
+		"workboard_auxiliary_review_settlement_immutable_update": `CREATE TRIGGER workboard_auxiliary_review_settlement_immutable_update BEFORE UPDATE ON workboard_auxiliary_review_settlements BEGIN SELECT RAISE(ABORT,'workboard auxiliary review settlement is immutable'); END`,
+		"workboard_auxiliary_review_settlement_immutable_delete": `CREATE TRIGGER workboard_auxiliary_review_settlement_immutable_delete BEFORE DELETE ON workboard_auxiliary_review_settlements BEGIN SELECT RAISE(ABORT,'workboard auxiliary review settlement is immutable'); END`,
+		"workboard_auxiliary_review_settlement_charge_limit":     `CREATE TRIGGER workboard_auxiliary_review_settlement_charge_limit BEFORE INSERT ON workboard_auxiliary_review_settlements WHEN NEW.charged_time_ms>300000 BEGIN SELECT RAISE(ABORT,'workboard auxiliary review settlement charge exceeds limit'); END`,
+	}
 }

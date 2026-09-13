@@ -6994,3 +6994,53 @@ start predates its admission. Initialization locking resolves filesystem
 symlink aliases and uses a context-cancelable keyed semaphore; the expanded
 review, chronology, initialization, and replay tests passed ten focused race
 runs.
+
+## 2026-09-13 — DAR-91 production task composition and crash recovery
+
+DAR-91 remains in progress. The configured Workboard task factory now freezes
+one explicit worker model, provider, settings digest, resource limits, and
+card-owned execution reservation without opening a provider or mutating durable
+state. It derives remaining capacity from validated settled and unresolved
+execution and auxiliary-review accounts, leaves the full configured reviewer
+time/token/cost reservation available, and rejects unattended cards with an
+unbounded or insufficient resource dimension. Exact-zero local worker cost is
+retained; the review ceiling remains deliberately positive. Configuration now
+rejects scheduler workers whose provider cannot enforce an output-token limit
+and worker concurrency beyond the durable execution-admission maximum.
+
+Worker total-token accounting is separate from generation control. The factory
+reserves the configured context allowance for every possible runtime turn plus
+a positive aggregate output share, while the worker handle passes only that
+output share to the provider. Host-bound Workboard tasks suppress recursive
+delegation even when ordinary coordinator delegation is configured. A real
+loopback Ollama execution proves the provider receives the smaller ceiling,
+reported input plus output settles within the larger reservation, and an output
+ceiling larger than the total reservation is rejected before dispatch.
+
+The budget projection verifies the exact definitions of every auxiliary-review
+accounting trigger, reconstructs canonical admissions and settlements, compares
+their full binding, and reconciles per-card settlement cardinality. Missing or
+altered triggers, forged admission/settlement drift, and orphan or misindexed
+settlements fail closed. Process-level SIGKILL tests now cover both sides of the
+atomic composite boundary: an admitted review killed before commit recovers at
+its exact deadline to one conservative failed settlement without reviewer
+redispatch, while a kill after commit but before acknowledgement replays the
+single durable candidate/audit/outcome/settlement graph without a second review.
+
+An application-level interval supervisor is present but not daemon-wired. It
+discovers a complete frozen active-board snapshot, runs serial non-overlapping
+cycles immediately and after each joined interval, contains callback panics,
+continues past one failed board so later boards are not starved, exposes bounded
+local health, and joins cancellation. Serial cross-board execution may
+underutilize global capacity and is an explicit later design problem. The stock
+daemon scheduler enablement guard remains unchanged pending end-to-end
+worker-to-review qualification, daemon health composition, and shutdown/restart
+process tests. No live model or user database was used in this checkpoint.
+
+Final qualification passed with `GOFLAGS='-p=1' make check`: formatting and
+the 1,000-line limit, `go vet ./...`, the complete race-enabled native suite,
+and `go build ./...`. The two longest packages completed successfully in
+1113.684 seconds for `internal/app` and 1168.454 seconds for
+`internal/telemetry`; releasepack completed in 434.828 seconds. Focused
+application/configuration/telemetry race suites also passed repeatedly before
+the aggregate gate.

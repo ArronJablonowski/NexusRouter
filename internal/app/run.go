@@ -135,6 +135,12 @@ type Result struct {
 // dispatch retains its loopback-only transport even when cloud use is enabled.
 func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
+	if r.runtimeHostAdmission != nil {
+		// A host-bound Workboard execution is already a child capability. Strip
+		// recursive delegation even if an internal caller bypassed Service.Run's
+		// ordinary composition path with pre-populated callbacks.
+		r.delegate, r.delegateAudit = nil, nil
+	}
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
 	if classifyErr != nil {
@@ -486,7 +492,7 @@ func validateRuntimeHostStore(ctx context.Context, s config.Settings, r Request)
 	if ctx == nil || a.store == nil || a.commitFirst == nil || a.state == nil || invalidRuntimeHostRequestState(r) ||
 		!sessions.ValidEventPageID(a.taskID) || !sessions.ValidEventPageID(a.sessionID) ||
 		(a.parentTaskID != "" && !sessions.ValidEventPageID(a.parentTaskID)) || !validRuntimeHostWorkerID(a.workerID) ||
-		r.ModelID == "" || r.ModelID == "auto" || s.Workers.DelegateModel != "" {
+		r.ModelID == "" || r.ModelID == "auto" {
 		return ErrAdmission
 	}
 	same, err := a.store.SameDatabaseFile(ctx, s.Telemetry.Database)

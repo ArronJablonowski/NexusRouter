@@ -128,7 +128,9 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 	if ctx.Err() != nil || admission.Err() != nil {
 		return Result{}, ErrAdmission
 	}
-	if r.delegatedParent == "" {
+	// A Workboard host-bound execution is already a bounded child capability.
+	// It must not inherit the service's ordinary recursive delegation surface.
+	if r.delegatedParent == "" && r.runtimeHostAdmission == nil {
 		r.delegate = s.bindDelegate(r)
 		r.delegateAudit = s.bindDelegationAudit()
 	}

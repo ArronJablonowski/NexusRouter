@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
@@ -33,6 +34,11 @@ type WorkboardWorkerTask struct {
 	WorkerID             string
 	SubmissionID         string
 	ExpectedCardRevision int64
+	// MaxOutputTokens is the provider-enforced aggregate generation ceiling.
+	// It is distinct from Reservation.TokenLimit, which accounts for both
+	// provider input and output usage. Zero retains the legacy reservation-wide
+	// ceiling for manually composed tasks.
+	MaxOutputTokens int64
 	// Reservation opts this task into the transactional schema-42 admission
 	// path. The value is copied before the callback starts and must match the
 	// actual task.started route exactly.
@@ -89,12 +95,16 @@ func (r *WorkboardWorkerRunner) Run(ctx context.Context, task WorkboardWorkerTas
 	if ctx == nil || r == nil || r.supervisor == nil || task.BoardID == "" || task.CardID == "" || task.TaskID == "" ||
 		task.SessionID == "" || task.Scope == "" || task.ExpectedCardRevision < 1 ||
 		task.SubmissionID != "" || task.Execute == nil || task.Validate == nil ||
+		task.MaxOutputTokens < 0 || task.MaxOutputTokens > providers.MaxOutputTokens ||
 		(task.WorkerID != "" && !validRuntimeHostWorkerID(task.WorkerID)) ||
 		(task.FailureEffect != runtime.NoEffect && task.FailureEffect != runtime.ConfirmedEffect && task.FailureEffect != runtime.UncertainEffect) {
 		return WorkboardCandidate{}, ErrAdmission
 	}
 	if task.Reservation != nil {
 		reservation := *task.Reservation
+		if task.MaxOutputTokens > reservation.TokenLimit {
+			return WorkboardCandidate{}, ErrAdmission
+		}
 		task.Reservation = &reservation
 	}
 	card, err := r.repository.GetCard(ctx, task.BoardID, task.CardID)
@@ -151,6 +161,7 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 		reservation := *task.Reservation
 		handle.reservation = &reservation
 	}
+	handle.maxOutputTokens = executionOutputTokenLimit(handle.reservation, task.MaxOutputTokens)
 	handle.bindCancellation(cancel, stopSupervisor)
 	heartbeats := make(chan error, 1)
 	joined := false
@@ -246,6 +257,7 @@ type WorkboardWorkerHandle struct {
 	cancelCallback, stopSupervisor                context.CancelFunc
 	commitFirst                                   func(context.Context, runtime.Event) error
 	reservation                                   *workboard.ExecutionReservation
+	maxOutputTokens                               int64
 }
 
 // BindRuntimeRequest attaches this pending worker capability to exactly one
@@ -262,11 +274,14 @@ func (h *WorkboardWorkerHandle) BindRuntimeRequest(request Request) (Request, er
 	}
 	h.bound = true
 	return withRuntimeHostAdmission(request, runtimeHostAdmission{taskID: h.taskID, sessionID: h.sessionID,
-		parentTaskID: h.parentTaskID, workerID: h.workerID, maxOutputTokens: executionTokenLimit(h.reservation),
+		parentTaskID: h.parentTaskID, workerID: h.workerID, maxOutputTokens: h.maxOutputTokens,
 		store: h.runtimeStore, commitFirst: h.commitFirst})
 }
 
-func executionTokenLimit(reservation *workboard.ExecutionReservation) int64 {
+func executionOutputTokenLimit(reservation *workboard.ExecutionReservation, configured int64) int64 {
+	if configured > 0 {
+		return configured
+	}
 	if reservation == nil {
 		return 0
 	}

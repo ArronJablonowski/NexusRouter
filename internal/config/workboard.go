@@ -52,6 +52,9 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 || judge.MaxInputTokens <= 0 || judge.MaxOutputTokens <= 0 {
 		return errors.New("enabled workboard scheduler requires bounded worker and acceptance reviewer")
 	}
+	if s.Workers.Max > workboard.MaxExecutionWIPLimit {
+		return errors.New("workboard scheduler worker limit exceeds execution admission")
+	}
 	if !modelHasCapability(worker, "chat") || !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
 		!finite(*worker.EstimatedCost) || *worker.EstimatedCost < 0 || (worker.Locality != "local" && *worker.EstimatedCost == 0) {
 		return errors.New("workboard scheduler worker unavailable within configured limits")
@@ -63,12 +66,21 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if judge.MaxInputTokens+judge.MaxOutputTokens > int64(reviewer.ContextTokens) {
 		return errors.New("workboard acceptance reviewer token reservation exceeds model context")
 	}
-	providerKind := ""
+	workerProviderKind, providerKind := "", ""
 	for _, provider := range s.Providers {
+		if provider.ID == worker.Provider {
+			workerProviderKind = provider.Kind
+		}
 		if provider.ID == reviewer.Provider {
 			providerKind = provider.Kind
-			break
 		}
+	}
+	// Unattended Workboard execution always carries a positive output-token
+	// ceiling. Codex app-server currently cannot enforce that provider-side, so
+	// accepting it here would defer a deterministic configuration failure until
+	// after the scheduler had selected a card.
+	if workerProviderKind != "ollama" && workerProviderKind != "openai_compatible" {
+		return errors.New("workboard scheduler worker cannot enforce output-token ceiling")
 	}
 	if providerKind != "ollama" && providerKind != "openai_compatible" {
 		return errors.New("workboard acceptance reviewer cannot enforce output-token ceiling")

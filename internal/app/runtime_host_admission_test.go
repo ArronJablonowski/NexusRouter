@@ -191,7 +191,7 @@ func TestRuntimeHostAdmissionRequiresConfiguredDatabaseAndSingleTaskPolicy(t *te
 	}
 	r = makeRequest(store)
 	cfg.Workers.DelegateModel = "child"
-	if err = validateRuntimeHostStore(ctx, cfg, r); !errors.Is(err, ErrAdmission) {
-		t.Fatal("delegating host request admitted", err)
+	if err = validateRuntimeHostStore(ctx, cfg, r); err != nil {
+		t.Fatal("host request rejected instead of suppressing recursive delegation", err)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"math"
 	"testing"
+
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
 func TestWorkboardSchedulerDefaultsAndOverrides(t *testing.T) {
@@ -51,10 +53,17 @@ func TestEnabledWorkboardSchedulerRequiresExplicitIndependentLocalJudge(t *testi
 		"worker lacks estimate":  func(s *Settings) { s.Models[0].EstimatedCost = nil },
 		"worker lacks chat":      func(s *Settings) { s.Models[0].Capabilities = []string{"reasoning"} },
 		"cloud worker zero cost": func(s *Settings) { *s.Models[0].EstimatedCost = 0 },
-		"judge disabled":         func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Enabled = false },
-		"global judge disabled":  func(s *Settings) { s.Evaluation.Judge = false },
-		"missing reviewer":       func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel = "" },
-		"unknown reviewer":       func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel = "missing" },
+		"worker WIP exceeds execution admission": func(s *Settings) {
+			s.Workers.Max = workboard.MaxExecutionWIPLimit + 1
+		},
+		"worker provider lacks output ceiling": func(s *Settings) {
+			s.Providers[0] = Provider{ID: "cloud", Kind: "codex_app_server", Executable: "/fixture/codex"}
+			s.Models[0].Model = "gpt-5.6-sol"
+		},
+		"judge disabled":        func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Enabled = false },
+		"global judge disabled": func(s *Settings) { s.Evaluation.Judge = false },
+		"missing reviewer":      func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel = "" },
+		"unknown reviewer":      func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel = "missing" },
 		"same resolved model": func(s *Settings) {
 			s.Models[0].Locality = "local"
 			s.Workboard.Scheduler.AcceptanceJudge.ReviewerModel = "worker"

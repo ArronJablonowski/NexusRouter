@@ -87,11 +87,20 @@ func validatedExecutionAccounts(ctx context.Context, tx *sql.Tx, boardID, cardID
 }
 
 func validateExecutionImmutabilityGuards(ctx context.Context, tx *sql.Tx) error {
-	expected := canonicalExecutionGuardDefinitions()
-	rows, err := tx.QueryContext(ctx, `SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN(
-		'workboard_execution_admission_no_active','workboard_execution_admission_binding','workboard_execution_settlement_binding',
-		'workboard_execution_admission_immutable_update','workboard_execution_admission_immutable_delete',
-		'workboard_execution_settlement_immutable_update','workboard_execution_settlement_immutable_delete')`)
+	return validateCanonicalTriggerDefinitions(ctx, tx, canonicalExecutionGuardDefinitions())
+}
+
+func validateCanonicalTriggerDefinitions(ctx context.Context, tx *sql.Tx, expected map[string]string) error {
+	if len(expected) == 0 {
+		return ErrWorkboardCorrupt
+	}
+	names := make([]string, 0, len(expected))
+	args := make([]any, 0, len(expected))
+	for name := range expected {
+		names = append(names, "?")
+		args = append(args, name)
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN(`+strings.Join(names, ",")+`)`, args...)
 	if err != nil {
 		return err
 	}
@@ -103,7 +112,7 @@ func validateExecutionImmutabilityGuards(ctx context.Context, tx *sql.Tx) error 
 			return ErrWorkboardCorrupt
 		}
 		definitionExpected, ok := expected[name]
-		normalized := strings.ToLower(strings.Join(strings.Fields(definition), ""))
+		normalized := normalizeTriggerDefinition(definition)
 		if !ok || normalized != definitionExpected {
 			return ErrWorkboardCorrupt
 		}
@@ -116,6 +125,10 @@ func validateExecutionImmutabilityGuards(ctx context.Context, tx *sql.Tx) error 
 		return ErrWorkboardCorrupt
 	}
 	return nil
+}
+
+func normalizeTriggerDefinition(definition string) string {
+	return strings.ToLower(strings.Join(strings.Fields(definition), ""))
 }
 
 func canonicalExecutionGuardDefinitions() map[string]string {
@@ -164,7 +177,7 @@ func canonicalExecutionGuardDefinitions() map[string]string {
 			BEGIN SELECT RAISE(ABORT,'workboard execution settlement is immutable'); END`,
 	}
 	for name, definition := range raw {
-		raw[name] = strings.ToLower(strings.Join(strings.Fields(definition), ""))
+		raw[name] = normalizeTriggerDefinition(definition)
 	}
 	return raw
 }
