@@ -8,6 +8,7 @@
 	const client = window.DarwinWorkboardClient;
 	if (!client) return;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+	const validatorPattern = /^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$/;
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const states = ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"];
 	const boardPageLimit = 25, cardPageLimit = 100, dependencyLimit = 100, attemptLimit = 25, maxBoards = 100, maxCards = 10000;
@@ -65,7 +66,7 @@
 	function uniqueIDs(values, max, reject) { return Array.isArray(values) && values.length <= max && values.every(id => idPattern.test(id) && id !== reject) && new Set(values).size === values.length; }
 	function validLabels(values) { const keys = new Set(); return Array.isArray(values) && values.length <= 32 && values.every(label => { const key = typeof label === "string" ? label.trim().toLowerCase() : ""; if (!boundedText(label, 64, false) || keys.has(key)) return false; keys.add(key); return true; }); }
 	function validBudget(value) { return value && Number.isSafeInteger(value.attempt_limit) && value.attempt_limit >= 1 && value.attempt_limit <= 32 && Number.isSafeInteger(value.time_limit_ms) && value.time_limit_ms >= 0 && value.time_limit_ms <= 2592000000 && Number.isSafeInteger(value.token_limit) && value.token_limit >= 0 && value.token_limit <= 1000000000 && Number.isSafeInteger(value.cost_micros) && value.cost_micros >= 0 && value.cost_micros <= 1000000000000; }
-	function validCriteria(values, revision) { const ids = new Set(); return Array.isArray(values) && values.length <= 32 && values.length > 0 && values.every(item => { if (!item || item.version !== 1 || !idPattern.test(item.id) || ids.has(item.id) || !idPattern.test(item.validator_id) || !boundedText(item.description, 4096, false) || typeof item.required !== "boolean") return false; ids.add(item.id); return item.kind === "objective" && item.required_source === "deterministic" || item.kind === "subjective" && item.required_source === "user_feedback"; }) && Number.isSafeInteger(revision) && revision >= 1; }
+	function validCriteria(values, revision) { const ids = new Set(); return Array.isArray(values) && values.length <= 32 && values.length > 0 && values.every(item => { if (!item || item.version !== 1 || !idPattern.test(item.id) || ids.has(item.id) || typeof item.validator_id !== "string" || item.validator_id.length > 128 || !validatorPattern.test(item.validator_id) || !boundedText(item.description, 4096, false) || typeof item.required !== "boolean") return false; ids.add(item.id); return item.kind === "objective" && item.required_source === "deterministic" || item.kind === "subjective" && item.required_source === "user_feedback"; }) && Number.isSafeInteger(revision) && revision >= 1; }
 	function validCursorTail(value, limit) {
 		return Array.isArray(value.items) && value.items.length <= limit && typeof value.has_more === "boolean" &&
 			(value.next_cursor === undefined || value.next_cursor === "" || boundedPrintable(value.next_cursor, 1, 512)) && value.has_more === Boolean(value.next_cursor) && (!value.has_more || value.items.length > 0);

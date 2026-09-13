@@ -115,7 +115,7 @@ type AcceptanceCriterion struct {
 }
 
 func (c AcceptanceCriterion) Validate() error {
-	if c.Version != ContractVersion || !validID(c.ID) || !validID(c.ValidatorID) ||
+	if c.Version != ContractVersion || !validID(c.ID) || !validValidatorID(c.ValidatorID) ||
 		requireText(c.Description, MaxCriterionTextBytes) != nil {
 		return ErrContract
 	}

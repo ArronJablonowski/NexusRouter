@@ -273,7 +273,7 @@
                   <label for="card-create-criterion-id">Criterion ID</label><input id="card-create-criterion-id" name="criteria.id" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}">
                   <label for="card-create-criterion-kind">Kind</label><select id="card-create-criterion-kind" name="criteria.kind" required><option value="objective">Objective</option><option value="subjective">Subjective</option></select>
                   <label for="card-create-required-source">Required source</label><select id="card-create-required-source" name="criteria.required_source" required><option value="deterministic">Deterministic</option><option value="user_feedback">User feedback</option></select>
-                  <label for="card-create-validator">Validator ID</label><input id="card-create-validator" name="criteria.validator_id" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,127}">
+                  <label for="card-create-validator">Validator ID</label><input id="card-create-validator" name="criteria.validator_id" required maxlength="128" pattern="[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*">
                   <label for="card-create-criterion-description">Description</label><textarea id="card-create-criterion-description" name="criteria.description" required maxlength="4096" data-max-bytes="4096" rows="3"></textarea>
                   <label class="confirmation"><input id="card-create-criterion-required" name="criteria.required" type="checkbox"> Required</label>
                 </div>

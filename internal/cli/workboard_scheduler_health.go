@@ -7,6 +7,10 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 )
 
+func workboardSchedulerReady(enabled bool, scheduler *app.WorkboardScheduleSupervisor) bool {
+	return !enabled || scheduler != nil && scheduler.Health() == (app.WorkboardScheduleHealth{Status: "healthy", Code: "supervisor_ok"})
+}
+
 // withWorkboardSchedulerHealth converts the app-owned status only at the daemon
 // composition boundary. Presence means scheduling is enabled, so shared health
 // readiness requires this distinct supervisor to be healthy.

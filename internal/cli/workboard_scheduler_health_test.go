@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
 func TestWorkboardSchedulerHealthConversionAndMerge(t *testing.T) {
@@ -35,4 +37,37 @@ func TestWorkboardSchedulerHealthConversionAndMerge(t *testing.T) {
 			t.Fatal("malformed scheduler health admitted", malformed)
 		}
 	}
+}
+
+func TestWorkboardSchedulerReadinessIsConditional(t *testing.T) {
+	if !workboardSchedulerReady(false, nil) || workboardSchedulerReady(true, nil) {
+		t.Fatal("disabled or absent scheduler readiness drift")
+	}
+	starting, err := app.StartWorkboardScheduleSupervisor(context.Background(), emptyWorkboardLister{}, emptyWorkboardCycles{}, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer starting.Close()
+	deadline := time.Now().Add(time.Second)
+	for !workboardSchedulerReady(true, starting) && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if !workboardSchedulerReady(true, starting) {
+		t.Fatal("healthy enabled scheduler not ready", starting.Health())
+	}
+	if err := starting.Close(); err != nil || workboardSchedulerReady(true, starting) {
+		t.Fatal("stopped scheduler remained ready", err, starting.Health())
+	}
+}
+
+type emptyWorkboardLister struct{}
+
+func (emptyWorkboardLister) ListWorkboards(context.Context, workboard.BoardListOptions) (workboard.BoardPage, error) {
+	return workboard.BoardPage{Version: workboard.SchemaVersion}, nil
+}
+
+type emptyWorkboardCycles struct{}
+
+func (emptyWorkboardCycles) RunCycle(context.Context, string) (app.WorkboardScheduleResult, error) {
+	return app.WorkboardScheduleResult{}, nil
 }

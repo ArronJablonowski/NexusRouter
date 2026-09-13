@@ -458,17 +458,17 @@ without a runtime start creates no task, attempt, or claim. The marker and
 complete progressed journal continue to prevent adoption of independently
 committed or corrupted halves.
 
-The bounded per-board scheduling cycle still remains dependency-injected rather
-than stock-daemon execution. Its integrated runtime path accepts only an
-explicit model and fails closed for automatic routing, managed residency,
-worker delegation, provider fallback, provider-overflow compaction, and
-automatic post-run audit. The stock daemon continues to reject an enabled
-scheduler. Schema 42 now provides repository-verified transactional execution
+The bounded per-board scheduling cycle is dependency-injected and composed by
+the stock daemon when explicitly enabled. Its integrated runtime path accepts
+only an explicit model and fails closed for automatic routing, managed
+residency, worker delegation, provider fallback, and provider-overflow
+compaction; the configured scheduler supplies a separate independent audit.
+Schema 42 provides repository-verified transactional execution
 admissions and settlements with exact runtime/configuration identity, bounded
 WIP, conservative unknown-usage accounting, successful-overrun rejection, and
-replay/tamper tests. Provider-side hard token ceilings, the independent local
-reviewer dispatch, stock-daemon composition, and broader crash/lease/acceptance
-qualification remain required before unattended scheduling is enabled. DAR-83 owns the
+replay/tamper tests. Provider-side hard token ceilings, independent local
+reviewer dispatch, stock-daemon composition, and crash/lease/acceptance
+qualification are enforced by the enabled unattended path. DAR-83 owns the
 integrated visual Kanban inside this same Web UI; its first read-only slice now
 renders the seven canonical lanes with bounded card, dependency, attempt, and
 checkpoint previews, bounded board/card filters, a canonical list alternative,
@@ -701,8 +701,9 @@ worker must be available in the configured deployment mode and have positive
 context capacity plus an explicit cost estimate. The reviewer must additionally
 be local, remain within its bounded `100ms`–`5m` timeout and `max_cost`, and have
 a different provider/model identity from the worker. The global LLM-judge gate
-must remain enabled. These fail-closed configuration rules do not themselves
-enable the stock scheduler or prove that independent review dispatch is wired.
+must remain enabled. The stock daemon composes these fail-closed rules with the
+qualified independent-review path, readiness health, and joined scheduler
+shutdown; an enabled scheduler is never silently ignored.
 
 ## 8. Adaptive Routing
 

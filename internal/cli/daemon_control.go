@@ -176,10 +176,6 @@ func runDaemonControl(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "daemon configuration unavailable")
 		return 1
 	}
-	if args[0] == "start" && !stockDaemonConfigurationSupported(cfg) {
-		fmt.Fprintln(stderr, "workboard scheduler is not available in the stock daemon")
-		return 1
-	}
 	token := os.Getenv("DARWIN_API_TOKEN")
 	client, err := daemonClient(cfg, token)
 	if err != nil {

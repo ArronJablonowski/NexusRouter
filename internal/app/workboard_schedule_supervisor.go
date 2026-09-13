@@ -25,7 +25,7 @@ type WorkboardCycleRunner interface {
 // WorkboardScheduleSupervisor owns repeated application-level scheduling
 // passes. Each pass discovers the current active boards and starts one bounded
 // cycle per board so a slow board cannot prevent another from progressing. It
-// is intentionally not wired into the stock daemon yet.
+// is composed by the stock daemon only when explicitly enabled.
 type WorkboardScheduleSupervisor struct {
 	mu     sync.Mutex
 	cancel context.CancelFunc

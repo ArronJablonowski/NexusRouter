@@ -19,7 +19,7 @@ function extract(name) {
   process.exit(41);
 }
 const names = ['textBytes','validUnicode','boundedText','validTime','uniqueIDs','validBudget','validCriteria','optionalID','validClaim','validCandidate','validEvidence','validAttempt','validAcceptance','validLifecycle','validLifecycleBatch','cardLifecycleSummary'];
-const prelude = "const idPattern=/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/; const digestPattern=/^[0-9a-f]{64}$/; const attemptStates=['running','review','accepted','rejected','failed','canceled']; const lifecycleByCard=new Map();\n";
+const prelude = "const idPattern=/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/; const validatorPattern=/^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$/; const digestPattern=/^[0-9a-f]{64}$/; const attemptStates=['running','review','accepted','rejected','failed','canceled']; const lifecycleByCard=new Map();\n";
 const api = Function(prelude + names.map(extract).join('\n') + '\nreturn {validLifecycleBatch,cardLifecycleSummary,lifecycleByCard};')();
 const digest = character => character.repeat(64), now = '2026-09-10T12:00:00Z', later = '2026-09-10T12:01:00Z';
 const criterion = {version:1,id:'tests',kind:'objective',required_source:'deterministic',validator_id:'validator-a',description:'Tests pass',required:true};

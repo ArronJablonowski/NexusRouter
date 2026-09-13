@@ -7156,3 +7156,36 @@ competing-owner, restart, and crash cases repeatedly. The production daemon
 enablement guard remains intentionally intact for DAR-96, whose scope is CLI
 composition plus process-level health, successful execution, joined SIGTERM
 shutdown, and restart qualification.
+
+## 2026-09-13 — DAR-96 stock daemon scheduler enablement
+
+DAR-96 is acceptance-ready. The stock daemon now conditionally prepares the
+configured Workboard schedule from its already-owned SQLite store, starts the
+supervisor after the other application supervisors, includes its distinct
+state in aggregate health and readiness only when enabled, and cancels and
+joins it before exporters, the dispatcher, or storage are closed. Scheduler
+shutdown failures remain visible instead of being hidden by HTTP shutdown
+errors. Disabled configurations retain their prior health and lifecycle.
+
+Process qualification builds and starts the real `darwin serve` binary against
+separate bounded loopback worker and reviewer providers. It proves one worker
+execution and one independent audit reach a durable review candidate, and that
+the readiness report contains `workboard_scheduler` as healthy. A second live
+card blocks in its provider until SIGTERM; the daemon cancels that request,
+joins the scheduler, exits cleanly, and leaves both board databases readable.
+The complementary SIGKILL case leaves an uncertain in-progress claim, waits
+past lease expiry, restarts the stock daemon, observes multiple healthy
+scheduler passes, and proves there is no second worker or reviewer dispatch and
+no mutation of the unresolved claim.
+
+The process fixture also exposed a public-contract mismatch: the built-in
+`deterministic.meaningful_text.v1` validator was accepted by the Workboard
+domain but rejected by browser/API ID validation. The Go contract, JSON schema,
+HTML constraint, mutation client, projection validator, and browser CRUD
+qualification now share a bounded namespaced validator grammar. Object IDs
+retain their stricter non-namespaced grammar. Focused race suites pass for the
+Web UI, Web UI application, daemon lifecycle, and both process boundaries. The
+full serialized repository gate passed: `internal/app` completed in 1155.974
+seconds, `internal/cli` in 112.033 seconds, `internal/telemetry` in 1196.038
+seconds, and `internal/releasepack` in 459.923 seconds, followed by the complete
+production build.

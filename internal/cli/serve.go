@@ -54,10 +54,6 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot load daemon configuration")
 		return 1
 	}
-	if !stockDaemonConfigurationSupported(s) {
-		fmt.Fprintln(stderr, "workboard scheduler is not available in the stock daemon")
-		return 1
-	}
 	host, port, err := net.SplitHostPort(s.Daemon.Listen)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid daemon address")
@@ -130,10 +126,19 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot initialize workboard recovery services")
 		return 1
 	}
+	var workboardSchedulePlan *app.ConfiguredWorkboardSchedulePlan
+	if s.Workboard.Scheduler.Enabled {
+		workboardSchedulePlan, err = app.PrepareConfiguredWorkboardSchedule(ctx, service, db)
+		if err != nil {
+			fmt.Fprintln(stderr, "cannot prepare workboard scheduler")
+			return 1
+		}
+	}
 	var dispatcher *app.Dispatcher
 	var learner *app.ConfiguredLearning
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
+	var workboardScheduler *app.WorkboardScheduleSupervisor
 	var browserHandler *webuiapp.Handler
 	healthReport := func(ctx context.Context) (health.Report, error) {
 		if dispatcher == nil {
@@ -151,7 +156,17 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		if err != nil {
 			return health.Report{}, err
 		}
-		return withTraceExportHealth(report, traceExporter.Health())
+		report, err = withTraceExportHealth(report, traceExporter.Health())
+		if err != nil {
+			return health.Report{}, err
+		}
+		if s.Workboard.Scheduler.Enabled {
+			if workboardScheduler == nil {
+				return health.Report{}, errors.New("workboard scheduler unavailable")
+			}
+			return withWorkboardSchedulerHealth(report, workboardScheduler.Health())
+		}
+		return report, nil
 	}
 	if s.WebUI.Enabled {
 		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)
@@ -255,7 +270,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health())) {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health()) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler)) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -342,7 +357,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return app.InspectLeaseAttentionHistory(ctx, s.Telemetry.Database, id, options)
 		},
 		Health: func(ctx context.Context) error {
-			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler) {
 				return errors.New("supervisor unavailable")
 			}
 			_, err := db.Read(ctx, "__health__", 0, 1)
@@ -395,9 +410,29 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer traceExporter.Close()
+	if workboardSchedulePlan != nil {
+		workboardScheduler, err = workboardSchedulePlan.Start(ctx)
+		if err != nil {
+			fmt.Fprintln(stderr, "cannot start workboard scheduler")
+			return 1
+		}
+		defer workboardScheduler.Close()
+	}
 	rootHandler := composeServeHandler(handler, browserHandler, s.WebUI.PathPrefix)
-	if err := serveHTTP(ctx, listener, rootHandler, stdout); err != nil {
+	serveErr := serveHTTP(ctx, listener, rootHandler, stdout)
+	var workboardCloseErr error
+	if workboardScheduler != nil {
+		workboardCloseErr = workboardScheduler.Close()
+	}
+	if serveErr != nil {
 		fmt.Fprintln(stderr, "daemon stopped with an error")
+		if workboardCloseErr != nil {
+			fmt.Fprintln(stderr, "workboard scheduler requires inspection")
+		}
+		return 1
+	}
+	if workboardCloseErr != nil {
+		fmt.Fprintln(stderr, "workboard scheduler requires inspection")
 		return 1
 	}
 	if err := exporter.Close(); err != nil {

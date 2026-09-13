@@ -84,6 +84,11 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
       "x-maxBytes": 128
     },
+    "validator_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$",
+      "x-maxBytes": 128
+    },
     "cursor": {
       "type": "string",
       "minLength": 1,
@@ -672,7 +677,7 @@
           ]
         },
         "validator_id": {
-          "$ref": "#/$defs/id"
+          "$ref": "#/$defs/validator_id"
         },
         "description": {
           "type": "string",

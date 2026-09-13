@@ -35,6 +35,7 @@ var (
 	ErrContract      = errors.New("invalid web UI contract")
 	idPattern        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 	modelIDPattern   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
+	validatorPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$`)
 	operationPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
 )
 
@@ -836,6 +837,10 @@ var operationSpecs = []OperationSpec{
 }
 
 func validID(value string) bool { return idPattern.MatchString(value) }
+
+func validValidatorID(value string) bool {
+	return len(value) <= MaxIDBytes && validatorPattern.MatchString(value)
+}
 
 func optionalID(value string) bool { return value == "" || validID(value) }
 

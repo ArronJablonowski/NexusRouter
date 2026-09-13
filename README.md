@@ -110,11 +110,11 @@ workboard attempt and claim. An assigned card may run only under its exact
 assignee identity. An unassigned card receives a fresh host-generated worker
 identity. Either form may be a top-level runtime task with no parent task.
 
-This is a narrow trusted-host path, not unattended scheduling. It requires an
-explicit model and rejects automatic routing, managed model residency, worker
-delegation, provider fallback, provider-overflow compaction, and automatic
-post-run audit. The stock daemon still rejects
-`workboard.scheduler.enabled: true`. Schema 42 now transactionally binds the
+This is a narrow trusted-host path used by unattended scheduling. It requires
+an explicit model and rejects automatic routing, managed model residency,
+worker delegation, provider fallback, and provider-overflow compaction; the
+configured scheduler composes its separate independent post-run audit. Schema
+42 transactionally binds the
 first runtime event, claim, model/provider, effective configuration digest,
 resource reservation, and global/per-board WIP admission; proof-bearing
 finalization writes an immutable settlement in the same transaction. Known
@@ -551,12 +551,12 @@ enabled judge also requires positive `max_input_tokens` and
 `max_output_tokens` ceilings whose sum fits both the reviewer context window
 and the Workboard token ledger. The full sum is reserved before dispatch.
 Judge costs are bounded by the card ledger's $1,000,000 representable maximum,
-and timeouts are bounded from `100ms` through `5m`. These are configuration
-admission checks, not evidence that review dispatch is composed. The stock
-daemon currently rejects `workboard.scheduler.enabled: true` before opening
-storage, binding its listener, or constructing providers; it will not silently
-ignore an enabled scheduler until independent review, provider-side token
-ceilings, and lifecycle qualification are complete.
+and timeouts are bounded from `100ms` through `5m`. The stock daemon now
+prepares an enabled scheduler only after it owns the listener and durable
+store, exposes the scheduler as a readiness-critical health component, and
+cancels and joins every scheduling cycle before closing SQLite. Independent
+review, provider-side token ceilings, and lifecycle recovery remain enforced
+at the qualified application boundaries.
 
 Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; DarwinRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
 

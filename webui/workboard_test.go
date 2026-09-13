@@ -21,6 +21,20 @@ func criterion(id, kind string) AcceptanceCriterion {
 	return AcceptanceCriterion{Version: 1, ID: id, Kind: kind, RequiredSource: source, ValidatorID: validator, Description: "The result satisfies the requirement.", Required: true}
 }
 
+func TestAcceptanceCriterionAdmitsNamespacedBuiltinValidator(t *testing.T) {
+	item := criterion("meaningful-output", "objective")
+	item.ValidatorID = "deterministic.meaningful_text.v1"
+	if err := item.Validate(); err != nil {
+		t.Fatal("built-in validator rejected by public contract", err)
+	}
+	for _, invalid := range []string{".validator", "validator..name", "validator/name", "validator name"} {
+		item.ValidatorID = invalid
+		if err := item.Validate(); err == nil {
+			t.Fatal("invalid validator identifier accepted", invalid)
+		}
+	}
+}
+
 func boardFixture() Board {
 	now := workboardTime()
 	return Board{Version: 1, ID: "board-a", Revision: 1, LayoutRevision: 1, EventSequence: 1, State: "active", Title: "DarwinRouter", Description: "Work", CardCount: 1, ActiveClaims: 1, CreatedAt: now, UpdatedAt: now}

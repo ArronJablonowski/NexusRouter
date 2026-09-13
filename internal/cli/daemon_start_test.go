@@ -248,21 +248,23 @@ func TestManagedDaemonStartRefusesBeforeLaunch(t *testing.T) {
 	}
 }
 
-func TestManagedDaemonStartRejectsUnwiredWorkboardSchedulerBeforeLaunch(t *testing.T) {
+func TestManagedDaemonStartAllowsWorkboardSchedulerConfiguration(t *testing.T) {
 	t.Setenv("DARWIN_TEST_START_CHILD", "1")
 	token := strings.Repeat("test-token-", 4)
 	t.Setenv("DARWIN_API_TOKEN", token)
 	cfg, path, marker := daemonStartFixtureConfig(t, "ready")
 	cfg.Workboard.Scheduler.Enabled = true
-	if _, err := runDaemonStart(context.Background(), cfg, path, token); err == nil {
-		t.Fatal("unwired scheduler admitted")
-	}
-	if _, err := os.Stat(marker); !os.IsNotExist(err) {
-		t.Fatal("refused scheduler configuration spawned a child")
-	}
-	listener, err := net.Listen("tcp", cfg.Daemon.Listen)
+	status, err := runDaemonStart(context.Background(), cfg, path, token)
 	if err != nil {
-		t.Fatal("refused scheduler configuration acquired the listener", err)
+		t.Fatal("scheduler configuration rejected before managed launch", err)
 	}
-	listener.Close()
+	client, err := daemonClient(cfg, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	defer func() { _, _ = client.Stop(context.Background(), status.InstanceID) }()
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("scheduler configuration did not launch child", err)
+	}
 }
