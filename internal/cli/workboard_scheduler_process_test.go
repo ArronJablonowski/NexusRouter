@@ -117,7 +117,7 @@ func workboardDaemonAudit() string {
 // TestEnabledWorkboardSchedulerDaemonExecutesAndJoinsOnSIGTERM qualifies the
 // stock executable rather than an in-process composition. It proves that an
 // enabled scheduler participates in readiness, uses independent loopback
-// worker and reviewer identities, and joins an in-flight provider call before
+// worker, reviewer, and validator identities, and joins an in-flight provider call before
 // the daemon closes its database and exits.
 func TestEnabledWorkboardSchedulerDaemonExecutesAndJoinsOnSIGTERM(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -141,7 +141,7 @@ func TestEnabledWorkboardSchedulerDaemonExecutesAndJoinsOnSIGTERM(t *testing.T) 
 	assertWorkboardSchedulerHealth(t, report, "healthy", "supervisor_ok")
 	waitForWorkboardWorkerCall(t, ctx, fixture, 1)
 	waitForWorkboardReviewerCall(t, ctx, fixture, 1, process)
-	waitWorkboardCardState(t, ctx, cfg.Telemetry.Database, boardID, firstCard, workboard.Review, fixture, process)
+	waitWorkboardCardState(t, ctx, cfg.Telemetry.Database, boardID, firstCard, workboard.Done, fixture, process)
 	if fixture.workerCalls.Load() != 1 || fixture.reviewerCalls.Load() != 1 {
 		t.Fatal("configured worker/reviewer did not execute exactly once", fixture.workerCalls.Load(), fixture.reviewerCalls.Load())
 	}

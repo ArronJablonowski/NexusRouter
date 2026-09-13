@@ -23,7 +23,14 @@ func (e *capturingWorkboardEvaluator) EvaluateCandidate(_ context.Context, reque
 	e.request = request
 	e.request.ArtifactRefs = append([]string{}, request.ArtifactRefs...)
 	e.actor = workboard.Actor{ID: request.WorkerID, Type: "worker"}
-	return []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "passed", ActorID: "go-test", ActorType: "validator", Reference: "focused-test-report"}}, nil
+	validatorID := "go-test"
+	for _, criterion := range request.Criteria {
+		if criterion.ID == "tests" {
+			validatorID = criterion.ValidatorID
+			break
+		}
+	}
+	return []workboard.EvidenceInput{{CriterionID: "tests", Source: "deterministic", Outcome: "passed", ActorID: validatorID, ActorType: "validator", Reference: "focused-test-report"}}, nil
 }
 
 func TestWorkboardWorkerDispatchOwnsOnlyWorkerLifecycle(t *testing.T) {

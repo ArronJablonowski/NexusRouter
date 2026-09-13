@@ -33,7 +33,7 @@ type workboardE2ECycleResult struct {
 	err    error
 }
 
-func TestConfiguredWorkboardScheduleSupervisorPersistsReviewedCandidateEndToEnd(t *testing.T) {
+func TestConfiguredWorkboardScheduleSupervisorPersistsAcceptedCandidateEndToEnd(t *testing.T) {
 	workerRequests := make(chan workboardE2EProviderRequest, 1)
 	workerServer := httptest.NewServer(workboardE2EOllamaHandler(t, workerRequests, "factory candidate", 100, 20))
 	defer workerServer.Close()
@@ -227,16 +227,21 @@ func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store
 	card, err := store.GetCard(ctx, boardID, cardID)
 	snapshots, snapshotErr := store.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
 	attempt := snapshots[cardID].Attempt
-	if err != nil || snapshotErr != nil || card.State != workboard.Review || card.CurrentClaimID != "" ||
-		attempt == nil || attempt.Validate() != nil || attempt.State != "review" || attempt.Claim.State != string(workboard.LeaseReleased) ||
-		attempt.Candidate == nil || attempt.Candidate.Summary != "factory candidate" || attempt.Candidate.EvidenceCount != 1 ||
-		len(attempt.Evidence) != 1 || len(attempt.TaskIDs) != 1 || len(attempt.SessionIDs) != 1 {
+	if err != nil || snapshotErr != nil || card.State != workboard.Done || card.CurrentClaimID != "" || card.AcceptanceID == "" ||
+		attempt == nil || attempt.Validate() != nil || attempt.State != "accepted" || attempt.Claim.State != string(workboard.LeaseReleased) ||
+		attempt.Candidate == nil || attempt.Candidate.Summary != "factory candidate" || attempt.Candidate.EvidenceCount != 2 ||
+		len(attempt.Evidence) != 2 || attempt.Acceptance == nil || attempt.Acceptance.ID != card.AcceptanceID ||
+		attempt.Acceptance.Decision != "accepted" || attempt.Acceptance.DecidedBy != configuredAcceptanceAuthority ||
+		attempt.Acceptance.DecidedByType != "validator" || len(attempt.TaskIDs) != 1 || len(attempt.SessionIDs) != 1 {
 		t.Fatalf("card=%+v lifecycle=%+v errors=%v/%v", card, snapshots[cardID], err, snapshotErr)
 	}
-	evidence := attempt.Evidence[0]
-	if evidence.Source != "model_audit" || evidence.Outcome != "passed" || evidence.CriterionID != "tests" ||
-		evidence.ActorID != "reviewer" || evidence.ActorType != "model" || evidence.Reference == "" {
-		t.Fatalf("evidence=%+v", evidence)
+	deterministic, auditEvidence := attempt.Evidence[0], attempt.Evidence[1]
+	if deterministic.Source != "deterministic" || deterministic.Outcome != "passed" || deterministic.CriterionID != "tests" ||
+		deterministic.ActorID != "deterministic.nonempty_text.v1" || deterministic.ActorType != "validator" || deterministic.Reference == "" ||
+		auditEvidence.Source != "model_audit" || auditEvidence.Outcome != "passed" || auditEvidence.CriterionID != "tests" ||
+		auditEvidence.ActorID != "reviewer" || auditEvidence.ActorType != "model" || auditEvidence.Reference == "" ||
+		!strings.Contains(attempt.Acceptance.Rationale, deterministic.Reference) || strings.Contains(attempt.Acceptance.Rationale, auditEvidence.Reference) {
+		t.Fatalf("evidence=%+v acceptance=%+v", attempt.Evidence, attempt.Acceptance)
 	}
 	taskID, sessionID := attempt.TaskIDs[0], attempt.SessionIDs[0]
 	events, err := store.Read(ctx, taskID, 0, 10)
@@ -276,7 +281,7 @@ func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store
 		outcome.SourceTaskID != taskID || outcome.SourceSessionID != sessionID || outcome.SourceCompletionEventID != completed.ID ||
 		outcome.SourceTerminalEventID != terminal.ID || outcome.SourceConfigID != wantConfigID || outcome.ReviewerProviderID != admission.ProviderID ||
 		outcome.AdmissionDigest != admission.AdmissionDigest || outcome.SettlementDigest != settlement.SettlementDigest ||
-		outcome.AuditID != evidence.Reference || outcome.EvidenceCount != 1 || outcome.EvidenceDigest != attempt.Candidate.EvidenceDigest {
+		outcome.AuditID != auditEvidence.Reference || outcome.EvidenceCount != 2 || outcome.EvidenceDigest != attempt.Candidate.EvidenceDigest {
 		t.Fatalf("review outcome=%+v found=%v legacy=%v err=%v", outcome, found, legacy, err)
 	}
 	audit, err := store.Audit(ctx, outcome.AuditID)

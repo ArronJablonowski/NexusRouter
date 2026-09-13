@@ -74,6 +74,7 @@ type WorkboardWorkerRunner struct {
 	ttl          time.Duration
 	now          func() time.Time
 	runtimeStore *telemetry.Store
+	acceptance   *workboard.AcceptanceCoordinator
 }
 
 func NewWorkboardWorkerRunner(supervisor *workers.Supervisor, repository workboardWorkerRepository,
@@ -205,6 +206,11 @@ func (r *WorkboardWorkerRunner) execute(ctx context.Context, stopSupervisor cont
 	}
 	if _, runErr = handle.submit(ctx, candidate); runErr != nil {
 		return WorkboardCandidate{}, runErr
+	}
+	if r.acceptance != nil {
+		if _, runErr = r.acceptance.Coordinate(ctx, task.BoardID, task.CardID); runErr != nil {
+			return WorkboardCandidate{}, runErr
+		}
 	}
 	return candidate, nil
 }

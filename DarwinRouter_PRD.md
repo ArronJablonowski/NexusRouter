@@ -339,6 +339,14 @@ bounded retries, and stall/attention states prevent runaway work. Lease expiry
 makes work recoverable but does not prove execution stopped or authorize replay
 of confirmed or uncertain side effects.
 
+Trusted deterministic validators are selected by immutable, versioned identity
+and receive an owned copy of the exact frozen candidate and criterion binding.
+The host constructs their evidence records; validator callbacks and model
+review output cannot choose evidence source, actor, criterion, or authority.
+Unknown required validators, callback panic, cancellation, or invalid evidence
+references fail closed. Stock validator identities cannot be replaced by
+extension code without a new identity.
+
 Before any unattended card execution constructs a provider request or invokes a
 tool, the scheduler must transactionally reserve a global and per-board WIP slot
 and the card's remaining time, token, and cost allowance against the exact card
@@ -365,6 +373,15 @@ atomically unlocks eligible successors; parent progress is derived rather than
 cached as independent truth. Operators can pause, cancel, steer, reprioritize,
 or revise future acceptance criteria at safe boundaries, but those changes do
 not expand an active worker's permissions.
+
+Candidate commitment and acceptance decision are separate durable boundaries.
+After restart, the scheduler must page through already-committed Review
+candidates and re-drive only the criterion decision from their stored evidence;
+it must never reconstruct the task or redispatch the worker or advisory reviewer.
+The scan is bounded and fair so subjective candidates awaiting user feedback do
+not starve later objective candidates. A deterministic rejection returned to
+Ready is not eligible for another worker attempt in the same reconciliation
+pass.
 
 The Web UI is bound to loopback by default and uses a same-origin browser
 session/BFF boundary over the daemon's authenticated application service. Host

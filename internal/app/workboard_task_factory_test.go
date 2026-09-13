@@ -352,7 +352,7 @@ func readyFactoryCard(t *testing.T, database string, budget workboard.WorkBudget
 	contractBudget := webui.WorkBudget{AttemptLimit: budget.AttemptLimit, TimeLimitMS: budget.TimeLimitMS,
 		TokenLimit: budget.TokenLimit, CostMicros: budget.CostMicros}
 	criteria := []webui.AcceptanceCriterion{{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic",
-		ValidatorID: "go-test", Description: "Focused tests pass", Required: true}}
+		ValidatorID: "deterministic.nonempty_text.v1", Description: "Focused tests pass", Required: true}}
 	card, err := bridge.NativeMutate(ctx, webui.BoardRequest{Version: 1, Action: webui.CardCreate,
 		IdempotencyKey: "factory-card-create", BoardID: board.BoardID, Title: &cardTitle, Description: &description,
 		Budget: &contractBudget, Criteria: criteria, ExpectedBoardRevision: revisionPointer(board.BoardRevision), ExpectedGraphRevision: revisionPointer(1)})

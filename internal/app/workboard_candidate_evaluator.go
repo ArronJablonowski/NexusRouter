@@ -2,13 +2,12 @@ package app
 
 import (
 	"context"
-	"strings"
 
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
-const meaningfulWorkboardOutputValidator = "deterministic.meaningful_text.v1"
+const meaningfulWorkboardOutputValidator = workboard.MeaningfulTextCandidateValidatorID
 
 type workboardEvaluationEventSource interface {
 	Read(context.Context, string, int64, int) ([]runtime.Event, error)
@@ -18,18 +17,29 @@ type workboardEvaluationEventSource interface {
 // outcomes with the independently budgeted advisory reviewer. Model output is
 // never given a path to construct deterministic evidence.
 type configuredWorkboardCandidateEvaluator struct {
-	events   workboardEvaluationEventSource
-	reviewer workboard.BudgetedCandidateEvaluator
+	events     workboardEvaluationEventSource
+	reviewer   workboard.BudgetedCandidateEvaluator
+	validators *workboard.CandidateValidatorRegistry
 }
 
-func newConfiguredWorkboardCandidateEvaluator(events workboardEvaluationEventSource,
-	reviewer workboard.CandidateEvaluator,
+func newConfiguredWorkboardCandidateEvaluator(events workboardEvaluationEventSource, reviewer workboard.CandidateEvaluator,
+	configured ...*workboard.CandidateValidatorRegistry,
 ) (workboard.CandidateEvaluator, error) {
 	budgeted, ok := reviewer.(workboard.BudgetedCandidateEvaluator)
-	if events == nil || !ok {
+	if events == nil || !ok || len(configured) > 1 {
 		return nil, ErrAdmission
 	}
-	return &configuredWorkboardCandidateEvaluator{events: events, reviewer: budgeted}, nil
+	registry, err := workboard.NewCandidateValidatorRegistry(nil)
+	if len(configured) == 1 {
+		registry, err = configured[0], nil
+	}
+	if err != nil || registry == nil {
+		return nil, ErrAdmission
+	}
+	if _, err = registry.Resolve(workboard.MeaningfulTextCandidateValidatorID); err != nil {
+		return nil, ErrAdmission
+	}
+	return &configuredWorkboardCandidateEvaluator{events: events, reviewer: budgeted, validators: registry}, nil
 }
 
 func (*configuredWorkboardCandidateEvaluator) EvaluateCandidate(context.Context,
@@ -50,7 +60,7 @@ func (e *configuredWorkboardCandidateEvaluator) AuxiliaryReviewReservation(
 func (e *configuredWorkboardCandidateEvaluator) EvaluateBudgetedCandidate(ctx context.Context,
 	frozen workboard.CandidateEvaluationRequest,
 ) (workboard.BudgetedCandidateEvaluation, error) {
-	if e == nil || e.events == nil || e.reviewer == nil || ctx == nil || ctx.Err() != nil || frozen.Validate() != nil {
+	if e == nil || e.events == nil || e.validators == nil || e.reviewer == nil || ctx == nil || ctx.Err() != nil || frozen.Validate() != nil {
 		return workboard.BudgetedCandidateEvaluation{}, ErrAdmission
 	}
 	deterministic, err := e.deterministicEvidence(ctx, frozen)
@@ -97,21 +107,42 @@ func (e *configuredWorkboardCandidateEvaluator) deterministicEvidence(ctx contex
 		if criterion.RequiredSource != "deterministic" {
 			continue
 		}
-		passed, reference, found := false, "", false
-		if criterion.ValidatorID == meaningfulWorkboardOutputValidator {
-			passed, reference, found = meaningfulWorkboardOutput(frozen.SourceOutput, frozen.Criteria), frozen.SourceCompletionEventID, true
-		} else if event, ok := byValidator[criterion.ValidatorID]; ok {
-			passed, reference, found = *event.Data.Accepted, event.ID, true
+		validator, err := e.validators.Resolve(criterion.ValidatorID)
+		if err != nil {
+			// Runtime deterministic evaluation events are trusted host output. Bind
+			// only the exact configured identity and immutable event result into a
+			// one-entry registry; arbitrary or missing identities still fail closed.
+			if event, ok := byValidator[criterion.ValidatorID]; ok {
+				bound := event
+				transient, buildErr := workboard.NewCandidateValidatorRegistry(map[string]workboard.CandidateValidator{
+					criterion.ValidatorID: workboard.CandidateValidatorFunc(func(context.Context, workboard.CandidateValidationInput) (workboard.CandidateValidationDecision, error) {
+						return workboard.CandidateValidationDecision{Passed: *bound.Data.Accepted, Reference: bound.ID}, nil
+					}),
+				})
+				if buildErr == nil {
+					validator, err = transient.Resolve(criterion.ValidatorID)
+				}
+			}
 		}
-		if !found {
-			continue
+		if err != nil {
+			if !criterion.Required {
+				continue
+			}
+			return nil, ErrAdmission
+		}
+		decision, err := workboard.InvokeCandidateValidator(ctx, validator, workboard.CandidateValidationInput{
+			Candidate: frozen,
+			Criterion: criterion,
+		})
+		if err != nil {
+			return nil, ErrAdmission
 		}
 		outcome := "failed"
-		if passed {
+		if decision.Passed {
 			outcome = "passed"
 		}
 		item := workboard.EvidenceInput{CriterionID: criterion.ID, Source: "deterministic",
-			Outcome: outcome, ActorID: criterion.ValidatorID, ActorType: "validator", Reference: reference}
+			Outcome: outcome, ActorID: criterion.ValidatorID, ActorType: "validator", Reference: decision.Reference}
 		if item.Validate() != nil {
 			return nil, ErrAdmission
 		}
@@ -120,30 +151,8 @@ func (e *configuredWorkboardCandidateEvaluator) deterministicEvidence(ctx contex
 	return result, nil
 }
 
-// meaningfulWorkboardOutput is deliberately conservative. It proves only that
-// the exact runtime output contains substantive text rather than whitespace or
-// a promise to perform the requested work later.
 func meaningfulWorkboardOutput(output string, criteria []workboard.AcceptanceCriterion) bool {
-	normalized := strings.ToLower(strings.Join(strings.Fields(output), " "))
-	normalized = strings.Trim(normalized, " .,!?:;\"'")
-	if normalized == "" {
-		return false
-	}
-	for _, criterion := range criteria {
-		repeated := strings.ToLower(strings.Join(strings.Fields(criterion.Description), " "))
-		if normalized == strings.Trim(repeated, " .,!?:;\"'") {
-			return false
-		}
-	}
-	words := strings.Fields(normalized)
-	for _, promise := range []string{
-		"i will ", "i'll ", "i can ", "let me ", "working on it", "sure, i will ", "sure, i'll ",
-	} {
-		if len(words) <= 8 && (normalized == strings.TrimSpace(promise) || strings.HasPrefix(normalized, promise)) {
-			return false
-		}
-	}
-	return true
+	return workboard.MeaningfulCandidateOutput(output, criteria)
 }
 
 var _ workboard.BudgetedCandidateEvaluator = (*configuredWorkboardCandidateEvaluator)(nil)

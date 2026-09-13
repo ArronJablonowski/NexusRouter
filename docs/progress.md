@@ -7159,7 +7159,9 @@ shutdown, and restart qualification.
 
 ## 2026-09-13 — DAR-96 stock daemon scheduler enablement
 
-DAR-96 is acceptance-ready. The stock daemon now conditionally prepares the
+The DAR-96 daemon-composition slice is acceptance-ready. At this checkpoint,
+the full issue still depended on the criterion-bound decision coordinator in
+DAR-93. The stock daemon now conditionally prepares the
 configured Workboard schedule from its already-owned SQLite store, starts the
 supervisor after the other application supervisors, includes its distinct
 state in aggregate health and readiness only when enabled, and cancels and
@@ -7189,3 +7191,50 @@ full serialized repository gate passed: `internal/app` completed in 1155.974
 seconds, `internal/cli` in 112.033 seconds, `internal/telemetry` in 1196.038
 seconds, and `internal/releasepack` in 459.923 seconds, followed by the complete
 production build.
+
+## 2026-09-13 — DAR-91/DAR-92/DAR-93 completion and DAR-96 acceptance qualification
+
+DAR-91's independent-review budget path now has explicit race-enabled terminal
+coverage for cancellation, deadline expiry, and evaluator panic. Each case
+proves one durable admission, one terminal settlement, no candidate, no hidden
+redispatch, and conservative full-reservation charges for every unknown time,
+token, and cost dimension. This complements the existing SIGKILL tests before
+the atomic candidate commit and after commit but before acknowledgement.
+
+DAR-92 now exposes an immutable, typed-nil-safe trusted candidate-validator
+registry. The protected `deterministic.meaningful_text.v1` validator and exact
+host-produced runtime validation events operate on an owned copy of the frozen
+candidate/criterion snapshot. Unknown required validators, callback panics,
+cancellation, invalid references, and reviewer attempts to forge deterministic
+or user-feedback evidence fail closed before advisory review can grant any
+authority. Model audit evidence remains separately persisted and advisory.
+
+DAR-93 adds a validator-authority coordinator after the candidate and evidence
+commit. It auto-accepts only when every required objective criterion has an
+exact deterministic pass and no required subjective criterion remains;
+required deterministic failure auto-rejects. Subjective work stays in Review
+for authenticated operator feedback, and `model_audit` outcomes never decide.
+The existing transactional revision/digest fences make scheduler/operator races
+single-winner and preserve the winning actor, reason, and evidence set. The API
+already projects these records, and the integrated Kanban now displays the
+bounded rationale and evidence references.
+
+An adversarial review found and closed the post-candidate/pre-decision restart
+window. Each scheduler cycle now freezes its worker-dispatch view, then scans a
+bounded rotating page of already-durable Review candidates and re-drives only
+their acceptance decision. It never reconstructs the task or redispatches the
+worker or reviewer. Close/reopen qualification proves one worker and one
+reviewer call before the simulated crash, zero model redispatch after restart,
+and objective completion from durable evidence. Rotation tests prove more than
+one full page of subjective candidates cannot starve a later objective card,
+and injected reconciler panics are contained at the scheduler boundary.
+
+With DAR-91 through DAR-95 prerequisites represented in production and the
+stock-daemon process qualification already passing, DAR-96 is now
+acceptance-ready. The exact-tree serialized repository gate passed: formatting
+and the 1,000-line limit, `go vet`, the full race-enabled suite, and the
+production build all completed successfully. The longest changed-boundary
+packages were `internal/app` at 1201.822 seconds, `internal/cli` at 109.008
+seconds, `internal/telemetry` at 1246.763 seconds, `internal/releasepack` at
+488.327 seconds, `sdk/v1` at 133.985 seconds, and `webui` at 9.186 seconds. No
+Linear state or comment is changed without operator confirmation.

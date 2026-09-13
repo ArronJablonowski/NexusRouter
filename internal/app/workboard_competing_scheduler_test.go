@@ -109,10 +109,12 @@ func TestCompetingConfiguredWorkboardSchedulersRelyOnDurableClaimCAS(t *testing.
 	card, cardErr := firstStore.GetCard(ctx, boardID, cardID)
 	lifecycles, lifecycleErr := firstStore.ReadCardLifecycleSnapshots(ctx, boardID, []string{cardID})
 	attempt := lifecycles[cardID].Attempt
-	if cardErr != nil || lifecycleErr != nil || card.State != workboard.Review || card.AttemptCount != 1 ||
+	if cardErr != nil || lifecycleErr != nil || card.State != workboard.Done || card.AttemptCount != 1 || card.AcceptanceID == "" ||
 		card.CurrentClaimID != "" || attempt == nil || attempt.Validate() != nil || attempt.Claim == nil ||
 		attempt.Claim.State != string(workboard.LeaseReleased) || attempt.Candidate == nil ||
-		attempt.Candidate.Summary != "factory candidate" || len(attempt.TaskIDs) != 1 || len(attempt.SessionIDs) != 1 {
+		attempt.Candidate.Summary != "factory candidate" || attempt.Acceptance == nil || attempt.Acceptance.ID != card.AcceptanceID ||
+		attempt.Acceptance.Decision != "accepted" || attempt.Acceptance.DecidedBy != configuredAcceptanceAuthority ||
+		len(attempt.TaskIDs) != 1 || len(attempt.SessionIDs) != 1 {
 		t.Fatalf("card=%+v lifecycle=%+v errors=%v/%v", card, lifecycles[cardID], cardErr, lifecycleErr)
 	}
 	tasks, taskErr := firstStore.ListTasks(ctx, sessions.TaskListOptions{Limit: 10})

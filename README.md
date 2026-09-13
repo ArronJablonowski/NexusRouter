@@ -1877,8 +1877,8 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Finish transactional workboard execution budgets, configured acceptance judging, stock-daemon scheduler composition, and broad crash/lease/acceptance qualification through DAR-85.
-2. Qualify Web UI/Kanban security, recovery, accessibility, and packaging in DAR-86 and DAR-87.
+1. Close the verified DAR-91 through DAR-96 Workboard review, decision, supervision, and stock-daemon scheduling slice in Linear.
+2. Continue the remaining Linear backlog, prioritizing Web UI/Kanban security, recovery, accessibility, packaging, and release qualification.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

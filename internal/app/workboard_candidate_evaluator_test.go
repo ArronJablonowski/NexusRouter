@@ -66,6 +66,33 @@ func TestConfiguredWorkboardCandidateEvaluatorCombinesTrustedAndAdvisoryEvidence
 	}
 }
 
+func TestConfiguredWorkboardCandidateEvaluatorRunsExactRegisteredValidator(t *testing.T) {
+	frozen := workboardReviewFrozen(t)
+	registry, err := workboard.NewCandidateValidatorRegistry(map[string]workboard.CandidateValidator{
+		frozen.Criteria[0].ValidatorID: workboard.CandidateValidatorFunc(func(_ context.Context, input workboard.CandidateValidationInput) (workboard.CandidateValidationDecision, error) {
+			if input.Candidate.CandidateDigest != frozen.CandidateDigest || input.Criterion != frozen.Criteria[0] {
+				t.Fatal("validator received a different candidate binding")
+			}
+			return workboard.CandidateValidationDecision{Passed: true, Reference: "trusted-validator-event"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &workboardReviewProvider{response: workboardAuditResponse("abstain", []any{})}
+	reviewer := newWorkboardCandidateReviewer(workboardReviewerConfig(), provider, nil, nil)
+	reviewer.newID = func() string { return "runtime-projection-audit" }
+	evaluator, err := newConfiguredWorkboardCandidateEvaluator(workboardEvaluationEvents{}, reviewer, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := evaluator.(workboard.BudgetedCandidateEvaluator).EvaluateBudgetedCandidate(context.Background(), frozen)
+	if err != nil || len(result.Evidence) != 1 || result.Evidence[0].ActorID != frozen.Criteria[0].ValidatorID ||
+		result.Evidence[0].Reference != "trusted-validator-event" || result.Evidence[0].Outcome != "passed" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
 func TestConfiguredWorkboardCandidateEvaluatorProjectsExactRuntimeValidator(t *testing.T) {
 	frozen := workboardReviewFrozen(t)
 	frozen.SourceTerminalSequence++
@@ -89,25 +116,44 @@ func TestConfiguredWorkboardCandidateEvaluatorProjectsExactRuntimeValidator(t *t
 	}
 }
 
-func TestConfiguredWorkboardCandidateEvaluatorIgnoresUnconfiguredValidatorIdentity(t *testing.T) {
+func TestConfiguredWorkboardCandidateEvaluatorFailsClosedForUnconfiguredRequiredValidator(t *testing.T) {
 	frozen := workboardReviewFrozen(t)
-	frozen.SourceTerminalSequence++
-	accepted := true
-	events := workboardEvaluationEvents{events: []runtime.Event{{
-		Version: 1, ID: "other-validator-event", TaskID: frozen.SourceTaskID, SessionID: frozen.SourceSessionID,
-		Sequence: frozen.SourceCompletionSequence + 1, TurnID: frozen.SourceTurnID, AttemptID: frozen.SourceAttemptID, Kind: runtime.EvaluationRecorded,
-		Data: runtime.Data{Code: "other-validator", Accepted: &accepted},
-	}}}
 	provider := &workboardReviewProvider{response: workboardAuditResponse("abstain", []any{})}
 	reviewer := newWorkboardCandidateReviewer(workboardReviewerConfig(), provider, nil, nil)
 	reviewer.newID = func() string { return "identity-audit" }
-	evaluator, err := newConfiguredWorkboardCandidateEvaluator(events, reviewer)
+	evaluator, err := newConfiguredWorkboardCandidateEvaluator(workboardEvaluationEvents{}, reviewer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := evaluator.(workboard.BudgetedCandidateEvaluator).EvaluateBudgetedCandidate(context.Background(), frozen)
-	if err != nil || len(result.Evidence) != 0 {
-		t.Fatalf("unconfigured validator projected: result=%+v err=%v", result, err)
+	if _, err = evaluator.(workboard.BudgetedCandidateEvaluator).EvaluateBudgetedCandidate(context.Background(), frozen); !errors.Is(err, ErrAdmission) {
+		t.Fatalf("unconfigured required validator admitted: %v", err)
+	}
+	if provider.calls.Load() != 0 {
+		t.Fatal("reviewer ran before required deterministic validator was resolved")
+	}
+}
+
+func TestConfiguredWorkboardCandidateEvaluatorContainsValidatorPanicBeforeReview(t *testing.T) {
+	frozen := workboardReviewFrozen(t)
+	registry, err := workboard.NewCandidateValidatorRegistry(map[string]workboard.CandidateValidator{
+		frozen.Criteria[0].ValidatorID: workboard.CandidateValidatorFunc(func(context.Context, workboard.CandidateValidationInput) (workboard.CandidateValidationDecision, error) {
+			panic("host validator failure")
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &workboardReviewProvider{response: workboardAuditResponse("abstain", []any{})}
+	reviewer := newWorkboardCandidateReviewer(workboardReviewerConfig(), provider, nil, nil)
+	evaluator, err := newConfiguredWorkboardCandidateEvaluator(workboardEvaluationEvents{}, reviewer, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = evaluator.(workboard.BudgetedCandidateEvaluator).EvaluateBudgetedCandidate(context.Background(), frozen); !errors.Is(err, ErrAdmission) {
+		t.Fatalf("panicking validator admitted: %v", err)
+	}
+	if provider.calls.Load() != 0 {
+		t.Fatal("reviewer ran after deterministic validator panic")
 	}
 }
 

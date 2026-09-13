@@ -255,7 +255,16 @@
 		const result = {criteria: "Criteria revision " + String(card.criteria_revision) + " · " + String(required.length) + " required of " + String(card.criteria.length), required: required.map(criterion => criterion.description), attempt: "No current attempt lifecycle in this page.", acceptance: "Acceptance not recorded.", claim: "No claim recorded.", attention: false};
 		if (!lifecycle) return result;
 		const attempt = lifecycle.attempt; result.attempt = "Attempt " + String(attempt.ordinal) + " · " + attempt.state + " · criteria revision " + String(attempt.criteria_revision);
-		if (lifecycle.acceptance) result.acceptance = "Acceptance " + lifecycle.acceptance.decision + " · decided by " + lifecycle.acceptance.decided_by;
+		if (lifecycle.acceptance) {
+			const criteria = new Map(card.criteria.map(item => [item.id, item]));
+			const references = attempt.evidence.filter(item => {
+				const criterion = criteria.get(item.criterion_id);
+				return criterion && criterion.required && item.source === criterion.required_source &&
+					(item.source !== "deterministic" || item.actor_type === "validator" && item.actor_id === criterion.validator_id) &&
+					(item.source !== "user_feedback" || item.actor_type === "operator");
+			}).map(item => item.reference);
+			result.acceptance = "Acceptance " + lifecycle.acceptance.decision + " · decided by " + lifecycle.acceptance.decided_by + " · reason " + lifecycle.acceptance.rationale + " · evidence references " + (references.length ? references.join(", ") : "none");
+		}
 		if (attempt.claim) { result.attention = attempt.claim.state === "attention"; result.claim = "Claim owner " + attempt.claim.owner_id + " · " + attempt.claim.state + " · heartbeat " + attempt.claim.last_heartbeat + " · expires " + attempt.claim.expires_at + (result.attention ? " · stale/orphan attention required" : ""); }
 		return result;
 	}

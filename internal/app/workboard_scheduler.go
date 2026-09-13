@@ -39,6 +39,10 @@ type WorkboardTaskRunner interface {
 	Run(context.Context, WorkboardWorkerTask) (WorkboardCandidate, error)
 }
 
+type WorkboardAcceptanceReconciler interface {
+	ReconcileBoard(context.Context, string, int) (workboard.AcceptanceReconciliationResult, error)
+}
+
 type WorkboardTaskRunnerFunc func(context.Context, WorkboardWorkerTask) (WorkboardCandidate, error)
 
 func (f WorkboardTaskRunnerFunc) Run(ctx context.Context, task WorkboardWorkerTask) (WorkboardCandidate, error) {
@@ -69,11 +73,12 @@ type WorkboardScheduleResult struct {
 // remain authoritative across daemon restarts. Claim CAS prevents duplicate
 // ownership of one card; deployment still permits only one daemon scheduler.
 type WorkboardScheduler struct {
-	reader  WorkboardSupervisionReader
-	factory WorkboardTaskFactory
-	runner  WorkboardTaskRunner
-	limits  WorkboardScheduleLimits
-	cycles  *workboardCycleGate
+	reader     WorkboardSupervisionReader
+	factory    WorkboardTaskFactory
+	runner     WorkboardTaskRunner
+	acceptance WorkboardAcceptanceReconciler
+	limits     WorkboardScheduleLimits
+	cycles     *workboardCycleGate
 }
 
 // workboardCycleGate serializes duplicate cycles for one board without making
@@ -117,6 +122,14 @@ func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (Work
 	ready, err := s.discover(ctx, boardID, &result)
 	if err != nil {
 		return result, err
+	}
+	// Reconcile only after freezing this cycle's worker-dispatch view. A
+	// deterministic rejection may return a card to Ready, but it must not cause
+	// a new worker attempt in the same recovery pass.
+	if s.acceptance != nil {
+		if _, err = reconcileScheduledWorkboardAcceptance(ctx, s.acceptance, boardID, s.limits.ScanLimit); err != nil {
+			return result, errors.Join(ErrWorkboardSchedule, err)
+		}
 	}
 	available := s.limits.MaxInFlight - result.ExistingWIP
 	if available < 1 {
@@ -171,6 +184,17 @@ func (s *WorkboardScheduler) RunCycle(ctx context.Context, boardID string) (Work
 		return result, ctx.Err()
 	}
 	return result, nil
+}
+
+func reconcileScheduledWorkboardAcceptance(ctx context.Context, reconciler WorkboardAcceptanceReconciler,
+	boardID string, limit int,
+) (result workboard.AcceptanceReconciliationResult, err error) {
+	defer func() {
+		if recover() != nil {
+			result, err = workboard.AcceptanceReconciliationResult{}, ErrWorkboardSchedule
+		}
+	}()
+	return reconciler.ReconcileBoard(ctx, boardID, limit)
 }
 
 func (g *workboardCycleGate) acquire(ctx context.Context, boardID string) (func(), error) {

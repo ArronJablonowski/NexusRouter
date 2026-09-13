@@ -74,6 +74,11 @@ func prepareConfiguredWorkboardSchedule(ctx context.Context, service *Service,
 	if err != nil {
 		return nil, ErrAdmission
 	}
+	coordinator, err := newConfiguredWorkboardAcceptanceCoordinator(store, now)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	runner.acceptance = coordinator
 	authority := fixedWorkboardAuthority{authority: workboard.Authority{CreationScope: "workboard-scheduler", Actor: workboard.Actor{ID: "workboard-scheduler", Type: "system"}}}
 	supervision, err := workboard.NewSupervisionService(store, authority, now, lease)
 	if err != nil {
@@ -86,6 +91,7 @@ func prepareConfiguredWorkboardSchedule(ctx context.Context, service *Service,
 	if err != nil {
 		return nil, ErrAdmission
 	}
+	scheduler.acceptance = coordinator
 	return &ConfiguredWorkboardSchedulePlan{lister: store, scheduler: scheduler, interval: interval}, nil
 }
 
