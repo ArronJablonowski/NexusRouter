@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -174,6 +175,25 @@ func TestApprovedSigningRejectsArtifactNoticeOutsideLicenseEvidenceBeforeKey(t *
 	}
 }
 
+func TestApprovedSigningRejectsSBOMIdentityDriftBeforeKey(t *testing.T) {
+	for _, drift := range []string{"missing", "tampered", "created", "target", "binary", "module", "toolchain", "source_asset"} {
+		t.Run(drift, func(t *testing.T) {
+			options, _ := approvedSigningFixtureWithOptions(t, false, false, drift)
+			calls := 0
+			reader := func(string) ([]byte, error) {
+				calls++
+				return make([]byte, ed25519.SeedSize), nil
+			}
+			if err := signApproved(context.Background(), options, reader); err != ErrSignature {
+				t.Fatal("SBOM identity drift accepted", err)
+			}
+			if calls != 0 {
+				t.Fatal("SBOM identity drift reached private-key reader")
+			}
+		})
+	}
+}
+
 func TestApprovedArtifactLicenseIdentityRejectsRelationalMismatch(t *testing.T) {
 	options, _ := approvedSigningFixture(t)
 	_, evidence, err := readLicenseEvidence(options.LicenseEvidenceFile)
@@ -185,6 +205,10 @@ func TestApprovedArtifactLicenseIdentityRejectsRelationalMismatch(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer root.Close()
+	assets, err := readSBOMSourceFiles(options.Source)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for name, mutate := range map[string]func(*LicenseEvidence){
 		"source_commit": func(record *LicenseEvidence) { record.SourceCommit = strings.Repeat("a", 40) },
 		"toolchain":     func(record *LicenseEvidence) { record.Toolchain.GOVERSION = "go1.99.0" },
@@ -196,7 +220,8 @@ func TestApprovedArtifactLicenseIdentityRejectsRelationalMismatch(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			changed := cloneLicenseEvidence(evidence)
 			mutate(&changed)
-			if approvedArtifactLicenseIdentity(root, candidateFixtureFromFile(t, options.CandidateRecordFile), changed) == nil {
+			candidate := candidateFixtureFromFile(t, options.CandidateRecordFile)
+			if approvedArtifactLicenseIdentity(root, candidate, changed, assets, candidate.ReleaseCreated) == nil {
 				t.Fatal("artifact accepted with mismatched license evidence")
 			}
 		})
@@ -235,18 +260,18 @@ func canonicalAuthorizationFixture(t *testing.T, authorization SigningAuthorizat
 }
 
 func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, false, false)
+	return approvedSigningFixtureWithOptions(t, false, false, "")
 }
 
 func approvedSigningFixtureWithNoticeMismatch(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, true, false)
+	return approvedSigningFixtureWithOptions(t, true, false, "")
 }
 
 func approvedSigningExecutableFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, false, true)
+	return approvedSigningFixtureWithOptions(t, false, true, "")
 }
 
-func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableNative bool) (ApprovedSigningOptions, ed25519.PublicKey) {
+func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableNative bool, sbomDrift string) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
 	source := collateralSourceFixture(t)
@@ -259,6 +284,15 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 		t.Fatal(err)
 	}
 	if err = os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Join(source, "webui", "assets", "v1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "webui", "assets", "v1", "app.js"), []byte("fixture frontend source\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "webui", "shell.go"), []byte("package webui\n\nimport \"embed\"\n\n//go:embed assets/v1/*\nvar assets embed.FS\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	program := "package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"
@@ -277,6 +311,10 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 		}
 	}
 	commit := approvedSourceCommit(t, source)
+	created, err := releaseCommitCreated(ctx, source, commit, environment())
+	if err != nil {
+		t.Fatal(err)
+	}
 	licenseEvidenceFile := filepath.Join(t.TempDir(), "license-evidence.json")
 	licenseEvidenceSHA256, err := FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{
 		Commit: commit, Source: source, Out: licenseEvidenceFile,
@@ -301,11 +339,19 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 		t.Fatal(err)
 	}
 	releaseDir := t.TempDir()
-	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: commit, Toolchain: licenseEvidence.Toolchain.GOVERSION}
+	assets, err := readSBOMSourceFiles(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: commit, Created: created, Toolchain: licenseEvidence.Toolchain.GOVERSION}
 	var sums strings.Builder
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
-		notice, entryErr := thirdPartyNotices(ctx, source, target[0], target[1], environment())
+		modules, entryErr := targetNoticeModules(ctx, source, target[0], target[1], environment())
+		if entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		notice, entryErr := renderThirdPartyNotices(target[0], target[1], modules)
 		if entryErr != nil {
 			t.Fatal(entryErr)
 		}
@@ -324,9 +370,29 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 				t.Fatal(entryErr)
 			}
 		}
-		entries, metadata, entryErr := releaseEntries(shared, notice, binary)
+		binaryDigest := sha256.Sum256(binary)
+		sbom, entryErr := renderTargetSBOM(TargetSBOMOptions{
+			Version: "1.0.0", Commit: commit, TargetOS: target[0], TargetArch: target[1],
+			Created: created, BinarySHA256: hex.EncodeToString(binaryDigest[:]),
+		}, modules, assets)
 		if entryErr != nil {
 			t.Fatal(entryErr)
+		}
+		if sbomDrift != "" && target[0] == "darwin" && target[1] == "amd64" {
+			if sbomDrift == "tampered" {
+				sbom = append([]byte(nil), sbom...)
+				sbom[len(sbom)-2] ^= 1
+			} else if sbomDrift != "missing" {
+				sbom = driftApprovedSBOMFixture(t, sbom, sbomDrift)
+			}
+		}
+		entries, metadata, entryErr := releaseEntries(shared, notice, sbom, binary)
+		if entryErr != nil {
+			t.Fatal(entryErr)
+		}
+		if sbomDrift == "missing" && target[0] == "darwin" && target[1] == "amd64" {
+			entries = append(entries[:3], entries[4:]...)
+			metadata = append(metadata[:3], metadata[4:]...)
 		}
 		var archive strings.Builder
 		if entryErr = Archive(&archive, entries); entryErr != nil {
@@ -396,6 +462,75 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 		ExpectedKeyFingerprint:  keyFingerprint,
 		AuthorizationRecordFile: authorizationFile, ExpectedAuthorizationSHA256: prefixedDigest(authorizationBody),
 	}, public
+}
+
+func driftApprovedSBOMFixture(t *testing.T, body []byte, drift string) []byte {
+	t.Helper()
+	var document spdxDocument
+	if json.Unmarshal(body, &document) != nil {
+		t.Fatal("decode approved SBOM fixture")
+	}
+	replaceRelationID := func(old, replacement string) {
+		for i := range document.Relationships {
+			if document.Relationships[i].ElementID == old {
+				document.Relationships[i].ElementID = replacement
+			}
+			if document.Relationships[i].RelatedID == old {
+				document.Relationships[i].RelatedID = replacement
+			}
+		}
+	}
+	switch drift {
+	case "created":
+		original := document.CreationInfo.Created
+		document.CreationInfo.Created = "2026-09-13T18:00:01Z"
+		if document.CreationInfo.Created == original {
+			document.CreationInfo.Created = "2026-09-13T18:00:02Z"
+		}
+	case "target":
+		document.Name = strings.Replace(document.Name, "darwin-amd64", "darwin-arm64", 1)
+		document.DocumentNamespace = strings.Replace(document.DocumentNamespace, "darwin-amd64/sbom", "darwin-arm64/sbom", 1)
+	case "binary":
+		document.Files[0].Checksums[0].ChecksumValue = strings.Repeat("b", 64)
+	case "module":
+		for i := 1; i < len(document.Packages); i++ {
+			if document.Packages[i].Name != goToolchainModulePath {
+				old := document.Packages[i].SPDXID
+				document.Packages[i].Name = "example.com/unapproved"
+				document.Packages[i].SPDXID = stableSPDXID("Package", document.Packages[i].Name+"@"+document.Packages[i].VersionInfo)
+				replaceRelationID(old, document.Packages[i].SPDXID)
+				break
+			}
+		}
+	case "toolchain":
+		for i := 1; i < len(document.Packages); i++ {
+			if document.Packages[i].Name == goToolchainModulePath {
+				old := document.Packages[i].SPDXID
+				document.Packages[i].VersionInfo = "v1.26.0"
+				document.Packages[i].SPDXID = stableSPDXID("Package", goToolchainModulePath+"@"+document.Packages[i].VersionInfo)
+				replaceRelationID(old, document.Packages[i].SPDXID)
+				break
+			}
+		}
+	case "source_asset":
+		document.Files[1].Checksums[0].ChecksumValue = strings.Repeat("b", 64)
+	default:
+		t.Fatal("unknown SBOM drift fixture", drift)
+	}
+	sort.Slice(document.Packages[1:], func(i, j int) bool { return document.Packages[i+1].SPDXID < document.Packages[j+1].SPDXID })
+	sort.Slice(document.Relationships, func(i, j int) bool {
+		a, b := document.Relationships[i], document.Relationships[j]
+		return a.ElementID+"\x00"+a.Type+"\x00"+a.RelatedID < b.ElementID+"\x00"+b.Type+"\x00"+b.RelatedID
+	})
+	encoded, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded = append(encoded, '\n')
+	if ValidateTargetSBOM(encoded) != nil {
+		t.Fatal("drift fixture must remain canonical SPDX", drift)
+	}
+	return encoded
 }
 
 func approvedSourceCommit(t *testing.T, source string) string {

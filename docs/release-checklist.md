@@ -39,6 +39,9 @@ and sensitive logs out of this record and the repository.
 - License-evidence verification host/time/result:
 - Distribution scope reviewed (binary/source/channel):
 - Per-target module counts and `THIRD_PARTY_NOTICES.txt` SHA-256 values:
+- Per-target `SBOM.spdx.json` SHA-256 values and validation results:
+- Pinned official SPDX 2.3 schema revision/digest validation result:
+- First-party Web UI source inventory/hash review:
 - Go toolchain `LICENSE`/`PATENTS` hashes:
 - Approved repository license and evidence:
 - Dependency-license review evidence:
@@ -50,6 +53,12 @@ and sensitive logs out of this record and the repository.
   clean candidate and its independently supplied digest.
 - [ ] All four target closures, legal-file hashes and rendered-notice hashes
   were reviewed for the exact toolchain and distribution scope.
+- [ ] All four canonical SPDX 2.3 SBOMs match their target binary hashes,
+  candidate-bound module/toolchain closures, and exact first-party Web UI
+  source hashes.
+- [ ] SBOM `NOASSERTION` values were treated as unresolved review inputs, not
+  license approval; vulnerability scanning, build provenance, and legal review
+  were completed separately where the publication policy requires them.
 - [ ] Dependency and toolchain licenses, patent grants and required notices
   were approved for the shipped graph and included through the approved
   publication channel.
@@ -149,11 +158,14 @@ be omitted.
 - Independently confirmed license-evidence digest used by signing:
 - Independently approved exact `SHA256SUMS` SHA-256 source:
 - `manifest.json` SHA-256:
+- Per-target `SBOM.spdx.json` SHA-256 values:
 - `SHA256SUMS` SHA-256:
 - `SHA256SUMS.sig` SHA-256:
 - `verify-approved-release` JSON result location and digest:
 - Independent verification operator, host, time and result:
 - [ ] Manifest version and commit equal the recorded candidate identity.
+- [ ] The candidate record is canonical schema 2, the release manifest is
+  canonical schema 3, and each archive has the exact seven-member contract.
 - [ ] `build-approved-release` performed two isolated builds and the retained
   unsigned directory is one of those byte-compared outputs, not a later rebuild.
 - [ ] The retained checksum digest equals the exact independently authorized

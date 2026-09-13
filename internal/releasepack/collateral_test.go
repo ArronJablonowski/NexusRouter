@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-var collateralNames = []string{installName, licenseName, releaseNotesName, noticeName, configName, "darwin"}
+var collateralNames = []string{installName, licenseName, releaseNotesName, sbomName, noticeName, configName, "darwin"}
 
-func TestCollateralLoadAndSixMemberContract(t *testing.T) {
+func TestCollateralLoadAndSevenMemberContract(t *testing.T) {
 	source := collateralSourceFixture(t)
 	shared, err := loadCollateral(source)
 	if err != nil {
@@ -26,11 +26,12 @@ func TestCollateralLoadAndSixMemberContract(t *testing.T) {
 	}
 	notice := signingNoticeFixture("linux", "amd64")
 	binary := signingBinaryFixture(t, "linux", "amd64")
-	entries, metadata, err := releaseEntries(shared, notice, binary)
+	sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "linux", "amd64", binary)
+	entries, metadata, err := releaseEntries(shared, notice, sbom, binary)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 6 || len(metadata) != 6 || len(archiveContract) != 6 {
+	if len(entries) != 7 || len(metadata) != 7 || len(archiveContract) != 7 {
 		t.Fatalf("release member count: entries=%d metadata=%d contract=%d", len(entries), len(metadata), len(archiveContract))
 	}
 	for i, contract := range archiveContract {
@@ -50,7 +51,7 @@ func TestCollateralLoadAndSixMemberContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	actual := collateralReadArchive(t, encoded.Bytes())
-	if len(actual) != 6 {
+	if len(actual) != 7 {
 		t.Fatalf("archive member count: %d", len(actual))
 	}
 	for i, member := range actual {
@@ -90,38 +91,41 @@ func TestReleaseEntriesEnforcesEveryMemberBound(t *testing.T) {
 	base := signingCollateralFixture()
 	notice := signingNoticeFixture("linux", "amd64")
 	binary := signingBinaryFixture(t, "linux", "amd64")
-	for name, mutate := range map[string]func(*collateral, *[]byte, *[]byte){
-		"empty_install": func(c *collateral, _, _ *[]byte) { c.install = nil },
-		"empty_license": func(c *collateral, _, _ *[]byte) { c.license = nil },
-		"empty_notes":   func(c *collateral, _, _ *[]byte) { c.notes = nil },
-		"empty_config":  func(c *collateral, _, _ *[]byte) { c.config = nil },
-		"empty_notice":  func(_ *collateral, n, _ *[]byte) { *n = nil },
-		"empty_binary":  func(_ *collateral, _, b *[]byte) { *b = nil },
-		"large_install": func(c *collateral, _, _ *[]byte) { c.install = bytes.Repeat([]byte("x"), maxInstall+1) },
-		"large_license": func(c *collateral, _, _ *[]byte) { c.license = bytes.Repeat([]byte("x"), maxLicense+1) },
-		"large_notes":   func(c *collateral, _, _ *[]byte) { c.notes = bytes.Repeat([]byte("x"), maxReleaseNotes+1) },
-		"large_config":  func(c *collateral, _, _ *[]byte) { c.config = bytes.Repeat([]byte("x"), maxConfig+1) },
-		"large_notice":  func(_ *collateral, n, _ *[]byte) { *n = bytes.Repeat([]byte("x"), maxNotice+1) },
+	sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "linux", "amd64", binary)
+	for name, mutate := range map[string]func(*collateral, *[]byte, *[]byte, *[]byte){
+		"empty_install": func(c *collateral, _, _, _ *[]byte) { c.install = nil },
+		"empty_license": func(c *collateral, _, _, _ *[]byte) { c.license = nil },
+		"empty_notes":   func(c *collateral, _, _, _ *[]byte) { c.notes = nil },
+		"empty_config":  func(c *collateral, _, _, _ *[]byte) { c.config = nil },
+		"empty_notice":  func(_ *collateral, n, _, _ *[]byte) { *n = nil },
+		"empty_sbom":    func(_ *collateral, _, s, _ *[]byte) { *s = nil },
+		"empty_binary":  func(_ *collateral, _, _, b *[]byte) { *b = nil },
+		"large_install": func(c *collateral, _, _, _ *[]byte) { c.install = bytes.Repeat([]byte("x"), maxInstall+1) },
+		"large_license": func(c *collateral, _, _, _ *[]byte) { c.license = bytes.Repeat([]byte("x"), maxLicense+1) },
+		"large_notes":   func(c *collateral, _, _, _ *[]byte) { c.notes = bytes.Repeat([]byte("x"), maxReleaseNotes+1) },
+		"large_config":  func(c *collateral, _, _, _ *[]byte) { c.config = bytes.Repeat([]byte("x"), maxConfig+1) },
+		"large_notice":  func(_ *collateral, n, _, _ *[]byte) { *n = bytes.Repeat([]byte("x"), maxNotice+1) },
+		"large_sbom":    func(_ *collateral, _, s, _ *[]byte) { *s = bytes.Repeat([]byte("x"), maxTargetSBOM+1) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			shared := base
-			n, b := append([]byte(nil), notice...), append([]byte(nil), binary...)
-			mutate(&shared, &n, &b)
-			if _, _, err := releaseEntries(shared, n, b); err != ErrInvalid {
+			n, s, b := append([]byte(nil), notice...), append([]byte(nil), sbom...), append([]byte(nil), binary...)
+			mutate(&shared, &n, &s, &b)
+			if _, _, err := releaseEntries(shared, n, s, b); err != ErrInvalid {
 				t.Fatal("out-of-bound member accepted", err)
 			}
 		})
 	}
-	if archiveContract[5].name != "darwin" || archiveContract[5].max != maxArtifact {
+	if archiveContract[6].name != "darwin" || archiveContract[6].max != maxArtifact {
 		t.Fatal("binary bound is not maxArtifact")
 	}
 	invalid := archiveEntryMetadata{Name: "darwin", Mode: 0755, Size: maxArtifact + 1, SHA256: strings.Repeat("0", 64)}
-	if validEntryMetadata(invalid, 5, binary) {
+	if validEntryMetadata(invalid, 6, binary) {
 		t.Fatal("oversize binary metadata accepted")
 	}
 }
 
-func TestCollateralSchemaTwoMetadataAndSharedEquality(t *testing.T) {
+func TestCollateralSchemaThreeMetadataAndSharedEquality(t *testing.T) {
 	dir, _, _ := signingFixture(t)
 	body, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
@@ -131,13 +135,13 @@ func TestCollateralSchemaTwoMetadataAndSharedEquality(t *testing.T) {
 	if err = json.Unmarshal(body, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.SchemaVersion != 2 || len(manifest.Artifacts) != 4 {
+	if manifest.SchemaVersion != releaseManifestSchema || len(manifest.Artifacts) != 4 {
 		t.Fatalf("manifest schema/artifacts: %d/%d", manifest.SchemaVersion, len(manifest.Artifacts))
 	}
-	sharedIndexes := []int{0, 1, 2, 4}
+	sharedIndexes := []int{0, 1, 2, 5}
 	for artifactIndex, artifact := range manifest.Artifacts {
 		members := collateralReadArchiveFile(t, filepath.Join(dir, artifact.File))
-		if len(artifact.Entries) != 6 || len(members) != 6 {
+		if len(artifact.Entries) != 7 || len(members) != 7 {
 			t.Fatalf("artifact %d member metadata count", artifactIndex)
 		}
 		for i, member := range members {
@@ -464,7 +468,7 @@ func collateralRewriteSums(t *testing.T, dir string, manifest Manifest) {
 }
 
 func TestCollateralContractNamesAreCanonicalAndSorted(t *testing.T) {
-	if !reflect.DeepEqual(collateralNames, []string{"INSTALL.md", "LICENSE", "RELEASE_NOTES.md", "THIRD_PARTY_NOTICES.txt", "config.example.yaml", "darwin"}) {
+	if !reflect.DeepEqual(collateralNames, []string{"INSTALL.md", "LICENSE", "RELEASE_NOTES.md", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.txt", "config.example.yaml", "darwin"}) {
 		t.Fatal("unexpected collateral contract names", collateralNames)
 	}
 	for i := 1; i < len(collateralNames); i++ {

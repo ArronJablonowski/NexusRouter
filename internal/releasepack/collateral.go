@@ -17,6 +17,7 @@ const (
 	licenseName      = "LICENSE"
 	releaseNotesName = "RELEASE_NOTES.md"
 	configName       = "config.example.yaml"
+	sbomName         = "SBOM.spdx.json"
 	maxInstall       = 256 << 10
 	maxLicense       = 64 << 10
 	maxReleaseNotes  = 512 << 10
@@ -42,6 +43,7 @@ var archiveContract = []struct {
 	{installName, 0644, maxInstall},
 	{licenseName, 0644, maxLicense},
 	{releaseNotesName, 0644, maxReleaseNotes},
+	{sbomName, 0644, maxTargetSBOM},
 	{noticeName, 0644, maxNotice},
 	{configName, 0644, maxConfig},
 	{"darwin", 0755, maxArtifact},
@@ -110,8 +112,8 @@ func canonicalText(body []byte) bool {
 	return len(body) > 0 && utf8.Valid(body) && bytes.IndexByte(body, 0) < 0 && bytes.IndexByte(body, '\r') < 0 && body[len(body)-1] == '\n'
 }
 
-func releaseEntries(c collateral, notice, binary []byte) ([]Entry, []archiveEntryMetadata, error) {
-	entries := []Entry{{installName, c.install}, {licenseName, c.license}, {releaseNotesName, c.notes}, {noticeName, notice}, {configName, c.config}, {"darwin", binary}}
+func releaseEntries(c collateral, notice, sbom, binary []byte) ([]Entry, []archiveEntryMetadata, error) {
+	entries := []Entry{{installName, c.install}, {licenseName, c.license}, {releaseNotesName, c.notes}, {sbomName, sbom}, {noticeName, notice}, {configName, c.config}, {"darwin", binary}}
 	metadata := make([]archiveEntryMetadata, len(entries))
 	for i, entry := range entries {
 		contract := archiveContract[i]

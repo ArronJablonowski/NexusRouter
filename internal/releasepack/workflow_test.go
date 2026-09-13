@@ -174,7 +174,11 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	for _, evidence := range []string{
 		"four target-specific dependency closures and notice digests",
 		"does not grant legal approval",
-		"exact six-member schema-2 collateral",
+		"exact seven-member schema-3 archive metadata",
+		"target-specific canonical SPDX 2.3 module inventories",
+		"first-party Web UI source hashes",
+		"not vulnerability scanning, build provenance, or a legal conclusion",
+		"unreviewed dependency license expressions remain NOASSERTION",
 		"target-specific dependency notices",
 		"disposable native install",
 		"schema-29-to-" + strconv.Itoa(stateschema.Current) + " migration",

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	candidateSchema = 1
+	candidateSchema = 2
 	maxCandidate    = 64 << 10
 )
 
@@ -26,6 +26,7 @@ type CandidateRecord struct {
 	SchemaVersion         int                   `json:"schema_version"`
 	ReleaseVersion        string                `json:"release_version"`
 	SourceCommit          string                `json:"source_commit"`
+	ReleaseCreated        string                `json:"release_created"`
 	ReleaseManifestSchema int                   `json:"release_manifest_schema"`
 	Targets               []CandidateTarget     `json:"targets"`
 	ArchiveEntries        []CandidateEntry      `json:"archive_entries"`
@@ -107,7 +108,11 @@ func FreezeCandidate(ctx context.Context, o Options) error {
 	if err = snapshot(ctx, source, o.Commit, snapshotDir, env); err != nil {
 		return err
 	}
-	record, err := candidateRecord(o.Version, o.Commit, snapshotDir)
+	created, err := releaseCommitCreated(ctx, source, o.Commit, env)
+	if err != nil {
+		return err
+	}
+	record, err := candidateRecord(o.Version, o.Commit, created, snapshotDir)
 	if err != nil {
 		return err
 	}
@@ -198,7 +203,11 @@ func verifyCandidateRecord(ctx context.Context, record CandidateRecord, source s
 	if err = snapshot(ctx, root, record.SourceCommit, snapshotDir, env); err != nil {
 		return err
 	}
-	expected, err := candidateRecord(record.ReleaseVersion, record.SourceCommit, snapshotDir)
+	created, err := releaseCommitCreated(ctx, root, record.SourceCommit, env)
+	if err != nil || created != record.ReleaseCreated {
+		return ErrInvalid
+	}
+	expected, err := candidateRecord(record.ReleaseVersion, record.SourceCommit, created, snapshotDir)
 	if err != nil || expectedBody(record, expected) != nil {
 		return ErrInvalid
 	}
@@ -255,14 +264,14 @@ func verifyCandidateCheckout(ctx context.Context, source, commit string, env []s
 	return nil
 }
 
-func candidateRecord(version, commit, source string) (CandidateRecord, error) {
+func candidateRecord(version, commit, created, source string) (CandidateRecord, error) {
 	shared, err := loadCollateral(source)
 	if err != nil {
 		return CandidateRecord{}, err
 	}
 	entries := make([]CandidateEntry, len(archiveContract))
 	for i, entry := range archiveContract {
-		entries[i] = CandidateEntry{Name: entry.name, Mode: entry.mode, MaxBytes: entry.max, Shared: entry.name != noticeName && entry.name != "darwin"}
+		entries[i] = CandidateEntry{Name: entry.name, Mode: entry.mode, MaxBytes: entry.max, Shared: entry.name != noticeName && entry.name != sbomName && entry.name != "darwin"}
 	}
 	collateral := []struct {
 		source, entry string
@@ -282,7 +291,8 @@ func candidateRecord(version, commit, source string) (CandidateRecord, error) {
 		SchemaVersion:         candidateSchema,
 		ReleaseVersion:        version,
 		SourceCommit:          commit,
-		ReleaseManifestSchema: 2,
+		ReleaseCreated:        created,
+		ReleaseManifestSchema: releaseManifestSchema,
 		Targets:               append([]CandidateTarget(nil), candidateTargets...),
 		ArchiveEntries:        entries,
 		SourceCollateral:      sources,
@@ -308,7 +318,8 @@ func validateCandidate(body []byte) error {
 }
 
 func validateCandidateRecord(record CandidateRecord) error {
-	if record.SchemaVersion != candidateSchema || record.ReleaseManifestSchema != 2 ||
+	if record.SchemaVersion != candidateSchema || record.ReleaseManifestSchema != releaseManifestSchema ||
+		!validSPDXCreated(record.ReleaseCreated) ||
 		validate(Options{Version: record.ReleaseVersion, Commit: record.SourceCommit, Out: "release"}) != nil ||
 		len(record.Targets) != len(candidateTargets) || len(record.ArchiveEntries) != len(archiveContract) ||
 		len(record.SourceCollateral) != 4 || len(record.OperatorGates) != len(candidateGates) {
@@ -320,7 +331,7 @@ func validateCandidateRecord(record CandidateRecord) error {
 		}
 	}
 	for i, contract := range archiveContract {
-		want := CandidateEntry{Name: contract.name, Mode: contract.mode, MaxBytes: contract.max, Shared: contract.name != noticeName && contract.name != "darwin"}
+		want := CandidateEntry{Name: contract.name, Mode: contract.mode, MaxBytes: contract.max, Shared: contract.name != noticeName && contract.name != sbomName && contract.name != "darwin"}
 		if record.ArchiveEntries[i] != want {
 			return ErrInvalid
 		}

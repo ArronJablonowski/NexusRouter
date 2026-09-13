@@ -2,11 +2,28 @@
 
 This is a development summary, not a completed v1.0.0 release announcement. The
 deterministic testable-MVP gate passes and 41 of the original 42 MVP issues are
-complete, but DAR-46 remains open. The newly required Web UI and integrated
-Kanban backlog is also unfinished. A premature annotated `v1.0.0` tag was pushed
+complete, but DAR-46 remains open. The Web UI/Kanban implementation is complete;
+DAR-87 release qualification and operator approval remain open. A premature annotated `v1.0.0` tag was pushed
 outside the guarded publisher and is quarantined; no GitHub Release, signed
 production assets, supported-platform decision or canonical publication
 approval is claimed.
+
+- DAR-87 changes the release contract to canonical schema-2 candidate records,
+  schema-3 manifests, and seven-member target archives containing
+  `SBOM.spdx.json`. Each target-specific SPDX 2.3 document binds the exact
+  binary SHA-256, module-level Go dependency/toolchain closure, and every
+  checked-in first-party Web UI source hash. Approved signing and verification
+  cross-check it against the clean candidate, license evidence, archive member
+  metadata, and checksums. This is not vulnerability scanning, build provenance,
+  a legal conclusion, or proof that licenses marked `NOASSERTION` were reviewed;
+  separate notices and operator approval remain required.
+  An adversarial SPDX review removed an invalid package-to-file containment
+  claim while `filesAnalyzed` is false, stopped assigning MIT as the composite
+  executable conclusion, modeled the Go compiler as a build tool, bound the
+  deterministic creation time through the candidate and manifest, and replaced
+  runtime-version asset selection with the candidate package's actual Go embed
+  inventory. Generated documents are checked offline against the exact pinned
+  official SPDX 2.3 JSON schema.
 
 - DAR-86 adds a required real-Chrome Web UI qualification gate spanning the
   embedded shell, browser authentication/BFF, local/cloud/hybrid application

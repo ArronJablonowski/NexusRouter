@@ -18,7 +18,7 @@ var ErrInvalid = errors.New("invalid release input")
 const maxArtifact = 256 << 20
 
 func maxReleaseData() int {
-	return maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig
+	return maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxTargetSBOM + maxConfig
 }
 
 type Entry struct {

@@ -84,11 +84,11 @@ func TestReleaseTarStreamLimitIncludesWorstCasePadding(t *testing.T) {
 	if err != nil || closeErr != nil {
 		t.Fatal("read archive", err, closeErr)
 	}
-	// Six headers + six padded data blocks + two EOF blocks.
-	if len(stream) != 14*tarBlockSize {
+	// Seven headers + seven padded data blocks + two EOF blocks.
+	if len(stream) != 16*tarBlockSize {
 		t.Fatalf("unexpected canonical tar size: %d", len(stream))
 	}
-	if maxTarStream != maxReleaseData()+14*tarBlockSize {
+	if maxTarStream != maxReleaseData()+16*tarBlockSize {
 		t.Fatal("release tar limit does not reserve every header, padding block, and EOF block")
 	}
 }

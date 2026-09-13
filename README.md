@@ -21,13 +21,20 @@ compares two isolated four-target outputs byte for byte, and retains one of the
 compared directories as the only signable artifact set.
 Candidate-bound license evidence records the root MIT license, exact Go
 toolchain, four target dependency/legal-file closures and notice hashes.
+Each target archive also carries canonical `SBOM.spdx.json` inventory bound to
+that binary, the module/toolchain closure, and the checked-in first-party Web UI
+source hashes. This module-level SPDX 2.3 inventory is not vulnerability
+scanning, build provenance, legal approval, or a substitute for reviewing
+dependency licenses recorded as `NOASSERTION` and the separate notices.
 Production signing and independent verification bind its exact approved digest
 alongside the candidate, checksum set, authorization, active trust record, key
 identity and clean source checkout.
 The deterministic testable-MVP
 gate passes and 41 of the original 42 MVP issues are complete. DAR-46 remains
-open, and the newly required Web UI/Kanban milestone is only partially implemented: no
-release has been published, and
+open. The Web UI/Kanban implementation and deterministic browser qualification
+are complete; DAR-87 release qualification remains pending against the new
+schema-2 candidate, schema-3 manifest, and seven-member archive contract.
+No release has been published, and
 dependency-notice review, supported platforms, production signing trust, release approval
 and publication authority remain operator gates.
 
@@ -151,6 +158,9 @@ acceptance tools remain future agent-tool work. DAR-83's integrated interactive
 Kanban is complete. The deterministic DAR-86 browser gate, supported-browser
 matrix, and explicit qualification limits are documented in
 [Web UI and Kanban qualification](docs/webui-qualification.md).
+Configuration, browser authorization, board lifecycle, agent-tool gates, and
+safe backup/restore procedures are documented in the
+[Web UI and Workboard operator guide](docs/workboard-operator-guide.md).
 
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), and the accessibility

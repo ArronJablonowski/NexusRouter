@@ -21,9 +21,9 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 		return ErrSignature
 	}
 	var manifest Manifest
-	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != 2 ||
+	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != releaseManifestSchema ||
 		validate(Options{Version: manifest.Version, Commit: manifest.Commit, Out: "release"}) != nil ||
-		len(manifest.Toolchain) > 64 || !signedToolchain.MatchString(manifest.Toolchain) || len(manifest.Artifacts) != 4 {
+		!validSPDXCreated(manifest.Created) || len(manifest.Toolchain) > 64 || !signedToolchain.MatchString(manifest.Toolchain) || len(manifest.Artifacts) != 4 {
 		return ErrSignature
 	}
 	canonical, err := json.MarshalIndent(manifest, "", "  ")
@@ -31,7 +31,7 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 		return ErrSignature
 	}
 	targets := [4][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}}
-	sharedIndexes := [...]int{0, 1, 2, 4}
+	sharedIndexes := [...]int{0, 1, 2, 5}
 	var shared [len(sharedIndexes)]archiveEntryMetadata
 	for i, target := range targets {
 		artifact := manifest.Artifacts[i]
@@ -50,7 +50,7 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 				}
 			}
 		}
-		if validateReleaseArchive(root, artifact) != nil {
+		if validateReleaseArchive(root, manifest, artifact) != nil {
 			return ErrSignature
 		}
 	}

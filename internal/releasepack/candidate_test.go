@@ -10,7 +10,7 @@ import (
 
 func candidateFixture(t *testing.T) CandidateRecord {
 	t.Helper()
-	record, err := candidateRecord("1.0.0-rc.3", "0123456789abcdef0123456789abcdef01234567", collateralSourceFixture(t))
+	record, err := candidateRecord("1.0.0-rc.3", "0123456789abcdef0123456789abcdef01234567", "2026-09-13T18:00:00Z", collateralSourceFixture(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestCandidateCanonicalContract(t *testing.T) {
 	if validateCandidate(body) != nil {
 		t.Fatal("canonical candidate rejected")
 	}
-	if len(record.Targets) != 4 || len(record.ArchiveEntries) != 6 || len(record.SourceCollateral) != 4 || len(record.OperatorGates) != 5 {
+	if record.SchemaVersion != candidateSchema || record.ReleaseManifestSchema != releaseManifestSchema || len(record.Targets) != 4 || len(record.ArchiveEntries) != 7 || len(record.SourceCollateral) != 4 || len(record.OperatorGates) != 5 {
 		t.Fatal("candidate contract cardinality")
 	}
 	for _, target := range record.Targets {
@@ -57,6 +57,7 @@ func TestCandidateRejectsContractDrift(t *testing.T) {
 		{"manifest_schema", func(r *CandidateRecord) { r.ReleaseManifestSchema++ }},
 		{"version", func(r *CandidateRecord) { r.ReleaseVersion = "v1.0.0" }},
 		{"commit", func(r *CandidateRecord) { r.SourceCommit = "ABC" }},
+		{"created_format", func(r *CandidateRecord) { r.ReleaseCreated = "2026-09-13T12:00:00-06:00" }},
 		{"target_removed", func(r *CandidateRecord) { r.Targets = r.Targets[:3] }},
 		{"target_reordered", func(r *CandidateRecord) { r.Targets[0], r.Targets[1] = r.Targets[1], r.Targets[0] }},
 		{"target_approved", func(r *CandidateRecord) { r.Targets[0].Decision = "supported" }},
@@ -170,10 +171,36 @@ func TestFreezeAndVerifyCandidateFromCleanCommit(t *testing.T) {
 	if err = FreezeCandidate(ctx, options); err == nil {
 		t.Fatal("existing candidate overwritten")
 	}
+	body, record, err := readCandidateRecord(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record.ReleaseCreated = "2026-09-13T18:00:01Z"
+	if record.ReleaseCreated == candidateFixtureFromBody(t, body).ReleaseCreated {
+		record.ReleaseCreated = "2026-09-13T18:00:02Z"
+	}
+	if err = os.WriteFile(out, candidateBody(t, record), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err = VerifyCandidate(ctx, out, source); err == nil {
+		t.Fatal("candidate timestamp drift from commit accepted")
+	}
+	if err = os.WriteFile(out, body, 0644); err != nil {
+		t.Fatal(err)
+	}
 	if err = os.WriteFile(filepath.Join(source, "untracked"), []byte("dirty\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err = VerifyCandidate(ctx, out, source); err == nil {
 		t.Fatal("dirty source accepted")
 	}
+}
+
+func candidateFixtureFromBody(t *testing.T, body []byte) CandidateRecord {
+	t.Helper()
+	var record CandidateRecord
+	if err := json.Unmarshal(body, &record); err != nil {
+		t.Fatal(err)
+	}
+	return record
 }

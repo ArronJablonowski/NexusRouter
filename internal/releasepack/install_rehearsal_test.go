@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -28,6 +29,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/memory"
 	darwinruntime "github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/webui"
 	_ "modernc.org/sqlite"
 )
 
@@ -64,12 +66,28 @@ func TestNativeInstallMigrationRehearsal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	toolchain, err := embeddedGoToolchainModule()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets, err := readSBOMSourceFiles(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binaryDigest := sha256.Sum256(binary)
+	sbom, err := renderTargetSBOM(TargetSBOMOptions{
+		Version: rehearsalVersion, Commit: strings.Repeat("0", 40), TargetOS: runtime.GOOS, TargetArch: runtime.GOARCH,
+		Created: "2026-09-13T18:00:00Z", BinarySHA256: hex.EncodeToString(binaryDigest[:]),
+	}, []noticeModule{{Path: "example.invalid/rehearsal", Version: "v1.0.0", Files: []noticeFile{{Name: "LICENSE", Body: []byte("Synthetic test-only license.\n")}}}, toolchain}, assets)
+	if err != nil {
+		t.Fatal(err)
+	}
 	entries, metadata, err := releaseEntries(collateral{
 		install: []byte("Synthetic installation fixture.\n"),
 		license: []byte("Synthetic project license fixture.\n"),
 		notes:   []byte("Synthetic release notes fixture.\n"),
 		config:  []byte("version: 1\nmode: local_only\n"),
-	}, notice, binary)
+	}, notice, sbom, binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +122,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	}
 	archiveDigest := "sha256:" + archiveRawDigest
 	binary := rehearsalArchiveBinary(t, archiveBody, artifact)
+	assertEmbeddedWebUIAssets(t, source, binary)
 	installRoot := filepath.Join(root, "installation")
 	installPrefix := filepath.Join(installRoot, "releases", version)
 	for _, path := range []string{installRoot, filepath.Join(installRoot, "releases"), installPrefix, filepath.Join(installPrefix, "bin")} {
@@ -129,7 +148,8 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	}
 	database := filepath.Join(stateRoot, "darwin.db")
 	configuration := filepath.Join(privateRoot, "config.yaml")
-	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
+	address := freeLoopbackAddress(t)
+	writeRehearsalConfig(t, configuration, database, address)
 	assertMode(t, privateRoot, 0700)
 	assertMode(t, stateRoot, 0700)
 	assertMode(t, ownerRoot, 0700)
@@ -138,7 +158,7 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 	if got, err := runInstalled(ctx, installed, root, runtimeEnv, nil, "config", "validate", "--config", configuration); err != nil || strings.TrimSpace(got) != "Configuration valid (version 1)" {
 		t.Fatalf("installed configuration validation: %q: %v", got, err)
 	}
-	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
+	runOwnedDaemon(t, ctx, source, installed, configuration, address, root, runtimeEnv)
 	assertMode(t, database, 0600)
 	checkDatabase(t, database, stateschema.Current, "", "")
 	seedRehearsalEvents(t, database)
@@ -171,8 +191,9 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 		t.Fatal("schema-29 backup changed task timing epoch")
 	}
 
-	writeRehearsalConfig(t, configuration, database, freeLoopbackAddress(t))
-	runOwnedDaemon(t, ctx, installed, configuration, root, runtimeEnv)
+	address = freeLoopbackAddress(t)
+	writeRehearsalConfig(t, configuration, database, address)
+	runOwnedDaemon(t, ctx, source, installed, configuration, address, root, runtimeEnv)
 	checkDatabase(t, database, stateschema.Current, fact.Scope, fact.ID)
 	if got := databaseEvidence(t, database, fact.Scope, fact.ID); got != evidenceBefore {
 		t.Fatal("migration changed synthetic evidence")
@@ -307,7 +328,40 @@ func rehearsalArchiveBinary(t *testing.T, archive []byte, artifact Artifact) []b
 	return binary
 }
 
-func runOwnedDaemon(t *testing.T, ctx context.Context, binary, configuration, dir string, env []string) {
+// assertEmbeddedWebUIAssets binds the complete checked-in frontend inventory to
+// the executable member whose digest is already covered by the release manifest
+// and SHA256SUMS. It discovers the directory so qualification covers every
+// checked-in asset, including future additions.
+func assertEmbeddedWebUIAssets(t *testing.T, source string, binary []byte) string {
+	t.Helper()
+	assetRoot := filepath.Join(source, "webui", "assets", webui.ShellAssetVersion)
+	entries, err := os.ReadDir(assetRoot)
+	if err != nil || len(entries) == 0 {
+		t.Fatal("cannot inventory release WebUI assets", err)
+	}
+	hash := sha256.New()
+	for _, entry := range entries {
+		info, infoErr := entry.Info()
+		if infoErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			t.Fatal("unsafe WebUI release asset", entry.Name(), infoErr)
+		}
+		body, readErr := os.ReadFile(filepath.Join(assetRoot, entry.Name()))
+		if readErr != nil || len(body) == 0 || !bytes.Contains(binary, body) {
+			t.Fatal("release binary does not contain exact WebUI asset", entry.Name(), readErr)
+		}
+		_, _ = hash.Write([]byte("assets/" + webui.ShellAssetVersion + "/" + entry.Name()))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write(body)
+		_, _ = hash.Write([]byte{0})
+	}
+	digest := hex.EncodeToString(hash.Sum(nil))
+	if embeddedDigest, err := webui.ShellAssetDigest(); err != nil || embeddedDigest == "" {
+		t.Fatal("release WebUI embedded manifest unavailable", embeddedDigest, err)
+	}
+	return digest
+}
+
+func runOwnedDaemon(t *testing.T, ctx context.Context, source, binary, configuration, address, dir string, env []string) {
 	t.Helper()
 	instance := strings.Repeat("a", 64)
 	cmd := exec.CommandContext(ctx, binary, "serve", "--config", configuration, "--instance-id", instance)
@@ -346,6 +400,7 @@ func runOwnedDaemon(t *testing.T, ctx context.Context, binary, configuration, di
 	if status.Validate() != nil || status.InstanceID != instance {
 		t.Fatal("invalid daemon status", status)
 	}
+	assertInstalledWebUISmoke(t, ctx, source, address)
 	body, err := runInstalled(ctx, binary, dir, env, nil, "daemon", "stop", "--config", configuration)
 	var stopping daemon.Status
 	if err != nil || json.Unmarshal([]byte(body), &stopping) != nil || stopping.Validate() != nil || stopping.InstanceID != instance || stopping.State != "stopping" {
@@ -362,6 +417,54 @@ func runOwnedDaemon(t *testing.T, ctx context.Context, binary, configuration, di
 	}
 }
 
+func assertInstalledWebUISmoke(t *testing.T, ctx context.Context, source, address string) {
+	t.Helper()
+	client := &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return errors.New("release WebUI smoke must not redirect")
+	}}
+	for endpoint, name := range map[string]string{
+		"/app/bootstrap":                  "bootstrap.html",
+		"/app/bootstrap/v1/bootstrap.css": "bootstrap.css",
+		"/app/bootstrap/v1/bootstrap.js":  "bootstrap.js",
+	} {
+		expected, err := os.ReadFile(filepath.Join(source, "webui", "assets", webui.ShellAssetVersion, name))
+		if err != nil {
+			t.Fatal("read WebUI smoke fixture", err)
+		}
+		expected = bytes.ReplaceAll(expected, []byte("__DARWIN_BASE_PATH__"), []byte("/app"))
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+endpoint, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal("installed WebUI request failed", endpoint, err)
+		}
+		body, readErr := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+		closeErr := response.Body.Close()
+		if readErr != nil || closeErr != nil || response.StatusCode != http.StatusOK || !bytes.Equal(body, expected) {
+			t.Fatal("installed WebUI asset mismatch", endpoint, response.StatusCode, readErr, closeErr)
+		}
+		if response.Header.Get("Cache-Control") != "no-store" || response.Header.Get("X-Content-Type-Options") != "nosniff" ||
+			!strings.Contains(response.Header.Get("Content-Security-Policy"), "default-src 'self'") {
+			t.Fatal("installed WebUI security headers missing", endpoint)
+		}
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/app/assets/v1/app.js", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal("installed authenticated shell probe failed", err)
+	}
+	_, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+	closeErr := response.Body.Close()
+	if readErr != nil || closeErr != nil || response.StatusCode != http.StatusUnauthorized {
+		t.Fatal("installed WebUI shell did not fail closed", response.StatusCode, readErr, closeErr)
+	}
+}
+
 func runInstalled(ctx context.Context, binary, dir string, env []string, input []byte, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Dir, command.Env, command.WaitDelay = dir, env, 2*time.Second
@@ -374,7 +477,7 @@ func runInstalled(ctx context.Context, binary, dir string, env []string, input [
 
 func writeRehearsalConfig(t *testing.T, path, database, address string) {
 	t.Helper()
-	body := fmt.Sprintf("version: 1\nmode: local_only\ndaemon:\n  listen: %q\nmemory:\n  scope: release-rehearsal\ntelemetry:\n  database: %q\n", address, database)
+	body := fmt.Sprintf("version: 1\nmode: local_only\ndaemon:\n  listen: %q\nweb_ui:\n  enabled: true\n  path_prefix: /app\nmemory:\n  scope: release-rehearsal\ntelemetry:\n  database: %q\n", address, database)
 	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -421,11 +524,38 @@ func checkDatabase(t *testing.T, path string, schema int, scope, id string) {
 	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='submission_stream_events')`).Scan(&streamMapping); err != nil || streamMapping != (schema >= 32) {
 		t.Fatal("submission stream schema boundary invalid", streamMapping, err)
 	}
+	checkBrowserMigrationObjects(t, db, schema)
 	checkRehearsalEventLog(t, db, schema)
 	if scope != "" {
 		var content string
 		if err := db.QueryRow(`SELECT content FROM memory_facts WHERE scope=? AND id=?`, scope, id).Scan(&content); err != nil || content != "Synthetic schema migration evidence." {
 			t.Fatal("synthetic record unavailable", err)
+		}
+	}
+}
+
+func checkBrowserMigrationObjects(t *testing.T, db *sql.DB, schema int) {
+	t.Helper()
+	boundaries := map[int][]string{
+		35: {"workboard_boards", "workboard_columns", "workboard_cards", "workboard_events", "workboard_operations"},
+		37: {"workspace_identity"},
+		38: {"browser_operation_recoveries", "legacy_browser_workboard_operations"},
+		40: {"workboard_reassignments"},
+		41: {"workboard_task_start_claims"},
+	}
+	for boundary, names := range boundaries {
+		for _, name := range names {
+			var exists bool
+			err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=?)`, name).Scan(&exists)
+			if err != nil || exists != (schema >= boundary) {
+				t.Fatalf("schema %d migration object %s boundary %d invalid: exists=%t: %v", schema, name, boundary, exists, err)
+			}
+		}
+	}
+	if schema >= 36 {
+		var cardIDColumns int
+		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('workboard_events') WHERE name='card_id' AND type='TEXT'`).Scan(&cardIDColumns); err != nil || cardIDColumns != 1 {
+			t.Fatal("schema 36 workboard event card binding unavailable", cardIDColumns, err)
 		}
 	}
 }
@@ -501,6 +631,30 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 	t.Helper()
 	db := openRehearsalDatabase(t, path, "rw")
 	defer db.Close()
+	if _, err := db.Exec(`PRAGMA foreign_keys=OFF`); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND
+		(name GLOB 'workboard_*' OR name IN('workspace_identity','browser_operation_recoveries','legacy_browser_workboard_operations')) ORDER BY name DESC`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var browserTables []string
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		browserTables = append(browserTables, name)
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		t.Fatal(err)
+	}
+	if err = rows.Close(); err != nil {
+		t.Fatal(err)
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		t.Fatal(err)
@@ -508,6 +662,11 @@ func downgradeFixtureToSchema29(t *testing.T, path string) {
 	defer tx.Rollback()
 	if _, err = tx.Exec(`DROP TABLE event_log; DROP TABLE submission_stream_events; DROP INDEX evaluations_routing_key; DROP TABLE usage_corrections; DROP TABLE usage_heads; DROP TABLE usage_records; DROP TABLE usage_metadata; DROP TRIGGER IF EXISTS workboard_auxiliary_review_settlement_immutable_delete; DROP TRIGGER IF EXISTS workboard_auxiliary_review_settlement_immutable_update; DROP TRIGGER IF EXISTS workboard_auxiliary_review_settlement_binding; DROP INDEX IF EXISTS workboard_auxiliary_review_settlements_board; DROP TABLE IF EXISTS workboard_auxiliary_review_settlements; DROP TRIGGER IF EXISTS workboard_auxiliary_review_admission_immutable_delete; DROP TRIGGER IF EXISTS workboard_auxiliary_review_admission_immutable_update; DROP TRIGGER IF EXISTS workboard_auxiliary_review_admission_binding; DROP INDEX IF EXISTS workboard_auxiliary_review_admissions_board; DROP TABLE IF EXISTS workboard_auxiliary_review_admissions; DROP TRIGGER IF EXISTS workboard_execution_settlement_immutable_delete; DROP TRIGGER IF EXISTS workboard_execution_settlement_immutable_update; DROP TRIGGER IF EXISTS workboard_execution_settlement_binding; DROP INDEX IF EXISTS workboard_execution_settlements_board; DROP TABLE IF EXISTS workboard_execution_settlements; DROP TRIGGER IF EXISTS workboard_execution_admission_immutable_delete; DROP TRIGGER IF EXISTS workboard_execution_admission_immutable_update; DROP TRIGGER IF EXISTS workboard_execution_admission_binding; DROP TRIGGER IF EXISTS workboard_execution_admission_no_active; DROP INDEX IF EXISTS workboard_execution_admissions_card; DROP INDEX IF EXISTS workboard_execution_admissions_board; DROP INDEX IF EXISTS workboard_execution_admissions_global; DROP TABLE IF EXISTS workboard_execution_admissions; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_delete; DROP TRIGGER IF EXISTS workboard_task_start_claim_immutable_update; DROP INDEX IF EXISTS workboard_task_start_claims_board; DROP TABLE IF EXISTS workboard_task_start_claims; PRAGMA user_version=29`); err != nil {
 		t.Fatal(err)
+	}
+	for _, name := range browserTables {
+		if _, err = tx.Exec(`DROP TABLE IF EXISTS "` + strings.ReplaceAll(name, `"`, `""`) + `"`); err != nil {
+			t.Fatal("drop post-schema-29 browser table", name, err)
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)

@@ -1,5 +1,30 @@
 # Implementation evidence
 
+DAR-87 release-contract checkpoint: candidate records are now canonical schema
+2, release manifests are schema 3, and every target archive has seven ordered
+members including target-specific `SBOM.spdx.json`. The canonical SPDX 2.3
+document binds the exact target binary, module-level `cmd/darwin` dependency and
+Go toolchain closure, and SHA-256 hashes for every checked-in first-party Web UI
+source. Archive member metadata, the manifest, `SHA256SUMS`, production signing,
+and approval-bound verification cover the SBOM and its binary/source bindings.
+Dependency license expressions that have not been mechanically established use
+`NOASSERTION`; the inventory is not a vulnerability scan, independent build
+provenance, legal conclusion, or replacement for candidate-bound license
+evidence and notices. New release qualification and operator approval are still
+required; earlier schema-1 candidate/schema-2 manifest and six-member RC evidence
+below remains historical and does not qualify this changed contract.
+
+An adversarial review corrected the first SBOM draft before release: an
+unanalyzed package no longer claims to contain files; composite package,
+executable, and individual file conclusions remain `NOASSERTION`; the Go
+toolchain uses `BUILD_TOOL_OF`; and the document declares its intentionally
+partial file scope. Candidate and manifest records freeze the commit-derived UTC
+creation time. Source hashes now come from the candidate package's actual
+`go:embed` file list instead of a version constant compiled into the verifier.
+Tests validate canonical output against the official SPDX 2.3 JSON schema pinned
+by upstream commit and digest. A post-build module verification catches ordinary
+cache drift, but this remains non-hermetic inventory rather than provenance.
+
 Clean pushed commit `fd20a4fb19dfb3b0567c899e859fa79556deb2f4`
 was frozen as external RC11 candidate and license evidence. The candidate-record
 SHA-256 is

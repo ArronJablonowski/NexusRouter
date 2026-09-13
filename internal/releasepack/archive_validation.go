@@ -4,70 +4,91 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"debug/elf"
 	"debug/macho"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
 
-const maxArchive = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig + (1 << 20)
+const maxArchive = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxTargetSBOM + maxConfig + (1 << 20)
 const tarBlockSize = 512
 
-// Six regular entries require six headers, up to one padding block per payload,
+// Seven regular entries require seven headers, up to one padding block per payload,
 // and two end-of-archive blocks. All payload maxima are block-aligned, but keep
 // the conservative derived allowance so later contract changes remain safe.
-const maxTarStream = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxConfig + (2*6+2)*tarBlockSize
+const maxTarStream = maxArtifact + maxNotice + maxInstall + maxLicense + maxReleaseNotes + maxTargetSBOM + maxConfig + (2*7+2)*tarBlockSize
 
 // validateReleaseArchive checks the format that Package emits before a payload
 // can be signed or accepted. Checksums authenticate bytes; this check also
 // ensures those bytes are a release artifact for the target named in the
 // authenticated manifest.
-func validateReleaseArchive(root *os.Root, artifact Artifact) error {
+func validateReleaseArchive(root *os.Root, manifest Manifest, artifact Artifact) error {
+	_, err := validatedReleaseArchiveSBOM(root, manifest, artifact)
+	return err
+}
+
+func validatedReleaseArchiveSBOM(root *os.Root, manifest Manifest, artifact Artifact) (spdxDocument, error) {
+	var sbomDocument spdxDocument
+	if root == nil || len(artifact.Entries) != len(archiveContract) {
+		return sbomDocument, ErrSignature
+	}
 	body, err := readReleaseFile(root, artifact.File, maxArchive)
 	if err != nil {
-		return ErrSignature
+		return sbomDocument, ErrSignature
 	}
 	compressed := bytes.NewReader(body)
 	gz, err := gzip.NewReader(compressed)
 	if err != nil || !gz.ModTime.IsZero() || gz.Name != "" || gz.Comment != "" || len(gz.Extra) != 0 || gz.OS != 255 {
-		return ErrSignature
+		return sbomDocument, ErrSignature
 	}
 	gz.Multistream(false)
 	decompressed := &io.LimitedReader{R: gz, N: maxTarStream + 1}
 	tr := tar.NewReader(decompressed)
 	var binary []byte
+	var sbom []byte
 	for index, contract := range archiveContract {
 		header, err := tr.Next()
 		if err != nil || !canonicalArchiveHeader(header, contract.name, int64(contract.mode), contract.max) {
 			gz.Close()
-			return ErrSignature
+			return sbomDocument, ErrSignature
 		}
 		entry, err := io.ReadAll(io.LimitReader(tr, contract.max+1))
 		if err != nil || int64(len(entry)) != header.Size || !validEntryMetadata(artifact.Entries[index], index, entry) {
 			gz.Close()
-			return ErrSignature
+			return sbomDocument, ErrSignature
 		}
 		switch contract.name {
 		case noticeName:
 			if validateNotice(entry, artifact.OS, artifact.Arch) != nil {
 				gz.Close()
-				return ErrSignature
+				return sbomDocument, ErrSignature
 			}
+		case sbomName:
+			if ValidateTargetSBOM(entry) != nil || json.Unmarshal(entry, &sbomDocument) != nil {
+				gz.Close()
+				return spdxDocument{}, ErrSignature
+			}
+			sbom = entry
 		case "darwin":
 			binary = entry
 		default:
 			if !utf8.Valid(entry) || bytes.IndexByte(entry, 0) >= 0 || bytes.IndexByte(entry, '\r') >= 0 || entry[len(entry)-1] != '\n' {
 				gz.Close()
-				return ErrSignature
+				return sbomDocument, ErrSignature
 			}
 		}
 	}
 	if _, err = tr.Next(); err != io.EOF {
 		gz.Close()
-		return ErrSignature
+		return sbomDocument, ErrSignature
 	}
 	// tar.Reader reports EOF after the two canonical zero blocks. Drain through
 	// gzip so its CRC/trailer is checked, but reject any uncompressed suffix and
@@ -75,12 +96,45 @@ func validateReleaseArchive(root *os.Root, artifact Artifact) error {
 	suffix, copyErr := io.Copy(io.Discard, decompressed)
 	if copyErr != nil || suffix != 0 || decompressed.N == 0 {
 		gz.Close()
-		return ErrSignature
+		return sbomDocument, ErrSignature
 	}
 	if err = gz.Close(); err != nil || compressed.Len() != 0 {
+		return sbomDocument, ErrSignature
+	}
+	if len(sbom) == 0 || validateReleaseBinary(binary, artifact.OS, artifact.Arch) != nil ||
+		validateReleaseSBOMBinding(sbomDocument, manifest, artifact, binary) != nil {
+		return spdxDocument{}, ErrSignature
+	}
+	return sbomDocument, nil
+}
+
+func validateReleaseSBOMBinding(document spdxDocument, manifest Manifest, artifact Artifact, binary []byte) error {
+	if manifest.SchemaVersion != releaseManifestSchema || artifact.OS == "" || artifact.Arch == "" || len(document.Packages) < 2 || len(document.Files) < 1 {
 		return ErrSignature
 	}
-	return validateReleaseBinary(binary, artifact.OS, artifact.Arch)
+	expectedName := fmt.Sprintf("DarwinRouter-%s-%s-%s", manifest.Version, artifact.OS, artifact.Arch)
+	expectedNamespace := fmt.Sprintf("https://github.com/ArronJablonowski/DarwinRouter/releases/%s/%s/%s-%s/sbom", manifest.Version, manifest.Commit, artifact.OS, artifact.Arch)
+	digest := sha256.Sum256(binary)
+	binarySHA256 := hex.EncodeToString(digest[:])
+	if document.Name != expectedName || document.DocumentNamespace != expectedNamespace || document.CreationInfo.Created != manifest.Created ||
+		document.Packages[0].VersionInfo != manifest.Version || len(document.Packages[0].Checksums) != 0 || document.Files[0].FileName != "./darwin" ||
+		len(document.Files[0].Checksums) != 1 || document.Files[0].Checksums[0].ChecksumValue != binarySHA256 {
+		return ErrSignature
+	}
+	wantToolchainVersion := "v" + strings.TrimPrefix(manifest.Toolchain, "go")
+	toolchainCount := 0
+	for _, item := range document.Packages[1:] {
+		if item.Name == goToolchainModulePath {
+			if item.VersionInfo != wantToolchainVersion {
+				return ErrSignature
+			}
+			toolchainCount++
+		}
+	}
+	if toolchainCount != 1 {
+		return ErrSignature
+	}
+	return nil
 }
 
 func canonicalArchiveHeader(header *tar.Header, name string, mode, maxSize int64) bool {

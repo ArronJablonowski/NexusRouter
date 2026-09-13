@@ -211,7 +211,7 @@ func executePublishedNativeArchive(ctx context.Context, downloadDir, installRoot
 			break
 		}
 	}
-	if artifact.File == "" || len(artifact.Entries) != len(archiveContract) || "sha256:"+artifact.SHA256 != receiptAssetSHA(receipt.Assets, artifact.File) || validateReleaseArchive(root, artifact) != nil {
+	if artifact.File == "" || len(artifact.Entries) != len(archiveContract) || "sha256:"+artifact.SHA256 != receiptAssetSHA(receipt.Assets, artifact.File) || validateReleaseArchive(root, manifest, artifact) != nil {
 		return "", "", ErrPublishedInstallEvidence
 	}
 	archiveBody, err := readReleaseFile(root, artifact.File, maxArchive)

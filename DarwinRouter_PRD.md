@@ -1323,10 +1323,18 @@ known overflow or with generation, output, and iteration budget exhaustion.
 Release preparation must bind artifacts to an explicit reviewed source commit
 and semantic version. Build macOS/Linux amd64/arm64 archives from one isolated
 snapshot of committed source, with fixed build/archive metadata. Include a
-versioned manifest and checksums covering both binaries' archives and manifest.
+canonical target-specific SPDX 2.3 SBOM in each archive and a versioned manifest
+and checksums covering each complete archive and the manifest. The SBOM must
+identify the exact binary SHA-256, module-level Go dependency/toolchain closure,
+and hashes of the first-party Web UI sources embedded in that binary. Unknown or
+unreviewed dependency license conclusions remain `NOASSERTION`.
 Qualify reproducibility with two complete builds and verify executable target
 identities and the native CLI version. Cross-compilation is not native runtime
 qualification on the other targets.
+
+SBOM generation is inventory evidence only. It does not perform vulnerability
+analysis, establish independent build provenance, make a legal conclusion, or
+replace candidate-bound license evidence, third-party notices, and human review.
 
 Sign the checksum set with a separately provisioned release identity; never
 reuse repository SSH credentials. Verification must require an independently

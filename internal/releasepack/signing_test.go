@@ -33,13 +33,15 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	writeSigningFixture(t, seedFile, []byte(hex.EncodeToString(private.Seed())+"\n"), 0600)
 	writeSigningFixture(t, publicFile, []byte(hex.EncodeToString(public)+"\n"), 0644)
 	var sums strings.Builder
-	manifest := Manifest{SchemaVersion: 2, Version: "1.0.0", Commit: strings.Repeat("a", 40), Toolchain: "go1.27.1"}
+	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: strings.Repeat("a", 40), Created: "2026-09-13T18:00:00Z", Toolchain: "go1.27.1"}
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
 		body := signingArchiveFixture(t, target[0], target[1])
 		writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(body), name)
-		_, metadata, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(target[0], target[1]), signingBinaryFixture(t, target[0], target[1]))
+		binary := signingBinaryFixture(t, target[0], target[1])
+		sbom := signingSBOMFixture(t, manifest.Version, manifest.Commit, target[0], target[1], binary)
+		_, metadata, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(target[0], target[1]), sbom, binary)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,7 +60,9 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 
 func signingArchiveFixture(t *testing.T, targetOS, targetArch string) []byte {
 	t.Helper()
-	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(targetOS, targetArch), signingBinaryFixture(t, targetOS, targetArch))
+	binary := signingBinaryFixture(t, targetOS, targetArch)
+	sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), targetOS, targetArch, binary)
+	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture(targetOS, targetArch), sbom, binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +176,7 @@ func headerOnlyBinaryFixture(targetOS, targetArch string) []byte {
 }
 
 func TestSigningManifestContract(t *testing.T) {
-	for _, scenario := range []string{"schema", "version", "commit", "toolchain", "target", "hash", "filename", "count", "entry_count", "entry_name", "entry_order", "entry_mode", "entry_size", "entry_hash", "shared_collateral", "malformed", "duplicate_key", "missing_manifest", "extra_payload"} {
+	for _, scenario := range []string{"schema", "version", "commit", "created", "toolchain", "target", "hash", "filename", "count", "entry_count", "entry_name", "entry_order", "entry_mode", "entry_size", "entry_hash", "shared_collateral", "malformed", "duplicate_key", "missing_manifest", "extra_payload"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seedFile, public := signingFixture(t)
 			path := filepath.Join(dir, "manifest.json")
@@ -191,6 +195,8 @@ func TestSigningManifestContract(t *testing.T) {
 				manifest.Version = "01.0.0"
 			case "commit":
 				manifest.Commit = strings.Repeat("A", 40)
+			case "created":
+				manifest.Created = "2026-09-13T18:00:01Z"
 			case "toolchain":
 				manifest.Toolchain = "go01.27.1"
 			case "target":
@@ -225,7 +231,7 @@ func TestSigningManifestContract(t *testing.T) {
 				body = []byte("{invalid}")
 			}
 			if scenario == "duplicate_key" {
-				body = []byte(strings.Replace(string(body), `"schema_version": 2,`, `"schema_version": 2, "schema_version": 2,`, 1))
+				body = []byte(strings.Replace(string(body), `"schema_version": 3,`, `"schema_version": 3, "schema_version": 3,`, 1))
 			}
 			writeSigningFixture(t, path, body, 0644)
 			if scenario == "missing_manifest" {
@@ -299,7 +305,7 @@ func TestSigningOfflineRoundTrip(t *testing.T) {
 }
 
 func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
-	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "missing_notice", "missing_config", "tampered_license", "wrong_notice_target", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
+	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "missing_notice", "missing_sbom", "missing_config", "tampered_license", "tampered_sbom", "wrong_notice_target", "wrong_sbom_target", "wrong_sbom_binary", "wrong_sbom_toolchain", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
 			name := "DarwinRouter_1.0.0_darwin_amd64.tar.gz"
@@ -323,15 +329,29 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 				body = archive.Bytes()
 			case "missing_notice":
 				body = archiveSigningBody(t, signingBinaryFixture(t, "darwin", "amd64"), nil)
-			case "missing_config", "tampered_license":
-				entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), signingBinaryFixture(t, "darwin", "amd64"))
+			case "missing_sbom", "missing_config", "tampered_license", "tampered_sbom", "wrong_sbom_target", "wrong_sbom_binary", "wrong_sbom_toolchain":
+				binary := signingBinaryFixture(t, "darwin", "amd64")
+				sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "darwin", "amd64", binary)
+				entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), sbom, binary)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if scenario == "missing_config" {
-					entries = append(entries[:4], entries[5:]...)
-				} else {
+				switch scenario {
+				case "missing_sbom":
+					entries = append(entries[:3], entries[4:]...)
+				case "missing_config":
+					entries = append(entries[:5], entries[6:]...)
+				case "tampered_license":
 					entries[1].Data = []byte("changed license\n")
+				case "tampered_sbom":
+					entries[3].Data = append([]byte(nil), entries[3].Data...)
+					entries[3].Data[len(entries[3].Data)-2] ^= 1
+				case "wrong_sbom_target":
+					entries[3].Data = driftApprovedSBOMFixture(t, entries[3].Data, "target")
+				case "wrong_sbom_binary":
+					entries[3].Data = driftApprovedSBOMFixture(t, entries[3].Data, "binary")
+				case "wrong_sbom_toolchain":
+					entries[3].Data = driftApprovedSBOMFixture(t, entries[3].Data, "toolchain")
 				}
 				var archive bytes.Buffer
 				if err = Archive(&archive, entries); err != nil {
@@ -378,7 +398,8 @@ func archiveSigningBody(t *testing.T, body, notice []byte) []byte {
 	entries := []Entry{{Name: "darwin", Data: body}}
 	if notice != nil {
 		var err error
-		entries, _, err = releaseEntries(signingCollateralFixture(), notice, body)
+		sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "darwin", "amd64", body)
+		entries, _, err = releaseEntries(signingCollateralFixture(), notice, sbom, body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -392,7 +413,8 @@ func archiveSigningBody(t *testing.T, body, notice []byte) []byte {
 
 func customSigningArchive(t *testing.T, body []byte, mode int64, suffix int64) []byte {
 	t.Helper()
-	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), body)
+	sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "darwin", "amd64", body)
+	entries, _, err := releaseEntries(signingCollateralFixture(), signingNoticeFixture("darwin", "amd64"), sbom, body)
 	if err != nil {
 		t.Fatal(err)
 	}

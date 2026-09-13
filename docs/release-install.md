@@ -36,6 +36,7 @@ archive="$release_dir/DarwinRouter_${release_version}_${release_os}_${release_ar
 test "$(tar -tzf "$archive")" = "INSTALL.md
 LICENSE
 RELEASE_NOTES.md
+SBOM.spdx.json
 THIRD_PARTY_NOTICES.txt
 config.example.yaml
 darwin"
@@ -46,7 +47,7 @@ mkdir -p "$install_root/releases"
 mkdir "$install_prefix"
 mkdir "$install_prefix/bin"
 install -m 0755 "$stage_dir/darwin" "$install_prefix/bin/darwin"
-for file in INSTALL.md LICENSE RELEASE_NOTES.md THIRD_PARTY_NOTICES.txt; do
+for file in INSTALL.md LICENSE RELEASE_NOTES.md SBOM.spdx.json THIRD_PARTY_NOTICES.txt; do
   install -m 0644 "$stage_dir/$file" "$install_prefix/$file"
 done
 install -m 0600 "$stage_dir/config.example.yaml" "$install_prefix/config.example.yaml"
@@ -67,3 +68,17 @@ Keep the previous versioned installation and its matching pre-upgrade database
 backup for rollback. Stop old writers before starting a binary that may migrate
 the database. Do not use a database upgraded by a newer binary with an older
 binary unless the release notes explicitly qualify that downgrade.
+
+The release binary contains the versioned Web UI assets and Workboard schema;
+no separate frontend installation is required. Before enabling browser access
+or Workboard scheduling, follow the authentication, origin/CSP, approval,
+backup, restore, and rollback procedures in the
+[Web UI and Workboard operator guide](workboard-operator-guide.md).
+
+`SBOM.spdx.json` is the target-specific canonical SPDX 2.3 inventory covered by
+the authenticated archive and manifest checksums. It includes the binary hash,
+module-level Go dependency/toolchain inventory, and hashes for the first-party
+Web UI sources embedded in the binary. It is not a vulnerability report, build
+provenance, legal conclusion, or proof that every dependency license was
+reviewed. `NOASSERTION` marks dependency license expressions that still require
+operator review; retain and review `THIRD_PARTY_NOTICES.txt` separately.

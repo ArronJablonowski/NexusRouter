@@ -206,6 +206,8 @@ func TestReleaseQualification(t *testing.T) {
 	nativeRan := false
 	for _, artifact := range manifest.Artifacts {
 		binary := qualificationBinary(t, filepath.Join(first, artifact.File), artifact)
+		assetDigest := assertEmbeddedWebUIAssets(t, source, binary)
+		t.Logf("verified embedded WebUI assets sha256:%s in %s", assetDigest, artifact.File)
 		if artifact.OS == "darwin" {
 			f, e := macho.NewFile(bytes.NewReader(binary))
 			want := macho.CpuAmd64

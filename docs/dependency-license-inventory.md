@@ -44,6 +44,19 @@ the same captured closure. Freeze and verification fail closed on a dirty or
 different checkout, noncanonical/tampered evidence, dependency drift, a local
 module replacement, altered legal files, or an incompatible toolchain.
 
+Release archives also carry a target-specific canonical `SBOM.spdx.json`. Its
+module list must match this candidate-bound target closure, and it additionally
+records the exact target binary SHA-256 and each checked-in first-party Web UI
+source hash. The Go toolchain is declared `BSD-3-Clause`; other dependency
+license fields intentionally remain `NOASSERTION` unless mechanically reviewed.
+This SPDX 2.3 document is a module-level inventory only—not a vulnerability
+scan, complete build provenance, legal conclusion, or replacement for the legal
+files, rendered notices, and human approval described here.
+The DarwinRouter package declares MIT from reviewed root evidence, while the
+composite package conclusion, executable conclusion, and individual file
+conclusions remain `NOASSERTION`; a statically linked binary must not inherit a
+single project-license conclusion over its unresolved dependency set.
+
 “Observed family” is a convenience classification from the checked module-cache
 text. It is not an SPDX attestation and must not replace review of the complete
 source file identified by the module version and digest.

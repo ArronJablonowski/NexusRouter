@@ -1,5 +1,16 @@
 version: 1
 mode: local_only
+daemon:
+  # The stock daemon and Web UI accept loopback listeners only.
+  listen: 127.0.0.1:7788
+web_ui:
+  enabled: true
+  # One non-reserved path segment, for example /app or /darwin.
+  path_prefix: /app
+  # Empty derives the sole origin from daemon.listen. Additional entries must
+  # be exact http loopback origins on the same port; this is not a CORS list.
+  allowed_origins: []
+  browser_session_ttl: 8h  # Valid range: 5m-24h; sessions do not survive restart.
 runtime:
   max_turns: 8  # Shared iteration budget for initial work and active steering.
   # Reuse a currently operator-approved stored summary only when full-history
@@ -8,8 +19,8 @@ runtime:
 workboard:
   enabled: true
   scheduler:
-    # Unattended execution is deliberately unavailable in the stock daemon
-    # until durable task attribution, budgets, and acceptance are wired.
+    # Unattended execution is opt-in. Enabling it dispatches Ready cards, so
+    # first configure independent bounded worker and local reviewer aliases.
     enabled: false
     interval: 5s
     max_active_claims: 3
@@ -49,8 +60,12 @@ models:
     # On Apple unified memory, include GPU allocations here and leave VRAM zero.
     ram_bytes: 0
 tools:
-  # Enable tools only after reviewing their roots and approval policy.
+  # Filesystem tools remain disabled. Agent-facing Workboard reads/writes are
+  # separate gates; writes require reads and an interactive approval presenter.
   enabled: false
+  workboard_read_enabled: false
+  workboard_write_enabled: false
+  max_turns: 8
 memory:
   # Opt in only after selecting a private durable scope and retention policy.
   enabled: false
@@ -64,5 +79,10 @@ skills:
 evaluation:
   # Subjective auxiliary judging is opt-in and may create provider traffic.
   llm_judge_enabled: false
+security:
+  # local_only enforces a deny transport, not only absence of cloud models.
+  local_only_egress: deny
+  # Side-effecting agent tools require an exact operator decision.
+  default_tool_policy: ask
 telemetry:
   database: ./data/darwin.db

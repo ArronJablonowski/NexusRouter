@@ -33,10 +33,11 @@ These labels and capacities must be rechecked against GitHub's
 [hosted-runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 before final dispatch because runner images continue to change.
 
-Each qualification job builds all four six-member release archives twice,
-compares their unsigned bytes, verifies authenticated schema-2 member metadata,
-shared collateral and target-specific dependency notices, verifies executable
-formats, exercises disposable-key signing and tamper rejection, and rehearses
+Each qualification job builds all four seven-member release archives twice,
+compares their unsigned bytes, verifies authenticated schema-3 member metadata,
+shared collateral, target-specific SPDX 2.3 SBOMs and dependency notices,
+verifies executable formats, exercises disposable-key signing and tamper
+rejection, and rehearses
 installation plus schema migration/backup/rollback with only the artifact
 matching that job's asserted native platform. Other targets in that job are
 cross-build evidence, not native execution evidence. Four-target support
@@ -45,6 +46,12 @@ for the exact version and commit. Each bundle contains the primary native
 record, canonical install-rehearsal record, bounded transcript, and canonical
 in-job verification result. The summary identifies failures and skipped gates;
 neither qualifies a release.
+
+Each SBOM is checked against its exact binary digest, target dependency and Go
+toolchain closure, and the clean commit's first-party Web UI source hashes. The
+SBOM is a module-level inventory only: the workflow does not perform a
+vulnerability scan, establish build provenance, reach a legal conclusion, or
+resolve dependency licenses recorded as `NOASSERTION`.
 
 The workflow has read-only repository permissions, pins the checkout and Go
 setup actions to reviewed full commit IDs, disables checkout credential

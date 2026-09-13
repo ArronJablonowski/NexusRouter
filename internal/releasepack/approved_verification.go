@@ -71,6 +71,14 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 	if err != nil {
 		return result, ErrSignature
 	}
+	sbomSources, err := discoverSBOMSourceFiles(ctx, source, environment())
+	if err != nil {
+		return result, ErrSignature
+	}
+	expectedCreated, err := releaseCommitCreated(ctx, source, candidate.SourceCommit, environment())
+	if err != nil || expectedCreated != candidate.ReleaseCreated {
+		return result, ErrSignature
+	}
 	authorization, err := ReadSigningAuthorization(options.AuthorizationRecordFile, SigningAuthorizationExpectations{
 		RecordSHA256: options.ExpectedAuthorizationSHA256, CandidateRecordSHA256: options.ExpectedCandidateSHA256,
 		LicenseEvidenceSHA256: options.ExpectedLicenseEvidenceSHA256,
@@ -91,7 +99,7 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 	}
 	defer root.Close()
 	if prefixedDigest(sums) != options.ExpectedSumsSHA256 ||
-		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence) != nil {
+		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence, sbomSources, expectedCreated) != nil {
 		return result, ErrSignature
 	}
 	encodedSignature, err := readReleaseFile(root, signatureName, 129)

@@ -24,12 +24,23 @@ whose `HEAD` is exactly the supplied commit, materializes that commit through
 the release snapshot rules, and records:
 
 - the semantic version and full source commit;
-- the schema-2 release manifest contract;
+- the schema-3 release manifest contract;
 - the exact ordered Darwin/Linux, amd64/arm64 target set;
-- the exact six-member archive order, modes, size ceilings and cross-target
+- the exact seven-member archive order, modes, size ceilings and cross-target
   sharing rules; and
 - SHA-256 hashes of installation instructions, project license, release notes
   and conservative example configuration from the immutable snapshot.
+
+The canonical candidate record is schema 2. Its target-specific archive
+contract includes `SBOM.spdx.json` as a non-shared member between release notes
+and third-party notices. The SBOM is an SPDX 2.3 module-level inventory bound to
+the target binary, Go dependency/toolchain closure, and exact first-party Web UI
+source hashes. It is not vulnerability or build-provenance evidence and does not
+make a legal determination; unreviewed dependency license expressions remain
+`NOASSERTION` pending the separate operator review.
+The record also freezes the release creation timestamp as the source commit's
+committer time normalized to whole-second UTC. Manifest and SBOM timestamps must
+match it exactly; production signing re-derives the value from the clean commit.
 
 All four target decisions and every operator-controlled gate are recorded as
 `unapproved`. This is intentional: generating a contract cannot authorize a

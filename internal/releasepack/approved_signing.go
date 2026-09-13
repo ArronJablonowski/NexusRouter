@@ -84,6 +84,14 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 	if err != nil {
 		return ErrSignature
 	}
+	sbomSources, err := discoverSBOMSourceFiles(ctx, source, environment())
+	if err != nil {
+		return ErrSignature
+	}
+	expectedCreated, err := releaseCommitCreated(ctx, source, candidate.SourceCommit, environment())
+	if err != nil || expectedCreated != candidate.ReleaseCreated {
+		return ErrSignature
+	}
 	trustRecord, public, err := readExpectedTrustRecord(options.TrustRecordFile, options.ExpectedKeyID,
 		options.ExpectedKeyFingerprint, options.ExpectedTrustRecordSHA256)
 	if err != nil || authorization.ReleasePolicyURL != trustRecord.ReleasePolicyURL {
@@ -94,7 +102,7 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		return ErrSignature
 	}
 	if prefixedDigest(sums) != options.ExpectedSumsSHA256 ||
-		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence) != nil {
+		approvedArtifactLicenseIdentity(root, candidate, licenseEvidence, sbomSources, expectedCreated) != nil {
 		root.Close()
 		return ErrSignature
 	}
@@ -141,20 +149,56 @@ func approvedArtifactIdentity(root *os.Root, candidate CandidateRecord) error {
 	return err
 }
 
-func approvedArtifactLicenseIdentity(root *os.Root, candidate CandidateRecord, evidence LicenseEvidence) error {
+func approvedArtifactLicenseIdentity(root *os.Root, candidate CandidateRecord, evidence LicenseEvidence, expectedAssets []sbomSourceFile, expectedCreated string) error {
+	if !validSPDXCreated(expectedCreated) || candidate.ReleaseCreated != expectedCreated {
+		return ErrSignature
+	}
 	manifest, err := approvedArtifactManifest(root, candidate)
 	if err != nil || evidence.SourceCommit != candidate.SourceCommit ||
-		manifest.Toolchain != evidence.Toolchain.GOVERSION || len(evidence.Targets) != len(manifest.Artifacts) {
+		manifest.Created != expectedCreated || manifest.Toolchain != evidence.Toolchain.GOVERSION || len(evidence.Targets) != len(manifest.Artifacts) || len(expectedAssets) == 0 {
 		return ErrSignature
 	}
 	for i, target := range evidence.Targets {
 		artifact := manifest.Artifacts[i]
-		if target.OS != artifact.OS || target.Arch != artifact.Arch || len(artifact.Entries) <= 3 ||
-			artifact.Entries[3].Name != noticeName || target.NoticeSHA256 != "sha256:"+artifact.Entries[3].SHA256 {
+		document, documentErr := validatedReleaseArchiveSBOM(root, manifest, artifact)
+		if documentErr != nil || target.OS != artifact.OS || target.Arch != artifact.Arch || len(artifact.Entries) <= 4 ||
+			artifact.Entries[4].Name != noticeName || target.NoticeSHA256 != "sha256:"+artifact.Entries[4].SHA256 ||
+			!sbomMatchesLicenseEvidence(document, target, expectedAssets) {
 			return ErrSignature
 		}
 	}
 	return nil
+}
+
+func sbomMatchesLicenseEvidence(document spdxDocument, evidence LicenseEvidenceTarget, expectedAssets []sbomSourceFile) bool {
+	if len(document.Packages)-1 != len(evidence.Modules) || len(document.Files)-1 != len(expectedAssets) {
+		return false
+	}
+	modules := make(map[string]bool, len(evidence.Modules))
+	for _, module := range evidence.Modules {
+		key := module.Path + "\x00" + module.Version
+		if modules[key] {
+			return false
+		}
+		modules[key] = true
+	}
+	for _, item := range document.Packages[1:] {
+		key := item.Name + "\x00" + item.VersionInfo
+		if !modules[key] {
+			return false
+		}
+		delete(modules, key)
+	}
+	if len(modules) != 0 {
+		return false
+	}
+	for i, expected := range expectedAssets {
+		file := document.Files[i+1]
+		if file.FileName != "./"+expected.Name || len(file.Checksums) != 1 || file.Checksums[0].ChecksumValue != expected.SHA256 {
+			return false
+		}
+	}
+	return true
 }
 
 func approvedArtifactManifest(root *os.Root, candidate CandidateRecord) (Manifest, error) {
@@ -165,6 +209,7 @@ func approvedArtifactManifest(root *os.Root, candidate CandidateRecord) (Manifes
 	var manifest Manifest
 	if json.Unmarshal(body, &manifest) != nil || manifest.SchemaVersion != candidate.ReleaseManifestSchema ||
 		manifest.Version != candidate.ReleaseVersion || manifest.Commit != candidate.SourceCommit ||
+		manifest.Created != candidate.ReleaseCreated ||
 		len(manifest.Artifacts) != len(candidate.Targets) {
 		return Manifest{}, ErrSignature
 	}
@@ -178,7 +223,7 @@ func approvedArtifactManifest(root *os.Root, candidate CandidateRecord) (Manifes
 			return Manifest{}, ErrSignature
 		}
 	}
-	indexes := [...]int{0, 1, 2, 4}
+	indexes := [...]int{0, 1, 2, 5}
 	if len(candidate.SourceCollateral) != len(indexes) {
 		return Manifest{}, ErrSignature
 	}

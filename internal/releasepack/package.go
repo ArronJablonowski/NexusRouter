@@ -28,9 +28,12 @@ type Manifest struct {
 	SchemaVersion int        `json:"schema_version"`
 	Version       string     `json:"version"`
 	Commit        string     `json:"commit"`
+	Created       string     `json:"created"`
 	Toolchain     string     `json:"toolchain"`
 	Artifacts     []Artifact `json:"artifacts"`
 }
+
+const releaseManifestSchema = 3
 
 var semver = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -205,14 +208,26 @@ func Package(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
-	manifest := Manifest{SchemaVersion: 2, Version: o.Version, Commit: o.Commit, Toolchain: toolchain}
+	created, err := releaseCommitCreated(ctx, source, o.Commit, env)
+	if err != nil {
+		return err
+	}
 	noticeEnv := executableOnlyPATH(env, goExecutable)
+	sbomSources, err := discoverSBOMSourceFiles(ctx, buildSource, noticeEnv)
+	if err != nil {
+		return err
+	}
+	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: o.Version, Commit: o.Commit, Created: created, Toolchain: toolchain}
 	var sums strings.Builder
 	for _, target := range []struct{ os, arch string }{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		if err = goIdentity.verify(); err != nil {
 			return err
 		}
-		notices, e := thirdPartyNotices(ctx, buildSource, target.os, target.arch, noticeEnv)
+		modules, e := targetNoticeModules(ctx, buildSource, target.os, target.arch, noticeEnv)
+		if e != nil {
+			return e
+		}
+		notices, e := renderThirdPartyNotices(target.os, target.arch, modules)
 		if e != nil {
 			return e
 		}
@@ -234,6 +249,13 @@ func Package(ctx context.Context, o Options) error {
 		if err != nil {
 			return err
 		}
+		// Re-verify the module cache after compilation so ordinary corruption or
+		// concurrent cache drift cannot silently separate the recorded module
+		// closure from the bytes that just entered the executable. This is not a
+		// hermetic-build attestation against a malicious same-user cache actor.
+		if _, e = command(ctx, buildSource, env, goExecutable, "mod", "verify"); e != nil {
+			return e
+		}
 		if err = goIdentity.verify(); err != nil {
 			return err
 		}
@@ -246,11 +268,19 @@ func Package(ctx context.Context, o Options) error {
 			return e
 		}
 		name := "DarwinRouter_" + o.Version + "_" + target.os + "_" + target.arch + ".tar.gz"
+		binaryDigest := sha256.Sum256(data)
+		sbom, e := renderTargetSBOM(TargetSBOMOptions{
+			Version: o.Version, Commit: o.Commit, TargetOS: target.os, TargetArch: target.arch,
+			Created: created, BinarySHA256: hex.EncodeToString(binaryDigest[:]),
+		}, modules, sbomSources)
+		if e != nil {
+			return e
+		}
 		f, e := os.OpenFile(filepath.Join(stage, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if e != nil {
 			return e
 		}
-		entries, metadata, e := releaseEntries(shared, notices, data)
+		entries, metadata, e := releaseEntries(shared, notices, sbom, data)
 		if e != nil {
 			f.Close()
 			return e
@@ -301,4 +331,16 @@ func Package(ctx context.Context, o Options) error {
 		return ErrInvalid
 	}
 	return publish(stage, out)
+}
+
+func releaseCommitCreated(ctx context.Context, source, commit string, env []string) (string, error) {
+	value, err := command(ctx, source, env, "git", "show", "--no-patch", "--format=%cI", commit)
+	if err != nil {
+		return "", err
+	}
+	created, err := time.Parse(time.RFC3339, value)
+	if err != nil || created.Before(time.Unix(0, 0)) {
+		return "", ErrInvalid
+	}
+	return created.UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z"), nil
 }

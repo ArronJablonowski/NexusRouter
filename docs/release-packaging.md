@@ -57,12 +57,34 @@ Artifacts are produced for macOS (`darwin`) and Linux, both `amd64` and `arm64`:
 
 - Four `DarwinRouter_VERSION_OS_ARCH.tar.gz` archives. Each contains, in exact
   order, `INSTALL.md`, `LICENSE`, `RELEASE_NOTES.md`,
-  `THIRD_PARTY_NOTICES.txt`, `config.example.yaml` (all mode 0644), and the
-  target executable `darwin` (mode 0755).
-- `manifest.json`: schema version 2, release version, source commit, Go version,
+  `SBOM.spdx.json`, `THIRD_PARTY_NOTICES.txt`, `config.example.yaml` (all mode
+  0644), and the target executable `darwin` (mode 0755).
+- `manifest.json`: schema version 3, release version, source commit, Go version,
   and the four ordered target names, archive SHA-256 hashes, and member
   name/mode/size/SHA-256 metadata.
 - `SHA256SUMS`: sorted checksums of all four archives **and** the manifest.
+
+Each target-specific `SBOM.spdx.json` is canonical SPDX 2.3 JSON. It identifies
+the target binary and its SHA-256, the `cmd/darwin` module dependency closure,
+the exact Go toolchain component, and every checked-in first-party Web UI source
+asset with its SHA-256. `GENERATED_FROM` relationships connect the embedded
+binary to those frontend sources. Dependencies whose license expression has not
+been mechanically established use `NOASSERTION`; the separate notice bundle and
+human license review remain authoritative for release approval.
+
+The document creation time is the source commit's committer timestamp converted
+to whole-second UTC. Candidate schema 2 and manifest schema 3 freeze that value,
+and approved verification re-derives it before key access. Qualification also
+validates generated documents offline against the official SPDX 2.3 JSON schema
+pinned to the dereferenced `v2.3` commit and recorded digest. The project package
+declares MIT but leaves its composite license conclusion, executable file, and
+individual source-file conclusions as `NOASSERTION`; `filesAnalyzed` remains
+false and no package-to-file containment is claimed.
+
+This is a module-level inventory, not a package-file or transitive vulnerability
+scan, build-provenance attestation, legal conclusion, or statement that every
+dependency license was reviewed. It records no CVEs and does not replace the
+candidate-bound license evidence or `THIRD_PARTY_NOTICES.txt`.
 
 Builds use `CGO_ENABLED=0`, `-mod=readonly`, `-trimpath`, `-buildvcs=false`, a
 cleared linker build ID and an embedded CLI version. Workspace selection,
@@ -156,7 +178,9 @@ every payload and the manifest contract, binds manifest identity and shared
 collateral to the candidate, and matches the exact approved `SHA256SUMS`
 digest. The license evidence records the exact Go toolchain and directive,
 root MIT license, four target dependency closures, legal-file hashes and
-rendered notice hashes. The authorization and trust record must name the exact
+rendered notice hashes. Each archive's SPDX document must also match that target
+closure, the clean source's first-party Web UI hashes, and the exact binary
+digest. The authorization and trust record must name the exact
 same release-policy URL. It then proves the seed-derived public key matches the
 expected trust identity. Signing exclusively creates `SHA256SUMS.sig`: 128
 lowercase hex characters containing the Ed25519 signature over the exact
@@ -229,9 +253,10 @@ verifier does not extract, run or install anything. Checks include safe
 basenames, regular nonsymlink files, no extra/missing payloads, the exact four
 target identities, exact ordered archive members and metadata, identical shared
 collateral across targets, target-specific dependency notices, and agreement
-between manifest and checksums. Manifest JSON must use the canonical schema-2
-encoding emitted by the packager (two-space indentation, ordered fields, final
-LF); editing or reformatting invalidates it.
+between manifest and checksums. Each target SBOM must be canonical SPDX 2.3,
+target-bound, source-bound and binary-bound. Manifest JSON must use the
+canonical schema-3 encoding emitted by the packager (two-space indentation,
+ordered fields, final LF); editing or reformatting invalidates it.
 
 Use a quiescent directory you control for signing, verification and subsequent
 installation. Checks are point-in-time observations, not a lock preventing
@@ -245,9 +270,10 @@ After verification, map the host identity to an archive name. `uname -s` values
 value is unsupported and must stop installation rather than guessing.
 
 The authenticated archive carries its own `INSTALL.md`, project license,
-release notes, exact target dependency notices and conservative local example.
+release notes, target-specific SBOM, exact target dependency notices and
+conservative local example.
 After verification, follow that embedded `INSTALL.md`; its source counterpart is
-[release-install.md](release-install.md). It checks all six members before
+[release-install.md](release-install.md). It checks all seven members before
 extraction, uses a new versioned user-controlled prefix, installs documentation
 and the binary, and requires deployment-specific review of the fail-closed
 example. Do not replace an existing prefix; retain the previous binary and its
