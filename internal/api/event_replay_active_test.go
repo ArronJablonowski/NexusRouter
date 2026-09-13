@@ -48,7 +48,7 @@ func TestHTTPEventReplayDisconnectLeavesActiveTaskRunning(t *testing.T) {
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "active.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
-	svc, err := app.NewService(cfg, func(string) string { return "" })
+	svc, err := newAPIFixtureService(cfg, func(string) string { return "" })
 	if err != nil {
 		t.Fatal(err)
 	}

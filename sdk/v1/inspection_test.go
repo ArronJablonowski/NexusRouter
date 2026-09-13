@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
 )
@@ -89,6 +90,8 @@ func TestSDKInspectionSnapshotsDoNotExecuteOrMutate(t *testing.T) {
 	dir := t.TempDir()
 	body := fmt.Sprintf(`version: 1
 mode: local_only
+hardware:
+  auto_profile: false
 telemetry:
   database: %q
 providers:
@@ -109,7 +112,8 @@ models:
 	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
 		t.Fatal(err)
 	}
-	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: path})
+	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: path,
+		ResourceProfiler: sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) { return sdkGoodMeasurement(), nil })})
 	if err != nil {
 		t.Fatal(err)
 	}

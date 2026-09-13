@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -85,7 +84,7 @@ func TestHTTPCompactedContinuationPersistsBeforeProvider(t *testing.T) {
 	defer provider.Close()
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, ContextTokens: 8192}}
-	svc, err := app.NewService(cfg, nil)
+	svc, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

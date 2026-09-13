@@ -47,7 +47,7 @@ func TestDurableTaskStreamDisconnectResumeAndTerminalReplay(t *testing.T) {
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "events.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
-	svc, err := app.NewService(cfg, func(name string) string {
+	svc, err := newAPIFixtureService(cfg, func(name string) string {
 		if name == "DARWIN_API_TOKEN" {
 			return token
 		}
@@ -231,7 +231,7 @@ func TestDurableTaskStreamDisconnectResumeAndTerminalReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer reopened.Close()
-	restartedSvc, err := app.NewService(cfg, func(name string) string {
+	restartedSvc, err := newAPIFixtureService(cfg, func(name string) string {
 		if name == "DARWIN_API_TOKEN" {
 			return token
 		}

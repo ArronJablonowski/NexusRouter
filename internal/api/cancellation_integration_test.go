@@ -38,7 +38,7 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "cancellation.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}}}
-	runner, err := app.NewService(cfg, nil)
+	runner, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestHTTPDurableCancellationWithFullExecutionCapacity(t *testing.T) {
 	defer dispatcher.Close()
 	// A separate application service has no private handle to the runner's
 	// context. Cancellation must travel through committed database state.
-	controller, err := app.NewService(cfg, nil)
+	controller, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

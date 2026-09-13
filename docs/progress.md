@@ -7044,3 +7044,38 @@ and `go build ./...`. The two longest packages completed successfully in
 `internal/telemetry`; releasepack completed in 434.828 seconds. Focused
 application/configuration/telemetry race suites also passed repeatedly before
 the aggregate gate.
+
+## 2026-09-13 — DAR-91 configured scheduling qualification
+
+DAR-91 remains in progress. A new inert application-owned scheduling plan now
+derives a versioned, domain-separated policy digest from redacted validated
+configuration and composes the system-authority supervision service, bounded
+worker supervisor, configured worker task factory, independent configured
+reviewer, worker runner, scheduler, and interval supervisor. Preparation opens
+no provider, starts no goroutine, and mutates no durable state; a plan can
+transfer ownership to only one interval supervisor.
+
+A real end-to-end test executes a Ready card through separate loopback Ollama
+worker and reviewer endpoints, then closes the supervisor, reopens SQLite, and
+verifies the runtime ledger, execution accounting, candidate, advisory audit
+evidence, auxiliary-review admission/settlement/outcome, policy binding, and
+remaining card budget. It also exposed and fixed a host-timezone defect:
+auxiliary review admission now canonicalizes the injected clock to UTC before
+the storage boundary. The regression test supplies a deterministic non-UTC
+host clock so this cannot depend on CI timezone.
+
+Shared health now recognizes a distinct `workboard_scheduler` singleton. When
+present it is readiness-critical and accepts only the bounded supervisor
+starting, healthy, error, and stopped states; reports that predate the optional
+component keep their existing semantics. The CLI conversion helper is present
+but deliberately unused. All stock daemon scheduler guards remain intact until
+CLI composition and process-level success, health, SIGTERM/join, and restart
+tests qualify the final enablement patch.
+
+The first aggregate qualification run also exposed three SDK integration tests
+that implicitly depended on live host RAM pressure. After the preceding long
+race suites, their otherwise deterministic local-model fixtures could be denied
+for resource pressure. Those fixtures now disable automatic profiling and
+inject the same bounded test profiler into SDK clients and the submission
+dispatcher service. The affected SDK cases passed ten consecutive race-enabled
+runs; production admission behavior remains fail-closed and unchanged.

@@ -65,7 +65,8 @@ func TestOpenAIUsageRealProviderTwoTurnDurableIntegration(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			svc, err := app.NewServiceWithToolExtension(cfg, nil, nil, nil, nil, nil, ext)
+			cfg.Hardware.AutoProfile = false
+			svc, err := app.NewServiceWithToolExtension(cfg, nil, apiFixtureProfiler{}, nil, nil, nil, ext)
 			if err != nil {
 				t.Fatal(err)
 			}

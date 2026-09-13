@@ -437,7 +437,12 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		}
 		reviewReservation = reservation
 		reviewOperation = auxiliaryReviewOperationID(frozen)
-		_, created, admitErr := s.auxiliary.AdmitAuxiliaryReview(ctx, frozen, reservation, reviewOperation, s.now)
+		// Storage accepts only canonical UTC timestamps. Normalize the injected
+		// clock at this boundary so a host's local timezone cannot make an
+		// otherwise valid auxiliary review fail admission.
+		_, created, admitErr := s.auxiliary.AdmitAuxiliaryReview(ctx, frozen, reservation, reviewOperation, func() time.Time {
+			return s.now().UTC()
+		})
 		if admitErr != nil {
 			active.err = admitErr
 			return OperationReceipt{}, admitErr

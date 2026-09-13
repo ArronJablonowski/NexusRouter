@@ -37,13 +37,17 @@ func TestHTTPTaskToProviderAndDurableInspection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	service, err := newAPIFixtureService(s, func(name string) string {
+		if name == "DARWIN_API_TOKEN" {
+			return token
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	run := func(ctx context.Context, r app.Request) (app.Result, error) {
-		return app.RunExplicit(ctx, s, r, func(name string) string {
-			if name == "DARWIN_API_TOKEN" {
-				return token
-			}
-			return ""
-		})
+		return service.Run(ctx, r)
 	}
 	h, err := New(token, 1, Services{
 		FeedbackHistory: func(ctx context.Context, task string) ([]evaluation.Record, error) {

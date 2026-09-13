@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 	"go.yaml.in/yaml/v3"
@@ -73,6 +74,7 @@ func TestSDKEventsPaginationRestartRedactionAndCorruption(t *testing.T) {
 	defer cancel()
 	cfg := config.Defaults()
 	cfg.Mode = "local_only"
+	cfg.Hardware.AutoProfile = false
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "events.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: server.URL, APIKeyEnv: "SDK_EVENT_SECRET"}}
 	zero := 0.0
@@ -90,7 +92,7 @@ func TestSDKEventsPaginationRestartRedactionAndCorruption(t *testing.T) {
 			return secret
 		}
 		return ""
-	}}
+	}, ResourceProfiler: sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) { return sdkGoodMeasurement(), nil })}
 	client, err := sdk.New(options)
 	if err != nil {
 		t.Fatal(err)

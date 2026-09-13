@@ -60,7 +60,7 @@ func TestDurableTaskStreamFallbackUsesOneGlobalReplayOrder(t *testing.T) {
 	for _, id := range []string{"a", "z"} {
 		cfg.Models = append(cfg.Models, config.Model{ID: id, Provider: "local", Model: id, Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}, EstimatedCost: &zero})
 	}
-	svc, err := app.NewService(cfg, nil)
+	svc, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestDurableTaskStreamAdmissionFailureHasReplayableResultOnly(t *testing.T) 
 	cfg.Mode = "local_only"
 	cfg.Workers.Max = 1
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "denied-stream.db")
-	svc, err := app.NewService(cfg, nil)
+	svc, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestDurableTaskStreamTaskFailureReplaysAfterRestartWithoutRedispatch(t *tes
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "failed-stream.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
 	cfg.Models = []config.Model{{ID: "a", Provider: "local", Model: "a", Locality: "local", RAMBytes: 1, ContextTokens: 8192, Capabilities: []string{"chat"}}}
-	svc, err := app.NewService(cfg, nil)
+	svc, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestDurableTaskStreamTaskFailureReplaysAfterRestartWithoutRedispatch(t *tes
 	}
 	provider.Close()
 
-	restartedSvc, err := app.NewService(cfg, nil)
+	restartedSvc, err := newAPIFixtureService(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
 	"github.com/ArronJablonowski/DarwinRouter/submissions"
 	"go.yaml.in/yaml/v3"
@@ -88,6 +89,7 @@ func TestSDKSubmissionRestartAndDispatcherInteroperate(t *testing.T) {
 	defer cancel()
 	cfg := config.Defaults()
 	cfg.Mode = "local_only"
+	cfg.Hardware.AutoProfile = false
 	cfg.Workers.Max = 1
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "queued.db")
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL}}
@@ -101,7 +103,8 @@ func TestSDKSubmissionRestartAndDispatcherInteroperate(t *testing.T) {
 	if err = os.WriteFile(path, body, 0600); err != nil {
 		t.Fatal(err)
 	}
-	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: path})
+	profiler := sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) { return sdkGoodMeasurement(), nil })
+	client, err := sdk.New(sdk.ConfigOptions{ProjectFile: path, ResourceProfiler: profiler})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +113,7 @@ func TestSDKSubmissionRestartAndDispatcherInteroperate(t *testing.T) {
 	if err != nil || first.State != "queued" || first.ID == "" || calls.Load() != 0 {
 		t.Fatal(first, err)
 	}
-	restarted, err := sdk.New(sdk.ConfigOptions{ProjectFile: path})
+	restarted, err := sdk.New(sdk.ConfigOptions{ProjectFile: path, ResourceProfiler: profiler})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +146,7 @@ func TestSDKSubmissionRestartAndDispatcherInteroperate(t *testing.T) {
 	if err != nil || queued.State != "queued" || calls.Load() != 0 {
 		t.Fatal(queued, err)
 	}
-	service, err := app.NewService(cfg, nil)
+	service, err := app.NewServiceWithProfiler(cfg, nil, profiler)
 	if err != nil {
 		t.Fatal(err)
 	}
