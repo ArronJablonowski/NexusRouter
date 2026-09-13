@@ -76,6 +76,21 @@ func evidenceFixture(candidate Candidate, source string) EvidenceRecord {
 	return EvidenceRecord{Version: 1, ID: "evidence-" + source, Revision: 1, BoardID: candidate.BoardID, CardID: candidate.CardID, AttemptID: candidate.AttemptID, CandidateID: candidate.ID, CriterionID: "tests", Source: source, Outcome: "passed", ActorID: actor, ActorType: actorType, Reference: "result-reference", CandidateDigest: candidate.Digest, CriteriaDigest: candidate.CriteriaDigest, PolicyDigest: candidate.PolicyDigest, CreatedAt: workboardTime()}
 }
 
+func TestEvidenceProjectionMatchesAuthoritativeReferenceAndOutcomeGrammar(t *testing.T) {
+	candidate := attemptFixture("review").Candidate
+	evidence := evidenceFixture(*candidate, "deterministic")
+	for name, mutate := range map[string]func(*EvidenceRecord){
+		"non-identifier reference": func(item *EvidenceRecord) { item.Reference = "report with spaces" },
+		"deterministic abstention": func(item *EvidenceRecord) { item.Outcome = "abstained" },
+	} {
+		item := evidence
+		mutate(&item)
+		if item.Validate() == nil {
+			t.Fatalf("%s crossed the browser contract", name)
+		}
+	}
+}
+
 func attemptFixture(state string) Attempt {
 	criteria := []AcceptanceCriterion{criterion("tests", "objective")}
 	criteriaDigest := AcceptanceCriteriaDigest(criteria)
@@ -437,6 +452,8 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"claim", `{"version":1,"id":"claim-a","board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","revision":1,"state":"active","owner_id":"operator-a","owner_type":"operator","expires_at":"2026-09-09T12:01:00Z","last_heartbeat":"2026-09-09T12:00:00Z"}`},
 		{"claim", `{"version":1,"id":"claim-a","board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","revision":1,"state":"released","owner_id":"worker-a","owner_type":"worker","expires_at":"2026-09-09T12:01:00Z","last_heartbeat":"2026-09-09T12:00:00Z"}`},
 		{"evidence", `{"version":1,"id":"evidence-a","revision":1,"board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","candidate_id":"candidate-a","criterion_id":"tests","source":"user_feedback","outcome":"abstained","actor_id":"model-a","actor_type":"model","reference":"ref","candidate_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","criteria_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","policy_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","created_at":"2026-09-09T12:00:00Z"}`},
+		{"evidence", `{"version":1,"id":"evidence-a","revision":1,"board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","candidate_id":"candidate-a","criterion_id":"tests","source":"deterministic","outcome":"abstained","actor_id":"validator-a","actor_type":"validator","reference":"ref","candidate_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","criteria_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","policy_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","created_at":"2026-09-09T12:00:00Z"}`},
+		{"evidence", `{"version":1,"id":"evidence-a","revision":1,"board_id":"board-a","card_id":"card-a","attempt_id":"attempt-a","candidate_id":"candidate-a","criterion_id":"tests","source":"deterministic","outcome":"passed","actor_id":"validator-a","actor_type":"validator","reference":"report with spaces","candidate_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","criteria_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","policy_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","created_at":"2026-09-09T12:00:00Z"}`},
 		{"snapshot", `{"version":1,"board":{},"cards":[],"has_more":true,"graph_revision":1,"graph_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`},
 		{"attempt", `{"version":1,"id":"attempt-a","board_id":"board-a","card_id":"card-a","ordinal":1,"revision":1,"state":"accepted","worker_id":"worker-a","criteria_revision":1,"criteria_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","policy_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","budget":{},"criteria":[],"task_ids":[],"session_ids":[],"evidence":[],"started_at":"2026-09-09T12:00:00Z"}`},
 	}

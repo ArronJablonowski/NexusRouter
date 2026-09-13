@@ -202,9 +202,15 @@ func chromeTestNode(t *testing.T) string {
 	t.Helper()
 	node, err := exec.LookPath("node")
 	if err != nil {
+		if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+			t.Fatal("Node with a built-in WebSocket is required for Chrome qualification")
+		}
 		t.Skip("Node with a built-in WebSocket is required for Chrome qualification")
 	}
 	if output, probeErr := exec.Command(node, "-p", "typeof WebSocket").CombinedOutput(); probeErr != nil || strings.TrimSpace(string(output)) != "function" {
+		if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+			t.Fatal("Node with a built-in WebSocket is required for Chrome qualification")
+		}
 		t.Skip("Node with a built-in WebSocket is required for Chrome qualification")
 	}
 	return node
@@ -289,6 +295,9 @@ func chromeTestBinary(t *testing.T) string {
 		if info, err := os.Stat(binary); err == nil && !info.IsDir() {
 			return binary
 		}
+	}
+	if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+		t.Fatal("Chrome or Chrome for Testing is required for Chrome qualification")
 	}
 	t.Skip("Chrome or Chrome for Testing is not installed")
 	return ""
@@ -375,7 +384,7 @@ function cdp(method, params = {}) { const id = ++sequence; return new Promise((r
 async function evaluate(expression) { const result = await cdp('Runtime.evaluate', {expression, returnByValue:true, awaitPromise:true}); if (result.exceptionDetails) throw new Error(result.exceptionDetails.text); return result.result.value; }
 async function eventually(expression, label) { const deadline = Date.now() + 5000; let last; while (Date.now() < deadline) { try { last = await evaluate(expression); if (last) return; } catch (_) {} await new Promise(resolve => setTimeout(resolve, 20)); } throw new Error(label + ' (last value: ' + JSON.stringify(last) + ')'); }
 async function enter() { const common = {key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13}; await cdp('Input.dispatchKeyEvent', {type:'rawKeyDown', ...common}); await cdp('Input.dispatchKeyEvent', {type:'char', text:'\r', unmodifiedText:'\r', ...common}); await cdp('Input.dispatchKeyEvent', {type:'keyUp', ...common}); }
-await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
+await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable'); await cdp('Accessibility.enable');
 const cookie = await cdp('Network.setCookie', {name:'darwin_session', value:'valid', url:origin + '/app/'});
 if (!cookie.success) throw new Error('could not establish authenticated browser fixture');
 await cdp('Page.navigate', {url:origin + '/app/chats'});
@@ -387,6 +396,12 @@ await eventually('document.querySelector(\'a[href="/app/workboards/board-a"]\')'
 await evaluate('document.querySelector(\'a[href="/app/workboards/board-a"]\').focus()'); await enter();
 await eventually('location.pathname === "/app/workboards/board-a" && document.querySelector("#workboard-state").textContent === "Loading cards and lanes…" && document.querySelector("#kanban").getAttribute("aria-busy") === "true"', 'direct workboard loading state was not exposed');
 await eventually('document.querySelector("#selected-board-title").textContent === "Browser qualification" && document.querySelector("#workboard-state").textContent === "No cards match the current filters." && document.querySelector("#workboard-state").getAttribute("role") === "status" && document.querySelector("#kanban").getAttribute("aria-label") === "Workboard lanes" && document.querySelector("#kanban").getAttribute("aria-busy") === "false"', 'accessible empty workboard did not render');
+const accessibility = await cdp('Accessibility.getFullAXTree');
+const axValue = (node, field) => node[field] && node[field].value || '';
+const interactiveRoles = new Set(['button','link','textbox','combobox','checkbox']);
+const unnamed = accessibility.nodes.filter(node => !node.ignored && interactiveRoles.has(axValue(node, 'role')) && !String(axValue(node, 'name')).trim());
+if (unnamed.length) throw new Error('unnamed interactive accessibility nodes: ' + unnamed.map(node => axValue(node, 'role')).join(','));
+for (const landmark of ['main','navigation','region']) if (!accessibility.nodes.some(node => !node.ignored && axValue(node, 'role') === landmark)) throw new Error('missing accessibility landmark: ' + landmark);
 await evaluate('document.querySelector("#refresh-workboards").focus()'); await enter();
 await eventually('performance.getEntriesByName(location.origin + "/app/api/v1/workboards/board-a?limit=100").length >= 2', 'Enter did not activate workboard refresh');
 await eventually('document.querySelector("#workboard-state").textContent === "No cards match the current filters." && document.querySelector("#kanban").getAttribute("aria-busy") === "false" && document.activeElement.id === "refresh-workboards"', 'refresh did not restore stable keyboard focus');

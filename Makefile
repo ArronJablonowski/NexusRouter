@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-release qualify-license-evidence qualify-codex-repair
+.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-webui qualify-release qualify-license-evidence qualify-codex-repair
 
 build:
 	go build -trimpath -buildvcs=false -o bin/darwin ./cmd/darwin
@@ -45,6 +45,14 @@ qualify-mvp:
 	go test -race ./internal/cli -run '^TestDaemonBranchAndRecoveredResumeAcrossRestart$$' -count=1 -v
 	go test -race ./internal/app ./internal/telemetry -run '^(TestClassifyRequestIntentUsesOnlyStructuredEvidence|TestClassifiedDomainPrecedesSkillDiscoveryAndPersistsEveryUse|TestSubmissionDigestUsesCanonicalIntentBeforeStorage|TestSubmissionContractGenerationFencesLegacyQueuedIntent|TestDispatcherRetiresOldConfigurationAndContinuesCurrentWork|TestConfigurationReconciliationAdvancesPastCorruptRequest|TestConfigurationReconciliationReconsidersLaterExpiration|TestConfigurationMismatchCandidatesSkipHistoryAndAdvancePastCorruption|TestConfigurationMismatchCandidatesReconsiderNewlyExpiredWork)$$' -count=1 -v
 	go test -race ./runtime ./sessions ./metrics ./internal/telemetry ./internal/app -run '^(TestApprovedCompaction.*|TestApprovedMidTaskCompactionPreservesLiveToolSuffix|TestMidTaskCompactionActivationBudgetTerminalizesWithRealStore|TestPendingCompactionSkipsUnsupportedAssemblyProviderAndRedaction|TestAutoCompactionPreparationFailurePrecedesManagedResidencyMutation|TestAutoCapacityRerankDiscardsRejectedCandidateCompaction|TestReplayContextCompaction.*|TestInterrupted.*Compaction.*|TestContextCompaction.*|TestPostCompaction.*|TestTraceSnapshotIncludesMidTaskContextCompaction|TestMetricsCountsCanonicalRuntimeEvents)$$' -count=1 -v
+
+# Deterministic DAR-86 browser qualification. All provider traffic uses
+# loopback fixtures. Real-Chrome checks run when Chrome and a Node runtime with
+# built-in WebSocket support are installed; a skip is not browser evidence.
+qualify-webui:
+	DARWIN_REQUIRE_CHROME=1 DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./webui ./internal/browserauth ./internal/webuiapp
+	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./internal/app -run '^(TestExplicitTaskEndToEnd|TestMVPCloudOnlyOpenAICompatible|TestHybridSolCoordinatorDelegatesToIsolatedOllama|TestLocalOnlyBlocksCloudAndUnapprovedTransportsAcrossRuntimeSurfaces|TestBrowser.*|TestWorkboardScheduler.*)$$'
+	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./internal/cli -run '^(TestDaemonLifecycleAcrossCLIProcesses|TestDaemonBranchAndRecoveredResumeAcrossRestart|TestEnabledWorkboardSchedulerDaemonExecutesAndJoinsOnSIGTERM|TestEnabledWorkboardSchedulerDaemonAfterSIGKILLDoesNotRedispatch)$$'
 
 # Explicit supervised signed-in cloud inference with controlled local results.
 # Uses account usage; never included in check/test or ordinary CI.

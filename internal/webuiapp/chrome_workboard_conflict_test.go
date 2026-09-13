@@ -24,9 +24,15 @@ func TestChromeWorkboardConflictReconciliation(t *testing.T) {
 	chrome := conflictChromeBinary(t)
 	node, err := exec.LookPath("node")
 	if err != nil {
+		if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+			t.Fatal("Node with a built-in WebSocket is required for Chrome qualification")
+		}
 		t.Skip("Node with a built-in WebSocket is required for Chrome qualification")
 	}
 	if output, probeErr := exec.Command(node, "-p", "typeof WebSocket").CombinedOutput(); probeErr != nil || strings.TrimSpace(string(output)) != "function" {
+		if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+			t.Fatal("Node with a built-in WebSocket is required for Chrome qualification")
+		}
 		t.Skip("Node with a built-in WebSocket is required for Chrome qualification")
 	}
 
@@ -159,6 +165,9 @@ func conflictChromeBinary(t *testing.T) string {
 		if info, err := os.Stat(binary); err == nil && !info.IsDir() {
 			return binary
 		}
+	}
+	if os.Getenv("DARWIN_REQUIRE_CHROME") == "1" {
+		t.Fatal("Chrome or Chrome for Testing is required for Chrome qualification")
 	}
 	t.Skip("Chrome or Chrome for Testing is not installed")
 	return ""

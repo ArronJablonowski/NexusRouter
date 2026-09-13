@@ -338,7 +338,7 @@ func (e EvidenceRecord) Validate() error {
 	if e.Version != ContractVersion || !validID(e.ID) || e.Revision < 1 || !validID(e.BoardID) ||
 		!validID(e.CardID) || !validID(e.AttemptID) || !validID(e.CandidateID) ||
 		!validID(e.CriterionID) || !validID(e.ActorID) || !validActorType(e.ActorType) ||
-		!boundedPrintable(e.Reference, 1, MaxReferenceBytes) || !validWorkboardDigest(e.CandidateDigest) ||
+		!validID(e.Reference) || !validWorkboardDigest(e.CandidateDigest) ||
 		!validWorkboardDigest(e.CriteriaDigest) || !validWorkboardDigest(e.PolicyDigest) ||
 		!validWorkboardTime(e.CreatedAt) {
 		return ErrContract
@@ -354,7 +354,7 @@ func (e EvidenceRecord) Validate() error {
 	}
 	switch e.Source {
 	case "deterministic":
-		if e.ActorType != "validator" {
+		if e.ActorType != "validator" || e.Outcome == "abstained" {
 			return ErrContract
 		}
 	case "user_feedback":

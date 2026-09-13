@@ -19,12 +19,13 @@ a { color: inherit; }
 .rail a { display: block; margin-bottom: .35rem; padding: .7rem .8rem; border-radius: .55rem; text-decoration: none; }
 .rail a:hover, .rail a:focus-visible, .rail a[aria-current="page"] { outline: none; background: #263758; }
 main { min-width: 0; padding: 1.25rem; }
-button, textarea, input { font: inherit; }
+button, textarea, input, select { font: inherit; }
 button { padding: .65rem 1rem; border: 1px solid #73e6b1; border-radius: .6rem; background: #73e6b1; color: #08130f; font-weight: 700; cursor: pointer; }
 button:disabled, textarea:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
-textarea, input { width: 100%; border: 1px solid #465675; border-radius: .55rem; background: #0d1628; color: inherit; }
+textarea, input, select { border: 1px solid #66799b; border-radius: .55rem; background: #0d1628; color: inherit; }
+textarea, input { width: 100%; }
 textarea { padding: .7rem; resize: vertical; }
-input { padding: .55rem .7rem; }
+input, select { padding: .55rem .7rem; }
 .chat-view { display: grid; grid-template-columns: minmax(14rem, 18rem) minmax(28rem, 1fr) minmax(18rem, 22rem); gap: 1rem; height: calc(100vh - 6.5rem); min-height: 30rem; }
 .chat-index, .transcript-panel, .inspector { min-width: 0; overflow: hidden; border: 1px solid #34415d; border-radius: 1rem; background: #111a2ddd; box-shadow: 0 1rem 3rem #0003; }
 .chat-index { display: flex; flex-direction: column; padding: 1rem; }

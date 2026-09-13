@@ -7238,3 +7238,47 @@ packages were `internal/app` at 1201.822 seconds, `internal/cli` at 109.008
 seconds, `internal/telemetry` at 1246.763 seconds, `internal/releasepack` at
 488.327 seconds, `sdk/v1` at 133.985 seconds, and `webui` at 9.186 seconds. No
 Linear state or comment is changed without operator confirmation.
+
+## 2026-09-13 — DAR-86 Web UI and Kanban qualification
+
+The release-wide browser slice now has one deterministic `make qualify-webui`
+gate. It requires Chrome/Chromium and a Node runtime with built-in WebSocket
+support rather than silently accepting skipped real-browser evidence. The gate
+combines the complete race-enabled Web UI, browser-auth and browser-BFF suites
+with local-only, cloud-only and hybrid application fixtures, enforced
+local-only egress denial, durable Workboard scheduling, actual daemon lifecycle
+and restart tests, and the SIGKILL uncertain-effect no-redispatch boundary.
+
+An adversarial real-Chrome fixture carries hostile image/event-handler markup
+through user and assistant chat messages, board/card content, acceptance
+criteria and candidate summaries. The exact literal text remains visible while
+no element or script is created. Existing Host, Origin, Fetch Metadata, CSRF,
+cookie, bearer, secret projection, policy-bypass, idempotency and operation
+reconciliation tests remain part of the gate.
+
+Accessibility qualification now statically checks unique IDs, ARIA targets,
+programmatic control labels, natural tab order, landmarks, dialog/live-region
+semantics, reduced motion and named color-pair contrast. A real Chrome
+accessibility-tree assertion rejects unnamed interactive nodes and requires the
+main/navigation/Workboard landmarks. The audit found and fixed form-control
+borders that were below WCAG's 3:1 component-boundary contrast. The browser
+matrix and manual compatibility checklist explicitly avoid inferring
+Firefox/Safari/Edge evidence from Chrome or responsive layout from mobile
+support.
+
+The security review also found a fail-closed but inconsistent EvidenceRecord
+boundary: the browser Go/JSON contract admitted arbitrary printable references
+and deterministic abstention, while the authoritative Workboard domain and
+JavaScript required identifier references and passed/failed deterministic
+outcomes. All published layers now share the authoritative grammar, with
+positive and negative schema tests.
+
+On macOS 26.6.2 arm64, the required gate passed with Google Chrome
+152.0.7977.84 and Node 26.7.0. The exact-tree repository gate then passed source
+format/LOC checks, `go vet`, every package under the race detector and the
+production build. Changed-boundary timings included `internal/app` at 1144.455
+seconds, `internal/cli` at 110.707 seconds, `internal/releasepack` at 471.581
+seconds, `internal/telemetry` at 1188.211 seconds, `sdk/v1` at 131.895 seconds,
+`internal/webuiapp` at 5.163 seconds and `webui` at 7.774 seconds. DAR-86 is
+acceptance-ready; no Linear state or comment is changed without operator
+confirmation.

@@ -274,9 +274,7 @@
           ]
         },
         "reference": {
-          "type": "string",
-          "minLength": 1,
-          "x-maxBytes": 128
+          "$ref": "v1#/$defs/id"
         },
         "candidate_digest": {
           "$ref": "#/$defs/digest"
@@ -292,7 +290,7 @@
         }
       },
       "allOf": [
-        {"if": {"properties": {"source": {"const": "deterministic"}}}, "then": {"properties": {"actor_type": {"const": "validator"}}}},
+        {"if": {"properties": {"source": {"const": "deterministic"}}}, "then": {"properties": {"actor_type": {"const": "validator"}, "outcome": {"enum": ["passed", "failed"]}}}},
         {"if": {"properties": {"source": {"const": "user_feedback"}}}, "then": {"properties": {"actor_type": {"const": "operator"}, "outcome": {"enum": ["passed", "failed"]}}}},
         {"if": {"properties": {"source": {"const": "model_audit"}}}, "then": {"properties": {"actor_type": {"const": "model"}}}}
       ]

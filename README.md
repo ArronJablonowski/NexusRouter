@@ -148,11 +148,15 @@ and separately enable approval-backed board/card creation, board revision and
 archive, rich card updates, backlog/ready transitions, same-lane card
 reordering, dependency changes, and pause/cancellation requests. Additional
 acceptance tools remain future agent-tool work. DAR-83's integrated interactive
-Kanban is complete; release-wide browser hardening and qualification remain
-DAR-86 work.
+Kanban is complete. The deterministic DAR-86 browser gate, supported-browser
+matrix, and explicit qualification limits are documented in
+[Web UI and Kanban qualification](docs/webui-qualification.md).
 
 The browser/workboard boundary is now specified in
-[ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), with versioned Go wire
+[ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), and the accessibility
+target, automated gates, manual checklist, and explicit browser matrix are in
+[Web UI accessibility and browser support](docs/web-ui-accessibility.md). The
+boundary uses versioned Go wire
 types, JSON Schema, fixtures, hard payload bounds, a complete UI-operation map,
 same-origin session rules, resumable presentation-event semantics, and durable
 Kanban ownership rules. Closed presentation schemas include board/card/claim/

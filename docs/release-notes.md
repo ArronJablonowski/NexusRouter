@@ -8,6 +8,20 @@ outside the guarded publisher and is quarantined; no GitHub Release, signed
 production assets, supported-platform decision or canonical publication
 approval is claimed.
 
+- DAR-86 adds a required real-Chrome Web UI qualification gate spanning the
+  embedded shell, browser authentication/BFF, local/cloud/hybrid application
+  paths, durable Workboard scheduling and daemon restart recovery. A hostile
+  content fixture proves model/operator markup remains inert across chat,
+  cards, criteria and candidate review. Static and computed accessibility
+  checks now cover labels, ARIA references, landmarks, keyboard focus, reduced
+  motion, WCAG AA text contrast and 3:1 control boundaries; the previously
+  under-contrast form border is corrected. The browser EvidenceRecord contract
+  now matches the authoritative Workboard reference grammar and rejects
+  deterministic abstention consistently in Go, JSON Schema and JavaScript.
+  Support claims remain explicit: a recorded no-skip Chrome run is direct
+  evidence, while Edge, Firefox and Safari require separate compatibility
+  qualification and mobile remains unsupported for v1.
+
 - DAR-83 now adds the first operator mutation controls directly to the
   authenticated Kanban. Operators can create, revise, and archive boards and
   create or revise cards through bounded dialogs with immutable revision
