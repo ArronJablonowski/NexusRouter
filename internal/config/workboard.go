@@ -27,6 +27,10 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if judge.MaxOutputTokens < 0 || judge.MaxOutputTokens > providers.MaxOutputTokens {
 		return errors.New("invalid workboard acceptance judge output-token ceiling")
 	}
+	if judge.MaxInputTokens < 0 || judge.MaxInputTokens > workboard.MaxWorkTokens ||
+		judge.MaxOutputTokens > workboard.MaxWorkTokens-judge.MaxInputTokens {
+		return errors.New("invalid workboard acceptance judge total-token ceiling")
+	}
 	if judge.Enabled && !scheduler.Enabled {
 		return errors.New("workboard acceptance judge requires enabled scheduler")
 	}
@@ -45,7 +49,7 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if !scheduler.Enabled {
 		return nil
 	}
-	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 || judge.MaxOutputTokens <= 0 {
+	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 || judge.MaxInputTokens <= 0 || judge.MaxOutputTokens <= 0 {
 		return errors.New("enabled workboard scheduler requires bounded worker and acceptance reviewer")
 	}
 	if !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
@@ -55,6 +59,9 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if reviewer.Locality != "local" || !modelAvailableInMode(reviewer, s.Mode) || reviewer.ContextTokens < 1 || reviewer.EstimatedCost == nil ||
 		!finite(*reviewer.EstimatedCost) || *reviewer.EstimatedCost < 0 || *reviewer.EstimatedCost > maxWorkboardJudgeCost || *reviewer.EstimatedCost > judge.MaxCost {
 		return errors.New("workboard acceptance reviewer unavailable within configured limits")
+	}
+	if judge.MaxInputTokens+judge.MaxOutputTokens > int64(reviewer.ContextTokens) {
+		return errors.New("workboard acceptance reviewer token reservation exceeds model context")
 	}
 	providerKind := ""
 	for _, provider := range s.Providers {

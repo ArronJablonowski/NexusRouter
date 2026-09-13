@@ -6929,3 +6929,68 @@ schema-45 append-only review outcome must still atomically bind the structured
 audit, host-derived advisory evidence, candidate, and completed auxiliary
 settlement. The production reviewer adapter and scheduler composition remain
 disabled until that transaction and its crash/replay qualification are complete.
+
+## 2026-09-12 — DAR-91 structured review/outcome transaction checkpoint
+
+DAR-91 remains in progress. The configured acceptance reviewer now has
+separate positive input and output ceilings; their overflow-safe sum must fit
+both the reviewer context and the card-owned token ledger and is reserved
+before dispatch. The provider-neutral adapter accepts only an independent
+local reviewer and an exact budgeted runtime result, performs one tool-free
+review call without fallback or retry, refreshes secret redaction, and retains
+trusted usage and elapsed measurements. It maps only explicitly cited criteria
+to host-authored `model_audit` evidence. Subjective criteria continue to
+require operator-owned `user_feedback`; abstention, uncited findings, malformed
+output, identity drift, resolver panic, and non-finite budgets create no
+candidate evidence.
+
+Schema 45 adds one immutable outcome per successful auxiliary admission and
+migration-seals every older admission as legacy without inventing audits or
+authority. A successful transaction now revalidates the exact runtime event
+ledger and execution admission, then atomically persists the validated
+structured audit, host-derived evidence, candidate, completed settlement, and
+canonical outcome binding. Outcome replay rechecks the source events,
+execution admission, candidate evidence head, audit digest, reviewer identity,
+and settlement. New completed settlements cannot be written outside this
+transaction; torn or downgraded outcome authority fails closed. Only explicitly
+sealed pre-schema-45 admissions retain conservative lost-acknowledgement repair.
+
+Focused adapter, configuration, schema, atomic rollback/replay, successor-fence,
+identity-spoofing, and telemetry tests pass, as does the broader non-race app,
+CLI, evaluation, Workboard, configuration, and telemetry package suite. The
+stock daemon scheduler guard remains disabled. Production reviewer/provider
+construction, scheduler composition, crash injection across every new durable
+boundary, and the complete race/build gate remain before DAR-91 completion.
+
+An adversarial follow-up tightened that checkpoint before merge. The service
+and repository now require every `model_audit` evidence row to be an exact
+host-derived projection of cited audit findings and verdict; abstention cannot
+carry evidence, and accept/reject outcomes cannot be inverted. Audit time is
+causally bounded by admission and the atomic commit. Replay reconstructs the
+canonical candidate and evidence rows rather than trusting cached digest/count
+columns. The reviewer receives the bounded, host-read final runtime output,
+not an independently supplied candidate summary, while durable metadata keeps
+only its exact digest. Successful provider reviews require reported token usage, auxiliary
+time charges are database-bounded to five minutes, and schema validation checks
+the authority-bearing outcome-trigger predicates. Concurrent in-process clients
+serialize database initialization per canonical path while independent paths
+remain concurrent; the shared-reader lease scenario passed 50 consecutive
+isolated repetitions.
+The serial repository race gate now allows 25 minutes per package: telemetry's
+exhaustive migration suite was still making progress when it exceeded the old
+20-minute ceiling, after a prior run completed with only ten seconds of margin.
+Repeated race-enabled durable-stream testing also exposed a pre-existing claim
+chronology race: a dispatcher could capture its claim time before waiting for
+SQLite and then commit an `updated_at` earlier than the newly created
+submission. Claim admission now clamps that timestamp to the durable creation
+time. The full durable-stream and cancellation set passed ten consecutive race
+runs, and concurrent same-path initialization plus claim chronology each passed
+twenty focused race runs.
+The reviewer envelope now labels the exact runtime output and the separately
+bound candidate summary/artifact claim so the auditor can reject unsupported
+claim-to-output mismatches without treating artifact identifiers as proof of
+contents. The durable boundary also rejects a measured review whose implied
+start predates its admission. Initialization locking resolves filesystem
+symlink aliases and uses a context-cancelable keyed semaphore; the expanded
+review, chronology, initialization, and replay tests passed ten focused race
+runs.

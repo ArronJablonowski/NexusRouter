@@ -13,6 +13,7 @@ type candidateRuntimeSource struct {
 	terminal         runtime.Event
 	terminalDigest   string
 	outputDigest     string
+	output           string
 	domain           string
 	profile          string
 	privacy          string
@@ -37,7 +38,7 @@ func candidateSourceCompletion(ctx context.Context, tx *sql.Tx, taskID, sessionI
 			}
 			return candidateRuntimeSource{completion: events[i], completionDigest: streamBodyDigestMust(events[i]),
 				terminal: terminal, terminalDigest: streamBodyDigestMust(terminal),
-				outputDigest: digestBytes([]byte(events[i].Data.Text)), domain: events[0].Data.Domain,
+				output: events[i].Data.Text, outputDigest: digestBytes([]byte(events[i].Data.Text)), domain: events[0].Data.Domain,
 				profile: events[0].Data.Profile, privacy: events[0].Data.Privacy}, nil
 		}
 	}

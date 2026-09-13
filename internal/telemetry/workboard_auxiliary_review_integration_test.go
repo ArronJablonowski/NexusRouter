@@ -3,12 +3,15 @@ package telemetry
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
@@ -24,6 +27,8 @@ type budgetedReviewFixture struct {
 	evidence    []workboard.EvidenceInput
 	captured    chan workboard.CandidateEvaluationRequest
 	onEvaluate  func()
+	auditMutate func(*evaluation.AuditRecord)
+	now         func() time.Time
 }
 
 func (e *budgetedReviewFixture) EvaluateCandidate(context.Context, workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
@@ -74,7 +79,34 @@ func (e *budgetedReviewFixture) EvaluateBudgetedCandidate(ctx context.Context, f
 		timeMS, tokens, cost := int64(25), int64(12), int64(7)
 		measurements = workboard.AuxiliaryReviewMeasurements{TimeMS: &timeMS, Tokens: &tokens, CostMicros: &cost}
 	}
-	return workboard.BudgetedCandidateEvaluation{Evidence: e.evidence, Measurements: measurements}, nil
+	auditTime := time.Now().UTC()
+	if e.now != nil {
+		auditTime = e.now().UTC()
+	}
+	audit := budgetedReviewAudit(frozen, auditTime)
+	if e.auditMutate != nil {
+		e.auditMutate(&audit)
+	}
+	evidence := append([]workboard.EvidenceInput(nil), e.evidence...)
+	for i := range evidence {
+		if evidence[i].Source == "model_audit" && evidence[i].ActorID == "independent-reviewer" {
+			evidence[i].Reference = audit.ID
+		}
+	}
+	return workboard.BudgetedCandidateEvaluation{Evidence: evidence, Measurements: measurements, Audit: audit}, nil
+}
+
+func budgetedReviewAudit(frozen workboard.CandidateEvaluationRequest, auditTime time.Time) evaluation.AuditRecord {
+	refs := []string{"requirements", "candidate", "candidate_claim", "source_binding"}
+	for index := range frozen.Criteria {
+		refs = append(refs, "criterion_"+fmt.Sprintf("%02d", index))
+	}
+	return evaluation.AuditRecord{Version: 1, ID: "review-audit-" + frozen.CandidateID, TaskID: frozen.SourceTaskID,
+		AttemptID: frozen.SourceAttemptID, EvaluatorModel: "review-model", EvaluatorProvider: "review-provider",
+		Audit: evaluation.Audit{Version: 1, EvaluatorID: "independent-reviewer", RubricVersion: "fixture-v1",
+			Domain: frozen.SourceDomain, Verdict: "abstain", Findings: []evaluation.AuditFinding{}},
+		EvidenceRefs: refs, Usage: &providers.Usage{InputTokens: 4, OutputTokens: 8},
+		Elapsed: 25 * time.Millisecond, Time: auditTime}
 }
 
 func TestEvaluationServiceBudgetedEvaluatorPreservesLegacyCandidateReplay(t *testing.T) {
@@ -138,6 +170,30 @@ func TestEvaluationServiceRejectsReviewOverrunAndContainsPanic(t *testing.T) {
 		{name: "spoofed-reviewer", evaluator: &budgetedReviewFixture{evidence: []workboard.EvidenceInput{{
 			CriterionID: "tests", Source: "model_audit", Outcome: "passed", ActorID: "other-reviewer", ActorType: "model", Reference: "spoofed-review",
 		}}}},
+		{name: "spoofed-audit-model", evaluator: &budgetedReviewFixture{auditMutate: func(a *evaluation.AuditRecord) {
+			a.EvaluatorModel = "other-model"
+		}}},
+		{name: "spoofed-audit-domain", evaluator: &budgetedReviewFixture{auditMutate: func(a *evaluation.AuditRecord) {
+			a.Audit.Domain = "other-domain"
+		}}},
+		{name: "audit-before-admission", evaluator: &budgetedReviewFixture{auditMutate: func(a *evaluation.AuditRecord) {
+			a.Time = time.Unix(1, 0).UTC()
+		}}},
+		{name: "audit-start-before-admission", evaluator: &budgetedReviewFixture{auditMutate: func(a *evaluation.AuditRecord) {
+			a.Time = a.Time.Add(-10 * time.Millisecond)
+		}}},
+		{name: "audit-after-commit", evaluator: &budgetedReviewFixture{auditMutate: func(a *evaluation.AuditRecord) {
+			a.Time = time.Date(2260, 1, 1, 0, 0, 0, 0, time.UTC)
+		}}},
+		{name: "abstain-with-evidence", evaluator: &budgetedReviewFixture{evidence: []workboard.EvidenceInput{{
+			CriterionID: "tests", Source: "model_audit", Outcome: "passed", ActorID: "independent-reviewer", ActorType: "model",
+		}}}},
+		{name: "reject-with-passed-evidence", evaluator: &budgetedReviewFixture{evidence: []workboard.EvidenceInput{{
+			CriterionID: "tests", Source: "model_audit", Outcome: "passed", ActorID: "independent-reviewer", ActorType: "model",
+		}}, auditMutate: func(a *evaluation.AuditRecord) {
+			a.Audit.Verdict = "reject"
+			a.Audit.Findings = []evaluation.AuditFinding{{Summary: "test failure", EvidenceRefs: []string{"criterion_00"}}}
+		}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -277,6 +333,12 @@ func prepareBudgetedReviewService(t *testing.T, store *Store, evaluator workboar
 	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
 	terminal := appendBudgetRuntime(t, ctx, store, event, &providers.Usage{InputTokens: 4, OutputTokens: 3}, event.Time.Add(2*time.Second), runtime.TaskCompleted)
 	*clock = terminal.Time.Add(time.Second)
+	if fixture, ok := evaluator.(*budgetedReviewFixture); ok && fixture.now == nil {
+		fixture.now = func() time.Time {
+			*clock = clock.Add(25 * time.Millisecond)
+			return *clock
+		}
+	}
 	service := newTestEvaluationService(t, store, workboard.Actor{ID: event.WorkerID, Type: "worker"}, evaluator, clock)
 	request := workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID, ClaimID: claimID,
 		IdempotencyKey: "integrated-candidate-" + suffix, ExpectedCardRevision: *receipt.CardRevision,
@@ -312,8 +374,29 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 	if err != nil || !found || settlement.Disposition != workboard.AuxiliaryReviewCompleted || settlement.ChargedTokens != 12 || settlement.ChargedCostMicros != 7 {
 		t.Fatalf("settlement=%+v found=%v err=%v", settlement, found, err)
 	}
+	outcome, found, err := readAuxiliaryReviewOutcome(ctx, tx, admission.AdmissionID)
+	if err != nil || !found || outcome.ValidateBindings(frozen, admission, settlement) != nil || outcome.AuditID != "review-audit-"+frozen.CandidateID ||
+		outcome.EvidenceCount != 0 || outcome.EvidenceDigest != workboard.EvidenceSetDigest([]workboard.EvidenceRecord{}) {
+		t.Fatalf("outcome=%+v found=%v err=%v", outcome, found, err)
+	}
+	var auditBody []byte
+	if err = tx.QueryRowContext(ctx, `SELECT body FROM audit_records WHERE id=? AND task_id=?`, outcome.AuditID, frozen.SourceTaskID).Scan(&auditBody); err != nil {
+		t.Fatal("structured audit missing from atomic commit", err)
+	}
+	var storedAudit evaluation.AuditRecord
+	if json.Unmarshal(auditBody, &storedAudit) != nil || storedAudit.Validate() != nil {
+		t.Fatal("invalid structured audit in atomic commit")
+	}
+	auditDigest, err := evaluation.AuditRecordDigest(storedAudit)
+	if err != nil || auditDigest != outcome.AuditDigest {
+		t.Fatalf("audit digest=%q outcome=%q err=%v", auditDigest, outcome.AuditDigest, err)
+	}
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+	publicOutcome, found, legacy, err := store.ReplayAuxiliaryReviewOutcome(ctx, operation)
+	if err != nil || !found || legacy || publicOutcome.OutcomeDigest != outcome.OutcomeDigest {
+		t.Fatalf("outcome replay=%+v found=%v legacy=%v err=%v", publicOutcome, found, legacy, err)
 	}
 	mutation := workboard.EvaluationMutation{Version: 1, Kind: workboard.EvaluationCandidateSubmit, BoardID: request.BoardID,
 		CardID: request.CardID, AttemptID: request.AttemptID, ClaimID: request.ClaimID, CandidateID: frozen.CandidateID,
@@ -328,13 +411,13 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 	}
 	timeMS, tokens, cost := int64(25), int64(12), int64(7)
 	measurements := workboard.AuxiliaryReviewMeasurements{TimeMS: &timeMS, Tokens: &tokens, CostMicros: &cost}
-	replayedAtomic, replayedSettlement, err := store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements)
-	if err != nil || replayedAtomic.OperationID != receipt.OperationID || replayedAtomic.ResponseDigest != receipt.ResponseDigest || replayedSettlement != settlement {
+	replayedAtomic, replayedSettlement, replayedOutcome, err := store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements)
+	if err != nil || replayedAtomic.OperationID != receipt.OperationID || replayedAtomic.ResponseDigest != receipt.ResponseDigest || replayedSettlement != settlement || replayedOutcome.AuditID == "" {
 		t.Fatalf("atomic replay receipt=%+v settlement=%+v err=%v", replayedAtomic, replayedSettlement, err)
 	}
 	driftedTokens := int64(13)
 	measurements.Tokens = &driftedTokens
-	if _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements); !errors.Is(err, ErrConflict) {
+	if _, _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements); err == nil {
 		t.Fatalf("atomic replay measurement drift accepted: %v", err)
 	}
 	measurements.Tokens = &tokens
@@ -346,7 +429,7 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 		UPDATE workboard_auxiliary_review_successor_fences SET body=json_set(body,'$.claim_revision',claim_revision+1) WHERE admission_id=?`, admission.AdmissionID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements); !errors.Is(err, ErrWorkboardCorrupt) {
+	if _, _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements); !errors.Is(err, ErrWorkboardCorrupt) {
 		t.Fatalf("completed replay ignored corrupt schema-44 fence: %v", err)
 	}
 	var databasePath string
@@ -367,14 +450,43 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 	if err = store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(ctx, databasePath)
-	if err != nil {
+	if reopened, openErr := Open(ctx, databasePath); openErr == nil {
+		reopened.Close()
+		t.Fatal("downgraded declaration retained schema-45 outcome authority")
+	}
+}
+
+func TestAuxiliaryReviewOutcomeReplayRereadsCanonicalEvidence(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 19, 0, 0, 0, time.UTC)
+	evaluator := &budgetedReviewFixture{
+		evidence: []workboard.EvidenceInput{{CriterionID: "tests", Source: "model_audit", Outcome: "failed", ActorID: "independent-reviewer", ActorType: "model"}},
+		auditMutate: func(a *evaluation.AuditRecord) {
+			a.Audit.Verdict = "reject"
+			a.Audit.Findings = []evaluation.AuditFinding{{Summary: "test failure", EvidenceRefs: []string{"criterion_00"}}}
+		},
+	}
+	service, request := prepareBudgetedReviewService(t, store, evaluator, &clock, "evidence-replay")
+	if _, err := service.SubmitCandidate(ctx, request); err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
-	legacyReplay, legacySettlement, err := reopened.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements)
-	if err != nil || legacyReplay.OperationID != receipt.OperationID || legacyReplay.ResponseDigest != receipt.ResponseDigest || legacySettlement != settlement {
-		t.Fatalf("completed schema-43 replay receipt=%+v settlement=%+v err=%v", legacyReplay, legacySettlement, err)
+	var candidateID string
+	if err := store.db.QueryRowContext(ctx, `SELECT id FROM workboard_candidates WHERE board_id=? AND card_id=? AND attempt_id=?`,
+		request.BoardID, request.CardID, request.AttemptID).Scan(&candidateID); err != nil {
+		t.Fatal(err)
+	}
+	operation := "candidate-review-" + candidateID
+	if _, found, legacy, err := store.ReplayAuxiliaryReviewOutcome(ctx, operation); err != nil || !found || legacy {
+		t.Fatalf("valid outcome did not replay: found=%v legacy=%v err=%v", found, legacy, err)
+	}
+	if _, err := store.db.ExecContext(ctx, `DELETE FROM workboard_evidence WHERE board_id=? AND card_id=? AND attempt_id=? AND candidate_id=?`,
+		request.BoardID, request.CardID, request.AttemptID, candidateID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := store.ReplayAuxiliaryReviewOutcome(ctx, operation); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("missing canonical evidence replayed: %v", err)
 	}
 }
 
@@ -425,14 +537,17 @@ func TestAtomicReviewCommitSamplesClockAfterWriterWait(t *testing.T) {
 	terminal := appendBudgetRuntime(t, ctx, store, event, &providers.Usage{InputTokens: 4, OutputTokens: 3}, event.Time.Add(2*time.Second), runtime.TaskCompleted)
 	baseTime := terminal.Time.Add(time.Second)
 	committedAt := baseTime.Add(time.Second)
-	evaluator := &budgetedReviewFixture{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	evaluator := &budgetedReviewFixture{entered: make(chan struct{}, 1), release: make(chan struct{}), now: func() time.Time { return baseTime.Add(25 * time.Millisecond) }}
 	var clockCalls atomic.Int64
 	clockCalled := make(chan struct{}, 1)
 	service, err := workboard.NewEvaluationService(store, telemetryCardAuthority{authority: workboard.Authority{
 		CreationScope: "acceptance-authority", Actor: workboard.Actor{ID: event.WorkerID, Type: "worker"},
 	}}, evaluator, func() time.Time {
 		if clockCalls.Add(1) >= 4 {
-			clockCalled <- struct{}{}
+			select {
+			case clockCalled <- struct{}{}:
+			default:
+			}
 			return committedAt
 		}
 		return baseTime

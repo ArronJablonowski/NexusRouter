@@ -30,6 +30,16 @@ type Store struct {
 	workboardCursorErr  error
 }
 
+type storeOpenLock struct {
+	token chan struct{}
+	users int
+}
+
+var storeOpenLocks = struct {
+	sync.Mutex
+	paths map[string]*storeOpenLock
+}{paths: map[string]*storeOpenLock{}}
+
 // Open creates a private on-disk database. Callers must use a dedicated data
 // directory; application configuration must never point into shared scratch.
 func Open(ctx context.Context, path string) (*Store, error) {
@@ -56,11 +66,54 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db}
+	lockPath, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	release, err := lockStoreOpenPath(ctx, lockPath)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	defer release()
 	if err = s.initialize(ctx); err != nil {
 		db.Close()
 		return nil, err
 	}
 	return s, nil
+}
+
+func lockStoreOpenPath(ctx context.Context, path string) (func(), error) {
+	storeOpenLocks.Lock()
+	entry := storeOpenLocks.paths[path]
+	if entry == nil {
+		entry = &storeOpenLock{token: make(chan struct{}, 1)}
+		entry.token <- struct{}{}
+		storeOpenLocks.paths[path] = entry
+	}
+	entry.users++
+	storeOpenLocks.Unlock()
+	select {
+	case <-ctx.Done():
+		storeOpenLocks.Lock()
+		entry.users--
+		if entry.users == 0 {
+			delete(storeOpenLocks.paths, path)
+		}
+		storeOpenLocks.Unlock()
+		return nil, ctx.Err()
+	case <-entry.token:
+	}
+	return func() {
+		entry.token <- struct{}{}
+		storeOpenLocks.Lock()
+		entry.users--
+		if entry.users == 0 {
+			delete(storeOpenLocks.paths, path)
+		}
+		storeOpenLocks.Unlock()
+	}, nil
 }
 
 func (s *Store) initialize(ctx context.Context) error {
@@ -99,6 +152,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 45 {
+		if err = discardEmptyFutureAuxiliaryReviewOutcomes(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 44 {
 		if err = discardEmptyFutureAuxiliaryReviewSuccessorFences(ctx, conn); err != nil {
 			return err
@@ -116,6 +174,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version == 44 {
 		if err = validateWorkboardAuxiliaryReviewSuccessorFenceSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 45 {
+		if err = validateWorkboardAuxiliaryReviewOutcomeSchema(ctx, conn); err != nil {
 			return err
 		}
 	}
@@ -441,6 +504,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 44 {
 		if err = migrateWorkboardAuxiliaryReviewSuccessorFences(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 45 {
+		if err = migrateWorkboardAuxiliaryReviewOutcomes(ctx, conn); err != nil {
 			return err
 		}
 	}

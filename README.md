@@ -534,6 +534,7 @@ workboard:
       enabled: false
       reviewer_model: local-reviewer
       max_cost: 0.01
+      max_input_tokens: 4096
       max_output_tokens: 4096
       timeout: 30s
 ```
@@ -546,7 +547,9 @@ cost estimate. It also requires the global LLM-judge gate and the nested
 acceptance judge. `reviewer_model` must resolve to a local, mode-eligible model
 with positive context capacity and a configured estimate no greater than
 `max_cost`; its provider/model identity must differ from the worker's. An
-enabled judge also requires a positive `max_output_tokens` provider ceiling.
+enabled judge also requires positive `max_input_tokens` and
+`max_output_tokens` ceilings whose sum fits both the reviewer context window
+and the Workboard token ledger. The full sum is reserved before dispatch.
 Judge costs are bounded by the card ledger's $1,000,000 representable maximum,
 and timeouts are bounded from `100ms` through `5m`. These are configuration
 admission checks, not evidence that review dispatch is composed. The stock

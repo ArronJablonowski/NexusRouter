@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -76,6 +77,66 @@ func insertCanonicalEventForTest(t *testing.T, store *Store, event runtime.Event
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestOpenSamePathSerializesInitialization(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shared.db")
+	seed, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = seed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(filepath.Dir(path), "shared-alias.db")
+	if err = os.Symlink(path, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	start := make(chan struct{})
+	stores := make(chan *Store, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for _, openPath := range []string{path, alias} {
+		wg.Add(1)
+		go func(openPath string) {
+			defer wg.Done()
+			<-start
+			store, err := Open(context.Background(), openPath)
+			stores <- store
+			errs <- err
+		}(openPath)
+	}
+	close(start)
+	wg.Wait()
+	close(stores)
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for store := range stores {
+		if store == nil {
+			t.Fatal("concurrent open returned a nil store")
+		}
+		if err := store.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestStoreOpenLockHonorsCancellation(t *testing.T) {
+	release, err := lockStoreOpenPath(context.Background(), "test-lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err = lockStoreOpenPath(ctx, "test-lock"); !errors.Is(err, context.Canceled) {
+		release()
+		t.Fatal("canceled lock wait was admitted", err)
+	}
+	release()
 }
 
 func TestRecoveryIdempotencyAndTerminalState(t *testing.T) {

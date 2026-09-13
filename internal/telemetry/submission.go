@@ -221,13 +221,22 @@ func (s *Store) ClaimSubmission(ctx context.Context, digest string, now time.Tim
 		return out, err
 	}
 	defer tx.Rollback()
-	var id string
+	var id, created string
 	var size int64
-	if err := tx.QueryRowContext(ctx, "SELECT id,length(request) FROM submissions WHERE state='queued' AND config_digest=? ORDER BY rowid LIMIT 1", digest).Scan(&id, &size); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT id,created_at,length(request) FROM submissions WHERE state='queued' AND config_digest=? ORDER BY rowid LIMIT 1", digest).Scan(&id, &created, &size); err != nil {
 		return out, err
 	}
 	if size < 1 || size > submissions.MaxRequestBytes {
 		return out, submissions.ErrInvalid
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, created)
+	if err != nil {
+		return out, submissions.ErrInvalid
+	}
+	// The caller can capture now before waiting for the SQLite writer. Never
+	// commit a claim whose updated time predates the queued record it claims.
+	if now.Before(createdAt) {
+		now = createdAt
 	}
 	if err := tx.QueryRowContext(ctx, "SELECT request FROM submissions WHERE id=?", id).Scan(&out.Request); err != nil {
 		return out, err

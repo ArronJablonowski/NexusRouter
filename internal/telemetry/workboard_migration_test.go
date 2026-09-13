@@ -13,6 +13,8 @@ import (
 )
 
 var workboardTables = []string{
+	"workboard_auxiliary_review_outcomes",
+	"workboard_auxiliary_review_legacy_outcome_admissions",
 	"workboard_auxiliary_review_successor_fences",
 	"workboard_auxiliary_review_legacy_admissions",
 	"workboard_auxiliary_review_settlements",
@@ -45,6 +47,7 @@ var workboardTables = []string{
 
 func dropWorkboardAuxiliaryReviewSchema44(t *testing.T, db *sql.DB) {
 	t.Helper()
+	dropWorkboardAuxiliaryReviewSchema45(t, db)
 	if _, err := db.Exec(`DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_delete;
 		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_update;
 		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_binding;
@@ -53,6 +56,23 @@ func dropWorkboardAuxiliaryReviewSchema44(t *testing.T, db *sql.DB) {
 		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_admission_immutable_update;
 		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_admission_immutable_delete;
 		DROP TABLE IF EXISTS workboard_auxiliary_review_legacy_admissions`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func dropWorkboardAuxiliaryReviewSchema45(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`DROP TRIGGER IF EXISTS workboard_auxiliary_review_outcome_immutable_delete;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_outcome_immutable_update;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_outcome_binding;
+		DROP INDEX IF EXISTS workboard_auxiliary_review_outcomes_source;
+		DROP INDEX IF EXISTS workboard_auxiliary_review_outcomes_board;
+		DROP TABLE IF EXISTS workboard_auxiliary_review_outcomes;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_outcome_admission_sealed_insert;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_outcome_admission_immutable_update;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_outcome_admission_immutable_delete;
+		DROP TABLE IF EXISTS workboard_auxiliary_review_legacy_outcome_admissions;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_settlement_charge_limit`); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -172,7 +192,7 @@ func TestWorkboardMigrationCreatesDurableBoundedSchema(t *testing.T) {
 	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name LIKE 'workboard_%'`).Scan(&tables); err != nil || tables != len(workboardTables) {
 		t.Fatal("workboard tables", tables, err)
 	}
-	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'workboard_%_limit'`).Scan(&triggers); err != nil || triggers != 11 {
+	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'workboard_%_limit'`).Scan(&triggers); err != nil || triggers != 12 {
 		t.Fatal("workboard limit triggers", triggers, err)
 	}
 	if _, err = store.db.Exec(`INSERT INTO workboard_columns(board_id,version,id,state,ordinal,rank,title) VALUES('board',1,'ready','ready',2,'x','Ready')`); err == nil {

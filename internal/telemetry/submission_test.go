@@ -170,6 +170,20 @@ func TestSubmissionClaimRaceAndLeaseRules(t *testing.T) {
 	}
 }
 
+func TestSubmissionClaimCannotPredateCreation(t *testing.T) {
+	db, _ := submissionStore(t)
+	created := queuedSubmission(t, db, "chronology")
+	ttl := time.Minute
+	claim, err := db.ClaimSubmission(context.Background(), submitDigest("config"), created.CreatedAt.Add(-time.Second), ttl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claim.Status.UpdatedAt.Before(claim.Status.CreatedAt) || claim.Status.LeaseExpiresAt == nil ||
+		!claim.Status.LeaseExpiresAt.Equal(claim.Status.UpdatedAt.Add(ttl)) {
+		t.Fatal("claim chronology is invalid", claim.Status)
+	}
+}
+
 func TestSubmissionAppendGateAndTerminalAttribution(t *testing.T) {
 	db, _ := submissionStore(t)
 	ctx := context.Background()

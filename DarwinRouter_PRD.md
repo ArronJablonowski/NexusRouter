@@ -597,6 +597,7 @@ workboard:
       enabled: false
       reviewer_model: local-reviewer
       max_cost: 0.01
+      max_input_tokens: 4096
       max_output_tokens: 4096
       timeout: 30s
 
@@ -805,7 +806,7 @@ The orchestrator must be able to audit model output and observed results automat
 - Creative and preference-heavy tasks give explicit user feedback greater influence than orchestrator taste judgments. Model-only subjective assessments remain low-confidence, bounded advisory signals; they must not disable models, activate skills, or outweigh later user feedback.
 - Keep objective validity and subjective quality as separate dimensions. A user preference does not erase a failed test, and a test pass does not establish creative quality. Where no evidence supports an assessment, abstain rather than invent success.
 - Later user feedback must be able to supersede prior subjective judge evidence through compensating, versioned records. Recompute the affected fitness contribution without double-counting the attempt; preserve original evidence and revision history. Corrections to objective evidence require explicit provenance.
-- Audits inherit local-only/privacy constraints, use independent evaluator identity where possible, enforce time/cost budgets, and do not recursively judge their own judgments. A same-model accept or abstention creates no routing signal; a same-model rejection is capped as a low-confidence advisory warning. Failed, malformed, or missing audits never become positive evidence.
+- Audits inherit local-only/privacy constraints, use independent evaluator identity where possible, reserve explicit input plus output token ceilings before dispatch, enforce time/cost budgets, and do not recursively judge their own judgments. The input/output sum must fit the reviewer context and the owning work budget; reported provider usage is checked against the same reservation. A same-model accept or abstention creates no routing signal; a same-model rejection is capped as a low-confidence advisory warning. Failed, malformed, or missing audits never become positive evidence.
 
 Acceptance tests must cover blank final answers versus tool-only intermediate turns, compiler/test evidence versus review opinion, creative-task user preference overriding a prior judge contribution, abstention, adversarial output attempting to influence the evaluator, revision replay/idempotency, and local-only audit egress denial.
 

@@ -188,6 +188,12 @@ func TestWorkboardAuxiliaryReviewBindingsUniquenessAndImmutability(t *testing.T)
 	if err = insertAuxiliaryReviewSettlement(t, store.db, completed); err == nil || !strings.Contains(err.Error(), "settlement binding mismatch") {
 		t.Fatalf("completed settlement without candidate: %v", err)
 	}
+	overcharged := auxiliaryReviewSettlement(t, admission, workboard.AuxiliaryReviewFailed)
+	overcharged.ChargedTimeMS = workboard.MaxAuxiliaryReviewDurationMillis + 1
+	overcharged.TimeChargeMode = workboard.AuxiliaryReviewMeasured
+	if err = insertAuxiliaryReviewSettlement(t, store.db, overcharged); err == nil || !strings.Contains(err.Error(), "charge exceeds limit") {
+		t.Fatalf("over-limit time charge accepted: %v", err)
+	}
 	failed := auxiliaryReviewSettlement(t, admission, workboard.AuxiliaryReviewFailed)
 	if err = insertAuxiliaryReviewSettlement(t, store.db, failed); err != nil {
 		t.Fatal(err)

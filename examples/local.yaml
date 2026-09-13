@@ -22,6 +22,7 @@ workboard:
       enabled: false
       reviewer_model: ""
       max_cost: 0
+      max_input_tokens: 0
       max_output_tokens: 0
       timeout: 30s
 providers:

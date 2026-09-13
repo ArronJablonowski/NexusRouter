@@ -99,19 +99,23 @@ func TestAuxiliaryReviewAdmissionAndSettlementReplay(t *testing.T) {
 	}
 	timeMS, tokens := int64(25), int64(12)
 	settledAt := admissionTime.Add(time.Second)
-	settlement, settled, err := store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewCompleted,
+	if _, _, err = store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewCompleted,
+		AuxiliaryReviewMeasurements{TimeMS: &timeMS, Tokens: &tokens}, settledAt); !errors.Is(err, ErrConflict) {
+		t.Fatalf("post-schema-45 review completed without atomic outcome: %v", err)
+	}
+	settlement, settled, err := store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
 		AuxiliaryReviewMeasurements{TimeMS: &timeMS, Tokens: &tokens}, settledAt)
 	if err != nil || !settled || settlement.Validate() != nil || settlement.TimeChargeMode != workboard.AuxiliaryReviewMeasured ||
 		settlement.TokenChargeMode != workboard.AuxiliaryReviewMeasured || settlement.CostChargeMode != workboard.AuxiliaryReviewConservative ||
 		settlement.ChargedCostMicros != admission.CostMicros {
 		t.Fatalf("settlement=%+v settled=%v err=%v", settlement, settled, err)
 	}
-	replayedSettlement, settled, err := store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewCompleted,
+	replayedSettlement, settled, err := store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
 		AuxiliaryReviewMeasurements{TimeMS: &timeMS, Tokens: &tokens}, settledAt.Add(time.Minute))
 	if err != nil || settled || replayedSettlement != settlement {
 		t.Fatalf("settlement replay=%+v settled=%v err=%v", replayedSettlement, settled, err)
 	}
-	if _, _, err = store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewFailed,
+	if _, _, err = store.SettleAuxiliaryReview(ctx, admission.OperationID, workboard.AuxiliaryReviewCompleted,
 		AuxiliaryReviewMeasurements{}, settledAt); !errors.Is(err, ErrConflict) {
 		t.Fatalf("terminal drift accepted: %v", err)
 	}

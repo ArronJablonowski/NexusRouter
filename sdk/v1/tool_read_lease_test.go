@@ -138,6 +138,12 @@ func TestSDKSharedReadLeasesBlockWriterUntilCallbacksJoin(t *testing.T) {
 	for range 2 {
 		select {
 		case <-entered:
+		case err := <-done[0]:
+			joined[0] = true
+			t.Fatalf("first reader exited before overlap: %v", err)
+		case err := <-done[1]:
+			joined[1] = true
+			t.Fatalf("second reader exited before overlap: %v", err)
 		case <-ctx.Done():
 			t.Fatal("readers failed to overlap")
 		}

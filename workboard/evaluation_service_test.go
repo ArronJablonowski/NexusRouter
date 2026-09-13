@@ -27,10 +27,11 @@ func TestCandidateEvaluationRequestBindsCriteriaContent(t *testing.T) {
 func TestCandidateEvaluationRequestRequiresCompleteRuntimeSourceBinding(t *testing.T) {
 	criteria := []AcceptanceCriterion{{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic",
 		ValidatorID: "go-test", Description: "Tests pass.", Required: true}}
+	sourceOutput := "exact runtime output"
 	request := CandidateEvaluationRequest{Version: 1, BoardID: "board", CardID: "card", AttemptID: "attempt", ClaimID: "claim",
 		CandidateID: "candidate", BindingKind: "runtime_budgeted", SourceTaskID: "task", SourceSessionID: "session",
 		SourceTurnID: "turn", SourceAttemptID: "source-attempt", SourceCompletionEventID: "turn-completed",
-		SourceCompletionSequence: 3, SourceCompletionDigest: strings.Repeat("b", 64), SourceOutputDigest: strings.Repeat("c", 64),
+		SourceCompletionSequence: 3, SourceCompletionDigest: strings.Repeat("b", 64), SourceOutput: sourceOutput, SourceOutputDigest: SourceOutputDigest(sourceOutput),
 		SourceTerminalEventID: "task-completed", SourceTerminalSequence: 4, SourceTerminalDigest: strings.Repeat("d", 64),
 		SourceDomain: "code", SourceProfile: "default", SourcePrivacy: "local_only", WorkerID: "worker",
 		AdmissionID: "admission", AdmissionDigest: strings.Repeat("e", 64), SourceModelID: "source-model",
@@ -43,13 +44,14 @@ func TestCandidateEvaluationRequestRequiresCompleteRuntimeSourceBinding(t *testi
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*CandidateEvaluationRequest){
-		"turn":     func(r *CandidateEvaluationRequest) { r.SourceTurnID = "" },
-		"attempt":  func(r *CandidateEvaluationRequest) { r.SourceAttemptID = "" },
-		"event":    func(r *CandidateEvaluationRequest) { r.SourceCompletionEventID = "" },
-		"sequence": func(r *CandidateEvaluationRequest) { r.SourceCompletionSequence = 0 },
-		"digest":   func(r *CandidateEvaluationRequest) { r.SourceCompletionDigest = "" },
-		"output":   func(r *CandidateEvaluationRequest) { r.SourceOutputDigest = "" },
-		"terminal": func(r *CandidateEvaluationRequest) { r.SourceTerminalEventID = "" },
+		"turn":        func(r *CandidateEvaluationRequest) { r.SourceTurnID = "" },
+		"attempt":     func(r *CandidateEvaluationRequest) { r.SourceAttemptID = "" },
+		"event":       func(r *CandidateEvaluationRequest) { r.SourceCompletionEventID = "" },
+		"sequence":    func(r *CandidateEvaluationRequest) { r.SourceCompletionSequence = 0 },
+		"digest":      func(r *CandidateEvaluationRequest) { r.SourceCompletionDigest = "" },
+		"output":      func(r *CandidateEvaluationRequest) { r.SourceOutputDigest = "" },
+		"output body": func(r *CandidateEvaluationRequest) { r.SourceOutput = "different output" },
+		"terminal":    func(r *CandidateEvaluationRequest) { r.SourceTerminalEventID = "" },
 		"legacy leak": func(r *CandidateEvaluationRequest) {
 			r.BindingKind, r.SourceTaskID, r.SourceSessionID = "legacy", "", ""
 		},

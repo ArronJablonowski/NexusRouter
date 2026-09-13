@@ -19,6 +19,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/DarwinRouter/submissions"
 )
 
 func TestDurableTaskStreamFallbackUsesOneGlobalReplayOrder(t *testing.T) {
@@ -77,9 +78,15 @@ func TestDurableTaskStreamFallbackUsesOneGlobalReplayOrder(t *testing.T) {
 		Run:              svc.Run,
 		Submit:           svc.Submit,
 		ResumeSubmission: svc.ResumeSubmission,
-		SubmissionStream: db.ReadSubmissionStreamPage,
-		Inspect:          func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
-		Health:           func(context.Context) error { return nil },
+		SubmissionStream: func(ctx context.Context, id string, after int64, limit int) (submissions.StreamPage, error) {
+			page, readErr := db.ReadSubmissionStreamPage(ctx, id, after, limit)
+			if readErr == nil && !validTaskStreamPage(page, id, after) {
+				t.Logf("invalid durable stream page: %+v", page)
+			}
+			return page, readErr
+		},
+		Inspect: func(ctx context.Context, id string) (sessions.Snapshot, error) { return sessions.Replay(ctx, db, id) },
+		Health:  func(context.Context) error { return nil },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +109,12 @@ func TestDurableTaskStreamFallbackUsesOneGlobalReplayOrder(t *testing.T) {
 	}
 	response, err := request("")
 	if err != nil || response.StatusCode != http.StatusOK {
-		t.Fatal(response, err)
+		if response == nil {
+			t.Fatal(response, err)
+		}
+		failure, _ := io.ReadAll(response.Body)
+		response.Body.Close()
+		t.Fatalf("stream status=%d body=%q err=%v", response.StatusCode, failure, err)
 	}
 	encoded, err := io.ReadAll(response.Body)
 	response.Body.Close()

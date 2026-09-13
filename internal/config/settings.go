@@ -63,6 +63,7 @@ type WorkboardAcceptanceJudge struct {
 	Enabled         bool    `yaml:"enabled" json:"enabled"`
 	ReviewerModel   string  `yaml:"reviewer_model" json:"reviewer_model"`
 	MaxCost         float64 `yaml:"max_cost" json:"max_cost"`
+	MaxInputTokens  int64   `yaml:"max_input_tokens" json:"max_input_tokens,omitempty"`
 	MaxOutputTokens int64   `yaml:"max_output_tokens" json:"max_output_tokens,omitempty"`
 	Timeout         string  `yaml:"timeout" json:"timeout"`
 }

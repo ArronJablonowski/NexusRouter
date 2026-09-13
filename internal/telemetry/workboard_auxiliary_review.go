@@ -139,6 +139,15 @@ func (s *Store) SettleAuxiliaryReview(ctx context.Context, operationID string, d
 	if !found {
 		return workboard.AuxiliaryReviewSettlementRecord{}, false, sql.ErrNoRows
 	}
+	if disposition == workboard.AuxiliaryReviewCompleted {
+		legacy, legacyErr := isLegacyAuxiliaryReviewOutcomeAdmission(ctx, tx, admission)
+		if legacyErr != nil {
+			return workboard.AuxiliaryReviewSettlementRecord{}, false, legacyErr
+		}
+		if !legacy {
+			return workboard.AuxiliaryReviewSettlementRecord{}, false, ErrConflict
+		}
+	}
 	if prior, settled, readErr := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID); settled || readErr != nil {
 		if readErr != nil {
 			return workboard.AuxiliaryReviewSettlementRecord{}, false, readErr

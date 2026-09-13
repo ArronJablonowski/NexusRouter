@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
@@ -133,7 +134,7 @@ func (s *Store) PrepareCandidateEvaluation(ctx context.Context, mutation workboa
 		AttemptID: mutation.AttemptID, ClaimID: mutation.ClaimID, CandidateID: mutation.CandidateID, SourceTaskID: sourceTask,
 		SourceSessionID: sourceSession, SourceTurnID: source.completion.TurnID, SourceAttemptID: source.completion.AttemptID,
 		SourceCompletionEventID: source.completion.ID, SourceCompletionSequence: source.completion.Sequence,
-		SourceCompletionDigest: source.completionDigest, SourceOutputDigest: source.outputDigest,
+		SourceCompletionDigest: source.completionDigest, SourceOutput: source.output, SourceOutputDigest: source.outputDigest,
 		SourceTerminalEventID: source.terminal.ID, SourceTerminalSequence: source.terminal.Sequence, SourceTerminalDigest: source.terminalDigest,
 		SourceDomain:  source.domain,
 		SourceProfile: source.profile, SourcePrivacy: source.privacy, BindingKind: bindingKind, AdmissionID: admissionID, AdmissionDigest: admissionDigest,
@@ -198,106 +199,132 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	return receipt, nil
 }
 
-// ApplyEvaluationMutationAndSettleAuxiliaryReview commits candidate evidence
-// and completed auxiliary-review accounting under one SQLite writer
-// transaction. A crash can expose neither half independently.
-func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Context, mutation workboard.EvaluationMutation,
-	now func() time.Time, operationID string, measurements workboard.AuxiliaryReviewMeasurements,
-) (workboard.OperationReceipt, workboard.AuxiliaryReviewSettlementRecord, error) {
-	if ctx == nil || s == nil || s.db == nil || mutation.Kind != workboard.EvaluationCandidateSubmit || now == nil ||
-		!validWorkboardID(operationID) || !validAuxiliaryReviewMeasurements(measurements) {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, invalidWorkboard("auxiliary_review_commit")
+// ApplyEvaluationMutationAndSettleAuxiliaryReview commits the structured audit,
+// host-derived evidence, candidate, completed accounting and immutable outcome
+// under one SQLite writer transaction. A crash can expose none or all of them.
+func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Context, frozen workboard.CandidateEvaluationRequest,
+	mutation workboard.EvaluationMutation, audit evaluation.AuditRecord, now func() time.Time, operationID string,
+	measurements workboard.AuxiliaryReviewMeasurements,
+) (workboard.OperationReceipt, workboard.AuxiliaryReviewSettlementRecord, workboard.AuxiliaryReviewOutcomeRecord, error) {
+	empty := func(err error) (workboard.OperationReceipt, workboard.AuxiliaryReviewSettlementRecord, workboard.AuxiliaryReviewOutcomeRecord, error) {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, workboard.AuxiliaryReviewOutcomeRecord{}, err
+	}
+	if ctx == nil || s == nil || s.db == nil || frozen.Validate() != nil || frozen.BindingKind != "runtime_budgeted" ||
+		mutation.Kind != workboard.EvaluationCandidateSubmit || now == nil || !validWorkboardID(operationID) ||
+		!validAuxiliaryReviewMeasurements(measurements) || !reviewAuditMatchesFrozen(audit, frozen, mutation) ||
+		!reviewAuditMeasurementsMatch(audit, measurements) {
+		return empty(invalidWorkboard("auxiliary_review_commit"))
 	}
 	if err := validateEvaluationMutation(mutation, true); err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
 	}
 	want, err := workboard.EvaluationDigest(mutation)
 	if err != nil || want != mutation.RequestDigest {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, invalidWorkboard("request_digest")
+		return empty(invalidWorkboard("request_digest"))
+	}
+	auditDigest, err := evaluation.AuditRecordDigest(audit)
+	if err != nil {
+		return empty(err)
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
 	}
 	defer tx.Rollback()
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
 	}
 	admission, found, err := readAuxiliaryReviewAdmissionByOperation(ctx, tx, operationID)
 	if err != nil || !found {
 		if err == nil {
 			err = sql.ErrNoRows
 		}
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
 	}
-	if admission.BoardID != mutation.BoardID || admission.CardID != mutation.CardID || admission.AttemptID != mutation.AttemptID ||
-		admission.ClaimID != mutation.ClaimID || admission.CandidateID != mutation.CandidateID ||
-		admission.CandidateDigest != mutation.CandidateDigest {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	if !auxiliaryReviewCommitBindings(frozen, mutation, audit, admission) {
+		return empty(ErrConflict)
 	}
 	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
 	replayed, candidateFound, replayErr := readEvaluationReplay(ctx, tx, mutation, keyDigest, want)
 	if replayErr != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, replayErr
+		return empty(replayErr)
 	}
 	fence, fenceFound, fenceErr := readAuxiliaryReviewSuccessorFence(ctx, tx, admission.AdmissionID)
 	if fenceErr != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, fenceErr
+		return empty(fenceErr)
 	}
-	if fenceFound && !auxiliaryReviewFenceMatchesAdmission(fence, admission, mutation, operationID) {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	if !fenceFound || !auxiliaryReviewFenceMatchesAdmission(fence, admission, mutation, operationID) {
+		return empty(ErrConflict)
 	}
 	if prior, settled, readErr := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID); readErr != nil || settled {
 		if readErr != nil {
-			return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, readErr
+			return empty(readErr)
 		}
-		if !candidateFound || prior.Disposition != workboard.AuxiliaryReviewCompleted {
-			return workboard.OperationReceipt{}, prior, ErrConflict
-		}
-		if !fenceFound {
-			legacy, legacyErr := isLegacyAuxiliaryReviewAdmission(ctx, tx, admission)
-			if legacyErr != nil {
-				return workboard.OperationReceipt{}, prior, legacyErr
+		outcome, outcomeFound, outcomeErr := readAuxiliaryReviewOutcome(ctx, tx, admission.AdmissionID)
+		if outcomeErr != nil || !candidateFound || prior.Disposition != workboard.AuxiliaryReviewCompleted || !outcomeFound ||
+			audit.Time.Before(admission.AdmittedAt) || audit.Time.Add(-audit.Elapsed).Before(admission.AdmittedAt) || audit.Time.After(prior.SettledAt) {
+			if outcomeErr != nil {
+				return empty(outcomeErr)
 			}
-			if !legacy {
-				return workboard.OperationReceipt{}, prior, ErrWorkboardCorrupt
-			}
+			return empty(ErrConflict)
 		}
 		expected, buildErr := auxiliaryReviewSettlementRecord(admission, prior.SettlementID, workboard.AuxiliaryReviewCompleted, measurements, prior.SettledAt)
-		if buildErr != nil || expected.SettlementDigest != prior.SettlementDigest {
-			return workboard.OperationReceipt{}, prior, ErrConflict
+		if buildErr != nil || expected.SettlementDigest != prior.SettlementDigest || outcome.AuditDigest != auditDigest ||
+			outcome.AuditID != audit.ID || outcome.ValidateBindings(frozen, admission, prior) != nil {
+			return empty(ErrConflict)
 		}
-		return replayed, prior, nil
+		if err = tx.Commit(); err != nil {
+			return empty(err)
+		}
+		return replayed, prior, outcome, nil
 	}
 	if candidateFound {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+		return empty(ErrConflict)
 	}
-	if !fenceFound {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	committedAt := now().UTC()
+	if committedAt.Location() != time.UTC || committedAt.Year() < 1970 || committedAt.Year() >= 2261 ||
+		audit.Time.Before(admission.AdmittedAt) || audit.Time.Add(-audit.Elapsed).Before(admission.AdmittedAt) || audit.Time.After(committedAt) {
+		return empty(ErrConflict)
 	}
-	var committedAt time.Time
-	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, func() time.Time {
-		committedAt = now().UTC()
-		return committedAt
-	}, &fence)
+	if err = validateFrozenRuntimeSource(ctx, tx, frozen); err != nil {
+		return empty(err)
+	}
+	if err = recordAudit(ctx, tx, audit); err != nil {
+		return empty(err)
+	}
+	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, func() time.Time { return committedAt }, &fence)
 	if err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.Join(errors.New("atomic candidate mutation failed"), err)
+		return empty(errors.Join(errors.New("atomic candidate mutation failed"), err))
 	}
 	settlementID := newWorkboardID()
 	if settlementID == "" {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.New("secure identifier generation failed")
+		return empty(errors.New("secure identifier generation failed"))
 	}
 	settlement, err := auxiliaryReviewSettlementRecord(admission, settlementID, workboard.AuxiliaryReviewCompleted, measurements, committedAt)
 	if err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.Join(errors.New("atomic review settlement build failed"), err)
+		return empty(errors.Join(errors.New("atomic review settlement build failed"), err))
 	}
 	if err = insertAuxiliaryReviewSettlementTx(ctx, tx, settlement); err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
+	}
+	var evidenceDigest string
+	var evidenceCount int
+	if err = tx.QueryRowContext(ctx, `SELECT evidence_digest,evidence_count FROM workboard_candidates
+		WHERE board_id=? AND card_id=? AND attempt_id=? AND id=?`, mutation.BoardID, mutation.CardID, mutation.AttemptID,
+		mutation.CandidateID).Scan(&evidenceDigest, &evidenceCount); err != nil {
+		return empty(err)
+	}
+	outcome, err := buildAuxiliaryReviewOutcome(frozen, admission, settlement, audit, auditDigest, evidenceDigest, evidenceCount, committedAt)
+	if err != nil {
+		return empty(err)
+	}
+	if err = insertAuxiliaryReviewOutcomeTx(ctx, tx, outcome); err != nil {
+		return empty(err)
 	}
 	if err = tx.Commit(); err != nil {
-		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, err
+		return empty(err)
 	}
-	return receipt, settlement, nil
+	return receipt, settlement, outcome, nil
 }
 
 func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.EvaluationMutation, now func() time.Time,

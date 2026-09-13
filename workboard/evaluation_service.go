@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 )
 
 const (
@@ -160,27 +162,27 @@ type SubmitCandidateRequest struct {
 // worker attempt and acceptance policy; evaluators never derive identity from
 // model output or transport input.
 type CandidateEvaluationRequest struct {
-	Version                                               int
-	BoardID, CardID, AttemptID, ClaimID, CandidateID      string
-	BindingKind                                           string
-	SourceTaskID, SourceSessionID, SourceTurnID           string
-	SourceAttemptID, SourceCompletionEventID              string
-	SourceCompletionSequence                              int64
-	SourceCompletionDigest, SourceOutputDigest            string
-	SourceTerminalEventID                                 string
-	SourceTerminalSequence                                int64
-	SourceTerminalDigest                                  string
-	SourceDomain, SourceProfile, SourcePrivacy            string
-	AdmissionID, AdmissionDigest                          string
-	SourceModelID, SourceProviderID, ConfigID             string
-	SourceTimeLimitMS, SourceTokenLimit, SourceCostMicros int64
-	WorkerID                                              string
-	ExpectedCardRevision, ExpectedClaimRevision           int64
-	CriteriaRevision                                      int64
-	CandidateDigest, CriteriaDigest, PolicyDigest         string
-	Summary                                               string
-	ArtifactRefs                                          []string
-	Criteria                                              []AcceptanceCriterion
+	Version                                                  int
+	BoardID, CardID, AttemptID, ClaimID, CandidateID         string
+	BindingKind                                              string
+	SourceTaskID, SourceSessionID, SourceTurnID              string
+	SourceAttemptID, SourceCompletionEventID                 string
+	SourceCompletionSequence                                 int64
+	SourceCompletionDigest, SourceOutput, SourceOutputDigest string
+	SourceTerminalEventID                                    string
+	SourceTerminalSequence                                   int64
+	SourceTerminalDigest                                     string
+	SourceDomain, SourceProfile, SourcePrivacy               string
+	AdmissionID, AdmissionDigest                             string
+	SourceModelID, SourceProviderID, ConfigID                string
+	SourceTimeLimitMS, SourceTokenLimit, SourceCostMicros    int64
+	WorkerID                                                 string
+	ExpectedCardRevision, ExpectedClaimRevision              int64
+	CriteriaRevision                                         int64
+	CandidateDigest, CriteriaDigest, PolicyDigest            string
+	Summary                                                  string
+	ArtifactRefs                                             []string
+	Criteria                                                 []AcceptanceCriterion
 }
 
 func (r CandidateEvaluationRequest) Validate() error {
@@ -196,7 +198,7 @@ func (r CandidateEvaluationRequest) Validate() error {
 	switch r.BindingKind {
 	case "legacy":
 		if r.SourceTaskID != "" || r.SourceTurnID != "" || r.SourceAttemptID != "" || r.SourceCompletionEventID != "" ||
-			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
+			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutput != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
 			r.SourceTerminalSequence != 0 || r.SourceTerminalDigest != "" || r.SourceDomain != "" ||
 			r.SourceProfile != "" || r.SourcePrivacy != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
 			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
@@ -204,7 +206,7 @@ func (r CandidateEvaluationRequest) Validate() error {
 		}
 	case "runtime_unbudgeted":
 		if r.SourceTaskID == "" || r.SourceTurnID != "" || r.SourceAttemptID != "" || r.SourceCompletionEventID != "" ||
-			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
+			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutput != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
 			r.SourceTerminalSequence != 0 || r.SourceTerminalDigest != "" || r.SourceDomain != "" || r.SourceProfile != "" ||
 			r.SourcePrivacy != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
 			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
@@ -213,6 +215,7 @@ func (r CandidateEvaluationRequest) Validate() error {
 	case "runtime_budgeted":
 		if r.SourceTaskID == "" || !validLifecycleIDs(r.SourceTurnID, r.SourceAttemptID, r.SourceCompletionEventID, r.SourceTerminalEventID) ||
 			r.SourceCompletionSequence < 1 || !digest(r.SourceCompletionDigest) || !digest(r.SourceOutputDigest) ||
+			!boundedText(r.SourceOutput, 1<<20, true) || SourceOutputDigest(r.SourceOutput) != r.SourceOutputDigest ||
 			r.SourceTerminalSequence <= r.SourceCompletionSequence || !digest(r.SourceTerminalDigest) ||
 			!boundedText(r.SourceDomain, MaxIdentifierBytes, true) || !boundedText(r.SourceProfile, MaxIdentifierBytes, true) ||
 			!boundedText(r.SourcePrivacy, MaxIdentifierBytes, true) ||
@@ -225,6 +228,14 @@ func (r CandidateEvaluationRequest) Validate() error {
 		return fail(CodeInvalid, "candidate_evaluation")
 	}
 	return nil
+}
+
+// SourceOutputDigest binds the exact host-read runtime output supplied to an
+// auxiliary reviewer without requiring that sensitive output be persisted in
+// review outcome metadata.
+func SourceOutputDigest(output string) string {
+	sum := sha256.Sum256([]byte(output))
+	return hex.EncodeToString(sum[:])
 }
 
 type DecideCandidateRequest struct {
@@ -271,6 +282,7 @@ type CandidateEvaluator interface {
 type BudgetedCandidateEvaluation struct {
 	Evidence     []EvidenceInput
 	Measurements AuxiliaryReviewMeasurements
+	Audit        evaluation.AuditRecord
 }
 
 // BudgetedCandidateEvaluator opts a candidate evaluator into durable review
@@ -288,7 +300,8 @@ type AuxiliaryReviewRepository interface {
 	ReplayAuxiliaryReviewAdmission(context.Context, string) (AuxiliaryReviewAdmissionRecord, bool, error)
 	SettleAuxiliaryReview(context.Context, string, AuxiliaryReviewDisposition, AuxiliaryReviewMeasurements, time.Time) (AuxiliaryReviewSettlementRecord, bool, error)
 	ReplayAuxiliaryReviewSettlement(context.Context, string, AuxiliaryReviewDisposition) (AuxiliaryReviewSettlementRecord, bool, error)
-	ApplyEvaluationMutationAndSettleAuxiliaryReview(context.Context, EvaluationMutation, func() time.Time, string, AuxiliaryReviewMeasurements) (OperationReceipt, AuxiliaryReviewSettlementRecord, error)
+	ReplayAuxiliaryReviewOutcome(context.Context, string) (AuxiliaryReviewOutcomeRecord, bool, bool, error)
+	ApplyEvaluationMutationAndSettleAuxiliaryReview(context.Context, CandidateEvaluationRequest, EvaluationMutation, evaluation.AuditRecord, func() time.Time, string, AuxiliaryReviewMeasurements) (OperationReceipt, AuxiliaryReviewSettlementRecord, AuxiliaryReviewOutcomeRecord, error)
 }
 
 type EvaluationRepository interface {
@@ -396,6 +409,7 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 	var reviewOperation string
 	var reviewReservation AuxiliaryReviewReservation
 	var measurements AuxiliaryReviewMeasurements
+	var reviewAudit evaluation.AuditRecord
 	if budgeted, ok := s.evaluator.(BudgetedCandidateEvaluator); ok {
 		reservation, reserveErr := prepareAuxiliaryReviewReservation(budgeted, frozen)
 		if reserveErr != nil || reservation.Validate() != nil || !auxiliaryReservationMatchesFrozen(reservation, frozen) {
@@ -426,7 +440,10 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		if evaluateErr == nil && !auxiliaryMeasurementsWithinReservation(result.Measurements, reservation) {
 			evaluateErr = fail(CodeLimitExceeded, "auxiliary_review_measurements")
 		}
-		mutation.Evaluated, measurements, err = result.Evidence, result.Measurements, evaluateErr
+		if evaluateErr == nil && !validBudgetedCandidateEvaluation(result, frozen, reservation) {
+			evaluateErr = fail(CodeInvalid, "auxiliary_review_result")
+		}
+		mutation.Evaluated, measurements, reviewAudit, err = result.Evidence, result.Measurements, result.Audit, evaluateErr
 	} else {
 		mutation.Evaluated, err = s.evaluator.EvaluateCandidate(ctx, frozen)
 	}
@@ -465,13 +482,15 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 	mutation.Now = s.now().UTC()
 	if reviewOperation != "" {
 		var settlement AuxiliaryReviewSettlementRecord
-		active.receipt, settlement, active.err = s.auxiliary.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, s.now, reviewOperation, measurements)
+		var outcome AuxiliaryReviewOutcomeRecord
+		active.receipt, settlement, outcome, active.err = s.auxiliary.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, reviewAudit, s.now, reviewOperation, measurements)
 		if active.err != nil {
 			active.err = errors.Join(active.err, s.settleAuxiliaryReview(ctx, reviewOperation, AuxiliaryReviewFailed, measurements))
 		} else if active.receipt.Validate() != nil || active.receipt.BoardID != mutation.BoardID || active.receipt.CardID != mutation.CardID ||
 			settlement.Validate() != nil || settlement.OperationID != reviewOperation || settlement.Disposition != AuxiliaryReviewCompleted ||
 			settlement.BoardID != mutation.BoardID || settlement.CardID != mutation.CardID || settlement.AttemptID != mutation.AttemptID ||
-			settlement.ClaimID != mutation.ClaimID || settlement.CandidateID != mutation.CandidateID || settlement.CandidateDigest != mutation.CandidateDigest {
+			settlement.ClaimID != mutation.ClaimID || settlement.CandidateID != mutation.CandidateID || settlement.CandidateDigest != mutation.CandidateDigest ||
+			outcome.ValidateBindings(frozen, settlement.admission(), settlement) != nil || outcome.AuditID != reviewAudit.ID {
 			active.receipt = OperationReceipt{}
 			active.err = fail(CodeInvalid, "stored_auxiliary_review_commit")
 		}
@@ -507,6 +526,38 @@ func auxiliaryMeasurementsWithinReservation(m AuxiliaryReviewMeasurements, r Aux
 	return optionalAuxiliaryMeasurementWithin(m.TimeMS, r.TimeLimitMS) &&
 		optionalAuxiliaryMeasurementWithin(m.Tokens, r.TokenLimit) &&
 		optionalAuxiliaryMeasurementWithin(m.CostMicros, r.CostMicros)
+}
+
+func validBudgetedCandidateEvaluation(result BudgetedCandidateEvaluation, frozen CandidateEvaluationRequest,
+	reservation AuxiliaryReviewReservation,
+) bool {
+	audit := result.Audit
+	_, offset := audit.Time.Zone()
+	if audit.Validate() != nil || offset != 0 || audit.TaskID != frozen.SourceTaskID || audit.AttemptID != frozen.SourceAttemptID ||
+		audit.EvaluatorModel != reservation.ModelID || audit.EvaluatorProvider != reservation.ProviderID ||
+		audit.Audit.EvaluatorID != reservation.ReviewerID || audit.Audit.Domain != frozen.SourceDomain {
+		return false
+	}
+	if audit.Usage != nil {
+		if audit.Usage.InputTokens > MaxWorkTokens-audit.Usage.OutputTokens || result.Measurements.Tokens == nil ||
+			*result.Measurements.Tokens != audit.Usage.InputTokens+audit.Usage.OutputTokens {
+			return false
+		}
+	} else if result.Measurements.Tokens != nil {
+		return false
+	}
+	if audit.Elapsed > 0 {
+		elapsedMS := audit.Elapsed.Milliseconds()
+		if audit.Elapsed%time.Millisecond != 0 {
+			elapsedMS++
+		}
+		if result.Measurements.TimeMS == nil || *result.Measurements.TimeMS != elapsedMS {
+			return false
+		}
+	} else if result.Measurements.TimeMS != nil {
+		return false
+	}
+	return ValidateAuxiliaryReviewEvidence(frozen, audit, result.Evidence) == nil
 }
 
 func optionalAuxiliaryMeasurementWithin(measured *int64, limit int64) bool {
@@ -553,12 +604,25 @@ func (s *EvaluationService) reconcileAuxiliaryReview(ctx context.Context, mutati
 	if _, admitted, err := s.auxiliary.ReplayAuxiliaryReviewAdmission(ctx, operation); err != nil || !admitted {
 		return err
 	}
-	if _, found, err := s.auxiliary.ReplayAuxiliaryReviewSettlement(ctx, operation, AuxiliaryReviewCompleted); err != nil || found {
+	_, outcomeFound, legacy, err := s.auxiliary.ReplayAuxiliaryReviewOutcome(ctx, operation)
+	if err != nil {
 		return err
 	}
+	if _, found, err := s.auxiliary.ReplayAuxiliaryReviewSettlement(ctx, operation, AuxiliaryReviewCompleted); err != nil {
+		return err
+	} else if found {
+		if legacy || outcomeFound {
+			return nil
+		}
+		return fail(CodeIllegalTransition, "auxiliary_review_outcome")
+	}
+	if !legacy || outcomeFound {
+		return fail(CodeIllegalTransition, "auxiliary_review_outcome")
+	}
 	// Candidate commit proves the review reached the application boundary. If a
-	// crash lost terminal measurements, repair accounting conservatively without
-	// ever redispatching the reviewer.
+	// pre-schema-45 crash lost terminal measurements, repair accounting
+	// conservatively without ever redispatching the reviewer. New admissions
+	// cannot gain completion authority without their atomic outcome.
 	return s.settleAuxiliaryReview(ctx, operation, AuxiliaryReviewCompleted, AuxiliaryReviewMeasurements{})
 }
 

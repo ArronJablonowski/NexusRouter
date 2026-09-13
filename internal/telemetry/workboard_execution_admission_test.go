@@ -26,7 +26,7 @@ func openExecutionAdmissionStore(t *testing.T, ctx context.Context) *Store {
 func budgetedStart(worker, task, session string, at time.Time, cost float64) runtime.Event {
 	return runtime.Event{Version: 1, ID: task + "-start", TaskID: task, SessionID: session, CorrelationID: task, WorkerID: worker,
 		Sequence: 1, Time: at.UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{ModelID: "worker-model", ProviderID: "worker-provider",
-			ConfigID: strings.Repeat("b", 64), RouteEstimatedCost: &cost}}
+			ConfigID: strings.Repeat("b", 64), RouteEstimatedCost: &cost, Domain: "code", Profile: "default", Privacy: "local_only"}}
 }
 
 func executionReservation(event runtime.Event, timeMS, tokens, costMicros int64, globalWIP, boardWIP int) workboard.ExecutionReservation {
