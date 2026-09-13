@@ -14,11 +14,13 @@ import (
 )
 
 type executionTerminalProof struct {
-	event       runtime.Event
-	digest      string
-	timeMS      int64
-	tokens      int64
-	tokensKnown bool
+	event            runtime.Event
+	digest           string
+	completion       runtime.Event
+	completionDigest string
+	timeMS           int64
+	tokens           int64
+	tokensKnown      bool
 }
 
 // settleExecutionAttempt releases a durable execution reservation only after
@@ -218,6 +220,8 @@ func readExecutionTerminalProof(ctx context.Context, tx *sql.Tx, admission workb
 	var start, terminal runtime.Event
 	var terminalDigest string
 	turns := map[string]bool{}
+	var lastCompleted runtime.Event
+	var lastCompletedDigest string
 	tokens, completed, usageUnknown := int64(0), 0, false
 	count := int64(0)
 	for rows.Next() {
@@ -252,11 +256,12 @@ func readExecutionTerminalProof(ctx context.Context, tx *sql.Tx, admission workb
 			}
 			turns[key] = true
 		case runtime.TurnCompleted:
-			if !turns[key] || event.Data.ProviderID != "" && event.Data.ProviderID != admission.ProviderID ||
+			if event.AttemptID == "" || !turns[key] || event.Data.ProviderID != "" && event.Data.ProviderID != admission.ProviderID ||
 				event.Data.ModelID != "" && event.Data.ModelID != admission.ModelID {
 				return executionTerminalProof{}, ErrWorkboardCorrupt
 			}
 			delete(turns, key)
+			lastCompleted, lastCompletedDigest = event, digest
 			completed++
 			if event.Data.Usage == nil {
 				usageUnknown = true
@@ -280,6 +285,10 @@ func readExecutionTerminalProof(ctx context.Context, tx *sql.Tx, admission workb
 		start.Data.ModelID != admission.ModelID || start.Data.ProviderID != admission.ProviderID || terminal.Sequence != head || wantState == "" || state != wantState {
 		return executionTerminalProof{}, ErrWorkboardCorrupt
 	}
+	if terminal.Kind == runtime.TaskCompleted && (lastCompleted.AttemptID == "" || lastCompleted.TurnID == "" || len(turns) != 0 ||
+		terminal.TurnID != lastCompleted.TurnID || terminal.AttemptID != lastCompleted.AttemptID) {
+		return executionTerminalProof{}, ErrWorkboardCorrupt
+	}
 	known := completed > 0 && !usageUnknown && len(turns) == 0
 	if !known {
 		tokens = admission.TokenLimit
@@ -288,7 +297,8 @@ func readExecutionTerminalProof(ctx context.Context, tx *sql.Tx, admission workb
 	if err != nil {
 		return executionTerminalProof{}, err
 	}
-	return executionTerminalProof{event: terminal, digest: terminalDigest, timeMS: timeMS, tokens: tokens, tokensKnown: known}, nil
+	return executionTerminalProof{event: terminal, digest: terminalDigest, completion: lastCompleted,
+		completionDigest: lastCompletedDigest, timeMS: timeMS, tokens: tokens, tokensKnown: known}, nil
 }
 
 func executionElapsedMillis(start, terminal time.Time, limit int64) (int64, error) {

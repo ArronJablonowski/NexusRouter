@@ -163,7 +163,14 @@ type CandidateEvaluationRequest struct {
 	Version                                               int
 	BoardID, CardID, AttemptID, ClaimID, CandidateID      string
 	BindingKind                                           string
-	SourceTaskID, SourceSessionID                         string
+	SourceTaskID, SourceSessionID, SourceTurnID           string
+	SourceAttemptID, SourceCompletionEventID              string
+	SourceCompletionSequence                              int64
+	SourceCompletionDigest, SourceOutputDigest            string
+	SourceTerminalEventID                                 string
+	SourceTerminalSequence                                int64
+	SourceTerminalDigest                                  string
+	SourceDomain, SourceProfile, SourcePrivacy            string
 	AdmissionID, AdmissionDigest                          string
 	SourceModelID, SourceProviderID, ConfigID             string
 	SourceTimeLimitMS, SourceTokenLimit, SourceCostMicros int64
@@ -188,17 +195,28 @@ func (r CandidateEvaluationRequest) Validate() error {
 	}
 	switch r.BindingKind {
 	case "legacy":
-		if r.SourceTaskID != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
+		if r.SourceTaskID != "" || r.SourceTurnID != "" || r.SourceAttemptID != "" || r.SourceCompletionEventID != "" ||
+			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
+			r.SourceTerminalSequence != 0 || r.SourceTerminalDigest != "" || r.SourceDomain != "" ||
+			r.SourceProfile != "" || r.SourcePrivacy != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
 			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
 			return fail(CodeInvalid, "candidate_evaluation")
 		}
 	case "runtime_unbudgeted":
-		if r.SourceTaskID == "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
+		if r.SourceTaskID == "" || r.SourceTurnID != "" || r.SourceAttemptID != "" || r.SourceCompletionEventID != "" ||
+			r.SourceCompletionSequence != 0 || r.SourceCompletionDigest != "" || r.SourceOutputDigest != "" || r.SourceTerminalEventID != "" ||
+			r.SourceTerminalSequence != 0 || r.SourceTerminalDigest != "" || r.SourceDomain != "" || r.SourceProfile != "" ||
+			r.SourcePrivacy != "" || r.AdmissionID != "" || r.AdmissionDigest != "" || r.SourceModelID != "" ||
 			r.SourceProviderID != "" || r.ConfigID != "" || r.SourceTimeLimitMS != 0 || r.SourceTokenLimit != 0 || r.SourceCostMicros != 0 {
 			return fail(CodeInvalid, "candidate_evaluation")
 		}
 	case "runtime_budgeted":
-		if r.SourceTaskID == "" || !validLifecycleIDs(r.AdmissionID, r.SourceProviderID) || !boundedText(r.SourceModelID, MaxExecutionModelBytes, false) ||
+		if r.SourceTaskID == "" || !validLifecycleIDs(r.SourceTurnID, r.SourceAttemptID, r.SourceCompletionEventID, r.SourceTerminalEventID) ||
+			r.SourceCompletionSequence < 1 || !digest(r.SourceCompletionDigest) || !digest(r.SourceOutputDigest) ||
+			r.SourceTerminalSequence <= r.SourceCompletionSequence || !digest(r.SourceTerminalDigest) ||
+			!boundedText(r.SourceDomain, MaxIdentifierBytes, true) || !boundedText(r.SourceProfile, MaxIdentifierBytes, true) ||
+			!boundedText(r.SourcePrivacy, MaxIdentifierBytes, true) ||
+			!validLifecycleIDs(r.AdmissionID, r.SourceProviderID) || !boundedText(r.SourceModelID, MaxExecutionModelBytes, false) ||
 			!digest(r.AdmissionDigest) || !digest(r.ConfigID) || r.SourceTimeLimitMS < 0 || r.SourceTimeLimitMS > MaxWorkDurationMillis ||
 			r.SourceTokenLimit < 0 || r.SourceTokenLimit > MaxWorkTokens || r.SourceCostMicros < 0 || r.SourceCostMicros > MaxWorkCostMicros {
 			return fail(CodeInvalid, "candidate_evaluation")

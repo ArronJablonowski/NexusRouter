@@ -6905,3 +6905,27 @@ existing admission replay, schema-43 completed-operation replay, atomic
 candidate/settlement replay, and ordinary lifecycle behavior. Production
 reviewer composition and the atomic structured audit/outcome binding remain
 open; the stock daemon scheduler guard remains unchanged.
+
+## 2026-09-12 — DAR-91 exact source-result binding checkpoint
+
+DAR-91 remains in progress. The frozen budgeted Workboard candidate review
+input now binds the exact final runtime result instead of only its task and session. The
+binding includes the final `turn.completed` event, turn and model-attempt IDs,
+sequence, canonical event-ledger digest and output digest, plus the following
+`task.completed` identity, sequence and digest. Domain, execution profile and
+privacy classification are retained for the future structured audit adapter.
+
+Runtime replay now proves that a successful task terminal names the same final
+turn and attempt as the preceding completed model turn. Candidate preparation
+reconstructs the canonical event log, derives the immutable source fields, and
+cross-checks the independent budget terminal proof before evaluator dispatch.
+A coherently rewritten task terminal that names a different model attempt is
+rejected before any reviewer call. Legacy and deliberately unbudgeted manual
+candidates retain no invented model-turn provenance and are not eligible for
+the production paid-reviewer path.
+
+This closes a prerequisite integrity gap; it does not complete DAR-91. A
+schema-45 append-only review outcome must still atomically bind the structured
+audit, host-derived advisory evidence, candidate, and completed auxiliary
+settlement. The production reviewer adapter and scheduler composition remain
+disabled until that transaction and its crash/replay qualification are complete.

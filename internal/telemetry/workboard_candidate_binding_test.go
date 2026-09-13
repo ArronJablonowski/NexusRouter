@@ -79,6 +79,10 @@ func TestWorkboardCandidateEvaluationBindsBudgetedRuntimeAdmission(t *testing.T)
 	}
 	frozen := evaluator.frozen()
 	if frozen.Validate() != nil || frozen.BindingKind != "runtime_budgeted" || frozen.SourceTaskID != event.TaskID || frozen.SourceSessionID != event.SessionID ||
+		frozen.SourceTurnID != "turn-1" || frozen.SourceAttemptID != "model-attempt-1" ||
+		frozen.SourceCompletionEventID != event.TaskID+"-turn-done" || frozen.SourceCompletionSequence != 3 || frozen.SourceCompletionDigest == "" ||
+		frozen.SourceOutputDigest != digestBytes(nil) || frozen.SourceTerminalEventID != terminal.ID ||
+		frozen.SourceTerminalSequence != terminal.Sequence || frozen.SourceTerminalDigest == "" ||
 		frozen.ConfigID != reservation.ConfigID || frozen.WorkerID != event.WorkerID || frozen.CandidateDigest != workboard.CandidateContentDigest(summary, artifacts) ||
 		frozen.AdmissionID == "" || frozen.AdmissionDigest == "" || frozen.SourceModelID != event.Data.ModelID ||
 		frozen.SourceProviderID != event.Data.ProviderID || frozen.SourceTimeLimitMS != reservation.TimeLimitMS ||
@@ -90,6 +94,42 @@ func TestWorkboardCandidateEvaluationBindsBudgetedRuntimeAdmission(t *testing.T)
 	if candidate.ID != frozen.CandidateID || candidate.Digest != frozen.CandidateDigest || candidate.CriteriaDigest != frozen.CriteriaDigest ||
 		candidate.PolicyDigest != frozen.PolicyDigest {
 		t.Fatalf("stored candidate drifted from evaluator input: candidate=%+v frozen=%+v", candidate, frozen)
+	}
+}
+
+func TestWorkboardCandidateEvaluationRejectsTaskTerminalAttemptDrift(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 11, 15, 0, 0, time.UTC)
+	card, boardID := createReadyBudgetCard(t, ctx, store, clock, "terminal-attempt-drift", workboardTestBudget())
+	clock = card.UpdatedAt.Add(time.Second)
+	start := budgetedStart("terminal-worker", "terminal-task", "terminal-session", clock, .0005)
+	receipt, err := claimBudgetedStart(t, ctx, store, &clock, card, boardID, start,
+		executionReservation(start, 10_000, 2_000, 500, 4, 2), "terminal-drift-claim")
+	if err != nil || receipt.CardRevision == nil || receipt.ClaimRevision == nil {
+		t.Fatal(receipt, err)
+	}
+	attemptID, claimID := currentLifecycleIDs(t, store, boardID, card.ID)
+	terminal := appendBudgetRuntime(t, ctx, store, start, &providers.Usage{InputTokens: 4, OutputTokens: 3},
+		start.Time.Add(2*time.Second), runtime.TaskCompleted)
+	terminal.AttemptID = "different-model-attempt"
+	body, err := terminal.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`UPDATE events SET body=? WHERE id=?; UPDATE event_log SET body_digest=? WHERE event_id=?`,
+		body, terminal.ID, streamBodyDigest(body), terminal.ID); err != nil {
+		t.Fatal(err)
+	}
+	clock = terminal.Time.Add(time.Second)
+	evaluator := &evaluationFixture{}
+	service := newTestEvaluationService(t, store, workboard.Actor{ID: start.WorkerID, Type: "worker"}, evaluator, &clock)
+	_, err = service.SubmitCandidate(ctx, workboard.SubmitCandidateRequest{BoardID: boardID, CardID: card.ID, AttemptID: attemptID,
+		ClaimID: claimID, IdempotencyKey: "terminal-drift-candidate", ExpectedCardRevision: *receipt.CardRevision,
+		ExpectedClaimRevision: *receipt.ClaimRevision, CriteriaRevision: card.CriteriaRevision, Summary: "must not dispatch"})
+	if !errors.Is(err, ErrWorkboardCorrupt) || evaluator.count() != 0 {
+		t.Fatalf("terminal attempt drift err=%v evaluator calls=%d", err, evaluator.count())
 	}
 }
 

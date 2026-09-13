@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 	"github.com/ArronJablonowski/DarwinRouter/workers"
@@ -41,11 +42,23 @@ func TestWorkboardWorkerRunnerPersistsBudgetedAdmissionAndSettlement(t *testing.
 			if err := bindBudgetedWorkboardRuntime(run, handle, modelID, provider, reservation.ConfigID, cost, started); err != nil {
 				return WorkboardCandidate{}, err
 			}
-			completed := runtime.Event{Version: 1, ID: taskID + "-completed", TaskID: taskID, SessionID: sessionID,
-				CorrelationID: taskID, WorkerID: workerID, Sequence: 2, Time: started.Add(time.Millisecond),
-				Kind: runtime.TaskCompleted}
-			if err := store.Append(run, 1, completed); err != nil {
-				return WorkboardCandidate{}, err
+			turnID, attemptID := "budgeted-turn", "budgeted-model-attempt"
+			events := []runtime.Event{
+				{Version: 1, ID: taskID + "-turn", TaskID: taskID, SessionID: sessionID, CorrelationID: taskID,
+					WorkerID: workerID, TurnID: turnID, AttemptID: attemptID, Sequence: 2, Time: started.Add(time.Millisecond),
+					Kind: runtime.TurnStarted, Data: runtime.Data{ModelID: modelID, ProviderID: provider}},
+				{Version: 1, ID: taskID + "-turn-completed", TaskID: taskID, SessionID: sessionID, CorrelationID: taskID,
+					WorkerID: workerID, TurnID: turnID, AttemptID: attemptID, Sequence: 3, Time: started.Add(2 * time.Millisecond),
+					Kind: runtime.TurnCompleted, Data: runtime.Data{Text: "budgeted candidate", ModelID: modelID, ProviderID: provider,
+						Usage: &providers.Usage{InputTokens: 2, OutputTokens: 2}, FinishReason: "stop"}},
+				{Version: 1, ID: taskID + "-completed", TaskID: taskID, SessionID: sessionID, CorrelationID: taskID,
+					WorkerID: workerID, TurnID: turnID, AttemptID: attemptID, Sequence: 4, Time: started.Add(3 * time.Millisecond),
+					Kind: runtime.TaskCompleted},
+			}
+			for expected, event := range events {
+				if err := store.Append(run, int64(expected+1), event); err != nil {
+					return WorkboardCandidate{}, err
+				}
 			}
 			return WorkboardCandidate{Summary: "budgeted candidate"}, nil
 		}, Validate: func(context.Context, WorkboardCandidate) error { return nil }})
@@ -54,7 +67,7 @@ func TestWorkboardWorkerRunnerPersistsBudgetedAdmissionAndSettlement(t *testing.
 	}
 	assertBudgetRows(t, database, taskID, 1, 1)
 	events, err := store.Read(ctx, taskID, 0, 10)
-	if err != nil || len(events) != 2 || events[0].Data.ModelID != modelID ||
+	if err != nil || len(events) != 4 || events[0].Data.ModelID != modelID ||
 		events[0].Data.ProviderID != provider || events[0].Data.RouteEstimatedCost == nil ||
 		*events[0].Data.RouteEstimatedCost != cost {
 		t.Fatalf("budgeted runtime journal=%+v err=%v", events, err)

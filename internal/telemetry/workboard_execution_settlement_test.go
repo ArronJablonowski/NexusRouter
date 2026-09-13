@@ -23,7 +23,8 @@ func appendBudgetRuntime(t *testing.T, ctx context.Context, store *Store, start 
 		Sequence: 3, Time: start.Time.Add(1500 * time.Millisecond), Kind: runtime.TurnCompleted,
 		Data: runtime.Data{ModelID: start.Data.ModelID, ProviderID: start.Data.ProviderID, Usage: usage}}
 	terminal := runtime.Event{Version: 1, ID: start.TaskID + "-terminal", TaskID: start.TaskID, SessionID: start.SessionID,
-		CorrelationID: start.TaskID, WorkerID: start.WorkerID, Sequence: 4, Time: terminalAt.UTC(), Kind: kind}
+		CorrelationID: start.TaskID, TurnID: turn.TurnID, AttemptID: turn.AttemptID, WorkerID: start.WorkerID,
+		Sequence: 4, Time: terminalAt.UTC(), Kind: kind}
 	for expected, event := range []runtime.Event{turn, done, terminal} {
 		if err := store.Append(ctx, int64(expected+1), event); err != nil {
 			t.Fatal(err)

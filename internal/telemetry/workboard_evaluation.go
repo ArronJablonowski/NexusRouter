@@ -87,6 +87,7 @@ func (s *Store) PrepareCandidateEvaluation(ctx context.Context, mutation workboa
 		return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
 	}
 	bindingKind, admissionID, admissionDigest := "legacy", "", ""
+	var source candidateRuntimeSource
 	sourceModel, sourceProvider, configID := "", "", ""
 	sourceTimeLimit, sourceTokenLimit, sourceCost := int64(0), int64(0), int64(0)
 	if sourceTask != "" {
@@ -103,6 +104,10 @@ func (s *Store) PrepareCandidateEvaluation(ctx context.Context, mutation workboa
 			canonicalAdmission.SessionID != sourceSession || canonicalAdmission.PolicyDigest != attempt.PolicyDigest {
 			return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
 		}
+		source, err = candidateSourceCompletion(ctx, tx, sourceTask, sourceSession)
+		if err != nil {
+			return workboard.CandidateEvaluationRequest{}, err
+		}
 		proof, proofErr := readExecutionTerminalProof(ctx, tx, canonicalAdmission)
 		if proofErr != nil {
 			return workboard.CandidateEvaluationRequest{}, proofErr
@@ -114,12 +119,24 @@ func (s *Store) PrepareCandidateEvaluation(ctx context.Context, mutation workboa
 			return workboard.CandidateEvaluationRequest{}, budgetErr
 		}
 		bindingKind, admissionID, admissionDigest = "runtime_budgeted", canonicalAdmission.AdmissionID, canonicalAdmission.AdmissionDigest
+		if source.completion.ID != proof.completion.ID || source.completion.TaskID != proof.completion.TaskID ||
+			source.completion.SessionID != proof.completion.SessionID || source.completion.TurnID != proof.completion.TurnID ||
+			source.completion.AttemptID != proof.completion.AttemptID || source.completion.Sequence != proof.completion.Sequence ||
+			source.completion.Kind != proof.completion.Kind || source.completionDigest != proof.completionDigest ||
+			source.terminal.ID != proof.event.ID || source.terminal.Sequence != proof.event.Sequence || source.terminalDigest != proof.digest {
+			return workboard.CandidateEvaluationRequest{}, ErrWorkboardCorrupt
+		}
 		sourceModel, sourceProvider, configID = canonicalAdmission.ModelID, canonicalAdmission.ProviderID, canonicalAdmission.ConfigID
 		sourceTimeLimit, sourceTokenLimit, sourceCost = canonicalAdmission.TimeLimitMS, canonicalAdmission.TokenLimit, canonicalAdmission.CostMicros
 	}
 	frozen := workboard.CandidateEvaluationRequest{Version: workboard.SchemaVersion, BoardID: mutation.BoardID, CardID: mutation.CardID,
 		AttemptID: mutation.AttemptID, ClaimID: mutation.ClaimID, CandidateID: mutation.CandidateID, SourceTaskID: sourceTask,
-		SourceSessionID: sourceSession, BindingKind: bindingKind, AdmissionID: admissionID, AdmissionDigest: admissionDigest,
+		SourceSessionID: sourceSession, SourceTurnID: source.completion.TurnID, SourceAttemptID: source.completion.AttemptID,
+		SourceCompletionEventID: source.completion.ID, SourceCompletionSequence: source.completion.Sequence,
+		SourceCompletionDigest: source.completionDigest, SourceOutputDigest: source.outputDigest,
+		SourceTerminalEventID: source.terminal.ID, SourceTerminalSequence: source.terminal.Sequence, SourceTerminalDigest: source.terminalDigest,
+		SourceDomain:  source.domain,
+		SourceProfile: source.profile, SourcePrivacy: source.privacy, BindingKind: bindingKind, AdmissionID: admissionID, AdmissionDigest: admissionDigest,
 		SourceModelID: sourceModel, SourceProviderID: sourceProvider, ConfigID: configID, SourceTimeLimitMS: sourceTimeLimit,
 		SourceTokenLimit: sourceTokenLimit, SourceCostMicros: sourceCost, WorkerID: mutation.Actor.ID, ExpectedCardRevision: mutation.ExpectedCardRevision,
 		ExpectedClaimRevision: mutation.ExpectedClaimRevision, CriteriaRevision: attempt.CriteriaRevision,
