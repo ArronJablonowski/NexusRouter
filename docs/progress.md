@@ -6875,3 +6875,33 @@ claim expiry, and only within the review deadline when no heartbeat, pause,
 cancel, recovery, or reassignment changed the durable state. The production
 reviewer adapter and atomic structured audit record also remain open. The stock
 daemon scheduler enablement guard is unchanged.
+
+## 2026-09-12 — DAR-91 revision-bound review successor fence
+
+DAR-91 remains in progress. Schema 44 adds an immutable successor fence for
+each newly admitted auxiliary review. The fence captures the exact admission,
+operation, card, attempt, claim, card/claim/criteria revisions, candidate,
+criteria and policy digests, plus an admission-derived review deadline. The
+admission and fence are inserted atomically after the existing live-claim and
+capacity checks. Historical schema-43 admissions are deliberately not
+backfilled and therefore cannot acquire completion authority after migration;
+retained nonempty future fence state under an older declared schema fails
+closed.
+
+Only the composite candidate-and-completed-settlement transaction consumes the
+successor fence. Ordinary candidate submission still requires an unexpired
+worker lease. The composite path may cross wall-clock claim expiry only while
+the claim remains active with the same owner and exact admitted revisions and
+the durable card/attempt/criteria/policy state is unchanged. It rejects a
+heartbeat revision, pause, cancellation, recovery, reassignment, corrupted
+fence, missing legacy fence, or completion after the review deadline. Writer
+serialization makes recovery and completion converge on one durable winner.
+
+Focused race tests cover atomic admission/fence creation and rollback,
+schema-43 non-escalation, retained-authority rejection, canonical body and
+immutability checks, successful completion just beyond claim expiry, late
+review rejection at the exact deadline, heartbeat revision invalidation,
+existing admission replay, schema-43 completed-operation replay, atomic
+candidate/settlement replay, and ordinary lifecycle behavior. Production
+reviewer composition and the atomic structured audit/outcome binding remain
+open; the stock daemon scheduler guard remains unchanged.

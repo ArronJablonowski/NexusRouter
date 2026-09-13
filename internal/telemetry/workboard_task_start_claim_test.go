@@ -51,6 +51,7 @@ func TestTaskStartClaimSchema40MigrationAndLeaseTTLBounds(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			dropWorkboardAuxiliaryReviewSchema44(t, store.db)
 			if _, err = store.db.Exec(`DROP TRIGGER workboard_auxiliary_review_settlement_immutable_delete;
 				DROP TRIGGER workboard_auxiliary_review_settlement_immutable_update;
 				DROP TRIGGER workboard_auxiliary_review_settlement_binding;

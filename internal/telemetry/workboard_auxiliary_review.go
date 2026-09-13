@@ -80,6 +80,13 @@ func (s *Store) AdmitAuxiliaryReview(ctx context.Context, frozen workboard.Candi
 		}
 		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
 	}
+	fence, err := auxiliaryReviewSuccessorFence(record, frozen)
+	if err != nil {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
+	}
+	if err = insertAuxiliaryReviewSuccessorFenceTx(ctx, tx, fence); err != nil {
+		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
+	}
 	if err = tx.Commit(); err != nil {
 		return workboard.AuxiliaryReviewAdmissionRecord{}, false, err
 	}

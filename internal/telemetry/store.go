@@ -99,6 +99,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 44 {
+		if err = discardEmptyFutureAuxiliaryReviewSuccessorFences(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version == 42 {
 		if err = validateWorkboardExecutionBudgetSchema(ctx, conn); err != nil {
 			return err
@@ -106,6 +111,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version == 43 {
 		if err = validateWorkboardAuxiliaryReviewSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 44 {
+		if err = validateWorkboardAuxiliaryReviewSuccessorFenceSchema(ctx, conn); err != nil {
 			return err
 		}
 	}
@@ -426,6 +436,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 43 {
 		if err = migrateWorkboardAuxiliaryReviews(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 44 {
+		if err = migrateWorkboardAuxiliaryReviewSuccessorFences(ctx, conn); err != nil {
 			return err
 		}
 	}

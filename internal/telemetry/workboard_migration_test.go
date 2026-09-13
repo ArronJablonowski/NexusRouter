@@ -13,6 +13,8 @@ import (
 )
 
 var workboardTables = []string{
+	"workboard_auxiliary_review_successor_fences",
+	"workboard_auxiliary_review_legacy_admissions",
 	"workboard_auxiliary_review_settlements",
 	"workboard_auxiliary_review_admissions",
 	"workboard_execution_settlements",
@@ -39,6 +41,20 @@ var workboardTables = []string{
 	"workboard_cards",
 	"workboard_columns",
 	"workboard_boards",
+}
+
+func dropWorkboardAuxiliaryReviewSchema44(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_delete;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_update;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_binding;
+		DROP TABLE IF EXISTS workboard_auxiliary_review_successor_fences;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_admission_sealed_insert;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_admission_immutable_update;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_legacy_admission_immutable_delete;
+		DROP TABLE IF EXISTS workboard_auxiliary_review_legacy_admissions`); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func downgradeWorkboards(t *testing.T, db *sql.DB) {

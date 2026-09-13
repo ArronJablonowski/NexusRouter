@@ -23,6 +23,7 @@ type budgetedReviewFixture struct {
 	measured    *workboard.AuxiliaryReviewMeasurements
 	evidence    []workboard.EvidenceInput
 	captured    chan workboard.CandidateEvaluationRequest
+	onEvaluate  func()
 }
 
 func (e *budgetedReviewFixture) EvaluateCandidate(context.Context, workboard.CandidateEvaluationRequest) ([]workboard.EvidenceInput, error) {
@@ -43,6 +44,9 @@ func (e *budgetedReviewFixture) AuxiliaryReviewReservation(frozen workboard.Cand
 
 func (e *budgetedReviewFixture) EvaluateBudgetedCandidate(ctx context.Context, frozen workboard.CandidateEvaluationRequest) (workboard.BudgetedCandidateEvaluation, error) {
 	e.calls.Add(1)
+	if e.onEvaluate != nil {
+		e.onEvaluate()
+	}
 	if e.captured != nil {
 		e.captured <- frozen
 	}
@@ -184,6 +188,79 @@ func TestEvaluationServiceEnforcesAuxiliaryReviewDeadline(t *testing.T) {
 	}
 }
 
+func TestAuxiliaryReviewSuccessorFencePermitsExpiredClaimBeforeReviewDeadline(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 20, 40, 0, 0, time.UTC)
+	evaluator := &budgetedReviewFixture{}
+	service, request := prepareBudgetedReviewService(t, store, evaluator, &clock, "expired-claim-successor")
+	var expiresAtNS int64
+	if err := store.db.QueryRowContext(ctx, `SELECT expires_at FROM workboard_claims WHERE id=?`, request.ClaimID).Scan(&expiresAtNS); err != nil {
+		t.Fatal(err)
+	}
+	expiresAt := time.Unix(0, expiresAtNS).UTC()
+	clock = expiresAt.Add(-50 * time.Millisecond)
+	evaluator.onEvaluate = func() { clock = expiresAt.Add(50 * time.Millisecond) }
+
+	receipt, err := service.SubmitCandidate(ctx, request)
+	if err != nil || receipt.Validate() != nil || evaluator.calls.Load() != 1 {
+		t.Fatalf("receipt=%+v calls=%d err=%v", receipt, evaluator.calls.Load(), err)
+	}
+}
+
+func TestAuxiliaryReviewSuccessorFenceRejectsCompletionAfterReviewDeadline(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 20, 50, 0, 0, time.UTC)
+	evaluator := &budgetedReviewFixture{}
+	service, request := prepareBudgetedReviewService(t, store, evaluator, &clock, "expired-review-deadline")
+	admittedAt := clock
+	evaluator.onEvaluate = func() { clock = admittedAt.Add(5 * time.Second) }
+
+	if _, err := service.SubmitCandidate(ctx, request); !errors.Is(err, &workboard.Violation{Code: workboard.CodeLeaseExpired}) {
+		t.Fatalf("late review completion accepted: %v", err)
+	}
+	var candidates int
+	if err := store.db.QueryRowContext(ctx, `SELECT count(*) FROM workboard_candidates WHERE board_id=? AND card_id=? AND attempt_id=?`,
+		request.BoardID, request.CardID, request.AttemptID).Scan(&candidates); err != nil || candidates != 0 {
+		t.Fatalf("candidates=%d err=%v", candidates, err)
+	}
+	var disposition string
+	if err := store.db.QueryRowContext(ctx, `SELECT disposition FROM workboard_auxiliary_review_settlements`).Scan(&disposition); err != nil || disposition != "failed" {
+		t.Fatalf("disposition=%q err=%v", disposition, err)
+	}
+}
+
+func TestAuxiliaryReviewSuccessorFenceRejectsHeartbeatRevisionAdvance(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 20, 55, 0, 0, time.UTC)
+	evaluator := &budgetedReviewFixture{}
+	service, request := prepareBudgetedReviewService(t, store, evaluator, &clock, "heartbeat-revision")
+	evaluator.onEvaluate = func() {
+		clock = clock.Add(10 * time.Millisecond)
+		lifecycle := newTestLifecycleService(t, store, workboard.Actor{ID: "integrated-worker-heartbeat-revision", Type: "worker"},
+			verifiedLifecycleRecovery("review-heartbeat-proof", workboard.EffectFree), &clock)
+		if _, err := lifecycle.Heartbeat(ctx, workboard.HeartbeatRequest{BoardID: request.BoardID, CardID: request.CardID,
+			AttemptID: request.AttemptID, ClaimID: request.ClaimID, IdempotencyKey: "review-heartbeat-revision-advance",
+			ExpectedClaimRevision: request.ExpectedClaimRevision}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := service.SubmitCandidate(ctx, request); !errors.Is(err, &workboard.Violation{Code: workboard.CodeStaleRevision}) {
+		t.Fatalf("review completion survived heartbeat revision: %v", err)
+	}
+	var candidates int
+	if err := store.db.QueryRowContext(ctx, `SELECT count(*) FROM workboard_candidates WHERE board_id=? AND card_id=? AND attempt_id=?`,
+		request.BoardID, request.CardID, request.AttemptID).Scan(&candidates); err != nil || candidates != 0 {
+		t.Fatalf("candidates=%d err=%v", candidates, err)
+	}
+}
+
 func prepareBudgetedReviewService(t *testing.T, store *Store, evaluator workboard.CandidateEvaluator,
 	clock *time.Time, suffix string,
 ) (*workboard.EvaluationService, workboard.SubmitCandidateRequest) {
@@ -260,10 +337,44 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 	if _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements); !errors.Is(err, ErrConflict) {
 		t.Fatalf("atomic replay measurement drift accepted: %v", err)
 	}
-
+	measurements.Tokens = &tokens
 	replayed, err := service.SubmitCandidate(ctx, request)
 	if err != nil || replayed.ResponseDigest != receipt.ResponseDigest || replayed.OperationID != receipt.OperationID || evaluator.calls.Load() != 1 {
 		t.Fatalf("replay=%+v calls=%d err=%v", replayed, evaluator.calls.Load(), err)
+	}
+	if _, err = store.db.Exec(`DROP TRIGGER workboard_auxiliary_review_successor_fence_immutable_update;
+		UPDATE workboard_auxiliary_review_successor_fences SET body=json_set(body,'$.claim_revision',claim_revision+1) WHERE admission_id=?`, admission.AdmissionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("completed replay ignored corrupt schema-44 fence: %v", err)
+	}
+	var databasePath string
+	if err = store.db.QueryRow(`SELECT file FROM pragma_database_list WHERE name='main'`).Scan(&databasePath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_delete;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_immutable_update;
+		DROP TRIGGER IF EXISTS workboard_auxiliary_review_successor_fence_binding;
+		DROP TABLE workboard_auxiliary_review_successor_fences;
+		DROP TRIGGER workboard_auxiliary_review_legacy_admission_sealed_insert;
+		DROP TRIGGER workboard_auxiliary_review_legacy_admission_immutable_update;
+		DROP TRIGGER workboard_auxiliary_review_legacy_admission_immutable_delete;
+		DROP TABLE workboard_auxiliary_review_legacy_admissions;
+		PRAGMA user_version=43`); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	legacyReplay, legacySettlement, err := reopened.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, mutation, time.Now, operation, measurements)
+	if err != nil || legacyReplay.OperationID != receipt.OperationID || legacyReplay.ResponseDigest != receipt.ResponseDigest || legacySettlement != settlement {
+		t.Fatalf("completed schema-43 replay receipt=%+v settlement=%+v err=%v", legacyReplay, legacySettlement, err)
 	}
 }
 

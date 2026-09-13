@@ -20,6 +20,7 @@ func TestWorkboardExecutionBudgetSchema41MigrationIsEmptyAndRestartSafe(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	dropWorkboardAuxiliaryReviewSchema44(t, store.db)
 	if _, err = store.db.Exec(`DROP TABLE workboard_auxiliary_review_settlements;
 		DROP TABLE workboard_auxiliary_review_admissions;
 		DROP TABLE workboard_execution_settlements;

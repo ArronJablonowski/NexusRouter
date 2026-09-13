@@ -171,7 +171,7 @@ func (s *Store) ApplyEvaluationMutation(ctx context.Context, mutation workboard.
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
-	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, now)
+	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, now, nil)
 	if err != nil {
 		return workboard.OperationReceipt{}, err
 	}
@@ -223,12 +223,28 @@ func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Cont
 	if replayErr != nil {
 		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, replayErr
 	}
+	fence, fenceFound, fenceErr := readAuxiliaryReviewSuccessorFence(ctx, tx, admission.AdmissionID)
+	if fenceErr != nil {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, fenceErr
+	}
+	if fenceFound && !auxiliaryReviewFenceMatchesAdmission(fence, admission, mutation, operationID) {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	}
 	if prior, settled, readErr := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID); readErr != nil || settled {
 		if readErr != nil {
 			return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, readErr
 		}
 		if !candidateFound || prior.Disposition != workboard.AuxiliaryReviewCompleted {
 			return workboard.OperationReceipt{}, prior, ErrConflict
+		}
+		if !fenceFound {
+			legacy, legacyErr := isLegacyAuxiliaryReviewAdmission(ctx, tx, admission)
+			if legacyErr != nil {
+				return workboard.OperationReceipt{}, prior, legacyErr
+			}
+			if !legacy {
+				return workboard.OperationReceipt{}, prior, ErrWorkboardCorrupt
+			}
 		}
 		expected, buildErr := auxiliaryReviewSettlementRecord(admission, prior.SettlementID, workboard.AuxiliaryReviewCompleted, measurements, prior.SettledAt)
 		if buildErr != nil || expected.SettlementDigest != prior.SettlementDigest {
@@ -239,11 +255,14 @@ func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Cont
 	if candidateFound {
 		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
 	}
+	if !fenceFound {
+		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, ErrConflict
+	}
 	var committedAt time.Time
 	receipt, err := applyEvaluationMutationTx(ctx, tx, mutation, func() time.Time {
 		committedAt = now().UTC()
 		return committedAt
-	})
+	}, &fence)
 	if err != nil {
 		return workboard.OperationReceipt{}, workboard.AuxiliaryReviewSettlementRecord{}, errors.Join(errors.New("atomic candidate mutation failed"), err)
 	}
@@ -264,7 +283,9 @@ func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Cont
 	return receipt, settlement, nil
 }
 
-func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.EvaluationMutation, now func() time.Time) (workboard.OperationReceipt, error) {
+func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.EvaluationMutation, now func() time.Time,
+	successor *workboard.AuxiliaryReviewSuccessorFence,
+) (workboard.OperationReceipt, error) {
 	if now == nil {
 		return workboard.OperationReceipt{}, invalidWorkboard("clock")
 	}
@@ -303,7 +324,7 @@ func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboa
 	switch mutation.Kind {
 	case workboard.EvaluationCandidateSubmit:
 		var revision int64
-		revision, durable, storedResult, err = submitStoredCandidate(ctx, tx, mutation, &board, &card, &cardBody)
+		revision, durable, storedResult, err = submitStoredCandidate(ctx, tx, mutation, &board, &card, &cardBody, successor)
 		claimRevision = &revision
 	case workboard.EvaluationAccept, workboard.EvaluationReject:
 		durable, storedResult, err = decideStoredCandidate(ctx, tx, mutation, &board, &card, &cardBody)
@@ -361,7 +382,9 @@ func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboa
 	return receipt, nil
 }
 
-func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, board *workboard.Board, card *workboard.Card, cardBody *storedWorkboardCard) (int64, int, evaluationStoredResult, error) {
+func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, board *workboard.Board, card *workboard.Card,
+	cardBody *storedWorkboardCard, successor *workboard.AuxiliaryReviewSuccessorFence,
+) (int64, int, evaluationStoredResult, error) {
 	if card.Revision != m.ExpectedCardRevision {
 		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "card_revision"}
 	}
@@ -379,12 +402,18 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	if lease.OwnerID != m.Actor.ID {
 		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeLeaseOwner, Field: "owner"}
 	}
-	if lease.State != workboard.LeaseActive || !m.Now.Before(lease.ExpiresAt) {
+	if successor != nil && !validAuxiliaryReviewSuccessor(successor, m) {
+		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeLeaseExpired, Field: "review_deadline"}
+	}
+	if lease.State != workboard.LeaseActive || !m.Now.Before(lease.ExpiresAt) && successor == nil {
 		return 0, 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeLeaseExpired, Field: "claim"}
 	}
 	base, baseBytes, err := readRunningEvaluationAttempt(ctx, tx, m, claim)
 	if err != nil {
 		return 0, 0, evaluationStoredResult{}, err
+	}
+	if successor != nil && (successor.CriteriaDigest != base.CriteriaDigest || successor.PolicyDigest != base.PolicyDigest) {
+		return 0, 0, evaluationStoredResult{}, ErrConflict
 	}
 	candidateID, candidateDigest := m.CandidateID, m.CandidateDigest
 	if candidateDigest != workboard.CandidateContentDigest(m.Summary, m.ArtifactRefs) {
@@ -470,6 +499,25 @@ func submitStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 		return 0, 0, evaluationStoredResult{}, err
 	}
 	return claim.Revision, durable + cardBytes + settlementBytes, evaluationStoredResult{Candidate: &candidate, Evidence: evidence, Successors: []workboard.Card{}}, nil
+}
+
+func validAuxiliaryReviewSuccessor(fence *workboard.AuxiliaryReviewSuccessorFence, mutation workboard.EvaluationMutation) bool {
+	return fence != nil && fence.Validate() == nil && mutation.Now.Before(fence.DeadlineAt) &&
+		fence.BoardID == mutation.BoardID && fence.CardID == mutation.CardID && fence.AttemptID == mutation.AttemptID &&
+		fence.ClaimID == mutation.ClaimID && fence.CardRevision == mutation.ExpectedCardRevision &&
+		fence.ClaimRevision == mutation.ExpectedClaimRevision && fence.CriteriaRevision == mutation.CriteriaRevision &&
+		fence.CandidateID == mutation.CandidateID && fence.CandidateDigest == mutation.CandidateDigest
+}
+
+func auxiliaryReviewFenceMatchesAdmission(fence workboard.AuxiliaryReviewSuccessorFence,
+	admission workboard.AuxiliaryReviewAdmissionRecord, mutation workboard.EvaluationMutation, operationID string,
+) bool {
+	return fence.Validate() == nil && fence.AdmissionID == admission.AdmissionID && fence.AdmissionDigest == admission.AdmissionDigest &&
+		fence.OperationID == operationID && fence.BoardID == mutation.BoardID && fence.CardID == mutation.CardID &&
+		fence.AttemptID == mutation.AttemptID && fence.ClaimID == mutation.ClaimID && fence.CandidateID == mutation.CandidateID &&
+		fence.CandidateDigest == mutation.CandidateDigest && fence.CardRevision == mutation.ExpectedCardRevision &&
+		fence.ClaimRevision == mutation.ExpectedClaimRevision && fence.CriteriaRevision == mutation.CriteriaRevision &&
+		fence.CriteriaDigest == admission.CriteriaDigest && fence.PolicyDigest == admission.PolicyDigest
 }
 
 func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.EvaluationMutation, board *workboard.Board, card *workboard.Card, cardBody *storedWorkboardCard) (int, evaluationStoredResult, error) {
