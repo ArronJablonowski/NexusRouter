@@ -536,9 +536,61 @@ func TestEvaluationServiceNeverRedispatchesAnExistingReviewAdmission(t *testing.
 	if evaluator.calls.Load() != 1 {
 		t.Fatalf("review redispatched: %d calls", evaluator.calls.Load())
 	}
+	var prematureSettlements int
+	if err := store.db.QueryRowContext(ctx, `SELECT count(*) FROM workboard_auxiliary_review_settlements`).Scan(&prematureSettlements); err != nil || prematureSettlements != 0 {
+		t.Fatalf("inflight review settled before deadline: settlements=%d err=%v", prematureSettlements, err)
+	}
 	close(evaluator.release)
 	if err := <-firstResult; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEvaluationServiceRecoversExpiredReviewBeforeExpiredClaimPreparation(t *testing.T) {
+	ctx := context.Background()
+	store := openExecutionAdmissionStore(t, ctx)
+	defer store.Close()
+	clock := time.Date(2026, 9, 12, 20, 0, 0, 0, time.UTC)
+	evaluator := &budgetedReviewFixture{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	first, request := prepareBudgetedReviewService(t, store, evaluator, &clock, "xp")
+	firstResult := make(chan error, 1)
+	go func() {
+		_, err := first.SubmitCandidate(ctx, request)
+		firstResult <- err
+	}()
+	select {
+	case <-evaluator.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("review did not start")
+	}
+	// Expire both the five-second auxiliary deadline and the worker claim.
+	// Recovery must inspect the existing admission before candidate preparation,
+	// because preparation itself correctly rejects the stale claim.
+	clock = clock.Add(time.Minute)
+	second := newTestEvaluationService(t, store, workboard.Actor{ID: "integrated-worker-xp", Type: "worker"}, evaluator, &clock)
+	if _, err := second.SubmitCandidate(ctx, request); !errors.Is(err, &workboard.Violation{Code: workboard.CodeIllegalTransition}) {
+		t.Fatalf("expired review was not terminalized before preparation: %v", err)
+	}
+	if evaluator.calls.Load() != 1 {
+		t.Fatalf("expired admitted review was redispatched: %d", evaluator.calls.Load())
+	}
+	var operation string
+	if err := store.db.QueryRowContext(ctx, `SELECT operation_id FROM workboard_auxiliary_review_admissions`).Scan(&operation); err != nil {
+		t.Fatal(err)
+	}
+	settlement, found, err := store.ReplayAuxiliaryReviewSettlement(ctx, operation, workboard.AuxiliaryReviewFailed)
+	if err != nil || !found || settlement.TimeChargeMode != workboard.AuxiliaryReviewConservative ||
+		settlement.TokenChargeMode != workboard.AuxiliaryReviewConservative || settlement.CostChargeMode != workboard.AuxiliaryReviewConservative {
+		t.Fatalf("recovered settlement=%+v found=%v err=%v", settlement, found, err)
+	}
+	close(evaluator.release)
+	if err = <-firstResult; err == nil {
+		t.Fatal("late reviewer completion committed after recovery won")
+	}
+	var candidates int
+	if err = store.db.QueryRowContext(ctx, `SELECT count(*) FROM workboard_candidates WHERE board_id=? AND card_id=? AND attempt_id=?`,
+		request.BoardID, request.CardID, request.AttemptID).Scan(&candidates); err != nil || candidates != 0 {
+		t.Fatalf("candidates=%d err=%v", candidates, err)
 	}
 }
 

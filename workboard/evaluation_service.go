@@ -298,6 +298,7 @@ type BudgetedCandidateEvaluator interface {
 type AuxiliaryReviewRepository interface {
 	AdmitAuxiliaryReview(context.Context, CandidateEvaluationRequest, AuxiliaryReviewReservation, string, func() time.Time) (AuxiliaryReviewAdmissionRecord, bool, error)
 	ReplayAuxiliaryReviewAdmission(context.Context, string) (AuxiliaryReviewAdmissionRecord, bool, error)
+	RecoverExpiredAuxiliaryReview(context.Context, string, func() time.Time) (bool, error)
 	SettleAuxiliaryReview(context.Context, string, AuxiliaryReviewDisposition, AuxiliaryReviewMeasurements, time.Time) (AuxiliaryReviewSettlementRecord, bool, error)
 	ReplayAuxiliaryReviewSettlement(context.Context, string, AuxiliaryReviewDisposition) (AuxiliaryReviewSettlementRecord, bool, error)
 	ReplayAuxiliaryReviewOutcome(context.Context, string) (AuxiliaryReviewOutcomeRecord, bool, bool, error)
@@ -394,6 +395,21 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 		active.receipt, active.err = receipt, replayErr
 		return receipt, replayErr
 	}
+	if s.auxiliary != nil {
+		reviewOperation := "candidate-review-" + mutation.CandidateID
+		if _, admitted, replayErr := s.auxiliary.ReplayAuxiliaryReviewAdmission(ctx, reviewOperation); replayErr != nil {
+			active.err = replayErr
+			return OperationReceipt{}, replayErr
+		} else if admitted {
+			recoveryErr := s.recoverExpiredAuxiliaryReview(ctx, reviewOperation)
+			if recoveryErr != nil {
+				active.err = recoveryErr
+				return OperationReceipt{}, recoveryErr
+			}
+			active.err = fail(CodeIllegalTransition, "auxiliary_review_inflight")
+			return OperationReceipt{}, active.err
+		}
+	}
 	frozen, err := s.repository.PrepareCandidateEvaluation(ctx, mutation)
 	if err != nil || frozen.Validate() != nil || frozen.CandidateID != mutation.CandidateID || frozen.CandidateDigest != mutation.CandidateDigest ||
 		frozen.WorkerID != authority.Actor.ID || frozen.BoardID != request.BoardID || frozen.CardID != request.CardID ||
@@ -427,6 +443,10 @@ func (s *EvaluationService) SubmitCandidate(ctx context.Context, request SubmitC
 			return OperationReceipt{}, admitErr
 		}
 		if !created {
+			if recoverErr := s.recoverExpiredAuxiliaryReview(ctx, reviewOperation); recoverErr != nil {
+				active.err = recoverErr
+				return OperationReceipt{}, recoverErr
+			}
 			active.err = fail(CodeIllegalTransition, "auxiliary_review_inflight")
 			return OperationReceipt{}, active.err
 		}
@@ -593,6 +613,13 @@ func (s *EvaluationService) settleAuxiliaryReview(ctx context.Context, operation
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	_, _, err := s.auxiliary.SettleAuxiliaryReview(cleanup, operation, disposition, safeAuxiliaryMeasurements(measurements), s.now().UTC())
+	return err
+}
+
+func (s *EvaluationService) recoverExpiredAuxiliaryReview(ctx context.Context, operation string) error {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, err := s.auxiliary.RecoverExpiredAuxiliaryReview(cleanup, operation, s.now)
 	return err
 }
 
