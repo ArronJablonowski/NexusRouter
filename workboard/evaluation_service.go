@@ -582,7 +582,7 @@ func validBudgetedCandidateEvaluation(result BudgetedCandidateEvaluation, frozen
 	} else if result.Measurements.TimeMS != nil {
 		return false
 	}
-	return ValidateAuxiliaryReviewEvidence(frozen, audit, result.Evidence) == nil
+	return ValidateBudgetedCandidateEvidence(frozen, audit, result.Evidence) == nil
 }
 
 func optionalAuxiliaryMeasurementWithin(measured *int64, limit int64) bool {

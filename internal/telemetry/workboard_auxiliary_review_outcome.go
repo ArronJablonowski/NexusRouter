@@ -184,7 +184,7 @@ func reviewAuditMatchesFrozen(audit evaluation.AuditRecord, frozen workboard.Can
 		mutation.CandidateDigest != frozen.CandidateDigest {
 		return false
 	}
-	return workboard.ValidateAuxiliaryReviewEvidence(frozen, audit, mutation.Evaluated) == nil
+	return workboard.ValidateBudgetedCandidateEvidence(frozen, audit, mutation.Evaluated) == nil
 }
 
 func reviewAuditMeasurementsMatch(audit evaluation.AuditRecord, measurements workboard.AuxiliaryReviewMeasurements) bool {

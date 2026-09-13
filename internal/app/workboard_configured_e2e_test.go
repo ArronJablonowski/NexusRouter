@@ -64,6 +64,20 @@ func TestConfiguredWorkboardScheduleSupervisorPersistsReviewedCandidateEndToEnd(
 		store.Close()
 		t.Fatal(err)
 	}
+	configuredScheduler, ok := plan.scheduler.(*WorkboardScheduler)
+	if !ok {
+		store.Close()
+		t.Fatal("configured Workboard scheduler did not retain its production runner")
+	}
+	configuredRunner, runnerOK := configuredScheduler.runner.(*WorkboardWorkerRunner)
+	if !runnerOK {
+		store.Close()
+		t.Fatal("configured Workboard scheduler did not retain its production runner")
+	}
+	if _, composed := configuredRunner.evaluator.(*configuredWorkboardCandidateEvaluator); !composed {
+		store.Close()
+		t.Fatalf("configured runner evaluator=%T", configuredRunner.evaluator)
+	}
 	cardBefore, cardErr := store.GetCard(ctx, boardID, cardID)
 	if cardErr != nil || cardBefore.State != workboard.Ready || len(workerRequests) != 0 || len(reviewRequests) != 0 {
 		store.Close()
@@ -140,7 +154,12 @@ func TestConfiguredWorkboardScheduleSupervisorPersistsReviewedCandidateEndToEnd(
 		t.Fatal(err)
 	}
 	defer reopened.Close()
-	assertConfiguredWorkboardE2EDurability(t, reopened, boardID, cardID)
+	wantConfigID, configErr := settingsConfigID(settings)
+	if configErr != nil {
+		reopened.Close()
+		t.Fatal(configErr)
+	}
+	assertConfiguredWorkboardE2EDurability(t, reopened, boardID, cardID, wantConfigID)
 }
 
 func workboardE2EOllamaHandler(t *testing.T, requests chan<- workboardE2EProviderRequest, content string,
@@ -202,7 +221,7 @@ func configuredWorkboardE2ESettings(database, workerEndpoint, reviewerEndpoint s
 	return settings
 }
 
-func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store, boardID, cardID string) {
+func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store, boardID, cardID, wantConfigID string) {
 	t.Helper()
 	ctx := context.Background()
 	card, err := store.GetCard(ctx, boardID, cardID)
@@ -232,7 +251,7 @@ func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store
 		}
 	}
 	start, completed, terminal := events[0], events[3], events[5]
-	if start.Data.ModelID != "worker-native" || start.Data.ProviderID != "worker-provider" || start.Data.RouteEstimatedCost == nil ||
+	if start.Data.ModelID != "worker-native" || start.Data.ProviderID != "worker-provider" || start.Data.ConfigID != wantConfigID || start.Data.RouteEstimatedCost == nil ||
 		*start.Data.RouteEstimatedCost != .2 || completed.Data.Text != "factory candidate" || completed.Data.Usage == nil ||
 		completed.Data.Usage.InputTokens != 100 || completed.Data.Usage.OutputTokens != 20 {
 		t.Fatalf("runtime binding start=%+v completed=%+v", start, completed)
@@ -255,7 +274,7 @@ func assertConfiguredWorkboardE2EDurability(t *testing.T, store *telemetry.Store
 	outcome, found, legacy, err := store.ReplayAuxiliaryReviewOutcome(ctx, operation)
 	if err != nil || !found || legacy || outcome.Validate() != nil || outcome.CandidateID != attempt.Candidate.ID ||
 		outcome.SourceTaskID != taskID || outcome.SourceSessionID != sessionID || outcome.SourceCompletionEventID != completed.ID ||
-		outcome.SourceTerminalEventID != terminal.ID || outcome.ReviewerProviderID != admission.ProviderID ||
+		outcome.SourceTerminalEventID != terminal.ID || outcome.SourceConfigID != wantConfigID || outcome.ReviewerProviderID != admission.ProviderID ||
 		outcome.AdmissionDigest != admission.AdmissionDigest || outcome.SettlementDigest != settlement.SettlementDigest ||
 		outcome.AuditID != evidence.Reference || outcome.EvidenceCount != 1 || outcome.EvidenceDigest != attempt.Candidate.EvidenceDigest {
 		t.Fatalf("review outcome=%+v found=%v legacy=%v err=%v", outcome, found, legacy, err)

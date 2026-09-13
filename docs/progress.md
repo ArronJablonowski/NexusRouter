@@ -7079,3 +7079,35 @@ for resource pressure. Those fixtures now disable automatic profiling and
 inject the same bounded test profiler into SDK clients and the submission
 dispatcher service. The affected SDK cases passed ten consecutive race-enabled
 runs; production admission behavior remains fail-closed and unchanged.
+
+## 2026-09-13 — DAR-92/DAR-94 validation and authority hardening
+
+Acceptance audits found that configured Workboard tasks still combined trusted
+host instructions with untrusted card text and could inherit ambient memory,
+skills, and process-wide tools. The production factory now emits distinct
+system and user messages, requires a local worker until cards carry durable
+egress consent, rejects exhausted attempt budgets before construction, and
+marks execution effect-free only because the final provider boundary strips
+all tools, delegation, memory, and skill context. The runner's atomic claim
+revision fence remains the last pre-provider dispatch check. Focused tests now
+cover prompt injection isolation, stale revisions, exhausted retry budgets,
+cloud-without-consent rejection, the provider output ceiling, and preservation
+of the original settings digest after runtime authority reduction.
+
+Configured candidate evaluation now composes a host-owned deterministic
+projection with the separately budgeted advisory model reviewer. Only exact
+runtime evaluation events between the frozen completion and terminal events,
+with the criterion's configured validator identity, can become deterministic
+evidence. Reviewer output is still restricted to exact `model_audit`
+projections and cannot manufacture deterministic or user-feedback evidence.
+A closed `deterministic.meaningful_text.v1` validator rejects whitespace,
+criterion repetition, and short promise-only output; the task factory applies
+the same conservative meaningfulness gate to every configured candidate.
+
+The full non-race application suite and focused Workboard/application/telemetry
+race tests pass. A second DAR-94 audit found the behavior acceptance-ready; its
+remaining explicit model-drift and host-identity test gaps were then added,
+including proof that drift opens neither provider nor durable claim. DAR-92
+still lacks a general host validator/tool registry and broad semantic
+meaningfulness detection. The complete race/build gate has not yet run for
+this checkpoint.

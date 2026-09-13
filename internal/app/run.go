@@ -135,11 +135,26 @@ type Result struct {
 // dispatch retains its loopback-only transport even when cloud use is enabled.
 func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secret func(string) string) (Result, error) {
 	result := Result{}
+	configID, configErr := settingsConfigID(s)
+	if configErr != nil {
+		return result, ErrAdmission
+	}
 	if r.runtimeHostAdmission != nil {
-		// A host-bound Workboard execution is already a child capability. Strip
-		// recursive delegation even if an internal caller bypassed Service.Run's
-		// ordinary composition path with pre-populated callbacks.
+		// A host-bound Workboard execution is an effect-free child capability.
+		// It receives only the explicit frozen card context: no recursive
+		// delegation, ambient memory or skills, or process-wide tool registry.
+		// Keep this enforcement at the final provider boundary so an internal
+		// caller cannot regain authority by pre-populating Request fields.
 		r.delegate, r.delegateAudit = nil, nil
+		r.delegatedTools, r.toolExtension = nil, nil
+		r.toolReviewer, r.toolPresenter = nil, nil
+		r.memoryContext, r.skillContext = nil, nil
+		r.memoryPrepared, r.skillPrepared = true, true
+		s.Tools.Enabled, s.Tools.CreateEnabled, s.Tools.ReplaceEnabled = false, false, false
+		s.Tools.WorkboardReadEnabled, s.Tools.WorkboardWriteEnabled = false, false
+		s.Memory.Enabled, s.Skills.Enabled = false, false
+		s.Workers.DelegateModel = ""
+		s.Workers.DelegateReadTools = false
 	}
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
@@ -435,10 +450,6 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	defer deferredProvider.Close()
 	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: deferredProvider, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
-	configID, err := settingsConfigID(s)
-	if err != nil {
-		return result, ErrAdmission
-	}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()

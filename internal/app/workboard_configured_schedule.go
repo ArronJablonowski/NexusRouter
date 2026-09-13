@@ -62,11 +62,15 @@ func prepareConfiguredWorkboardSchedule(ctx context.Context, service *Service,
 	if err != nil {
 		return nil, ErrAdmission
 	}
+	evaluator, err := newConfiguredWorkboardCandidateEvaluator(store, reviewer)
+	if err != nil {
+		return nil, ErrAdmission
+	}
 	workerSupervisor, err := workers.New(service.settings.Workers.Max, heartbeat, lease, store, store)
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	runner, err := NewWorkboardWorkerRunner(workerSupervisor, store, reviewer, policyDigest, heartbeat, lease, now)
+	runner, err := NewWorkboardWorkerRunner(workerSupervisor, store, evaluator, policyDigest, heartbeat, lease, now)
 	if err != nil {
 		return nil, ErrAdmission
 	}
