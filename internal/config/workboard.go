@@ -52,11 +52,11 @@ func (s Settings) validateWorkboardSchedulerModels() error {
 	if !workerFound || !judge.Enabled || !reviewerFound || judge.MaxCost <= 0 || judge.MaxInputTokens <= 0 || judge.MaxOutputTokens <= 0 {
 		return errors.New("enabled workboard scheduler requires bounded worker and acceptance reviewer")
 	}
-	if !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
+	if !modelHasCapability(worker, "chat") || !modelAvailableInMode(worker, s.Mode) || worker.ContextTokens < 1 || worker.EstimatedCost == nil ||
 		!finite(*worker.EstimatedCost) || *worker.EstimatedCost < 0 || (worker.Locality != "local" && *worker.EstimatedCost == 0) {
 		return errors.New("workboard scheduler worker unavailable within configured limits")
 	}
-	if reviewer.Locality != "local" || !modelAvailableInMode(reviewer, s.Mode) || reviewer.ContextTokens < 1 || reviewer.EstimatedCost == nil ||
+	if !modelHasCapability(reviewer, "audit") || reviewer.Locality != "local" || !modelAvailableInMode(reviewer, s.Mode) || reviewer.ContextTokens < 1 || reviewer.EstimatedCost == nil ||
 		!finite(*reviewer.EstimatedCost) || *reviewer.EstimatedCost < 0 || *reviewer.EstimatedCost > maxWorkboardJudgeCost || *reviewer.EstimatedCost > judge.MaxCost {
 		return errors.New("workboard acceptance reviewer unavailable within configured limits")
 	}
@@ -86,6 +86,15 @@ func configuredModel(models []Model, alias string) (Model, bool) {
 		}
 	}
 	return Model{}, false
+}
+
+func modelHasCapability(model Model, capability string) bool {
+	for _, configured := range model.Capabilities {
+		if configured == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func modelAvailableInMode(model Model, mode string) bool {

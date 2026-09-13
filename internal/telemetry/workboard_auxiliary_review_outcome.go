@@ -51,41 +51,60 @@ func (s *Store) ReplayAuxiliaryReviewOutcome(ctx context.Context, operationID st
 		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, nil
 	}
 	settlement, settled, err := readAuxiliaryReviewSettlement(ctx, tx, admission.AdmissionID)
-	if err != nil || !settled || settlement.Disposition != workboard.AuxiliaryReviewCompleted ||
-		!outcomeMatchesAdmissionSettlement(outcome, admission, settlement) {
+	if err != nil || !settled {
 		if err == nil {
 			err = ErrWorkboardCorrupt
 		}
 		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, err
 	}
-	var auditTask string
-	var auditBody []byte
-	if err = tx.QueryRowContext(ctx, `SELECT task_id,body FROM audit_records WHERE id=?`, outcome.AuditID).Scan(&auditTask, &auditBody); err != nil {
+	if _, err = validateAuxiliaryReviewOutcomeGraph(ctx, tx, admission, settlement, outcome); err != nil {
 		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, err
-	}
-	audit, err := decodeAuditRecord(auditBody, outcome.AuditID, auditTask)
-	digest, digestErr := evaluation.AuditRecordDigest(audit)
-	if err != nil || digestErr != nil || digest != outcome.AuditDigest || !reviewAuditMatchesOutcome(audit, outcome, admission, settlement) {
-		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, ErrWorkboardCorrupt
-	}
-	if err = validateOutcomeRuntimeSource(ctx, tx, outcome); err != nil {
-		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, err
-	}
-	candidate, candidateErr := readEvaluationCandidate(ctx, tx, outcome.BoardID, outcome.CardID, outcome.AttemptID)
-	if candidateErr != nil || candidate.ID != outcome.CandidateID || candidate.Digest != outcome.CandidateDigest ||
-		candidate.CriteriaDigest != outcome.CriteriaDigest || candidate.PolicyDigest != outcome.PolicyDigest ||
-		candidate.EvidenceDigest != outcome.EvidenceDigest || candidate.EvidenceCount != outcome.EvidenceCount {
-		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, ErrWorkboardCorrupt
-	}
-	evidence, evidenceErr := readEvaluationEvidence(ctx, tx, outcome.BoardID, outcome.CardID, outcome.AttemptID, candidate)
-	if evidenceErr != nil || len(evidence) < outcome.EvidenceCount ||
-		workboard.EvidenceSetDigest(evidence[:outcome.EvidenceCount]) != outcome.EvidenceDigest {
-		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, ErrWorkboardCorrupt
 	}
 	if err = tx.Commit(); err != nil {
 		return workboard.AuxiliaryReviewOutcomeRecord{}, false, false, err
 	}
 	return outcome, true, false, nil
+}
+
+// validateAuxiliaryReviewOutcomeGraph re-derives successful review authority
+// from durable records. Callers must not acknowledge a replay from an outcome
+// row alone: the admission, settlement, audit, runtime source, candidate, and
+// evidence prefix are one immutable authority graph.
+func validateAuxiliaryReviewOutcomeGraph(ctx context.Context, tx *sql.Tx, admission workboard.AuxiliaryReviewAdmissionRecord,
+	settlement workboard.AuxiliaryReviewSettlementRecord, outcome workboard.AuxiliaryReviewOutcomeRecord,
+) (evaluation.AuditRecord, error) {
+	if settlement.Disposition != workboard.AuxiliaryReviewCompleted ||
+		!outcomeMatchesAdmissionSettlement(outcome, admission, settlement) {
+		return evaluation.AuditRecord{}, ErrWorkboardCorrupt
+	}
+	var auditTask string
+	var auditBody []byte
+	if err := tx.QueryRowContext(ctx, `SELECT task_id,body FROM audit_records WHERE id=?`, outcome.AuditID).Scan(&auditTask, &auditBody); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = ErrWorkboardCorrupt
+		}
+		return evaluation.AuditRecord{}, err
+	}
+	audit, err := decodeAuditRecord(auditBody, outcome.AuditID, auditTask)
+	digest, digestErr := evaluation.AuditRecordDigest(audit)
+	if err != nil || digestErr != nil || digest != outcome.AuditDigest || !reviewAuditMatchesOutcome(audit, outcome, admission, settlement) {
+		return evaluation.AuditRecord{}, ErrWorkboardCorrupt
+	}
+	if err = validateOutcomeRuntimeSource(ctx, tx, outcome); err != nil {
+		return evaluation.AuditRecord{}, err
+	}
+	candidate, candidateErr := readEvaluationCandidate(ctx, tx, outcome.BoardID, outcome.CardID, outcome.AttemptID)
+	if candidateErr != nil || candidate.ID != outcome.CandidateID || candidate.Digest != outcome.CandidateDigest ||
+		candidate.CriteriaDigest != outcome.CriteriaDigest || candidate.PolicyDigest != outcome.PolicyDigest ||
+		candidate.EvidenceDigest != outcome.EvidenceDigest || candidate.EvidenceCount != outcome.EvidenceCount {
+		return evaluation.AuditRecord{}, ErrWorkboardCorrupt
+	}
+	evidence, evidenceErr := readEvaluationEvidence(ctx, tx, outcome.BoardID, outcome.CardID, outcome.AttemptID, candidate)
+	if evidenceErr != nil || len(evidence) < outcome.EvidenceCount ||
+		workboard.EvidenceSetDigest(evidence[:outcome.EvidenceCount]) != outcome.EvidenceDigest {
+		return evaluation.AuditRecord{}, ErrWorkboardCorrupt
+	}
+	return audit, nil
 }
 
 func insertAuxiliaryReviewOutcomeTx(ctx context.Context, tx *sql.Tx, record workboard.AuxiliaryReviewOutcomeRecord) error {

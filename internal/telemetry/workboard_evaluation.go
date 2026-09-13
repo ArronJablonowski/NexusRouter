@@ -273,6 +273,14 @@ func (s *Store) ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx context.Cont
 			outcome.AuditID != audit.ID || outcome.ValidateBindings(frozen, admission, prior) != nil {
 			return empty(ErrConflict)
 		}
+		storedAudit, graphErr := validateAuxiliaryReviewOutcomeGraph(ctx, tx, admission, prior, outcome)
+		if graphErr != nil {
+			return empty(graphErr)
+		}
+		storedDigest, digestErr := evaluation.AuditRecordDigest(storedAudit)
+		if digestErr != nil || storedDigest != auditDigest {
+			return empty(ErrWorkboardCorrupt)
+		}
 		if err = tx.Commit(); err != nil {
 			return empty(err)
 		}

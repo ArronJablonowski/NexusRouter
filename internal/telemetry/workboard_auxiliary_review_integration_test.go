@@ -415,6 +415,28 @@ func TestEvaluationServiceAtomicallyCommitsBudgetedReviewAndCandidate(t *testing
 	if err != nil || replayedAtomic.OperationID != receipt.OperationID || replayedAtomic.ResponseDigest != receipt.ResponseDigest || replayedSettlement != settlement || replayedOutcome.AuditID == "" {
 		t.Fatalf("atomic replay receipt=%+v settlement=%+v err=%v", replayedAtomic, replayedSettlement, err)
 	}
+	if _, err = store.db.ExecContext(ctx, `UPDATE audit_records SET body=json_set(body,'$.ID','forged') WHERE id=?`, outcome.AuditID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("atomic replay trusted corrupt durable audit: %v", err)
+	}
+	if _, err = store.db.ExecContext(ctx, `UPDATE audit_records SET body=? WHERE id=?`, auditBody, outcome.AuditID); err != nil {
+		t.Fatal(err)
+	}
+	var sourceBody []byte
+	if err = store.db.QueryRowContext(ctx, `SELECT body FROM events WHERE id=?`, frozen.SourceCompletionEventID).Scan(&sourceBody); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.ExecContext(ctx, `UPDATE events SET body=CAST(body AS TEXT)||' ' WHERE id=?`, frozen.SourceCompletionEventID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements); !errors.Is(err, ErrWorkboardCorrupt) {
+		t.Fatalf("atomic replay trusted corrupt durable runtime source: %v", err)
+	}
+	if _, err = store.db.ExecContext(ctx, `UPDATE events SET body=? WHERE id=?`, sourceBody, frozen.SourceCompletionEventID); err != nil {
+		t.Fatal(err)
+	}
 	driftedTokens := int64(13)
 	measurements.Tokens = &driftedTokens
 	if _, _, _, err = store.ApplyEvaluationMutationAndSettleAuxiliaryReview(ctx, frozen, mutation, storedAudit, time.Now, operation, measurements); err == nil {

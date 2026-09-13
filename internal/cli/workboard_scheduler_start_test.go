@@ -22,7 +22,7 @@ func TestServeRejectsUnwiredWorkboardSchedulerBeforeStorageOrListen(t *testing.T
 	body := "daemon:\n  listen: \"" + address + "\"\n" +
 		"providers:\n  - id: local\n    kind: ollama\n    endpoint: http://127.0.0.1:11434\n" +
 		"models:\n  - id: worker\n    provider: local\n    model: worker-native\n    locality: local\n    capabilities: [chat]\n    context_tokens: 8192\n    estimated_cost: 0\n" +
-		"  - id: reviewer\n    provider: local\n    model: reviewer-native\n    locality: local\n    capabilities: [chat]\n    context_tokens: 8192\n    estimated_cost: 0\n" +
+		"  - id: reviewer\n    provider: local\n    model: reviewer-native\n    locality: local\n    capabilities: [chat, audit]\n    context_tokens: 8192\n    estimated_cost: 0\n" +
 		"evaluation:\n  llm_judge_enabled: true\nworkboard:\n  enabled: true\n  scheduler:\n    enabled: true\n    worker_model: worker\n" +
 		"    acceptance_judge:\n      enabled: true\n      reviewer_model: reviewer\n      max_cost: 0.01\n      max_input_tokens: 4096\n      max_output_tokens: 4096\n      timeout: 30s\n" +
 		"telemetry:\n  database: \"" + database + "\"\n"

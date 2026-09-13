@@ -49,6 +49,7 @@ func TestEnabledWorkboardSchedulerRequiresExplicitIndependentLocalJudge(t *testi
 		"unknown worker":         func(s *Settings) { s.Workboard.Scheduler.WorkerModel = "missing" },
 		"worker lacks context":   func(s *Settings) { s.Models[0].ContextTokens = 0 },
 		"worker lacks estimate":  func(s *Settings) { s.Models[0].EstimatedCost = nil },
+		"worker lacks chat":      func(s *Settings) { s.Models[0].Capabilities = []string{"reasoning"} },
 		"cloud worker zero cost": func(s *Settings) { *s.Models[0].EstimatedCost = 0 },
 		"judge disabled":         func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.Enabled = false },
 		"global judge disabled":  func(s *Settings) { s.Evaluation.Judge = false },
@@ -61,6 +62,7 @@ func TestEnabledWorkboardSchedulerRequiresExplicitIndependentLocalJudge(t *testi
 		"cloud reviewer":          func(s *Settings) { s.Models[1].Locality = "cloud" },
 		"reviewer lacks context":  func(s *Settings) { s.Models[1].ContextTokens = 0 },
 		"reviewer lacks estimate": func(s *Settings) { s.Models[1].EstimatedCost = nil },
+		"reviewer lacks audit":    func(s *Settings) { s.Models[1].Capabilities = []string{"chat"} },
 		"reviewer over budget":    func(s *Settings) { *s.Models[1].EstimatedCost = .26 },
 		"zero judge cost":         func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = 0 },
 		"negative judge cost":     func(s *Settings) { s.Workboard.Scheduler.AcceptanceJudge.MaxCost = -1 },
@@ -110,7 +112,7 @@ models:
     provider: local
     model: reviewer-native
     locality: local
-    capabilities: [chat]
+    capabilities: [chat, audit]
     context_tokens: 8192
     estimated_cost: 0
 workboard:
@@ -174,7 +176,7 @@ func validWorkboardSchedulerSettings() Settings {
 	}
 	s.Models = []Model{
 		{ID: "worker", Provider: "cloud", Model: "worker-native", Locality: "cloud", ContextTokens: 8192, EstimatedCost: &workerCost, Capabilities: []string{"chat"}},
-		{ID: "reviewer", Provider: "local", Model: "reviewer-native", Locality: "local", ContextTokens: 8192, EstimatedCost: &reviewerCost, Capabilities: []string{"chat"}},
+		{ID: "reviewer", Provider: "local", Model: "reviewer-native", Locality: "local", ContextTokens: 8192, EstimatedCost: &reviewerCost, Capabilities: []string{"chat", "audit"}},
 	}
 	s.Workboard.Scheduler.Enabled = true
 	s.Workboard.Scheduler.WorkerModel = "worker"
