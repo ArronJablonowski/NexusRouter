@@ -7137,6 +7137,22 @@ discovery after reopen, cross-page drift and bounds, slow-board fairness,
 same-board exclusion, distinct-board concurrency, cancellation cleanup,
 capacity cleanup, stall recovery, and joined shutdown.
 
-DAR-95 still needs configured real-store tests for competing scheduler
-instances, pre-existing healthy/stale/orphaned claims, and subprocess crash
-recovery. The production daemon enablement guard remains intact for DAR-96.
+DAR-95 is acceptance-ready. Two independent configured scheduler stacks and
+SQLite/WAL handles now contend from the same ready revision: both reach the
+real runner boundary, exactly one wins the durable claim CAS, exactly one
+worker and reviewer call occurs, and only one completed runtime task,
+candidate, attempt, and released claim survive. Clean close/reopen coverage
+also proves that pre-existing healthy, lease-expired, and terminal-task claims
+are re-derived as observed WIP without task construction, provider dispatch,
+or lifecycle/journal mutation across repeated restarts.
+
+A process-level SIGKILL qualification closes the crash boundary. A helper
+atomically commits `TaskStarted` with its Workboard claim, acknowledges that
+durable point, and is killed without deferred cleanup. A fresh SQLite handle
+re-derives the claim as lease-expired and stalled; the scheduler counts it as
+existing WIP, invokes neither factory nor runner, and leaves both the exact
+runtime journal and card lifecycle unchanged. Focused race runs cover the
+competing-owner, restart, and crash cases repeatedly. The production daemon
+enablement guard remains intentionally intact for DAR-96, whose scope is CLI
+composition plus process-level health, successful execution, joined SIGTERM
+shutdown, and restart qualification.
