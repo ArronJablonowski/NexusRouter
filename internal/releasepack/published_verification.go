@@ -24,7 +24,7 @@ type PublishedVerificationOptions struct {
 // PostPublicationVerificationPolicy identifies the exact verifier contract
 // enforced by this implementation. It is fixed by code rather than supplied by
 // an operator so a receipt cannot claim a different policy than the one run.
-const PostPublicationVerificationPolicy = "darwinrouter-github-post-publication-verification/v1"
+const PostPublicationVerificationPolicy = "darwinrouter-github-post-publication-verification/v2"
 
 // PostPublicationReceipt is canonical public evidence of one remote observation
 // and approval-bound verification. It is not a durability or future-state claim.
@@ -50,8 +50,23 @@ type PostPublicationReceipt struct {
 	ObservedAt                     string                     `json:"observed_at"`
 	VerifierID                     string                     `json:"verifier_id"`
 	VerificationPolicy             string                     `json:"verification_policy"`
+	ReleaseAttestation             PostPublicationAttestation `json:"release_attestation"`
 	Assets                         []PostPublicationAsset     `json:"assets"`
 	ApprovalVerification           ApprovedVerificationResult `json:"approval_verification"`
+}
+
+// PostPublicationAttestation binds the independently checked GitHub release
+// attestation and the exact local gh verifier used to check it.
+type PostPublicationAttestation struct {
+	VerifierVersion      string `json:"verifier_version"`
+	VerifierBinarySHA256 string `json:"verifier_binary_sha256"`
+	VerifiedResultSHA256 string `json:"verified_result_sha256"`
+	BundleSHA256         string `json:"bundle_sha256"`
+	Signer               string `json:"signer"`
+	Issuer               string `json:"issuer"`
+	PredicateType        string `json:"predicate_type"`
+	TimestampCount       int    `json:"timestamp_count"`
+	TagSubjectDigest     string `json:"tag_subject_digest"`
 }
 
 type PostPublicationAsset struct {
@@ -93,11 +108,13 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 		Assets: expectedAssets, DownloadDir: options.DownloadDir,
 		ForbiddenRoots: []string{options.Preflight.Verification.Source, options.Preflight.Verification.Dir},
 	})
+	attestation := postPublicationAttestation(observation.ReleaseAttestation)
 	if err != nil || !observation.Immutable || observation.Repository != preflight.Repository ||
 		observation.Tag != preflight.Tag || observation.Commit != preflight.SourceCommit ||
 		!commitPattern.MatchString(observation.TagObjectSHA) || observation.TagMessage != preflight.TagMessage ||
 		observation.Tagger != (githubverify.Tagger{Name: preflight.Tagger.Name, Email: preflight.Tagger.Email, Date: preflight.Tagger.Date}) ||
 		observation.Title != preflight.ReleaseTitle || observation.BodySHA256 != preflight.ReleaseNotesSHA256 ||
+		!validPostPublicationAttestation(attestation, observation.TagObjectSHA) ||
 		observation.Prerelease != preflight.Prerelease || len(observation.Assets) != len(preflight.Assets) {
 		return empty, ErrPublicationAuthorization
 	}
@@ -121,7 +138,7 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 		return empty, ErrPublicationAuthorization
 	}
 	receipt := PostPublicationReceipt{
-		SchemaVersion: 1, Scope: "darwinrouter-github-post-publication-verification",
+		SchemaVersion: 2, Scope: "darwinrouter-github-post-publication-verification",
 		PublicationAuthorizationSHA256: preflight.PublicationAuthorizationSHA256,
 		Repository:                     preflight.Repository, ReleaseVersion: preflight.ReleaseVersion,
 		ReleaseID: observation.ReleaseID, ReleaseURL: observation.ReleaseURL,
@@ -131,7 +148,7 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 		AuthorizedMakeLatest: preflight.MakeLatest, Immutable: true,
 		PublishedAt: observation.PublishedAt, ObservedAt: observation.ObservedAt,
 		VerifierID: options.VerifierID, VerificationPolicy: PostPublicationVerificationPolicy,
-		ApprovalVerification: verification,
+		ReleaseAttestation: attestation, ApprovalVerification: verification,
 	}
 	for _, asset := range observation.Assets {
 		receipt.Assets = append(receipt.Assets, PostPublicationAsset{
@@ -145,8 +162,17 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 	return receipt, nil
 }
 
+func postPublicationAttestation(attestation githubverify.ReleaseAttestationEvidence) PostPublicationAttestation {
+	return PostPublicationAttestation{
+		VerifierVersion: attestation.VerifierVersion, VerifierBinarySHA256: attestation.VerifierBinarySHA256,
+		VerifiedResultSHA256: attestation.VerifiedResultSHA256, BundleSHA256: attestation.BundleSHA256,
+		Signer: attestation.Signer, Issuer: attestation.Issuer, PredicateType: attestation.PredicateType,
+		TimestampCount: attestation.TimestampCount, TagSubjectDigest: attestation.TagSubjectDigest,
+	}
+}
+
 func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, error) {
-	if receipt.SchemaVersion != 1 || receipt.Scope != "darwinrouter-github-post-publication-verification" ||
+	if receipt.SchemaVersion != 2 || receipt.Scope != "darwinrouter-github-post-publication-verification" ||
 		!trustFingerprint(receipt.PublicationAuthorizationSHA256) || !githubRepository.MatchString(receipt.Repository) ||
 		receipt.ReleaseID < 1 || validate(Options{Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit, Out: "release"}) != nil ||
 		receipt.Tag != "v"+receipt.ReleaseVersion || !validGitHubReleaseURL(receipt.ReleaseURL, receipt.Repository, receipt.Tag) ||
@@ -155,7 +181,9 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		(receipt.Prerelease && receipt.AuthorizedMakeLatest) || receipt.Prerelease != strings.Contains(receipt.ReleaseVersion, "-") ||
 		!wholeSecondUTC(receipt.PublishedAt) || !wholeSecondUTC(receipt.ObservedAt) || len(receipt.Assets) != 7 ||
 		!observationAfterPublication(receipt.PublishedAt, receipt.ObservedAt) || !ValidPostPublicationVerifierID(receipt.VerifierID) ||
-		receipt.VerificationPolicy != PostPublicationVerificationPolicy || !validReceiptVerification(receipt.ApprovalVerification) {
+		receipt.VerificationPolicy != PostPublicationVerificationPolicy ||
+		!validPostPublicationAttestation(receipt.ReleaseAttestation, receipt.TagObjectSHA) ||
+		!validReceiptVerification(receipt.ApprovalVerification) {
 		return nil, ErrPublicationAuthorization
 	}
 	previous := ""
@@ -179,6 +207,15 @@ func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, erro
 		return nil, ErrPublicationAuthorization
 	}
 	return append(body, '\n'), nil
+}
+
+func validPostPublicationAttestation(attestation PostPublicationAttestation, tagObjectSHA string) bool {
+	return len(attestation.VerifierVersion) <= 100 && semver.MatchString(attestation.VerifierVersion) &&
+		trustFingerprint(attestation.VerifierBinarySHA256) && trustFingerprint(attestation.VerifiedResultSHA256) &&
+		trustFingerprint(attestation.BundleSHA256) && attestation.Signer == githubverify.ReleaseAttestationSigner &&
+		attestation.Issuer == githubverify.ReleaseAttestationIssuer && attestation.PredicateType == githubverify.ReleaseAttestationPredicateType &&
+		attestation.TimestampCount >= 1 && attestation.TimestampCount <= 1_000_000 &&
+		commitPattern.MatchString(tagObjectSHA) && attestation.TagSubjectDigest == "sha1:"+tagObjectSHA
 }
 
 // ValidPostPublicationVerifierID reports whether value is a bounded, canonical

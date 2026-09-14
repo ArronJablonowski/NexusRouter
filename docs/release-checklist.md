@@ -210,6 +210,12 @@ be omitted.
 - Independent re-download verification operator/time/result:
 - Canonical post-publication receipt location and SHA-256:
 - Post-publication receipt verifier identity, host and UTC verification time:
+- Reviewed GitHub CLI absolute resolved binary, version and independently
+  supplied SHA-256 source:
+- GitHub CLI authentication mode/account or public-access evidence (do not
+  record credentials):
+- GitHub release-attestation verified-result/bundle SHA-256, signer, issuer,
+  predicate, timestamp count and annotated-tag subject digest:
 - Public-key retrieval channel used for re-verification:
 - Installation smoke result from published bytes:
 - Canonical published-native install evidence location and SHA-256:
@@ -230,7 +236,15 @@ be omitted.
 - [ ] Published release notes, supported-target claims and public-key references
   match the approved records.
 - [ ] The canonical post-publication receipt binds the approved release, exact
-  downloaded bytes and independent verification inputs.
+  downloaded bytes, independent verification inputs, and exact GitHub release
+  attestation evidence.
+- [ ] The GitHub CLI is an operator-reviewed patched release at least 2.93.0;
+  its resolved regular nonsymlink executable matches a SHA-256 obtained through
+  an independent channel.
+- [ ] The attestation names the exact repository, tag, release ID, annotated-tag
+  object and seven authorized assets, uses the required GitHub signer and
+  Actions OIDC issuer and release predicate, and contains at least one verified
+  timestamp.
 - [ ] The host-matching archive was installed and executed from a fresh
   directory containing the exact receipt-bound downloaded byte set; its
   canonical evidence binds the completion time and observed binary

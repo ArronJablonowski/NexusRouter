@@ -36,9 +36,10 @@ type RoundTripper interface {
 }
 
 type Config struct {
-	APIBase   string
-	Transport RoundTripper
-	Now       func() time.Time
+	APIBase                    string
+	Transport                  RoundTripper
+	Now                        func() time.Time
+	ReleaseAttestationVerifier ReleaseAttestationVerifier
 }
 
 type ExpectedAsset struct {
@@ -69,22 +70,23 @@ type Tagger struct {
 }
 
 type Observation struct {
-	Repository   string
-	ReleaseID    int64
-	ReleaseURL   string
-	Tag          string
-	Commit       string
-	TagObjectSHA string
-	TagMessage   string
-	Tagger       Tagger
-	Title        string
-	BodySHA256   string
-	Prerelease   bool
-	Immutable    bool
-	PublishedAt  string
-	ObservedAt   string
-	Assets       []ObservedAsset
-	DownloadDir  string
+	Repository         string
+	ReleaseID          int64
+	ReleaseURL         string
+	Tag                string
+	Commit             string
+	TagObjectSHA       string
+	TagMessage         string
+	Tagger             Tagger
+	Title              string
+	BodySHA256         string
+	Prerelease         bool
+	Immutable          bool
+	PublishedAt        string
+	ObservedAt         string
+	Assets             []ObservedAsset
+	DownloadDir        string
+	ReleaseAttestation ReleaseAttestationEvidence
 }
 
 type ObservedAsset struct {
@@ -98,15 +100,16 @@ type ObservedAsset struct {
 }
 
 type Verifier struct {
-	api      *url.URL
-	metadata *http.Client
-	download *http.Client
-	now      func() time.Time
-	loopback bool
+	api         *url.URL
+	metadata    *http.Client
+	download    *http.Client
+	now         func() time.Time
+	loopback    bool
+	attestation ReleaseAttestationVerifier
 }
 
 func New(config Config) (*Verifier, error) {
-	if config.Transport == nil || config.Now == nil {
+	if config.Transport == nil || config.Now == nil || config.ReleaseAttestationVerifier == nil {
 		return nil, ErrVerify
 	}
 	api, loopback, err := endpoint(config.APIBase)
@@ -114,7 +117,7 @@ func New(config Config) (*Verifier, error) {
 		return nil, err
 	}
 	metadata := &http.Client{Transport: config.Transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	verifier := &Verifier{api: api, metadata: metadata, now: config.Now, loopback: loopback}
+	verifier := &Verifier{api: api, metadata: metadata, now: config.Now, loopback: loopback, attestation: config.ReleaseAttestationVerifier}
 	verifier.download = &http.Client{Transport: config.Transport, Timeout: 2 * time.Minute, CheckRedirect: verifier.checkRedirect}
 	return verifier, nil
 }
@@ -162,6 +165,13 @@ func (v *Verifier) Verify(ctx context.Context, input Plan) (Observation, error) 
 	if err != nil {
 		return empty, err
 	}
+	attestation, err := v.attestation.Verify(ctx, ReleaseAttestationPlan{
+		Repository: plan.Repository, Tag: plan.Tag, ReleaseID: release.ID,
+		TagObjectSHA: annotated.SHA, Assets: plan.Assets,
+	})
+	if err != nil || !validReleaseAttestationEvidence(attestation, annotated.SHA) {
+		return empty, ErrVerify
+	}
 	root, err := createDownloadRoot(plan.DownloadDir, plan.ForbiddenRoots)
 	if err != nil {
 		return empty, err
@@ -189,6 +199,7 @@ func (v *Verifier) Verify(ctx context.Context, input Plan) (Observation, error) 
 		Title: plan.Title, BodySHA256: digest(plan.Body),
 		Prerelease: plan.Prerelease, Immutable: true, PublishedAt: release.PublishedAt,
 		ObservedAt: v.now().UTC().Format("2006-01-02T15:04:05Z"), Assets: observed, DownloadDir: plan.DownloadDir,
+		ReleaseAttestation: attestation,
 	}, nil
 }
 

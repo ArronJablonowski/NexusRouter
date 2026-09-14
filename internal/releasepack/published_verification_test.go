@@ -20,13 +20,24 @@ func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
 		if err != nil || receipt.Repository != preflight.ExpectedRepository || !receipt.Immutable || len(receipt.Assets) != 7 {
 			t.Fatal("published release rejected", receipt, err)
 		}
+		wantAttestation := PostPublicationAttestation{
+			VerifierVersion: "2.98.0", VerifierBinarySHA256: testInstallDigest("8"),
+			VerifiedResultSHA256: testInstallDigest("9"), BundleSHA256: testInstallDigest("a"),
+			Signer: githubverify.ReleaseAttestationSigner, Issuer: githubverify.ReleaseAttestationIssuer,
+			PredicateType: githubverify.ReleaseAttestationPredicateType, TimestampCount: 1,
+			TagSubjectDigest: "sha1:" + receipt.TagObjectSHA,
+		}
+		if receipt.SchemaVersion != 2 || receipt.ReleaseAttestation != wantAttestation {
+			t.Fatal("release attestation was not bound", receipt.ReleaseAttestation)
+		}
 		body, err := MarshalPostPublicationReceipt(receipt)
 		if err != nil {
 			t.Fatal(err)
 		}
 		parsed, err := ParsePostPublicationReceipt(body)
 		if err != nil || parsed.PublicationAuthorizationSHA256 != preflight.ExpectedPublicationAuthorizationSHA256 ||
-			parsed.VerifierID != "idp:release-verifier" || parsed.VerificationPolicy != PostPublicationVerificationPolicy {
+			parsed.VerifierID != "idp:release-verifier" || parsed.VerificationPolicy != PostPublicationVerificationPolicy ||
+			parsed.ReleaseAttestation != wantAttestation {
 			t.Fatal("canonical receipt rejected", parsed, err)
 		}
 	})
@@ -39,6 +50,36 @@ func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
 			t.Fatal("replaced remote bytes accepted", result, err)
 		}
 	})
+}
+
+func TestVerifyPublishedReleaseRejectsMissingMalformedOrMismatchedAttestation(t *testing.T) {
+	preflight, signedDir := publishedFixture(t)
+	for name, mutate := range map[string]func(*githubverify.ReleaseAttestationEvidence){
+		"missing":          func(a *githubverify.ReleaseAttestationEvidence) { *a = githubverify.ReleaseAttestationEvidence{} },
+		"verifier_version": func(a *githubverify.ReleaseAttestationEvidence) { a.VerifierVersion = "gh current" },
+		"verifier_binary":  func(a *githubverify.ReleaseAttestationEvidence) { a.VerifierBinarySHA256 = "bad" },
+		"verified_result":  func(a *githubverify.ReleaseAttestationEvidence) { a.VerifiedResultSHA256 = "bad" },
+		"bundle":           func(a *githubverify.ReleaseAttestationEvidence) { a.BundleSHA256 = "bad" },
+		"signer":           func(a *githubverify.ReleaseAttestationEvidence) { a.Signer = "https://evil.example" },
+		"issuer":           func(a *githubverify.ReleaseAttestationEvidence) { a.Issuer = "invalid\nissuer" },
+		"predicate": func(a *githubverify.ReleaseAttestationEvidence) {
+			a.PredicateType = "https://example.invalid/predicate"
+		},
+		"timestamp_count": func(a *githubverify.ReleaseAttestationEvidence) { a.TimestampCount = 0 },
+		"tag_subject": func(a *githubverify.ReleaseAttestationEvidence) {
+			a.TagSubjectDigest = "sha1:" + strings.Repeat("d", 40)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reader := &fixtureReleaseReader{source: signedDir, mutateAttestation: mutate}
+			result, err := VerifyPublishedRelease(context.Background(), reader, PublishedVerificationOptions{
+				Preflight: preflight, DownloadDir: filepath.Join(t.TempDir(), "download"), VerifierID: "idp:release-verifier",
+			})
+			if err == nil || result.SchemaVersion != 0 {
+				t.Fatal("invalid release attestation accepted", result.ReleaseAttestation, err)
+			}
+		})
+	}
 }
 
 func TestPostPublicationReceiptRejectsNonGitHubEvidenceURL(t *testing.T) {
@@ -75,11 +116,28 @@ func TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity(t *t
 		t.Fatal(err)
 	}
 	for name, change := range map[string]func(*PostPublicationReceipt){
+		"schema": func(r *PostPublicationReceipt) { r.SchemaVersion = 1 },
+		"missing_attestation": func(r *PostPublicationReceipt) {
+			r.ReleaseAttestation = PostPublicationAttestation{}
+		},
 		"missing_verifier": func(r *PostPublicationReceipt) { r.VerifierID = "" },
 		"bad_verifier":     func(r *PostPublicationReceipt) { r.VerifierID = "INVALID VERIFIER" },
 		"missing_policy":   func(r *PostPublicationReceipt) { r.VerificationPolicy = "" },
 		"changed_policy": func(r *PostPublicationReceipt) {
-			r.VerificationPolicy = "darwinrouter-github-post-publication-verification/v2"
+			r.VerificationPolicy = "darwinrouter-github-post-publication-verification/v1"
+		},
+		"attestation_version": func(r *PostPublicationReceipt) { r.ReleaseAttestation.VerifierVersion = "gh current" },
+		"attestation_result":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.VerifiedResultSHA256 = "bad" },
+		"attestation_binary":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.VerifierBinarySHA256 = "bad" },
+		"attestation_bundle":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.BundleSHA256 = "bad" },
+		"attestation_signer":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.Signer = "https://evil.example" },
+		"attestation_issuer":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.Issuer = "bad\nissuer" },
+		"attestation_predicate": func(r *PostPublicationReceipt) {
+			r.ReleaseAttestation.PredicateType = "https://example.invalid/predicate"
+		},
+		"attestation_timestamp": func(r *PostPublicationReceipt) { r.ReleaseAttestation.TimestampCount = 0 },
+		"attestation_subject": func(r *PostPublicationReceipt) {
+			r.ReleaseAttestation.TagSubjectDigest = "sha1:" + strings.Repeat("e", 40)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -164,9 +222,10 @@ func publishedFixtureWithExecutable(t *testing.T, executableNative bool) (Public
 }
 
 type fixtureReleaseReader struct {
-	source           string
-	corruptAfterCopy bool
-	called           bool
+	source            string
+	corruptAfterCopy  bool
+	called            bool
+	mutateAttestation func(*githubverify.ReleaseAttestationEvidence)
 }
 
 func (f *fixtureReleaseReader) Verify(_ context.Context, plan githubverify.Plan) (githubverify.Observation, error) {
@@ -193,11 +252,21 @@ func (f *fixtureReleaseReader) Verify(_ context.Context, plan githubverify.Plan)
 			return githubverify.Observation{}, err
 		}
 	}
+	attestation := githubverify.ReleaseAttestationEvidence{
+		VerifierVersion: "2.98.0", VerifierBinarySHA256: testInstallDigest("8"),
+		VerifiedResultSHA256: testInstallDigest("9"), BundleSHA256: testInstallDigest("a"),
+		Signer: githubverify.ReleaseAttestationSigner, Issuer: githubverify.ReleaseAttestationIssuer,
+		PredicateType: githubverify.ReleaseAttestationPredicateType, TimestampCount: 1,
+		TagSubjectDigest: "sha1:" + strings.Repeat("c", 40),
+	}
+	if f.mutateAttestation != nil {
+		f.mutateAttestation(&attestation)
+	}
 	return githubverify.Observation{
 		Repository: plan.Repository, ReleaseID: 7, ReleaseURL: "https://github.com/" + plan.Repository + "/releases/tag/" + plan.Tag,
 		Tag: plan.Tag, Commit: plan.Commit, TagObjectSHA: strings.Repeat("c", 40), TagMessage: plan.TagMessage, Tagger: plan.Tagger,
 		Title: plan.Title, BodySHA256: publicationDigest(plan.Body),
 		Prerelease: plan.Prerelease, Immutable: true, PublishedAt: "2026-09-07T01:00:00Z",
-		ObservedAt: "2026-09-07T01:01:00Z", Assets: assets, DownloadDir: plan.DownloadDir,
+		ObservedAt: "2026-09-07T01:01:00Z", ReleaseAttestation: attestation, Assets: assets, DownloadDir: plan.DownloadDir,
 	}, nil
 }

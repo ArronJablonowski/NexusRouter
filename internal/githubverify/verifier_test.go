@@ -65,20 +65,36 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	verifier, err := New(Config{APIBase: server.URL, Transport: server.Client().Transport, Now: func() time.Time { return time.Date(2026, 9, 7, 1, 1, 0, 999, time.UTC) }})
+	attestor := &fixtureReleaseAttestor{}
+	verifier, err := New(Config{APIBase: server.URL, Transport: server.Client().Transport, Now: func() time.Time { return time.Date(2026, 9, 7, 1, 1, 0, 999, time.UTC) }, ReleaseAttestationVerifier: attestor})
 	if err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "fresh")
-	result, err := verifier.Verify(context.Background(), Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: tagger, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out})
+	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: tagger, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out}
+	result, err := verifier.Verify(context.Background(), plan)
 	if err != nil || !result.Immutable || result.ObservedAt != "2026-09-07T01:01:00Z" || len(result.Assets) != 7 {
 		t.Fatal("verification failed", result, err)
+	}
+	if !attestor.called || result.ReleaseAttestation.PredicateType != ReleaseAttestationPredicateType {
+		t.Fatal("release attestation was not retained")
 	}
 	for _, asset := range assets {
 		body, readErr := os.ReadFile(filepath.Join(out, asset.Name))
 		if readErr != nil || digest(body) != asset.SHA256 {
 			t.Fatal("fresh asset mismatch", asset.Name, readErr)
 		}
+	}
+	failing, err := New(Config{APIBase: server.URL, Transport: server.Client().Transport, Now: time.Now, ReleaseAttestationVerifier: &fixtureReleaseAttestor{err: ErrVerify}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.DownloadDir = filepath.Join(t.TempDir(), "must-not-exist")
+	if _, err = failing.Verify(context.Background(), plan); err != ErrVerify {
+		t.Fatal("attestation failure accepted", err)
+	}
+	if _, err = os.Lstat(plan.DownloadDir); !os.IsNotExist(err) {
+		t.Fatal("download root created before attestation verification", err)
 	}
 }
 
@@ -98,6 +114,12 @@ func TestVerifierRejectsRemoteDriftAndUnsafeOutput(t *testing.T) {
 	}
 	if _, _, err := endpoint("https://example.com"); err == nil {
 		t.Fatal("non-GitHub API accepted")
+	}
+}
+
+func TestNewRequiresReleaseAttestationVerifier(t *testing.T) {
+	if verifier, err := New(Config{APIBase: "https://api.github.com", Transport: rejectingTransport{}, Now: time.Now}); err != ErrVerify || verifier != nil {
+		t.Fatal("nil release attestation verifier accepted", verifier, err)
 	}
 }
 
@@ -166,7 +188,7 @@ func TestInitialDownloadURLBindsRepositoryTagAndAsset(t *testing.T) {
 }
 
 func TestRedirectPolicyRejectsUntrustedHosts(t *testing.T) {
-	verifier, err := New(Config{APIBase: "https://api.github.com", Transport: rejectingTransport{}, Now: time.Now})
+	verifier, err := New(Config{APIBase: "https://api.github.com", Transport: rejectingTransport{}, Now: time.Now, ReleaseAttestationVerifier: &fixtureReleaseAttestor{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,6 +235,24 @@ type rejectingTransport struct{}
 
 func (rejectingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("network disabled in test")
+}
+
+type fixtureReleaseAttestor struct {
+	called bool
+	err    error
+}
+
+func (f *fixtureReleaseAttestor) Verify(_ context.Context, plan ReleaseAttestationPlan) (ReleaseAttestationEvidence, error) {
+	f.called = true
+	if f.err != nil {
+		return ReleaseAttestationEvidence{}, f.err
+	}
+	return ReleaseAttestationEvidence{
+		VerifierVersion: MinimumReleaseAttestationVerifierVersion, VerifierBinarySHA256: "sha256:" + strings.Repeat("1", 64),
+		VerifiedResultSHA256: "sha256:" + strings.Repeat("2", 64), BundleSHA256: "sha256:" + strings.Repeat("3", 64),
+		Signer: ReleaseAttestationSigner, Issuer: ReleaseAttestationIssuer,
+		PredicateType: ReleaseAttestationPredicateType, TimestampCount: 1, TagSubjectDigest: "sha1:" + plan.TagObjectSHA,
+	}, nil
 }
 
 func writeJSON(t *testing.T, w http.ResponseWriter, value any) {

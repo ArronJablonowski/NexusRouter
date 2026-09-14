@@ -7514,3 +7514,22 @@ does not attest the host or hardware, prove independent key retrieval, approve
 the release, resolve the conflicting remote `v1.0.0` tag, publish artifacts, or
 replace the required second operator. DAR-55 therefore remains open until the
 production ceremony records that independent observation.
+
+## 2026-09-14 — DAR-60 GitHub release-attestation verification
+
+The production `verify-published-release` CLI now requires an explicitly
+resolved GitHub CLI executable and independently established executable digest.
+The command-backed verifier accepts only a stable GitHub CLI version at least
+2.93.0 and checks `gh release verify` evidence against the already observed
+repository, annotated tag object, release ID and exact seven authorized assets.
+The canonical schema-2 post-publication receipt retains bounded hashes and
+public attestation identity rather than raw bundles, statements, command output,
+paths, authentication configuration or credentials. CLI failures remain generic.
+
+This is read-only verification of GitHub's release attestation plus the existing
+approval-bound byte verification. The minimum CLI version is not a substitute
+for operator review of the currently patched release. GitHub authentication,
+binary provenance, verifier-host evidence and independent receipt retention
+remain operator responsibilities; the evidence is not hardware provenance,
+workflow attestation, vulnerability scanning, legal approval or publication
+authority.
