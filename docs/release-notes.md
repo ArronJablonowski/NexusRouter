@@ -2,8 +2,8 @@
 
 This is a development summary, not a completed v1.0.0 release announcement. The
 deterministic testable-MVP gate passes and 41 of the original 42 MVP issues are
-complete, but DAR-46 remains open. The Web UI/Kanban implementation is complete;
-DAR-87 release qualification and operator approval remain open. A premature annotated `v1.0.0` tag was pushed
+complete, but DAR-46 remains open. The Web UI/Kanban implementation and DAR-87
+release qualification are complete; final release approval remains open. A premature annotated `v1.0.0` tag was pushed
 outside the guarded publisher and is quarantined; no GitHub Release, signed
 production assets, supported-platform decision or canonical publication
 approval is claimed.
@@ -512,7 +512,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 43. Schema 30 added the immutable
+The current durable store uses SQLite schema 45. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -537,7 +537,13 @@ successors. Schema 41 atomically binds the first runtime event to the Workboard
 claim, and schema 42 adds immutable execution admission and settlement records
 for time, token, cost, route, configuration, and WIP budgets. Schema 43 adds
 immutable card-owned auxiliary-review admissions and settlements bound to the
-candidate, reviewer, configuration, and time/output-token/cost ceilings. Browser sessions
+candidate, reviewer, configuration, and time/output-token/cost ceilings. Schema
+44 adds immutable successor-completion fences for newly admitted
+auxiliary reviews and migration-seals older admissions rather than inventing
+revision authority. Schema 45 binds a successful auxiliary review to its exact
+candidate, runtime result, audit, evidence set, and settlement; older admissions
+remain migration-sealed and cannot acquire outcome authority retroactively.
+Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
 backup, and restore. Schema-34 migration validates exact table shape and rules

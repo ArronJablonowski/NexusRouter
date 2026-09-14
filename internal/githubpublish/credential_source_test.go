@@ -26,10 +26,35 @@ func TestFDCredentialSourceReadsPrivateSingleUseToken(t *testing.T) {
 	if err != nil || string(credential.Token) != "github_pat_operator-secret" || !credential.ContentsWrite || !credential.AdministrationRead {
 		t.Fatal("credential source rejected valid bounded input")
 	}
+	if _, err = read.Stat(); err != nil {
+		t.Fatal("credential consumption closed caller descriptor", err)
+	}
 	clear(credential.Token)
 	if _, err = source.GitHubCredential(t.Context()); !errors.Is(err, ErrCredentialTransport) || strings.Contains(err.Error(), "operator-secret") {
 		t.Fatal("credential source was reusable or leaked input", err)
 	}
+}
+
+func TestFDCredentialSourceOwnsDuplicateNotCallerDescriptor(t *testing.T) {
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := NewFDCredentialSource(int(read.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = read.Close(); err != nil {
+		t.Fatal("constructor closed caller descriptor", err)
+	}
+	if _, err = write.WriteString("github_pat_duplicate-owner\n"); err != nil || write.Close() != nil {
+		t.Fatal(err)
+	}
+	credential, err := source.GitHubCredential(t.Context())
+	if err != nil || string(credential.Token) != "github_pat_duplicate-owner" {
+		t.Fatal("owned duplicate did not survive caller close", err)
+	}
+	clear(credential.Token)
 }
 
 func TestFDCredentialSourceRejectsUnsafeInput(t *testing.T) {
@@ -70,6 +95,9 @@ func TestFDCredentialSourceRejectsCanceledAndPublicRegularFile(t *testing.T) {
 	defer file.Close()
 	if _, err = NewFDCredentialSource(int(file.Fd())); !errors.Is(err, ErrCredentialTransport) {
 		t.Fatal("public regular credential file accepted", err)
+	}
+	if _, err = file.Stat(); err != nil {
+		t.Fatal("constructor rejection closed caller descriptor", err)
 	}
 
 	read, write, err := os.Pipe()
@@ -146,5 +174,8 @@ func TestFDCredentialSourceRejectsCharacterDevice(t *testing.T) {
 	}
 	if _, err = NewFDCredentialSource(int(device.Fd())); !errors.Is(err, ErrCredentialTransport) {
 		t.Fatal("character-device credential input accepted", err)
+	}
+	if _, err = device.Stat(); err != nil {
+		t.Fatal("constructor rejection closed caller descriptor", err)
 	}
 }

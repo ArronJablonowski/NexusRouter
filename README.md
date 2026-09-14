@@ -31,9 +31,9 @@ alongside the candidate, checksum set, authorization, active trust record, key
 identity and clean source checkout.
 The deterministic testable-MVP
 gate passes and 41 of the original 42 MVP issues are complete. DAR-46 remains
-open. The Web UI/Kanban implementation and deterministic browser qualification
-are complete; DAR-87 release qualification remains pending against the new
-schema-2 candidate, schema-3 manifest, and seven-member archive contract.
+open. The Web UI/Kanban implementation, deterministic browser qualification,
+and DAR-87 release packaging qualification are complete against the schema-2
+candidate, schema-3 manifest, and seven-member archive contract.
 No release has been published, and
 dependency-notice review, supported platforms, production signing trust, release approval
 and publication authority remain operator gates.
@@ -129,14 +129,15 @@ usage and actual elapsed time are charged, ambiguous measurements consume the
 reservation, and an over-budget successful run cannot enter Review. Budgeted
 HTTP providers receive a hard output-token ceiling that shrinks across tool
 turns; an adapter that cannot prove enforcement is rejected. Configured
-independent acceptance-review dispatch, stock-daemon composition, and broader
-crash/lease/acceptance qualification remain open before DAR-85 can be marked
-Done. Schema 40
+independent acceptance-review dispatch, stock-daemon composition, and
+crash/lease/acceptance qualification are implemented and acceptance-ready
+through the decomposed DAR-91 through DAR-96 sprints. Schema 40
 now binds each proof-gated recovery to its exact replacement attempt and claim
 inside the replacement claim transaction; recovery clears the predecessor's
 worker assignment so a distinct worker can claim the Ready card. The lineage
 is immutable, restart-safe, exposed in bounded attempt reads, and cannot be
-supplied by a client or model. Release-wide browser qualification remains DAR-86.
+supplied by a client or model. The release-wide DAR-86 browser qualification is
+complete with the explicit compatibility limits documented below.
 Authoritative refetches now
 preserve a validated keyboard-focus identity across same-board and superseding
 refreshes, restoring the exact replacement control, its card toggle, or the

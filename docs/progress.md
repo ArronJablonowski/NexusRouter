@@ -7307,3 +7307,51 @@ seconds, `internal/telemetry` at 1188.211 seconds, `sdk/v1` at 131.895 seconds,
 `internal/webuiapp` at 5.163 seconds and `webui` at 7.774 seconds. DAR-86 is
 acceptance-ready; no Linear state or comment is changed without operator
 confirmation.
+
+## 2026-09-13 — DAR-64 credential ownership and release-contract audit
+
+An independent adversarial release audit reproduced a descriptor-ownership
+fault in the production GitHub publication credential source. The constructor
+created a second `os.File` owner over the caller's raw descriptor and later
+closed it; if the caller also closed its owner, descriptor-number reuse could
+turn the delayed close into corruption of an unrelated journal or temporary
+file. Repeated race tests produced `bad file descriptor` and broken-pipe
+failures. The source now atomically duplicates the supplied descriptor with
+`F_DUPFD_CLOEXEC`, owns only the duplicate, and never closes the caller's
+descriptor, including constructor rejection paths. Tests prove caller-close
+independence and retained caller ownership after rejection. Cancellation sets
+an immediate read deadline before closing the owned duplicate so a pipe or
+socket read cannot remain blocked while the caller intentionally retains its
+descriptor.
+
+The same audit found authenticated release collateral that still described a
+six-member archive and schemas 32, 33, or 43 after the seven-member SPDX archive
+and schema 45 migrations. The operator rehearsal, rollback-readiness guide, and
+release notes now state the exact current contract and describe schema-44/45
+authority. A releasepack regression test binds those statements to
+`stateschema.Current` and the seven-entry archive language so a future migration
+cannot silently leave candidate collateral stale. README status now reflects
+the completed DAR-85 decomposition and DAR-86/DAR-87 qualification work.
+
+The original failure reproducer passed 200 credential-source race repetitions
+and 20 complete `internal/githubpublish` race repetitions. Focused publisher and
+releasepack race tests passed, as did Linux/amd64 compile-only verification. A
+clean version/commit-bound `make qualify-release` for unreleased
+`1.0.0-rc.11` at `7d773f05cfd306b82525c6ac3d59a7deec514f1a` passed the expanded MVP gate,
+two byte-identical four-target build sets, exact embedded Web UI asset checks,
+SPDX collateral, disposable signing/verification, tamper rejection, and native
+schema-29-to-45 install/backup/rollback rehearsal. It created no tag, production
+signature, publication, or operator approval.
+
+The complete serialized repository gate passed formatting/LOC, `go vet`, every
+race-enabled package, and `go build ./...` after the ownership and documentation
+fix. Changed or longest boundaries included `internal/githubpublish` at 3.455
+seconds, `internal/app` at 1141.153 seconds, `internal/releasepack` at 535.139
+seconds, `internal/telemetry` at 1215.430 seconds, `sdk/v1` at 132.400 seconds,
+and `workers` at 20.647 seconds. A follow-on 100-repeat stress run exposed the
+pipe-cancellation edge and led to the deadline addition. The final exact tree
+then passed 200 credential-source and 20 full publisher race repetitions,
+affected-package vet and race tests, source/LOC checks, the documentation
+contract, and native plus Linux/amd64 builds. DAR-64 is code-complete but retains
+its production credential/publication gates; no Linear mutation is claimed
+without operator confirmation.

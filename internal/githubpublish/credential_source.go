@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 )
 
 // FDCredentialSource reads one GitHub release credential from an already-open
@@ -19,15 +20,21 @@ type FDCredentialSource struct {
 	used bool
 }
 
-// NewFDCredentialSource constructs a release-publisher credential source and
-// takes ownership of the descriptor. Reading and closing are deferred until the
-// publisher has completed its approval-bound offline preflight.
+// NewFDCredentialSource constructs a release-publisher credential source. It
+// duplicates the supplied descriptor and owns only that duplicate; the caller
+// retains ownership of fd. Reading and closing the duplicate are deferred until
+// the publisher has completed its approval-bound offline preflight.
 func NewFDCredentialSource(fd int) (*FDCredentialSource, error) {
 	if fd < 0 {
 		return nil, ErrCredentialTransport
 	}
-	file := os.NewFile(uintptr(fd), "darwinrouter-github-credential")
+	ownedFD, err := duplicateCredentialDescriptor(fd)
+	if err != nil {
+		return nil, ErrCredentialTransport
+	}
+	file := os.NewFile(uintptr(ownedFD), "darwinrouter-github-credential")
 	if file == nil {
+		closeCredentialDescriptor(ownedFD)
 		return nil, ErrCredentialTransport
 	}
 	info, err := file.Stat()
@@ -98,6 +105,7 @@ func readCredential(ctx context.Context, file *os.File) ([]byte, error) {
 	case value := <-done:
 		return value.body, value.err
 	case <-ctx.Done():
+		_ = file.SetReadDeadline(time.Now())
 		_ = file.Close()
 		value := <-done
 		clear(value.body)
