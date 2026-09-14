@@ -7373,3 +7373,42 @@ record against the clean checkout. Both records live outside the source tree.
 They are reproducible mechanical evidence only: all target decisions remain
 `unapproved`, and no human legal review, production key, signature, tag, hosted
 qualification, publication authorization, upload, or GitHub Release is claimed.
+
+## 2026-09-13 — DAR-49/DAR-52 RC12 local qualification evidence
+
+The exact clean RC12 checkout at
+`2086d4902f2074da5a28165908cada605740dc06` passed the release-packaging
+qualification for `1.0.0-rc.12` in 196.16 seconds. Two isolated builds produced
+byte-identical four-target artifact sets; all four executable formats, the
+seven-member archives, embedded Web UI digests, target-specific SBOMs and
+dependency notices verified. The disposable-key signing and approval-bound
+verification paths passed, the native Darwin/arm64 archive reported the exact
+version, and tampering was rejected. A separate current-main deterministic MVP
+run also passed before its deliberately mismatched release commit was rejected;
+the release gate was then rerun from the exact candidate checkout rather than
+weakening the commit fence.
+
+A second exact-candidate run retained the canonical Darwin/arm64 installation,
+migration, backup and rollback rehearsal outside the checkout. Its canonical
+record SHA-256 is
+`95d3b8e2f9825f1b3d07f9b42e956360621b14ba89cb6bf93830b96b77309dbb`;
+the bounded transcript SHA-256 is
+`f9b366efe7b98d03a946e9757096e22302d36100f6be60237884785d75e5733b`.
+Independent verification produced SHA-256
+`dd3dfc15a100164f8f692a897ee0cc428b7963a475b747351aea6d3765a4c91e`
+and accepted archive SHA-256
+`8be0a79b856a843884b2f0f5689d3c32728db627bc64f9ee1ce8bd93bfe6991a`,
+immutable backup SHA-256
+`5d02002eb6c9968f5b3cf9a4f4ac55d8ca8e13dfcaeb954b22d69f45dacf19c7`,
+source schema 29, migrated schema 45 and rollback schema 29.
+
+This closes DAR-49's current seven-member local packaging evidence gap and
+replaces DAR-52's stale RC11 rehearsal with current RC12 evidence. It remains
+one local Darwin/arm64 execution, not approval of the supported target matrix or
+the release. Hosted Ubuntu/macOS runs, the other native targets, human legal and
+notices review, production signing, publication authorization, and independent
+post-publication verification remain open. The remote also contains a
+quarantined annotated `v1.0.0` tag that peels to the older
+`ca07106cae194a5f02226f1e40fef0348d70f59d`; the create-only publisher must
+continue to fail closed until an operator explicitly resolves that conflicting
+remote identity.
