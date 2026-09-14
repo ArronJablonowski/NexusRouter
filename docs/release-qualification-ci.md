@@ -44,8 +44,10 @@ cross-build evidence, not native execution evidence. Four-target support
 requires four successful job summaries and four retained native evidence bundles
 for the exact version and commit. Each bundle contains the primary native
 record, canonical install-rehearsal record, bounded transcript, and canonical
-in-job verification result. The summary identifies failures and skipped gates;
-neither qualifies a release.
+install-only and combined native/install verification results. The combined
+result is produced by the offline `verify-native-release-evidence` command from
+separately computed record digests and public identity expectations. The
+summary identifies failures and skipped gates; neither qualifies a release.
 
 Each SBOM is checked against its exact binary digest, target dependency and Go
 toolchain closure, and the clean commit's first-party Web UI source hashes. The
@@ -60,8 +62,8 @@ persistence and Go cache uploads, forces the installed toolchain with
 experiment settings, disables cgo, and fixes the documented amd64/arm64
 architecture baselines. A pinned `actions/upload-artifact` step runs only after
 successful native qualification and retains both canonical JSON records, the
-bounded gate transcript, and the in-job verification result for 30 days. It
-does not upload release archives or publication assets. Test-generated archives,
+bounded gate transcript, and both verification results for 30 days. It does not
+upload release archives or publication assets. Test-generated archives,
 installation, database, backup, rollback copy and keys remain disposable
 runner-local files.
 It does not use the repository SSH key, production signing secrets or live model
@@ -77,10 +79,16 @@ the schema-2 primary native record. The job computes the companion-record digest
 checks those bindings, derives the expected archive name independently from the
 dispatched version and asserted native target, and runs
 `verify-install-rehearsal` with the observed archive/backup digests and fixed
-schema boundary. This catches truncation, noncanonical data, internal mismatch,
-and workflow plumbing errors. It is same-job verification, not independent
-operator approval. A later reviewer must retrieve the bundle, obtain its digests
-through the external evidence channel, and repeat verification before approval.
+schema boundary. It then runs `verify-native-release-evidence` over both retained
+records, binding their independently computed record digests to the checked
+version, commit, observed target, Go version, archive, schemas, and backup. This
+catches truncation, noncanonical data, cross-record mismatch, and workflow
+plumbing errors. It is same-job byte and identity verification, not independent
+operator approval. It does not authenticate the transcript, prove physical
+hardware or virtualization provenance, or attest that the recorded operations
+occurred. A later reviewer must retrieve the bundle, obtain its digests and
+expectations through the external evidence channel, and repeat the offline
+verification before approval.
 
 Standard hosted runners consume included Actions minutes for private
 repositories and may incur metered charges afterward; see GitHub's current

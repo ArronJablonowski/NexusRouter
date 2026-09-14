@@ -3,7 +3,10 @@ package releasepack
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +21,8 @@ const (
 	nativeEvidenceSchema = 1
 	maxNativeEvidence    = 32 << 10
 )
+
+var ErrNativeEvidenceVerification = errors.New("native evidence verification failed")
 
 // NativeEvidence is one host's canonical qualification result. It deliberately
 // has no field capable of claiming that another target was executed.
@@ -55,6 +60,51 @@ type NativeEvidenceGo struct {
 type NativeEvidenceGate struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
+}
+
+// NativeEvidenceExpectations must come from a channel independent of the
+// retained native evidence bundle. Every identity and digest needed to bind a
+// schema-2 native record to its install-rehearsal companion is explicit.
+type NativeEvidenceExpectations struct {
+	RecordSHA256                 string
+	InstallRehearsalRecordSHA256 string
+	Version                      string
+	Commit                       string
+	TargetOS                     string
+	TargetArch                   string
+	GoVersion                    string
+	ArtifactName                 string
+	ArtifactSHA256               string
+	SourceSchema                 int
+	CurrentSchema                int
+	BackupSHA256                 string
+}
+
+// Validate rejects incomplete or internally inconsistent external
+// expectations before either retained record is read.
+func (e NativeEvidenceExpectations) Validate() error {
+	if !validNativeEvidenceExpectations(e) {
+		return ErrNativeEvidenceVerification
+	}
+	return nil
+}
+
+// NativeEvidenceVerification is the path-free result of verifying both exact
+// canonical records in a native evidence bundle.
+type NativeEvidenceVerification struct {
+	RecordSHA256                 string `json:"record_sha256"`
+	InstallRehearsalRecordSHA256 string `json:"install_rehearsal_record_sha256"`
+	ReleaseVersion               string `json:"release_version"`
+	SourceCommit                 string `json:"source_commit"`
+	TargetOS                     string `json:"target_os"`
+	TargetArch                   string `json:"target_arch"`
+	GOVersion                    string `json:"go_version"`
+	ArtifactName                 string `json:"artifact_name"`
+	ArtifactSHA256               string `json:"artifact_sha256"`
+	SourceSchema                 int    `json:"source_schema"`
+	CurrentSchema                int    `json:"current_schema"`
+	BackupSHA256                 string `json:"backup_sha256"`
+	RollbackSchema               int    `json:"rollback_schema"`
 }
 
 var nativeEvidenceGates = []NativeEvidenceGate{
@@ -196,24 +246,99 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 // VerifyNativeEvidence validates exact canonical bytes. The unsigned record is
 // retained evidence, not an independent attestation of the commands it names.
 func VerifyNativeEvidence(path string) error {
+	body, err := readNativeEvidence(path)
+	if err != nil {
+		return ErrInvalid
+	}
+	return validateNativeEvidence(body)
+}
+
+// VerifyNativeEvidenceAgainst verifies a complete schema-2 native evidence
+// bundle without consulting the source checkout, a build tool, or the network.
+// The primary and companion record digests and all release, target, toolchain,
+// artifact, and schema identities are compared with independent expectations.
+func VerifyNativeEvidenceAgainst(nativePath, installRehearsalPath string, expected NativeEvidenceExpectations) (NativeEvidenceVerification, error) {
+	var result NativeEvidenceVerification
+	if !validNativeEvidenceExpectations(expected) {
+		return result, ErrNativeEvidenceVerification
+	}
+	body, err := readNativeEvidence(nativePath)
+	if err != nil || nativeEvidenceDigest(body) != expected.RecordSHA256 {
+		return result, ErrNativeEvidenceVerification
+	}
+	var record NativeEvidence
+	if validateNativeEvidence(body) != nil || json.Unmarshal(body, &record) != nil || record.SchemaVersion != 2 || record.InstallRehearsal == nil {
+		return result, ErrNativeEvidenceVerification
+	}
+	binding := record.InstallRehearsal
+	if record.ReleaseVersion != expected.Version || record.SourceCommit != expected.Commit ||
+		record.Target.OS != expected.TargetOS || record.Target.Arch != expected.TargetArch || record.Toolchain.GOVERSION != expected.GoVersion ||
+		binding.RecordSHA256 != expected.InstallRehearsalRecordSHA256 || binding.ArtifactName != expected.ArtifactName ||
+		binding.ArtifactSHA256 != expected.ArtifactSHA256 || binding.SourceSchema != expected.SourceSchema ||
+		binding.CurrentSchema != expected.CurrentSchema || binding.BackupSHA256 != expected.BackupSHA256 {
+		return result, ErrNativeEvidenceVerification
+	}
+	companion, err := VerifyInstallRehearsalEvidence(installRehearsalPath, InstallRehearsalExpectations{
+		RecordSHA256: expected.InstallRehearsalRecordSHA256,
+		Version:      expected.Version, Commit: expected.Commit,
+		TargetOS: expected.TargetOS, TargetArch: expected.TargetArch,
+		ArtifactName: expected.ArtifactName, ArtifactSHA256: expected.ArtifactSHA256,
+		SourceSchema: expected.SourceSchema, CurrentSchema: expected.CurrentSchema,
+		BackupSHA256: expected.BackupSHA256,
+	})
+	if err != nil {
+		return result, ErrNativeEvidenceVerification
+	}
+	return NativeEvidenceVerification{
+		RecordSHA256: expected.RecordSHA256, InstallRehearsalRecordSHA256: companion.RecordSHA256,
+		ReleaseVersion: record.ReleaseVersion, SourceCommit: record.SourceCommit,
+		TargetOS: record.Target.OS, TargetArch: record.Target.Arch, GOVersion: record.Toolchain.GOVERSION,
+		ArtifactName: companion.ArtifactName, ArtifactSHA256: companion.ArtifactSHA256,
+		SourceSchema: companion.SourceSchema, CurrentSchema: companion.CurrentSchema, BackupSHA256: companion.BackupSHA256,
+		RollbackSchema: companion.RollbackSchema,
+	}, nil
+}
+
+func validNativeEvidenceExpectations(e NativeEvidenceExpectations) bool {
+	expectedArtifactName := "DarwinRouter_" + e.Version + "_" + e.TargetOS + "_" + e.TargetArch + ".tar.gz"
+	if !validInstallDigest(e.RecordSHA256) || !validInstallDigest(e.InstallRehearsalRecordSHA256) ||
+		validate(Options{Version: e.Version, Commit: e.Commit, Out: "evidence"}) != nil ||
+		validateNativeGo(nativeGoEnvironment{GOOS: e.TargetOS, GOARCH: e.TargetArch, GOHOSTOS: e.TargetOS, GOHOSTARCH: e.TargetArch, GOVERSION: e.GoVersion}) != nil ||
+		e.ArtifactName != expectedArtifactName {
+		return false
+	}
+	return validInstallExpectations(InstallRehearsalExpectations{
+		RecordSHA256: e.InstallRehearsalRecordSHA256,
+		Version:      e.Version, Commit: e.Commit, TargetOS: e.TargetOS, TargetArch: e.TargetArch,
+		ArtifactName: e.ArtifactName, ArtifactSHA256: e.ArtifactSHA256,
+		SourceSchema: e.SourceSchema, CurrentSchema: e.CurrentSchema, BackupSHA256: e.BackupSHA256,
+	})
+}
+
+func readNativeEvidence(path string) ([]byte, error) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > maxNativeEvidence {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	defer f.Close()
 	actual, err := f.Stat()
 	if err != nil || !actual.Mode().IsRegular() || !os.SameFile(info, actual) || actual.Size() != info.Size() {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	body, err := io.ReadAll(io.LimitReader(f, maxNativeEvidence+1))
 	if err != nil || int64(len(body)) != actual.Size() {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
-	return validateNativeEvidence(body)
+	return body, nil
+}
+
+func nativeEvidenceDigest(body []byte) string {
+	digest := sha256.Sum256(body)
+	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
 func validateNativeEvidence(body []byte) error {

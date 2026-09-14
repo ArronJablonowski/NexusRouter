@@ -137,12 +137,14 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           EXPECTED_NATIVE_OS: ${{ matrix.expected_os }}
           EXPECTED_NATIVE_ARCH: ${{ matrix.expected_arch }}
+          EXPECTED_GO_VERSION: ${{ steps.source.outputs.go }}
         run: |
           set -euo pipefail
           umask 077
           record="$RUNNER_TEMP/native-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.json"
           install_record="$RUNNER_TEMP/install-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.json"
           install_verification="$RUNNER_TEMP/install-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}-verification.json"
+          native_verification="$RUNNER_TEMP/native-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}-verification.json"
           transcript="$RUNNER_TEMP/native-${EXPECTED_NATIVE_OS}-${EXPECTED_NATIVE_ARCH}.log"
           go run ./cmd/native-release-evidence \
             --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --source . --out "$record" \
@@ -178,13 +180,26 @@ jobs:
             --source-schema "$source_schema" --current-schema "$current_schema" \
             --backup-sha256 "$backup_sha256" > "$install_verification"
           install_verification_sha256="sha256:$(shasum -a 256 "$install_verification" | awk '{print $1}')"
+          go run ./cmd/verify-native-release-evidence \
+            --record "$record" --record-sha256 "$record_sha256" \
+            --install-rehearsal-record "$install_record" \
+            --install-rehearsal-record-sha256 "$install_record_sha256" \
+            --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" \
+            --target-os "$EXPECTED_NATIVE_OS" --target-arch "$EXPECTED_NATIVE_ARCH" \
+            --go-version "$EXPECTED_GO_VERSION" \
+            --artifact "$artifact_name" --artifact-sha256 "$artifact_sha256" \
+            --source-schema "$source_schema" --current-schema "$current_schema" \
+            --backup-sha256 "$backup_sha256" > "$native_verification"
+          native_verification_sha256="sha256:$(shasum -a 256 "$native_verification" | awk '{print $1}')"
           test "$(wc -c < "$record" | tr -d ' ')" -le 32768
           test "$(wc -c < "$install_record" | tr -d ' ')" -le 32768
           test "$(wc -c < "$install_verification" | tr -d ' ')" -le 32768
+          test "$(wc -c < "$native_verification" | tr -d ' ')" -le 32768
           test "$(wc -c < "$transcript" | tr -d ' ')" -le 2099200
           echo "record_sha256=$record_sha256" >> "$GITHUB_OUTPUT"
           echo "install_record_sha256=$install_record_sha256" >> "$GITHUB_OUTPUT"
           echo "install_verification_sha256=$install_verification_sha256" >> "$GITHUB_OUTPUT"
+          echo "native_verification_sha256=$native_verification_sha256" >> "$GITHUB_OUTPUT"
           echo "artifact_sha256=$artifact_sha256" >> "$GITHUB_OUTPUT"
           echo "backup_sha256=$backup_sha256" >> "$GITHUB_OUTPUT"
           echo "transcript_sha256=$transcript_sha256" >> "$GITHUB_OUTPUT"
@@ -196,6 +211,7 @@ jobs:
           path: |
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.log
+            ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-verification.json
             ${{ runner.temp }}/install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json
             ${{ runner.temp }}/install-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-verification.json
           if-no-files-found: error
@@ -228,6 +244,7 @@ jobs:
           NATIVE_RECORD_SHA256: ${{ steps.native_evidence.outputs.record_sha256 }}
           INSTALL_RECORD_SHA256: ${{ steps.native_evidence.outputs.install_record_sha256 }}
           INSTALL_VERIFICATION_SHA256: ${{ steps.native_evidence.outputs.install_verification_sha256 }}
+          NATIVE_VERIFICATION_SHA256: ${{ steps.native_evidence.outputs.native_verification_sha256 }}
           INSTALL_ARTIFACT_SHA256: ${{ steps.native_evidence.outputs.artifact_sha256 }}
           INSTALL_BACKUP_SHA256: ${{ steps.native_evidence.outputs.backup_sha256 }}
           NATIVE_TRANSCRIPT_SHA256: ${{ steps.native_evidence.outputs.transcript_sha256 }}
@@ -246,6 +263,7 @@ jobs:
             printf '\nNative evidence record SHA-256: `%s`\n' "${NATIVE_RECORD_SHA256:-unavailable}"
             printf '\nInstall rehearsal record SHA-256: `%s`\n' "${INSTALL_RECORD_SHA256:-unavailable}"
             printf '\nInstall rehearsal in-job verification SHA-256: `%s`\n' "${INSTALL_VERIFICATION_SHA256:-unavailable}"
+            printf '\nNative/install combined verification SHA-256: `%s`\n' "${NATIVE_VERIFICATION_SHA256:-unavailable}"
             printf '\nObserved native archive SHA-256: `%s`\n' "${INSTALL_ARTIFACT_SHA256:-unavailable}"
             printf '\nObserved immutable backup SHA-256: `%s`\n' "${INSTALL_BACKUP_SHA256:-unavailable}"
             printf '\nNative gate transcript SHA-256: `%s`\n' "${NATIVE_TRANSCRIPT_SHA256:-unavailable}"
@@ -254,5 +272,5 @@ jobs:
             echo
             echo 'This job natively executes only the observed platform above; the other three artifacts are cross-built and inspected. All four successful matrix jobs are required for four-target native evidence. Read the observed platform above; the workflow asserts it against the expected target instead of trusting the runner label alone. Failed/skipped gates do not qualify a release.'
             echo
-            echo 'The SBOM is module-level SPDX 2.3 inventory, not vulnerability scanning, build provenance, or a legal conclusion; unreviewed dependency license expressions remain NOASSERTION. The supplied candidate and license-evidence digests are independent dispatch inputs; this workflow checks exact derivation. The native archive and backup digests are generated observations from this job, emitted through the bounded native transcript, bound into the primary native record, and checked against the canonical install-rehearsal record in the same job. They are not independently approved expectations; a later operator must obtain and verify the retained record and digests through the external evidence channel. This workflow does not grant candidate, platform or release approval and does not grant legal approval. A successful job retains its bounded native record, install-rehearsal record, in-job verification result, and gate transcript for 30 days. No release archive, live model output, production signing key, tag, GitHub release asset, installation outside the disposable runner-local rehearsal, or publication. Records, transcripts and this summary are qualification evidence, not release approval or independent build attestation.'
+            echo 'The SBOM is module-level SPDX 2.3 inventory, not vulnerability scanning, build provenance, or a legal conclusion; unreviewed dependency license expressions remain NOASSERTION. The supplied candidate and license-evidence digests are independent dispatch inputs; this workflow checks exact derivation. The native archive and backup digests are generated observations from this job, emitted through the bounded native transcript, bound into the primary native record, and checked against the canonical install-rehearsal record in the same job. The offline combined verifier validates retained canonical bytes and cross-record identity; it does not authenticate the transcript, prove physical hardware or virtualization provenance, or provide human approval. The observed archive and backup digests are not independently approved expectations; a later operator must obtain and verify the retained records and digests through the external evidence channel. This workflow does not grant candidate, platform or release approval and does not grant legal approval. A successful job retains its bounded native record, install-rehearsal record, both verification results, and gate transcript for 30 days. No release archive, live model output, production signing key, tag, GitHub release asset, installation outside the disposable runner-local rehearsal, or publication. Records, transcripts and this summary are qualification evidence, not release approval or independent build attestation.'
           } >> "$GITHUB_STEP_SUMMARY"

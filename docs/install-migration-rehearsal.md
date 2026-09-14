@@ -108,6 +108,32 @@ The record is unsigned mechanical evidence, not independent attestation that a
 host ran the named operations; retain its bounded transcript and operator/host
 provenance separately.
 
+When the rehearsal record accompanies a schema-2 native-target record, verify
+the pair offline as one identity-bound evidence set as well:
+
+```sh
+go run ./cmd/verify-native-release-evidence \
+  --record /ABSOLUTE/EXTERNAL/EVIDENCE/native-TARGET.json \
+  --record-sha256 sha256:EXPECTED_NATIVE_RECORD \
+  --install-rehearsal-record /ABSOLUTE/EXTERNAL/EVIDENCE/install-TARGET.json \
+  --install-rehearsal-record-sha256 sha256:EXPECTED_INSTALL_RECORD \
+  --version 1.0.0 \
+  --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
+  --target-os darwin --target-arch arm64 --go-version go1.27.1 \
+  --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
+  --artifact-sha256 sha256:EXPECTED_ARCHIVE \
+  --source-schema 29 --current-schema 45 \
+  --backup-sha256 sha256:EXPECTED_BACKUP \
+  > /ABSOLUTE/EXTERNAL/EVIDENCE/native-TARGET-verification.json
+```
+
+Obtain both record digests and the expected public identity through the
+operator-controlled evidence channel. Successful output proves that the exact
+canonical bytes agree with those expectations and with each other. It does not
+validate hardware provenance, virtualization status, transcript authenticity,
+actual execution, or human approval. Retain and hash the canonical verification
+JSON separately.
+
 For an actual candidate, retain at least:
 
 - Candidate version and full source commit.
@@ -121,7 +147,8 @@ For an actual candidate, retain at least:
 - Migrated schema, preserved-record digest and daemon lifecycle result.
 - Rollback binary prefix, restored database path/digest and smoke result.
 - Canonical rehearsal-record location/digest and independent verification
-  output, operator identity, host provenance, and UTC verification time.
+  output, paired native/install verification output and digest, operator
+  identity, host provenance, and UTC verification time.
 
 Do not place credentials, private signing material, user prompts, model output
 or the database itself in repository or CI logs.

@@ -44,6 +44,37 @@ transcript. A partial log may likewise remain for diagnosis and must not be
 recorded as successful evidence. Retain and independently record both file
 digests.
 
+After transferring both retained records, verify them together through the
+offline cross-record verifier. Supply expectations from the reviewed release
+checklist and evidence channel rather than copying them out of either record:
+
+```sh
+go run ./cmd/verify-native-release-evidence \
+  --record /ABSOLUTE/EXTERNAL/EVIDENCE/native-TARGET.json \
+  --record-sha256 sha256:EXPECTED_NATIVE_RECORD \
+  --install-rehearsal-record /ABSOLUTE/EXTERNAL/EVIDENCE/install-TARGET.json \
+  --install-rehearsal-record-sha256 sha256:EXPECTED_INSTALL_RECORD \
+  --version 1.0.0 \
+  --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
+  --target-os darwin \
+  --target-arch arm64 \
+  --go-version go1.27.1 \
+  --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
+  --artifact-sha256 sha256:EXPECTED_ARCHIVE \
+  --source-schema 29 \
+  --current-schema 45 \
+  --backup-sha256 sha256:EXPECTED_BACKUP \
+  > /ABSOLUTE/EXTERNAL/EVIDENCE/native-TARGET-verification.json
+```
+
+The command is offline and emits one canonical JSON result only after both
+bounded records, their supplied digests, all public identity fields, and their
+cross-record bindings succeed. Retain and independently hash that result. It
+validates record bytes and identity relationships; it does not authenticate the
+gate transcript, establish physical-hardware or virtualization provenance,
+prove that the recorded operations occurred, or supply human platform/release
+approval.
+
 Without a companion rehearsal destination, the canonical schema-1 JSON contains
 exactly one target and the five completed gate names. With
 `--install-rehearsal-out`, schema 2 additionally binds the exact companion-record,
@@ -72,8 +103,9 @@ those generated observations are not external approval inputs.
 
 The record is unsigned retained evidence, not a remote attestation or proof of
 physical hardware. Preserve its SHA-256, command log, host/virtualization
-provenance, UTC run time, reviewed source channel, and operator identity in the
-release checklist. An operator must still decide the supported target matrix.
+provenance, UTC run time, combined verification JSON and digest, reviewed source
+channel, and operator identity in the release checklist. An operator must still
+decide the supported target matrix.
 Do not combine several records into a broader claim unless every approved target
 has its own reviewed native record and the checklist accepts its environment.
 

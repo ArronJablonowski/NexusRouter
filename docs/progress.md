@@ -7444,3 +7444,43 @@ This is current native evidence for one of the four fixed targets, not platform
 approval or a complete target matrix. Darwin/amd64, Linux/amd64 and Linux/arm64
 still require their own native records on matching hosts, and DAR-51 remains
 open until every operator-approved target has reviewed evidence.
+
+## 2026-09-14 — DAR-51 offline native-evidence bundle verification
+
+Release-grade native evidence can now be checked without trusting record paths,
+the current checkout, the review host, or network state. The new
+`verify-native-release-evidence` command requires independently supplied exact
+digests and release, commit, native target, Go toolchain, archive, backup and
+schema expectations. It accepts only a canonical schema-2 native record, checks
+the fixed ordered gate set, verifies every embedded install-rehearsal binding,
+and invokes the existing install-rehearsal verifier against the actual retained
+companion record. Its bounded path-free JSON result includes rollback schema;
+usage and verification failures expose neither paths nor underlying errors.
+
+The hosted qualification workflow now runs this combined verifier, hashes and
+retains its result with both records and the bounded transcript, and reports the
+verification digest. Static workflow tests preserve read-only permissions, the
+four-target runner matrix, exact verifier arguments, output bounds, artifact
+retention and the prohibition on secrets or publication authority. Operator
+documentation explains how to retrieve and reverify both records from an
+independent expectation channel. This verifies retained canonical bytes and
+cross-record identity only: it does not authenticate the transcript, establish
+physical hardware or virtualization provenance, attest that named commands ran,
+or provide candidate, platform, legal or release approval.
+
+The command independently accepted the retained RC12 Darwin/arm64 bundle for
+commit `2086d4902f2074da5a28165908cada605740dc06`: native record
+`6cbbe2892d52a63e517e67d163f369edb99ce271e215123823d67ee2e5191740`,
+companion record
+`4a2e50aa67a1830fcea059d37affc2fae19f468008bb3094a53a1b3e55d8c008`,
+archive `8be0a79b856a843884b2f0f5689d3c32728db627bc64f9ee1ce8bd93bfe6991a`,
+backup `40f1e6e23e3526bf96218443655cf5ad698a0267ae5c8de7c7dd7ecffc75fb98`,
+Go 1.27.1 and schema path 29 to 45 to 29. Focused verifier, CLI and
+workflow tests passed. The final exact tree passed `make check`, including
+format/1,000-line enforcement, `go vet ./...`, the complete race-enabled suite
+(`internal/app` 1142.623s, `internal/releasepack` 515.204s,
+`internal/telemetry` 1201.099s, `sdk/v1` 130.369s, `internal/cli` 109.291s,
+`internal/api` 50.205s, `internal/toolgate` 56.174s and `workers` 19.679s), and
+`go build ./...`. Hosted execution and the three remaining native targets are
+still open; this checkpoint does not resolve the conflicting remote `v1.0.0`
+tag or authorize publication.
