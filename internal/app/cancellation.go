@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
@@ -14,8 +15,10 @@ import (
 
 var ErrCancellationControl = errors.New("task cancellation control unavailable")
 
-// stop joins the bounded reader before its owning database can close.
-func watchCancellation(ctx context.Context, read func(context.Context) (bool, error), cancelRun context.CancelFunc) func() error {
+// stop joins the bounded reader before its owning database can close. When a
+// boundary is supplied, watcher-triggered cancellation cannot interrupt an
+// in-flight journal transaction and turn a known request into append ambiguity.
+func watchCancellation(ctx context.Context, read func(context.Context) (bool, error), cancelRun context.CancelFunc, boundary *sync.Mutex) func() error {
 	watchCtx, stop := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() {
@@ -30,7 +33,13 @@ func watchCancellation(ctx context.Context, read func(context.Context) (bool, er
 				return
 			}
 			if err != nil || requested {
+				if boundary != nil {
+					boundary.Lock()
+				}
 				cancelRun()
+				if boundary != nil {
+					boundary.Unlock()
+				}
 				if err != nil {
 					done <- ErrCancellationControl
 				} else {

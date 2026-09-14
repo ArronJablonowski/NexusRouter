@@ -88,6 +88,11 @@ func TestFDCredentialSourceRejectsCanceledAndPublicRegularFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("token"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// WriteFile applies the process umask. Force the deliberately unsafe mode so
+	// this fixture remains public when the test suite runs under umask 077.
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)

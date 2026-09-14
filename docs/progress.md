@@ -1,5 +1,37 @@
 # Implementation evidence
 
+## 2026-09-14 — DAR-51 RC15 failure correction
+
+RC15 failed closed during its `make check` gate before either native or install
+evidence JSON was created. The complete campaign was moved to a private
+quarantine and receives no qualification credit. Review found four concrete
+failures: durable cancellation could interrupt an SQLite journal append and
+leave the persisted session running; two deliberately unsafe permission
+fixtures were accidentally made safe by the campaign's `umask 077`; and the
+native rehearsal installer relied on the creation mode, allowing the same
+umask to reduce the requested executable mode from `0755` to `0700`.
+
+The runtime now fences watcher-triggered cancellation against each in-flight
+journal transaction while leaving provider and output cancellation responsive
+outside that boundary. Root and delegated journals share the same per-run
+fence. The permission fixtures explicitly apply their deliberately unsafe
+modes, and the rehearsal's exclusive writer checks complete writes, explicitly
+applies the requested mode, syncs, and verifies the resulting regular file.
+Its restrictive-umask regression runs in a subprocess so process-global umask
+state cannot contaminate other tests. Repeated race-enabled reproductions of
+all four RC15 failures pass under `umask 077`. A new native campaign must use a
+fresh directory and an exact new pushed commit; none of the quarantined RC15
+records may be reused as final release evidence.
+
+The final full `GOFLAGS='-p=1' make check` also passed under `umask 077`,
+including formatting and 1,000-line enforcement, `go vet ./...`, the complete
+race-enabled suite, and `go build ./...`. Notable uncached package times were
+application 1142.759s, CLI 107.467s, GitHub publication 2.202s, releasepack
+1416.568s, telemetry 1212.304s, toolgate 57.831s, SDK 133.222s, skills 23.272s,
+and workers 19.281s. This proves the corrective source against the restrictive
+campaign environment; it is not itself native qualification, candidate freeze,
+legal approval, platform approval, signing, tagging, or publication evidence.
+
 DAR-106 deterministic rollback-chain checkpoint: the first-release success and
 fail-closed regressions now build their releasable native fixture only from the
 repository's controlled local module proxy and locally signed checksum database.

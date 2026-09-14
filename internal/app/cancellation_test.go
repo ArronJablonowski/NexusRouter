@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestCancellationWatcherFailsClosedAndJoins(t *testing.T) {
 				return false, errors.New("private database detail")
 			}
 			return true, nil
-		}, cancelRun)
+		}, cancelRun, nil)
 		select {
 		case <-run.Done():
 		case <-ctx.Done():
@@ -33,6 +34,39 @@ func TestCancellationWatcherFailsClosedAndJoins(t *testing.T) {
 		}
 		cancelRun()
 		cancel()
+	}
+}
+
+func TestCancellationWatcherDoesNotInterruptDurableBoundary(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	run, cancelRun := context.WithCancel(ctx)
+	boundary := &sync.Mutex{}
+	boundary.Lock()
+	read := make(chan struct{})
+	stop := watchCancellation(run, func(context.Context) (bool, error) {
+		close(read)
+		return true, nil
+	}, cancelRun, boundary)
+	select {
+	case <-read:
+	case <-ctx.Done():
+		t.Fatal("watcher did not read cancellation")
+	}
+
+	select {
+	case <-run.Done():
+		t.Fatal("cancellation interrupted durable boundary")
+	default:
+	}
+	boundary.Unlock()
+	select {
+	case <-run.Done():
+	case <-ctx.Done():
+		t.Fatal("watcher did not cancel after durable boundary")
+	}
+	if err := stop(); err != nil {
+		t.Fatal(err)
 	}
 }
 

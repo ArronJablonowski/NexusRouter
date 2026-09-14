@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
@@ -66,6 +67,10 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 }
 
 func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, audit delegateAuditRunner, policies ...*tools.Policy) error {
+	var cancellationBoundary *sync.Mutex
+	if guarded, ok := journal.(redactingJournal); ok {
+		cancellationBoundary = guarded.cancellationBoundary
+	}
 	var parentPolicy *tools.Policy
 	if len(policies) == 1 {
 		parentPolicy = policies[0]
@@ -138,7 +143,7 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		}
 		stopWatcher := watchCancellation(childCtx, func(query context.Context) (bool, error) {
 			return db.CancellationRequested(query, workID)
-		}, cancel)
+		}, cancel, cancellationBoundary)
 		watcherStopped := false
 		defer func() {
 			if !watcherStopped {

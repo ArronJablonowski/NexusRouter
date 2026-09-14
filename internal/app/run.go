@@ -401,9 +401,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	}
 	ctx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
+	cancellationBoundary := &sync.Mutex{}
 	stopWatcher := watchCancellation(ctx, func(query context.Context) (bool, error) {
 		return db.CancellationRequested(query, result.TaskID)
-	}, cancelRun)
+	}, cancelRun, cancellationBoundary)
 	watcherStopped := false
 	defer func() {
 		if !watcherStopped {
@@ -416,7 +417,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.runtimeHostAdmission != nil {
 		sessionID = r.runtimeHostAdmission.sessionID
 	}
-	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken, runtimeHostAdmission: r.runtimeHostAdmission}
+	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken, runtimeHostAdmission: r.runtimeHostAdmission, cancellationBoundary: cancellationBoundary}
 	if r.textSink != nil || r.presentationTextSink != nil {
 		j.textDelivery = &textDelivery{secrets: secrets, emit: func(text string, final bool) {
 			if !final {
@@ -431,7 +432,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
 			return result, ErrAdmission
 		}
 	}
@@ -522,6 +523,7 @@ type redactingJournal struct {
 	deliverPerCall                bool
 	textDelivery                  *textDelivery
 	runtimeHostAdmission          *runtimeHostAdmission
+	cancellationBoundary          *sync.Mutex
 }
 
 func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.Event) error {
@@ -584,6 +586,12 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 	}
 	e.Data = redacted
 	commit := func() error {
+		// Durable cancellation may stop provider I/O immediately before or after
+		// this closure, but never while SQLite is deciding whether an append won.
+		if j.cancellationBoundary != nil {
+			j.cancellationBoundary.Lock()
+			defer j.cancellationBoundary.Unlock()
+		}
 		if j.runtimeHostAdmission != nil {
 			if err := j.runtimeHostAdmission.validateAppend(expected, e, j.db); err != nil {
 				return err

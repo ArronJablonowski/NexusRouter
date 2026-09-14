@@ -247,6 +247,11 @@ func TestCorruptionAndDirectoryPermissions(t *testing.T) {
 	if e := os.Mkdir(p, 0755); e != nil {
 		t.Fatal(e)
 	}
+	// Mkdir applies the process umask. Force the deliberately unsafe mode so
+	// this fixture remains nonprivate when the test suite runs under umask 077.
+	if e := os.Chmod(p, 0755); e != nil {
+		t.Fatal(e)
+	}
 	if s, e := Open(p, []string{"project"}); e == nil {
 		s.Close()
 		t.Fatal("accepted nonprivate directory")

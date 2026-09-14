@@ -768,8 +768,22 @@ func writeExclusive(path string, body []byte, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if _, err = f.Write(body); err == nil {
+	written, err := f.Write(body)
+	if err == nil && written != len(body) {
+		err = io.ErrShortWrite
+	}
+	if err == nil {
+		err = f.Chmod(mode)
+	}
+	if err == nil {
 		err = f.Sync()
+	}
+	if err == nil {
+		var info os.FileInfo
+		info, err = f.Stat()
+		if err == nil && (!info.Mode().IsRegular() || info.Mode().Perm() != mode.Perm()) {
+			err = errors.New("exclusive write mode mismatch")
+		}
 	}
 	closeErr := f.Close()
 	if err != nil {
