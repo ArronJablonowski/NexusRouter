@@ -8,6 +8,20 @@ outside the guarded publisher and is quarantined; no GitHub Release, signed
 production assets, supported-platform decision or canonical publication
 approval is claimed.
 
+- DAR-104 fixes the fresh-cache license bootstrap to suppress ordinary Go
+  dependency-download progress instead of treating successful stderr as a
+  failed gate. Freeze still requires exactly one canonical digest line, verify
+  requires empty stdout, and nonzero commands, malformed output, utility
+  failures, or cleanup failures expose only a generic error. A real Go/local
+  proxy fixture proves empty-cache compilation and cleanup; failed external
+  create-only output remains quarantined rather than overwritten.
+
+- DAR-105 directly qualifies the credentialed production publisher against an
+  existing annotated `v1.0.0` tag, an existing release, and ambiguous lookup
+  results. Every case fails before journal creation or any remote mutation and
+  retains no credential or release-body data. The test does not change the
+  quarantined remote tag; DAR-97 still requires an explicit operator decision.
+
 - DAR-101 routes release packaging through a fresh private reconstruction for
   SBOM discovery, four-target dependency and notice capture, compilation, and
   module verification. Each reproducibility pass gets a distinct cache, and

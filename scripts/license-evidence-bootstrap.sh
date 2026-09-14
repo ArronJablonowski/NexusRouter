@@ -122,11 +122,10 @@ if ! env -i \
 fi
 
 # Hold all subprocess bytes until the command has satisfied its intentionally
-# tiny success contract. Unexpected output can include private cache paths.
-if test -s "$command_stderr"; then
-  printf '%s\n' 'license-evidence bootstrap failed' >&2
-  exit 1
-fi
+# tiny success contract. Go writes ordinary module-download progress to stderr
+# while populating a fresh cache, so successful stderr is suppressed rather
+# than interpreted as a gate failure. A nonzero command status still fails
+# above without exposing either captured stream.
 case ${1-} in
   freeze)
     output_size=$(wc -c <"$command_stdout") || exit 1

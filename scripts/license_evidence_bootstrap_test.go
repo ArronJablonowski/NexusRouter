@@ -1,6 +1,8 @@
 package scripts
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,7 +142,7 @@ func TestLicenseEvidenceBootstrapRemovesWorkspaceAfterCommandFailure(t *testing.
 	}
 }
 
-func TestLicenseEvidenceBootstrapRejectsSuccessfulStderrWithoutLeak(t *testing.T) {
+func TestLicenseEvidenceBootstrapSuppressesSuccessfulStderr(t *testing.T) {
 	repository, err := filepath.Abs("..")
 	if err != nil {
 		t.Fatal(err)
@@ -160,9 +162,174 @@ func TestLicenseEvidenceBootstrapRejectsSuccessfulStderrWithoutLeak(t *testing.T
 		"DARWIN_LICENSE_BOOTSTRAP_PARENT=" + bootstrapParent,
 	}
 	output, runErr := command.CombinedOutput()
-	if runErr == nil || string(output) != "license-evidence bootstrap failed\n" || strings.Contains(string(output), secret) {
-		t.Fatalf("unexpected stderr was not rejected safely: %v: %q", runErr, output)
+	if runErr != nil || string(output) != "sha256:"+strings.Repeat("b", 64)+"\n" || strings.Contains(string(output), secret) {
+		t.Fatalf("successful stderr was not suppressed safely: %v: %q", runErr, output)
 	}
+}
+
+func TestLicenseEvidenceBootstrapRealGoUsesEmptyLocalProxyCache(t *testing.T) {
+	repository := t.TempDir()
+	scriptBody, err := os.ReadFile("license-evidence-bootstrap.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := filepath.Join(t.TempDir(), "proxy")
+	writeProxyModule(t, proxy, "example.com/bootstrapdep", "v1.0.0", map[string]string{
+		"go.mod":       "module example.com/bootstrapdep\n\ngo 1.27\n",
+		"bootstrap.go": "package bootstrapdep\n\nconst Value = \"downloaded\"\n",
+	})
+	patched := bytes.ReplaceAll(scriptBody, []byte("GOPROXY=https://proxy.golang.org"), []byte("GOPROXY=file://"+proxy))
+	patched = bytes.ReplaceAll(patched, []byte("GOSUMDB=sum.golang.org"), []byte("GOSUMDB=off"))
+	if bytes.Equal(patched, scriptBody) {
+		t.Fatal("bootstrap policy literals were not replaced for controlled fixture")
+	}
+	if err = os.MkdirAll(filepath.Join(repository, "scripts"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(repository, "scripts", "license-evidence-bootstrap.sh"), patched, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.MkdirAll(filepath.Join(repository, "cmd", "license-evidence"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	goMod := "module example.com/bootstraptest\n\ngo 1.27\n\nrequire example.com/bootstrapdep v1.0.0\n"
+	if err = os.WriteFile(filepath.Join(repository, "go.mod"), []byte(goMod), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mainSource := `package main
+
+import (
+	"crypto/sha256"
+	"fmt"
+	"os"
+
+	"example.com/bootstrapdep"
+)
+
+func main() {
+	if len(os.Args) != 6 || os.Args[1] != "freeze" || os.Args[4] != "--out" {
+		os.Exit(2)
+	}
+	file, err := os.OpenFile(os.Args[5], os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		os.Exit(1)
+	}
+	if _, err = file.WriteString(bootstrapdep.Value); err != nil || file.Sync() != nil || file.Close() != nil {
+		os.Exit(1)
+	}
+	sum := sha256.Sum256([]byte(bootstrapdep.Value))
+	fmt.Printf("sha256:%x\n", sum)
+}
+`
+	if err = os.WriteFile(filepath.Join(repository, "cmd", "license-evidence", "main.go"), []byte(mainSource), 0600); err != nil {
+		t.Fatal(err)
+	}
+	seedModuleCache := t.TempDir()
+	t.Cleanup(func() {
+		_ = filepath.Walk(seedModuleCache, func(path string, _ os.FileInfo, _ error) error {
+			_ = os.Chmod(path, 0700)
+			return nil
+		})
+	})
+	seedSums := exec.Command("go", "mod", "tidy")
+	seedSums.Dir = repository
+	seedSums.Env = append(os.Environ(),
+		"GOPROXY=file://"+proxy, "GOSUMDB=off", "GOMODCACHE="+seedModuleCache, "GOCACHE="+t.TempDir())
+	if output, downloadErr := seedSums.CombinedOutput(); downloadErr != nil {
+		t.Fatalf("seed fixture go.sum: %v: %s", downloadErr, output)
+	}
+	outputPath := filepath.Join(t.TempDir(), "evidence.json")
+	bootstrapParent := t.TempDir()
+	command := exec.Command("sh", filepath.Join(repository, "scripts", "license-evidence-bootstrap.sh"),
+		"freeze", "--commit", strings.Repeat("a", 40), "--out", outputPath)
+	command.Dir = repository
+	command.Env = append(os.Environ(), "DARWIN_LICENSE_BOOTSTRAP_PARENT="+bootstrapParent)
+	output, runErr := command.CombinedOutput()
+	if runErr != nil {
+		t.Fatalf("real empty-cache bootstrap failed: %v: %q", runErr, output)
+	}
+	expected := sha256Line("downloaded")
+	if string(output) != expected {
+		t.Fatalf("unexpected bootstrap output %q, want %q", output, expected)
+	}
+	if body, readErr := os.ReadFile(outputPath); readErr != nil || string(body) != "downloaded" {
+		t.Fatalf("unexpected evidence residue: %q, %v", body, readErr)
+	}
+	if entries, readErr := os.ReadDir(bootstrapParent); readErr != nil || len(entries) != 0 {
+		t.Fatalf("bootstrap workspace retained: %v, entries=%v", readErr, entries)
+	}
+}
+
+func TestLicenseEvidenceBootstrapNonzeroGoPreservesOutputResidueButLeaksNothing(t *testing.T) {
+	repository, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	residue := filepath.Join(t.TempDir(), "uncertain-evidence.json")
+	secret := "nonzero-go-secret"
+	fake := "#!/bin/sh\nprintf '%s' residue >" + strconv.Quote(residue) + "\nprintf '%s\\n' digest-like-output\nprintf '%s\\n' " + strconv.Quote(secret) + " >&2\nexit 41\n"
+	if err = os.WriteFile(filepath.Join(bin, "go"), []byte(fake), 0700); err != nil {
+		t.Fatal(err)
+	}
+	bootstrapParent := t.TempDir()
+	command := exec.Command("sh", filepath.Join(repository, "scripts", "license-evidence-bootstrap.sh"), "freeze")
+	command.Dir = repository
+	command.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "DARWIN_LICENSE_BOOTSTRAP_PARENT=" + bootstrapParent}
+	output, runErr := command.CombinedOutput()
+	if runErr == nil || string(output) != "license-evidence bootstrap failed\n" || strings.Contains(string(output), secret) || strings.Contains(string(output), "digest-like-output") {
+		t.Fatalf("nonzero Go failure was not generic: %v: %q", runErr, output)
+	}
+	if body, readErr := os.ReadFile(residue); readErr != nil || string(body) != "residue" {
+		t.Fatalf("external residue was altered: %q, %v", body, readErr)
+	}
+	if entries, readErr := os.ReadDir(bootstrapParent); readErr != nil || len(entries) != 0 {
+		t.Fatalf("failed bootstrap workspace retained: %v, entries=%v", readErr, entries)
+	}
+}
+
+func writeProxyModule(t *testing.T, proxy, module, version string, files map[string]string) {
+	t.Helper()
+	directory := filepath.Join(proxy, filepath.FromSlash(module), "@v")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	mod := files["go.mod"]
+	if err := os.WriteFile(filepath.Join(directory, version+".mod"), []byte(mod), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, version+".info"), []byte(`{"Version":"`+version+`","Time":"2026-01-01T00:00:00Z"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	archive, err := os.Create(filepath.Join(directory, version+".zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	zipWriter := zip.NewWriter(archive)
+	for name, body := range files {
+		entry, createErr := zipWriter.Create(module + "@" + version + "/" + name)
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		if _, writeErr := entry.Write([]byte(body)); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	if err = zipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sha256Line(value string) string {
+	// Fixed independently for the fixture payload; keeping the helper tiny makes
+	// the stdout assertion readable without coupling it to the generated file.
+	if value != "downloaded" {
+		panic("unexpected fixture value")
+	}
+	return "sha256:b7a8a844a613be796bc1892dc480f9d92c50d32a5713a87758e5c5addc4ec814\n"
 }
 
 func TestLicenseEvidenceBootstrapRedactsUtilityFailures(t *testing.T) {

@@ -1,5 +1,55 @@
 # Implementation evidence
 
+DAR-105 publication-conflict regression checkpoint: the credential-bearing
+production publisher is now exercised against the exact quarantined `v1.0.0`
+shape: the remote annotated tag ref already exists while no GitHub Release is
+present. Tag existence alone stops the create-only state machine before it
+follows the tag object, checks the later release endpoint, creates a journal, or
+sends any mutating request. Additional cases cover an existing release and
+ambiguous tag or release lookups. All remain `not_started` and retryable with no
+tag/release identity, request body, credential, or artifact content in returned
+evidence. The fixture also proves the bounded credential lease is closed and
+zeroed. This does not decide or alter DAR-97's remote tag; that remains an
+explicit operator action.
+
+DAR-61 rollback-readiness regression checkpoint: a full first-release fixture
+now carries the canonical post-publication receipt through the real published
+install evidence adapter and both canonical verifiers into read-only rollback
+readiness verification. The resulting verification receipt is committed once
+with private permissions, parsed back canonically, and cannot reuse its output
+path. Cross-chain publication-receipt drift and reuse of the receipt verifier as
+the readiness verifier fail closed; existing focused coverage continues to
+exercise stale approvals and exclusive-output collisions. The migration runbook
+now states the general schema boundary: the schema-29 binary cannot open any
+newer database, including current schema 45. This is regression evidence only;
+DAR-61 still requires the live DAR-60 receipt, a separately run verifier, and
+operator-approved first-release rollback policy, owner, channel, and validity
+window.
+
+DAR-104 license-bootstrap qualification checkpoint: the first post-schema-3
+RC13 mechanical freeze exposed that a real `go run` populating an initially
+empty module cache writes ordinary download progress to standard error. The
+bootstrap captured those bytes but incorrectly treated their presence as a
+failed gate after the create-only evidence file had already been committed.
+It now continues to suppress all captured standard error while accepting a
+successful command only when standard output is the exact single canonical
+digest line. Any nonzero Go exit, malformed standard output, utility failure,
+or cleanup failure remains a generic fail-closed error with no captured bytes
+or private paths exposed. A possible external create-only output from a failed
+command remains quarantined rather than deleted or overwritten.
+
+The regression suite retains the injected-environment tests and adds an actual
+Go compilation from fresh home, temporary, module, build, and GOPATH directories.
+That integration fixture obtains a synthetic dependency from a controlled local
+module proxy, proves the dependency was executed, accepts the successful
+download diagnostics without exposing them, and verifies workspace cleanup.
+Separate failure coverage makes a nonzero Go command emit both private standard
+error and digest-like standard output while leaving an external output residue;
+the caller sees only the fixed failure line, the private workspace is removed,
+and the external residue is preserved for quarantine. No RC13 evidence was
+approved, retried, deleted, or overwritten by this code change, and no
+credential, signing key, Git tag, GitHub release, or publication path was used.
+
 DAR-101 packaging reconstruction checkpoint: each `Package` invocation now
 creates one private, initially empty module/build cache under the same fixed
 public Go proxy and checksum policy used by schema-3 license evidence. SBOM

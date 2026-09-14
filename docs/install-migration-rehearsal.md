@@ -178,9 +178,10 @@ execute an ancestor implicitly.
 
 ## Safety and rollback limits
 
-- Schema 32 is intentionally unsupported by the schema-29 binary. There is no
-  supported in-place downgrade. Rollback means selecting the older binary and a
-  restored matching backup as one pair.
+- Any database schema newer than 29, including current schema 45, is
+  intentionally unsupported by the schema-29 binary. There is no supported
+  in-place downgrade. Rollback means selecting the older binary and a restored
+  matching backup as one pair.
 - Restore to a new path. Do not overwrite, rename or edit the migrated database;
   retain it for inspection until the rollback decision is closed.
 - Rollback discards all work committed after the backup. Record and approve that

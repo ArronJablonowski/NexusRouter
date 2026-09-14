@@ -25,6 +25,7 @@ func TestReleaseDocumentationTracksArchiveAndCurrentSchema(t *testing.T) {
 			"and schema " + current + ".",
 			"from schema\n29 to " + current,
 			"--current-schema " + current,
+			"including current schema " + current,
 		},
 		"docs/release-rollback-readiness.md": {
 			"(currently `" + current + "`)",
