@@ -82,11 +82,15 @@ type PostPublicationAsset struct {
 // VerifyPublishedRelease performs read-only GitHub observation, writes only a
 // fresh local download directory, and reuses the production approval verifier.
 func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, options PublishedVerificationOptions) (PostPublicationReceipt, error) {
+	return verifyPublishedReleaseWithLicenseEvidenceVerifier(ctx, remote, options, verifyLicenseEvidenceRecord)
+}
+
+func verifyPublishedReleaseWithLicenseEvidenceVerifier(ctx context.Context, remote PublishedReleaseReader, options PublishedVerificationOptions, verifyEvidence licenseEvidenceRecordVerifier) (PostPublicationReceipt, error) {
 	var empty PostPublicationReceipt
-	if ctx == nil || remote == nil || options.DownloadDir == "" || !ValidPostPublicationVerifierID(options.VerifierID) {
+	if ctx == nil || remote == nil || options.DownloadDir == "" || !ValidPostPublicationVerifierID(options.VerifierID) || verifyEvidence == nil {
 		return empty, ErrPublicationAuthorization
 	}
-	preflight, err := VerifyPublicationPreflight(ctx, options.Preflight)
+	preflight, err := verifyPublicationPreflightWithLicenseEvidenceVerifier(ctx, options.Preflight, verifyEvidence)
 	if err != nil || !ValidPostPublicationVerifierID(preflight.PublicationApproverID) || options.VerifierID == preflight.PublicationApproverID {
 		return empty, ErrPublicationAuthorization
 	}
@@ -127,7 +131,7 @@ func VerifyPublishedRelease(ctx context.Context, remote PublishedReleaseReader, 
 	}
 	verificationOptions := options.Preflight.Verification
 	verificationOptions.Dir = options.DownloadDir
-	verification, err := VerifyApproved(ctx, verificationOptions)
+	verification, err := verifyApprovedWithLicenseEvidenceVerifier(ctx, verificationOptions, verifyEvidence)
 	if err != nil || verification.CandidateRecordSHA256 != verificationOptions.ExpectedCandidateSHA256 ||
 		verification.LicenseEvidenceSHA256 != verificationOptions.ExpectedLicenseEvidenceSHA256 ||
 		verification.SHA256SUMSSHA256 != verificationOptions.ExpectedSumsSHA256 ||

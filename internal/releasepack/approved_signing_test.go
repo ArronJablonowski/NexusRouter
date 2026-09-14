@@ -356,15 +356,30 @@ func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bo
 }
 
 func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismatchNotice bool, executableVersion, sbomDrift string, reconstructEvidence bool) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithDependency(t, mismatchNotice, executableVersion, sbomDrift, reconstructEvidence, nil)
+}
+
+func approvedSigningControlledExecutableFixture(t *testing.T, policy goReconstructionPolicyOptions) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithDependency(t, false, "1.0.0", "", false, &policy)
+}
+
+func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, executableVersion, sbomDrift string, reconstructEvidence bool, controlledPolicy *goReconstructionPolicyOptions) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
+	externalDependency := controlledPolicy == nil
 	source := collateralSourceFixture(t)
 	var err error
 	source, err = filepath.EvalSymlinks(source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte("module example.com/approved\n\ngo 1.27.1\n\nrequire github.com/google/uuid v1.6.0\n"), 0644); err != nil {
+	dependencyPath := "example.com/darwin-fixture/common"
+	goModBody := "module example.com/approved\n\ngo 1.27.1\n\nrequire " + dependencyPath + " v1.0.0\n"
+	if externalDependency {
+		dependencyPath = "github.com/google/uuid"
+		goModBody = "module example.com/approved\n\ngo 1.27.1\n\nrequire " + dependencyPath + " v1.6.0\n"
+	}
+	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte(goModBody), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err = os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
@@ -379,15 +394,24 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 	if err = os.WriteFile(filepath.Join(source, "webui", "shell.go"), []byte("package webui\n\nimport \"embed\"\n\n//go:embed assets/v1/*\nvar assets embed.FS\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	program := "package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"
+	program := "package main\n\nimport _ \"" + dependencyPath + "\"\n\nfunc main() {}\n"
+	dependencyImport := "  _ \"" + dependencyPath + "\"\n"
 	if executableVersion != "" {
-		program = "package main\n\nimport (\n  \"fmt\"\n  _ \"github.com/google/uuid\"\n  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin " + executableVersion + "\")\n    return\n  }\n  os.Exit(2)\n}\n"
+		program = "package main\n\nimport (\n  \"fmt\"\n" + dependencyImport + "  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin " + executableVersion + "\")\n    return\n  }\n  os.Exit(2)\n}\n"
 	}
 	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte(program), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = command(ctx, source, environment(), "go", "mod", "tidy"); err != nil {
-		t.Fatal(err)
+	fixtureEnv := environment()
+	if !externalDependency {
+		for _, key := range []string{"GOPROXY", "GOSUMDB", "GOMODCACHE", "GOCACHE", "GOPATH"} {
+			if value, ok := os.LookupEnv(key); ok {
+				fixtureEnv = append(fixtureEnv, key+"="+value)
+			}
+		}
+	}
+	if _, err = command(ctx, source, fixtureEnv, "go", "mod", "tidy"); err != nil {
+		t.Fatal("tidy fixture module", err)
 	}
 	for _, step := range [][]string{{"init"}, {"config", "user.email", "approved@example.invalid"}, {"config", "user.name", "Approved Test"}, {"add", "."}, {"commit", "-m", "fixture"}} {
 		if _, err = command(ctx, source, environment(), "git", step...); err != nil {
@@ -428,7 +452,7 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 	}
 	candidateFile := filepath.Join(t.TempDir(), "candidate.json")
 	if err = FreezeCandidate(ctx, Options{Version: "1.0.0", Commit: commit, Out: candidateFile, Source: source}); err != nil {
-		t.Fatal(err)
+		t.Fatal("freeze candidate", err)
 	}
 	candidateBody, err := os.ReadFile(candidateFile)
 	if err != nil {
@@ -441,19 +465,19 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 	releaseDir := t.TempDir()
 	assets, err := readSBOMSourceFiles(source)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("read SBOM sources", err)
 	}
 	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: commit, Created: created, Toolchain: toolchainEvidence.GOVERSION}
 	var sums strings.Builder
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
-		modules, entryErr := targetNoticeModules(ctx, source, target[0], target[1], environment())
+		modules, entryErr := targetNoticeModules(ctx, source, target[0], target[1], fixtureEnv)
 		if entryErr != nil {
-			t.Fatal(entryErr)
+			t.Fatal("load target notice modules", target, entryErr)
 		}
 		notice, entryErr := renderThirdPartyNotices(target[0], target[1], modules)
 		if entryErr != nil {
-			t.Fatal(entryErr)
+			t.Fatal("render target notices", target, entryErr)
 		}
 		evidenceTarget := LicenseEvidenceTarget{
 			OS: target[0], Arch: target[1], PackageCount: 1,
@@ -478,9 +502,9 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 		binary := signingBinaryFixture(t, target[0], target[1])
 		if executableVersion != "" && target[0] == runtime.GOOS && target[1] == runtime.GOARCH {
 			binaryPath := filepath.Join(t.TempDir(), "darwin")
-			buildEnv := append(environment(), "GOOS="+target[0], "GOARCH="+target[1])
+			buildEnv := append(append([]string(nil), fixtureEnv...), "GOOS="+target[0], "GOARCH="+target[1])
 			if _, entryErr = command(ctx, source, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", binaryPath, "./cmd/darwin"); entryErr != nil {
-				t.Fatal(entryErr)
+				t.Fatal("build fixture executable", entryErr)
 			}
 			binary, entryErr = os.ReadFile(binaryPath)
 			if entryErr != nil {
@@ -493,7 +517,7 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 			Created: created, BinarySHA256: hex.EncodeToString(binaryDigest[:]),
 		}, modules, assets)
 		if entryErr != nil {
-			t.Fatal(entryErr)
+			t.Fatal("render target SBOM", target, entryErr)
 		}
 		if sbomDrift != "" && target[0] == "darwin" && target[1] == "amd64" {
 			if sbomDrift == "tampered" {
@@ -505,7 +529,7 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 		}
 		entries, metadata, entryErr := releaseEntries(shared, notice, sbom, binary)
 		if entryErr != nil {
-			t.Fatal(entryErr)
+			t.Fatal("assemble release entries", target, entryErr)
 		}
 		if sbomDrift == "missing" && target[0] == "darwin" && target[1] == "amd64" {
 			entries = append(entries[:3], entries[4:]...)
@@ -513,7 +537,7 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 		}
 		var archive strings.Builder
 		if entryErr = Archive(&archive, entries); entryErr != nil {
-			t.Fatal(entryErr)
+			t.Fatal("archive target", target, entryErr)
 		}
 		body := []byte(archive.String())
 		writeSigningFixture(t, filepath.Join(releaseDir, name), body, 0644)
@@ -533,15 +557,20 @@ func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismat
 	writeSigningFixture(t, filepath.Join(releaseDir, "SHA256SUMS"), sumsBody, 0644)
 	licenseEvidenceFile := filepath.Join(t.TempDir(), "license-evidence.json")
 	var licenseEvidenceSHA256 string
-	if reconstructEvidence {
+	if controlledPolicy != nil {
+		licenseEvidenceSHA256, err = freezeLicenseEvidenceWithPolicy(ctx, LicenseEvidenceOptions{Commit: commit, Source: source, Out: licenseEvidenceFile}, *controlledPolicy)
+		if err != nil {
+			t.Fatal("freeze controlled license evidence", err)
+		}
+	} else if reconstructEvidence {
 		licenseEvidenceSHA256, err = FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{Commit: commit, Source: source, Out: licenseEvidenceFile})
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("freeze license evidence", err)
 		}
 	} else {
 		licenseEvidenceBody, marshalErr := marshalLicenseEvidence(licenseEvidence)
 		if marshalErr != nil {
-			t.Fatal(marshalErr)
+			t.Fatal("marshal fixture license evidence", marshalErr)
 		}
 		writeSigningFixture(t, licenseEvidenceFile, licenseEvidenceBody, 0644)
 		licenseEvidenceSHA256 = licenseEvidenceDigest(licenseEvidenceBody)

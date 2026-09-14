@@ -1,6 +1,8 @@
 package releasepack
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,7 +12,13 @@ import (
 )
 
 func TestFirstReleaseRollbackReadinessCanonicalChain(t *testing.T) {
-	record, options := firstReleaseRollbackChainFixture(t)
+	fixture := newReconstructionFixture(t)
+	reconstructionRoot := rollbackPrivateEnvironment(t, fixture.policy)
+	preflight, signedDir, licenseVerifier := publishedControlledExecutableFixture(t, fixture.policy)
+	assertRollbackUsedControlledReconstruction(t, fixture)
+	sourceHead := rollbackSourceHead(t, preflight.Verification.Source)
+	signedDigest := rollbackFixtureDigest(t, signedDir)
+	record, options := firstReleaseRollbackChainFixture(t, preflight, signedDir, licenseVerifier)
 	result, err := VerifyRollbackReadiness(t.Context(), options)
 	if err != nil || result.RecordSHA256 != options.Expectations.RecordSHA256 || result.PublicationReceiptSHA256 != record.Current.PublicationReceiptSHA256 || result.RehearsalSHA256 != record.Rehearsal.EvidenceSHA256 {
 		t.Fatal("canonical first-release chain rejected", result, err)
@@ -44,11 +52,22 @@ func TestFirstReleaseRollbackReadinessCanonicalChain(t *testing.T) {
 	if _, err = PrepareRollbackEvidenceOutput(out); err == nil {
 		t.Fatal("completed verification receipt was reused")
 	}
+	assertRollbackFixtureUnchanged(t, preflight.Verification.Source, sourceHead, signedDir, signedDigest)
+	if !directoryEmpty(reconstructionRoot) {
+		t.Fatal("rollback chain retained a private reconstruction workspace")
+	}
 }
 
 func TestFirstReleaseRollbackReadinessCanonicalChainFailsClosed(t *testing.T) {
+	fixture := newReconstructionFixture(t)
+	reconstructionRoot := rollbackPrivateEnvironment(t, fixture.policy)
+	preflight, signedDir, licenseVerifier := publishedControlledExecutableFixture(t, fixture.policy)
+	assertRollbackUsedControlledReconstruction(t, fixture)
+	sourceHead := rollbackSourceHead(t, preflight.Verification.Source)
+	signedDigest := rollbackFixtureDigest(t, signedDir)
+
 	t.Run("cross_chain_receipt_digest", func(t *testing.T) {
-		record, options := firstReleaseRollbackChainFixture(t)
+		record, options := firstReleaseRollbackChainFixture(t, preflight, signedDir, licenseVerifier)
 		evidence, err := VerifyPublishedInstallReceipt(options.RehearsalFile, options.Expectations.RehearsalSHA256)
 		if err != nil {
 			t.Fatal(err)
@@ -72,20 +91,25 @@ func TestFirstReleaseRollbackReadinessCanonicalChainFailsClosed(t *testing.T) {
 		if _, err = VerifyRollbackReadiness(t.Context(), options); err == nil {
 			t.Fatal("published-install evidence from another receipt accepted")
 		}
+		assertRollbackFixtureUnchanged(t, preflight.Verification.Source, sourceHead, signedDir, signedDigest)
 	})
 
 	t.Run("verifier_role_collision", func(t *testing.T) {
-		_, options := firstReleaseRollbackChainFixture(t)
+		_, options := firstReleaseRollbackChainFixture(t, preflight, signedDir, licenseVerifier)
 		options.ReadinessVerifierID = options.Expectations.ReceiptVerifierID
 		if _, err := VerifyRollbackReadiness(t.Context(), options); err == nil {
 			t.Fatal("receipt observer reused as readiness verifier")
 		}
+		assertRollbackFixtureUnchanged(t, preflight.Verification.Source, sourceHead, signedDir, signedDigest)
 	})
+	if !directoryEmpty(reconstructionRoot) {
+		t.Fatal("rollback failure cases retained a private reconstruction workspace")
+	}
 }
 
-func firstReleaseRollbackChainFixture(t *testing.T) (RollbackReadiness, RollbackReadinessOptions) {
+func firstReleaseRollbackChainFixture(t *testing.T, preflight PublicationPreflightOptions, signedDir string, licenseVerifier licenseEvidenceRecordVerifier) (RollbackReadiness, RollbackReadinessOptions) {
 	t.Helper()
-	receiptFile, installFile, installExpected := publishedInstallFixture(t)
+	receiptFile, installFile, installExpected := publishedInstallFixtureFromRelease(t, preflight, signedDir, licenseVerifier)
 	receiptBody, err := os.ReadFile(receiptFile)
 	if err != nil {
 		t.Fatal(err)
@@ -182,4 +206,97 @@ func firstReleaseRollbackChainFixture(t *testing.T) (RollbackReadiness, Rollback
 			return time.Date(2026, 9, 7, 2, 0, 0, 0, time.UTC)
 		},
 	}
+}
+
+func rollbackPrivateEnvironment(t *testing.T, policy goReconstructionPolicyOptions) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err == nil && entry.IsDir() {
+				_ = os.Chmod(path, 0700)
+			}
+			return nil
+		})
+		if err := os.RemoveAll(root); err != nil {
+			t.Error("remove rollback private environment", err)
+		}
+		if _, err := os.Lstat(root); !os.IsNotExist(err) {
+			t.Error("rollback private environment survived cleanup", err)
+		}
+	})
+	for _, name := range []string{"home", "tmp", "gomodcache", "gocache", "gopath"} {
+		path := filepath.Join(root, name)
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+		key := map[string]string{
+			"home": "HOME", "tmp": "TMPDIR", "gomodcache": "GOMODCACHE", "gocache": "GOCACHE", "gopath": "GOPATH",
+		}[name]
+		t.Setenv(key, path)
+	}
+	t.Setenv("GOPROXY", policy.moduleProxy)
+	t.Setenv("GOSUMDB", policy.checksumDatabase)
+	return filepath.Join(root, "tmp")
+}
+
+func rollbackSourceHead(t *testing.T, source string) string {
+	t.Helper()
+	head, err := command(t.Context(), source, environment(), "git", "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := command(t.Context(), source, environment(), "git", "status", "--porcelain", "--untracked-files=all")
+	if err != nil || status != "" {
+		t.Fatal("rollback source fixture was not clean", status, err)
+	}
+	return head
+}
+
+func assertRollbackUsedControlledReconstruction(t *testing.T, fixture *reconstructionFixture) {
+	t.Helper()
+	if fixture.zipRequestCount() == 0 || fixture.sumDBRequestCount() == 0 {
+		t.Fatal("rollback fixture did not use the controlled proxy and checksum database")
+	}
+}
+
+func assertRollbackFixtureUnchanged(t *testing.T, source, sourceHead, signedDir, signedDigest string) {
+	t.Helper()
+	if got := rollbackSourceHead(t, source); got != sourceHead {
+		t.Fatal("rollback chain changed the source commit", got, sourceHead)
+	}
+	if got := rollbackFixtureDigest(t, signedDir); got != signedDigest {
+		t.Fatal("rollback chain changed the signed release fixture", got, signedDigest)
+	}
+}
+
+func rollbackFixtureDigest(t *testing.T, root string) string {
+	t.Helper()
+	digest := sha256.New()
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		_, _ = digest.Write([]byte(relative + "\x00" + info.Mode().String() + "\x00"))
+		if info.Mode().IsRegular() {
+			body, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			_, _ = digest.Write(body)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hex.EncodeToString(digest.Sum(nil))
 }

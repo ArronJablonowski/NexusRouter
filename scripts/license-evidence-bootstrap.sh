@@ -87,8 +87,11 @@ case $bootstrap_root in
   "$repository_root"|"$repository_root"/*) exit 1 ;;
 esac
 
-command_stdout=$bootstrap_root/stdout
-command_stderr=$bootstrap_root/stderr
+bootstrap_binary=$bootstrap_root/license-evidence
+build_stdout=$bootstrap_root/build-stdout
+build_stderr=$bootstrap_root/build-stderr
+command_stdout=$bootstrap_root/command-stdout
+command_stderr=$bootstrap_root/command-stderr
 
 cd "$repository_root"
 if ! env -i \
@@ -115,17 +118,60 @@ if ! env -i \
   GOAUTH=off \
   GOVCS='*:off' \
   GOTELEMETRY=off \
-  "$go_binary" run ./cmd/license-evidence "$@" \
+  "$go_binary" build -o "$bootstrap_binary" ./cmd/license-evidence \
+  >"$build_stdout" 2>"$build_stderr"; then
+  printf '%s\n' 'license-evidence bootstrap failed' >&2
+  exit 1
+fi
+
+# Go may write ordinary module-download progress while populating a fresh cache.
+# Suppress successful build diagnostics, but require an otherwise silent build
+# and validate the exact private binary before it crosses the execution gate.
+test ! -s "$build_stdout" || exit 1
+case $bootstrap_binary in
+  "$bootstrap_root"/license-evidence) ;;
+  *) exit 1 ;;
+esac
+test -f "$bootstrap_binary" && test ! -L "$bootstrap_binary" && test -s "$bootstrap_binary" || exit 1
+chmod 0500 "$bootstrap_binary" || exit 1
+test -x "$bootstrap_binary" || exit 1
+
+if ! env -i \
+  PATH="$PATH" \
+  LANG=C \
+  LC_ALL=C \
+  TZ=UTC \
+  HOME="$bootstrap_home" \
+  TMPDIR="$bootstrap_tmp" \
+  GOPATH="$bootstrap_gopath" \
+  GOMODCACHE="$bootstrap_module_cache" \
+  GOCACHE="$bootstrap_build_cache" \
+  GOENV=off \
+  GOFLAGS= \
+  GOWORK=off \
+  GOTOOLCHAIN=local \
+  CGO_ENABLED=0 \
+  GOPROXY=https://proxy.golang.org \
+  GOSUMDB=sum.golang.org \
+  GOPRIVATE= \
+  GONOPROXY= \
+  GONOSUMDB= \
+  GOINSECURE= \
+  GOAUTH=off \
+  GOVCS='*:off' \
+  GOTELEMETRY=off \
+  "$bootstrap_binary" "$@" \
   >"$command_stdout" 2>"$command_stderr"; then
   printf '%s\n' 'license-evidence bootstrap failed' >&2
   exit 1
 fi
 
-# Hold all subprocess bytes until the command has satisfied its intentionally
-# tiny success contract. Go writes ordinary module-download progress to stderr
-# while populating a fresh cache, so successful stderr is suppressed rather
-# than interpreted as a gate failure. A nonzero command status still fails
-# above without exposing either captured stream.
+# Unlike compiler/download diagnostics, application stderr is part of the
+# verifier contract. Any byte fails closed and remains private until cleanup.
+if test -s "$command_stderr"; then
+  printf '%s\n' 'license-evidence bootstrap failed' >&2
+  exit 1
+fi
 case ${1-} in
   freeze)
     output_size=$(wc -c <"$command_stdout") || exit 1

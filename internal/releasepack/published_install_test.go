@@ -138,10 +138,22 @@ func TestPublishedInstallEvidenceRejectsCanonicalFieldTampering(t *testing.T) {
 func publishedInstallFixture(t *testing.T) (string, string, PublishedInstallExpectations) {
 	t.Helper()
 	preflight, signedDir := publishedExecutableFixture(t)
+	return publishedInstallFixtureFromRelease(t, preflight, signedDir, nil)
+}
+
+func publishedInstallFixtureFromRelease(t *testing.T, preflight PublicationPreflightOptions, signedDir string, verifyEvidence licenseEvidenceRecordVerifier) (string, string, PublishedInstallExpectations) {
+	t.Helper()
 	downloadDir := filepath.Join(t.TempDir(), "download")
-	receipt, err := VerifyPublishedRelease(t.Context(), &fixtureReleaseReader{source: signedDir}, PublishedVerificationOptions{
+	options := PublishedVerificationOptions{
 		Preflight: preflight, DownloadDir: downloadDir, VerifierID: "idp:release-verifier",
-	})
+	}
+	var receipt PostPublicationReceipt
+	var err error
+	if verifyEvidence == nil {
+		receipt, err = VerifyPublishedRelease(t.Context(), &fixtureReleaseReader{source: signedDir}, options)
+	} else {
+		receipt, err = verifyPublishedReleaseWithLicenseEvidenceVerifier(t.Context(), &fixtureReleaseReader{source: signedDir}, options, verifyEvidence)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

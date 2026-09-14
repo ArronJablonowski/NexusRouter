@@ -81,6 +81,34 @@ func TestCredentialTransportAttachesOnlyToFixedGitHubOrigins(t *testing.T) {
 	}
 }
 
+func TestCredentialTransportCloseClearsPrivateLeaseCopy(t *testing.T) {
+	source := []byte("github_pat_private-lease-copy")
+	transport, err := newCredentialTransport(t.Context(), &transportFixture{}, &secretFixture{
+		credential: Credential{Token: source, ContentsWrite: true, AdministrationRead: true},
+	}, "acme/router")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaseCopy := transport.token
+	if len(leaseCopy) == 0 {
+		t.Fatal("credential lease copy missing before close")
+	}
+	if err = transport.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if transport.token != nil || !transport.closed {
+		t.Fatal("closed credential transport retained its token")
+	}
+	for _, value := range leaseCopy {
+		if value != 0 {
+			t.Fatal("private credential lease bytes survived close")
+		}
+	}
+	if err = transport.Close(); !errors.Is(err, ErrCredentialTransport) {
+		t.Fatal("closed credential transport was reusable", err)
+	}
+}
+
 func TestCredentialTransportAllowsExactAnnotatedTagRead(t *testing.T) {
 	sha := strings.Repeat("a", 40)
 	request, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://api.github.com/repos/acme/router/git/tags/"+sha, nil)

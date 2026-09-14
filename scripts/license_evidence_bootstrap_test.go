@@ -20,7 +20,8 @@ func TestLicenseEvidenceBootstrapUsesFreshFixedEnvironment(t *testing.T) {
 	bin := t.TempDir()
 	fakeGo := filepath.Join(bin, "go")
 	capture := filepath.Join(t.TempDir(), "environment")
-	fake := `#!/bin/sh
+	buildCapture := capture + ".build"
+	verifier := `#!/bin/sh
 capture=` + strconv.Quote(capture) + `
 {
 for name in HOME TMPDIR GOPATH GOMODCACHE GOCACHE GOENV GOFLAGS GOWORK GOTOOLCHAIN CGO_ENABLED GOPROXY GOSUMDB GOPRIVATE GONOPROXY GONOSUMDB GOINSECURE GOAUTH GOVCS GOTELEMETRY HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
@@ -36,6 +37,17 @@ printf '\n'
 } >"$capture"
 printf '%s\n' 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 `
+	fake := fakeGoBuilder(verifier, `capture=`+strconv.Quote(buildCapture)+`
+{
+for name in HOME TMPDIR GOPATH GOMODCACHE GOCACHE GOENV GOFLAGS GOWORK GOTOOLCHAIN CGO_ENABLED GOPROXY GOSUMDB GOPRIVATE GONOPROXY GONOSUMDB GOINSECURE GOAUTH GOVCS GOTELEMETRY HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
+  eval "value=\${$name-}"
+  printf '%s=%s\n' "$name" "$value"
+done
+printf 'ARGS='
+for argument in "$@"; do printf '<%s>' "$argument"; done
+printf '\n'
+} >"$capture"
+printf '%s\n' 'ordinary build download diagnostic' >&2`, 0)
 	if err = os.WriteFile(fakeGo, []byte(fake), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -72,16 +84,27 @@ printf '%s\n' 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 		t.Fatal(err)
 	}
 	values := parseBootstrapOutput(t, string(captured))
+	buildBody, err := os.ReadFile(buildCapture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buildValues := parseBootstrapOutput(t, string(buildBody))
 	for key, expected := range map[string]string{
 		"GOENV": "off", "GOFLAGS": "", "GOWORK": "off", "GOTOOLCHAIN": "local", "CGO_ENABLED": "0",
 		"GOPROXY": "https://proxy.golang.org", "GOSUMDB": "sum.golang.org", "GOPRIVATE": "",
 		"GONOPROXY": "", "GONOSUMDB": "", "GOINSECURE": "", "GOAUTH": "off", "GOVCS": "*:off", "GOTELEMETRY": "off",
 		"HTTP_PROXY": "", "HTTPS_PROXY": "", "ALL_PROXY": "", "NO_PROXY": "",
-		"ARGS": "<run><./cmd/license-evidence><freeze><--commit><" + strings.Repeat("a", 40) + "><--source><" + repository + "><--out></evidence.json>",
+		"ARGS": "<freeze><--commit><" + strings.Repeat("a", 40) + "><--source><" + repository + "><--out></evidence.json>",
 	} {
 		if values[key] != expected {
 			t.Fatalf("%s=%q, want %q", key, values[key], expected)
 		}
+		if key != "ARGS" && buildValues[key] != expected {
+			t.Fatalf("build %s=%q, want %q", key, buildValues[key], expected)
+		}
+	}
+	if args := buildValues["ARGS"]; !strings.HasPrefix(args, "<build><-o><"+bootstrapParentReal+string(filepath.Separator)) || !strings.HasSuffix(args, "><./cmd/license-evidence>") {
+		t.Fatalf("unexpected private build arguments %q", args)
 	}
 	for _, key := range []string{"HOME", "TMPDIR", "GOPATH", "GOMODCACHE", "GOCACHE"} {
 		value := values[key]
@@ -110,7 +133,7 @@ func TestLicenseEvidenceBootstrapRejectsUnsafeParentBeforeGo(t *testing.T) {
 	}
 }
 
-func TestLicenseEvidenceBootstrapRemovesWorkspaceAfterCommandFailure(t *testing.T) {
+func TestLicenseEvidenceBootstrapRemovesWorkspaceAfterBuildFailure(t *testing.T) {
 	repository, err := filepath.Abs("..")
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +154,7 @@ func TestLicenseEvidenceBootstrapRemovesWorkspaceAfterCommandFailure(t *testing.
 	}
 	output, runErr := command.CombinedOutput()
 	if runErr == nil {
-		t.Fatal("failing license-evidence command unexpectedly succeeded")
+		t.Fatal("failing license-evidence build unexpectedly succeeded")
 	}
 	if string(output) != "license-evidence bootstrap failed\n" || strings.Contains(string(output), secret) || strings.Contains(string(output), bootstrapParent) {
 		t.Fatalf("command failure leaked subprocess data: %q", output)
@@ -142,7 +165,7 @@ func TestLicenseEvidenceBootstrapRemovesWorkspaceAfterCommandFailure(t *testing.
 	}
 }
 
-func TestLicenseEvidenceBootstrapSuppressesSuccessfulStderr(t *testing.T) {
+func TestLicenseEvidenceBootstrapRejectsSuccessfulVerifierStderr(t *testing.T) {
 	repository, err := filepath.Abs("..")
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +173,8 @@ func TestLicenseEvidenceBootstrapSuppressesSuccessfulStderr(t *testing.T) {
 	bin := t.TempDir()
 	fakeGo := filepath.Join(bin, "go")
 	secret := "unexpected-stderr-secret"
-	fake := "#!/bin/sh\nprintf '%s\\n' 'sha256:" + strings.Repeat("b", 64) + "'\nprintf '%s\\n' '" + secret + "' >&2\n"
+	verifier := "#!/bin/sh\nprintf '%s\\n' 'sha256:" + strings.Repeat("b", 64) + "'\nprintf '%s\\n' '" + secret + "' >&2\n"
+	fake := fakeGoBuilder(verifier, "printf '%s\\n' 'ordinary build download diagnostic' >&2", 0)
 	if err = os.WriteFile(fakeGo, []byte(fake), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -162,8 +186,11 @@ func TestLicenseEvidenceBootstrapSuppressesSuccessfulStderr(t *testing.T) {
 		"DARWIN_LICENSE_BOOTSTRAP_PARENT=" + bootstrapParent,
 	}
 	output, runErr := command.CombinedOutput()
-	if runErr != nil || string(output) != "sha256:"+strings.Repeat("b", 64)+"\n" || strings.Contains(string(output), secret) {
-		t.Fatalf("successful stderr was not suppressed safely: %v: %q", runErr, output)
+	if runErr == nil || string(output) != "license-evidence bootstrap failed\n" || strings.Contains(string(output), secret) || strings.Contains(string(output), "ordinary build") {
+		t.Fatalf("successful verifier stderr was not rejected safely: %v: %q", runErr, output)
+	}
+	if entries, readErr := os.ReadDir(bootstrapParent); readErr != nil || len(entries) != 0 {
+		t.Fatalf("stderr failure retained bootstrap workspace: %v, entries=%v", readErr, entries)
 	}
 }
 
@@ -260,7 +287,7 @@ func main() {
 	}
 }
 
-func TestLicenseEvidenceBootstrapNonzeroGoPreservesOutputResidueButLeaksNothing(t *testing.T) {
+func TestLicenseEvidenceBootstrapNonzeroVerifierPreservesOutputResidueButLeaksNothing(t *testing.T) {
 	repository, err := filepath.Abs("..")
 	if err != nil {
 		t.Fatal(err)
@@ -268,7 +295,8 @@ func TestLicenseEvidenceBootstrapNonzeroGoPreservesOutputResidueButLeaksNothing(
 	bin := t.TempDir()
 	residue := filepath.Join(t.TempDir(), "uncertain-evidence.json")
 	secret := "nonzero-go-secret"
-	fake := "#!/bin/sh\nprintf '%s' residue >" + strconv.Quote(residue) + "\nprintf '%s\\n' digest-like-output\nprintf '%s\\n' " + strconv.Quote(secret) + " >&2\nexit 41\n"
+	verifier := "#!/bin/sh\nprintf '%s' residue >" + strconv.Quote(residue) + "\nprintf '%s\\n' digest-like-output\nprintf '%s\\n' " + strconv.Quote(secret) + " >&2\nexit 41\n"
+	fake := fakeGoBuilder(verifier, "", 0)
 	if err = os.WriteFile(filepath.Join(bin, "go"), []byte(fake), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +306,7 @@ func TestLicenseEvidenceBootstrapNonzeroGoPreservesOutputResidueButLeaksNothing(
 	command.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "DARWIN_LICENSE_BOOTSTRAP_PARENT=" + bootstrapParent}
 	output, runErr := command.CombinedOutput()
 	if runErr == nil || string(output) != "license-evidence bootstrap failed\n" || strings.Contains(string(output), secret) || strings.Contains(string(output), "digest-like-output") {
-		t.Fatalf("nonzero Go failure was not generic: %v: %q", runErr, output)
+		t.Fatalf("nonzero verifier failure was not generic: %v: %q", runErr, output)
 	}
 	if body, readErr := os.ReadFile(residue); readErr != nil || string(body) != "residue" {
 		t.Fatalf("external residue was altered: %q, %v", body, readErr)
@@ -332,6 +360,31 @@ func sha256Line(value string) string {
 	return "sha256:b7a8a844a613be796bc1892dc480f9d92c50d32a5713a87758e5c5addc4ec814\n"
 }
 
+func fakeGoBuilder(verifier, buildActions string, status int) string {
+	script := "#!/bin/sh\n" + buildActions + "\n"
+	if status != 0 {
+		return script + "exit " + strconv.Itoa(status) + "\n"
+	}
+	return script + `
+test "${1-}" = build || exit 91
+shift
+output=
+while test "$#" -gt 0; do
+  if test "$1" = -o; then
+    shift
+    test "$#" -gt 0 || exit 92
+    output=$1
+  fi
+  shift
+done
+test -n "$output" || exit 93
+cat >"$output" <<'DARWIN_LICENSE_EVIDENCE_FIXTURE'
+` + verifier + `
+DARWIN_LICENSE_EVIDENCE_FIXTURE
+chmod 0700 "$output" || exit 94
+`
+}
+
 func TestLicenseEvidenceBootstrapRedactsUtilityFailures(t *testing.T) {
 	repository, err := filepath.Abs("..")
 	if err != nil {
@@ -341,7 +394,8 @@ func TestLicenseEvidenceBootstrapRedactsUtilityFailures(t *testing.T) {
 		t.Run(utility, func(t *testing.T) {
 			bin := t.TempDir()
 			fakeGo := filepath.Join(bin, "go")
-			if writeErr := os.WriteFile(fakeGo, []byte("#!/bin/sh\nprintf '%s\\n' 'sha256:"+strings.Repeat("c", 64)+"'\n"), 0700); writeErr != nil {
+			verifier := "#!/bin/sh\nprintf '%s\\n' 'sha256:" + strings.Repeat("c", 64) + "'\n"
+			if writeErr := os.WriteFile(fakeGo, []byte(fakeGoBuilder(verifier, "", 0)), 0700); writeErr != nil {
 				t.Fatal(writeErr)
 			}
 			secret := "utility-secret-must-not-escape"

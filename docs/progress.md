@@ -1,5 +1,22 @@
 # Implementation evidence
 
+DAR-106 deterministic rollback-chain checkpoint: the first-release success and
+fail-closed regressions now build their releasable native fixture only from the
+repository's controlled local module proxy and locally signed checksum database.
+Each test pins HOME, temporary storage, module cache, build cache, and GOPATH to
+private test roots; the failure cases share one immutable signed set while each
+canonical post-publication observation copies it into fresh download and install
+roots. The public publication verifiers still select full production license
+reconstruction; an internal dependency-injection seam lets this controlled test
+run the same preflight and post-publication implementation against independently
+reconstructed local-policy evidence. The chain continues through real published
+install creation and exclusive evidence write, both canonical rollback adapters,
+readiness verification, and exclusive private receipt retention. Assertions
+prove reconstruction scratch cleanup, a clean unchanged source commit, unchanged
+signed bytes, cross-chain digest rejection, verifier-role separation, and output
+collision rejection. No live reconstruction service, release, tag, credential,
+or operator evidence is part of deterministic qualification.
+
 DAR-105 publication-conflict regression checkpoint: the credential-bearing
 production publisher is now exercised against the exact quarantined `v1.0.0`
 shape: the remote annotated tag ref already exists while no GitHub Release is
@@ -8,9 +25,11 @@ follows the tag object, checks the later release endpoint, creates a journal, or
 sends any mutating request. Additional cases cover an existing release and
 ambiguous tag or release lookups. All remain `not_started` and retryable with no
 tag/release identity, request body, credential, or artifact content in returned
-evidence. The fixture also proves the bounded credential lease is closed and
-zeroed. This does not decide or alter DAR-97's remote tag; that remains an
-explicit operator action.
+evidence. The conflict fixture proves the secret-source buffer is cleared and
+the operation returns through its deferred lease close; a separate package-level
+test retains an alias to the private lease copy and proves `Close` zeroes those
+bytes, drops the slice, and prevents reuse. This does not decide or alter
+DAR-97's remote tag; that remains an explicit operator action.
 
 DAR-61 rollback-readiness regression checkpoint: a full first-release fixture
 now carries the canonical post-publication receipt through the real published
@@ -27,27 +46,29 @@ operator-approved first-release rollback policy, owner, channel, and validity
 window.
 
 DAR-104 license-bootstrap qualification checkpoint: the first post-schema-3
-RC13 mechanical freeze exposed that a real `go run` populating an initially
-empty module cache writes ordinary download progress to standard error. The
-bootstrap captured those bytes but incorrectly treated their presence as a
-failed gate after the create-only evidence file had already been committed.
-It now continues to suppress all captured standard error while accepting a
-successful command only when standard output is the exact single canonical
-digest line. Any nonzero Go exit, malformed standard output, utility failure,
-or cleanup failure remains a generic fail-closed error with no captured bytes
-or private paths exposed. A possible external create-only output from a failed
-command remains quarantined rather than deleted or overwritten.
+RC13 mechanical freeze exposed that fresh-cache compilation writes ordinary Go
+download progress to standard error. The bootstrap now performs two subprocess
+phases under the same cleared, fixed environment. It first builds to an exact
+private, regular, nonsymlink binary inside the bootstrap workspace; successful
+build diagnostics are suppressed only after empty build stdout and binary
+path/type/mode checks. It then executes that binary with separate stream capture.
+The verifier must exit zero and emit no stderr before freeze can return one exact
+canonical digest line or verify can accept empty stdout. Nonzero build or
+verifier status, verifier stderr, malformed output, utility failure, or cleanup
+failure remains a generic fail-closed error with no captured bytes or private
+paths exposed. A possible external create-only output from a failed verifier
+remains quarantined rather than deleted or overwritten.
 
-The regression suite retains the injected-environment tests and adds an actual
-Go compilation from fresh home, temporary, module, build, and GOPATH directories.
-That integration fixture obtains a synthetic dependency from a controlled local
-module proxy, proves the dependency was executed, accepts the successful
-download diagnostics without exposing them, and verifies workspace cleanup.
-Separate failure coverage makes a nonzero Go command emit both private standard
-error and digest-like standard output while leaving an external output residue;
-the caller sees only the fixed failure line, the private workspace is removed,
-and the external residue is preserved for quarantine. No RC13 evidence was
-approved, retried, deleted, or overwritten by this code change, and no
+The regression suite retains the injected-environment tests and runs an actual
+Go build from fresh home, temporary, module, build, and GOPATH directories. That
+integration fixture obtains a synthetic dependency from a controlled local
+module proxy, proves the built verifier executes it, accepts private build
+diagnostics without exposing them, and verifies workspace cleanup. Separate
+failure coverage rejects a nonzero build, a zero-exit verifier that emits stderr
+beside shaped stdout, and a nonzero verifier that leaves an external output
+residue. The caller sees only the fixed failure line, the private workspace is
+removed, and the external residue is preserved for quarantine. No RC13 evidence
+was approved, retried, deleted, or overwritten by this code change, and no
 credential, signing key, Git tag, GitHub release, or publication path was used.
 
 DAR-101 packaging reconstruction checkpoint: each `Package` invocation now

@@ -39,12 +39,16 @@ type PublicationPreflightResult struct {
 // production-verified local signed set. It does not authorize itself or mutate
 // local or remote state.
 func VerifyPublicationPreflight(ctx context.Context, options PublicationPreflightOptions) (PublicationPreflightResult, error) {
+	return verifyPublicationPreflightWithLicenseEvidenceVerifier(ctx, options, verifyLicenseEvidenceRecord)
+}
+
+func verifyPublicationPreflightWithLicenseEvidenceVerifier(ctx context.Context, options PublicationPreflightOptions, verifyEvidence licenseEvidenceRecordVerifier) (PublicationPreflightResult, error) {
 	var result PublicationPreflightResult
 	if ctx == nil || options.PublicationAuthorizationFile == "" || options.ReleaseNotesFile == "" ||
-		!trustFingerprint(options.ExpectedPublicationAuthorizationSHA256) || !githubRepository.MatchString(options.ExpectedRepository) {
+		!trustFingerprint(options.ExpectedPublicationAuthorizationSHA256) || !githubRepository.MatchString(options.ExpectedRepository) || verifyEvidence == nil {
 		return result, ErrPublicationAuthorization
 	}
-	verification, err := VerifyApproved(ctx, options.Verification)
+	verification, err := verifyApprovedWithLicenseEvidenceVerifier(ctx, options.Verification, verifyEvidence)
 	if err != nil {
 		return result, ErrPublicationAuthorization
 	}
@@ -77,7 +81,7 @@ func VerifyPublicationPreflight(ctx context.Context, options PublicationPrefligh
 	}
 	// Close the point-in-time observation with the same full approval-bound
 	// verification and reject any local source or release mutation during preflight.
-	final, err := VerifyApproved(ctx, options.Verification)
+	final, err := verifyApprovedWithLicenseEvidenceVerifier(ctx, options.Verification, verifyEvidence)
 	if err != nil || final != verification || ctx.Err() != nil {
 		return result, ErrPublicationAuthorization
 	}

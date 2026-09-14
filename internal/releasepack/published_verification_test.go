@@ -173,6 +173,15 @@ func publishedExecutableFixture(t *testing.T) (PublicationPreflightOptions, stri
 	return publishedFixtureWithExecutable(t, true)
 }
 
+func publishedControlledExecutableFixture(t *testing.T, policy goReconstructionPolicyOptions) (PublicationPreflightOptions, string, licenseEvidenceRecordVerifier) {
+	signing, _ := approvedSigningControlledExecutableFixture(t, policy)
+	verifier := func(ctx context.Context, recordPath, expectedSHA256, source string, protectedPaths ...string) (LicenseEvidence, error) {
+		return verifyLicenseEvidenceRecordWithPolicy(ctx, recordPath, expectedSHA256, source, policy, protectedPaths...)
+	}
+	preflight, signedDir := publishedFixtureFromSigningWithVerifier(t, signing, verifier)
+	return preflight, signedDir, verifier
+}
+
 func publishedFixtureWithExecutable(t *testing.T, executableNative bool) (PublicationPreflightOptions, string) {
 	t.Helper()
 	var signing ApprovedSigningOptions
@@ -181,13 +190,35 @@ func publishedFixtureWithExecutable(t *testing.T, executableNative bool) (Public
 	} else {
 		signing, _ = approvedSigningFixture(t)
 	}
-	if err := SignApproved(context.Background(), signing); err != nil {
-		t.Fatal(err)
+	return publishedFixtureFromSigning(t, signing)
+}
+
+func publishedFixtureFromSigning(t *testing.T, signing ApprovedSigningOptions) (PublicationPreflightOptions, string) {
+	return publishedFixtureFromSigningWithVerifier(t, signing, nil)
+}
+
+func publishedFixtureFromSigningWithVerifier(t *testing.T, signing ApprovedSigningOptions, verifyEvidence licenseEvidenceRecordVerifier) (PublicationPreflightOptions, string) {
+	t.Helper()
+	var err error
+	if verifyEvidence == nil {
+		err = SignApproved(context.Background(), signing)
+	} else {
+		err = signApprovedWithLicenseEvidenceVerifier(context.Background(), signing, func(path string) ([]byte, error) {
+			return signingKeyFile(path, true)
+		}, verifyEvidence)
+	}
+	if err != nil {
+		t.Fatal("sign published fixture", err)
 	}
 	verification := verificationOptions(signing)
-	verified, err := VerifyApproved(context.Background(), verification)
+	var verified ApprovedVerificationResult
+	if verifyEvidence == nil {
+		verified, err = VerifyApproved(context.Background(), verification)
+	} else {
+		verified, err = verifyApprovedWithLicenseEvidenceVerifier(context.Background(), verification, verifyEvidence)
+	}
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("verify published fixture", err)
 	}
 	_, candidate, err := readCandidateRecord(signing.CandidateRecordFile)
 	if err != nil {
