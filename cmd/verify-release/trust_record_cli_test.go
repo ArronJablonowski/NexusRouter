@@ -115,7 +115,7 @@ func signedCLITrustFixture(t *testing.T) (string, string, string, string, string
 	}
 	repository := filepath.Clean(filepath.Join(filepath.Dir(testFile), "../.."))
 	source := filepath.Join(t.TempDir(), "source")
-	for _, directory := range []string{"cmd/darwin", "docs", "examples"} {
+	for _, directory := range []string{"cmd/darwin", "docs", "examples", "webui/assets/v1"} {
 		if err := os.MkdirAll(filepath.Join(source, directory), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -133,6 +133,27 @@ func signedCLITrustFixture(t *testing.T) (string, string, string, string, string
 		if err = os.WriteFile(filepath.Join(source, name), body, 0644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	assets, err := os.ReadDir(filepath.Join(repository, "webui", "assets", "v1"))
+	if err != nil || len(assets) == 0 {
+		t.Fatal("read WebUI release fixture", err)
+	}
+	for _, asset := range assets {
+		info, infoErr := asset.Info()
+		if infoErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			t.Fatal("unsafe WebUI release fixture", asset.Name(), infoErr)
+		}
+		body, readErr := os.ReadFile(filepath.Join(repository, "webui", "assets", "v1", asset.Name()))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if err = os.WriteFile(filepath.Join(source, "webui", "assets", "v1", asset.Name()), body, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	webUIBody := []byte("package webui\n\nimport \"embed\"\n\n//go:embed assets/v1/*\nvar assets embed.FS\n")
+	if err = os.WriteFile(filepath.Join(source, "webui", "shell.go"), webUIBody, 0644); err != nil {
+		t.Fatal(err)
 	}
 	mainBody := []byte("package main\n\nimport (\n\t\"fmt\"\n\t_ \"github.com/mattn/go-isatty\"\n)\n\nvar version = \"dev\"\n\nfunc main() { fmt.Println(version) }\n")
 	if err := os.WriteFile(filepath.Join(source, "cmd/darwin/main.go"), mainBody, 0644); err != nil {
