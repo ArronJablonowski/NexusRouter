@@ -52,7 +52,7 @@ authorization digests, install-evidence digest, native target, artifact and
 installed-binary digests, backup digest, source/current/rollback schemas, and
 verifier/time directly from it. The same rehearsal therefore cannot verify a
 different release. The destination schema is the authoritative build schema
-(currently `45`). Stop, uninstall, and data disposition remain approved incident
+(currently `46`). Stop, uninstall, and data disposition remain approved incident
 policy; this gate does not falsely claim that those incident actions were run.
 
 ## Verification
@@ -68,7 +68,7 @@ go run ./cmd/verify-rollback-readiness \
   --publication-authorization-sha256 sha256:AUTHORIZATION \
   --receipt-verifier-id idp:release-observer \
   --repository ArronJablonowski/DarwinRouter --version 1.0.0 \
-  --commit FULL40HEXCOMMIT --tag v1.0.0 --release-id 123 --current-schema 45 \
+  --commit FULL40HEXCOMMIT --tag v1.0.0 --release-id 123 --current-schema 46 \
   --mode first_release \
   --rehearsal-evidence published-install.json \
   --rehearsal-sha256 sha256:PUBLISHED_INSTALL_RECORD \

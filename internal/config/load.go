@@ -53,6 +53,9 @@ func Load(options Options) (Settings, error) {
 		merge(root, n)
 	}
 	for _, overrides := range []map[string]string{options.Env, options.Flags} {
+		if err := normalizeRoutingClassifierOverrideTypes(root, overrides); err != nil {
+			return Settings{}, err
+		}
 		if err := seedMetricsExportOverrides(root, overrides); err != nil {
 			return Settings{}, err
 		}

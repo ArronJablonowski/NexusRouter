@@ -59,6 +59,16 @@ models:
     # runtime overhead. Keeping zero denies local resource admission.
     # On Apple unified memory, include GPU allocations here and leave VRAM zero.
     ram_bytes: 0
+routing:
+  # Auxiliary intent classification is opt-in. Enabling it requires an exact
+  # configured model alias and remains within these cost, token, and time caps.
+  classifier:
+    enabled: false
+    model_id: ""
+    max_cost: 0
+    max_input_tokens: 4096
+    max_output_tokens: 256
+    timeout: 30s
 tools:
   # Filesystem tools remain disabled. Agent-facing Workboard reads/writes are
   # separate gates; writes require reads and an interactive approval presenter.

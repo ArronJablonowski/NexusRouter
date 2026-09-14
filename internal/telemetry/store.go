@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/classification"
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -151,6 +152,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
+	}
+	if version < 46 {
+		if err = discardEmptyFutureIntentClassificationAttempts(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 46 {
+		if err = validateIntentClassificationAttemptSchema(ctx, conn); err != nil {
+			return err
+		}
 	}
 	if version < 45 {
 		if err = discardEmptyFutureAuxiliaryReviewOutcomes(ctx, conn); err != nil {
@@ -512,6 +523,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 46 {
+		if err = migrateIntentClassificationAttempts(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
 		return errors.New("migration did not reach current database version")
 	}
@@ -649,12 +665,20 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM task_cancellations WHERE task_id=?)", e.TaskID).Scan(&requested); err != nil {
 			return err
 		}
-		if requested {
+		if requested && !intentClassificationCleanupEvent(ctx, tx, e) {
 			return runtime.ErrCancellationRequested
 		}
 	}
 	if err := steeringAppendGate(ctx, tx, e); err != nil {
 		return err
+	}
+	var intentClassification *classification.Attempt
+	if e.Kind == runtime.TaskStarted && e.Data.IntentClassification != nil {
+		attempt, validationErr := intentClassificationAttemptForEvent(ctx, tx, e)
+		if validationErr != nil {
+			return validationErr
+		}
+		intentClassification = &attempt
 	}
 	switch e.Kind {
 	case runtime.TaskCompleted:
@@ -679,6 +703,11 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	if err = appendTaskTiming(ctx, tx, e); err != nil {
 		return err
 	}
+	if intentClassification != nil {
+		if err = appendIntentClassificationUsage(ctx, tx, e, *intentClassification); err != nil {
+			return err
+		}
+	}
 	if err = appendRoutedUsage(ctx, tx, e); err != nil {
 		return err
 	}
@@ -691,6 +720,27 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		}
 	}
 	return tx.Commit()
+}
+
+// intentClassificationCleanupEvent recognizes the effect-free synthetic
+// lifecycle used only to close and account a terminal classifier attempt after
+// normal routing was denied. It never authorizes a provider or tool event.
+func intentClassificationCleanupEvent(ctx context.Context, tx *sql.Tx, event runtime.Event) bool {
+	if event.Kind == runtime.TaskStarted {
+		return event.Data.IntentClassification != nil && event.Data.IntentClassification.Validate() == nil &&
+			event.Data.ModelID == "" && event.Data.ProviderID == "" && len(event.Data.Messages) == 0 && event.Data.Route == nil
+	}
+	if event.Kind != runtime.ErrorRecorded && event.Kind != runtime.TaskFailed {
+		return false
+	}
+	var body []byte
+	if err := tx.QueryRowContext(ctx, "SELECT body FROM events WHERE task_id=? AND sequence=1", event.TaskID).Scan(&body); err != nil {
+		return false
+	}
+	var start runtime.Event
+	return json.Unmarshal(body, &start) == nil && start.Validate() == nil && start.Kind == runtime.TaskStarted &&
+		start.Data.IntentClassification != nil && start.Data.ModelID == "" && start.Data.ProviderID == "" &&
+		len(start.Data.Messages) == 0 && start.Data.Route == nil
 }
 
 // Read returns bounded pages; after is an exclusive per-task sequence cursor.

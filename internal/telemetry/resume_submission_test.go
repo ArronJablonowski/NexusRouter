@@ -21,8 +21,9 @@ func resumeEnvelope(t *testing.T, fence submissions.ResumeSourceFence, local boo
 	body, err := json.Marshal(struct {
 		Version int                            `json:"version"`
 		Request any                            `json:"request"`
+		Intent  submissionIntentProjection     `json:"intent"`
 		Resume  *submissions.ResumeSourceFence `json:"resume,omitempty"`
-	}{1, request, &fence})
+	}{2, request, submissionIntentProjection{Version: 1}, &fence})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,8 +348,9 @@ func TestResumeSubmissionRejectsPoisonRequestShapes(t *testing.T) {
 		body, err := json.Marshal(struct {
 			Version int                            `json:"version"`
 			Request any                            `json:"request"`
+			Intent  submissionIntentProjection     `json:"intent"`
 			Resume  *submissions.ResumeSourceFence `json:"resume"`
-		}{1, request, &fence})
+		}{2, request, submissionIntentProjection{Version: 1}, &fence})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,6 +358,29 @@ func TestResumeSubmissionRejectsPoisonRequestShapes(t *testing.T) {
 		if _, err = db.CreateResumeSubmission(context.Background(), submitDigest(string(body)), hex.EncodeToString(digest[:]), submitDigest("config"), body); !errors.Is(err, submissions.ErrInvalid) {
 			t.Fatal("poison resume request admitted", request, err)
 		}
+	}
+}
+
+func TestResumeSubmissionRequiresCanonicalV2IntentMetadata(t *testing.T) {
+	db, _ := submissionStore(t)
+	fence := recoveredModelSource(t, db, "local_only")
+	body, _ := resumeEnvelope(t, fence, true)
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(body, &envelope) != nil {
+		t.Fatal("invalid fixture")
+	}
+	for name, raw := range map[string][]byte{
+		"legacy version":       []byte(`{"version":1,"request":` + string(envelope["request"]) + `,"resume":` + string(envelope["resume"]) + `}`),
+		"missing intent":       []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"resume":` + string(envelope["resume"]) + `}`),
+		"bad intent version":   []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"intent":{"version":2,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false},"resume":` + string(envelope["resume"]) + `}`),
+		"unknown intent field": []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"intent":{"version":1,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false,"extra":true},"resume":` + string(envelope["resume"]) + `}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			digest := sha256.Sum256(raw)
+			if _, err := db.CreateResumeSubmission(context.Background(), submitDigest(name), hex.EncodeToString(digest[:]), submitDigest("config"), raw); !errors.Is(err, submissions.ErrInvalid) {
+				t.Fatal("invalid submission contract admitted", err)
+			}
+		})
 	}
 }
 

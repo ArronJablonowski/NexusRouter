@@ -114,6 +114,19 @@ type Routing struct {
 	HalfLife       string             `yaml:"decay_half_life" json:"decay_half_life"`
 	DecayOverrides []DecayOverride    `yaml:"decay_overrides,omitempty" json:"decay_overrides,omitempty"`
 	Weights        map[string]float64 `yaml:"weights" json:"weights"`
+	Classifier     RoutingClassifier  `yaml:"classifier" json:"classifier"`
+}
+
+// RoutingClassifier configures one policy-bounded auxiliary call that may
+// classify ambiguous automatic-routing requests. It does not select its own
+// model through adaptive routing.
+type RoutingClassifier struct {
+	Enabled         bool    `yaml:"enabled" json:"enabled"`
+	ModelID         string  `yaml:"model_id" json:"model_id"`
+	MaxCost         float64 `yaml:"max_cost" json:"max_cost"`
+	MaxInputTokens  int64   `yaml:"max_input_tokens" json:"max_input_tokens"`
+	MaxOutputTokens int64   `yaml:"max_output_tokens" json:"max_output_tokens"`
+	Timeout         string  `yaml:"timeout" json:"timeout"`
 }
 
 // DecayOverride selects an exact task domain and execution profile. Ordered
@@ -183,7 +196,7 @@ func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h"},
 		Workboard: Workboard{Enabled: true, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
-		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}},
+		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},
 		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
@@ -328,6 +341,9 @@ func (s Settings) Validate() error {
 	}
 	if math.Abs(total-1) > 1e-9 {
 		return errors.New("routing weights must sum to one")
+	}
+	if err := s.validateRoutingClassifier(); err != nil {
+		return err
 	}
 	if s.Security.Egress != "deny" {
 		return errors.New("local-only egress must be deny")

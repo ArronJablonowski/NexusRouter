@@ -20,17 +20,20 @@ func TestClassifyRequestIntentUsesOnlyStructuredEvidence(t *testing.T) {
 		domain     string
 		profile    string
 		capability []string
+		domainSet  bool
+		capsSet    bool
+		ambiguous  bool
 	}{
-		{name: "automatic defaults", request: Request{ModelID: "auto", Prompt: "write a poem and solve code"}, domain: "general", profile: "default", capability: []string{"chat"}},
-		{name: "implicit automatic defaults", request: Request{Prompt: "write Go"}, domain: "general", profile: "default", capability: []string{"chat"}},
-		{name: "explicit preserved", request: Request{ModelID: "model", Domain: "project.special", Profile: "careful mode"}, domain: "project.special", profile: "careful mode"},
-		{name: "explicit has no capability default", request: Request{ModelID: "model"}, domain: "general", profile: "default"},
-		{name: "validation wins", request: Request{ModelID: "model", Validation: "go_source", Capabilities: []string{"math"}}, domain: "code", profile: "default", capability: []string{"math"}},
-		{name: "code aliases agree", request: Request{Capabilities: []string{"coding", "debugging", "chat"}}, domain: "code", profile: "default", capability: []string{"coding", "debugging", "chat"}},
-		{name: "math", request: Request{Capabilities: []string{"mathematics"}}, domain: "math", profile: "default", capability: []string{"mathematics"}},
-		{name: "structured", request: Request{Capabilities: []string{"structured_output"}}, domain: "structured_json", profile: "default", capability: []string{"structured_output"}},
-		{name: "creative", request: Request{Capabilities: []string{"creative_writing"}}, domain: "creative", profile: "default", capability: []string{"creative_writing"}},
-		{name: "conflict", request: Request{Capabilities: []string{"code", "math"}}, domain: "general", profile: "default", capability: []string{"code", "math"}},
+		{name: "automatic defaults", request: Request{ModelID: "auto", Prompt: "write a poem and solve code"}, domain: "general", profile: "default", capability: []string{"chat"}, ambiguous: true},
+		{name: "implicit automatic defaults", request: Request{Prompt: "write Go"}, domain: "general", profile: "default", capability: []string{"chat"}, ambiguous: true},
+		{name: "explicit preserved", request: Request{ModelID: "model", Domain: "project.special", Profile: "careful mode"}, domain: "project.special", profile: "careful mode", domainSet: true},
+		{name: "explicit has no capability default", request: Request{ModelID: "model"}, domain: "general", profile: "default", ambiguous: true},
+		{name: "validation wins", request: Request{ModelID: "model", Validation: "go_source", Capabilities: []string{"math"}}, domain: "code", profile: "default", capability: []string{"math"}, capsSet: true},
+		{name: "code aliases agree", request: Request{Capabilities: []string{"coding", "debugging", "chat"}}, domain: "code", profile: "default", capability: []string{"coding", "debugging", "chat"}, capsSet: true},
+		{name: "math", request: Request{Capabilities: []string{"mathematics"}}, domain: "math", profile: "default", capability: []string{"mathematics"}, capsSet: true},
+		{name: "structured", request: Request{Capabilities: []string{"structured_output"}}, domain: "structured_json", profile: "default", capability: []string{"structured_output"}, capsSet: true},
+		{name: "creative", request: Request{Capabilities: []string{"creative_writing"}}, domain: "creative", profile: "default", capability: []string{"creative_writing"}, capsSet: true},
+		{name: "conflict", request: Request{Capabilities: []string{"code", "math"}}, domain: "general", profile: "default", capability: []string{"code", "math"}, capsSet: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -39,6 +42,9 @@ func TestClassifyRequestIntentUsesOnlyStructuredEvidence(t *testing.T) {
 			got, err := classifyRequestIntent(test.request)
 			if err != nil || got.Domain != test.domain || got.Profile != test.profile || !reflect.DeepEqual(got.Capabilities, test.capability) {
 				t.Fatal(got, err)
+			}
+			if !got.intentPrepared || got.domainExplicit != test.domainSet || got.capabilitiesExplicit != test.capsSet || got.intentAmbiguous != test.ambiguous {
+				t.Fatal("incorrect intent origin", got.domainExplicit, got.capabilitiesExplicit, got.intentAmbiguous)
 			}
 			if !reflect.DeepEqual(test.request.Capabilities, before) || test.request.Domain != originalDomain || test.request.Profile != originalProfile {
 				t.Fatal("caller request mutated")
@@ -168,7 +174,7 @@ func TestRunExplicitAdmittedDefensivelyClassifiesIntent(t *testing.T) {
 	}
 }
 
-func TestSubmissionDigestUsesCanonicalIntentBeforeStorage(t *testing.T) {
+func TestSubmissionDigestPreservesIntentOriginBeforeStorage(t *testing.T) {
 	ctx := context.Background()
 	svc := submissionService(t)
 	key := "classified-key-0001"
@@ -177,16 +183,14 @@ func TestSubmissionDigestUsesCanonicalIntentBeforeStorage(t *testing.T) {
 	if err != nil || first.State != "queued" {
 		t.Fatal(first, err)
 	}
-	equivalent := omitted
-	equivalent.Domain, equivalent.Profile, equivalent.Capabilities = "general", "default", []string{"chat"}
-	again, err := svc.Submit(ctx, key, equivalent)
+	again, err := svc.Submit(ctx, key, omitted)
 	if err != nil || again.ID != first.ID {
-		t.Fatal("equivalent classified request was not idempotent", again, err)
+		t.Fatal("omitted intent was not idempotent", again, err)
 	}
-	changed := equivalent
-	changed.Domain = "creative"
-	if _, err := svc.Submit(ctx, key, changed); !errors.Is(err, submissions.ErrConflict) {
-		t.Fatal("changed semantic domain did not conflict", err)
+	explicit := omitted
+	explicit.Domain, explicit.Profile, explicit.Capabilities = "general", "default", []string{"chat"}
+	if _, err := svc.Submit(ctx, key, explicit); !errors.Is(err, submissions.ErrConflict) {
+		t.Fatal("explicit intent origin did not conflict", err)
 	}
 }
 

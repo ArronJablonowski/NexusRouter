@@ -666,6 +666,13 @@ routing:
   exploration_rate: 0.05
   minimum_samples: 20
   decay_half_life: 30d
+  classifier:
+    enabled: false
+    model_id: ""
+    max_cost: 0
+    max_input_tokens: 4096
+    max_output_tokens: 256
+    timeout: 30s
   decay_overrides:
     - domain: coding
       profile: local
@@ -726,7 +733,22 @@ shutdown; an enabled scheduler is never silently ignored.
 
 ### 8.1 Task Classification
 
-Tasks receive one or more domains, required capabilities, privacy classification, context estimate, tool requirements, latency objective, budget, and execution-risk classification. Deterministic rules run first. An auxiliary classifier may fill ambiguous fields when policy and latency budgets permit.
+Tasks receive one or more domains, required capabilities, privacy classification, context estimate, tool requirements, latency objective, budget, and execution-risk classification. Deterministic rules run first. An opt-in auxiliary classifier may fill only omitted domain and capability fields when deterministic metadata is genuinely ambiguous. Explicit domain, capability, privacy, validation, delegated-worker, runtime-host, and fallback intent bypasses it. Merely enabling a local tool surface does not bypass a policy-compatible local classifier; the classifier itself receives no tools.
+
+The classifier makes at most one provider-neutral call with no tools,
+delegation, retry, memory, skill, or historical-session context. Only the fresh,
+credential-redacted request is admitted under the normal egress, locality,
+resource, token, time, and cost policies. Its closed JSON decision is validated,
+persisted before candidate dispatch, and reused after restart; an uncertain
+started attempt is never redispatched. A classifier decision may return no more
+than 16 capability constraints. The accepted decision may add constraints
+but cannot remove caller constraints. Classifier usage is accounted separately,
+and classifier output is never evaluation evidence, fitness evidence, or proof
+of task success. Malformed output, timeout, cancellation, provider failure, or
+ambiguous persistence fails closed before routed-provider dispatch. A terminal
+classifier call that cannot reach normal routing is closed through a minimal,
+redacted, restart-safe task journal so its lifecycle and known usage remain
+inspectable without claiming routed execution or fitness evidence.
 
 ### 8.2 Eligibility Filtering
 

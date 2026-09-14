@@ -26,6 +26,7 @@ import (
 type resumeSubmissionEnvelope struct {
 	Version int                            `json:"version"`
 	Request json.RawMessage                `json:"request"`
+	Intent  submissionIntentProjection     `json:"intent"`
 	Resume  *submissions.ResumeSourceFence `json:"resume,omitempty"`
 }
 
@@ -56,7 +57,7 @@ func parseResumeSubmission(body []byte) (submissions.ResumeSourceFence, bool, er
 	var envelope resumeSubmissionEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || len(envelope.Request) == 0 {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 2 || envelope.Intent.Version != 1 || len(envelope.Request) == 0 {
 		return submissions.ResumeSourceFence{}, false, submissions.ErrInvalid
 	}
 	canonical, err := json.Marshal(envelope)

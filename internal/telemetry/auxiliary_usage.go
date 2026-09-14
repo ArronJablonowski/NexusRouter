@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/accounting"
+	"github.com/ArronJablonowski/DarwinRouter/classification"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -35,6 +37,29 @@ func taskSession(ctx context.Context, tx *sql.Tx, task string) (string, error) {
 	var session string
 	err := tx.QueryRowContext(ctx, "SELECT session_id FROM task_heads WHERE task_id=?", task).Scan(&session)
 	return session, err
+}
+
+// appendIntentClassificationUsage binds classifier accounting to the exact
+// terminal attempt and the TaskStarted event that consumed it. Failed and
+// canceled classifications retain attribution but never claim token usage.
+func appendIntentClassificationUsage(ctx context.Context, tx *sql.Tx, event runtime.Event, attempt classification.Attempt) error {
+	disposition, retryClass := accounting.Completed, accounting.NotApplicable
+	usage := cloneUsage(attempt.Usage)
+	if attempt.Status == classification.AttemptFailed {
+		disposition, retryClass = accounting.Failed, accounting.NonRetryable
+	} else if attempt.Status == classification.AttemptCanceled {
+		disposition, retryClass, usage = accounting.Canceled, accounting.NonRetryable, nil
+	}
+	record := accounting.Record{
+		Version: 1, ID: usageID(accounting.Classifier, attempt.ID), TaskID: event.TaskID, SessionID: event.SessionID,
+		OperationID: attempt.ID, RouteID: attempt.ID, EvidenceID: event.ID,
+		Provider: attempt.Provider, Model: attempt.Model, Role: accounting.Classifier,
+		EvidenceKind: accounting.EventEvidence, Usage: usage, Disposition: disposition,
+		RetryClass: retryClass, OccurredAt: attempt.FinishedAt.UTC(),
+	}
+	record.NormalizedCost, record.Pricing = configuredAuxiliaryEstimate(
+		"intent_classification_attempt.estimated_cost", record.Provider, record.Model, attempt.EstimatedCost, attempt.StartedAt)
+	return appendUsage(ctx, tx, record)
 }
 
 // appendReviewUsage records one public orchestrator audit or legacy optional

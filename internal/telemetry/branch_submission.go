@@ -23,7 +23,18 @@ import (
 type branchSubmissionEnvelope struct {
 	Version int                            `json:"version"`
 	Request json.RawMessage                `json:"request"`
+	Intent  submissionIntentProjection     `json:"intent"`
 	Branch  *submissions.BranchSourceFence `json:"branch,omitempty"`
+}
+
+// submissionIntentProjection mirrors the durable, non-secret intent metadata
+// in the application submission contract. Telemetry deliberately validates
+// the contract boundary without re-running application classification.
+type submissionIntentProjection struct {
+	Version              int  `json:"version"`
+	DomainExplicit       bool `json:"domain_explicit"`
+	CapabilitiesExplicit bool `json:"capabilities_explicit"`
+	Ambiguous            bool `json:"ambiguous"`
 }
 
 type branchRequestProjection struct {
@@ -55,7 +66,7 @@ func parseBranchSubmission(body []byte) (submissions.BranchSourceFence, bool, er
 	var envelope branchSubmissionEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || len(envelope.Request) == 0 {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 2 || envelope.Intent.Version != 1 || len(envelope.Request) == 0 {
 		return submissions.BranchSourceFence{}, false, submissions.ErrInvalid
 	}
 	canonical, err := json.Marshal(envelope)

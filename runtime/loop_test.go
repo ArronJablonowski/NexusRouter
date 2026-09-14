@@ -106,6 +106,65 @@ func TestDurableToolLoop(t *testing.T) {
 	}
 }
 
+func TestLoopFreezesIntentClassificationOnTaskStartedBeforeRoute(t *testing.T) {
+	var events []runtime.Event
+	use := &runtime.IntentClassificationUse{
+		Version: 1, AttemptID: "classifier-attempt", Status: "completed",
+		DecisionDigest: strings.Repeat("a", 64),
+	}
+	capabilities := []string{"chat", "code"}
+	l := runtime.Loop{
+		Journal: journal(func(_ context.Context, sequence int64, event runtime.Event) error {
+			if sequence != int64(len(events)) {
+				t.Fatalf("unexpected sequence fence: %d", sequence)
+			}
+			events = append(events, event)
+			return nil
+		}),
+		Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			use.AttemptID = "caller-mutated"
+			capabilities[0] = "caller-mutated"
+			if err := emit(providers.Chunk{Text: "answer"}); err != nil {
+				return err
+			}
+			return emit(providers.Chunk{Done: true, FinishReason: "stop"})
+		}),
+	}
+	request := runRequest()
+	request.IntentClassification = use
+	request.Capabilities = capabilities
+	request.Route = &runtime.Data{ModelID: "fixture", ProviderID: "fixture"}
+	if _, err := l.Run(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if len(events) < 2 || events[0].Kind != runtime.TaskStarted || events[1].Kind != runtime.RouteSelected {
+		t.Fatalf("task/route order changed: %+v", events)
+	}
+	started := events[0].Data
+	if started.IntentClassification == nil || started.IntentClassification.AttemptID != "classifier-attempt" || !strings.EqualFold(started.IntentClassification.DecisionDigest, strings.Repeat("a", 64)) {
+		t.Fatalf("classification attribution not frozen: %+v", started.IntentClassification)
+	}
+	if len(started.Capabilities) != 2 || started.Capabilities[0] != "chat" || started.Capabilities[1] != "code" {
+		t.Fatalf("capabilities not frozen: %#v", started.Capabilities)
+	}
+}
+
+func TestLoopRejectsInvalidIntentClassificationBeforePersistence(t *testing.T) {
+	appends := 0
+	l := runtime.Loop{
+		Journal: journal(func(context.Context, int64, runtime.Event) error { appends++; return nil }),
+		Provider: model(func(context.Context, providers.Request, func(providers.Chunk) error) error {
+			t.Fatal("provider called for invalid classification")
+			return nil
+		}),
+	}
+	request := runRequest()
+	request.IntentClassification = &runtime.IntentClassificationUse{Version: 1, AttemptID: "classifier-attempt", Status: "completed"}
+	if _, err := l.Run(context.Background(), request); !errors.Is(err, runtime.ErrInvalidRun) || appends != 0 {
+		t.Fatalf("invalid request reached persistence: appends=%d err=%v", appends, err)
+	}
+}
+
 func TestLoopFailureBoundaries(t *testing.T) {
 	for _, name := range []string{"truncated", "denied", "uncertain", "last_turn", "cancel", "persistence"} {
 		t.Run(name, func(t *testing.T) {

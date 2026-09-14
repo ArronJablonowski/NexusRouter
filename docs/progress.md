@@ -1,5 +1,54 @@
 # Implementation evidence
 
+## 2026-09-14 — DAR-107 policy-bounded auxiliary intent classification
+
+DarwinRouter now has an opt-in provider-neutral auxiliary classifier for an
+automatic root or continuation request whose domain and capability intent were
+both omitted and remain ambiguous after deterministic structured
+classification. Explicit domain, capability, privacy, validation,
+delegated-worker, runtime-host, explicit-model, and fallback intent bypasses the
+classifier; a configured local tool surface does not grant the classifier tools
+or force a bypass. The call receives only a bounded encoding of the fresh prompt and
+messages after credential redaction; it has no tools, delegation, retry,
+memory, skill, session-history, evaluation, or fitness authority. Local/cloud
+mode, continuation privacy, credentials, task and classifier cost, context,
+timeout, output, provider transport, and local resource admission are checked
+before inference.
+
+The closed result can replace only the deterministically defaulted domain and
+add at most 16 sorted, duplicate-free capability constraints. Schema 46 stores the
+redacted started and terminal attempt before candidate dispatch, without the
+prompt or raw output. Durable submissions preserve omitted-versus-explicit
+intent in submission contract version 2; a completed classifier decision is
+reused after restart, while an uncertain started or terminal failed/canceled
+attempt is never redispatched. The first routed task records the final domain,
+capabilities, and decision digest in `task.started`; SQLite validates that
+attribution against the terminal attempt and atomically records classifier
+usage separately from routed inference. Terminal attempts that cannot reach
+normal routing close through a deterministic three-event minimal journal; this
+survives acknowledgement loss and does not claim routed execution. Classifier
+results never become task success or fitness evidence.
+
+Focused race-enabled application tests cover one-call execution, explicit
+bypass, malformed-output containment, exact durable decision reuse, live versus
+expired started-attempt recovery, single credential resolution, local tool
+workloads, charge-once fallback/recursion, and acknowledgement-safe minimal
+journals. Classifier, runtime, configuration, schema migration, storage, and
+accounting tests also pass independently. On the Apple M4 Max, 1,000 iterations
+of the host-only classifier benchmark measured 6.044–7.070 microseconds per
+operation, excluding provider inference, below the 500 ms requirement.
+
+The first full `GOFLAGS='-p=1' make check` found two stale schema-45 literals in
+the hosted release-qualification workflow after the durable store advanced to
+schema 46. The run failed closed in `TestReleaseQualificationWorkflowAuthority`;
+the workflow's exact current-schema assertion and hosted evidence summary were
+updated, and that authority test passed independently. A complete rerun under
+`umask 077` then passed formatting, the 1,000-line limit, `go vet ./...`, every
+race-enabled package, and `go build ./...`. Notable uncached times were
+application 1308.393s, releasepack 1466.195s, telemetry 1437.281s, CLI 120.008s,
+SDK 153.261s, toolgate 65.504s, API 59.535s, and workers 24.316s. An independent
+final `go build ./...`, diff check, and source-format/LOC check also passed.
+
 ## 2026-09-14 — DAR-51 RC15 failure correction
 
 RC15 failed closed during its `make check` gate before either native or install

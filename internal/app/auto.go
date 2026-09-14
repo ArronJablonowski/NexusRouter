@@ -133,6 +133,11 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	if classifyErr != nil {
 		return Result{}, classifyErr
 	}
+	if s.settings.Routing.Classifier.Enabled && r.intentAmbiguous && (r.ModelID == "" || r.ModelID == "auto") &&
+		r.delegatedParent == "" && r.runtimeHostAdmission == nil && r.onlyModelID == "" &&
+		r.Compaction == nil && r.SummaryAttemptID == "" {
+		r.intentClassification = &intentClassificationState{}
+	}
 	if r.eventDelivery == nil && (s.eventSink != nil || r.eventSink != nil) {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
@@ -306,7 +311,7 @@ func validateInput(r Request) error {
 	return nil
 }
 
-func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
+func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr error) {
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
 	if classifyErr != nil {
@@ -344,6 +349,15 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 		if history.Privacy != "cloud_allowed" {
 			r.LocalRequired = true
 		}
+	}
+	r, err = s.prepareAuxiliaryIntent(ctx, db, r)
+	if r.intentClassificationUse != nil {
+		defer func() {
+			result, runErr = persistUnroutedClassification(ctx, db, r, result, runErr)
+		}()
+	}
+	if err != nil {
+		return Result{}, err
 	}
 	if !r.memoryPrepared {
 		// Freeze one retrieval snapshot for context admission and execution.
@@ -622,7 +636,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (Result, error) {
 	}
 	r.delegate = s.bindDelegate(r)
 	r.delegateAudit = s.bindDelegationAudit()
-	result, runErr := runExplicitAdmitted(executionCtx, cfg, r, s.secret)
+	result, runErr = runExplicitAdmitted(executionCtx, cfg, r, s.secret)
 	if runErr != nil {
 		s.discovery.clear()
 	}

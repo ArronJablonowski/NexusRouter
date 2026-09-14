@@ -13,8 +13,17 @@ func classifyRequestIntent(r Request) (Request, error) {
 	if !validIntentLabel(r.Domain) || !validIntentLabel(r.Profile) {
 		return Request{}, ErrAdmission
 	}
+	if !r.intentPrepared {
+		r.intentPrepared = true
+		r.domainExplicit = r.Domain != ""
+		r.capabilitiesExplicit = len(r.Capabilities) > 0
+	}
 	if r.Domain == "" {
-		r.Domain = structuredDomain(r)
+		var confident bool
+		r.Domain, confident = structuredDomainEvidence(r)
+		// Explicit caller metadata is authoritative even when it is deliberately
+		// broad. Auxiliary classification is reserved for wholly omitted intent.
+		r.intentAmbiguous = !r.domainExplicit && !r.capabilitiesExplicit && !confident
 	}
 	if r.Profile == "" {
 		r.Profile = "default"
@@ -32,8 +41,13 @@ func validIntentLabel(value string) bool {
 }
 
 func structuredDomain(r Request) string {
+	domain, _ := structuredDomainEvidence(r)
+	return domain
+}
+
+func structuredDomainEvidence(r Request) (string, bool) {
 	if r.Validation == "go_source" {
-		return "code"
+		return "code", true
 	}
 	selected := ""
 	for _, capability := range r.Capabilities {
@@ -42,14 +56,14 @@ func structuredDomain(r Request) string {
 			continue
 		}
 		if selected != "" && selected != domain {
-			return "general"
+			return "general", false
 		}
 		selected = domain
 	}
 	if selected == "" {
-		return "general"
+		return "general", false
 	}
-	return selected
+	return selected, true
 }
 
 func capabilityDomain(capability string) string {

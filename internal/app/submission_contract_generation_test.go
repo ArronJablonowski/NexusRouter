@@ -37,8 +37,8 @@ func TestSubmissionContractGenerationFencesLegacyQueuedIntent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded, err := decodeSubmission(body); err != nil || decoded.Domain != "" || decoded.Profile != "" {
-		t.Fatal("fixture is not a valid legacy blank-intent envelope", decoded, err)
+	if _, err := decodeSubmission(body); !errors.Is(err, ErrAdmission) {
+		t.Fatal("legacy blank-intent envelope crossed the current contract", err)
 	}
 	if _, err := db.ClaimSubmission(ctx, currentDigest, time.Now().UTC(), time.Minute); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatal("new contract claimed legacy work", err)
@@ -58,8 +58,8 @@ func TestSubmissionContractGenerationFencesLegacyQueuedIntent(t *testing.T) {
 func TestSubmissionContractGenerationKeepsCanonicalIdempotencyStable(t *testing.T) {
 	ctx := context.Background()
 	s := submissionService(t)
-	request := Request{Prompt: "canonical request", Capabilities: []string{"chat"}, Domain: "general", Profile: "default"}
-	created, err := s.Submit(ctx, "canonical-contract-key", Request{Prompt: request.Prompt})
+	request := Request{Prompt: "canonical request"}
+	created, err := s.Submit(ctx, "canonical-contract-key", request)
 	if err != nil {
 		t.Fatal(err)
 	}

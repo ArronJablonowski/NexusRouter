@@ -25,8 +25,9 @@ func branchEnvelope(t *testing.T, fence submissions.BranchSourceFence, local boo
 	body, err := json.Marshal(struct {
 		Version int                            `json:"version"`
 		Request any                            `json:"request"`
+		Intent  submissionIntentProjection     `json:"intent"`
 		Branch  *submissions.BranchSourceFence `json:"branch,omitempty"`
-	}{1, request, &fence})
+	}{2, request, submissionIntentProjection{Version: 1}, &fence})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +190,7 @@ func TestBranchSubmissionRejectsUnsafeSourcesAndAmbiguousControls(t *testing.T) 
 		t.Fatal("invalid fixture")
 	}
 	request := `{"ContinueTaskID":"wrong","ContinueTaskID":"source","LocalRequired":false}`
-	body = []byte(`{"version":1,"request":` + request + `,"branch":` + string(envelope["branch"]) + `}`)
+	body = []byte(`{"version":2,"request":` + request + `,"intent":{"version":1,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false},"branch":` + string(envelope["branch"]) + `}`)
 	digest := sha256.Sum256(body)
 	if _, err := db.CreateBranchSubmission(ctx, submitDigest("ambiguous"), hex.EncodeToString(digest[:]), submitDigest("config"), body); !errors.Is(err, submissions.ErrInvalid) {
 		t.Fatal("duplicate branch controls admitted", err)
@@ -199,11 +200,43 @@ func TestBranchSubmissionRejectsUnsafeSourcesAndAmbiguousControls(t *testing.T) 
 		`{"ContinueTaskID":"source","local_required":false}`,
 		`{"continue-task-id":"source","LocalRequired":false}`,
 	} {
-		body = []byte(`{"version":1,"request":` + request + `,"branch":` + string(envelope["branch"]) + `}`)
+		body = []byte(`{"version":2,"request":` + request + `,"intent":{"version":1,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false},"branch":` + string(envelope["branch"]) + `}`)
 		digest = sha256.Sum256(body)
 		if _, err := db.CreateBranchSubmission(ctx, submitDigest(request), hex.EncodeToString(digest[:]), submitDigest("config"), body); !errors.Is(err, submissions.ErrInvalid) {
 			t.Fatalf("noncanonical branch control %d admitted: %v", index, err)
 		}
+	}
+}
+
+func TestBranchSubmissionRequiresCanonicalV2IntentMetadata(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(ctx, filepath.Join(t.TempDir(), "intent-contract.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	completedBranchSource(t, db, "source", "local_only")
+	fence, err := db.BranchSource(ctx, "source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := branchEnvelope(t, fence, true)
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(body, &envelope) != nil {
+		t.Fatal("invalid fixture")
+	}
+	for name, raw := range map[string][]byte{
+		"legacy version":       []byte(`{"version":1,"request":` + string(envelope["request"]) + `,"branch":` + string(envelope["branch"]) + `}`),
+		"missing intent":       []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"branch":` + string(envelope["branch"]) + `}`),
+		"bad intent version":   []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"intent":{"version":2,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false},"branch":` + string(envelope["branch"]) + `}`),
+		"unknown intent field": []byte(`{"version":2,"request":` + string(envelope["request"]) + `,"intent":{"version":1,"domain_explicit":false,"capabilities_explicit":false,"ambiguous":false,"extra":true},"branch":` + string(envelope["branch"]) + `}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			digest := sha256.Sum256(raw)
+			if _, err := db.CreateBranchSubmission(ctx, submitDigest(name), hex.EncodeToString(digest[:]), submitDigest("config"), raw); !errors.Is(err, submissions.ErrInvalid) {
+				t.Fatal("invalid submission contract admitted", err)
+			}
+		})
 	}
 }
 

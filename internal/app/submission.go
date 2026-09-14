@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,11 +25,21 @@ var ErrSubmission = errors.New("submission unavailable")
 // submissionContractVersion fences durable queued work from binaries whose
 // admission or canonicalization semantics differ. Increment it whenever a
 // change can reinterpret a persisted submission request.
-const submissionContractVersion = 1
+const submissionContractVersion = 2
+
+const submissionIntentVersion = 1
+
+type submissionIntent struct {
+	Version              int  `json:"version"`
+	DomainExplicit       bool `json:"domain_explicit"`
+	CapabilitiesExplicit bool `json:"capabilities_explicit"`
+	Ambiguous            bool `json:"ambiguous"`
+}
 
 type submissionEnvelope struct {
 	Version int                            `json:"version"`
 	Request Request                        `json:"request"`
+	Intent  submissionIntent               `json:"intent"`
 	Branch  *submissions.BranchSourceFence `json:"branch,omitempty"`
 	Resume  *submissions.ResumeSourceFence `json:"resume,omitempty"`
 }
@@ -47,22 +58,26 @@ func (s *Service) submissionConfigDigest() string {
 }
 
 func (s *Service) submissionPayload(key string, r Request) (string, string, []byte, error) {
-	return s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r})
+	return s.submissionEnvelopePayload(key, submissionEnvelope{Version: submissionContractVersion, Request: r})
 }
 
 func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
+	if envelope.Version != submissionContractVersion || envelope.Intent.Version != 0 {
+		return "", "", nil, ErrAdmission
+	}
 	r, err := classifyRequestIntent(envelope.Request)
 	if err != nil {
 		return "", "", nil, err
 	}
 	envelope.Request = r
+	envelope.Intent = submissionIntent{Version: submissionIntentVersion, DomainExplicit: r.domainExplicit, CapabilitiesExplicit: r.capabilitiesExplicit, Ambiguous: r.intentAmbiguous}
 	if len(s.toolExtension.Names()) > 0 || s.settings.Tools.ReplaceEnabled {
 		return "", "", nil, ErrAdmission
 	}
 	if len(key) < 16 || len(key) > 128 || strings.ContainsFunc(key, func(c rune) bool { return c < 33 || c > 126 }) || validateInput(r) != nil {
 		return "", "", nil, ErrAdmission
 	}
-	if envelope.Version != 1 || envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
+	if envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
 		return "", "", nil, ErrAdmission
 	}
 	body, err := json.Marshal(envelope)
@@ -128,7 +143,7 @@ func (s *Service) SubmitResume(ctx context.Context, key string, source sessions.
 	} else {
 		fence.EffectivePrivacy = "cloud_allowed"
 	}
-	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r, Resume: &fence})
+	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: submissionContractVersion, Request: r, Resume: &fence})
 	if err != nil {
 		return submissions.Status{}, err
 	}
@@ -167,7 +182,7 @@ func (s *Service) SubmitBranch(ctx context.Context, key string, source sessions.
 	} else {
 		fence.EffectivePrivacy = "cloud_allowed"
 	}
-	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: 1, Request: r, Branch: &fence})
+	keyDigest, requestDigest, body, err := s.submissionEnvelopePayload(key, submissionEnvelope{Version: submissionContractVersion, Request: r, Branch: &fence})
 	if err != nil {
 		return submissions.Status{}, err
 	}
@@ -239,7 +254,7 @@ func (s *Service) ExistingFollowUpSubmission(ctx context.Context, key string, so
 		} else {
 			fence.EffectivePrivacy = "cloud_allowed"
 		}
-		envelope = submissionEnvelope{Version: 1, Request: r, Resume: &fence}
+		envelope = submissionEnvelope{Version: submissionContractVersion, Request: r, Resume: &fence}
 	} else {
 		fence, readErr := db.BranchSource(ctx, source.TaskID)
 		if readErr != nil {
@@ -253,7 +268,7 @@ func (s *Service) ExistingFollowUpSubmission(ctx context.Context, key string, so
 		} else {
 			fence.EffectivePrivacy = "cloud_allowed"
 		}
-		envelope = submissionEnvelope{Version: 1, Request: r, Branch: &fence}
+		envelope = submissionEnvelope{Version: submissionContractVersion, Request: r, Branch: &fence}
 	}
 	keyDigest, requestDigest, _, err := s.submissionEnvelopePayload(key, envelope)
 	if err != nil {
@@ -348,7 +363,7 @@ func decodeSubmissionEnvelope(body []byte) (submissionEnvelope, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != 1 || validateInput(envelope.Request) != nil || envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.Version != submissionContractVersion || envelope.Intent.Version != submissionIntentVersion || validateInput(envelope.Request) != nil || envelope.Branch != nil && envelope.Branch.Validate() != nil || envelope.Resume != nil && envelope.Resume.Validate() != nil || envelope.Branch != nil && envelope.Resume != nil {
 		return submissionEnvelope{}, ErrAdmission
 	}
 	// Only the intake's canonical representation is accepted: this additionally
@@ -357,6 +372,23 @@ func decodeSubmissionEnvelope(body []byte) (submissionEnvelope, error) {
 	if err != nil || !bytes.Equal(body, canonical) {
 		return submissionEnvelope{}, ErrAdmission
 	}
+	original := envelope.Request
+	original.intentPrepared = false
+	original.domainExplicit = false
+	original.capabilitiesExplicit = false
+	original.intentAmbiguous = false
+	if !envelope.Intent.DomainExplicit {
+		original.Domain = ""
+	}
+	if !envelope.Intent.CapabilitiesExplicit {
+		original.Capabilities = nil
+	}
+	classified, err := classifyRequestIntent(original)
+	if err != nil || classified.Domain != envelope.Request.Domain || classified.Profile != envelope.Request.Profile || !slices.Equal(classified.Capabilities, envelope.Request.Capabilities) ||
+		classified.domainExplicit != envelope.Intent.DomainExplicit || classified.capabilitiesExplicit != envelope.Intent.CapabilitiesExplicit || classified.intentAmbiguous != envelope.Intent.Ambiguous {
+		return submissionEnvelope{}, ErrAdmission
+	}
+	envelope.Request = classified
 	if envelope.Branch != nil && (envelope.Request.ContinueTaskID != envelope.Branch.TaskID || envelope.Request.Compaction != nil || envelope.Request.SummaryAttemptID != "") {
 		return submissionEnvelope{}, ErrAdmission
 	}

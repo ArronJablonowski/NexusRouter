@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/accounting"
+	"github.com/ArronJablonowski/DarwinRouter/classification"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -130,6 +131,29 @@ func validateUsageEvidence(ctx context.Context, tx *sql.Tx, r accounting.Record,
 }
 
 func validateAuxiliaryUsage(ctx context.Context, tx *sql.Tx, r accounting.Record, body []byte, matchMeasurement bool) error {
+	if r.Role == accounting.Classifier {
+		var event runtime.Event
+		if r.EvidenceKind != accounting.EventEvidence || json.Unmarshal(body, &event) != nil || event.Validate() != nil ||
+			event.ID != r.EvidenceID || event.TaskID != r.TaskID || event.SessionID != r.SessionID || event.Kind != runtime.TaskStarted ||
+			event.Data.IntentClassification == nil || r.OperationID != event.Data.IntentClassification.AttemptID || r.RouteID != r.OperationID || r.CandidateAttemptID != "" {
+			return accounting.ErrUsage
+		}
+		attempt, err := intentClassificationAttemptForEvent(ctx, tx, event)
+		if err != nil || attempt.ID != r.OperationID || attempt.Provider != r.Provider || attempt.Model != r.Model ||
+			(matchMeasurement && !matchesConfiguredEstimate(r, "intent_classification_attempt.estimated_cost", attempt.EstimatedCost, attempt.StartedAt)) {
+			return accounting.ErrUsage
+		}
+		wantDisposition, wantUsage := accounting.Completed, attempt.Usage
+		if attempt.Status == classification.AttemptFailed {
+			wantDisposition = accounting.Failed
+		} else if attempt.Status == classification.AttemptCanceled {
+			wantDisposition, wantUsage = accounting.Canceled, nil
+		}
+		if r.Disposition != wantDisposition || (matchMeasurement && !accounting.SameUsage(r.Usage, wantUsage)) {
+			return accounting.ErrUsage
+		}
+		return nil
+	}
 	switch r.EvidenceKind {
 	case accounting.SummaryEvidence:
 		var a sessions.SummaryAttempt
@@ -185,8 +209,8 @@ func validateAuxiliaryUsage(ctx context.Context, tx *sql.Tx, r accounting.Record
 			return accounting.ErrUsage
 		}
 	default:
-		// The vocabulary reserves classifier accounting, but no authoritative
-		// classifier lifecycle exists yet. Never accept caller-asserted spend.
+		// Never accept caller-asserted auxiliary spend without a supported,
+		// independently validated lifecycle evidence type.
 		return accounting.ErrUsage
 	}
 	return nil

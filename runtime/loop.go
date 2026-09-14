@@ -54,8 +54,9 @@ type ToolResult struct {
 	Recoverable bool
 }
 type RunRequest struct {
-	SkillContext *SkillContextUse
-	SubmissionID string
+	SkillContext         *SkillContextUse
+	IntentClassification *IntentClassificationUse
+	SubmissionID         string
 	// WorkerID is an optional trusted host-supplied execution identity. It is
 	// copied onto every durable event emitted by this run so an enclosing
 	// worker capability can bind the inner agent loop to its durable owner.
@@ -75,6 +76,7 @@ type RunRequest struct {
 	// proposal. Non-text host workflows may leave this false explicitly.
 	RequireText                   bool
 	Domain, Profile               string
+	Capabilities                  []string
 	Route                         *Data
 	ParentTaskID, Privacy         string
 	TaskID, SessionID, ProviderID string
@@ -126,6 +128,15 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if r.SkillContext.Validate() != nil {
 		return Result{}, ErrInvalidRun
 	}
+	if (r.IntentClassification != nil && r.IntentClassification.Validate() != nil) || !validTaskCapabilities(r.Capabilities) {
+		return Result{}, ErrInvalidRun
+	}
+	var intentClassification *IntentClassificationUse
+	if r.IntentClassification != nil {
+		use := *r.IntentClassification
+		intentClassification = &use
+	}
+	capabilities := append([]string(nil), r.Capabilities...)
 	skillContext := r.SkillContext.Clone()
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
@@ -202,7 +213,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		cost := *r.RouteEstimatedCost
 		routeEstimatedCost = &cost
 	}
-	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, IntentClassification: intentClassification, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile, Capabilities: capabilities}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

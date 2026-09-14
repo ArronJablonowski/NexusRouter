@@ -546,7 +546,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 45. Schema 30 added the immutable
+The current durable store uses SQLite schema 46. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -577,6 +577,9 @@ auxiliary reviews and migration-seals older admissions rather than inventing
 revision authority. Schema 45 binds a successful auxiliary review to its exact
 candidate, runtime result, audit, evidence set, and settlement; older admissions
 remain migration-sealed and cannot acquire outcome authority retroactively.
+Schema 46 adds restart-safe auxiliary intent-classification attempts correlated
+to their task and optional durable submission without requiring a task journal
+to exist before routing begins.
 Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,

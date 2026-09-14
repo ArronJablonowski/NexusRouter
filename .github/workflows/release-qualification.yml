@@ -172,7 +172,7 @@ jobs:
           current_schema="${current_value#current_schema=}"
           test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"
           test "$source_schema" = 29
-          test "$current_schema" = 45
+          test "$current_schema" = 46
           go run ./cmd/verify-install-rehearsal \
             --record "$install_record" --record-sha256 "$install_record_sha256" \
             --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" \
@@ -269,7 +269,7 @@ jobs:
             printf '\nObserved immutable backup SHA-256: `%s`\n' "${INSTALL_BACKUP_SHA256:-unavailable}"
             printf '\nNative gate transcript SHA-256: `%s`\n' "${NATIVE_TRANSCRIPT_SHA256:-unavailable}"
             echo
-            echo 'Only successful license-evidence and qualification gates establish the following evidence: the exact source commit, Go version and module directive, root MIT license digest, four target-specific dependency closures and notice digests; deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact seven-member schema-3 archive metadata; target-specific canonical SPDX 2.3 module inventories bound to each binary, dependency/toolchain closure and first-party Web UI source hashes; target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-29-to-45 migration, backup and rollback rehearsal.'
+            echo 'Only successful license-evidence and qualification gates establish the following evidence: the exact source commit, Go version and module directive, root MIT license digest, four target-specific dependency closures and notice digests; deterministic MVP tests; two builds of each darwin/amd64, darwin/arm64, linux/amd64 and linux/arm64 artifact; identical unsigned bytes; exact seven-member schema-3 archive metadata; target-specific canonical SPDX 2.3 module inventories bound to each binary, dependency/toolchain closure and first-party Web UI source hashes; target-specific dependency notices; format checks; disposable-key signing/verification; tamper rejection; execution of the native artifact version command; and a disposable native install, schema-29-to-46 migration, backup and rollback rehearsal.'
             echo
             echo 'This job natively executes only the observed platform above; the other three artifacts are cross-built and inspected. All four successful matrix jobs are required for four-target native evidence. Read the observed platform above; the workflow asserts it against the expected target instead of trusting the runner label alone. Failed/skipped gates do not qualify a release.'
             echo

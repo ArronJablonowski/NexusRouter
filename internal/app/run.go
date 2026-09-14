@@ -57,6 +57,14 @@ type Request struct {
 	runtimeHostAdmission            *runtimeHostAdmission
 	Validation                      string
 	onlyModelID, retryOfTaskID      string
+	intentPrepared                  bool
+	domainExplicit                  bool
+	capabilitiesExplicit            bool
+	intentAmbiguous                 bool
+	intentClassification            *intentClassificationState
+	intentClassificationUse         *runtime.IntentClassificationUse
+	intentClassificationCharged     bool
+	taskID, sessionID               string
 	ModelID, Prompt, ContinueTaskID string
 	Messages                        []providers.Message
 	Domain, Profile                 string
@@ -103,7 +111,7 @@ func withRuntimeHostAdmission(r Request, admission runtimeHostAdmission) (Reques
 func invalidRuntimeHostRequestState(r Request) bool {
 	return r.submissionID != "" || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil ||
 		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.continuation != nil || r.retryOfTaskID != "" ||
-		r.onlyModelID != "" || r.autoCompactionTried
+		r.onlyModelID != "" || r.autoCompactionTried || r.intentClassification != nil || r.intentClassificationUse != nil || r.intentClassificationCharged || r.taskID != "" || r.sessionID != ""
 }
 
 func validRuntimeHostWorkerID(value string) bool {
@@ -329,7 +337,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 	}
 	messages := []providers.Message{}
-	sessionID := ""
+	sessionID := r.sessionID
 	privacy := "cloud_allowed"
 	if model.Locality == "local" {
 		privacy = "local_only"
@@ -348,6 +356,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 		if history.Privacy != "cloud_allowed" {
 			privacy = "local_only"
+		}
+		if sessionID != "" && sessionID != history.SessionID {
+			return result, ErrAdmission
 		}
 		sessionID = history.SessionID
 		if provider.Kind == "codex_app_server" && history.Compaction != nil {
@@ -390,7 +401,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if err != nil || len(encoded) > 4<<20 {
 		return result, ErrAdmission
 	}
-	result.TaskID = rand.Text()
+	result.TaskID = r.taskID
+	if result.TaskID == "" {
+		result.TaskID = rand.Text()
+	}
 	if r.runtimeHostAdmission != nil {
 		result.TaskID = r.runtimeHostAdmission.taskID
 	}
@@ -481,7 +495,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {
