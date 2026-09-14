@@ -7412,3 +7412,35 @@ quarantined annotated `v1.0.0` tag that peels to the older
 `ca07106cae194a5f02226f1e40fef0348d70f59d`; the create-only publisher must
 continue to fail closed until an operator explicitly resolves that conflicting
 remote identity.
+
+## 2026-09-13 — DAR-51 RC12 Darwin/arm64 native evidence
+
+The production `native-release-evidence` wrapper completed against the exact
+clean RC12 checkout at
+`2086d4902f2074da5a28165908cada605740dc06`. It ran the complete race-enabled
+repository gate, rechecked the source, ran the version/commit-bound release
+qualification, and rechecked the source again before exclusively committing its
+records. The canonical schema-2 Darwin/arm64 native record SHA-256 is
+`6cbbe2892d52a63e517e67d163f369edb99ce271e215123823d67ee2e5191740`;
+the bounded transcript SHA-256 is
+`cdcb77851b9ca4e27e3939329ebdd2bccdc198d96b2067556ed17324ce0a09c7`.
+
+The native record binds the observed Go 1.27.1 Darwin/arm64 host, all five
+passed source/check/qualification gates, and its exact companion rehearsal. The
+companion record SHA-256 is
+`4a2e50aa67a1830fcea059d37affc2fae19f468008bb3094a53a1b3e55d8c008`.
+Independent companion verification produced SHA-256
+`a451ff2df941472cb63850ccc28a55fbefe647f67bbf644e434757d5a900ba21`
+and accepted archive SHA-256
+`8be0a79b856a843884b2f0f5689d3c32728db627bc64f9ee1ce8bd93bfe6991a`,
+immutable backup SHA-256
+`40f1e6e23e3526bf96218443655cf5ad698a0267ae5c8de7c7dd7ecffc75fb98`,
+source schema 29, migrated schema 45 and rollback schema 29. An initial wrapper
+attempt used macOS's `/tmp` alias rather than its canonical `/private/tmp` path;
+the exact-root preflight rejected it before any gate or evidence write and left
+only an empty quarantined transcript.
+
+This is current native evidence for one of the four fixed targets, not platform
+approval or a complete target matrix. Darwin/amd64, Linux/amd64 and Linux/arm64
+still require their own native records on matching hosts, and DAR-51 remains
+open until every operator-approved target has reviewed evidence.
