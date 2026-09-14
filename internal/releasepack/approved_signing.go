@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ApprovedSigningOptions binds the production signing operation to externally
@@ -84,6 +85,9 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 	if err != nil {
 		return ErrSignature
 	}
+	if !privateKeyOutsideRoots(options.KeyFile, source, options.Dir) {
+		return ErrSignature
+	}
 	sbomSources, err := discoverSBOMSourceFiles(ctx, source, environment())
 	if err != nil {
 		return ErrSignature
@@ -142,6 +146,35 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		return ErrSignature
 	}
 	return nil
+}
+
+// privateKeyOutsideRoots enforces the production custody boundary before the
+// seed reader is invoked. Resolving every existing path prevents a parent
+// symlink from making a key inside the source or release tree appear external.
+func privateKeyOutsideRoots(keyFile string, roots ...string) bool {
+	key, err := filepath.Abs(keyFile)
+	if err != nil {
+		return false
+	}
+	key, err = filepath.EvalSymlinks(key)
+	if err != nil {
+		return false
+	}
+	for _, rawRoot := range roots {
+		root, err := filepath.Abs(rawRoot)
+		if err != nil {
+			return false
+		}
+		root, err = filepath.EvalSymlinks(root)
+		if err != nil {
+			return false
+		}
+		relative, err := filepath.Rel(root, key)
+		if err != nil || relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(os.PathSeparator))) {
+			return false
+		}
+	}
+	return true
 }
 
 func approvedArtifactIdentity(root *os.Root, candidate CandidateRecord) error {

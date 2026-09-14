@@ -41,7 +41,7 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 	for _, scenario := range []string{
 		"candidate", "candidate_identity", "license_evidence", "license_evidence_missing", "license_evidence_swapped",
 		"authorization", "policy_mismatch", "trust", "sums",
-		"artifact", "existing_signature", "source", "canceled",
+		"artifact", "existing_signature", "source", "key_in_source", "key_in_release", "canceled",
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			options, _ := approvedSigningFixture(t)
@@ -94,6 +94,10 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(options.Source, "untracked"), []byte("dirty\n"), 0600); err != nil {
 					t.Fatal(err)
 				}
+			case "key_in_source":
+				options.KeyFile = filepath.Join(options.Source, "go.mod")
+			case "key_in_release":
+				options.KeyFile = filepath.Join(options.Dir, "manifest.json")
 			case "canceled":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -157,6 +161,28 @@ func TestApprovedSigningReadsPrivateKeyOnceAfterPreflight(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("private-key reader called %d times", calls)
+	}
+}
+
+func TestPrivateKeyOutsideRootsResolvesParentSymlinks(t *testing.T) {
+	root := t.TempDir()
+	keyDir := filepath.Join(root, "keys")
+	if err := os.Mkdir(keyDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	keyFile := filepath.Join(keyDir, "seed")
+	writeSigningFixture(t, keyFile, []byte(strings.Repeat("0", 64)+"\n"), 0600)
+	alias := filepath.Join(t.TempDir(), "source-alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	if privateKeyOutsideRoots(filepath.Join(alias, "keys", "seed"), root) {
+		t.Fatal("key reached through a parent symlink was accepted inside protected root")
+	}
+	external := filepath.Join(t.TempDir(), "seed")
+	writeSigningFixture(t, external, []byte(strings.Repeat("0", 64)+"\n"), 0600)
+	if !privateKeyOutsideRoots(external, root) {
+		t.Fatal("key outside protected root was rejected")
 	}
 }
 
@@ -272,6 +298,14 @@ func approvedSigningExecutableFixture(t *testing.T) (ApprovedSigningOptions, ed2
 }
 
 func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableNative bool, sbomDrift string) (ApprovedSigningOptions, ed25519.PublicKey) {
+	executableVersion := ""
+	if executableNative {
+		executableVersion = "1.0.0"
+	}
+	return approvedSigningFixtureWithExecutableVersion(t, mismatchNotice, executableVersion, sbomDrift)
+}
+
+func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bool, executableVersion, sbomDrift string) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
 	source := collateralSourceFixture(t)
@@ -296,8 +330,8 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 		t.Fatal(err)
 	}
 	program := "package main\n\nimport _ \"github.com/google/uuid\"\n\nfunc main() {}\n"
-	if executableNative {
-		program = "package main\n\nimport (\n  \"fmt\"\n  _ \"github.com/google/uuid\"\n  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin 1.0.0\")\n    return\n  }\n  os.Exit(2)\n}\n"
+	if executableVersion != "" {
+		program = "package main\n\nimport (\n  \"fmt\"\n  _ \"github.com/google/uuid\"\n  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin " + executableVersion + "\")\n    return\n  }\n  os.Exit(2)\n}\n"
 	}
 	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte(program), 0644); err != nil {
 		t.Fatal(err)
@@ -359,7 +393,7 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 			notice = signingNoticeFixture(target[0], target[1])
 		}
 		binary := signingBinaryFixture(t, target[0], target[1])
-		if executableNative && target[0] == runtime.GOOS && target[1] == runtime.GOARCH {
+		if executableVersion != "" && target[0] == runtime.GOOS && target[1] == runtime.GOARCH {
 			binaryPath := filepath.Join(t.TempDir(), "darwin")
 			buildEnv := append(environment(), "GOOS="+target[0], "GOARCH="+target[1])
 			if _, entryErr = command(ctx, source, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", binaryPath, "./cmd/darwin"); entryErr != nil {

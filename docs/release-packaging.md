@@ -142,6 +142,11 @@ repository and artifact directory, in operator-controlled secret storage. The
 corresponding trusted public-key file is 64 lowercase hex characters with the
 same optional LF; it is not secret.
 
+Production signing resolves the seed, source and release paths before reading
+the seed and rejects a seed located in either protected tree, including through
+a symlink alias. This enforcement complements rather than replaces the
+operator-controlled custody and recovery policy.
+
 ```sh
 go run ./cmd/sign-release \
   --dir /ABSOLUTE/RELEASE_DIRECTORY \
@@ -263,6 +268,58 @@ installation. Checks are point-in-time observations, not a lock preventing
 another process from modifying files afterward. A valid signature establishes
 the signing key's approval of bytes, not that the code is safe or the claimed
 build process independently occurred.
+
+For a native staged-install check, use the approval-bound installer instead of
+manually separating verification from execution. Every digest and identity
+below must come from the independent approval/evidence channel. The output and
+installation paths must both be new:
+
+```sh
+go run ./cmd/verify-approved-install \
+  --dir /ABSOLUTE/QUIESCENT/SIGNED_RELEASE \
+  --source /ABSOLUTE/CLEAN/TRUSTED/SOURCE \
+  --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
+  --candidate-record-sha256 sha256:EXPECTED_CANDIDATE_SHA256 \
+  --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
+  --license-evidence-sha256 sha256:EXPECTED_LICENSE_EVIDENCE_SHA256 \
+  --expected-sums-sha256 sha256:EXPECTED_SHA256SUMS_SHA256 \
+  --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
+  --trust-record-sha256 sha256:EXPECTED_TRUST_RECORD_SHA256 \
+  --key-id EXPECTED_RELEASE_KEY_ID \
+  --key-fingerprint sha256:EXPECTED_PUBLIC_KEY_SHA256 \
+  --authorization-record /ABSOLUTE/INDEPENDENT/AUTHORIZATION.json \
+  --authorization-record-sha256 sha256:EXPECTED_AUTHORIZATION_SHA256 \
+  --target-os darwin --target-arch arm64 \
+  --install-root /ABSOLUTE/EXISTING/PRIVATE/PARENT/NEW-INSTALL \
+  --verifier-id idp:release-verifier \
+  --host-id host:reviewed-darwin-arm64 \
+  --public-key-channel https://keys.example.invalid/darwinrouter \
+  --out /ABSOLUTE/EXISTING/PRIVATE/EVIDENCE/NEW-approved-install.json
+```
+
+The command reserves the mode-0600 receipt before any artifact execution,
+performs the complete approval-bound verification, selects only the exact
+runtime-matching archive, validates all seven members, installs its binary into
+a new private root, and checks the exact version output. It then re-verifies the
+complete signed set and installed bytes before committing the receipt. Standard
+output contains only the retained receipt's `sha256:` digest.
+
+If the command fails after reservation, preserve the zero-length or partial
+receipt and any installation root for investigation. Execution may have begun;
+do not retry with either path. Classify the result and use entirely new paths
+for an explicitly approved retry. The receipt records operator-supplied verifier,
+host and public-key-channel assertions. It is point-in-time local evidence, not
+remote attestation, hardware provenance, safety review, or authority to install
+elsewhere, publish, or approve the release.
+
+Independently verify a transferred receipt against its separately obtained
+digest:
+
+```sh
+go run ./cmd/verify-approved-install-record \
+  --record /ABSOLUTE/EVIDENCE/approved-install.json \
+  --record-sha256 sha256:EXPECTED_RECEIPT_SHA256
+```
 
 After verification, map the host identity to an archive name. `uname -s` values
 `Darwin` and `Linux` map to `darwin` and `linux`; `uname -m` values `x86_64` and

@@ -5,6 +5,14 @@ Verify it first with an independently trusted DarwinRouter verifier and release
 public key. A checksum or key obtained only beside the archive does not establish
 authenticity.
 
+For a production-signed candidate, prefer the approval-bound staged-install
+command documented in [release packaging](release-packaging.md). It repeats the
+complete candidate/license/authorization/trust/signature verification, installs
+only the runtime-matching binary into a new private root, executes its version
+command, and retains a digest-bound canonical receipt. The shell procedure below
+remains the archive's transparent manual installation recipe; by itself it does
+not create approval-bound installation evidence.
+
 Choose the archive matching the host. `Darwin` and `Linux` map to `darwin` and
 `linux`. `x86_64` or `amd64` maps to `amd64`; `arm64` or `aarch64` maps to
 `arm64`. Stop on any other value rather than guessing.

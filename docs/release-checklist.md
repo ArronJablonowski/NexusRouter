@@ -163,6 +163,14 @@ be omitted.
 - `SHA256SUMS.sig` SHA-256:
 - `verify-approved-release` JSON result location and digest:
 - Independent verification operator, host, time and result:
+- `verify-approved-install` receipt location and independently retained SHA-256:
+- Approved native install target, private install root, installed binary digest
+  and version output:
+- Approved-install verifier ID, reviewed host ID and independent public-key
+  channel:
+- `verify-approved-install-record` output, operator and UTC time:
+- Incomplete receipt/install quarantine and execution-state classification (if
+  any):
 - [ ] Manifest version and commit equal the recorded candidate identity.
 - [ ] The candidate record is canonical schema 2, the release manifest is
   canonical schema 3, and each archive has the exact seven-member contract.
@@ -177,6 +185,10 @@ be omitted.
   channel and successfully ran the approval-bound verifier with independently
   supplied candidate, license-evidence, checksum, authorization, trust and key
   identities.
+- [ ] The host-matching staged archive was installed through a new private root;
+  its canonical receipt and digest were retained and independently rechecked.
+- [ ] The staged-install receipt is treated as point-in-time byte/execution
+  evidence, not remote attestation, hardware provenance, or release approval.
 
 ## Publication authorization
 

@@ -7484,3 +7484,33 @@ format/1,000-line enforcement, `go vet ./...`, the complete race-enabled suite
 `go build ./...`. Hosted execution and the three remaining native targets are
 still open; this checkpoint does not resolve the conflicting remote `v1.0.0`
 tag or authorize publication.
+
+## 2026-09-14 — DAR-53/DAR-55 signing and staged-install hardening
+
+Production signing now enforces the documented private-seed location boundary
+before the seed reader is invoked. The canonical key path must be outside both
+the independently trusted source checkout and the quiescent release directory;
+paths resolving through symlink aliases into either protected tree are rejected.
+This is a local mechanical boundary only. Dedicated release-key provenance,
+custody and recovery policy, authenticated trust-record publication, and the
+independent second-operator ceremony remain open operator gates under DAR-53.
+
+The new `verify-approved-install` command closes the code-addressable portion of
+DAR-55's pre-publication native-install evidence gap. It durably reserves a new
+mode-0600 output before execution, runs the complete approval-bound verifier,
+requires the exact host target, installs only the matching signed archive into
+a new private root disjoint from the source and release trees, requires the
+exact `darwin VERSION` output, and rechecks the installed binary and signed set.
+Its canonical schema-1 receipt binds the candidate, license, checksum,
+authorization, trust and signature identities plus manifest/archive/binary
+digests, target, verifier, host, independent HTTPS public-key channel, whole-
+second UTC observation time and passed result. A companion command verifies a
+retained receipt against an independently supplied digest. Failures preserve an
+incomplete reservation and install state for investigation rather than silently
+retrying an uncertain execution.
+
+Focused signing, install, canonical-receipt and CLI tests passed. This feature
+does not attest the host or hardware, prove independent key retrieval, approve
+the release, resolve the conflicting remote `v1.0.0` tag, publish artifacts, or
+replace the required second operator. DAR-55 therefore remains open until the
+production ceremony records that independent observation.
