@@ -7355,3 +7355,21 @@ affected-package vet and race tests, source/LOC checks, the documentation
 contract, and native plus Linux/amd64 builds. DAR-64 is code-complete but retains
 its production credential/publication gates; no Linear mutation is claimed
 without operator confirmation.
+
+## 2026-09-13 — RC12 candidate and license-evidence freeze
+
+Clean pushed commit `2086d4902f2074da5a28165908cada605740dc06` was frozen as
+the external, explicitly unapproved `1.0.0-rc.12` candidate after the descriptor
+and release-collateral fixes. The canonical schema-2 candidate record uses
+manifest schema 3, source-derived UTC creation time, the four fixed targets, and
+the seven-member archive contract including target-specific `SBOM.spdx.json`.
+Its SHA-256 is
+`7353c39acf2d5a454abf80e717160fa72b364df25b009b92a1e3619b1f7e83d7`.
+
+Candidate-bound schema-2 license evidence was frozen separately with SHA-256
+`f5a9d8c81d878576c2552b6cb4eb302d365356e07bac0320330c8a1dc89d507d`.
+`make qualify-license-evidence` independently re-derived and accepted that exact
+record against the clean checkout. Both records live outside the source tree.
+They are reproducible mechanical evidence only: all target decisions remain
+`unapproved`, and no human legal review, production key, signature, tag, hosted
+qualification, publication authorization, upload, or GitHub Release is claimed.
