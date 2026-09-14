@@ -48,11 +48,15 @@ func SignApproved(ctx context.Context, options ApprovedSigningOptions) error {
 type privateKeyReader func(path string) ([]byte, error)
 
 func signApproved(ctx context.Context, options ApprovedSigningOptions, readPrivateKey privateKeyReader) error {
+	return signApprovedWithLicenseEvidenceVerifier(ctx, options, readPrivateKey, verifyLicenseEvidenceRecord)
+}
+
+func signApprovedWithLicenseEvidenceVerifier(ctx context.Context, options ApprovedSigningOptions, readPrivateKey privateKeyReader, verifyEvidence licenseEvidenceRecordVerifier) error {
 	if ctx == nil || options.Dir == "" || options.KeyFile == "" || options.Source == "" ||
 		options.CandidateRecordFile == "" || options.LicenseEvidenceFile == "" || options.TrustRecordFile == "" ||
 		options.AuthorizationRecordFile == "" || !trustFingerprint(options.ExpectedCandidateSHA256) ||
 		!trustFingerprint(options.ExpectedLicenseEvidenceSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) ||
-		readPrivateKey == nil {
+		readPrivateKey == nil || verifyEvidence == nil {
 		return ErrSignature
 	}
 	if err := ctx.Err(); err != nil {
@@ -63,8 +67,8 @@ func signApproved(ctx context.Context, options ApprovedSigningOptions, readPriva
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
 		return ErrSignature
 	}
-	licenseEvidence, err := verifyLicenseEvidenceRecord(ctx, options.LicenseEvidenceFile,
-		options.ExpectedLicenseEvidenceSHA256, options.Source)
+	licenseEvidence, err := verifyEvidence(ctx, options.LicenseEvidenceFile,
+		options.ExpectedLicenseEvidenceSHA256, options.Source, options.Dir)
 	if err != nil || licenseEvidence.SourceCommit != candidate.SourceCommit {
 		return ErrSignature
 	}

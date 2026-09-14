@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -24,20 +25,48 @@ var noticeModulePath = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~+/\-]{0,511}
 var noticeModuleVersion = regexp.MustCompile(`^v[0-9][0-9A-Za-z.+\-]{0,127}$`)
 
 type listedPackage struct {
-	Module *listedModule `json:"Module"`
+	ImportPath string               `json:"ImportPath"`
+	Imports    []string             `json:"Imports"`
+	Module     *listedModule        `json:"Module"`
+	Standard   bool                 `json:"Standard"`
+	Incomplete bool                 `json:"Incomplete"`
+	Error      *listedPackageError  `json:"Error"`
+	DepsErrors []listedPackageError `json:"DepsErrors"`
+}
+
+type listedPackageError struct {
+	Err string `json:"Err"`
 }
 
 type listedModule struct {
-	Path    string        `json:"Path"`
-	Version string        `json:"Version"`
-	Dir     string        `json:"Dir"`
-	Main    bool          `json:"Main"`
-	Replace *listedModule `json:"Replace"`
+	Path     string        `json:"Path"`
+	Version  string        `json:"Version"`
+	Dir      string        `json:"Dir"`
+	Sum      string        `json:"Sum"`
+	GoModSum string        `json:"GoModSum"`
+	Main     bool          `json:"Main"`
+	Replace  *listedModule `json:"Replace"`
 }
 
 type noticeModule struct {
 	Path, Version string
+	Sum, GoModSum string
 	Files         []noticeFile
+}
+
+// targetClosure binds the module legal-file set to the complete package graph
+// selected for one release target. PackageCount counts every decoded node,
+// including the standard library and main module.
+type targetClosure struct {
+	Modules               []noticeModule
+	PackageCount          int
+	DependencyGraphSHA256 string
+}
+
+type dependencyGraphPackage struct {
+	ImportPath string   `json:"import_path"`
+	Source     string   `json:"source"`
+	Imports    []string `json:"imports"`
 }
 
 type noticeFile struct {
@@ -54,6 +83,187 @@ func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string,
 		return nil, err
 	}
 	return renderThirdPartyNotices(targetOS, targetArch, items)
+}
+
+// targetNoticeClosure derives canonical schema-v3 dependency and legal-file
+// evidence from the pinned, private reconstruction workspace.
+func targetNoticeClosure(ctx context.Context, source, targetOS, targetArch string, reconstruction *goReconstruction) (targetClosure, error) {
+	if ctx == nil || reconstruction == nil || reconstruction.verify() != nil ||
+		(targetOS != "darwin" && targetOS != "linux") || (targetArch != "amd64" && targetArch != "arm64") {
+		return targetClosure{}, ErrInvalid
+	}
+	listEnv := append(append([]string(nil), reconstruction.env...), "GOOS="+targetOS, "GOARCH="+targetArch)
+	toolchain, goExecutable, err := goToolchainAttribution(ctx, source, reconstruction.env)
+	if err != nil || goExecutable != reconstruction.goExecutable.path || toolchain.Sum != "" || toolchain.GoModSum != "" {
+		return targetClosure{}, ErrInvalid
+	}
+	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
+	if err != nil {
+		return targetClosure{}, err
+	}
+	if _, err = reconstruction.goOutput(ctx, source, listEnv, "mod", "verify"); err != nil {
+		return targetClosure{}, err
+	}
+	packages, err := decodeListedPackages(out)
+	if err != nil {
+		return targetClosure{}, err
+	}
+	closure, err := targetClosureFromPackages(packages, toolchain, reconstruction.moduleCache.path)
+	if err != nil {
+		return targetClosure{}, err
+	}
+	if _, err = reconstruction.goOutput(ctx, source, listEnv, "mod", "verify"); err != nil {
+		return targetClosure{}, err
+	}
+	if reconstruction.verify() != nil || reconstruction.goExecutable.verify() != nil {
+		return targetClosure{}, ErrInvalid
+	}
+	return closure, nil
+}
+
+func decodeListedPackages(out string) ([]listedPackage, error) {
+	decoder := json.NewDecoder(strings.NewReader(out))
+	var packages []listedPackage
+	for len(packages) <= 100_000 {
+		var pkg listedPackage
+		err := decoder.Decode(&pkg)
+		if err == io.EOF {
+			if len(packages) == 0 {
+				return nil, ErrInvalid
+			}
+			return packages, nil
+		}
+		if err != nil {
+			return nil, ErrInvalid
+		}
+		packages = append(packages, pkg)
+	}
+	return nil, ErrInvalid
+}
+
+func targetClosureFromPackages(packages []listedPackage, toolchain noticeModule, moduleCache string) (targetClosure, error) {
+	if len(packages) == 0 || len(packages) > 100_000 || !validGoToolchainModule(toolchain) || toolchain.Sum != "" || toolchain.GoModSum != "" {
+		return targetClosure{}, ErrInvalid
+	}
+	allPackages := make(map[string]bool, len(packages))
+	graphPackages := make([]dependencyGraphPackage, 0, len(packages))
+	modules := make(map[string]listedModule)
+	mainModulePath := ""
+	for _, pkg := range packages {
+		if !safeNoticeModulePath(pkg.ImportPath) || allPackages[pkg.ImportPath] || pkg.Incomplete || pkg.Error != nil || len(pkg.DepsErrors) != 0 {
+			return targetClosure{}, ErrInvalid
+		}
+		allPackages[pkg.ImportPath] = true
+		sourceIdentity := "stdlib"
+		if pkg.Module == nil {
+			if !pkg.Standard {
+				return targetClosure{}, ErrInvalid
+			}
+			graphPackages = append(graphPackages, dependencyGraphPackage{ImportPath: pkg.ImportPath, Source: sourceIdentity, Imports: []string{}})
+			continue
+		}
+		if pkg.Standard {
+			return targetClosure{}, ErrInvalid
+		}
+		module := *pkg.Module
+		if module.Replace != nil || !safeNoticeModulePath(module.Path) || module.Dir == "" {
+			return targetClosure{}, ErrInvalid
+		}
+		if module.Main {
+			if module.Version != "" || module.Sum != "" || module.GoModSum != "" {
+				return targetClosure{}, ErrInvalid
+			}
+			if mainModulePath != "" && mainModulePath != module.Path {
+				return targetClosure{}, ErrInvalid
+			}
+			mainModulePath = module.Path
+			sourceIdentity = "main:" + module.Path
+		} else {
+			if !safeNoticeModule(module.Path, module.Version) || !validGoModuleSum(module.Sum) ||
+				!validGoModuleSum(module.GoModSum) || !moduleDirectoryInCache(module.Dir, moduleCache) {
+				return targetClosure{}, ErrInvalid
+			}
+			key := module.Path + "@" + module.Version
+			if previous, ok := modules[key]; ok {
+				if previous.Dir != module.Dir || previous.Sum != module.Sum || previous.GoModSum != module.GoModSum {
+					return targetClosure{}, ErrInvalid
+				}
+			} else {
+				modules[key] = module
+			}
+			sourceIdentity = key
+		}
+		graphPackages = append(graphPackages, dependencyGraphPackage{ImportPath: pkg.ImportPath, Source: sourceIdentity, Imports: []string{}})
+	}
+	if mainModulePath == "" || len(modules) == 0 || len(graphPackages) != len(packages) {
+		return targetClosure{}, ErrInvalid
+	}
+	graphByPath := make(map[string]*dependencyGraphPackage, len(graphPackages))
+	for i := range graphPackages {
+		graphByPath[graphPackages[i].ImportPath] = &graphPackages[i]
+	}
+	for _, pkg := range packages {
+		node := graphByPath[pkg.ImportPath]
+		seen := map[string]bool{}
+		for _, imported := range pkg.Imports {
+			if !allPackages[imported] || seen[imported] {
+				return targetClosure{}, ErrInvalid
+			}
+			seen[imported] = true
+			node.Imports = append(node.Imports, imported)
+		}
+		sort.Strings(node.Imports)
+	}
+	sort.Slice(graphPackages, func(i, j int) bool { return graphPackages[i].ImportPath < graphPackages[j].ImportPath })
+	graphBody, err := json.Marshal(graphPackages)
+	if err != nil {
+		return targetClosure{}, ErrInvalid
+	}
+	digest := sha256.Sum256(graphBody)
+	closure := targetClosure{PackageCount: len(packages), DependencyGraphSHA256: "sha256:" + hex.EncodeToString(digest[:])}
+	for _, module := range modules {
+		files, err := noticeFilesInModuleCache(moduleCache, module.Dir, nil)
+		if err != nil {
+			return targetClosure{}, err
+		}
+		closure.Modules = append(closure.Modules, noticeModule{
+			Path: module.Path, Version: module.Version, Sum: module.Sum, GoModSum: module.GoModSum, Files: files,
+		})
+	}
+	closure.Modules = append(closure.Modules, toolchain)
+	sort.Slice(closure.Modules, func(i, j int) bool {
+		if closure.Modules[i].Path == closure.Modules[j].Path {
+			return closure.Modules[i].Version < closure.Modules[j].Version
+		}
+		return closure.Modules[i].Path < closure.Modules[j].Path
+	})
+	return closure, nil
+}
+
+func validGoModuleSum(value string) bool {
+	if len(value) != 47 || !strings.HasPrefix(value, "h1:") {
+		return false
+	}
+	digest, err := base64.StdEncoding.Strict().DecodeString(strings.TrimPrefix(value, "h1:"))
+	return err == nil && len(digest) == sha256.Size
+}
+
+func safeNoticeModulePath(value string) bool {
+	return safeNoticeField(value) && noticeModulePath.MatchString(value) && !strings.Contains(value, "..") &&
+		!strings.Contains(value, "//") && !strings.HasSuffix(value, "/")
+}
+
+func moduleDirectoryInCache(directory, moduleCache string) bool {
+	directoryReal, err := filepath.EvalSymlinks(directory)
+	if err != nil || !filepath.IsAbs(directoryReal) {
+		return false
+	}
+	cacheReal, err := filepath.EvalSymlinks(moduleCache)
+	if err != nil || !filepath.IsAbs(cacheReal) {
+		return false
+	}
+	relative, err := filepath.Rel(cacheReal, directoryReal)
+	return err == nil && relative != "." && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 // targetNoticeModules captures the complete target-specific legal-file closure
@@ -119,9 +329,110 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 }
 
 func noticeFiles(dir string) ([]noticeFile, error) {
-	entries, err := os.ReadDir(dir)
+	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return nil, err
+	}
+	files, readErr := noticeFilesFromRoot(root)
+	closeErr := root.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return files, nil
+}
+
+// noticeFilesInModuleCache opens directory relative to the pinned cache root,
+// reads through that anchored handle, and rejects named-path replacement before
+// returning any bytes. afterOpen is a deterministic test seam only.
+func noticeFilesInModuleCache(moduleCache, directory string, afterOpen func()) ([]noticeFile, error) {
+	cacheAbsolute, err := filepath.Abs(moduleCache)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	directoryAbsolute, err := filepath.Abs(directory)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	cacheInfo, err := os.Lstat(cacheAbsolute)
+	if err != nil || !cacheInfo.IsDir() || cacheInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, ErrInvalid
+	}
+	directoryInfo, err := os.Lstat(directoryAbsolute)
+	if err != nil || !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, ErrInvalid
+	}
+	cacheReal, err := filepath.EvalSymlinks(cacheAbsolute)
+	if err != nil || !filepath.IsAbs(cacheReal) {
+		return nil, ErrInvalid
+	}
+	directoryReal, err := filepath.EvalSymlinks(directoryAbsolute)
+	if err != nil || !filepath.IsAbs(directoryReal) {
+		return nil, ErrInvalid
+	}
+	relative, err := filepath.Rel(cacheReal, directoryReal)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return nil, ErrInvalid
+	}
+	cacheRoot, err := os.OpenRoot(cacheReal)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	cacheOpened, cacheStatErr := cacheRoot.Stat(".")
+	moduleRoot, openErr := cacheRoot.OpenRoot(relative)
+	if cacheStatErr != nil || openErr != nil || !os.SameFile(cacheInfo, cacheOpened) {
+		if moduleRoot != nil {
+			_ = moduleRoot.Close()
+		}
+		_ = cacheRoot.Close()
+		return nil, ErrInvalid
+	}
+	moduleOpened, moduleStatErr := moduleRoot.Stat(".")
+	if moduleStatErr != nil || !moduleOpened.IsDir() || !os.SameFile(directoryInfo, moduleOpened) {
+		_ = moduleRoot.Close()
+		_ = cacheRoot.Close()
+		return nil, ErrInvalid
+	}
+	if afterOpen != nil {
+		afterOpen()
+	}
+	files, readErr := noticeFilesFromRoot(moduleRoot)
+	moduleFinal, moduleFinalErr := moduleRoot.Stat(".")
+	cacheFinal, cacheFinalErr := cacheRoot.Stat(".")
+	cacheNamedFinal, cacheNamedFinalErr := os.Lstat(cacheAbsolute)
+	namedFinal, namedFinalErr := os.Lstat(directoryAbsolute)
+	moduleCloseErr := moduleRoot.Close()
+	cacheCloseErr := cacheRoot.Close()
+	finalReal, finalRealErr := filepath.EvalSymlinks(directoryAbsolute)
+	cacheRealFinal, cacheRealFinalErr := filepath.EvalSymlinks(cacheAbsolute)
+	if readErr != nil || moduleFinalErr != nil || cacheFinalErr != nil || cacheNamedFinalErr != nil || namedFinalErr != nil ||
+		moduleCloseErr != nil || cacheCloseErr != nil || finalRealErr != nil ||
+		cacheRealFinalErr != nil ||
+		!moduleFinal.IsDir() || !namedFinal.IsDir() || namedFinal.Mode()&os.ModeSymlink != 0 ||
+		!os.SameFile(directoryInfo, moduleFinal) || !os.SameFile(directoryInfo, namedFinal) ||
+		!cacheNamedFinal.IsDir() || cacheNamedFinal.Mode()&os.ModeSymlink != 0 ||
+		!os.SameFile(cacheInfo, cacheFinal) || !os.SameFile(cacheInfo, cacheNamedFinal) ||
+		cacheRealFinal != cacheReal || finalReal != directoryReal ||
+		!moduleDirectoryInCache(finalReal, cacheReal) {
+		return nil, ErrInvalid
+	}
+	return files, nil
+}
+
+func noticeFilesFromRoot(root *os.Root) ([]noticeFile, error) {
+	if root == nil {
+		return nil, ErrInvalid
+	}
+	directory, err := root.Open(".")
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	entries, readDirErr := directory.ReadDir(-1)
+	closeErr := directory.Close()
+	if readDirErr != nil || closeErr != nil {
+		return nil, ErrInvalid
 	}
 	var names []string
 	for _, entry := range entries {
@@ -134,11 +445,6 @@ func noticeFiles(dir string) ([]noticeFile, error) {
 	if len(names) == 0 || len(names) > 1_000 {
 		return nil, ErrInvalid
 	}
-	root, err := os.OpenRoot(dir)
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close()
 	files := make([]noticeFile, 0, len(names))
 	total := 0
 	for _, name := range names {
@@ -154,9 +460,11 @@ func noticeFiles(dir string) ([]noticeFile, error) {
 		body, readErr := io.ReadAll(io.LimitReader(file, info.Size()+1))
 		final, finalStatErr := file.Stat()
 		closeErr := file.Close()
+		namedFinal, namedFinalErr := root.Stat(name)
 		if statErr != nil || finalStatErr != nil || closeErr != nil || !actual.Mode().IsRegular() ||
 			!os.SameFile(info, actual) || !os.SameFile(actual, final) || actual.Size() != info.Size() ||
-			final.Size() != actual.Size() || readErr != nil || int64(len(body)) != actual.Size() ||
+			final.Size() != actual.Size() || namedFinalErr != nil || !os.SameFile(actual, namedFinal) ||
+			readErr != nil || int64(len(body)) != actual.Size() ||
 			!utf8.Valid(body) || bytes.IndexByte(body, 0) >= 0 {
 			return nil, ErrInvalid
 		}

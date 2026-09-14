@@ -71,4 +71,4 @@ qualify-release: qualify-mvp
 qualify-license-evidence:
 	test -n "$$DARWIN_LICENSE_EVIDENCE_RECORD"
 	test -n "$$DARWIN_LICENSE_EVIDENCE_SHA256"
-	go run ./cmd/license-evidence verify --record "$$DARWIN_LICENSE_EVIDENCE_RECORD" --record-sha256 "$$DARWIN_LICENSE_EVIDENCE_SHA256" --source .
+	sh scripts/license-evidence-bootstrap.sh verify --record "$$DARWIN_LICENSE_EVIDENCE_RECORD" --record-sha256 "$$DARWIN_LICENSE_EVIDENCE_SHA256" --source .

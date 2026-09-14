@@ -96,10 +96,15 @@ individual commands have shorter bounds and bounded output capture.
 Reproducibility means identical inputs, dependencies and toolchain produce
 identical artifacts. Packaging resolves one absolute Go executable, requires it
 to match `GOROOT/bin/go`, and rechecks its file identity and executable mode
-through the four-target build. This is still not a hermetic build or independent
+through the four-target build. Each `Package` invocation creates a new private
+module/build cache and uses it for embedded-source discovery, target graph and
+notice capture, all builds, and verification. `BuildApproved` therefore compares
+two independently reconstructed cache populations. The cache must be removed
+before a signable output directory is published. Both packaging and the separate
+license-evidence freeze/verify path permit only the fixed official Go proxy and
+checksum database policy. This is still not a hermetic build or independent
 provenance attestation: the selected Git/Go binary contents, initial PATH,
-module cache and build host remain trusted. Missing public modules may be
-downloaded through Go's normal module resolution. Packaging is not a
+public Go services, OS kernel and build host remain trusted. Packaging is not a
 model-runtime task and is not covered by `mode: local_only` egress controls.
 
 `cmd/package-release` remains the lower-level one-pass packaging primitive for
@@ -110,7 +115,7 @@ do not use it to create the production signable directory.
 ## Freeze and approve candidate license evidence
 
 Before authorizing production signing, freeze and independently review the
-canonical schema-2 license record described in the
+canonical schema-3 license record described in the
 [dependency license inventory](dependency-license-inventory.md). Its digest
 must be obtained through the release-evidence channel and entered in the
 operator checklist. Re-derive it from the exact clean candidate with:
@@ -122,6 +127,10 @@ DARWIN_LICENSE_EVIDENCE_SHA256=sha256:EXPECTED_EXACT_LICENSE_EVIDENCE_SHA256 \
 ```
 
 This mechanical gate does not decide whether distribution is legally approved.
+Its bootstrap compiles the verifier with fresh private home, temporary, module
+and build caches and a fail-closed public-module policy; the verifier then uses
+a separate fresh reconstruction workspace. Neither cache is retained or reused,
+and the record contains policy/result identity rather than local cache paths.
 An authorized human must review the complete project, dependency and toolchain
 terms for the intended binary/source channels. The external signing
 authorization then binds the exact reviewed evidence digest and separately

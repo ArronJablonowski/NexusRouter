@@ -17,10 +17,10 @@ release review must repeat the inventory against the exact candidate commit and
 toolchain because dependency or build-tag changes can alter the closure. This
 table is a readable baseline; it is not the final candidate authority.
 
-For a candidate, freeze the canonical schema-2 evidence outside the checkout:
+For a candidate, freeze the canonical schema-3 evidence outside the checkout:
 
 ```sh
-go run ./cmd/license-evidence freeze \
+sh scripts/license-evidence-bootstrap.sh freeze \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
   --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
   --out /ABSOLUTE/OPERATOR_CONTROLLED/LICENSE_EVIDENCE.json
@@ -36,13 +36,24 @@ DARWIN_LICENSE_EVIDENCE_SHA256=sha256:EXPECTED_64_LOWERCASE_HEX \
   make qualify-license-evidence
 ```
 
-The record binds the source commit, exact Go runtime version and module
-directive, root MIT license, four ordered target closures, every discovered
-legal-file size/hash, explicit Go toolchain `LICENSE` and `PATENTS`, and each
-rendered `THIRD_PARTY_NOTICES.txt` digest. Evidence and notice bytes derive from
-the same captured closure. Freeze and verification fail closed on a dirty or
+The bootstrap first compiles the command with newly created private
+`HOME`, `TMPDIR`, `GOPATH`, `GOMODCACHE`, and `GOCACHE` directories, clears the
+ambient environment, fixes `GOPROXY=https://proxy.golang.org` and
+`GOSUMDB=sum.golang.org`, and disables private modules, direct/network fallback,
+VCS downloads, toolchain downloads, authentication and telemetry. It removes
+that workspace on every exit. Freeze and verification then independently
+reconstruct the dependency graph in another initially empty private workspace
+under the same policy; verification never reuses the freeze cache.
+
+The record binds the source commit, exact `go.mod` and `go.sum` hashes, the
+reconstruction policy, exact Go runtime version and module directive, root MIT
+license, four ordered target closures, every discovered legal-file size/hash,
+explicit Go toolchain `LICENSE` and `PATENTS`, and each rendered
+`THIRD_PARTY_NOTICES.txt` digest. Evidence and notice bytes derive from the same
+reconstructed closure. Freeze and verification fail closed on a dirty or
 different checkout, noncanonical/tampered evidence, dependency drift, a local
-module replacement, altered legal files, or an incompatible toolchain.
+module replacement, altered legal files, an incompatible toolchain, or failure
+to obtain a public module through the fixed official proxy/checksum policy.
 
 Release archives also carry a target-specific canonical `SBOM.spdx.json`. Its
 module list must match this candidate-bound target closure, and it additionally
@@ -80,9 +91,10 @@ source file identified by the module version and digest.
 ## Required operator follow-up
 
 1. Confirm the repository's adopted MIT text is included in the candidate.
-2. Freeze and independently verify the candidate-bound schema-2 license record.
-3. Verify each upstream digest from a clean module download using the declared
-   Go checksum database/proxy policy.
+2. Freeze and independently verify the candidate-bound schema-3 license record.
+3. Confirm the retained reconstruction fields, source-input hashes, four target
+   closures, and upstream digests were produced under the declared fresh-cache
+   official Go checksum database/proxy policy.
 4. Review complete upstream license, notice and patent texts and determine the
    required attribution bundle for binary and source distribution.
 5. Approve the exact license-evidence digest and bind it into the external

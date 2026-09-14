@@ -8,6 +8,24 @@ outside the guarded publisher and is quarantined; no GitHub Release, signed
 production assets, supported-platform decision or canonical publication
 approval is claimed.
 
+- DAR-101 routes release packaging through a fresh private reconstruction for
+  SBOM discovery, four-target dependency and notice capture, compilation, and
+  module verification. Each reproducibility pass gets a distinct cache, and
+  cache cleanup must succeed before the signable artifact directory is
+  published. This prevents ambient module/build caches from supplying release
+  bytes; it does not make the build hermetic or remove trust in the pinned Go
+  executable, public Go services, kernel, or build host.
+
+- DAR-102 upgrades candidate license evidence to schema 3 with exact
+  `go.mod`/`go.sum` hashes and a fixed public-module reconstruction policy.
+  Freeze and verification are bootstrapped through fresh private home,
+  temporary, module and build caches and then use distinct fresh dependency
+  workspaces, so ambient or previously populated caches cannot supply evidence.
+  Only the official Go proxy and checksum database are permitted; private/direct
+  fallback, VCS downloads, authentication, automatic toolchain downloads and
+  telemetry are disabled. This remains mechanical evidence for separate human
+  legal and distribution review, not hermetic build provenance or approval.
+
 - DAR-87 changes the release contract to canonical schema-2 candidate records,
   schema-3 manifests, and seven-member target archives containing
   `SBOM.spdx.json`. Each target-specific SPDX 2.3 document binds the exact

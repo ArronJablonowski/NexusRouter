@@ -17,7 +17,7 @@ import (
 )
 
 func TestApprovedSigningRoundTrip(t *testing.T) {
-	options, public := approvedSigningFixture(t)
+	options, public := approvedSigningIntegrationFixture(t)
 	if err := SignApproved(context.Background(), options); err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 		"artifact", "existing_signature", "source", "key_in_source", "key_in_release", "canceled",
 	} {
 		t.Run(scenario, func(t *testing.T) {
-			options, _ := approvedSigningFixture(t)
+			options, _ := approvedSigningFastFixture(t)
 			ctx := context.Background()
 			switch scenario {
 			case "candidate":
@@ -108,7 +108,7 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 				calls++
 				return make([]byte, ed25519.SeedSize), nil
 			}
-			if err := signApproved(ctx, options, reader); err != ErrSignature {
+			if err := signApprovedFixture(ctx, options, reader); err != ErrSignature {
 				t.Fatal("failed preflight accepted", err)
 			}
 			if calls != 0 {
@@ -124,7 +124,7 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 }
 
 func TestApprovedSigningRejectsWrongSeed(t *testing.T) {
-	options, _ := approvedSigningFixture(t)
+	options, _ := approvedSigningFastFixture(t)
 	_, other, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +133,7 @@ func TestApprovedSigningRejectsWrongSeed(t *testing.T) {
 	if err = os.WriteFile(options.KeyFile, []byte(hex.EncodeToString(other.Seed())+"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err = SignApproved(context.Background(), options); err != ErrSignature {
+	if err = signApprovedFixture(context.Background(), options, func(path string) ([]byte, error) { return signingKeyFile(path, true) }); err != ErrSignature {
 		t.Fatal("wrong private identity accepted", err)
 	}
 	if _, err = os.Lstat(filepath.Join(options.Dir, signatureName)); !os.IsNotExist(err) {
@@ -142,7 +142,7 @@ func TestApprovedSigningRejectsWrongSeed(t *testing.T) {
 }
 
 func TestApprovedSigningReadsPrivateKeyOnceAfterPreflight(t *testing.T) {
-	options, _ := approvedSigningFixture(t)
+	options, _ := approvedSigningFastFixture(t)
 	seed, err := signingKeyFile(options.KeyFile, true)
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestApprovedSigningReadsPrivateKeyOnceAfterPreflight(t *testing.T) {
 		}
 		return append([]byte(nil), seed...), nil
 	}
-	if err = signApproved(context.Background(), options, reader); err != nil {
+	if err = signApprovedFixture(context.Background(), options, reader); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 1 {
@@ -187,13 +187,13 @@ func TestPrivateKeyOutsideRootsResolvesParentSymlinks(t *testing.T) {
 }
 
 func TestApprovedSigningRejectsArtifactNoticeOutsideLicenseEvidenceBeforeKey(t *testing.T) {
-	options, _ := approvedSigningFixtureWithNoticeMismatch(t)
+	options, _ := approvedSigningFixtureWithExecutableVersionAndEvidence(t, true, "", "", false)
 	calls := 0
 	reader := func(string) ([]byte, error) {
 		calls++
 		return make([]byte, ed25519.SeedSize), nil
 	}
-	if err := signApproved(context.Background(), options, reader); err != ErrSignature {
+	if err := signApprovedFixture(context.Background(), options, reader); err != ErrSignature {
 		t.Fatal("artifact notice outside license evidence accepted", err)
 	}
 	if calls != 0 {
@@ -204,13 +204,13 @@ func TestApprovedSigningRejectsArtifactNoticeOutsideLicenseEvidenceBeforeKey(t *
 func TestApprovedSigningRejectsSBOMIdentityDriftBeforeKey(t *testing.T) {
 	for _, drift := range []string{"missing", "tampered", "created", "target", "binary", "module", "toolchain", "source_asset"} {
 		t.Run(drift, func(t *testing.T) {
-			options, _ := approvedSigningFixtureWithOptions(t, false, false, drift)
+			options, _ := approvedSigningFixtureWithExecutableVersionAndEvidence(t, false, "", drift, false)
 			calls := 0
 			reader := func(string) ([]byte, error) {
 				calls++
 				return make([]byte, ed25519.SeedSize), nil
 			}
-			if err := signApproved(context.Background(), options, reader); err != ErrSignature {
+			if err := signApprovedFixture(context.Background(), options, reader); err != ErrSignature {
 				t.Fatal("SBOM identity drift accepted", err)
 			}
 			if calls != 0 {
@@ -286,7 +286,53 @@ func canonicalAuthorizationFixture(t *testing.T, authorization SigningAuthorizat
 }
 
 func approvedSigningFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
-	return approvedSigningFixtureWithOptions(t, false, false, "")
+	return approvedSigningFixtureWithExecutableVersionAndEvidence(t, false, "", "", true)
+}
+
+func approvedSigningIntegrationFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithExecutableVersionAndEvidence(t, false, "", "", true)
+}
+
+func approvedSigningFastFixture(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithExecutableVersionAndEvidence(t, false, "", "", false)
+}
+
+func signApprovedFixture(ctx context.Context, options ApprovedSigningOptions, readKey privateKeyReader) error {
+	return signApprovedWithLicenseEvidenceVerifier(ctx, options, readKey, fixtureLicenseEvidenceVerifier(options.Dir))
+}
+
+// fixtureLicenseEvidenceVerifier retains the canonical-byte, digest, checkout,
+// commit, and protected-path gates. Higher-level tests may skip only the fresh
+// four-target reconstruction that has dedicated integration coverage.
+func fixtureLicenseEvidenceVerifier(expectedProtected ...string) licenseEvidenceRecordVerifier {
+	want := make([]string, len(expectedProtected))
+	for i, path := range expectedProtected {
+		want[i], _ = canonicalProspectivePath(path)
+	}
+	return func(ctx context.Context, recordPath, expectedSHA256, source string, protectedPaths ...string) (LicenseEvidence, error) {
+		if ctx == nil || ctx.Err() != nil || !trustFingerprint(expectedSHA256) || len(protectedPaths) != len(want) {
+			return LicenseEvidence{}, ErrInvalid
+		}
+		for i, path := range protectedPaths {
+			got, err := canonicalProspectivePath(path)
+			if err != nil || want[i] == "" || got != want[i] {
+				return LicenseEvidence{}, ErrInvalid
+			}
+		}
+		body, record, err := readLicenseEvidence(recordPath)
+		if err != nil || licenseEvidenceDigest(body) != expectedSHA256 {
+			return LicenseEvidence{}, ErrInvalid
+		}
+		root, err := filepath.Abs(source)
+		if err != nil {
+			return LicenseEvidence{}, ErrInvalid
+		}
+		root, err = filepath.EvalSymlinks(root)
+		if err != nil || verifyCandidateCheckout(ctx, root, record.SourceCommit, environment()) != nil {
+			return LicenseEvidence{}, ErrInvalid
+		}
+		return record, nil
+	}
 }
 
 func approvedSigningFixtureWithNoticeMismatch(t *testing.T) (ApprovedSigningOptions, ed25519.PublicKey) {
@@ -306,6 +352,10 @@ func approvedSigningFixtureWithOptions(t *testing.T, mismatchNotice, executableN
 }
 
 func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bool, executableVersion, sbomDrift string) (ApprovedSigningOptions, ed25519.PublicKey) {
+	return approvedSigningFixtureWithExecutableVersionAndEvidence(t, mismatchNotice, executableVersion, sbomDrift, true)
+}
+
+func approvedSigningFixtureWithExecutableVersionAndEvidence(t *testing.T, mismatchNotice bool, executableVersion, sbomDrift string, reconstructEvidence bool) (ApprovedSigningOptions, ed25519.PublicKey) {
 	t.Helper()
 	ctx := context.Background()
 	source := collateralSourceFixture(t)
@@ -349,16 +399,32 @@ func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bo
 	if err != nil {
 		t.Fatal(err)
 	}
-	licenseEvidenceFile := filepath.Join(t.TempDir(), "license-evidence.json")
-	licenseEvidenceSHA256, err := FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{
-		Commit: commit, Source: source, Out: licenseEvidenceFile,
-	})
+	toolchainEvidence, err := licenseEvidenceToolchain(runtime.Version(), "1.27.1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, licenseEvidence, err := readLicenseEvidence(licenseEvidenceFile)
+	goMod, err := os.ReadFile(filepath.Join(source, "go.mod"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	goSum, err := os.ReadFile(filepath.Join(source, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootLicense, err := os.ReadFile(filepath.Join(source, licenseName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	licenseEvidence := LicenseEvidence{
+		SchemaVersion: licenseEvidenceSchema, Scope: licenseEvidenceScope, SourceCommit: commit,
+		SourceInputs: LicenseEvidenceSourceInputs{GoModSHA256: licenseEvidenceDigest(goMod), GoSumSHA256: licenseEvidenceDigest(goSum)},
+		Reconstruction: LicenseEvidenceReconstruction{
+			Policy: goReconstructionPolicy, ModuleProxy: goReconstructionProxy, ChecksumDatabase: goReconstructionSumDatabase,
+			ModuleMode: "readonly", ModuleCache: "fresh-isolated", BuildCache: "fresh-isolated",
+			NetworkFallback: "disabled", PrivateModules: "disabled",
+		},
+		Toolchain:   toolchainEvidence,
+		RootLicense: LicenseEvidenceRoot{Source: licenseName, SPDX: "MIT", Size: int64(len(rootLicense)), SHA256: licenseEvidenceDigest(rootLicense)},
 	}
 	candidateFile := filepath.Join(t.TempDir(), "candidate.json")
 	if err = FreezeCandidate(ctx, Options{Version: "1.0.0", Commit: commit, Out: candidateFile, Source: source}); err != nil {
@@ -377,7 +443,7 @@ func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bo
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: commit, Created: created, Toolchain: licenseEvidence.Toolchain.GOVERSION}
+	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: commit, Created: created, Toolchain: toolchainEvidence.GOVERSION}
 	var sums strings.Builder
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
 		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
@@ -389,6 +455,23 @@ func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bo
 		if entryErr != nil {
 			t.Fatal(entryErr)
 		}
+		evidenceTarget := LicenseEvidenceTarget{
+			OS: target[0], Arch: target[1], PackageCount: 1,
+			DependencyGraphSHA256: licenseEvidenceDigest([]byte(target[0] + "/" + target[1])),
+			NoticeSHA256:          licenseEvidenceDigest(notice),
+		}
+		for _, module := range modules {
+			evidenceModule := LicenseEvidenceModule{Path: module.Path, Version: module.Version, Sum: module.Sum, GoModSum: module.GoModSum}
+			if module.Path == "github.com/google/uuid" {
+				evidenceModule.Sum = "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0="
+				evidenceModule.GoModSum = "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo="
+			}
+			for _, file := range module.Files {
+				evidenceModule.Files = append(evidenceModule.Files, LicenseEvidenceFile{Name: file.Name, Size: int64(len(file.Body)), SHA256: licenseEvidenceDigest(file.Body)})
+			}
+			evidenceTarget.Modules = append(evidenceTarget.Modules, evidenceModule)
+		}
+		licenseEvidence.Targets = append(licenseEvidence.Targets, evidenceTarget)
 		if mismatchNotice && target[0] == "darwin" && target[1] == "amd64" {
 			notice = signingNoticeFixture(target[0], target[1])
 		}
@@ -448,6 +531,21 @@ func approvedSigningFixtureWithExecutableVersion(t *testing.T, mismatchNotice bo
 	fmt.Fprintf(&sums, "%x  manifest.json\n", sha256.Sum256(manifestBody))
 	sumsBody := []byte(sums.String())
 	writeSigningFixture(t, filepath.Join(releaseDir, "SHA256SUMS"), sumsBody, 0644)
+	licenseEvidenceFile := filepath.Join(t.TempDir(), "license-evidence.json")
+	var licenseEvidenceSHA256 string
+	if reconstructEvidence {
+		licenseEvidenceSHA256, err = FreezeLicenseEvidence(ctx, LicenseEvidenceOptions{Commit: commit, Source: source, Out: licenseEvidenceFile})
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		licenseEvidenceBody, marshalErr := marshalLicenseEvidence(licenseEvidence)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		writeSigningFixture(t, licenseEvidenceFile, licenseEvidenceBody, 0644)
+		licenseEvidenceSHA256 = licenseEvidenceDigest(licenseEvidenceBody)
+	}
 
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

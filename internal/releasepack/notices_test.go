@@ -34,6 +34,237 @@ func TestRenderThirdPartyNoticesDeterministic(t *testing.T) {
 	}
 }
 
+func TestTargetClosureBindsPackagesEdgesAndModuleSums(t *testing.T) {
+	cache := t.TempDir()
+	depDir := filepath.Join(cache, "example.com", "dep@v1.0.0")
+	leafDir := filepath.Join(cache, "example.com", "leaf@v1.0.0")
+	for _, dir := range []string{depDir, leafDir} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("fixture license\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const sumA = "h1:vF1DjpVEshcIqoEaauuHebaLk1O1forxjxBaVn884JQ="
+	const sumB = "h1:m8S8VeM9r4dzDwjrKO0a1sZP3YjeMamRRlD+fmR2Q/0="
+	packages := []listedPackage{
+		{ImportPath: "unsafe", Standard: true, Imports: nil},
+		{ImportPath: "example.com/root/cmd/darwin", Imports: []string{"unsafe", "example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
+		{ImportPath: "example.com/dep", Imports: []string{"example.com/leaf", "unsafe"}, Module: &listedModule{Path: "example.com/dep", Version: "v1.0.0", Dir: depDir, Sum: sumA, GoModSum: sumB}},
+		{ImportPath: "example.com/leaf", Imports: []string{"unsafe"}, Module: &listedModule{Path: "example.com/leaf", Version: "v1.0.0", Dir: leafDir, Sum: sumB, GoModSum: sumA}},
+	}
+	toolchain, err := embeddedGoToolchainModule()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := targetClosureFromPackages(packages, toolchain, cache)
+	if err != nil || first.PackageCount != 4 || !trustFingerprint(first.DependencyGraphSHA256) || len(first.Modules) != 3 {
+		t.Fatal("valid target closure rejected", first, err)
+	}
+	wantGraph := `[{"import_path":"example.com/dep","source":"example.com/dep@v1.0.0","imports":["example.com/leaf","unsafe"]},{"import_path":"example.com/leaf","source":"example.com/leaf@v1.0.0","imports":["unsafe"]},{"import_path":"example.com/root/cmd/darwin","source":"main:example.com/root","imports":["example.com/dep","unsafe"]},{"import_path":"unsafe","source":"stdlib","imports":[]}]`
+	if first.DependencyGraphSHA256 != licenseEvidenceDigest([]byte(wantGraph)) {
+		t.Fatal("graph did not bind canonical package sources and edges", first.DependencyGraphSHA256)
+	}
+	if first.Modules[0].Path != "example.com/dep" || first.Modules[0].Sum != sumA || first.Modules[0].GoModSum != sumB ||
+		first.Modules[1].Path != "example.com/leaf" || first.Modules[2].Path != goToolchainModulePath ||
+		first.Modules[2].Sum != "" || first.Modules[2].GoModSum != "" {
+		t.Fatal("module sums or canonical order lost", first.Modules)
+	}
+	reordered := []listedPackage{packages[3], packages[1], packages[0], packages[2]}
+	reordered[1].Imports = []string{"example.com/dep", "unsafe"}
+	second, err := targetClosureFromPackages(reordered, toolchain, cache)
+	if err != nil || second.DependencyGraphSHA256 != first.DependencyGraphSHA256 || second.PackageCount != first.PackageCount {
+		t.Fatal("equivalent graph was not canonical", second, err)
+	}
+	changed := append([]listedPackage(nil), packages...)
+	changedModule := *changed[2].Module
+	changedModule.Sum = sumB
+	changed[2].Module = &changedModule
+	third, err := targetClosureFromPackages(changed, toolchain, cache)
+	if err != nil || third.Modules[0].Sum != sumB || third.Modules[0].Sum == first.Modules[0].Sum {
+		t.Fatal("module sum was not closure-bound", third, err)
+	}
+	changed = append([]listedPackage(nil), packages...)
+	changed[1].Imports = []string{"unsafe"}
+	fourth, err := targetClosureFromPackages(changed, toolchain, cache)
+	if err != nil || fourth.DependencyGraphSHA256 == first.DependencyGraphSHA256 {
+		t.Fatal("package edge was not graph-bound", fourth, err)
+	}
+}
+
+func TestTargetClosureRejectsUntrustedModuleIdentityAndDirectory(t *testing.T) {
+	cache := t.TempDir()
+	inside := filepath.Join(cache, "example.com", "dep@v1.0.0")
+	outside := filepath.Join(t.TempDir(), "dep@v1.0.0")
+	for _, dir := range []string{inside, outside} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("fixture license\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const sum = "h1:vF1DjpVEshcIqoEaauuHebaLk1O1forxjxBaVn884JQ="
+	toolchain, err := embeddedGoToolchainModule()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := []listedPackage{
+		{ImportPath: "example.com/root/cmd/darwin", Imports: []string{"example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
+		{ImportPath: "example.com/dep", Module: &listedModule{Path: "example.com/dep", Version: "v1.0.0", Dir: inside, Sum: sum, GoModSum: sum}},
+	}
+	for name, mutate := range map[string]func(*listedModule){
+		"missing_sum":        func(m *listedModule) { m.Sum = "" },
+		"malformed_sum":      func(m *listedModule) { m.Sum = "h1:not-base64" },
+		"missing_go_mod_sum": func(m *listedModule) { m.GoModSum = "" },
+		"outside_cache":      func(m *listedModule) { m.Dir = outside },
+		"replacement":        func(m *listedModule) { m.Replace = &listedModule{Path: "example.com/other", Version: "v1.0.0"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			packages := append([]listedPackage(nil), base...)
+			module := *packages[1].Module
+			mutate(&module)
+			packages[1].Module = &module
+			if _, err := targetClosureFromPackages(packages, toolchain, cache); err == nil {
+				t.Fatal("untrusted module identity accepted")
+			}
+		})
+	}
+	for name, mutate := range map[string]func(*listedPackage){
+		"incomplete": func(p *listedPackage) { p.Incomplete = true },
+		"nonstandard_without_module": func(p *listedPackage) {
+			p.Module = nil
+			p.Standard = false
+		},
+		"package_error": func(p *listedPackage) { p.Error = &listedPackageError{Err: "failed"} },
+		"dependency_error": func(p *listedPackage) {
+			p.DepsErrors = []listedPackageError{{Err: "failed"}}
+		},
+		"missing_dependency_node": func(p *listedPackage) { p.Imports = []string{"example.com/missing"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			packages := append([]listedPackage(nil), base...)
+			mutate(&packages[0])
+			if _, err := targetClosureFromPackages(packages, toolchain, cache); err == nil {
+				t.Fatal("incomplete package graph accepted")
+			}
+		})
+	}
+	link := filepath.Join(cache, "escaped")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	packages := append([]listedPackage(nil), base...)
+	module := *packages[1].Module
+	module.Dir = link
+	packages[1].Module = &module
+	if _, err := targetClosureFromPackages(packages, toolchain, cache); err == nil {
+		t.Fatal("module directory escaping through cache symlink accepted")
+	}
+}
+
+func TestPinnedModuleLegalReadRejectsSymlinkAndDirectoryReplacement(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		replace func(module, moved, outside string) error
+	}{
+		{
+			name: "symlink_swap",
+			replace: func(module, moved, outside string) error {
+				if err := os.Rename(module, moved); err != nil {
+					return err
+				}
+				return os.Symlink(outside, module)
+			},
+		},
+		{
+			name: "directory_replacement",
+			replace: func(module, moved, outside string) error {
+				if err := os.Rename(module, moved); err != nil {
+					return err
+				}
+				if err := os.Mkdir(module, 0700); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(module, "LICENSE"), []byte("replacement license\n"), 0600)
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cache := t.TempDir()
+			module := filepath.Join(cache, "example.com", "module@v1.0.0")
+			moved := module + ".moved"
+			outside := filepath.Join(t.TempDir(), "outside")
+			for _, directory := range []string{module, outside} {
+				if err := os.MkdirAll(directory, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(module, "LICENSE"), []byte("original license\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(outside, "LICENSE"), []byte("outside license\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var hookErr error
+			files, err := noticeFilesInModuleCache(cache, module, func() {
+				hookErr = test.replace(module, moved, outside)
+			})
+			if hookErr != nil {
+				t.Fatal(hookErr)
+			}
+			if err == nil || files != nil {
+				t.Fatal("replaced module directory accepted", files)
+			}
+		})
+	}
+	t.Run("cache_root_replacement", func(t *testing.T) {
+		parent := t.TempDir()
+		cache := filepath.Join(parent, "cache")
+		module := filepath.Join(cache, "example.com", "module@v1.0.0")
+		if err := os.MkdirAll(module, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(module, "LICENSE"), []byte("original license\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		var hookErr error
+		files, err := noticeFilesInModuleCache(cache, module, func() {
+			moved := cache + ".moved"
+			if hookErr = os.Rename(cache, moved); hookErr != nil {
+				return
+			}
+			replacement := filepath.Join(cache, "example.com", "module@v1.0.0")
+			if hookErr = os.MkdirAll(replacement, 0700); hookErr != nil {
+				return
+			}
+			hookErr = os.WriteFile(filepath.Join(replacement, "LICENSE"), []byte("replacement license\n"), 0600)
+		})
+		if hookErr != nil {
+			t.Fatal(hookErr)
+		}
+		if err == nil || files != nil {
+			t.Fatal("replaced module cache root accepted", files)
+		}
+	})
+}
+
+func TestPinnedModuleLegalReadAcceptsStableAnchoredDirectory(t *testing.T) {
+	cache := t.TempDir()
+	module := filepath.Join(cache, "example.com", "module@v1.0.0")
+	if err := os.MkdirAll(module, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(module, "LICENSE"), []byte("stable license\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	files, err := noticeFilesInModuleCache(cache, module, nil)
+	if err != nil || len(files) != 1 || files[0].Name != "LICENSE" || string(files[0].Body) != "stable license\n" {
+		t.Fatal("stable anchored module rejected", files, err)
+	}
+}
+
 func TestValidateNoticeRejectsMalformedOrTamperedContent(t *testing.T) {
 	valid, err := renderThirdPartyNotices("linux", "amd64", []noticeModule{{
 		Path: "example.com/dependency", Version: "v1.0.0",

@@ -1,5 +1,29 @@
 # Implementation evidence
 
+DAR-101 packaging reconstruction checkpoint: each `Package` invocation now
+creates one private, initially empty module/build cache under the same fixed
+public Go proxy and checksum policy used by schema-3 license evidence. SBOM
+source discovery, all four target graphs and notices, compilation, and module
+verification share that invocation-owned reconstruction; `BuildApproved` still
+invokes `Package` twice, so its compared builds use independent caches. The
+workspace must be verified and removed before the artifact directory becomes
+visible. This closes ambient-cache reuse but is not a hermetic build attestation:
+the selected Go executable, public proxy/checksum services, OS kernel, and build
+host remain trusted inputs.
+
+DAR-102 license-evidence reconstruction checkpoint: the canonical evidence
+record is now schema 3 and binds exact `go.mod`/`go.sum` hashes plus a fixed
+public-module reconstruction policy. Make and hosted qualification no longer
+compile the evidence command with bare `go run`; a fail-closed bootstrap creates
+private, initially empty home, temporary, module, build and GOPATH directories,
+clears ambient configuration and credentials, permits only the official Go
+proxy/checksum database, disables private/direct/VCS/toolchain fallback and
+telemetry, and removes the workspace on every exit. Freeze and verification
+then independently create and remove their own fresh reconstruction workspaces,
+so verification cannot inherit the freeze or ordinary user/runner cache. This
+is deterministic dependency and license-input evidence, not hermetic build
+provenance, a legal conclusion, or human distribution approval.
+
 DAR-87 release-contract checkpoint: candidate records are now canonical schema
 2, release manifests are schema 3, and every target archive has seven ordered
 members including target-specific `SBOM.spdx.json`. The canonical SPDX 2.3

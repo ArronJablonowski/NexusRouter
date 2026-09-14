@@ -35,6 +35,9 @@ and sensitive logs out of this record and the repository.
   [distribution dependency license inventory](dependency-license-inventory.md)
 - External canonical license-evidence record location:
 - License-evidence schema, exact source commit and Go version/directive:
+- Exact `go.mod`/`go.sum` hashes and reconstruction policy:
+- Fresh bootstrap/reconstruction host, time and result:
+- Fixed module proxy/checksum database and disabled fallback/private-module result:
 - Independently supplied license-evidence SHA-256 and source:
 - License-evidence verification host/time/result:
 - Distribution scope reviewed (binary/source/channel):
@@ -50,7 +53,12 @@ and sensitive logs out of this record and the repository.
 - Reviewer and decision time (UTC):
 - [ ] The repository license is present and approved for distribution.
 - [ ] `license-evidence verify` re-derived the exact external record from this
-  clean candidate and its independently supplied digest.
+  clean candidate and its independently supplied digest in a separately created
+  and removed fresh cache; it did not reuse the freeze cache or user Go caches.
+- [ ] Freeze and verification used the fixed official proxy/checksum database,
+  disabled direct fallback, private-module resolution, VCS downloads,
+  authentication, automatic toolchain downloads and telemetry, and matched the
+  exact `go.mod`/`go.sum` hashes recorded in schema 3.
 - [ ] All four target closures, legal-file hashes and rendered-notice hashes
   were reviewed for the exact toolchain and distribution scope.
 - [ ] All four canonical SPDX 2.3 SBOMs match their target binary hashes,
@@ -62,6 +70,8 @@ and sensitive logs out of this record and the repository.
 - [ ] Dependency and toolchain licenses, patent grants and required notices
   were approved for the shipped graph and included through the approved
   publication channel.
+- [ ] An authorized human completed the legal/distribution review; clean-cache
+  reconstruction is mechanical evidence and was not treated as legal approval.
 
 ## Supported-platform decision
 

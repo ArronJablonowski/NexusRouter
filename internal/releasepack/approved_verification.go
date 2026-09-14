@@ -43,11 +43,24 @@ type ApprovedVerificationResult struct {
 // signed checksum set and every artifact through one pinned release root. It
 // never extracts, executes, installs, approves, uploads, tags, or publishes.
 func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (ApprovedVerificationResult, error) {
+	return verifyApprovedWithLicenseEvidenceVerifier(ctx, options, verifyLicenseEvidenceRecord)
+}
+
+type licenseEvidenceRecordVerifier func(context.Context, string, string, string, ...string) (LicenseEvidence, error)
+
+// verifyApproved lets compound workflows protect additional resource roots
+// while license evidence is reconstructed. The public verifier always protects
+// the signed release directory itself.
+func verifyApproved(ctx context.Context, options ApprovedVerificationOptions, protectedPaths ...string) (ApprovedVerificationResult, error) {
+	return verifyApprovedWithLicenseEvidenceVerifier(ctx, options, verifyLicenseEvidenceRecord, protectedPaths...)
+}
+
+func verifyApprovedWithLicenseEvidenceVerifier(ctx context.Context, options ApprovedVerificationOptions, verifyEvidence licenseEvidenceRecordVerifier, protectedPaths ...string) (ApprovedVerificationResult, error) {
 	var result ApprovedVerificationResult
 	if ctx == nil || options.Dir == "" || options.Source == "" || options.CandidateRecordFile == "" ||
 		options.LicenseEvidenceFile == "" || options.TrustRecordFile == "" || options.AuthorizationRecordFile == "" ||
 		!trustFingerprint(options.ExpectedCandidateSHA256) ||
-		!trustFingerprint(options.ExpectedLicenseEvidenceSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) {
+		!trustFingerprint(options.ExpectedLicenseEvidenceSHA256) || !trustFingerprint(options.ExpectedSumsSHA256) || verifyEvidence == nil {
 		return result, ErrSignature
 	}
 	if ctx.Err() != nil {
@@ -58,8 +71,9 @@ func VerifyApproved(ctx context.Context, options ApprovedVerificationOptions) (A
 		verifyCandidateRecord(ctx, candidate, options.Source) != nil {
 		return result, ErrSignature
 	}
-	licenseEvidence, err := verifyLicenseEvidenceRecord(ctx, options.LicenseEvidenceFile,
-		options.ExpectedLicenseEvidenceSHA256, options.Source)
+	protectedPaths = append([]string{options.Dir}, protectedPaths...)
+	licenseEvidence, err := verifyEvidence(ctx, options.LicenseEvidenceFile,
+		options.ExpectedLicenseEvidenceSHA256, options.Source, protectedPaths...)
 	if err != nil || licenseEvidence.SourceCommit != candidate.SourceCommit {
 		return result, ErrSignature
 	}

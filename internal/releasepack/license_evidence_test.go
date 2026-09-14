@@ -13,9 +13,19 @@ func TestRepositoryLicenseEvidenceDerivation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record, err := deriveLicenseEvidence(t.Context(), root, strings.Repeat("a", 40), environment())
+	ambientCache := t.TempDir()
+	marker := filepath.Join(ambientCache, "must-not-be-consulted")
+	if err = os.WriteFile(marker, []byte("ambient\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	deriveEnv := append(environment(), "GOMODCACHE="+ambientCache, "GOCACHE="+ambientCache, "GOPROXY=off", "GOSUMDB=off")
+	record, err := deriveLicenseEvidence(t.Context(), root, strings.Repeat("a", 40), deriveEnv)
 	if err != nil {
 		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(ambientCache)
+	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(marker) {
+		t.Fatal("ambient user cache was consulted", err)
 	}
 	body, err := marshalLicenseEvidence(record)
 	if err != nil || len(body) == 0 || len(record.Targets) != 4 {
@@ -55,16 +65,38 @@ func TestLicenseEvidenceCanonicalContractRejectsDrift(t *testing.T) {
 		t.Fatal("canonical evidence rejected", err)
 	}
 	for name, mutate := range map[string]func(*LicenseEvidence){
-		"schema":         func(r *LicenseEvidence) { r.SchemaVersion++ },
-		"scope":          func(r *LicenseEvidence) { r.Scope = "other" },
-		"commit":         func(r *LicenseEvidence) { r.SourceCommit = "bad" },
-		"toolchain":      func(r *LicenseEvidence) { r.Toolchain.GOVERSION = "devel" },
-		"go_directive":   func(r *LicenseEvidence) { r.Toolchain.GoDirective = "latest" },
+		"schema":       func(r *LicenseEvidence) { r.SchemaVersion++ },
+		"schema_2":     func(r *LicenseEvidence) { r.SchemaVersion = 2 },
+		"scope":        func(r *LicenseEvidence) { r.Scope = "other" },
+		"commit":       func(r *LicenseEvidence) { r.SourceCommit = "bad" },
+		"go_mod":       func(r *LicenseEvidence) { r.SourceInputs.GoModSHA256 = "bad" },
+		"go_sum":       func(r *LicenseEvidence) { r.SourceInputs.GoSumSHA256 = "bad" },
+		"policy":       func(r *LicenseEvidence) { r.Reconstruction.Policy = "other" },
+		"proxy":        func(r *LicenseEvidence) { r.Reconstruction.ModuleProxy = "direct" },
+		"sumdb":        func(r *LicenseEvidence) { r.Reconstruction.ChecksumDatabase = "off" },
+		"module_mode":  func(r *LicenseEvidence) { r.Reconstruction.ModuleMode = "mod" },
+		"module_cache": func(r *LicenseEvidence) { r.Reconstruction.ModuleCache = "ambient" },
+		"build_cache":  func(r *LicenseEvidence) { r.Reconstruction.BuildCache = "ambient" },
+		"fallback":     func(r *LicenseEvidence) { r.Reconstruction.NetworkFallback = "direct" },
+		"private":      func(r *LicenseEvidence) { r.Reconstruction.PrivateModules = "enabled" },
+		"toolchain":    func(r *LicenseEvidence) { r.Toolchain.GOVERSION = "devel" },
+		"go_directive": func(r *LicenseEvidence) { r.Toolchain.GoDirective = "latest" },
+		"toolchain_license": func(r *LicenseEvidence) {
+			r.Toolchain.LicenseSHA256 = "bad"
+		},
+		"toolchain_patents": func(r *LicenseEvidence) {
+			r.Toolchain.PatentsSHA256 = "bad"
+		},
+		"toolchain_id":   func(r *LicenseEvidence) { r.Toolchain.IdentitySHA256 = "bad" },
 		"license_spdx":   func(r *LicenseEvidence) { r.RootLicense.SPDX = "Apache-2.0" },
 		"license_digest": func(r *LicenseEvidence) { r.RootLicense.SHA256 = "bad" },
 		"target":         func(r *LicenseEvidence) { r.Targets[0].OS = "windows" },
+		"package_count":  func(r *LicenseEvidence) { r.Targets[0].PackageCount = 0 },
+		"graph":          func(r *LicenseEvidence) { r.Targets[0].DependencyGraphSHA256 = "bad" },
 		"notice":         func(r *LicenseEvidence) { r.Targets[0].NoticeSHA256 = "bad" },
 		"module":         func(r *LicenseEvidence) { r.Targets[0].Modules[0].Version = "bad" },
+		"module_sum":     func(r *LicenseEvidence) { r.Targets[0].Modules[0].Sum = "bad" },
+		"go_mod_sum":     func(r *LicenseEvidence) { r.Targets[0].Modules[0].GoModSum = "bad" },
 		"file":           func(r *LicenseEvidence) { r.Targets[0].Modules[0].Files[0].Name = "../LICENSE" },
 		"toolchain_missing": func(r *LicenseEvidence) {
 			r.Targets[0].Modules = r.Targets[0].Modules[:len(r.Targets[0].Modules)-1]
@@ -171,28 +203,92 @@ func TestLicenseEvidenceMakeGateIsFailClosed(t *testing.T) {
 		"qualify-license-evidence:",
 		`test -n "$$DARWIN_LICENSE_EVIDENCE_RECORD"`,
 		`test -n "$$DARWIN_LICENSE_EVIDENCE_SHA256"`,
-		`license-evidence verify --record "$$DARWIN_LICENSE_EVIDENCE_RECORD" --record-sha256 "$$DARWIN_LICENSE_EVIDENCE_SHA256" --source .`,
+		`scripts/license-evidence-bootstrap.sh verify --record "$$DARWIN_LICENSE_EVIDENCE_RECORD" --record-sha256 "$$DARWIN_LICENSE_EVIDENCE_SHA256" --source .`,
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatal("make evidence gate weakened", required)
+		}
+	}
+	if strings.Contains(text, `go run ./cmd/license-evidence verify`) {
+		t.Fatal("make evidence gate consults the ambient Go bootstrap cache")
+	}
+}
+
+func TestLicenseEvidenceSourceInputPinsExactRegularFile(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "go.mod")
+	if err := os.WriteFile(path, []byte("module example.com/test\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	input, err := readLicenseEvidenceInput(root, "go.mod", 1<<20)
+	if err != nil || input.verify() != nil || !trustFingerprint(input.digest) {
+		t.Fatal("regular source input rejected", err)
+	}
+	if err = os.WriteFile(path, []byte("module example.com/drift\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if input.verify() == nil {
+		t.Fatal("source input content drift accepted")
+	}
+	if err = os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Symlink(filepath.Join(root, "target"), path); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "target"), []byte("module example.com/test\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = readLicenseEvidenceInput(root, "go.mod", 1<<20); err == nil {
+		t.Fatal("symlink source input accepted")
+	}
+}
+
+func TestLicenseEvidenceToolchainIdentityIsHostNeutralAndExact(t *testing.T) {
+	toolchain, err := licenseEvidenceToolchain("go1.27.1", "1.27.1")
+	if err != nil || validLicenseEvidenceToolchainIdentity(toolchain) != nil {
+		t.Fatal("canonical toolchain identity rejected", err)
+	}
+	for _, mutate := range []func(*LicenseEvidenceToolchain){
+		func(value *LicenseEvidenceToolchain) { value.GOVERSION = "go1.27.2" },
+		func(value *LicenseEvidenceToolchain) { value.GoDirective = "1.27.0" },
+		func(value *LicenseEvidenceToolchain) { value.LicenseSHA256 = invalidPublicDigest() },
+		func(value *LicenseEvidenceToolchain) { value.PatentsSHA256 = invalidPublicDigest() },
+		func(value *LicenseEvidenceToolchain) { value.IdentitySHA256 = invalidPublicDigest() },
+	} {
+		changed := toolchain
+		mutate(&changed)
+		if validLicenseEvidenceToolchainIdentity(changed) == nil {
+			t.Fatal("toolchain identity drift accepted")
 		}
 	}
 }
 
 func licenseEvidenceRecordFixture() LicenseEvidence {
 	file := LicenseEvidenceFile{Name: "LICENSE", Size: 10, SHA256: "sha256:" + strings.Repeat("4", 64)}
-	module := LicenseEvidenceModule{Path: "example.com/module", Version: "v1.2.3", Files: []LicenseEvidenceFile{file}}
+	moduleSum := "h1:" + strings.Repeat("A", 43) + "="
+	module := LicenseEvidenceModule{Path: "example.com/module", Version: "v1.2.3", Sum: moduleSum, GoModSum: moduleSum, Files: []LicenseEvidenceFile{file}}
 	toolchain := LicenseEvidenceModule{Path: goToolchainModulePath, Version: "v1.27.1", Files: []LicenseEvidenceFile{
 		{Name: "LICENSE", Size: int64(len(goLicenseText)), SHA256: licenseEvidenceDigest([]byte(goLicenseText))},
 		{Name: "PATENTS", Size: int64(len(goPatentsText)), SHA256: licenseEvidenceDigest([]byte(goPatentsText))},
 	}}
+	toolchainEvidence, _ := licenseEvidenceToolchain("go1.27.1", "1.27.1")
 	targets := make([]LicenseEvidenceTarget, 0, len(licenseEvidenceTargets))
 	for _, target := range licenseEvidenceTargets {
-		targets = append(targets, LicenseEvidenceTarget{OS: target[0], Arch: target[1], NoticeSHA256: "sha256:" + strings.Repeat("3", 64), Modules: []LicenseEvidenceModule{module, toolchain}})
+		targets = append(targets, LicenseEvidenceTarget{
+			OS: target[0], Arch: target[1], PackageCount: 10,
+			DependencyGraphSHA256: "sha256:" + strings.Repeat("5", 64),
+			NoticeSHA256:          "sha256:" + strings.Repeat("3", 64), Modules: []LicenseEvidenceModule{module, toolchain},
+		})
 	}
 	return LicenseEvidence{
 		SchemaVersion: licenseEvidenceSchema, Scope: licenseEvidenceScope, SourceCommit: strings.Repeat("1", 40),
-		Toolchain:   LicenseEvidenceToolchain{GOVERSION: "go1.27.1", GoDirective: "1.27.1"},
+		SourceInputs: LicenseEvidenceSourceInputs{GoModSHA256: "sha256:" + strings.Repeat("6", 64), GoSumSHA256: "sha256:" + strings.Repeat("7", 64)},
+		Reconstruction: LicenseEvidenceReconstruction{
+			Policy: goReconstructionPolicy, ModuleProxy: goReconstructionProxy, ChecksumDatabase: goReconstructionSumDatabase,
+			ModuleMode: "readonly", ModuleCache: "fresh-isolated", BuildCache: "fresh-isolated", NetworkFallback: "disabled", PrivateModules: "disabled",
+		},
+		Toolchain:   toolchainEvidence,
 		RootLicense: LicenseEvidenceRoot{Source: "LICENSE", SPDX: "MIT", Size: 21, SHA256: "sha256:" + strings.Repeat("2", 64)},
 		Targets:     targets,
 	}

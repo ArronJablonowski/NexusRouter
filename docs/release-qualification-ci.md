@@ -15,12 +15,18 @@ from the dispatched source.
 Each Ubuntu/macOS matrix job independently freezes the candidate record and
 requires its digest to equal the candidate-record dispatch input before
 re-verifying it against the clean checkout. It independently freezes the
-schema-2 license record,
+schema-3 license record through `scripts/license-evidence-bootstrap.sh`,
 requires its digest to equal the dispatch input, re-verifies it against the
 clean checkout, and records the expected digest and gate outcome. The record
-binds the commit, Go version/directive, root MIT license digest, all four target
-module/legal-file closures, exact Go `LICENSE`/`PATENTS` hashes and rendered
-notice hashes. Each job also records the requested version, verified commit,
+binds the commit, exact `go.mod`/`go.sum` hashes, fixed reconstruction policy,
+Go version/directive, root MIT license digest, all four target module/legal-file
+closures, exact Go `LICENSE`/`PATENTS` hashes and rendered notice hashes. The
+bootstrap compiles the evidence command with fresh private home, temporary,
+module and build caches under the official proxy/checksum policy; it disables
+private/direct fallback, VCS downloads, authentication, toolchain downloads and
+telemetry, then removes the workspace. Freeze and verification each perform
+dependency reconstruction in a separate fresh cache, so the job cannot succeed
+from a populated setup-go or runner cache. Each job also records the requested version, verified commit,
 actual Go host OS/architecture, Go version and other gate outcomes in its job
 summary. The native wrapper itself runs `make check`, rechecks the source, runs
 `make qualify-release`, and checks the source again before creating its record.
@@ -57,7 +63,8 @@ resolve dependency licenses recorded as `NOASSERTION`.
 
 The workflow has read-only repository permissions, pins the checkout and Go
 setup actions to reviewed full commit IDs, disables checkout credential
-persistence and Go cache uploads, forces the installed toolchain with
+persistence and Go cache uploads, sets the bootstrap parent to the runner's
+temporary directory, forces the installed toolchain with
 `GOTOOLCHAIN=local`, disables ambient Go environment/workspace/flag and
 experiment settings, disables cgo, and fixes the documented amd64/arm64
 architecture baselines. A pinned `actions/upload-artifact` step runs only after

@@ -68,7 +68,7 @@ func VerifyApprovedInstall(ctx context.Context, options ApprovedInstallVerificat
 		!approvedInstallPathsDisjoint(options.InstallRoot, options.Verification.Source, options.Verification.Dir) {
 		return empty, ErrApprovedInstallVerification
 	}
-	approval, err := VerifyApproved(ctx, options.Verification)
+	approval, err := verifyApproved(ctx, options.Verification, options.InstallRoot)
 	if err != nil {
 		return empty, ErrApprovedInstallVerification
 	}
@@ -111,7 +111,7 @@ func VerifyApprovedInstall(ctx context.Context, options ApprovedInstallVerificat
 	if err != nil {
 		return empty, ErrApprovedInstallVerification
 	}
-	closingApproval, err := VerifyApproved(ctx, options.Verification)
+	closingApproval, err := verifyApproved(ctx, options.Verification, options.InstallRoot)
 	if err != nil || closingApproval != approval || ctx.Err() != nil {
 		return empty, ErrApprovedInstallVerification
 	}

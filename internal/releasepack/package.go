@@ -137,7 +137,7 @@ func executableOnlyPATH(env []string, executable string) []string {
 
 // Package stages all artifacts before publishing the directory. The exclusive
 // sibling lock prevents cooperating packagers from targeting the same output.
-func Package(ctx context.Context, o Options) error {
+func Package(ctx context.Context, o Options) (resultErr error) {
 	if ctx == nil || validate(o) != nil {
 		return ErrInvalid
 	}
@@ -182,15 +182,6 @@ func Package(ctx context.Context, o Options) error {
 	if err = verify(); err != nil {
 		return err
 	}
-	goIdentity, err := pinReleaseExecutable(env, "go")
-	if err != nil || goIdentity.verify() != nil {
-		return ErrInvalid
-	}
-	goExecutable := goIdentity.path
-	toolchain, err := command(ctx, source, env, goExecutable, "env", "GOVERSION")
-	if err != nil || !signedToolchain.MatchString(toolchain) || toolchain != runtime.Version() || goIdentity.verify() != nil {
-		return ErrInvalid
-	}
 	stage, err := os.MkdirTemp(filepath.Dir(out), ".darwin-release-")
 	if err != nil {
 		return err
@@ -204,6 +195,26 @@ func Package(ctx context.Context, o Options) error {
 	if err = snapshot(ctx, source, o.Commit, buildSource, env); err != nil {
 		return err
 	}
+	reconstruction, err := newGoReconstruction(env, source, out, stage, buildSource)
+	if err != nil {
+		return err
+	}
+	reconstructionClosed := false
+	defer func() {
+		if !reconstructionClosed {
+			closeErr := reconstruction.close()
+			if resultErr == nil && closeErr != nil {
+				resultErr = closeErr
+			}
+		}
+	}()
+	goIdentity := reconstruction.goExecutable
+	goExecutable := goIdentity.path
+	reconstructionEnv := reconstruction.env
+	toolchain, err := command(ctx, buildSource, reconstructionEnv, goExecutable, "env", "GOVERSION")
+	if err != nil || !signedToolchain.MatchString(toolchain) || toolchain != runtime.Version() || reconstruction.verify() != nil {
+		return ErrInvalid
+	}
 	shared, err := loadCollateral(buildSource)
 	if err != nil {
 		return err
@@ -212,21 +223,21 @@ func Package(ctx context.Context, o Options) error {
 	if err != nil {
 		return err
 	}
-	noticeEnv := executableOnlyPATH(env, goExecutable)
-	sbomSources, err := discoverSBOMSourceFiles(ctx, buildSource, noticeEnv)
+	sbomSources, err := discoverSBOMSourceFiles(ctx, buildSource, reconstructionEnv)
 	if err != nil {
 		return err
 	}
 	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: o.Version, Commit: o.Commit, Created: created, Toolchain: toolchain}
 	var sums strings.Builder
 	for _, target := range []struct{ os, arch string }{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
-		if err = goIdentity.verify(); err != nil {
+		if err = reconstruction.verify(); err != nil {
 			return err
 		}
-		modules, e := targetNoticeModules(ctx, buildSource, target.os, target.arch, noticeEnv)
+		closure, e := targetNoticeClosure(ctx, buildSource, target.os, target.arch, reconstruction)
 		if e != nil {
 			return e
 		}
+		modules := closure.Modules
 		notices, e := renderThirdPartyNotices(target.os, target.arch, modules)
 		if e != nil {
 			return e
@@ -234,14 +245,14 @@ func Package(ctx context.Context, o Options) error {
 		// go list above materializes the target closure. Verify the module-cache
 		// contents, including the legal files just captured, against go.sum before
 		// either those notices or compiled code enter a release artifact.
-		if err = goIdentity.verify(); err != nil {
+		if err = reconstruction.verify(); err != nil {
 			return err
 		}
-		if _, e = command(ctx, buildSource, env, goExecutable, "mod", "verify"); e != nil {
+		if _, e = command(ctx, buildSource, reconstructionEnv, goExecutable, "mod", "verify"); e != nil {
 			return e
 		}
 		binary := filepath.Join(stage, "darwin")
-		buildEnv := append(append([]string(nil), env...), "GOOS="+target.os, "GOARCH="+target.arch)
+		buildEnv := append(append([]string(nil), reconstructionEnv...), "GOOS="+target.os, "GOARCH="+target.arch)
 		if err = goIdentity.verify(); err != nil {
 			return err
 		}
@@ -253,7 +264,7 @@ func Package(ctx context.Context, o Options) error {
 		// concurrent cache drift cannot silently separate the recorded module
 		// closure from the bytes that just entered the executable. This is not a
 		// hermetic-build attestation against a malicious same-user cache actor.
-		if _, e = command(ctx, buildSource, env, goExecutable, "mod", "verify"); e != nil {
+		if _, e = command(ctx, buildSource, reconstructionEnv, goExecutable, "mod", "verify"); e != nil {
 			return e
 		}
 		if err = goIdentity.verify(); err != nil {
@@ -321,7 +332,7 @@ func Package(ctx context.Context, o Options) error {
 	if err = verify(); err != nil {
 		return err
 	}
-	if err = goIdentity.verify(); err != nil {
+	if err = reconstruction.verify(); err != nil {
 		return err
 	}
 	if err = ctx.Err(); err != nil {
@@ -330,6 +341,13 @@ func Package(ctx context.Context, o Options) error {
 	if _, err = os.Lstat(out); !os.IsNotExist(err) {
 		return ErrInvalid
 	}
+	// A failed call must never leave a visible signable directory. Close the
+	// private reconstruction workspace before the no-replace publish so cleanup
+	// failure cannot turn a successful publication into an ambiguous error.
+	if err = reconstruction.close(); err != nil {
+		return err
+	}
+	reconstructionClosed = true
 	return publish(stage, out)
 }
 

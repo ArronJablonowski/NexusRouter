@@ -116,7 +116,9 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	}
 	evidence := job.Steps[4]
 	if evidence.ID != "license_evidence" || evidence.Env["EXPECTED_LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" ||
-		!strings.Contains(evidence.Run, `license-evidence freeze --commit "$GITHUB_SHA"`) ||
+		evidence.Env["DARWIN_LICENSE_BOOTSTRAP_PARENT"] != "${{ runner.temp }}" ||
+		!strings.Contains(evidence.Run, `scripts/license-evidence-bootstrap.sh freeze --commit "$GITHUB_SHA"`) ||
+		strings.Contains(evidence.Run, `go run ./cmd/license-evidence`) ||
 		!strings.Contains(evidence.Run, `test "$actual" = "$EXPECTED_LICENSE_EVIDENCE_SHA256"`) ||
 		!strings.Contains(evidence.Run, "make qualify-license-evidence") {
 		t.Fatal("candidate license evidence is not independently bound and re-derived")

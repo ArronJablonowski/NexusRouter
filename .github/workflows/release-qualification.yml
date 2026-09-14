@@ -122,10 +122,11 @@ jobs:
         shell: bash
         env:
           EXPECTED_LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
+          DARWIN_LICENSE_BOOTSTRAP_PARENT: ${{ runner.temp }}
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/darwinrouter-license-evidence.json"
-          actual=$(go run ./cmd/license-evidence freeze --commit "$GITHUB_SHA" --source . --out "$evidence")
+          actual=$(sh scripts/license-evidence-bootstrap.sh freeze --commit "$GITHUB_SHA" --source . --out "$evidence")
           test "$actual" = "$EXPECTED_LICENSE_EVIDENCE_SHA256"
           DARWIN_LICENSE_EVIDENCE_RECORD="$evidence" \
           DARWIN_LICENSE_EVIDENCE_SHA256="$EXPECTED_LICENSE_EVIDENCE_SHA256" \

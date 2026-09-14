@@ -8,7 +8,7 @@ import (
 )
 
 func TestApprovedVerificationRoundTrip(t *testing.T) {
-	signing, _ := approvedSigningFixture(t)
+	signing, _ := approvedSigningIntegrationFixture(t)
 	if err := SignApproved(context.Background(), signing); err != nil {
 		t.Fatal(err)
 	}
@@ -35,9 +35,9 @@ func TestApprovedVerificationRoundTrip(t *testing.T) {
 func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
 	for _, scenario := range []string{"candidate", "license_evidence", "license_evidence_missing", "license_evidence_swapped", "sums", "trust", "authorization", "key_id", "fingerprint", "policy", "unsigned", "artifact", "signature", "dirty_source", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
-			signing, _ := approvedSigningFixture(t)
+			signing, _ := approvedSigningFastFixture(t)
 			if scenario != "unsigned" {
-				if err := SignApproved(context.Background(), signing); err != nil {
+				if err := signApprovedFixture(context.Background(), signing, func(path string) ([]byte, error) { return signingKeyFile(path, true) }); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -94,7 +94,7 @@ func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			if result, err := VerifyApproved(ctx, options); err == nil || result != (ApprovedVerificationResult{}) {
+			if result, err := verifyApprovedFixture(ctx, options); err == nil || result != (ApprovedVerificationResult{}) {
 				t.Fatal("unsafe release verified", result, err)
 			}
 		})
@@ -102,13 +102,18 @@ func TestApprovedVerificationRejectsUnboundOrInvalidInputs(t *testing.T) {
 }
 
 func TestApprovedVerificationRejectsSignedArtifactNoticeOutsideLicenseEvidence(t *testing.T) {
-	signing, _ := approvedSigningFixtureWithNoticeMismatch(t)
+	signing, _ := approvedSigningFixtureWithExecutableVersionAndEvidence(t, true, "", "", false)
 	if err := signUncheckedForTest(signing.Dir, signing.KeyFile); err != nil {
 		t.Fatal(err)
 	}
-	if result, err := VerifyApproved(context.Background(), verificationOptions(signing)); err == nil || result != (ApprovedVerificationResult{}) {
+	if result, err := verifyApprovedFixture(context.Background(), verificationOptions(signing)); err == nil || result != (ApprovedVerificationResult{}) {
 		t.Fatal("signed artifact notice outside license evidence verified", result, err)
 	}
+}
+
+func verifyApprovedFixture(ctx context.Context, options ApprovedVerificationOptions, protectedPaths ...string) (ApprovedVerificationResult, error) {
+	wantProtected := append([]string{options.Dir}, protectedPaths...)
+	return verifyApprovedWithLicenseEvidenceVerifier(ctx, options, fixtureLicenseEvidenceVerifier(wantProtected...), protectedPaths...)
 }
 
 func verificationOptions(signing ApprovedSigningOptions) ApprovedVerificationOptions {

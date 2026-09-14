@@ -6,6 +6,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/mod v0.37.0
 	golang.org/x/sys v0.47.0
 	modernc.org/sqlite v1.57.0
 )
