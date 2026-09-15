@@ -67,6 +67,10 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	} else if !exists {
 		return workboard.CardMutationResult{}, ErrWorkboardNotFound
 	}
+	decomposition, err := prepareDecompositionAdmission(ctx, tx, mutation, graph)
+	if err != nil {
+		return workboard.CardMutationResult{}, err
+	}
 	if err = mutateStoredCard(ctx, tx, mutation, &card, &body, graph); err != nil {
 		return workboard.CardMutationResult{}, err
 	}
@@ -119,6 +123,21 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	}
 	event := workboard.BoardEvent{Version: 1, ID: eventID, BoardID: board.ID, Sequence: board.EventSequence,
 		OperationID: operationID, Kind: mutationBoardAction(mutation.Kind), ActorID: mutation.Actor.ID, ActorType: mutation.Actor.Type, CardID: card.ID, CreatedAt: now}
+	var admission workboard.DecompositionAdmission
+	var admissionBody []byte
+	if decomposition != nil {
+		admission, err = decomposition.finalize(card.ID, operationID, requestDigest, mutation.Actor, now)
+		if err != nil {
+			return workboard.CardMutationResult{}, err
+		}
+		if err = event.BindDecompositionAdmission(admission); err != nil {
+			return workboard.CardMutationResult{}, err
+		}
+		admissionBody, err = json.Marshal(admission)
+		if err != nil {
+			return workboard.CardMutationResult{}, err
+		}
+	}
 	eventBody, err := json.Marshal(event)
 	if err != nil {
 		return workboard.CardMutationResult{}, err
@@ -130,7 +149,7 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	receipt := workboard.OperationReceipt{Version: 1, BoardID: board.ID, OperationID: operationID, RequestDigest: requestDigest,
 		FirstSequence: board.EventSequence, LastSequence: board.EventSequence, EventCount: 1, BoardRevision: board.Revision,
 		CardID: card.ID, CardRevision: &cardRevision, Outcome: "committed", CreatedAt: now}
-	response, err := finalizeCardMutationReceipt(&receipt, card, len(boardBody)+len(bodyBytes)+len(eventBody))
+	response, err := finalizeCardMutationReceipt(&receipt, card, len(boardBody)+len(bodyBytes)+len(eventBody)+len(admissionBody))
 	if err != nil {
 		return workboard.CardMutationResult{}, err
 	}
@@ -150,8 +169,18 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 		return workboard.CardMutationResult{}, err
 	}
 	actor := workboard.Actor{ID: event.ActorID, Type: event.ActorType}
-	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, actor, now, eventBody); err != nil {
+	if decomposition == nil {
+		err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, actor, now, eventBody)
+	} else {
+		err = insertDecompositionWorkboardEvent(ctx, tx, event, eventBody)
+	}
+	if err != nil {
 		return workboard.CardMutationResult{}, err
+	}
+	if decomposition != nil {
+		if err = insertDecompositionAdmission(ctx, tx, admission, admissionBody); err != nil {
+			return workboard.CardMutationResult{}, err
+		}
 	}
 	if err = tx.Commit(); err != nil {
 		return workboard.CardMutationResult{}, err
@@ -186,6 +215,15 @@ func validateStoreMutation(m workboard.CardMutation) error {
 		if r < 0x21 || r > 0x7e {
 			return invalidWorkboard("mutation")
 		}
+	}
+	agent := m.Actor.Type == "model" || m.Actor.Type == "worker"
+	hierarchy := m.Kind == workboard.MutationCreate || m.Kind == workboard.MutationRevise && m.Patch.ParentID != nil
+	if agent && hierarchy {
+		if m.Decomposition == nil || m.Decomposition.Validate() != nil {
+			return invalidWorkboard("decomposition_policy")
+		}
+	} else if m.Decomposition != nil {
+		return invalidWorkboard("decomposition_policy")
 	}
 	switch m.Kind {
 	case workboard.MutationCreate:

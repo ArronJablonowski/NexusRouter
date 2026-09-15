@@ -418,7 +418,7 @@ func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest)
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationRevise, BoardID: request.BoardID, CardID: request.CardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedCardRevision: request.ExpectedCardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision, Patch: copyPatch(request.Patch)}
-	if request.Patch.ParentID != nil && actor.Type == "model" && s.decomposition != nil {
+	if request.Patch.ParentID != nil && (actor.Type == "model" || actor.Type == "worker") && s.decomposition != nil {
 		mutation.Decomposition = copyDecompositionPolicy(s.decomposition)
 	}
 	if card, found, err := s.replay(ctx, mutation); found || err != nil {
@@ -714,7 +714,7 @@ func (s *CardService) hasAtomicReplayStore() bool {
 }
 
 func (s *CardService) createDecompositionPolicy(actor Actor, restriction *DecompositionLimits) (*DecompositionPolicy, error) {
-	if actor.Type != "model" || s.decomposition == nil {
+	if actor.Type != "model" && actor.Type != "worker" || s.decomposition == nil {
 		if restriction != nil {
 			return nil, fail(CodeInvalid, "decomposition_restriction")
 		}

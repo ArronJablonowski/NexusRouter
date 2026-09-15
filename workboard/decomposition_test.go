@@ -185,7 +185,7 @@ func TestConfiguredCardServiceBindsOnlyModelHierarchyMutations(t *testing.T) {
 	for _, tc := range []struct {
 		actor Actor
 		bound bool
-	}{{Actor{ID: "model-a", Type: "model"}, true}, {Actor{ID: "operator-a", Type: "operator"}, false}} {
+	}{{Actor{ID: "model-a", Type: "model"}, true}, {Actor{ID: "worker-a", Type: "worker"}, true}, {Actor{ID: "operator-a", Type: "operator"}, false}} {
 		store := &fakeCardStore{graph: decompositionGraph(), applyResult: serviceMutationResult(created)}
 		_, err := newService(tc.actor, store).CreateCard(context.Background(), CreateCardRequest{BoardID: "board-a", Card: intent,
 			IdempotencyKey: serviceKey, ExpectedBoardRevision: 1, ExpectedGraphRevision: 3})

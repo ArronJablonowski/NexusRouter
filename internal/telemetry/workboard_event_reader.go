@@ -139,7 +139,10 @@ func scanCanonicalWorkboardEvent(row rowScanner, boardID string) (workboard.Boar
 	}
 	indexed.Version, indexed.Kind, indexed.CreatedAt = 1, workboard.BoardAction(kind), time.Unix(0, created).UTC()
 	var event workboard.BoardEvent
-	if len(body) == 0 || len(body) > workboard.MaxTransactionBytes || strictJSON(body, &event) != nil || event.Validate() != nil || event != indexed {
+	if len(body) == 0 || len(body) > workboard.MaxTransactionBytes || strictJSON(body, &event) != nil || event.Validate() != nil ||
+		event.Version != indexed.Version || event.ID != indexed.ID || event.BoardID != indexed.BoardID || event.Sequence != indexed.Sequence ||
+		event.OperationID != indexed.OperationID || event.Kind != indexed.Kind || event.ActorID != indexed.ActorID ||
+		event.ActorType != indexed.ActorType || event.CardID != indexed.CardID || !event.CreatedAt.Equal(indexed.CreatedAt) {
 		return workboard.BoardEvent{}, ErrWorkboardCorrupt
 	}
 	return event, nil
