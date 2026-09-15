@@ -287,7 +287,7 @@ func (e BoardEvent) HasDecompositionAdmission() bool { return e.DecompositionAdm
 func (e *BoardEvent) BindDecompositionAdmission(admission DecompositionAdmission) error {
 	if e == nil || admission.Validate() != nil || admission.BoardID != e.BoardID || admission.CardID != e.CardID ||
 		admission.OperationID != e.OperationID || admission.Actor.ID != e.ActorID || admission.Actor.Type != e.ActorType ||
-		(e.Kind != CardCreateAction && e.Kind != CardReviseAction) {
+		!admission.AdmittedAt.Equal(e.CreatedAt) || (e.Kind != CardCreateAction && e.Kind != CardReviseAction) {
 		return fail(CodeInvalid, "decomposition_event")
 	}
 	e.DecompositionAdmissionID = admission.AdmissionID

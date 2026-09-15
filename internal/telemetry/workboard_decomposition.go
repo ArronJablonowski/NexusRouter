@@ -113,9 +113,8 @@ func decompositionRuntimeOrigin(ctx context.Context, tx *sql.Tx) (workboard.Deco
 
 func readCurrentDecompositionAdmission(ctx context.Context, tx *sql.Tx, boardID, cardID string) (workboard.DecompositionAdmission, bool, error) {
 	var body []byte
-	err := tx.QueryRowContext(ctx, `SELECT a.body FROM workboard_decomposition_admissions a
-		JOIN workboard_events e ON e.board_id=a.board_id AND e.decomposition_admission_id=a.admission_id
-		WHERE a.board_id=? AND a.card_id=? ORDER BY e.sequence DESC,a.admission_id DESC LIMIT 1`, boardID, cardID).Scan(&body)
+	err := tx.QueryRowContext(ctx, `SELECT body FROM workboard_decomposition_admissions
+		WHERE board_id=? AND card_id=? ORDER BY event_sequence DESC,admission_id DESC LIMIT 1`, boardID, cardID).Scan(&body)
 	if errors.Is(err, sql.ErrNoRows) {
 		return workboard.DecompositionAdmission{}, false, nil
 	}
@@ -135,19 +134,18 @@ func insertDecompositionWorkboardEvent(ctx context.Context, tx *sql.Tx, event wo
 		return ErrWorkboardCorrupt
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO workboard_events(
-		id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body,
-		decomposition_admission_id,decomposition_admission_digest,decomposition_decision_digest,decomposition_config_digest,
-		decomposition_policy_digest,decomposition_max_depth,decomposition_max_children,decomposition_depth,decomposition_direct_children)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, event.ID, event.BoardID, event.Sequence, event.OperationID, string(event.Kind), event.ActorID,
-		event.ActorType, event.CardID, event.CreatedAt.UnixNano(), body, event.DecompositionAdmissionID, event.DecompositionAdmissionDigest,
-		event.DecompositionDecisionDigest, event.DecompositionConfigDigest, event.DecompositionPolicyDigest, event.DecompositionMaxDepth,
-		event.DecompositionMaxChildren, event.DecompositionDepth, event.DecompositionDirectChildren)
+		id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+		VALUES(?,?,?,?,?,?,?,?,?,?)`, event.ID, event.BoardID, event.Sequence, event.OperationID, string(event.Kind), event.ActorID,
+		event.ActorType, event.CardID, event.CreatedAt.UnixNano(), body)
 	return err
 }
 
-func insertDecompositionAdmission(ctx context.Context, tx *sql.Tx, admission workboard.DecompositionAdmission, body []byte) error {
+func insertDecompositionAdmission(ctx context.Context, tx *sql.Tx, admission workboard.DecompositionAdmission, event workboard.BoardEvent, body []byte) error {
 	var canonical workboard.DecompositionAdmission
-	if strictJSON(body, &canonical) != nil || canonical != admission || admission.Validate() != nil {
+	if strictJSON(body, &canonical) != nil || canonical != admission || admission.Validate() != nil || event.Validate() != nil ||
+		!event.HasDecompositionAdmission() || event.DecompositionAdmissionID != admission.AdmissionID || event.BoardID != admission.BoardID ||
+		event.CardID != admission.CardID || event.OperationID != admission.OperationID || event.ActorID != admission.Actor.ID || event.ActorType != admission.Actor.Type ||
+		!event.CreatedAt.Equal(admission.AdmittedAt) {
 		return ErrWorkboardCorrupt
 	}
 	nullable := func(value string) any {
@@ -157,11 +155,11 @@ func insertDecompositionAdmission(ctx context.Context, tx *sql.Tx, admission wor
 		return value
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO workboard_decomposition_admissions(
-		admission_id,board_id,card_id,parent_card_id,operation_id,request_digest,decision_digest,actor_id,actor_type,
+		admission_id,board_id,card_id,parent_card_id,operation_id,event_id,event_sequence,event_created_at,request_digest,decision_digest,actor_id,actor_type,
 		origin_task_id,origin_session_id,origin_turn_id,origin_attempt_id,origin_tool_call_id,origin_tool_name,origin_model_id,origin_provider_id,
 		config_digest,policy_digest,max_depth,max_children,depth,direct_children,parent_admission_id,parent_admission_digest,admitted_at,admission_digest,body)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, admission.AdmissionID, admission.BoardID, admission.CardID,
-		nullable(admission.ParentID), admission.OperationID, admission.RequestDigest, admission.DecisionDigest, admission.Actor.ID, admission.Actor.Type,
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, admission.AdmissionID, admission.BoardID, admission.CardID,
+		nullable(admission.ParentID), admission.OperationID, event.ID, event.Sequence, event.CreatedAt.UnixNano(), admission.RequestDigest, admission.DecisionDigest, admission.Actor.ID, admission.Actor.Type,
 		nullable(admission.Origin.TaskID), nullable(admission.Origin.SessionID), nullable(admission.Origin.TurnID), nullable(admission.Origin.AttemptID),
 		nullable(admission.Origin.ToolCallID), nullable(admission.Origin.ToolName), nullable(admission.Origin.ModelID), nullable(admission.Origin.ProviderID),
 		admission.ConfigDigest, admission.PolicyDigest, admission.Limits.MaxDepth, admission.Limits.MaxChildren, admission.Depth,

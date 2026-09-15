@@ -40,6 +40,10 @@ func TestWorkboardDecompositionAdmissionMigrationPreservesLegacyEvents(t *testin
 		Scan(&version, &events, &admissions); err != nil || version != 49 || events != 1 || admissions != 0 {
 		t.Fatalf("schema=%d events=%d admissions=%d err=%v", version, events, admissions, err)
 	}
+	var decompositionColumns int
+	if err = store.db.QueryRow(`SELECT count(*) FROM pragma_table_info('workboard_events') WHERE name GLOB 'decomposition_*'`).Scan(&decompositionColumns); err != nil || decompositionColumns != 0 {
+		t.Fatalf("normalized decomposition event columns=%d err=%v", decompositionColumns, err)
+	}
 }
 
 func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.T) {
@@ -59,6 +63,10 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 	eventID := "decomposition-event"
 	operationID := "decomposition-operation"
 	admittedAt := "2026-09-09T12:00:00Z"
+	admittedAtTime, err := time.Parse(time.RFC3339Nano, admittedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body, err := json.Marshal(map[string]any{
 		"version": 1, "admission_id": admissionID, "operation_id": operationID,
 		"request_digest": digest, "decision_digest": decisionDigest,
@@ -94,19 +102,17 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(`INSERT INTO workboard_decomposition_admissions
-		(admission_id,board_id,card_id,parent_card_id,operation_id,request_digest,decision_digest,actor_id,actor_type,
+		(admission_id,board_id,card_id,parent_card_id,operation_id,event_id,event_sequence,event_created_at,request_digest,decision_digest,actor_id,actor_type,
 		origin_task_id,origin_session_id,origin_turn_id,origin_attempt_id,origin_tool_call_id,origin_tool_name,origin_model_id,origin_provider_id,
 		config_digest,policy_digest,max_depth,max_children,depth,direct_children,parent_admission_id,parent_admission_digest,admitted_at,admission_digest,body)
-		VALUES(?,'board','successor','card',?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,4,8,2,1,NULL,NULL,?,?,?)`,
-		admissionID, operationID, digest, decisionDigest, digest, digest, admittedAt, digest, body); err != nil {
+		VALUES(?,'board','successor','card',?,?,2,?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,4,8,2,1,NULL,NULL,?,?,?)`,
+		admissionID, operationID, eventID, admittedAtTime.UnixNano(), digest, decisionDigest, digest, digest, admittedAt, digest, body); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(`INSERT INTO workboard_events
-		(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body,
-		decomposition_admission_id,decomposition_admission_digest,decomposition_decision_digest,decomposition_config_digest,decomposition_policy_digest,
-		decomposition_max_depth,decomposition_max_children,decomposition_depth,decomposition_direct_children)
-		VALUES(?,'board',2,?,'card.revise','worker','worker','successor',2,?,?,?,?,?,?,?,?,?,?)`,
-		eventID, operationID, eventBody, admissionID, digest, decisionDigest, digest, digest, 4, 8, 2, 1); err != nil {
+		(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+		VALUES(?,'board',2,?,'card.revise','worker','worker','successor',?,?)`,
+		eventID, operationID, admittedAtTime.UnixNano(), eventBody); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(); err != nil {
@@ -117,9 +123,6 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 	}
 	if _, err = store.db.Exec(`DELETE FROM workboard_decomposition_admissions WHERE admission_id=?`, admissionID); err == nil {
 		t.Fatal("immutable admission accepted delete")
-	}
-	if _, err = store.db.Exec(`UPDATE workboard_events SET decomposition_max_depth=5 WHERE id=?`, eventID); err == nil {
-		t.Fatal("immutable event binding accepted update")
 	}
 	if _, err = store.db.Exec(`UPDATE workboard_events SET actor_id='attacker' WHERE id=?`, eventID); err == nil {
 		t.Fatal("immutable admitted event accepted base-column update")
@@ -140,11 +143,9 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 		t.Fatal(err)
 	}
 	if _, err = store.db.Exec(`INSERT INTO workboard_events
-		(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body,
-		decomposition_admission_id,decomposition_admission_digest,decomposition_decision_digest,decomposition_config_digest,decomposition_policy_digest,
-		decomposition_max_depth,decomposition_max_children,decomposition_depth,decomposition_direct_children)
-		VALUES('invented-event','board',3,?,'card.revise','worker','worker','successor',3,?,?,?,?,?,?,?,?,?,?)`,
-		operationID, inventedBody, admissionID, digest, decisionDigest, digest, decisionDigest, 4, 8, 2, 1); err == nil {
+		(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+		VALUES('invented-event','board',3,?,'card.revise','worker','worker','successor',3,?)`,
+		operationID, inventedBody); err == nil {
 		t.Fatal("event projection not matching referenced admission was accepted")
 	}
 	if _, err = store.db.Exec(`INSERT INTO workboard_events(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
@@ -154,6 +155,24 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 	if _, err = store.db.Exec(`INSERT INTO workboard_events(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
 		VALUES('ordinary-revise-event','board',3,?,'card.revise','worker','worker','successor',3,'{}')`, operationID); err != nil {
 		t.Fatal("ordinary worker card.revise event rejected", err)
+	}
+	partialFields := []string{
+		"decomposition_admission_id", "decomposition_admission_digest", "decomposition_decision_digest",
+		"decomposition_config_digest", "decomposition_policy_digest", "decomposition_max_depth",
+		"decomposition_max_children", "decomposition_depth", "decomposition_direct_children",
+	}
+	for index, field := range partialFields {
+		for _, value := range []any{nil, "declared"} {
+			partialBody, marshalErr := json.Marshal(map[string]any{field: value})
+			if marshalErr != nil {
+				t.Fatal(marshalErr)
+			}
+			if _, insertErr := store.db.Exec(`INSERT INTO workboard_events(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+				VALUES(?, 'board', ?, ?, 'card.revise', 'worker', 'worker', 'successor', ?, ?)`,
+				fmt.Sprintf("partial-%d-%v", index, value == nil), 10+index, operationID, 10+index, partialBody); insertErr == nil {
+				t.Fatalf("partial decomposition declaration accepted: field=%s value=%v", field, value)
+			}
+		}
 	}
 
 	parentCases := []struct {
@@ -186,11 +205,11 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 				t.Fatal(beginErr)
 			}
 			_, insertErr := caseTx.Exec(`INSERT INTO workboard_decomposition_admissions(
-				admission_id,board_id,card_id,parent_card_id,operation_id,request_digest,decision_digest,actor_id,actor_type,
+				admission_id,board_id,card_id,parent_card_id,operation_id,event_id,event_sequence,event_created_at,request_digest,decision_digest,actor_id,actor_type,
 				origin_task_id,origin_session_id,origin_turn_id,origin_attempt_id,origin_tool_call_id,origin_tool_name,origin_model_id,origin_provider_id,
 				config_digest,policy_digest,max_depth,max_children,depth,direct_children,parent_admission_id,parent_admission_digest,admitted_at,admission_digest,body)
-				VALUES(?,?,?,?,?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,?,?,?,?,?, ?,?,?,?)`,
-				"child-"+test.value, test.boardID, "child-card", test.parentCardID, "operation-"+test.value, caseDigest, caseDigest,
+				VALUES(?,?,?,?,?,?,?,?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,?,?,?,?,?, ?,?,?,?)`,
+				"child-"+test.value, test.boardID, "child-card", test.parentCardID, "operation-"+test.value, "event-"+test.value, 10, 10, caseDigest, caseDigest,
 				caseDigest, caseDigest, test.maxDepth, test.maxChildren, 3, 1, admissionID, test.parentDigest, admittedAt, caseDigest, childBody)
 			_ = caseTx.Rollback()
 			if insertErr == nil {
@@ -198,6 +217,233 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 			}
 		})
 	}
+}
+
+func TestWorkboardDecompositionAdmissionEventIntegrity(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err = store.db.Exec(`INSERT INTO task_heads(task_id,session_id,sequence,state) VALUES('task','session',1,'running')`); err != nil {
+		t.Fatal(err)
+	}
+	insertWorkboardFixture(t, store.db)
+	stamp := time.Date(2026, 9, 9, 12, 0, 0, 123456789, time.UTC)
+
+	digest := func(index int) string { return fmt.Sprintf("%064x", index) }
+	insertOperation := func(t *testing.T, tx *sql.Tx, operationID string, sequence int64, value string) {
+		t.Helper()
+		if _, insertErr := tx.Exec(`INSERT INTO workboard_operations
+			(scope_kind,scope_id,key_digest,operation_id,board_id,request_digest,response_digest,first_sequence,last_sequence,event_count,transaction_bytes,outcome,response,created_at)
+			VALUES('board','board',?,?,'board',?,?,?, ?,1,2,'committed','{}',?)`,
+			value, operationID, value, value, sequence, sequence, stamp.UnixNano()); insertErr != nil {
+			t.Fatal(insertErr)
+		}
+	}
+	admissionBody := func(admissionID, operationID, value string) []byte {
+		body, marshalErr := json.Marshal(map[string]any{
+			"version": 1, "admission_id": admissionID, "operation_id": operationID,
+			"request_digest": value, "decision_digest": value, "board_id": "board", "card_id": "successor", "parent_id": "card",
+			"actor": map[string]any{"id": "worker", "type": "worker"}, "origin": map[string]any{},
+			"limits":        map[string]any{"version": 1, "max_depth": 4, "max_children": 8},
+			"config_digest": value, "policy_digest": value, "depth": 2, "direct_children": 1,
+			"admitted_at": stamp.Format(time.RFC3339Nano), "admission_digest": value,
+		})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		return body
+	}
+	eventBody := func(admissionID, operationID, eventID, value, createdAt string, sequence int64) []byte {
+		body, marshalErr := json.Marshal(map[string]any{
+			"version": 1, "id": eventID, "board_id": "board", "sequence": sequence, "operation_id": operationID,
+			"kind": "card.revise", "actor_id": "worker", "actor_type": "worker", "card_id": "successor", "created_at": createdAt,
+			"decomposition_admission_id": admissionID, "decomposition_admission_digest": value,
+			"decomposition_decision_digest": value, "decomposition_config_digest": value, "decomposition_policy_digest": value,
+			"decomposition_max_depth": 4, "decomposition_max_children": 8, "decomposition_depth": 2, "decomposition_direct_children": 1,
+		})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		return body
+	}
+	insertAdmission := func(t *testing.T, tx *sql.Tx, admissionID, operationID, eventID string, sequence, createdAt int64, value string) {
+		t.Helper()
+		if _, insertErr := tx.Exec(`INSERT INTO workboard_decomposition_admissions(
+			admission_id,board_id,card_id,parent_card_id,operation_id,event_id,event_sequence,event_created_at,request_digest,decision_digest,actor_id,actor_type,
+			origin_task_id,origin_session_id,origin_turn_id,origin_attempt_id,origin_tool_call_id,origin_tool_name,origin_model_id,origin_provider_id,
+			config_digest,policy_digest,max_depth,max_children,depth,direct_children,parent_admission_id,parent_admission_digest,admitted_at,admission_digest,body)
+			VALUES(?,'board','successor','card',?,?,?,?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,4,8,2,1,NULL,NULL,?,?,?)`,
+			admissionID, operationID, eventID, sequence, createdAt, value, value, value, value,
+			stamp.Format(time.RFC3339Nano), value, admissionBody(admissionID, operationID, value)); insertErr != nil {
+			t.Fatal(insertErr)
+		}
+	}
+	insertEvent := func(tx *sql.Tx, admissionID, operationID, eventID, value string, sequence, createdAt int64, bodyTime string) error {
+		_, insertErr := tx.Exec(`INSERT INTO workboard_events
+			(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+			VALUES(?,'board',?,?,'card.revise','worker','worker','successor',?,?)`, eventID, sequence, operationID, createdAt,
+			eventBody(admissionID, operationID, eventID, value, bodyTime, sequence))
+		return insertErr
+	}
+
+	t.Run("orphan rejected at commit", func(t *testing.T) {
+		tx, beginErr := store.db.BeginTx(ctx, nil)
+		if beginErr != nil {
+			t.Fatal(beginErr)
+		}
+		value := digest(101)
+		insertOperation(t, tx, "orphan-operation", 10, value)
+		insertAdmission(t, tx, "orphan-admission", "orphan-operation", "orphan-event", 10, stamp.UnixNano(), value)
+		if commitErr := tx.Commit(); commitErr == nil {
+			t.Fatal("admission without its reserved event committed")
+		}
+		var retained int
+		if countErr := store.db.QueryRow(`SELECT count(*) FROM workboard_decomposition_admissions WHERE admission_id='orphan-admission'`).Scan(&retained); countErr != nil || retained != 0 {
+			t.Fatalf("orphan retained=%d err=%v", retained, countErr)
+		}
+	})
+
+	t.Run("reserved event rejects ordinary body", func(t *testing.T) {
+		tx, beginErr := store.db.BeginTx(ctx, nil)
+		if beginErr != nil {
+			t.Fatal(beginErr)
+		}
+		defer tx.Rollback()
+		value := digest(102)
+		insertOperation(t, tx, "reserved-operation", 11, value)
+		insertAdmission(t, tx, "reserved-admission", "reserved-operation", "reserved-event", 11, stamp.UnixNano(), value)
+		if _, insertErr := tx.Exec(`INSERT INTO workboard_events
+			(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+			VALUES('reserved-event','board',11,'reserved-operation','card.revise','worker','worker','successor',?,'{}')`, stamp.UnixNano()); insertErr == nil {
+			t.Fatal("reserved event accepted an ordinary body")
+		}
+	})
+
+	t.Run("split event identity rejected", func(t *testing.T) {
+		tx, beginErr := store.db.BeginTx(ctx, nil)
+		if beginErr != nil {
+			t.Fatal(beginErr)
+		}
+		defer tx.Rollback()
+		value := digest(103)
+		insertOperation(t, tx, "split-operation", 12, value)
+		insertAdmission(t, tx, "split-admission", "split-operation", "split-event-id", 12, stamp.UnixNano(), value)
+		if insertErr := insertEvent(tx, "split-admission", "split-operation", "split-event-id", value, 13, stamp.UnixNano(), stamp.Format(time.RFC3339Nano)); insertErr == nil {
+			t.Fatal("reserved event id accepted the wrong sequence")
+		}
+		if _, insertErr := tx.Exec(`INSERT INTO workboard_events
+			(id,board_id,sequence,operation_id,kind,actor_id,actor_type,card_id,created_at,body)
+			VALUES('split-event-sequence','board',12,'split-operation','card.revise','worker','worker','successor',?,'{}')`, stamp.UnixNano()); insertErr == nil {
+			t.Fatal("reserved event sequence accepted a different id")
+		}
+	})
+
+	t.Run("event reservation is one to one", func(t *testing.T) {
+		t.Run("duplicate event id", func(t *testing.T) {
+			tx, beginErr := store.db.BeginTx(ctx, nil)
+			if beginErr != nil {
+				t.Fatal(beginErr)
+			}
+			defer tx.Rollback()
+			first, second := digest(107), digest(108)
+			insertOperation(t, tx, "duplicate-id-operation-a", 107, first)
+			insertAdmission(t, tx, "duplicate-id-admission-a", "duplicate-id-operation-a", "duplicate-event", 107, stamp.UnixNano(), first)
+			insertOperation(t, tx, "duplicate-id-operation-b", 108, second)
+			if _, insertErr := tx.Exec(`INSERT INTO workboard_decomposition_admissions(
+				admission_id,board_id,card_id,parent_card_id,operation_id,event_id,event_sequence,event_created_at,request_digest,decision_digest,actor_id,actor_type,
+				origin_task_id,origin_session_id,origin_turn_id,origin_attempt_id,origin_tool_call_id,origin_tool_name,origin_model_id,origin_provider_id,
+				config_digest,policy_digest,max_depth,max_children,depth,direct_children,parent_admission_id,parent_admission_digest,admitted_at,admission_digest,body)
+				VALUES(?,'board','successor','card',?,?,?,?,?,?,'worker','worker',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,?,4,8,2,1,NULL,NULL,?,?,?)`,
+				"duplicate-id-admission-b", "duplicate-id-operation-b", "duplicate-event", 108, stamp.UnixNano(), second, second, second, second,
+				stamp.Format(time.RFC3339Nano), second, admissionBody("duplicate-id-admission-b", "duplicate-id-operation-b", second)); insertErr == nil {
+				t.Fatal("two admissions reserved the same event id")
+			}
+		})
+
+		t.Run("duplicate board sequence", func(t *testing.T) {
+			tx, beginErr := store.db.BeginTx(ctx, nil)
+			if beginErr != nil {
+				t.Fatal(beginErr)
+			}
+			first, second := digest(109), digest(110)
+			insertOperation(t, tx, "duplicate-sequence-operation-a", 109, first)
+			insertAdmission(t, tx, "duplicate-sequence-admission-a", "duplicate-sequence-operation-a", "duplicate-sequence-event-a", 109, stamp.UnixNano(), first)
+			insertOperation(t, tx, "duplicate-sequence-operation-b", 109, second)
+			insertAdmission(t, tx, "duplicate-sequence-admission-b", "duplicate-sequence-operation-b", "duplicate-sequence-event-b", 109, stamp.UnixNano(), second)
+			if insertErr := insertEvent(tx, "duplicate-sequence-admission-a", "duplicate-sequence-operation-a", "duplicate-sequence-event-a", first, 109, stamp.UnixNano(), stamp.Format(time.RFC3339Nano)); insertErr != nil {
+				t.Fatal(insertErr)
+			}
+			if commitErr := tx.Commit(); commitErr == nil {
+				t.Fatal("two admissions sharing one board sequence committed")
+			}
+		})
+	})
+
+	for _, test := range []struct {
+		name      string
+		createdAt int64
+		bodyTime  string
+	}{
+		{"normalized timestamp", stamp.UnixNano() + 1, stamp.Format(time.RFC3339Nano)},
+		{"body timestamp", stamp.UnixNano(), stamp.Add(time.Second).Format(time.RFC3339Nano)},
+	} {
+		t.Run("mismatched "+test.name, func(t *testing.T) {
+			tx, beginErr := store.db.BeginTx(ctx, nil)
+			if beginErr != nil {
+				t.Fatal(beginErr)
+			}
+			defer tx.Rollback()
+			index := 104
+			if test.name == "body timestamp" {
+				index++
+			}
+			value := digest(index)
+			operationID, admissionID, eventID := fmt.Sprintf("time-operation-%d", index), fmt.Sprintf("time-admission-%d", index), fmt.Sprintf("time-event-%d", index)
+			insertOperation(t, tx, operationID, int64(index), value)
+			insertAdmission(t, tx, admissionID, operationID, eventID, int64(index), stamp.UnixNano(), value)
+			if insertErr := insertEvent(tx, admissionID, operationID, eventID, value, int64(index), test.createdAt, test.bodyTime); insertErr == nil {
+				t.Fatal("mismatched event timestamp accepted")
+			}
+		})
+	}
+
+	t.Run("normalized association seals compromised body", func(t *testing.T) {
+		tx, beginErr := store.db.BeginTx(ctx, nil)
+		if beginErr != nil {
+			t.Fatal(beginErr)
+		}
+		value := digest(106)
+		insertOperation(t, tx, "sealed-operation", 106, value)
+		insertAdmission(t, tx, "sealed-admission", "sealed-operation", "sealed-event", 106, stamp.UnixNano(), value)
+		if insertErr := insertEvent(tx, "sealed-admission", "sealed-operation", "sealed-event", value, 106, stamp.UnixNano(), stamp.Format(time.RFC3339Nano)); insertErr != nil {
+			t.Fatal(insertErr)
+		}
+		if commitErr := tx.Commit(); commitErr != nil {
+			t.Fatal(commitErr)
+		}
+		var triggerSQL string
+		if queryErr := store.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='trigger' AND name='workboard_decomposition_event_immutable'`).Scan(&triggerSQL); queryErr != nil {
+			t.Fatal(queryErr)
+		}
+		if _, execErr := store.db.Exec(`DROP TRIGGER workboard_decomposition_event_immutable`); execErr != nil {
+			t.Fatal(execErr)
+		}
+		if _, execErr := store.db.Exec(`UPDATE workboard_events SET body='{}' WHERE id='sealed-event'`); execErr != nil {
+			t.Fatal(execErr)
+		}
+		if _, execErr := store.db.Exec(triggerSQL); execErr != nil {
+			t.Fatal(execErr)
+		}
+		if _, execErr := store.db.Exec(`UPDATE workboard_events SET actor_id='attacker' WHERE id='sealed-event'`); execErr == nil {
+			t.Fatal("normalized admission association did not seal update after body compromise")
+		}
+		if _, execErr := store.db.Exec(`DELETE FROM workboard_events WHERE id='sealed-event'`); execErr == nil {
+			t.Fatal("normalized admission association did not seal delete after body compromise")
+		}
+	})
 }
 
 func TestWorkboardDecompositionAdmissionSchemaTamperAndPartialFutureFailClosed(t *testing.T) {
@@ -387,15 +633,6 @@ func downgradeWorkboardDecomposition49(db *sql.DB) error {
 		DROP TRIGGER workboard_decomposition_admission_immutable_delete;
 		DROP TRIGGER workboard_decomposition_admission_immutable_update;
 		DROP TRIGGER workboard_decomposition_admission_binding;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_direct_children;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_depth;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_max_children;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_max_depth;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_policy_digest;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_config_digest;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_decision_digest;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_admission_digest;
-		ALTER TABLE workboard_events DROP COLUMN decomposition_admission_id;
 		DROP INDEX workboard_decomposition_admissions_card;
 		DROP INDEX workboard_decomposition_admissions_parent;
 		DROP TABLE workboard_decomposition_admissions;

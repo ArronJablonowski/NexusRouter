@@ -165,6 +165,11 @@ func TestDecompositionAdmissionRecordAndBoardEventReplayShape(t *testing.T) {
 	if err = event.BindDecompositionAdmission(admission); err != nil || event.Validate() != nil || !event.HasDecompositionAdmission() {
 		t.Fatalf("event=%+v bind=%v validation=%v", event, err, event.Validate())
 	}
+	mismatchedTime := event
+	mismatchedTime.CreatedAt = admission.AdmittedAt.Add(time.Nanosecond)
+	if err = mismatchedTime.BindDecompositionAdmission(admission); err == nil {
+		t.Fatal("admission with mismatched event time accepted")
+	}
 	event.DecompositionAdmissionDigest = ""
 	if event.Validate() == nil {
 		t.Fatal("partial admission reference accepted")

@@ -169,7 +169,7 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 		return workboard.CardMutationResult{}, err
 	}
 	if decomposition != nil {
-		if err = insertDecompositionAdmission(ctx, tx, admission, admissionBody); err != nil {
+		if err = insertDecompositionAdmission(ctx, tx, admission, event, admissionBody); err != nil {
 			return workboard.CardMutationResult{}, err
 		}
 	}
