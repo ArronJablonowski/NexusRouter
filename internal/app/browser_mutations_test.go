@@ -246,8 +246,12 @@ func TestBrowserListsLiveBlockedProposalAfterToolStarted(t *testing.T) {
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:1"}}
 	zero := 0.0
 	cfg.Models = []config.Model{{ID: "coordinator", Model: "coordinator", Provider: "local", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 200_000, EstimatedCost: &zero, RAMBytes: 100}}
-	criterion := map[string]any{"version": 1, "id": "tests", "kind": "objective", "required_source": "deterministic", "validator_id": "go-test", "description": "Focused tests pass.", "required": true}
-	arguments, _ := json.Marshal(map[string]any{"idempotency_key": "browser-proposal-key", "board_id": "board", "card_id": "card", "expected_board_revision": 2, "expected_card_revision": 3, "expected_criteria_revision": 1, "expected_criteria_digest": strings.Repeat("a", 64), "criteria": []any{criterion}})
+	arguments := json.RawMessage(` {
+  "criteria" : [ { "required" : true, "description" : "Focused tests pass.", "validator_id" : "go-test", "required_source" : "deterministic", "kind" : "objective", "id" : "tests", "version" : 1 } ],
+  "expected_criteria_digest" : "` + strings.Repeat("a", 64) + `", "expected_criteria_revision" : 1,
+  "expected_card_revision" : 3, "expected_board_revision" : 2, "card_id" : "card", "board_id" : "board",
+  "idempotency_key" : "browser-proposal-key"
+} `)
 	provider := &browserBlockedProposalProvider{arguments: arguments}
 	presented := make(chan tools.ApprovalPrompt, 1)
 	svc, err := NewService(cfg, nil)
@@ -271,6 +275,9 @@ func TestBrowserListsLiveBlockedProposalAfterToolStarted(t *testing.T) {
 	var prompt tools.ApprovalPrompt
 	select {
 	case prompt = <-presented:
+		if string(prompt.Arguments) == string(arguments) {
+			t.Fatal("provider argument whitespace and key order were not canonicalized before approval")
+		}
 	case outcome := <-finished:
 		t.Fatalf("provider stopped before blocked approval: result=%+v err=%v", outcome.result, outcome.err)
 	case <-ctx.Done():
