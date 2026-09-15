@@ -11,9 +11,6 @@ import (
 // admissions. A new model/worker card.create event can commit only beside the
 // exact admission row that binds its limits and redaction-safe config digest.
 func migrateWorkboardDecompositionAdmissions(ctx context.Context, conn *sql.Conn) error {
-	if err := validateSummaryAttemptRecoverySchema(ctx, conn); err != nil {
-		return err
-	}
 	if _, err := conn.ExecContext(ctx, `CREATE TABLE workboard_decomposition_admissions(
 		admission_id TEXT PRIMARY KEY CHECK(length(CAST(admission_id AS BLOB)) BETWEEN 1 AND 128),
 		board_id TEXT NOT NULL,
@@ -163,7 +160,7 @@ func migrateWorkboardDecompositionAdmissions(ctx context.Context, conn *sql.Conn
 	PRAGMA user_version=49;`); err != nil {
 		return err
 	}
-	return validateWorkboardDecompositionAdmissionSchema(ctx, conn)
+	return validateWorkboardDecompositionAdmissionObjects(ctx, conn)
 }
 
 // Lowered-version recovery may discard only an entirely empty schema-49
@@ -249,6 +246,14 @@ func validateWorkboardDecompositionAdmissionSchema(ctx context.Context, conn *sq
 	if err := validateSummaryAttemptRecoverySchema(ctx, conn); err != nil {
 		return err
 	}
+	return validateWorkboardDecompositionAdmissionObjects(ctx, conn)
+}
+
+// validateWorkboardDecompositionAdmissionObjects proves the schema-49
+// extension itself. Migration callers have already validated schema 48 in the
+// same transaction, so repeating the full historical validator here only
+// reparses hundreds of unchanged objects under race instrumentation.
+func validateWorkboardDecompositionAdmissionObjects(ctx context.Context, conn *sql.Conn) error {
 	if !browserTableShape(ctx, conn, "workboard_decomposition_admissions",
 		"admission_id:TEXT:0:1,board_id:TEXT:1:0,card_id:TEXT:1:0,parent_card_id:TEXT:0:0,operation_id:TEXT:1:0,request_digest:TEXT:1:0,decision_digest:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,origin_task_id:TEXT:0:0,origin_session_id:TEXT:0:0,origin_turn_id:TEXT:0:0,origin_attempt_id:TEXT:0:0,origin_tool_call_id:TEXT:0:0,origin_tool_name:TEXT:0:0,origin_model_id:TEXT:0:0,origin_provider_id:TEXT:0:0,config_digest:TEXT:1:0,policy_digest:TEXT:1:0,max_depth:INTEGER:1:0,max_children:INTEGER:1:0,depth:INTEGER:1:0,direct_children:INTEGER:1:0,parent_admission_id:TEXT:0:0,parent_admission_digest:TEXT:0:0,admitted_at:TEXT:1:0,admission_digest:TEXT:1:0,body:BLOB:1:0") ||
 		!browserTableShape(ctx, conn, "workboard_events", "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_decision_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0") ||

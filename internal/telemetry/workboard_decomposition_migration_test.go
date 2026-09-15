@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestWorkboardDecompositionAdmissionMigrationPreservesLegacyEvents(t *testing.T) {
@@ -200,6 +202,24 @@ func TestWorkboardDecompositionAdmissionSchemaBindsAndSealsAuthority(t *testing.
 
 func TestWorkboardDecompositionAdmissionSchemaTamperAndPartialFutureFailClosed(t *testing.T) {
 	ctx := context.Background()
+	t.Run("tampered predecessor schema", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.db")
+		store, err := Open(ctx, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.db.Exec(`DROP TRIGGER summary_attempt_recovery_immutable_delete`); err != nil {
+			t.Fatal(err)
+		}
+		if err = store.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if reopened, openErr := Open(ctx, path); openErr == nil {
+			reopened.Close()
+			t.Fatal("current schema-49 open skipped predecessor validation")
+		}
+	})
+
 	t.Run("tampered current trigger", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "state.db")
 		store, err := Open(ctx, path)
@@ -285,6 +305,77 @@ func TestWorkboardDecompositionAdmissionMigrationConcurrentOpen(t *testing.T) {
 	for err = range errs {
 		if err != nil {
 			t.Fatal("serialized schema-49 open", err)
+		}
+	}
+}
+
+func TestCurrentWorkboardDecompositionSchemaConcurrentOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	store, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	start := make(chan struct{})
+	errs := make(chan error, 12)
+	var group sync.WaitGroup
+	for range 12 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			opened, openErr := Open(ctx, path)
+			if openErr == nil {
+				openErr = opened.Close()
+			}
+			errs <- openErr
+		}()
+	}
+	close(start)
+	group.Wait()
+	close(errs)
+	for err = range errs {
+		if err != nil {
+			t.Fatal("concurrent current-schema open", err)
+		}
+	}
+}
+
+func BenchmarkCurrentWorkboardDecompositionSchemaOpen(b *testing.B) {
+	path := filepath.Join(b.TempDir(), "state.db")
+	store, err := Open(context.Background(), path)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for range b.N {
+		opened, openErr := Open(context.Background(), path)
+		if openErr != nil {
+			b.Fatal(openErr)
+		}
+		if openErr = opened.Close(); openErr != nil {
+			b.Fatal(openErr)
+		}
+	}
+}
+
+func BenchmarkFreshWorkboardDecompositionSchemaOpen(b *testing.B) {
+	directory := b.TempDir()
+	b.ResetTimer()
+	for index := range b.N {
+		opened, err := Open(context.Background(), filepath.Join(directory, fmt.Sprintf("state-%d.db", index)))
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err = opened.Close(); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
