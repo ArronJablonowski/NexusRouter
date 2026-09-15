@@ -543,12 +543,17 @@ Mutation events use a deterministic task-bound model actor while the task
 journal retains selected provider/model provenance. Child workers cannot
 inherit these tools. Interactive terminal chat renders an exact ASCII-safe,
 credential-screened preview for each supported workboard proposal before an
-operator can approve its one-use authority. Acceptance decisions,
-durable daemon/headless approval presentation, and real-provider approval UX
-qualification remain. Acceptance-criteria changes must use a future two-party
-proposal/application protocol that durably preserves both the model proposer and
-authenticated operator approver; a model must never rewrite its own acceptance
-gate merely because an outer tool approval was consumed.
+operator can approve its one-use authority. DAR-109 adds root-only criteria and
+candidate-decision proposal tools using the runtime event journal plus the
+digest-bound approval ledger as one two-party record. The durable store
+revalidates the exact canonical arguments, task/turn/tool identity,
+model/provider provenance, operator decision, revisions, and evidence/policy
+digests before applying an operator-attributed mutation. The Web UI reconstructs
+the same bounded proposal for inspection and fails closed when that proof cannot
+be reproduced. A spent approval is never redispatched; lost acknowledgements
+are reconciled read-only from the exact operation receipt. The model therefore
+cannot rewrite its own acceptance gate or accept its own result merely because
+an outer tool approval was consumed.
 
 The DAR-79 journal lives in the primary SQLite/WAL database under schema 34 so
 backup, restore, and migration use one state store. Operations are bound to the

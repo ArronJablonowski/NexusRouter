@@ -97,7 +97,12 @@ request after an exact heartbeat, cancel and
 join the supervisor-owned callback, persist runtime cancellation, and retain
 the workboard claim for independently proven finalization. They acknowledge
 pause and resume only at exact-fenced safe boundaries while retaining their
-heartbeat, claim, and supervisor slot. The integrated Kanban distinguishes
+heartbeat, claim, and supervisor slot. Root models may also submit exact
+criteria-change or candidate-decision proposals, but the durable store applies
+them only from a consumed authenticated operator approval and attributes the
+decision to that operator. The integrated Kanban approval queue reconstructs
+the bounded proposal from durable runtime evidence and fails closed on any
+identity, digest, revision, or policy mismatch. The integrated Kanban distinguishes
 requested, acknowledged, and resume-requested phases. A bounded per-board
 scheduling cycle reads the complete authoritative supervision projection before
 constructing tasks, counts running, stalled, and orphaned claims against its WIP

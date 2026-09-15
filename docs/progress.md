@@ -7976,3 +7976,32 @@ rerun; it is unrelated to outcome supervision. The subsequent complete
 `make check` passed: formatting/LOC, vet, the full race-enabled suite, and build.
 The slowest successful packages were telemetry (1,641 seconds), application
 (1,557 seconds), release packaging (1,468 seconds), and the SDK (186 seconds).
+
+## 2026-09-15 — DAR-109 agent-facing Workboard decisions
+
+The local root catalog now exposes closed-schema
+`workboard_propose_criteria` and `workboard_request_candidate_decision` tools.
+Each proposal freezes the exact board, card, attempt, criteria, candidate,
+evidence-head, and policy fences required by its operation. Child workers do
+not inherit either tool. The existing runtime event journal and one-use approval
+ledger form the canonical two-party record rather than a second proposal store.
+
+After approval consumption, the Workboard store independently re-reads the
+approval and runtime journal, verifies the canonical argument digest and exact
+task/turn/call identity, resolves the proposing model and provider, and derives
+the applying actor from the authenticated operator decision. Objective
+candidate acceptance still requires deterministic evidence; subjective work
+still depends on explicit user feedback. A crash before the Workboard commit
+spends the approval without replay authority. A committed operation whose
+acknowledgement is lost is reconciled read-only from its exact receipt.
+
+The authenticated Web UI approval queue reconstructs a bounded criteria or
+candidate-decision projection from the live dispatched call and fails closed
+when its durable proof cannot be reproduced. Provider tool arguments are now
+canonicalized before both journaling and authorization, with duplicate nested
+members rejected and JSON number precision preserved through redaction. This
+keeps approval digests restart-verifiable regardless of provider whitespace or
+object-member order. The root catalog also adds
+`workboard_request_resume`; a provider-neutral fixture proves pause request,
+worker safe-boundary acknowledgement, resume request, acknowledgement, and
+completion attribution.

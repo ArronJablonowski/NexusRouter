@@ -150,15 +150,23 @@ approval-backed tools:
 - `workboard_create_card`, `workboard_update_card`,
   `workboard_transition_card`, `workboard_reorder_card`;
 - `workboard_add_dependency`, `workboard_remove_dependency`;
-- `workboard_request_pause`, `workboard_request_cancel`.
+- `workboard_request_pause`, `workboard_request_resume`,
+  `workboard_request_cancel`;
+- `workboard_propose_criteria`,
+  `workboard_request_candidate_decision`.
 
 Writes are confined to `workboards` for board creation and
 `workboard:<board_id>` for all per-board actions. Child workers do not inherit
 these root mutation tools. Agent transition tools intentionally move cards only
 between Backlog and Ready; claim, heartbeat, safe-boundary acknowledgement,
-candidate submission, criteria revision, acceptance, cancellation finalization,
-and recovery remain host/operator lifecycle operations. Every write is schema-
-closed, revision-fenced, single-writer scoped, and approval-backed.
+candidate submission, cancellation finalization, and recovery remain trusted
+host lifecycle operations. Criteria and candidate-decision tools are advisory
+two-party proposals: the model freezes the exact revisions and digests, while
+only the authenticated operator approval can apply the resulting mutation or
+become the acceptance actor. Every write is schema-closed, revision-fenced,
+single-writer scoped, and approval-backed. Proposal arguments are canonicalized
+before both journaling and authorization so the durable approval digest can be
+reproduced after restart; duplicate JSON members are rejected.
 
 ## Optional unattended scheduling
 
