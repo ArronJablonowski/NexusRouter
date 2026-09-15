@@ -8160,4 +8160,6 @@ every race-enabled package, and `go build ./...`. Notable uncached package times
 were telemetry 2,242.261 seconds, application 2,195.906 seconds, releasepack
 858.794 seconds, SDK 259.821 seconds, CLI 177.005 seconds, runtime 130.128
 seconds, toolgate 105.021 seconds, API 96.845 seconds, and workers 41.638
-seconds. A GitHub checkpoint and Linear closure remain pending.
+seconds. The implementation was pushed and `origin/main` verified at
+`576e1c42857902b2e2496ae7cc76bc9d5820cfc1`; the same evidence was posted to
+Linear and DAR-123 was closed, unblocking DAR-124, DAR-125, and DAR-126.
