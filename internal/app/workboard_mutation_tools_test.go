@@ -2,12 +2,16 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -47,14 +51,79 @@ func executeWorkboardMutationForTask(t *testing.T, executor tools.Executor, task
 		Call: providers.ToolCall{ID: callID, Name: name, Arguments: raw}})
 }
 
+// workboardMutationJournal exercises a write handler at the same durable
+// boundary used by the runtime: the model turn and tool start are committed
+// before the approved handler receives its scoped execution identity.
+type workboardMutationJournal struct {
+	t                     *testing.T
+	store                 *telemetry.Store
+	taskID, sessionID     string
+	sequence, turnOrdinal int64
+}
+
+func newWorkboardMutationJournal(t *testing.T, store *telemetry.Store) *workboardMutationJournal {
+	t.Helper()
+	j := &workboardMutationJournal{t: t, store: store, taskID: "task", sessionID: "session"}
+	j.append(runtime.Event{Kind: runtime.TaskStarted})
+	return j
+}
+
+func (j *workboardMutationJournal) append(event runtime.Event) {
+	j.t.Helper()
+	j.sequence++
+	event.Version, event.ID = 1, fmt.Sprintf("workboard-agent-event-%d", j.sequence)
+	event.TaskID, event.SessionID, event.CorrelationID = j.taskID, j.sessionID, j.taskID
+	event.Sequence, event.Time = j.sequence, time.Unix(1_800_000_000+j.sequence, 0).UTC()
+	if err := j.store.Append(context.Background(), j.sequence-1, event); err != nil {
+		j.t.Fatalf("append %s: %v", event.Kind, err)
+	}
+}
+
+func (j *workboardMutationJournal) execute(executor tools.Executor, callID, name string, arguments any) (runtime.ToolResult, error) {
+	j.t.Helper()
+	raw, err := json.Marshal(arguments)
+	if err != nil {
+		j.t.Fatal(err)
+	}
+	j.turnOrdinal++
+	turnID := fmt.Sprintf("workboard-agent-turn-%d", j.turnOrdinal)
+	attemptID := fmt.Sprintf("workboard-agent-attempt-%d", j.turnOrdinal)
+	call := providers.ToolCall{ID: callID, Name: name, Arguments: raw}
+	j.append(runtime.Event{Kind: runtime.TurnStarted, TurnID: turnID, AttemptID: attemptID,
+		Data: runtime.Data{ModelID: "coordinator-model", ProviderID: "coordinator-provider"}})
+	j.append(runtime.Event{Kind: runtime.TurnCompleted, TurnID: turnID, AttemptID: attemptID,
+		Data: runtime.Data{FinishReason: "tool_calls", ToolCalls: []providers.ToolCall{call}}})
+	j.append(runtime.Event{Kind: runtime.ToolStarted, TurnID: turnID, AttemptID: attemptID,
+		Data: runtime.Data{ToolCallID: callID, ToolName: name, ToolBehavior: runtime.BehaviorIdempotentWrite, Effect: runtime.UncertainEffect}})
+	out, executeErr := executor.ExecuteScoped(context.Background(), runtime.ToolExecution{TaskID: j.taskID, SessionID: j.sessionID,
+		TurnID: turnID, AttemptID: attemptID, Call: call})
+	code := ""
+	if executeErr != nil || out.Failed {
+		code = "tool_failed"
+	}
+	j.append(runtime.Event{Kind: runtime.ToolCompleted, TurnID: turnID, AttemptID: attemptID,
+		Data: runtime.Data{ToolCallID: callID, ToolName: name, ToolBehavior: runtime.BehaviorIdempotentWrite, Effect: out.Effect, Text: out.Content, Code: code}})
+	return out, executeErr
+}
+
 func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 	ctx := context.Background()
-	store, err := telemetry.Open(ctx, filepath.Join(t.TempDir(), "workboards.db"))
+	database := filepath.Join(t.TempDir(), "workboards.db")
+	store, err := telemetry.Open(ctx, database)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	bridge, err := NewWorkboardBridge(store, store, defaultWorkboardNow)
+	settings := config.Defaults()
+	configID, err := settingsConfigID(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := configuredWorkboardDecompositionPolicy(settings, configID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridge, err := NewWorkboardBridgeWithDecomposition(store, store, defaultWorkboardNow, policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +144,11 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 	if json.Unmarshal([]byte(boardOut.Content), &board) != nil || board.Validate() != nil {
 		t.Fatalf("board receipt = %s", boardOut.Content)
 	}
+	journal := newWorkboardMutationJournal(t, store)
 	criterion := map[string]any{"version": 1, "id": "go-tests", "kind": "objective", "required_source": "deterministic", "validator_id": "go-test", "description": "Focused tests pass", "required": true}
 	baseArgs := map[string]any{"idempotency_key": "agent-card-key-00001", "board_id": board.BoardID, "title": "Base card", "criteria": []any{criterion},
 		"expected_board_revision": board.BoardRevision, "expected_graph_revision": 1}
-	baseOut, err := executeWorkboardMutation(t, executor, "base-call", "workboard_create_card", baseArgs)
+	baseOut, err := journal.execute(executor, "base-call", "workboard_create_card", baseArgs)
 	if err != nil || baseOut.Effect != runtime.ConfirmedEffect {
 		t.Fatalf("create base card: out=%+v err=%v", baseOut, err)
 	}
@@ -94,13 +164,34 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 		"priority": "high", "parent_id": base.CardID, "assignee_id": "worker_one", "labels": []string{"runtime", "testing"}, "dependencies": []string{base.CardID},
 		"budget": map[string]any{"attempt_limit": 3, "time_limit_ms": 60000, "token_limit": 100000, "cost_micros": 50000}, "criteria": []any{criterion},
 		"expected_board_revision": snapshot.Board.Revision, "expected_graph_revision": snapshot.GraphRevision}
-	richOut, err := executeWorkboardMutation(t, executor, "rich-call", "workboard_create_card", richArgs)
+	richOut, err := journal.execute(executor, "rich-call", "workboard_create_card", richArgs)
 	if err != nil || richOut.Effect != runtime.ConfirmedEffect {
 		t.Fatalf("create rich card: out=%+v err=%v", richOut, err)
 	}
-	replayOut, err := executeWorkboardMutation(t, executor, "replay-call", "workboard_create_card", richArgs)
+	var richReceipt webui.OperationReceipt
+	if json.Unmarshal([]byte(richOut.Content), &richReceipt) != nil || richReceipt.Validate() != nil {
+		t.Fatalf("rich receipt = %s", richOut.Content)
+	}
+	replayOut, err := journal.execute(executor, "replay-call", "workboard_create_card", richArgs)
 	if err != nil || replayOut.Effect != runtime.ConfirmedEffect || replayOut.Content != richOut.Content {
 		t.Fatalf("replay: out=%+v err=%v", replayOut, err)
+	}
+	raw, err := sql.Open("sqlite", database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	var admissionBody []byte
+	if err = raw.QueryRow(`SELECT body FROM workboard_decomposition_admissions WHERE operation_id=?`, richReceipt.OperationID).Scan(&admissionBody); err != nil {
+		t.Fatal(err)
+	}
+	var admission workboard.DecompositionAdmission
+	if json.Unmarshal(admissionBody, &admission) != nil || admission.Validate() != nil || admission.ConfigDigest != configID ||
+		admission.Origin.TaskID != journal.taskID || admission.Origin.SessionID != journal.sessionID ||
+		admission.Origin.TurnID != "workboard-agent-turn-2" || admission.Origin.AttemptID != "workboard-agent-attempt-2" ||
+		admission.Origin.ToolCallID != "rich-call" || admission.Origin.ToolName != "workboard_create_card" ||
+		admission.Origin.ModelID != "coordinator-model" || admission.Origin.ProviderID != "coordinator-provider" {
+		t.Fatalf("durable runtime origin = %+v", admission)
 	}
 	snapshot, err = bridge.RootAgentRead(ctx, board.BoardID, webui.BoardSnapshotOptions{Limit: 100})
 	if err != nil || len(snapshot.Cards) != 2 {
@@ -115,7 +206,7 @@ func TestRootAgentWorkboardMutationToolsCreateRichCardAndReplay(t *testing.T) {
 	if rich.ID == "" || rich.ParentID != base.CardID || rich.AssigneeID != "worker_one" || len(rich.Labels) != 2 || len(rich.Dependencies) != 1 || rich.Budget.AttemptLimit != 3 {
 		t.Fatalf("rich card = %+v", rich)
 	}
-	updateOut, err := executeWorkboardMutation(t, executor, "update-call", "workboard_update_card", map[string]any{
+	updateOut, err := journal.execute(executor, "update-call", "workboard_update_card", map[string]any{
 		"idempotency_key": "agent-update-key-001", "board_id": board.BoardID, "card_id": rich.ID, "expected_card_revision": rich.Revision,
 		"expected_graph_revision": snapshot.GraphRevision, "clear_parent": true, "clear_assignee": true, "labels": []string{},
 		"budget": map[string]any{"attempt_limit": 2, "time_limit_ms": 0, "token_limit": 0, "cost_micros": 0},
