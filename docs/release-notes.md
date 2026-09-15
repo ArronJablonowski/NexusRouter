@@ -561,7 +561,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 48. Schema 30 added the immutable
+The current durable store uses SQLite schema 49. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -599,7 +599,12 @@ redaction-safe outcome-supervision lifecycle journal bound to the exact
 operation, scheduler check, activation revision, and policy. Schema 48 binds
 new summary attempts to their exact guarded local process owner and adds
 immutable, redaction-safe receipts for conservative interrupted-attempt
-recovery after independently proving owner exit.
+recovery after independently proving owner exit. Schema 49 adds immutable
+Workboard decomposition admissions for model- and worker-authored hierarchy
+mutations. Each admission binds the exact operation, request, host configuration
+and policy digests, effective depth/direct-child limits, resulting placement,
+actor, runtime provenance, and parent admission when present; the associated
+board event carries only the redaction-safe audit projection.
 Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,
