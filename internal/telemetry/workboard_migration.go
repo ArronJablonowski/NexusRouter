@@ -616,7 +616,7 @@ func workboardNamedObjects(ctx context.Context, conn *sql.Conn, kind string, exp
 		AND name NOT IN ('workboard_decomposition_admissions','workboard_decomposition_admissions_parent','workboard_decomposition_admissions_card',
 			'workboard_decomposition_admission_binding','workboard_decomposition_admission_immutable_update',
 			'workboard_decomposition_admission_immutable_delete','workboard_decomposition_event_binding',
-			'workboard_decomposition_event_immutable')
+			'workboard_decomposition_event_immutable','workboard_decomposition_event_immutable_delete')
 		ORDER BY name`, kind)
 	if err != nil {
 		return err

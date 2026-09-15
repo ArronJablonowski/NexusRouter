@@ -98,6 +98,12 @@ func migrateWorkboardDecompositionAdmissions(ctx context.Context, conn *sql.Conn
 			OR json_extract(NEW.body,'$.parent_admission_digest') IS NOT NEW.parent_admission_digest
 			OR json_extract(NEW.body,'$.admitted_at') IS NOT NEW.admitted_at
 			OR json_extract(NEW.body,'$.admission_digest') IS NOT NEW.admission_digest
+			OR (NEW.parent_admission_id IS NOT NULL AND NOT EXISTS(
+				SELECT 1 FROM workboard_decomposition_admissions parent
+				WHERE parent.admission_id=NEW.parent_admission_id
+					AND parent.admission_digest=NEW.parent_admission_digest
+					AND parent.board_id=NEW.board_id AND parent.card_id=NEW.parent_card_id
+					AND NEW.max_depth<=parent.max_depth AND NEW.max_children<=parent.max_children))
 		BEGIN SELECT RAISE(ABORT,'workboard decomposition admission binding'); END;
 	CREATE TRIGGER workboard_decomposition_event_binding BEFORE INSERT ON workboard_events
 		WHEN NOT ((NEW.decomposition_admission_id IS NULL AND NEW.decomposition_admission_digest IS NULL
@@ -106,6 +112,15 @@ func migrateWorkboardDecompositionAdmissions(ctx context.Context, conn *sql.Conn
 			AND NEW.decomposition_depth IS NULL AND NEW.decomposition_direct_children IS NULL
 			AND NOT (NEW.kind='card.create' AND NEW.actor_type IN('model','worker')))
 		OR (NEW.decomposition_admission_id IS NOT NULL AND length(CAST(NEW.decomposition_admission_id AS BLOB)) BETWEEN 1 AND 128
+			AND json_extract(NEW.body,'$.version')=1
+			AND json_extract(NEW.body,'$.id') IS NEW.id
+			AND json_extract(NEW.body,'$.board_id') IS NEW.board_id
+			AND json_extract(NEW.body,'$.sequence') IS NEW.sequence
+			AND json_extract(NEW.body,'$.operation_id') IS NEW.operation_id
+			AND json_extract(NEW.body,'$.kind') IS NEW.kind
+			AND json_extract(NEW.body,'$.actor_id') IS NEW.actor_id
+			AND json_extract(NEW.body,'$.actor_type') IS NEW.actor_type
+			AND json_extract(NEW.body,'$.card_id') IS NEW.card_id
 			AND length(NEW.decomposition_admission_digest)=64 AND NEW.decomposition_admission_digest NOT GLOB '*[^0-9a-f]*'
 			AND length(NEW.decomposition_decision_digest)=64 AND NEW.decomposition_decision_digest NOT GLOB '*[^0-9a-f]*'
 			AND length(NEW.decomposition_config_digest)=64 AND NEW.decomposition_config_digest NOT GLOB '*[^0-9a-f]*'
@@ -123,20 +138,27 @@ func migrateWorkboardDecompositionAdmissions(ctx context.Context, conn *sql.Conn
 			AND json_extract(NEW.body,'$.decomposition_max_depth') IS NEW.decomposition_max_depth
 			AND json_extract(NEW.body,'$.decomposition_max_children') IS NEW.decomposition_max_children
 			AND json_extract(NEW.body,'$.decomposition_depth') IS NEW.decomposition_depth
-			AND coalesce(json_extract(NEW.body,'$.decomposition_direct_children'),0) IS NEW.decomposition_direct_children))
+			AND coalesce(json_extract(NEW.body,'$.decomposition_direct_children'),0) IS NEW.decomposition_direct_children
+			AND EXISTS(SELECT 1 FROM workboard_decomposition_admissions admission
+				WHERE admission.admission_id=NEW.decomposition_admission_id
+					AND admission.admission_digest=NEW.decomposition_admission_digest
+					AND admission.decision_digest=NEW.decomposition_decision_digest
+					AND admission.config_digest=NEW.decomposition_config_digest
+					AND admission.policy_digest=NEW.decomposition_policy_digest
+					AND admission.max_depth=NEW.decomposition_max_depth
+					AND admission.max_children=NEW.decomposition_max_children
+					AND admission.depth=NEW.decomposition_depth
+					AND admission.direct_children=NEW.decomposition_direct_children
+					AND admission.board_id=NEW.board_id AND admission.card_id=NEW.card_id
+					AND admission.operation_id=NEW.operation_id
+					AND admission.actor_id=NEW.actor_id AND admission.actor_type=NEW.actor_type
+					AND admission.admitted_at=json_extract(NEW.body,'$.created_at'))))
 		BEGIN SELECT RAISE(ABORT,'workboard decomposition event admission required'); END;
-	CREATE TRIGGER workboard_decomposition_event_immutable BEFORE UPDATE OF
-		decomposition_admission_id,decomposition_admission_digest,decomposition_decision_digest,decomposition_config_digest,decomposition_policy_digest,
-		decomposition_max_depth,decomposition_max_children,decomposition_depth,decomposition_direct_children ON workboard_events
-		WHEN NEW.decomposition_admission_id IS NOT OLD.decomposition_admission_id
-			OR NEW.decomposition_admission_digest IS NOT OLD.decomposition_admission_digest
-			OR NEW.decomposition_decision_digest IS NOT OLD.decomposition_decision_digest
-			OR NEW.decomposition_config_digest IS NOT OLD.decomposition_config_digest
-			OR NEW.decomposition_policy_digest IS NOT OLD.decomposition_policy_digest
-			OR NEW.decomposition_max_depth IS NOT OLD.decomposition_max_depth
-			OR NEW.decomposition_max_children IS NOT OLD.decomposition_max_children
-			OR NEW.decomposition_depth IS NOT OLD.decomposition_depth
-			OR NEW.decomposition_direct_children IS NOT OLD.decomposition_direct_children
+	CREATE TRIGGER workboard_decomposition_event_immutable BEFORE UPDATE ON workboard_events
+		WHEN OLD.decomposition_admission_id IS NOT NULL
+		BEGIN SELECT RAISE(ABORT,'workboard decomposition event immutable'); END;
+	CREATE TRIGGER workboard_decomposition_event_immutable_delete BEFORE DELETE ON workboard_events
+		WHEN OLD.decomposition_admission_id IS NOT NULL
 		BEGIN SELECT RAISE(ABORT,'workboard decomposition event immutable'); END;
 	PRAGMA user_version=49;`); err != nil {
 		return err
@@ -154,14 +176,14 @@ func discardEmptyFutureWorkboardDecompositionAdmissions(ctx context.Context, con
 		(SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name IN(
 			'workboard_decomposition_admission_binding','workboard_decomposition_admission_immutable_update',
 			'workboard_decomposition_admission_immutable_delete','workboard_decomposition_event_binding',
-			'workboard_decomposition_event_immutable')),
+			'workboard_decomposition_event_immutable','workboard_decomposition_event_immutable_delete')),
 		(SELECT count(*) FROM pragma_table_info('workboard_events') WHERE name GLOB 'decomposition_*')`).Scan(&table, &indexes, &triggers, &columns); err != nil {
 		return err
 	}
 	if table == 0 && indexes == 0 && triggers == 0 && columns == 0 {
 		return nil
 	}
-	if table != 1 || indexes != 2 || triggers != 5 || columns != 9 {
+	if table != 1 || indexes != 2 || triggers != 6 || columns != 9 {
 		return errors.New("incomplete workboard decomposition admission schema before schema 49")
 	}
 	var admissions int
@@ -176,6 +198,7 @@ func discardEmptyFutureWorkboardDecompositionAdmissions(ctx context.Context, con
 	// whose referenced tables are about to be discarded by their own cleanup.
 	// Columns and tables are removed after all earlier future-object cleanup.
 	_, err := conn.ExecContext(ctx, `DROP TRIGGER workboard_decomposition_event_binding;
+		DROP TRIGGER workboard_decomposition_event_immutable_delete;
 		DROP TRIGGER workboard_decomposition_event_immutable;
 		DROP TRIGGER workboard_decomposition_admission_immutable_delete;
 		DROP TRIGGER workboard_decomposition_admission_immutable_update;
@@ -255,6 +278,7 @@ func validateWorkboardDecompositionAdmissionSchema(ctx context.Context, conn *sq
 			"json_extract(new.body,'$.limits.max_depth')isnotnew.max_depth",
 			"json_extract(new.body,'$.admitted_at')isnotnew.admitted_at",
 			"json_extract(new.body,'$.config_digest')isnotnew.config_digest",
+			"new.parent_admission_idisnotnullandnotexists(",
 			"raise(abort,'workboarddecompositionadmissionbinding')",
 		}) ||
 		!workboardObjectRules(ctx, conn, "trigger", "workboard_decomposition_admission_immutable_update", []string{
@@ -264,10 +288,13 @@ func validateWorkboardDecompositionAdmissionSchema(ctx context.Context, conn *sq
 			"beforedeleteonworkboard_decomposition_admissions", "raise(abort,'workboarddecompositionadmissionimmutable')",
 		}) ||
 		!workboardObjectRules(ctx, conn, "trigger", "workboard_decomposition_event_binding", []string{
-			"beforeinsertonworkboard_events", "new.kindin('card.create','card.revise')andnew.actor_typein('model','worker')", "json_extract(new.body,'$.decomposition_admission_id')isnew.decomposition_admission_id", "raise(abort,'workboarddecompositioneventadmissionrequired')",
+			"beforeinsertonworkboard_events", "json_extract(new.body,'$.operation_id')isnew.operation_id", "new.kindin('card.create','card.revise')andnew.actor_typein('model','worker')", "json_extract(new.body,'$.decomposition_admission_id')isnew.decomposition_admission_id", "exists(select1fromworkboard_decomposition_admissionsadmission", "raise(abort,'workboarddecompositioneventadmissionrequired')",
 		}) ||
 		!workboardObjectRules(ctx, conn, "trigger", "workboard_decomposition_event_immutable", []string{
-			"beforeupdateofdecomposition_admission_id", "onworkboard_events", "raise(abort,'workboarddecompositioneventimmutable')",
+			"beforeupdateonworkboard_events", "old.decomposition_admission_idisnotnull", "raise(abort,'workboarddecompositioneventimmutable')",
+		}) ||
+		!workboardObjectRules(ctx, conn, "trigger", "workboard_decomposition_event_immutable_delete", []string{
+			"beforedeleteonworkboard_events", "old.decomposition_admission_idisnotnull", "raise(abort,'workboarddecompositioneventimmutable')",
 		}) {
 		return errors.New("invalid workboard decomposition admission schema")
 	}
