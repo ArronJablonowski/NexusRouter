@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 47 {
+		if err = discardEmptyFutureOutcomeSupervisionEvents(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 47 {
+		if err = validateOutcomeSupervisionEventSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 46 {
 		if err = discardEmptyFutureIntentClassificationAttempts(ctx, conn); err != nil {
 			return err
@@ -525,6 +535,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 46 {
 		if err = migrateIntentClassificationAttempts(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 47 {
+		if err = migrateOutcomeSupervisionEvents(ctx, conn); err != nil {
 			return err
 		}
 	}
