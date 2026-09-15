@@ -128,9 +128,11 @@ An LLM self-review is not a deterministic validator. Configured unattended
 semantic approval, typed per-claim evidence and full PRD acceptance remain open.
 Recovery does not resolve provider billing, recover output, authorize retry, or
 prove semantic correctness. Owners that are active, remote or cannot be proven
-stopped remain fenced. Dedicated CLI/HTTP recovery-receipt inspection and live
-signed-in native crash/power-loss qualification remain open. The native launch
-profile is experimental, not a host/process isolation certification.
+stopped remain fenced. Legacy pre-schema-48 `started` summary rows have no
+durable owner proof, remain fenced and unverifiable, and are never automatically
+recovered or redispatched. Dedicated CLI/HTTP recovery-receipt inspection and
+live signed-in native crash/power-loss qualification remain open. The native
+launch profile is experimental, not a host/process isolation certification.
 
 ## Qualification
 
