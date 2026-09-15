@@ -55,7 +55,8 @@ func newExtension(definitions []Definition, policy *Policy, reviewed bool) (*Ext
 		switch d.Tool.Name {
 		case "read_file", "create_file", "replace_file", "workboard_list", "workboard_read",
 			"workboard_create_board", "workboard_revise_board", "workboard_archive_board", "workboard_create_card", "workboard_update_card", "workboard_transition_card",
-			"workboard_add_dependency", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_pause", "workboard_request_resume", "workboard_request_cancel", "delegate", "delegate_batch":
+			"workboard_add_dependency", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_pause", "workboard_request_resume", "workboard_request_cancel",
+			"workboard_propose_criteria", "workboard_request_candidate_decision", "delegate", "delegate_batch":
 			return nil, ErrDefinition
 		}
 		body, err := json.Marshal(d.Tool)

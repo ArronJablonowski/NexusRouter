@@ -14,6 +14,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 	"github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
 
 var chatWorkboardActions = map[string]webui.BoardAction{
@@ -32,8 +33,9 @@ var chatWorkboardActions = map[string]webui.BoardAction{
 }
 
 func chatWorkboardApprovalPreview(settings config.Settings, secret func(string) string, p tools.ApprovalPrompt) (string, error) {
-	action, ok := chatWorkboardActions[p.Request.ToolName]
-	if !ok || !settings.Tools.WorkboardReadEnabled || !settings.Tools.WorkboardWriteEnabled ||
+	action, mutation := chatWorkboardActions[p.Request.ToolName]
+	proposal := p.Request.ToolName == workboard.CriteriaProposalTool || p.Request.ToolName == workboard.CandidateDecisionRequestTool
+	if (!mutation && !proposal) || !settings.Tools.WorkboardReadEnabled || !settings.Tools.WorkboardWriteEnabled ||
 		p.Request.Validate() != nil || p.Request.ToolBehavior != tools.BehaviorIdempotentWrite ||
 		len(p.Arguments) == 0 || len(p.Arguments) > 1<<20 || !utf8.Valid(p.Arguments) {
 		return "", tools.ErrDenied
@@ -42,20 +44,32 @@ func chatWorkboardApprovalPreview(settings config.Settings, secret func(string) 
 	if hex.EncodeToString(digest[:]) != p.Request.ArgumentsDigest {
 		return "", tools.ErrDenied
 	}
-	request, values, err := decodeChatWorkboardRequest(p.Arguments, action)
-	if err != nil {
-		return "", tools.ErrDenied
+	var boardID, actionName string
+	var values []string
+	if mutation {
+		request, decoded, err := decodeChatWorkboardRequest(p.Arguments, action)
+		if err != nil {
+			return "", tools.ErrDenied
+		}
+		boardID, actionName, values = request.BoardID, string(action), decoded
+	} else {
+		var err error
+		boardID, values, err = decodeChatAgentProposal(p.Arguments, p.Request.ToolName)
+		if err != nil {
+			return "", tools.ErrDenied
+		}
+		actionName = p.Request.ToolName
 	}
-	wantScope := "workboards"
-	if action != webui.BoardCreate {
-		wantScope = "workboard:" + request.BoardID
+	wantScope := "workboard:" + boardID
+	if mutation && action == webui.BoardCreate {
+		wantScope = "workboards"
 	}
 	values = append(values, string(p.Arguments), hex.EncodeToString(digest[:]), wantScope, p.Description, p.Request.ID, p.Request.TaskID, p.Request.TurnID, p.Request.ToolCallID, p.Request.Scope)
 	if p.Request.Scope != wantScope || chatApprovalContainsSecret(settings, secret, values) {
 		return "", tools.ErrDenied
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "[approval pending %s]\nDarwinRouter Kanban mutation proposed by the local root model.\nTool: %s\nAction: %s\nExact resource scope: %s\n", p.Request.ID, p.Request.ToolName, action, strconv.QuoteToASCII(wantScope))
+	fmt.Fprintf(&out, "[approval pending %s]\nDarwinRouter Kanban mutation proposed by the local root model.\nTool: %s\nAction: %s\nExact resource scope: %s\n", p.Request.ID, p.Request.ToolName, actionName, strconv.QuoteToASCII(wantScope))
 	fmt.Fprintf(&out, "Exact model arguments: %d UTF-8 bytes, SHA-256 %x\n| %s\n", len(p.Arguments), digest, strconv.QuoteToASCII(string(p.Arguments)))
 	out.WriteString("Warning: approval authorizes this exact one-use request only. A committed or uncertain effect is never automatically replayed.\n")
 	fmt.Fprintf(&out, "Declared behavior: %s (not retry authority)\nUse /approve %s or /deny %s for this request only.\n", p.Request.ToolBehavior, p.Request.ID, p.Request.ID)
@@ -63,6 +77,47 @@ func chatWorkboardApprovalPreview(settings config.Settings, secret func(string) 
 		return "", tools.ErrDenied
 	}
 	return out.String(), nil
+}
+
+func decodeChatAgentProposal(raw []byte, toolName string) (string, []string, error) {
+	if webui.RejectDuplicateJSONFields(raw) != nil {
+		return "", nil, tools.ErrDenied
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var fields map[string]any
+	if decoder.Decode(&fields) != nil || fields == nil || decoder.Decode(new(any)) != io.EOF {
+		return "", nil, tools.ErrDenied
+	}
+	origin := workboard.AgentProposalOrigin{TaskID: "task", SessionID: "session", TurnID: "turn", RuntimeAttemptID: "attempt", ToolCallID: "call", ToolName: toolName, ApprovalID: "approval"}
+	strict := json.NewDecoder(bytes.NewReader(raw))
+	strict.DisallowUnknownFields()
+	boardID := ""
+	switch toolName {
+	case workboard.CriteriaProposalTool:
+		var proposal workboard.ApprovedCriteriaProposal
+		if strict.Decode(&proposal) != nil || strict.Decode(new(any)) != io.EOF {
+			return "", nil, tools.ErrDenied
+		}
+		proposal.Origin = origin
+		if proposal.Validate() != nil {
+			return "", nil, tools.ErrDenied
+		}
+		boardID = proposal.BoardID
+	case workboard.CandidateDecisionRequestTool:
+		var proposal workboard.ApprovedCandidateDecisionProposal
+		if strict.Decode(&proposal) != nil || strict.Decode(new(any)) != io.EOF {
+			return "", nil, tools.ErrDenied
+		}
+		proposal.Origin = origin
+		if proposal.Validate() != nil {
+			return "", nil, tools.ErrDenied
+		}
+		boardID = proposal.BoardID
+	default:
+		return "", nil, tools.ErrDenied
+	}
+	return boardID, chatWorkboardStrings(fields), nil
 }
 
 func decodeChatWorkboardRequest(raw []byte, action webui.BoardAction) (webui.BoardRequest, []string, error) {

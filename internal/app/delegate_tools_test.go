@@ -143,6 +143,8 @@ func TestApplicationToolPolicyUsesConfiguredWriteDecision(t *testing.T) {
 			{"workboard_request_pause", "workboard:board_a"},
 			{"workboard_request_resume", "workboard:board_a"},
 			{"workboard_request_cancel", "workboard:board_a"},
+			{"workboard_propose_criteria", "workboard:board_a"},
+			{"workboard_request_candidate_decision", "workboard:board_a"},
 		} {
 			if got := policy.Decide(target.tool, target.scope); got != test.want {
 				t.Fatalf("configured=%q tool=%q scope=%q got=%q want=%q", test.configured, target.tool, target.scope, got, test.want)

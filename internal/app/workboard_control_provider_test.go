@@ -49,7 +49,7 @@ func (p *workboardPauseResumeProvider) Stream(ctx context.Context, request provi
 			p.errMu.Unlock()
 		}
 	}()
-	wantTools := []string{"workboard_add_dependency", "workboard_archive_board", "workboard_create_board", "workboard_create_card", "workboard_list", "workboard_read", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_cancel", "workboard_request_pause", "workboard_request_resume", "workboard_revise_board", "workboard_transition_card", "workboard_update_card"}
+	wantTools := []string{"workboard_add_dependency", "workboard_archive_board", "workboard_create_board", "workboard_create_card", "workboard_list", "workboard_propose_criteria", "workboard_read", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_cancel", "workboard_request_candidate_decision", "workboard_request_pause", "workboard_request_resume", "workboard_revise_board", "workboard_transition_card", "workboard_update_card"}
 	names := make([]string, len(request.Tools))
 	for index := range request.Tools {
 		names[index] = request.Tools[index].Name

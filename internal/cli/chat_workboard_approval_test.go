@@ -35,22 +35,25 @@ func chatWorkboardPrompt(t *testing.T, name, scope string, arguments any) (confi
 
 func TestChatWorkboardApprovalPreviewSupportsMutationCatalog(t *testing.T) {
 	criteria := []map[string]any{{"version": 1, "id": "tests", "kind": "objective", "required_source": "deterministic", "validator_id": "go_test", "description": "Tests pass.", "required": true}}
+	digest := strings.Repeat("d", 64)
 	cases := map[string]struct {
 		scope string
 		args  map[string]any
 	}{
-		"workboard_create_board":      {"workboards", map[string]any{"idempotency_key": "approval-board-create-01", "title": "Board"}},
-		"workboard_revise_board":      {"workboard:board_a", map[string]any{"idempotency_key": "approval-board-revise-01", "board_id": "board_a", "title": "Revised", "expected_board_revision": 1}},
-		"workboard_archive_board":     {"workboard:board_a", map[string]any{"idempotency_key": "approval-board-archive-1", "board_id": "board_a", "expected_board_revision": 1}},
-		"workboard_create_card":       {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-create-001", "board_id": "board_a", "title": "Card", "criteria": criteria, "expected_board_revision": 1, "expected_graph_revision": 1}},
-		"workboard_update_card":       {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-update-001", "board_id": "board_a", "card_id": "card_a", "title": "Updated", "expected_card_revision": 1}},
-		"workboard_transition_card":   {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-move-0001", "board_id": "board_a", "card_id": "card_a", "target_state": "ready", "expected_board_revision": 1, "expected_layout_revision": 1, "expected_card_revision": 1}},
-		"workboard_reorder_card":      {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-order-001", "board_id": "board_a", "card_id": "card_a", "before_card_id": "card_b", "expected_board_revision": 1, "expected_layout_revision": 1, "expected_card_revision": 1}},
-		"workboard_add_dependency":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-add1", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
-		"workboard_remove_dependency": {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-rm01", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
-		"workboard_request_pause":     {"workboard:board_a", map[string]any{"idempotency_key": "approval-pause-request1", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
-		"workboard_request_resume":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-resume-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
-		"workboard_request_cancel":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-cancel-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
+		"workboard_create_board":               {"workboards", map[string]any{"idempotency_key": "approval-board-create-01", "title": "Board"}},
+		"workboard_revise_board":               {"workboard:board_a", map[string]any{"idempotency_key": "approval-board-revise-01", "board_id": "board_a", "title": "Revised", "expected_board_revision": 1}},
+		"workboard_archive_board":              {"workboard:board_a", map[string]any{"idempotency_key": "approval-board-archive-1", "board_id": "board_a", "expected_board_revision": 1}},
+		"workboard_create_card":                {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-create-001", "board_id": "board_a", "title": "Card", "criteria": criteria, "expected_board_revision": 1, "expected_graph_revision": 1}},
+		"workboard_update_card":                {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-update-001", "board_id": "board_a", "card_id": "card_a", "title": "Updated", "expected_card_revision": 1}},
+		"workboard_transition_card":            {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-move-0001", "board_id": "board_a", "card_id": "card_a", "target_state": "ready", "expected_board_revision": 1, "expected_layout_revision": 1, "expected_card_revision": 1}},
+		"workboard_reorder_card":               {"workboard:board_a", map[string]any{"idempotency_key": "approval-card-order-001", "board_id": "board_a", "card_id": "card_a", "before_card_id": "card_b", "expected_board_revision": 1, "expected_layout_revision": 1, "expected_card_revision": 1}},
+		"workboard_add_dependency":             {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-add1", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
+		"workboard_remove_dependency":          {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-rm01", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
+		"workboard_request_pause":              {"workboard:board_a", map[string]any{"idempotency_key": "approval-pause-request1", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
+		"workboard_request_resume":             {"workboard:board_a", map[string]any{"idempotency_key": "approval-resume-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
+		"workboard_request_cancel":             {"workboard:board_a", map[string]any{"idempotency_key": "approval-cancel-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
+		"workboard_propose_criteria":           {"workboard:board_a", map[string]any{"idempotency_key": "approval-criteria-propose", "board_id": "board_a", "card_id": "card_a", "expected_board_revision": 1, "expected_card_revision": 1, "expected_criteria_revision": 1, "expected_criteria_digest": digest, "criteria": criteria}},
+		"workboard_request_candidate_decision": {"workboard:board_a", map[string]any{"idempotency_key": "approval-candidate-decision", "board_id": "board_a", "card_id": "card_a", "attempt_id": "attempt_a", "candidate_id": "candidate_a", "expected_board_revision": 1, "expected_card_revision": 1, "expected_attempt_revision": 1, "criteria_revision": 1, "evidence_head_revision": 1, "candidate_digest": digest, "criteria_digest": digest, "evidence_set_digest": digest, "policy_digest": digest, "decision": "accepted", "rationale": "Deterministic evidence passed."}},
 	}
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {

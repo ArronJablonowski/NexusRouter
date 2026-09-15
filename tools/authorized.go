@@ -104,7 +104,14 @@ func (e Executor) approved(ctx context.Context, x runtime.ToolExecution, t entry
 				returned, returnedErr = result, handlerErr
 			}
 		}()
-		runCtx, cancel := context.WithCancel(ctx)
+		// Approval authorities may add only the consumed approval provenance used
+		// by durable downstream stores. Do not pass arbitrary authority context
+		// values into a tool handler.
+		handlerCtx := ctx
+		if consumed, ok := ConsumedApprovalFromContext(approvedCtx); ok {
+			handlerCtx = WithConsumedApproval(handlerCtx, consumed)
+		}
+		runCtx, cancel := context.WithCancel(handlerCtx)
 		stop := context.AfterFunc(approvedCtx, cancel)
 		defer stop()
 		defer cancel()

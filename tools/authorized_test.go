@@ -23,6 +23,32 @@ func authorizedExecution() runtime.ToolExecution {
 	return runtime.ToolExecution{TaskID: "task", SessionID: "session", TurnID: "turn", AttemptID: "attempt", Call: providers.ToolCall{ID: "call", Name: "lookup", Arguments: json.RawMessage(`{ "q": "value" }`)}}
 }
 
+type approvalContextKey struct{}
+
+func TestApprovedExecutionPassesOnlyConsumedApprovalProvenance(t *testing.T) {
+	registry := &Registry{}
+	if err := registry.Register(Definition{Tool: providers.Tool{Name: "proposal", Description: "proposal", Parameters: json.RawMessage(`{"type":"object"}`)}, Scope: "scope", Behavior: runtime.BehaviorIdempotentWrite,
+		Handler: func(ctx context.Context, _ json.RawMessage) (runtime.ToolResult, error) {
+			approval, ok := ConsumedApprovalFromContext(ctx)
+			if !ok || approval.ID != "approval_1" || ctx.Value(approvalContextKey{}) != nil {
+				t.Fatalf("handler context approval=%+v ok=%v foreign=%v", approval, ok, ctx.Value(approvalContextKey{}))
+			}
+			return runtime.ToolResult{Effect: runtime.ConfirmedEffect}, nil
+		}}); err != nil {
+		t.Fatal(err)
+	}
+	authority := authorityFunc(func(ctx context.Context, _ Authorization, invoke func(context.Context) (runtime.ToolResult, error)) (runtime.ToolResult, error) {
+		ctx = context.WithValue(ctx, approvalContextKey{}, "must not pass")
+		return invoke(WithConsumedApproval(ctx, ConsumedApproval{ID: "approval_1"}))
+	})
+	executor := Executor{Registry: registry, Policy: &Policy{Default: Allow}, Authority: authority}
+	execution := authorizedExecution()
+	execution.Call.Name = "proposal"
+	if _, err := executor.ExecuteScoped(context.Background(), execution); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestApprovalPreservesAmbiguousConsumptionWithoutDispatch(t *testing.T) {
 	calls := 0
 	d := definition(&calls)

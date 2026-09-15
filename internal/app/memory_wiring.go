@@ -60,6 +60,9 @@ func contextTools(cfg config.Settings, extensions ...*tools.Extension) []string 
 		for _, spec := range workboardMutationSpecs() {
 			names = append(names, spec.Name)
 		}
+		for _, spec := range workboardAgentProposalSpecs() {
+			names = append(names, spec.Name)
+		}
 	}
 	if cfg.Tools.CreateEnabled {
 		names = append(names, "create_file")

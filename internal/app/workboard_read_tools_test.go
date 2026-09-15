@@ -181,7 +181,7 @@ func (p workboardCatalogProvider) Stream(_ context.Context, request providers.Re
 	}
 	want := []string{"delegate", "delegate_batch", "workboard_list", "workboard_read"}
 	if p.writes {
-		want = []string{"delegate", "delegate_batch", "workboard_add_dependency", "workboard_archive_board", "workboard_create_board", "workboard_create_card", "workboard_list", "workboard_read", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_cancel", "workboard_request_pause", "workboard_request_resume", "workboard_revise_board", "workboard_transition_card", "workboard_update_card"}
+		want = []string{"delegate", "delegate_batch", "workboard_add_dependency", "workboard_archive_board", "workboard_create_board", "workboard_create_card", "workboard_list", "workboard_propose_criteria", "workboard_read", "workboard_remove_dependency", "workboard_reorder_card", "workboard_request_cancel", "workboard_request_candidate_decision", "workboard_request_pause", "workboard_request_resume", "workboard_revise_board", "workboard_transition_card", "workboard_update_card"}
 	}
 	if !slices.Equal(names, want) {
 		p.t.Errorf("root catalog = %v, want %v", names, want)
@@ -231,6 +231,9 @@ func TestConfiguredWorkboardToolsReachRootRuntimeButNotChild(t *testing.T) {
 	bridge, err := NewWorkboardBridge(store, store, defaultWorkboardNow)
 	if err != nil || registerWorkboardMutationTools(registry, bridge) != nil {
 		t.Fatalf("register workboard mutation tools: %v", err)
+	}
+	if err := registerWorkboardAgentProposalTools(registry, store); err != nil {
+		t.Fatalf("register workboard proposal tools: %v", err)
 	}
 	childContext, err := inheritDelegateTools(context.Background(), registry, applicationToolPolicy())
 	if err != nil {
