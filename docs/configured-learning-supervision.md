@@ -148,6 +148,11 @@ healthy or disabled for daemon readiness. Health is metadata, not proof that a
 particular skill passed. Durable check receipts and activation/rollback history
 provide that evidence. Shutdown cannot undo model inference already submitted.
 
+The separate disabled-by-default outcome rollback supervisor has its own
+configuration, SDK handle, health component, and shutdown join. It does not use
+the validator registry or the durable regression-monitor cursor. See
+[configured outcome supervision](configured-outcome-supervision.md).
+
 ## Remaining qualification
 
 New model-generated drafts retain their verified source domain as a discovery

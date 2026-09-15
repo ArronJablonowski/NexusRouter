@@ -873,10 +873,10 @@ policy and saves a schema-26 activation intent before a later validation tick.
 Receipt reconciliation resumes cursor progression without reactivation after
 rollback. Go hosts can also explicitly start periodic deterministic regression
 monitoring with automatic rollback via `StartSkillRegression`. The configured
-daemon/SDK lifecycle can now select registered trusted validators and jointly
-supervise learning and durable regression checks. The stock binary has no
-qualified domain validator; production validation engines and statistical
-outcome-based regression monitoring remain required.
+daemon/SDK lifecycle can select registered trusted validators and jointly
+supervise learning and durable regression checks. The stock binary ships the
+narrow protected observed-tools provenance validator; broader semantic domain
+validators remain required.
 See [configured supervision](docs/configured-learning-supervision.md) and
 [regression monitoring](docs/skill-regression-monitor.md).
 See [activation operations](docs/skill-activation-operations.md).
@@ -909,25 +909,28 @@ comparison now reads all observations in one SQLite snapshot and reports advisor
 Wilson-interval separation, using independent quality evidence and conservative
 exclusions. Indexed automatic latest-window selection now fixes privacy and
 selects recorded exposures before examining outcomes, with snapshot-wide session
-exclusions. Trusted Go hosts can now explicitly opt into one committed
-outcome-policy adjudication per first candidate activation, with a receipt and
-rollback atomically bound to its validated predecessor. The report remains
-observational, never fabricated deterministic evidence. A durable preselection
-intent now binds the configured model, policy and exact activation before reading
-outcomes. Failed or interrupted attempts remain inspectable and cannot silently
-reselect evidence under the same or a different operation ID. The checkpointed
-host path additionally saves validated selected reports before final commit;
-exact recovery uses the saved report and rechecks its fixed source tasks against
-current journal, feedback and session-correlation evidence, plus current policy
-and activation. Changed evidence invalidates unfinished work without selecting a
-replacement window. This SQLite snapshot check is not atomic with the later
-catalog commit. Saved evidence is not a completion receipt.
-Reactivation attribution, confounder controls, repeated-monitoring policy and
-unattended daemon supervision remain required.
+exclusions. Trusted Go hosts can explicitly opt into one committed outcome-policy
+adjudication per first candidate activation, with a receipt and rollback
+atomically bound to its validated predecessor. The configured daemon and SDK can
+now supervise that path. They inspect the exact catalog-owned candidate and a
+fresh bounded comparison read-only; `waiting` creates no intent. Once both
+cohorts are decision-ready, the prepared path atomically saves the intent and
+exact selected report before final adjudication. Exact recovery uses that fixed
+report and rechecks its source tasks, policy and activation without selecting a
+replacement window. The scan cursor is process-local and resets on restart; no
+durable named monitor or scheduling record is claimed. The daemon starts the
+supervisor before task dispatch, includes it in readiness, and joins it on
+shutdown. Reports remain observational/advisory and never fabricate deterministic
+evidence. Subjective creative/unknown policy requires operator-owned
+`user_feedback`; judge-only evidence is never supervisor authority. SQLite source
+checks are not atomic with catalog replacement. Reactivation attribution,
+causal/confounder controls, repeated-look policy and durable scheduling remain
+open.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).
 See [outcome comparison and limitations](docs/skill-outcome-comparison.md).
 See [automatic window selection](docs/skill-comparison-selection.md).
 See [opt-in outcome-policy rollback](docs/skill-outcome-rollback.md).
+See [configured outcome supervision](docs/configured-outcome-supervision.md).
 
 Before dispatch, a learning selection must bind its grouping-rule identity, destination skill, configured model, policy version and exact source/evaluation digests. Generation verifies those bindings against the same coherent source snapshot used for its prompt. Changed evidence or policy invalidates the selection rather than silently substituting inputs. The durable selection ID is the single-use generation attempt ID; uncertain or failed attempts do not authorize automatic redispatch. Source selection does not establish semantic repetition or substitute for activation validation. Background learning additionally requires durable scan progress, explicit grouping rules and aggregate budget/cooldown controls.
 

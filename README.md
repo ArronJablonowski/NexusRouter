@@ -280,7 +280,40 @@ failed or interrupted attempts against automatic reselection; trusted hosts can
 inspect intents, selected-evidence checkpoints and receipts. Exact retries can
 finish from a saved checkpoint only after its fixed source tasks still match
 current evidence, policy and activation checks. Corrected feedback blocks
-completion without selecting replacement tasks. No daemon loop starts automatically.
+completion without selecting replacement tasks.
+
+The daemon and Go SDK can explicitly start the disabled-by-default configured
+supervisor:
+
+```yaml
+skills:
+  enabled: true
+  root: /absolute/private/catalog
+  scope: project
+  rollback_on_regression: true
+  outcome_rollback: true
+  outcome_rollback_supervisor:
+    version: 1
+    enabled: true
+    interval: 5m
+    model_id: local-worker
+    domain: creative
+    profile: default
+    source: user_feedback
+    privacy: local_only
+    min_samples: 20
+    min_drop: 0.1
+    tasks_per_version: 20
+```
+
+Waiting scans are read-only and create no intent. Once both cohorts are ready,
+the selected evidence and intent are prepared atomically before adjudication.
+The scan cursor is in-memory only, not a durable monitor record. Subjective
+creative/unknown supervision requires operator-owned `user_feedback`; judge-only
+evidence never qualifies and an LLM judge has no supervisor authority. The daemon
+adds the supervisor to readiness and cancels and joins it on shutdown. See
+[configured outcome supervision](docs/configured-outcome-supervision.md) for the
+SDK lifecycle, policy bounds, and observational limitations.
 
 ### Managed local model residency
 

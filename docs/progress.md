@@ -7908,3 +7908,44 @@ outcome comparison and subjective user-feedback weighting remain DAR-119.
 Final verification passed `make check`: source formatting and the 1,000-line
 limit, `go vet ./...`, the complete `go test -race -timeout=35m ./...` suite,
 and `go build ./...` all completed successfully.
+
+## 2026-09-15 — DAR-119 activation-bound outcome supervision
+
+The file catalog now exposes read-only candidate inspection for the exact current
+first activation and its immediate deterministically validated predecessor.
+Application and SDK readiness inspection combines that binding with a fresh,
+bounded outcome selection. A `waiting` result is successful and leaves catalog
+bytes unchanged: it creates no intent, selection checkpoint, receipt, cursor, or
+monitor record.
+
+When both cohorts meet the configured threshold, the prepared rollback path
+validates the fixed report and atomically persists its outcome intent and exact
+selection checkpoint before final adjudication. A post-prepare retry uses that
+saved evidence rather than selecting a newer window. Receipt/no-action or
+receipt/rollback still commits in the final catalog replacement, with the prior
+activation and fixed-source evidence guards intact.
+
+Version-one `skills.outcome_rollback_supervisor` policy is disabled by default
+and binds interval, exact model, domain/profile, evidence source, privacy, sample
+minimum, drop threshold, and tasks per version. Creative and unknown domains
+require operator-owned `user_feedback`; objective domains may also select
+deterministic or tool-result evidence. Judge-only evidence is rejected, and an
+LLM judge never becomes rollback or supervisor authority. All outcome reports
+remain observational/advisory rather than causal or deterministic proof.
+
+The SDK exposes candidate/readiness inspection, one-step driving, an owned
+monitor, and settings-frozen configured startup with a composable disabled
+handle. The daemon prepares policy before listener binding, performs read-only
+catalog/database preflight, starts the supervisor before task dispatch, composes
+its content-free health into readiness, and cancels and joins it during shutdown.
+The supervisor advances one lexical skill per iteration with an in-process cursor
+that resets at the end and on restart. No durable cursor, named monitor record,
+lease, missed-tick replay, or cross-process election is claimed.
+
+Focused coverage exercises catalog eligibility, read-only waiting, deterministic
+operation identity, ready execution from the inspected report, atomic prepare
+and retry, configuration bounds and layering, SDK ownership/disabled lifecycle,
+health composition, panic containment, settings drift, and daemon startup failure
+ordering. Remaining work includes causal/confounder controls, repeated-look
+policy, reactivation attribution, durable scheduling, broader production-domain
+qualification, and safe long-term outcome-record retention.

@@ -1,9 +1,10 @@
 # Opt-in outcome-policy rollback
 
-Trusted Go hosts can apply one outcome-policy decision to an inspected skill
-activation. This is a separate authority from deterministic validation: the
-recorded comparison remains advisory, and the operator explicitly permits a
-rollback based on its observational regression signal.
+Trusted Go hosts and the configured daemon supervisor can apply one
+outcome-policy decision to an inspected skill activation. This is a separate
+authority from deterministic validation: the recorded comparison remains
+observational and advisory, and configuration explicitly permits rollback from
+that signal. An LLM judge is never supervisor authority.
 
 This policy can roll back a good version because workloads, time and task
 difficulty can confound outcomes. It is not causal proof or a statistically
@@ -22,12 +23,32 @@ skills:
   scope: project
   rollback_on_regression: true
   outcome_rollback: true
+  outcome_rollback_supervisor:
+    version: 1
+    enabled: false
+    interval: 5m
+    model_id: local-worker
+    domain: creative
+    profile: default
+    source: user_feedback
+    privacy: local_only
+    min_samples: 20
+    min_drop: 0.1
+    tasks_per_version: 20
 ```
 
 `outcome_rollback` defaults to false. Drafting and new activation can remain
 disabled. The new false value is omitted from JSON policy fingerprints, preserving
 existing default policy bindings; explicit true participates in the fingerprint.
 YAML retains the false field so layered environment/flag overrides can resolve it.
+The supervisor is independently disabled by default. Enabling it also requires
+the catalog root and scope, both rollback switches, and an exact configured
+model. Intervals range from one second to 24 hours; sample and per-version task
+limits range from 20 to 100. Creative and unknown domains require
+`user_feedback`. Coding, debugging, math and structured-JSON domains may use
+`deterministic`, `tool_result` or `user_feedback`. `llm_judge` is rejected for
+every domain. Privacy is fixed to `local_only` or `cloud_allowed` and remains
+subject to the normal model/evidence admission checks.
 
 The versioned SDK exposes:
 
@@ -36,13 +57,22 @@ receipt, err := client.OutcomeRollbackOnce(ctx, operationID, expected, selection
 historical, err := client.OutcomeRollbackOperation(ctx, expected.Key, operationID)
 intent, err := client.OutcomeRollbackIntent(ctx, expected.Key, operationID)
 selected, err := client.OutcomeSelectionCheckpoint(ctx, expected.Key, operationID)
+
+candidate, err := client.OutcomeRollbackCandidate(ctx, expected.Key)
+readiness, err := client.InspectOutcomeRollbackReadiness(ctx, expected.Key)
+next, readiness, err := client.OutcomeSupervisionStep(ctx, after)
+monitor, err := client.StartOutcomeSupervision(ctx)
+configured, err := client.StartConfiguredOutcomeSupervision(ctx)
 ```
 
 `expected` is an inspected `skills.ActivationState`; `selectionRequest` is the
 same `SkillComparisonSelectionRequest` used for read-only window selection.
-Retain the operation ID, expected activation and request before calling. This
-interface is trusted-host-only: there is no new CLI/HTTP mutation endpoint and
-no automatically started daemon loop. Constructing a client starts no work.
+Retain the operation ID, expected activation and request before calling. There
+is no new CLI/HTTP mutation endpoint. Constructing a client starts no work.
+`StartOutcomeSupervision` and `StartConfiguredOutcomeSupervision` return owned
+handles; callers must call `Close()` to cancel and join them. The stock daemon
+starts the configured handle when enabled and joins it during shutdown. See
+[configured outcome supervision](configured-outcome-supervision.md).
 The application builds the report through its actual SQLite selector; callers
 cannot submit an invented report through the SDK.
 
@@ -87,7 +117,8 @@ The write consumes this activation revision's single attempt: another ID or
 changed binding cannot select evidence, even if the original attempt failed.
 Only the call that successfully created the intent proceeds to selection.
 
-Do not call prematurely if the host intends to wait for sufficient samples.
+Do not call the manual `OutcomeRollbackOnce` path prematurely if the host intends
+to wait for sufficient samples.
 Selection failure, cancellation, panic, process death or a later guard denial
 leaves an inspectable intent without a decision receipt. It does not become
 `no_action`, positive validation, or permission to select again. An exact retry
@@ -130,7 +161,17 @@ checkpoint age/expiry policy. Workload drift and repeated monitoring remain open
 An intent with no checkpoint and no receipt remains unresolved and cannot
 reselect. This includes old schema7 attempts and death before checkpoint save.
 Selection and receipt guards may run again during recovery and must be trusted,
-read-only and retry-safe. Recovery is an explicit host retry, not a daemon loop.
+read-only and retry-safe. Recovery for that legacy/manual shape is an explicit
+host retry.
+
+The supervisor avoids that premature-claim shape. Candidate and readiness
+inspection open the catalog and telemetry database read-only. `waiting` is a
+successful observation and creates no intent, selection checkpoint or receipt.
+Once both cohorts satisfy the configured minimum, the supervisor passes the
+already-selected report to `OutcomeRollbackPrepared`. That path validates all
+guards before atomically storing the intent and exact selection checkpoint in
+one catalog replacement, then attempts final adjudication. A crash after prepare
+can resume only from that fixed report; it cannot select newer evidence.
 
 An exact retry returns the saved historical receipt without reading SQLite or
 selecting newer outcomes, even after later activations or loss of the evidence
@@ -140,9 +181,11 @@ available with rollback disabled and scoped skills still configured.
 
 ## Atomicity, evidence and privacy
 
-The intent and optional selection checkpoint are separate earlier catalog
-replacements. The final catalog
-replacement commits the receipt and optional rollback together. The
+The manual checkpointed path may write the intent and selection checkpoint as
+separate earlier catalog replacements. The prepared supervisor path writes both
+records atomically in one replacement after the evidence is decision-ready. In
+both paths, the final catalog replacement commits the receipt and optional
+rollback together. The
 receipt retains operation ID, expected state, selection policy/report, after state,
 decision time and activation-history position. A distinct `outcome_operation_id`
 on the rollback transition links it to that receipt. It cannot also carry
@@ -201,8 +244,10 @@ consistency checks, not cryptographic attestation of an experiment.
 
 Tests cover actual catalog/SQLite feedback-driven rollback, no-action decisions,
 concurrent revision fencing, policy/secret/path changes, receipt corruption,
-independent kill switches, reactivation rejection and deterministic-evidence
-separation. An owned subprocess is killed after commit but before wrapper
+independent kill switches, reactivation rejection, deterministic-evidence
+separation, catalog candidate inspection, read-only waiting, atomic prepared
+evidence, SDK-owned lifecycle, and daemon startup/health/shutdown composition.
+An owned subprocess is killed after commit but before wrapper
 acknowledgement; retry invokes no selector and adds no rollback. This does not
 qualify interruption during rename/fsync, physical power loss, production domain
-validators, or a complete unattended learning lifecycle.
+validators, causal outcome attribution, or durable supervisor scheduling.

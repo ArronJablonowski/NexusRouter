@@ -664,6 +664,31 @@ The scheduling cursor is not proof of rollback; restart reads the current catalo
 Neither API enables learning or new activation. See
 [regression monitoring](../../docs/skill-regression-monitor.md) for full limitations.
 
+For activation-bound outcome supervision, use
+`OutcomeRollbackCandidate(ctx, key)` to inspect the exact current first
+activation and its validated predecessor, then
+`InspectOutcomeRollbackReadiness(ctx, key)` for a fresh bounded evidence
+snapshot. A `waiting` result is successful and read-only: it creates no outcome
+intent, selection checkpoint, receipt, or durable monitor state. The evidence is
+observational and advisory, not causal proof or deterministic validation.
+
+`OutcomeSupervisionStep(ctx, after)` advances one lexical active-skill position.
+It applies `OutcomeRollbackPrepared` only when both cohorts meet the configured
+minimum; the intent and exact selected report are then saved atomically before
+final adjudication. Subjective creative/unknown policy requires
+`user_feedback`. Judge-only evidence is rejected and a judge is never supervisor
+authority.
+
+Call `StartOutcomeSupervision(ctx)` for a directly owned monitor or
+`StartConfiguredOutcomeSupervision(ctx)` for settings-frozen, read-only preflight
+and a composable disabled handle. Both returned handles must be closed to cancel
+and join their goroutine; `Health()` reports the content-free
+`outcome_supervision` component. The monitor runs one immediate step and one per
+configured interval. Its cursor is in memory only and resets at the end of a
+scan; restart begins again. There is no durable cursor/monitor record,
+cross-process election, missed-tick replay, CLI/HTTP mutation endpoint, or
+automatic model judgment. See [configured outcome supervision](../../docs/configured-outcome-supervision.md).
+
 `Client.DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` discovers accepted
 source candidates from durable tasks. It requires enabled skill drafting and a
 configured root/scope, but reads only the existing telemetry database. Limits are
