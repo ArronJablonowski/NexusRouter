@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-webui qualify-release qualify-release-test qualify-license-evidence qualify-codex-repair
+.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-webui qualify-release qualify-release-test qualify-license-evidence qualify-codex-repair qualify-codex-rollover
 
 build:
 	go build -trimpath -buildvcs=false -o bin/darwin ./cmd/darwin
@@ -59,6 +59,11 @@ qualify-webui:
 qualify-codex-repair:
 	DARWIN_CODEX_LIVE_FAILURE_REPAIR=1 go test -race ./internal/codexbridge -run '^TestLiveCodexRecoverableToolProtocol$$' -count=1 -v
 	DARWIN_CODEX_LIVE_REPAIR=1 go test -race ./internal/app -run '^TestLiveCodexDelegationRepair$$' -count=1 -v
+
+# Explicit supervised signed-in Sol qualification of durable context rollover.
+# Uses two native inference calls; never included in check/test or ordinary CI.
+qualify-codex-rollover:
+	DARWIN_CODEX_LIVE_ROLLOVER=1 go test -race ./internal/app -run '^TestLiveCodexApprovedPlanRollover$$' -count=1 -v
 
 # Requires DARWIN_RELEASE_VERSION, DARWIN_RELEASE_COMMIT and a clean committed
 # checkout. Uses only disposable test signing keys.

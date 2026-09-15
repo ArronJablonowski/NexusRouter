@@ -5,7 +5,10 @@ round trip verified on September 5, 2026. Target model remains `gpt-5.6-sol`.
 Use `examples/sol-codex-local-smoke.yaml` with `--model coordinator` for fresh,
 supervised, non-sensitive tasks or [explicit history continuation](codex-history-continuation.md).
 Live continuation from the earlier completed Sol/local-worker task has also
-passed; automatic resume and compaction remain unfinished.
+passed. Automatic native-session resume after a process crash remains
+deliberately fail-closed. Approved, plan-backed compaction can now roll a
+completed native turn into a new checked session; deterministic qualification
+has passed, while the dedicated live rollover check remains opt-in.
 Durable [boundary steering](codex-steering.md) is now supported, with live
 CLI 0.153.4 checks for both a completed native turn and a paused synthetic tool.
 Historical sections below record earlier
@@ -75,9 +78,33 @@ Executing delegation inside a provider callback would skip these boundaries.
 `internal/codexbridge.Pending` binds the proposal to the original model,
 catalog, schema, history and exact assistant/tool pair. It returns a single-use
 response body, not permission to execute a tool. It rejects altered history,
-wrong call IDs, extra steering messages and repeated resolution. Steering and
-compaction need explicit future handling instead of silently changing a paused
-Codex turn. RPC response delivery failure must abort, never rerun the worker.
+wrong call IDs, extra steering messages and repeated resolution. Compaction is
+still forbidden while a native tool RPC is paused. At a completed native turn,
+the adapter may instead perform the checked rollover described below. RPC
+response delivery failure must abort, never rerun the worker.
+
+## Plan-backed context rollover
+
+Codex mid-task compaction is admitted only from a current version-two reviewed
+context-compaction plan. Legacy in-memory approval is not enough. The runtime
+first asks the active session to verify, without mutation, that its exact native
+turn is finished and that the prospective replacement is a valid import ending
+in committed user guidance. Tool-proposal segments cannot cross this boundary.
+
+SQLite then atomically commits `context.compacted`, the exact live-suffix
+evidence, and the plan's activated lifecycle fact. Only after that transaction
+succeeds may the task owner close the old session. A close error is ambiguous
+and poisons the owner; no replacement is launched. The next durable turn lazily
+opens a fresh checked app-server process, imports the compacted prefix plus the
+exact live suffix, verifies the import acknowledgement, and only then sends
+`turn/start`. The first replacement request must retain the prospectively
+checked steering prefix byte-for-byte. Later errors, cancellation, malformed or
+missing acknowledgements, and process failure never reopen or retry a generation.
+
+Historical tool calls/results are typed inert import items. Runtime lineage also
+retains removed tool-call identities, so a replacement model cannot redispatch
+an old call ID. Interrupted tasks remain terminal on recovery rather than
+reconstructing uncertain native work.
 
 `internal/codexrpc` supplies bounded JSON-line framing, strict envelopes,
 opaque request IDs, serialized writes and payload-free local errors. Its
@@ -131,8 +158,8 @@ boundary and prevent a response. This is not a live Codex/local worker test.
   failure, cancellation, iteration limits, rejected tools and normal completion.
 - Qualify the implemented initialize/thread/turn and item correlation against
   the actual CLI, including notification ordering and usage arriving late.
-  Add historical session import, steering and compaction handling without
-  weakening the single-turn prototype's correspondence checks.
+  Keep historical session import, steering, and completed-turn rollover
+  qualification current without weakening paused-tool correspondence checks.
 - Disable ambient shell, filesystem, MCP, apps, plugins, hooks, skills and
   auxiliary agents before launch/turn execution. Verify the actual exposed
   capabilities for the supported CLI version. Empty working directories and

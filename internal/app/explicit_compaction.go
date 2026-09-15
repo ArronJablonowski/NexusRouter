@@ -29,11 +29,14 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 		return r, ErrAdmission
 	}
 	defer db.Close()
+	codexProvider := midTaskCompactionCodexProvider(s.settings, model)
 	var preparedEngine runtime.ContextEngineIdentity
-	if s.contextEngine != nil {
+	if s.contextEngine != nil || codexProvider {
 		// A schema-50 plan may use a custom engine only when its identity is
-		// stable across both complete assemblies. Undescribed legacy engines
-		// remain usable for ordinary, non-planned context assembly.
+		// stable across both complete assemblies. Codex also requires a durable
+		// plan, so its nil engine is pinned to the stable built-in identity.
+		// Undescribed legacy engines remain usable for ordinary, non-planned
+		// context assembly.
 		preparedEngine, _ = contextengine.DescribeEngine(ctx, s.contextEngine)
 	}
 	secrets := memorySecrets(s.settings, s.secret)
@@ -83,7 +86,7 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if !sameMessages(fullTail, compactTail) {
 		return full, nil
 	}
-	if s.contextEngine == nil {
+	if s.contextEngine == nil && !codexProvider {
 		full.approvedCompaction = &runtime.ApprovedCompaction{
 			Compaction:        compact.continuation.Compaction,
 			OriginalPrefix:    inference.Messages,
@@ -95,6 +98,12 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if err != nil {
 		return r, err
 	}
+	if plan == nil {
+		// Codex must never fall back to the legacy in-memory approval. A
+		// missing version-2 durable plan therefore leaves the complete context
+		// unchanged and carries no pending compaction into execution.
+		return full, nil
+	}
 	full.compactionPlan = plan
 	return full, nil
 }
@@ -102,7 +111,16 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 func midTaskCompactionProvider(settings config.Settings, model config.Model) bool {
 	for _, provider := range settings.Providers {
 		if provider.ID == model.Provider {
-			return provider.Kind != "codex_app_server"
+			return true
+		}
+	}
+	return false
+}
+
+func midTaskCompactionCodexProvider(settings config.Settings, model config.Model) bool {
+	for _, provider := range settings.Providers {
+		if provider.ID == model.Provider {
+			return provider.Kind == "codex_app_server"
 		}
 	}
 	return false

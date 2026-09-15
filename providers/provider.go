@@ -60,6 +60,18 @@ type Provider interface {
 	Stream(context.Context, Request, func(Chunk) error) error
 	Models(context.Context) ([]string, error)
 }
+
+// ContextRolloverProvider is an optional lifecycle contract for providers that
+// retain conversation state outside Request. CheckContextRollover must be
+// read-only: current is the exact request completed by the provider and
+// prospectiveReplacement is the request that would be dispatched after
+// compaction, including prospective steering. ActivateContextRollover runs only
+// after the replacement commits durably; activatedBase excludes any
+// prospective steering that has not yet committed.
+type ContextRolloverProvider interface {
+	CheckContextRollover(context.Context, Request, Request) error
+	ActivateContextRollover(context.Context, Request) error
+}
 type Failure struct {
 	Code      string
 	Retryable bool

@@ -7,6 +7,16 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- DAR-124 adds plan-backed context rollover for the stateful Codex app-server
+  coordinator. A read-only native-boundary check must prove the exact prior
+  turn completed before SQLite atomically activates the reviewed compaction
+  plan. The task owner then closes the old generation and lazily launches one
+  replacement whose typed history import and acknowledgement precede its next
+  turn. Paused tool calls, legacy approvals, request mismatch, cancellation,
+  close/launch/import ambiguity, and retries fail closed. Deterministic runtime,
+  bridge, application, and restart evidence is part of the normal suite; live
+  Sol rollover remains separately opt-in and account-consuming.
+
 - DAR-121 introduces the provider-neutral authority contract for extended
   compaction. A validated context-engine identity pins implementation revision;
   a sealed plan binds the approved source checkpoint, review and draft,

@@ -47,7 +47,9 @@ still apply; this is not a universal byte-identical export guarantee. The custom
 Codex continuation path avoids scrubbing an already-scrubbed assembly a second
 time, since literal replacement need not be idempotent. Existing Codex admission
 limits remain: fresh tasks require one user message, and compaction/reviewed-summary
-imports through that backend are not yet enabled or qualified.
+imports are supported. Deferred mid-task replacement requires a durable
+version-two plan plus a completed native turn; paused tool turns remain
+ineligible.
 
 Omitting memory removes its last-use update from that attempt. The engine cannot
 weaken existing local-only privacy restrictions: a task pinned local during
@@ -72,9 +74,11 @@ approved draft bypasses re-planning and validates the frozen checkpoint exactly;
 replacing the engine cannot reinterpret the approved artifact. Changing the
 summary or retention requires a new draft/review. These hooks do not enable
 background inference or automatic summary approval. The stock history-first
-engine may activate an already approved replacement at a later safe turn
-boundary, but a custom engine fails closed because the current contract does
-not expose durable stable-tier proof for prefix replacement.
+engine and a described stable custom engine may activate an already approved
+replacement at a later safe turn boundary. Custom-engine activation requires
+its frozen identity and tier digests to match the durable plan; descriptor drift
+fails closed. Stateful Codex execution additionally requires the provider
+rollover capability and a completed native `stop` boundary before activation.
 
 ## SDK example
 

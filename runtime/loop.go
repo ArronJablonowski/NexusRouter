@@ -88,7 +88,10 @@ type RunRequest struct {
 	RouteEstimatedCost *float64
 	// RequireText applies only to a final answer, never an intermediate tool
 	// proposal. Non-text host workflows may leave this false explicitly.
-	RequireText                   bool
+	RequireText bool
+	// RequireContextRollover requires a stateful provider rollover backed by an
+	// exact durable CompactionPlan. Stateless providers leave this false.
+	RequireContextRollover        bool
 	Domain, Profile               string
 	Capabilities                  []string
 	Route                         *Data
@@ -181,6 +184,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if encodeErr != nil || initialErr != nil || !bytes.Equal(original, initial) {
 			return Result{}, ErrInvalidRun
 		}
+	}
+	rolloverProvider, hasContextRollover := l.Provider.(providers.ContextRolloverProvider)
+	if r.RequireContextRollover && (!hasContextRollover || r.CompactionPlan == nil) {
+		return Result{}, ErrInvalidRun
 	}
 	if r.MaxContextTokens < 0 || (l.ContextEstimator != nil && r.MaxContextTokens == 0) || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) ||
 		(r.ConfigID != "" && !validConfigID(r.ConfigID)) || r.Inference.MaxOutputTokens < 0 || r.Inference.MaxOutputTokens > providers.MaxOutputTokens {
@@ -289,6 +296,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	}
 	result := Result{}
 	compactionActivated := false
+	lastProviderFinishReason := ""
 	appliedSteering := 0
 	// The cancellation gate guarantees no append occurred. Unlike an ambiguous
 	// storage failure, it is safe to append one bounded cancellation terminal.
@@ -392,6 +400,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if pendingCompaction == nil || compactionActivated || result.Turns == 0 || len(base.Messages) < len(pendingCompaction.OriginalPrefix) {
 			return base, prospective, ErrContextOverflow
 		}
+		if hasContextRollover && lastProviderFinishReason != "stop" {
+			return base, prospective, ErrContextOverflow
+		}
 		prefix, encodeErr := json.Marshal(base.Messages[:len(pendingCompaction.OriginalPrefix)])
 		original, originalErr := json.Marshal(pendingCompaction.OriginalPrefix)
 		if encodeErr != nil || originalErr != nil || !bytes.Equal(prefix, original) {
@@ -415,6 +426,37 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if compactEstimate > r.MaxContextTokens || compactEstimate >= estimate {
 			return base, prospective, ErrContextOverflow
 		}
+		invokeRollover := func(activate bool, current, replacement providers.Request) (err error) {
+			defer func() {
+				if recover() != nil {
+					if ctx.Err() != nil {
+						err = ctx.Err()
+					} else {
+						err = errors.Join(ErrProvider, &providers.Failure{Code: "context_rollover_failed"})
+					}
+				}
+			}()
+			if activate {
+				err = rolloverProvider.ActivateContextRollover(ctx, replacement)
+			} else {
+				err = rolloverProvider.CheckContextRollover(ctx, current, replacement)
+			}
+			if err == nil {
+				return nil
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return errors.Join(ErrProvider, &providers.Failure{Code: "context_rollover_failed"})
+		}
+		if hasContextRollover {
+			if rolloverErr := invokeRollover(false, base, compactedProspective); rolloverErr != nil {
+				return base, prospective, rolloverErr
+			}
+			if ctx.Err() != nil {
+				return base, prospective, ctx.Err()
+			}
+		}
 		nextLineage := contextLineage
 		if pendingCompaction.Compaction.Version >= 2 || contextLineage != nil {
 			var lineageErr error
@@ -433,6 +475,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			}
 		}
 		compactionActivated = true
+		if hasContextRollover {
+			if rolloverErr := invokeRollover(true, providers.Request{}, compacted); rolloverErr != nil {
+				return base, prospective, rolloverErr
+			}
+		}
 		if ctx.Err() != nil {
 			return base, prospective, ctx.Err()
 		}
@@ -639,6 +686,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if err := persist(ctx, TurnCompleted, Data{Text: text.String(), ToolCalls: calls, Usage: usage, FinishReason: reason}); err != nil {
 			return terminalizeJournalLimit(err)
 		}
+		lastProviderFinishReason = reason
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
 		}

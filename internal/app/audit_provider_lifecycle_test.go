@@ -148,7 +148,8 @@ func TestCodexOwnedProviderCleanupIdempotent(t *testing.T) {
 		cwd = spec.CWD
 		return fixture, nil
 	})
-	if err != nil || adapter != fixture {
+	owned, ok := adapter.(*ownedCodexProvider)
+	if err != nil || !ok || owned.taskProvider != fixture {
 		t.Fatal("open failed")
 	}
 	closeProvider()

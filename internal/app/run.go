@@ -467,7 +467,12 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		return withMemoryUse(adapter, selectMemoryStore(r.memoryStore, db), r.memoryContext), cleanup, nil
 	})
 	defer deferredProvider.Close()
-	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: deferredProvider, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
+	var executionProvider providers.Provider = deferredProvider
+	requireContextRollover := provider.Kind == "codex_app_server" && r.compactionPlan != nil
+	if requireContextRollover {
+		executionProvider = newContextRolloverTaskProvider(deferredProvider)
+	}
+	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: executionProvider, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
 	inference := providers.Request{Model: model.Model, Messages: messages}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
@@ -501,7 +506,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		compaction = r.continuation.Compaction
 		contextLineage = r.continuation.ContextLineage
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, RequireContextRollover: requireContextRollover, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {

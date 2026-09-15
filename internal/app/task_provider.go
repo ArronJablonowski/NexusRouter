@@ -21,6 +21,52 @@ type taskProvider interface {
 type codexLaunch func(context.Context, codexbridge.LaunchSpec) (taskProvider, error)
 type taskProviderOpen func(context.Context) (providers.Provider, func(), error)
 
+// ownedCodexProvider gives rollover and task-final cleanup the same exactly-once
+// close boundary. An ambiguous close or panic is memoized and never retried,
+// while the private working directory is still removed on every terminal path.
+type ownedCodexProvider struct {
+	taskProvider
+	dir  string
+	once sync.Once
+	err  error
+}
+
+func (p *ownedCodexProvider) Close() error {
+	if p == nil {
+		return ErrAdmission
+	}
+	p.once.Do(func() {
+		p.err = closeCodexTaskProvider(p.taskProvider)
+		_ = os.RemoveAll(p.dir)
+	})
+	return p.err
+}
+
+func closeCodexTaskProvider(provider taskProvider) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrAdmission
+		}
+	}()
+	if provider == nil || (reflect.ValueOf(provider).Kind() == reflect.Pointer && reflect.ValueOf(provider).IsNil()) {
+		return ErrAdmission
+	}
+	return provider.Close()
+}
+
+func (p *ownedCodexProvider) CheckContextRollover(ctx context.Context, current, prospective providers.Request) error {
+	if p == nil {
+		return &providers.Failure{Code: "context_rollover"}
+	}
+	inspector, ok := p.taskProvider.(interface {
+		CheckContextRollover(context.Context, providers.Request, providers.Request) error
+	})
+	if !ok {
+		return &providers.Failure{Code: "context_rollover"}
+	}
+	return inspector.CheckContextRollover(ctx, current, prospective)
+}
+
 // deferredTaskProvider is inert until the runtime starts its first model turn.
 // The runtime therefore remains the sole owner of task.started while selected
 // execution construction and owned subprocess launch happen only after the
@@ -231,17 +277,7 @@ func openOwnedCodexProvider(ctx context.Context, s config.Settings, provider con
 		}
 	}
 	var p taskProvider
-	var once sync.Once
-	closeProvider = func() {
-		once.Do(func() {
-			defer os.RemoveAll(dir) // Only this invocation's private directory.
-			defer func() { _ = recover() }()
-			if p != nil && !(reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
-				_ = p.Close()
-			}
-		})
-	}
-	cleanup := closeProvider
+	cleanup := func() { _ = os.RemoveAll(dir) }
 	defer func() {
 		if recover() != nil {
 			err = ErrAdmission
@@ -252,8 +288,14 @@ func openOwnedCodexProvider(ctx context.Context, s config.Settings, provider con
 		}
 	}()
 	p, err = launch(ctx, codexbridge.LaunchSpec{Executable: provider.Executable, CWD: dir, Model: model.Model, Mode: s.Mode, Privacy: privacy, Env: env})
-	if err != nil || p == nil || (reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
+	if p == nil || (reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
 		return nil, nil, ErrAdmission
 	}
-	return p, closeProvider, nil
+	owned := &ownedCodexProvider{taskProvider: p, dir: dir}
+	cleanup = func() { _ = owned.Close() }
+	if err != nil {
+		return nil, nil, ErrAdmission
+	}
+	closeProvider = func() { _ = owned.Close() }
+	return owned, closeProvider, nil
 }

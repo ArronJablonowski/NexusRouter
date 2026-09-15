@@ -183,8 +183,8 @@ func TestMidTaskCompactionActivationBudgetTerminalizesWithRealStore(t *testing.T
 	}
 }
 
-func TestPendingCompactionSkipsUnsupportedAssemblyProviderAndRedaction(t *testing.T) {
-	for _, mode := range []string{"custom-engine", "codex", "redacted-source"} {
+func TestPendingCompactionSkipsUnsupportedAssemblyAndRedaction(t *testing.T) {
+	for _, mode := range []string{"custom-engine", "redacted-source"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx := context.Background()
 			svc, cfg := autoFixture(t)
@@ -200,8 +200,6 @@ func TestPendingCompactionSkipsUnsupportedAssemblyProviderAndRedaction(t *testin
 			switch mode {
 			case "custom-engine":
 				svc.contextEngine = contextengine.Default{}
-			case "codex":
-				svc.settings.Providers[0].Kind = "codex_app_server"
 			case "redacted-source":
 				svc.secret = func(name string) string {
 					if name == "DARWIN_API_TOKEN" {
@@ -215,6 +213,24 @@ func TestPendingCompactionSkipsUnsupportedAssemblyProviderAndRedaction(t *testin
 				t.Fatal("unsupported pending compaction was prepared", prepared, err)
 			}
 		})
+	}
+}
+
+func TestCodexPendingCompactionRejectsLegacyApprovalWithoutPlan(t *testing.T) {
+	ctx := context.Background()
+	svc, cfg := autoFixture(t)
+	source, err := svc.Run(ctx, Request{ModelID: "a", Prompt: "source " + strings.Repeat("history ", 100)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvedOverflowSummary(t, svc, cfg, source.TaskID)
+	svc.settings.Runtime.AutoApprovedCompaction = true
+	svc.settings.Models[0].ContextTokens = 1 << 20
+	svc.settings.Providers[0].Kind = "codex_app_server"
+
+	prepared, err := svc.prepareExplicitApprovedCompaction(ctx, Request{ModelID: "a", ContinueTaskID: source.TaskID, Prompt: "continue"}, svc.settings.Models[0])
+	if err != nil || prepared.approvedCompaction != nil || prepared.compactionPlan != nil || prepared.SummaryAttemptID != "" || prepared.Compaction != nil {
+		t.Fatal("legacy approval authorized Codex pending compaction", prepared, err)
 	}
 }
 

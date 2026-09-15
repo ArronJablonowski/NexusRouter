@@ -1,5 +1,28 @@
 # Implementation evidence
 
+## 2026-09-15 — DAR-124 Codex app-server rollover checkpoint
+
+Stateful Codex execution now participates in deferred mid-task compaction only
+through a current version-two reviewed, durable plan. The active native session
+performs a read-only completed-turn check before activation; paused tool RPCs,
+legacy approvals, malformed replacement imports, and descriptor drift remain
+ineligible. SQLite still atomically commits the exact plan activation and live
+suffix before the application closes the old owned generation.
+
+The task-scoped provider owner now supervises successive native generations.
+It treats old-session close failure as ambiguous, launches no replacement until
+the next durable turn, binds that first request to the checked compacted prefix
+and steering, and permanently poisons failed or mismatched rollover attempts.
+The replacement app-server session retains the existing checked order of thread
+creation, typed history import, empty acknowledgement, and turn start. Retired
+tool identities remain protected by the schema-51 context lineage.
+
+Focused runtime, bridge, application, race, and SQLite-backed integration tests
+cover activation/close/open ordering, stop-only eligibility, exact request
+binding, historical tool safety, cancellation, panic, process/close/import
+failure, and no duplicate provider work. The opt-in signed-in Sol qualification
+is intentionally separate from normal CI and must not be claimed until run.
+
 ## 2026-09-15 — DAR-110 configurable Workboard decomposition checkpoint
 
 Configuration version 1 now includes a versioned Workboard decomposition policy

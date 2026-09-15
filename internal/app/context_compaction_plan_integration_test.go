@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/contextengine"
+	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -315,5 +316,97 @@ func TestCustomContextEnginePlanRejectsDescriptorDrift(t *testing.T) {
 	state, err := reopened.ContextCompactionPlanForAttempt(ctx, attempt.ID)
 	if err != nil || state.Status != sessions.ContextCompactionStarted || state.Plan != nil {
 		t.Fatal("descriptor drift advanced lifecycle", state, err)
+	}
+}
+
+func prepareCodexPlanEvidence(t *testing.T, engine contextengine.Engine) (*Service, sessions.SummaryAttempt, sessions.SummaryReview) {
+	t.Helper()
+	ctx := context.Background()
+	cfg := codexTaskConfig(t)
+	svc, err := NewService(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if engine != nil {
+		svc.contextEngine, svc.contextEstimator = engine, engine
+	}
+	svc.codexLauncher = func(context.Context, codexbridge.LaunchSpec) (taskProvider, error) {
+		return contextCodexFixture{delegateEstimatorProvider(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			return emit(providers.Chunk{Text: "source answer", Done: true, FinishReason: "stop"})
+		})}, nil
+	}
+	source, err := svc.Run(ctx, Request{ModelID: "brain", Prompt: "codex-plan-source-" + strings.Repeat("history ", 300)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.codexLauncher = func(context.Context, codexbridge.LaunchSpec) (taskProvider, error) {
+		return contextCodexFixture{delegateEstimatorProvider(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			return emit(providers.Chunk{Text: `{"version":1,"summary":{"requirements":["Preserve Codex plan evidence"]}}`, Done: true, FinishReason: "stop"})
+		})}, nil
+	}
+	operation, err := svc.PrepareSummary(ctx, "codex-context-plan-evidence-0001", PrepareSummaryRequest{
+		Version: 1, TaskID: source.TaskID, ModelID: "brain", Keep: 1, MaxCost: 0,
+	})
+	if err != nil || operation.TerminalAttempt == nil || operation.TerminalAttempt.Draft == nil {
+		t.Fatal("Codex summary preparation failed", operation, err)
+	}
+	attempt := *operation.TerminalAttempt
+	registry := summaryValidationRegistry(t, sessions.SummaryValidatorFunc(func(context.Context, sessions.SummaryValidationInput) (sessions.SummaryValidationDecision, error) {
+		return sessions.SummaryValidationDecision{Decision: "approved", Note: "deterministic source checks passed"}, nil
+	}))
+	review, err := svc.ValidateSummary(ctx, attempt.ID, "", "codex-context-plan-validation-0001", "project-tests-v1", registry)
+	if err != nil || review.Version != 2 || review.Decision != "approved" {
+		t.Fatal("Codex trusted validation failed", review, err)
+	}
+	svc.settings.Runtime.AutoApprovedCompaction = true
+	svc.settings.Models[0].ContextTokens = 1 << 20
+	return svc, attempt, review
+}
+
+func TestCodexPendingCompactionRequiresDurablePlan(t *testing.T) {
+	ctx := context.Background()
+	svc, attempt, review := prepareCodexPlanEvidence(t, nil)
+	prepared, err := svc.prepareExplicitApprovedCompaction(ctx, Request{
+		ModelID: "brain", ContinueTaskID: attempt.TaskID, Prompt: "continue with the complete first turn",
+	}, svc.settings.Models[0])
+	if err != nil || prepared.compactionPlan == nil || prepared.approvedCompaction != nil {
+		t.Fatal("Codex did not receive exactly one durable plan", prepared.compactionPlan, prepared.approvedCompaction, err)
+	}
+	plan := prepared.compactionPlan
+	if plan.Compaction == nil || plan.Compaction.SummaryAttemptID != attempt.ID || plan.Compaction.SummaryReviewID != review.ID ||
+		plan.Engine.ID != "darwin.default" || plan.Engine.Revision != "v1" {
+		t.Fatal("Codex plan lost reviewed evidence or built-in engine identity", plan)
+	}
+	read, err := telemetry.OpenReadOnly(ctx, svc.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer read.Close()
+	state, err := read.ContextCompactionPlanForAttempt(ctx, attempt.ID)
+	if err != nil || state.Status != sessions.ContextCompactionApproved || state.Plan == nil || state.Plan.PlanDigest != plan.PlanDigest {
+		t.Fatal("Codex plan was not durably approved", state, err)
+	}
+}
+
+func TestCodexPendingCompactionRejectsDescriptorDrift(t *testing.T) {
+	ctx := context.Background()
+	identity, err := runtime.NewContextEngineIdentity("test.codex-context-engine", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := &describedApplicationContextEngine{
+		applicationContextEngine: applicationContextEngine{Default: contextengine.Default{}},
+		identity:                 identity,
+	}
+	svc, attempt, _ := prepareCodexPlanEvidence(t, engine)
+	engine.identity, err = runtime.NewContextEngineIdentity("test.codex-context-engine", "v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := svc.prepareExplicitApprovedCompaction(ctx, Request{
+		ModelID: "brain", ContinueTaskID: attempt.TaskID, Prompt: "continue after descriptor drift",
+	}, svc.settings.Models[0])
+	if err != ErrAdmission || prepared.compactionPlan != nil || prepared.approvedCompaction != nil {
+		t.Fatal("Codex descriptor drift did not fail closed", prepared.compactionPlan, prepared.approvedCompaction, err)
 	}
 }
