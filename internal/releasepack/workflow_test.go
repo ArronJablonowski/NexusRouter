@@ -86,7 +86,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		{"linux/amd64", "ubuntu-24.04", "linux", "amd64"},
 		{"linux/arm64", "ubuntu-24.04-arm", "linux", "arm64"},
 	}
-	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 180 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
+	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 300 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
 		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 9 {
 		t.Fatal("unexpected job structure")
 	}
@@ -96,10 +96,13 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	}
 	if strings.Count(string(makefile), `go test -race -timeout=35m ./...`) != 2 ||
 		strings.Count(string(makefile), `go test -count=1 -timeout=45m -run '^TestReleaseQualification$$'`) != 1 ||
+		strings.Count(string(makefile), "qualify-release:\n\t$(MAKE) qualify-mvp\n\t$(MAKE) qualify-release-test") != 1 ||
+		strings.Count(string(makefile), "\nqualify-release-test:\n") != 1 ||
 		nativeGateTimeout != 60*time.Minute ||
 		nativeGateTimeout < 35*time.Minute+20*time.Minute ||
-		nativeGateTimeout < 45*time.Minute+10*time.Minute ||
-		time.Duration(job.Timeout)*time.Minute <= 2*nativeGateTimeout+45*time.Minute {
+		nativeGateTimeout < 45*time.Minute+15*time.Minute ||
+		time.Duration(job.Timeout)*time.Minute <= 3*nativeGateTimeout+90*time.Minute ||
+		time.Duration(job.Timeout)*time.Minute-3*nativeGateTimeout != 120*time.Minute {
 		t.Fatal("release timeout hierarchy has insufficient headroom")
 	}
 	for i, expected := range expectedMatrix {
@@ -121,14 +124,14 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		t.Fatal("toolchain/cache contract")
 	}
 	candidate := job.Steps[3]
-	if candidate.ID != "candidate" || candidate.Env["EXPECTED_CANDIDATE_RECORD_SHA256"] != "${{ inputs.candidate_record_sha256 }}" ||
+	if candidate.ID != "candidate" || candidate.Env["EXPECTED_CANDIDATE_RECORD_SHA256"] != "${{ steps.source.outputs.candidate_record_sha256 }}" ||
 		!strings.Contains(candidate.Run, `release-candidate freeze`) ||
 		!strings.Contains(candidate.Run, `test "$actual" = "$EXPECTED_CANDIDATE_RECORD_SHA256"`) ||
 		!strings.Contains(candidate.Run, `release-candidate verify`) {
 		t.Fatal("candidate record is not independently bound and re-derived")
 	}
 	evidence := job.Steps[4]
-	if evidence.ID != "license_evidence" || evidence.Env["EXPECTED_LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" ||
+	if evidence.ID != "license_evidence" || evidence.Env["EXPECTED_LICENSE_EVIDENCE_SHA256"] != "${{ steps.source.outputs.license_evidence_sha256 }}" ||
 		evidence.Env["DARWIN_LICENSE_BOOTSTRAP_PARENT"] != "${{ runner.temp }}" ||
 		!strings.Contains(evidence.Run, `scripts/license-evidence-bootstrap.sh freeze --commit "$GITHUB_SHA"`) ||
 		strings.Contains(evidence.Run, `go run ./cmd/license-evidence`) ||
@@ -158,9 +161,16 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		t.Fatal("canonical native qualification is not retained and bounded")
 	}
 	if job.Steps[2].Env["RELEASE_VERSION"] != "${{ inputs.version }}" ||
+		job.Steps[2].Env["EXPECTED_CANDIDATE_RECORD_SHA256"] != "${{ inputs.candidate_record_sha256 }}" ||
+		job.Steps[2].Env["EXPECTED_LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" ||
 		job.Steps[2].Env["EXPECTED_NATIVE_OS"] != "${{ matrix.expected_os }}" ||
 		job.Steps[2].Env["EXPECTED_NATIVE_ARCH"] != "${{ matrix.expected_arch }}" ||
 		!strings.Contains(job.Steps[2].Run, "version_pattern") || !strings.Contains(job.Steps[2].Run, "version=$RELEASE_VERSION") ||
+		!strings.Contains(job.Steps[2].Run, `digest_pattern='^sha256:[0-9a-f]{64}$'`) ||
+		!strings.Contains(job.Steps[2].Run, `[[ "$EXPECTED_CANDIDATE_RECORD_SHA256" =~ $digest_pattern ]]`) ||
+		!strings.Contains(job.Steps[2].Run, `[[ "$EXPECTED_LICENSE_EVIDENCE_SHA256" =~ $digest_pattern ]]`) ||
+		!strings.Contains(job.Steps[2].Run, `candidate_record_sha256=$EXPECTED_CANDIDATE_RECORD_SHA256`) ||
+		!strings.Contains(job.Steps[2].Run, `license_evidence_sha256=$EXPECTED_LICENSE_EVIDENCE_SHA256`) ||
 		!strings.Contains(job.Steps[2].Run, `test "$(go env GOOS)" = "$EXPECTED_NATIVE_OS"`) ||
 		!strings.Contains(job.Steps[2].Run, `test "$(go env GOARCH)" = "$EXPECTED_NATIVE_ARCH"`) ||
 		!strings.Contains(job.Steps[2].Run, `test "$(go env GOHOSTOS)" = "$EXPECTED_NATIVE_OS"`) ||
@@ -191,8 +201,15 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		}
 	}
 	report := job.Steps[8]
-	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["NATIVE_EVIDENCE_OUTCOME"] != "${{ steps.native_evidence.outcome }}" || report.Env["CANDIDATE_RECORD_SHA256"] != "${{ inputs.candidate_record_sha256 }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ inputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || report.Env["INSTALL_RECORD_SHA256"] != "${{ steps.native_evidence.outputs.install_record_sha256 }}" || report.Env["INSTALL_VERIFICATION_SHA256"] != "${{ steps.native_evidence.outputs.install_verification_sha256 }}" || report.Env["NATIVE_VERIFICATION_SHA256"] != "${{ steps.native_evidence.outputs.native_verification_sha256 }}" || !strings.Contains(report.Run, "Expected reviewed candidate-record digest") || !strings.Contains(report.Run, "Install rehearsal record SHA-256") || !strings.Contains(report.Run, "Native/install combined verification SHA-256") {
+	if report.If != "${{ always() }}" || !strings.Contains(report.Run, "GITHUB_STEP_SUMMARY") || report.Env["NATIVE_EVIDENCE_OUTCOME"] != "${{ steps.native_evidence.outcome }}" || report.Env["CANDIDATE_RECORD_SHA256"] != "${{ steps.source.outputs.candidate_record_sha256 }}" || report.Env["LICENSE_EVIDENCE_OUTCOME"] != "${{ steps.license_evidence.outcome }}" || report.Env["LICENSE_EVIDENCE_SHA256"] != "${{ steps.source.outputs.license_evidence_sha256 }}" || report.Env["RELEASE_VERSION"] != "${{ steps.source.outputs.version }}" || report.Env["INSTALL_RECORD_SHA256"] != "${{ steps.native_evidence.outputs.install_record_sha256 }}" || report.Env["INSTALL_VERIFICATION_SHA256"] != "${{ steps.native_evidence.outputs.install_verification_sha256 }}" || report.Env["NATIVE_VERIFICATION_SHA256"] != "${{ steps.native_evidence.outputs.native_verification_sha256 }}" || !strings.Contains(report.Run, "Expected reviewed candidate-record digest") || !strings.Contains(report.Run, "Install rehearsal record SHA-256") || !strings.Contains(report.Run, "Native/install combined verification SHA-256") {
 		t.Fatal("missing failure-aware evidence")
+	}
+	for _, step := range job.Steps[3:] {
+		for _, value := range step.Env {
+			if strings.Contains(value, "inputs.candidate_record_sha256") || strings.Contains(value, "inputs.license_evidence_sha256") {
+				t.Fatal("unvalidated digest input reaches a post-validation step", step.Name)
+			}
+		}
 	}
 	for _, evidence := range []string{
 		"four target-specific dependency closures and notice digests",

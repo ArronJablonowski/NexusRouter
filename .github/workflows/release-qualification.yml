@@ -24,7 +24,7 @@ permissions:
 jobs:
   qualify:
     name: Qualify ${{ matrix.target }}
-    timeout-minutes: 180
+    timeout-minutes: 300
     env:
       # Use only the setup-go toolchain and repository module/workspace state.
       CGO_ENABLED: "0"
@@ -73,12 +73,17 @@ jobs:
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          EXPECTED_CANDIDATE_RECORD_SHA256: ${{ inputs.candidate_record_sha256 }}
+          EXPECTED_LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
           EXPECTED_NATIVE_OS: ${{ matrix.expected_os }}
           EXPECTED_NATIVE_ARCH: ${{ matrix.expected_arch }}
         run: |
           set -euo pipefail
           version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          digest_pattern='^sha256:[0-9a-f]{64}$'
           [[ ${#RELEASE_VERSION} -le 100 && "$RELEASE_VERSION" =~ $version_pattern ]]
+          [[ "$EXPECTED_CANDIDATE_RECORD_SHA256" =~ $digest_pattern ]]
+          [[ "$EXPECTED_LICENSE_EVIDENCE_SHA256" =~ $digest_pattern ]]
           if [[ "$RELEASE_VERSION" == *-* ]]; then
             prerelease=${RELEASE_VERSION#*-}
             IFS=. read -ra identifiers <<< "$prerelease"
@@ -97,6 +102,8 @@ jobs:
           test "$(go env GOHOSTARCH)" = "$EXPECTED_NATIVE_ARCH"
           {
             echo "version=$RELEASE_VERSION"
+            echo "candidate_record_sha256=$EXPECTED_CANDIDATE_RECORD_SHA256"
+            echo "license_evidence_sha256=$EXPECTED_LICENSE_EVIDENCE_SHA256"
             echo "commit=$commit"
             echo "os=$(go env GOHOSTOS)"
             echo "arch=$(go env GOHOSTARCH)"
@@ -107,7 +114,7 @@ jobs:
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-          EXPECTED_CANDIDATE_RECORD_SHA256: ${{ inputs.candidate_record_sha256 }}
+          EXPECTED_CANDIDATE_RECORD_SHA256: ${{ steps.source.outputs.candidate_record_sha256 }}
         run: |
           set -euo pipefail
           candidate="$RUNNER_TEMP/darwinrouter-candidate.json"
@@ -121,7 +128,7 @@ jobs:
         id: license_evidence
         shell: bash
         env:
-          EXPECTED_LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
+          EXPECTED_LICENSE_EVIDENCE_SHA256: ${{ steps.source.outputs.license_evidence_sha256 }}
           DARWIN_LICENSE_BOOTSTRAP_PARENT: ${{ runner.temp }}
         run: |
           set -euo pipefail
@@ -236,8 +243,8 @@ jobs:
           NATIVE_OS: ${{ steps.source.outputs.os }}
           NATIVE_ARCH: ${{ steps.source.outputs.arch }}
           GO_VERSION: ${{ steps.source.outputs.go }}
-          CANDIDATE_RECORD_SHA256: ${{ inputs.candidate_record_sha256 }}
-          LICENSE_EVIDENCE_SHA256: ${{ inputs.license_evidence_sha256 }}
+          CANDIDATE_RECORD_SHA256: ${{ steps.source.outputs.candidate_record_sha256 }}
+          LICENSE_EVIDENCE_SHA256: ${{ steps.source.outputs.license_evidence_sha256 }}
           SOURCE_OUTCOME: ${{ steps.source.outcome }}
           CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
           LICENSE_EVIDENCE_OUTCOME: ${{ steps.license_evidence.outcome }}

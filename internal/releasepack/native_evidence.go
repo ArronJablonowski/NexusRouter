@@ -130,6 +130,9 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 	if ctx == nil || validate(o) != nil || o.Source == "" || log == nil {
 		return ErrInvalid
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	transcript := &strictNativeLog{destination: log}
 	source, err := filepath.Abs(o.Source)
 	if err != nil {
@@ -160,10 +163,19 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 	}
 	env := environment()
 	top, err := command(ctx, source, env, "git", "rev-parse", "--show-toplevel")
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
 	if err != nil || top != source || verifyCandidateCheckout(ctx, source, o.Commit, env) != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
 		return ErrInvalid
 	}
 	hostJSON, err := command(ctx, source, env, "go", "env", "-json", "GOOS", "GOARCH", "GOHOSTOS", "GOHOSTARCH", "GOVERSION")
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
 	if err != nil {
 		return err
 	}
@@ -178,16 +190,34 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 		return err
 	}
 	if err = verifyCandidateCheckout(ctx, source, o.Commit, env); err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
 		return err
 	}
 	qualificationEnv := append(append([]string(nil), env...), "DARWIN_RELEASE_VERSION="+o.Version, "DARWIN_RELEASE_COMMIT="+o.Commit)
 	if installOut != "" {
 		qualificationEnv = append(qualificationEnv, "DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT="+installOut)
 	}
-	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-release", transcript); err != nil {
+	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-mvp", transcript); err != nil {
 		return err
 	}
 	if err = verifyCandidateCheckout(ctx, source, o.Commit, env); err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
+		return err
+	}
+	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-release-test", transcript); err != nil {
+		return err
+	}
+	if err = verifyCandidateCheckout(ctx, source, o.Commit, env); err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
+		return err
+	}
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 	record := NativeEvidence{
@@ -227,10 +257,21 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 	if validateNativeEvidence(body) != nil {
 		return ErrInvalid
 	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
 	f, err := outputRoot.OpenFile(outputName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = f.Close()
+			_ = outputRoot.Remove(outputName)
+			_ = syncNativeEvidenceRoot(outputRoot)
+		}
+	}()
 	_, writeErr := f.Write(body)
 	syncErr := f.Sync()
 	closeErr := f.Close()
@@ -240,7 +281,25 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 	if syncErr != nil {
 		return syncErr
 	}
-	return closeErr
+	if closeErr != nil {
+		return closeErr
+	}
+	if err = syncNativeEvidenceRoot(outputRoot); err != nil {
+		return err
+	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func syncNativeEvidenceRoot(root *os.Root) error {
+	directory, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
 
 // VerifyNativeEvidence validates exact canonical bytes. The unsigned record is
@@ -398,6 +457,8 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	gateCtx, cancel := context.WithTimeout(ctx, nativeGateTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(gateCtx, "make", target)
+	configureNativeProcessTree(cmd)
+	cmd.Cancel = func() error { return terminateNativeProcessTree(cmd) }
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = source
 	cmd.Env = env
@@ -407,9 +468,18 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	output := &boundedNativeGateLog{destination: log}
 	cmd.Stdout, cmd.Stderr = output, output
 	if err := cmd.Run(); err != nil || output.overflow {
+		if contextErr := gateCtx.Err(); contextErr != nil {
+			return contextErr
+		}
 		return fmt.Errorf("native release gate failed: %s", target)
 	}
+	if err := gateCtx.Err(); err != nil {
+		return err
+	}
 	if _, err := fmt.Fprintf(log, "\n== make %s passed ==\n", target); err != nil {
+		return err
+	}
+	if err := gateCtx.Err(); err != nil {
 		return err
 	}
 	return nil

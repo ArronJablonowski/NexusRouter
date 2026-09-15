@@ -1,5 +1,53 @@
 # Implementation evidence
 
+## 2026-09-14 — Native qualification preflight and process-tree correction
+
+A fresh RC18 preflight froze and verified a schema-3 candidate, rendered final
+release notes, and independently reconstructed schema-3 license evidence for
+clean pushed commit `9aa4c9b2d82fe689ce2e77b69ef5d628123ca7e5`.
+Before the native wrapper was launched, an independent review found that its
+60-minute `make qualify-release` gate still combined the entire deterministic
+MVP suite with the separately bounded 45-minute release test. It also found
+that context cancellation killed only the direct `make` process, so descendant
+test or build processes could survive a failed campaign. The preliminary RC18
+records were moved intact to private quarantine and receive no qualification
+credit. Their candidate, rendered-notes, and license-evidence SHA-256 values
+are respectively
+`55e3a165a4322bb7d524d2d115b4ee16cfb2016c428993de7ecd873066035a50`,
+`3ff007bfe027b232cf5b3a631d442071da996f2ea421951c498bf4e832d19a7b`,
+and `37015f82a7c4ad1e874ff008d222c4b1d8e1c0cd93d045d8199b691f6fd74ea5`.
+None may be reused by a later candidate.
+
+The native wrapper now runs `make check`, `make qualify-mvp`, and the private
+`make qualify-release-test` target as three separately bounded commands, with a
+clean exact-commit check between every phase. The public `make
+qualify-release` target invokes the latter two sequentially even if the outer
+make enables parallel execution. On Darwin and Linux, every native command
+runs in its own process group; cancellation or deadline expiry terminates the
+complete group and reaps the command leader while preserving
+`context.Canceled` or `context.DeadlineExceeded`. Adversarial tests prove that a
+known-live descendant does not survive cancellation or timeout.
+
+Primary native evidence now checks cancellation before committing, syncs both
+the file and its parent directory, and removes and re-syncs an unacknowledged
+record after late cancellation or a commit failure. The hosted workflow has a
+five-hour ceiling: three independent 60-minute native command budgets plus 120
+minutes for checkout/toolchain setup, candidate work, two fresh license
+reconstructions, verification, upload, and reporting. Dispatch digests must be
+exact lowercase `sha256:` values before they can reach later steps or the
+always-run Markdown summary, preventing unvalidated multiline summary content.
+
+Focused race-enabled native cancellation, failure-boundary, late-cancellation,
+and workflow-authority tests pass. Affected-package vet and Darwin/Linux/Windows
+package builds pass; the repository's existing Windows test-only use of
+`syscall.Umask` prevents cross-compiling the whole releasepack test binary and
+is outside the supported Darwin/Linux native-release matrix. The complete
+`umask 077; make check` repository gate also passed: its slowest race-enabled
+packages were releasepack in 1,536.026 seconds, telemetry in 1,483.121 seconds,
+and app in 1,391.832 seconds. A future native attempt must use a fresh candidate
+directory and the exact corrective pushed commit; this work grants no legal,
+platform, signing, tag, upload, publication, or native qualification approval.
+
 ## 2026-09-14 — DAR-114 qualification timeout and cancellation correction
 
 RC17 failed closed during its Darwin/arm64 `make check` gate before native or

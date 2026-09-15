@@ -28,9 +28,24 @@ The wrapper does not accept a target or gate result from the operator. It reads
 `GOOS`, `GOARCH`, `GOHOSTOS`, `GOHOSTARCH`, and `GOVERSION` from the fixed local
 Go environment and requires execution target and Go host to agree on one of the
 four packaged target pairs. It checks clean commit binding, runs `make check`,
-checks the source again, runs the version- and commit-bound
-`make qualify-release`, and performs a final clean-source check before
-exclusively creating the record.
+checks the source again, runs `make qualify-mvp`, checks the source again, runs
+the version- and commit-bound `make qualify-release-test`, and performs a final
+clean-source check before exclusively creating the record.
+
+The wrapper runs `check`, `qualify-mvp`, and the private
+`qualify-release-test` target as three separately bounded native commands. The
+public `make qualify-release` target preserves the same operator-facing order
+with explicit sequential recursive invocations of `qualify-mvp` and then
+`qualify-release-test`, including when the outer make enables parallel work;
+splitting the
+wrapper invocations prevents the MVP phase from consuming the release test's
+45-minute ceiling.
+
+The hosted matrix gives those three native commands 60 minutes each and keeps
+a separate 120-minute allowance for checkout and toolchain setup, candidate
+derivation, two fresh license-evidence reconstructions, verification, artifact
+upload, and failure-aware reporting. That five-hour job limit is an execution
+ceiling, not evidence that a timed-out or skipped gate passed.
 
 Standard output is the complete gate transcript and standard error contains
 only command diagnostics. Redirect stdout to the explicit operator-controlled

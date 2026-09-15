@@ -28,8 +28,11 @@ telemetry, then removes the workspace. Freeze and verification each perform
 dependency reconstruction in a separate fresh cache, so the job cannot succeed
 from a populated setup-go or runner cache. Each job also records the requested version, verified commit,
 actual Go host OS/architecture, Go version and other gate outcomes in its job
-summary. The native wrapper itself runs `make check`, rechecks the source, runs
-`make qualify-release`, and checks the source again before creating its record.
+summary. The native wrapper itself runs `make check`, `make qualify-mvp`, and
+`make qualify-release-test` as independently bounded commands. It rechecks the
+source after every command before creating its record; the public
+`make qualify-release` target preserves the same sequential MVP-then-release
+ordering for operators.
 The four-job matrix uses explicit standard hosted-runner labels:
 `macos-15-intel` for Darwin/amd64, `macos-15` for Darwin/arm64,
 `ubuntu-24.04` for Linux/amd64 and `ubuntu-24.04-arm` for Linux/arm64. Each job

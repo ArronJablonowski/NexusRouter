@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,6 +14,19 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
+
+type cancelOnNativeQualification struct {
+	destination io.Writer
+	cancel      context.CancelFunc
+}
+
+func (w cancelOnNativeQualification) Write(body []byte) (int, error) {
+	n, err := w.destination.Write(body)
+	if bytes.Contains(body, []byte("== make qualify-release-test passed ==")) {
+		w.cancel()
+	}
+	return n, err
+}
 
 func nativeEvidenceFixture() NativeEvidence {
 	return NativeEvidence{
@@ -182,7 +196,7 @@ func TestQualifyNativeReleaseRunsBoundGatesBeforeWritingEvidence(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "make.log")
 	installFixture := filepath.Join(t.TempDir(), "install-fixture.json")
 	writeNativeInstallFixture(t, installFixture, "1.0.0-rc.3", commit, runtime.GOOS, runtime.GOARCH, nil)
-	script := "#!/bin/sh\nprintf '%s|%s|%s|%s\\n' \"$*\" \"${DARWIN_RELEASE_VERSION-}\" \"${DARWIN_RELEASE_COMMIT-}\" \"${DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT-}\" >> \"" + logPath + "\"\nif [ \"$1\" = qualify-release ]; then cp \"" + installFixture + "\" \"$DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT\"; fi\n"
+	script := "#!/bin/sh\nprintf '%s|%s|%s|%s\\n' \"$*\" \"${DARWIN_RELEASE_VERSION-}\" \"${DARWIN_RELEASE_COMMIT-}\" \"${DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT-}\" >> \"" + logPath + "\"\nif [ \"$1\" = qualify-release-test ]; then cp \"" + installFixture + "\" \"$DARWIN_INSTALL_REHEARSAL_EVIDENCE_OUT\"; fi\n"
 	if err = os.WriteFile(filepath.Join(bin, "make"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -197,11 +211,11 @@ func TestQualifyNativeReleaseRunsBoundGatesBeforeWritingEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "check|||\nqualify-release|1.0.0-rc.3|" + commit + "|" + installOut + "\n"
+	want := "check|||\nqualify-mvp|1.0.0-rc.3|" + commit + "|" + installOut + "\nqualify-release-test|1.0.0-rc.3|" + commit + "|" + installOut + "\n"
 	if string(logBody) != want {
 		t.Fatalf("gate invocation mismatch: %q", logBody)
 	}
-	for _, marker := range []string{"darwin-native-evidence version=1.0.0-rc.3 commit=" + commit, "== make check ==", "== make check passed ==", "== make qualify-release ==", "== make qualify-release passed =="} {
+	for _, marker := range []string{"darwin-native-evidence version=1.0.0-rc.3 commit=" + commit, "== make check ==", "== make check passed ==", "== make qualify-mvp ==", "== make qualify-mvp passed ==", "== make qualify-release-test ==", "== make qualify-release-test passed =="} {
 		if !bytes.Contains(transcript.Bytes(), []byte(marker)) {
 			t.Fatal("complete transcript missing marker", marker)
 		}
@@ -264,7 +278,7 @@ func TestQualifyNativeReleaseRequiresBoundInstallEvidenceBeforePrimary(t *testin
 			out, installOut := filepath.Join(t.TempDir(), "native.json"), filepath.Join(t.TempDir(), "install.json")
 			bin := t.TempDir()
 			operation := setup(t, commit, runtime.GOOS, runtime.GOARCH, installOut)
-			script := "#!/bin/sh\nif [ \"$1\" = qualify-release ]; then " + operation + "; fi\n"
+			script := "#!/bin/sh\nif [ \"$1\" = qualify-release-test ]; then " + operation + "; fi\n"
 			if err := os.WriteFile(filepath.Join(bin, "make"), []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
@@ -357,9 +371,11 @@ func TestQualifyNativeReleasePreflightsBothEvidenceDestinations(t *testing.T) {
 func TestQualifyNativeReleaseFailureBoundariesLeaveNoEvidence(t *testing.T) {
 	for name, body := range map[string]string{
 		"failed_check":           `if [ "$1" = check ]; then exit 7; fi`,
-		"failed_qualification":   `if [ "$1" = qualify-release ]; then exit 7; fi`,
+		"failed_mvp":             `if [ "$1" = qualify-mvp ]; then exit 7; fi`,
+		"failed_release_test":    `if [ "$1" = qualify-release-test ]; then exit 7; fi`,
 		"mutation_after_check":   `if [ "$1" = check ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
-		"mutation_after_qualify": `if [ "$1" = qualify-release ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"mutation_after_mvp":     `if [ "$1" = qualify-mvp ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"mutation_after_qualify": `if [ "$1" = qualify-release-test ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			source, commit := nativeEvidenceGitFixture(t)
@@ -379,6 +395,25 @@ func TestQualifyNativeReleaseFailureBoundariesLeaveNoEvidence(t *testing.T) {
 				t.Fatal("failure left evidence file", statErr)
 			}
 		})
+	}
+}
+
+func TestQualifyNativeReleaseLateCancellationLeavesNoEvidence(t *testing.T) {
+	source, commit := nativeEvidenceGitFixture(t)
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "make"), []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out := filepath.Join(t.TempDir(), "native.json")
+	ctx, cancel := context.WithCancel(context.Background())
+	log := cancelOnNativeQualification{destination: io.Discard, cancel: cancel}
+	err := QualifyNativeRelease(ctx, Options{Version: "1.0.0", Commit: commit, Source: source, Out: out}, log)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("late cancellation returned %v", err)
+	}
+	if _, statErr := os.Lstat(out); !os.IsNotExist(statErr) {
+		t.Fatal("late cancellation wrote primary evidence", statErr)
 	}
 }
 
