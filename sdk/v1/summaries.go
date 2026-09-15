@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -16,6 +17,8 @@ type SummaryValidator = sessions.SummaryValidator
 type SummaryValidatorFunc = sessions.SummaryValidatorFunc
 type SummaryValidatorRegistry = sessions.SummaryValidatorRegistry
 type SummaryIntegrityValidator = sessions.SummaryIntegrityValidator
+type PrepareSummaryRequest = app.PrepareSummaryRequest
+type SummaryPreparation = sessions.ContextCompactionOperationState
 
 const SummaryIntegrityValidatorID = sessions.SummaryIntegrityValidatorID
 
@@ -46,6 +49,35 @@ func (c *Client) SummarizeTask(ctx context.Context, task, modelID string, keep i
 		return SummaryAttempt{}, err
 	}
 	return c.service.SummarizeTask(ctx, task, modelID, keep, maxCost)
+}
+
+// PrepareSummary starts or resumes one caller-keyed durable preparation. Exact
+// retries return the committed terminal attempt without redispatching a model.
+func (c *Client) PrepareSummary(ctx context.Context, idempotencyKey string, request PrepareSummaryRequest) (SummaryPreparation, error) {
+	if !c.valid(ctx) {
+		return SummaryPreparation{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return SummaryPreparation{}, err
+	}
+	return c.service.PrepareSummary(ctx, idempotencyKey, request)
+}
+
+// InspectSummaryPreparation reads one operation without creating storage or
+// dispatching inference.
+func (c *Client) InspectSummaryPreparation(ctx context.Context, operationID string) (SummaryPreparation, error) {
+	if !c.valid(ctx) {
+		return SummaryPreparation{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return SummaryPreparation{}, err
+	}
+	store, err := telemetry.OpenReadOnly(ctx, c.database)
+	if err != nil {
+		return SummaryPreparation{}, err
+	}
+	defer store.Close()
+	return store.ContextCompactionPlan(ctx, operationID)
 }
 
 // ValidateSummary runs one trusted deterministic validator against an existing

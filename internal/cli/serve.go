@@ -332,6 +332,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		Steering:             service.SteeringStatus,
 		SteeringList:         service.ListSteering,
 		Summarize:            service.SummarizeTask,
+		PrepareSummary:       service.PrepareSummary,
+		SummaryPreparation:   db.ContextCompactionPlan,
 		SummaryAttempt:       db.SummaryAttempt,
 		SummaryAttempts:      db.ListSummaryAttempts,
 		ReviewSummary:        service.ReviewSummary,

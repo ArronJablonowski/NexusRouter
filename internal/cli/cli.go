@@ -72,7 +72,7 @@ Usage:
   darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
   darwin audits list|show|attempts --db path [--task id] [--id audit-id]
   darwin audit --config path --task id --reviewer model-id [--max-cost amount]
-  darwin summary --config path --task id --model id --keep n [--max-cost amount]
+  darwin summary --config path --task id --model id --keep n [--max-cost amount] [--idempotency-key key]
     Generate a stored summary draft; does not activate compaction
   darwin summaries list|show|recoveries --db path [--task id --after id --limit n] [--id id]
   darwin summary-review --config path --attempt id [--expected review-id] --decision approved|rejected --note text

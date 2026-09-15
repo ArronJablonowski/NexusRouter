@@ -83,6 +83,8 @@ type Services struct {
 	RunStream               func(context.Context, app.Request, func(runtime.Event) error) (app.Result, error)
 	RunTextStream           func(context.Context, app.Request, func(string) error) (app.Result, error)
 	Summarize               func(context.Context, string, string, int, float64) (sessions.SummaryAttempt, error)
+	PrepareSummary          func(context.Context, string, app.PrepareSummaryRequest) (sessions.ContextCompactionOperationState, error)
+	SummaryPreparation      func(context.Context, string) (sessions.ContextCompactionOperationState, error)
 	SummaryAttempt          func(context.Context, string) (sessions.SummaryAttempt, error)
 	SummaryAttempts         func(context.Context, string, string, int) ([]sessions.SummaryAttempt, error)
 	ReviewSummary           func(context.Context, string, string, string, string) (sessions.SummaryReview, error)
@@ -247,6 +249,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveTaskLeases(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/tasks/stream" && r.Method == http.MethodPost:
 		h.serveTaskStream(w, r.WithContext(ctx))
+	case r.URL.Path == "/v1/summary-preparations" || strings.HasPrefix(r.URL.Path, "/v1/summary-preparations/"):
+		h.serveSummaryPreparations(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/summaries" || strings.HasPrefix(r.URL.Path, "/v1/summaries/"):
 		h.serveSummaries(w, r.WithContext(ctx))
 	case r.URL.Path == "/v1/feedback/revisions" && r.Method == http.MethodPost:

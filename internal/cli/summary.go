@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,13 +20,19 @@ import (
 )
 
 type summaryArgs struct {
-	config, task, model string
-	keep                int
-	maxCost             float64
+	config, task, model, idempotencyKey string
+	keep                                int
+	maxCost                             float64
 }
 
 func parseSummaryArgs(args []string) (summaryArgs, error) {
 	var out summaryArgs
+	keyFlags := 0
+	for _, arg := range args {
+		if arg == "--idempotency-key" || strings.HasPrefix(arg, "--idempotency-key=") {
+			keyFlags++
+		}
+	}
 	fs := flag.NewFlagSet("summary", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.StringVar(&out.config, "config", "", "configuration")
@@ -33,7 +40,11 @@ func parseSummaryArgs(args []string) (summaryArgs, error) {
 	fs.StringVar(&out.model, "model", "", "configured summary model")
 	fs.IntVar(&out.keep, "keep", 0, "recent messages to retain")
 	fs.Float64Var(&out.maxCost, "max-cost", 0, "estimated summary cost ceiling")
-	if fs.Parse(args) != nil || fs.NArg() != 0 || out.config == "" || out.task == "" || out.model == "" || out.keep < 1 || out.keep > 100000 || out.maxCost < 0 || math.IsNaN(out.maxCost) || math.IsInf(out.maxCost, 0) {
+	fs.StringVar(&out.idempotencyKey, "idempotency-key", "", "durable preparation idempotency key")
+	if fs.Parse(args) != nil || fs.NArg() != 0 || keyFlags > 1 || out.config == "" || out.task == "" || out.model == "" || out.keep < 1 || out.keep > 100000 || out.maxCost < 0 || math.IsNaN(out.maxCost) || math.IsInf(out.maxCost, 0) {
+		return out, errors.New("invalid summary arguments")
+	}
+	if out.idempotencyKey != "" && (len(out.idempotencyKey) < 16 || len(out.idempotencyKey) > 128 || strings.ContainsFunc(out.idempotencyKey, func(r rune) bool { return r < 33 || r > 126 })) {
 		return out, errors.New("invalid summary arguments")
 	}
 	return out, nil
@@ -59,6 +70,17 @@ func runSummary(args []string, stdout, stderr io.Writer) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	if parsed.idempotencyKey != "" {
+		state, prepareErr := svc.PrepareSummary(ctx, parsed.idempotencyKey, app.PrepareSummaryRequest{Version: 1, TaskID: parsed.task, ModelID: parsed.model, Keep: parsed.keep, MaxCost: parsed.maxCost})
+		if prepareErr != nil {
+			fmt.Fprintln(stderr, "summary preparation failed; retry only with the same idempotency key")
+			return 1
+		}
+		if json.NewEncoder(stdout).Encode(state) != nil {
+			return 1
+		}
+		return 0
+	}
 	attempt, err := svc.SummarizeTask(ctx, parsed.task, parsed.model, parsed.keep, parsed.maxCost)
 	if err != nil {
 		if attempt.ID != "" {

@@ -24,12 +24,24 @@ func TestSummaryArguments(t *testing.T) {
 	if err != nil || got.maxCost != 0 {
 		t.Fatal("zero-cost default lost", err)
 	}
+	keyed, err := parseSummaryArgs(append(base, "--idempotency-key", "summary-preparation-key-0001"))
+	if err != nil || keyed.idempotencyKey != "summary-preparation-key-0001" {
+		t.Fatal("idempotent preparation key rejected", err)
+	}
 	for _, flags := range [][]string{{"--keep", "0"}, {"--keep", "-1"}, {"--keep", "100001"}, {"--keep", "1.5"}, {"--max-cost", "NaN"}, {"--max-cost", "Inf"}, {"--max-cost", "-1"}, {"--max-cost", "1e999"}, {"--task", ""}, {"--model", ""}, {"--config", ""}, {"secret-value"}} {
 		var out, stderr bytes.Buffer
 		code := RunWithInput(append(append([]string{"summary"}, base...), flags...), strings.NewReader(""), &out, &stderr, "dev")
 		if code != 2 || out.Len() != 0 || strings.Contains(stderr.String(), "secret-value") {
 			t.Fatalf("code=%d error=%q", code, stderr.String())
 		}
+	}
+	for _, key := range []string{"short", "summary key with spaces", strings.Repeat("x", 129)} {
+		if _, err := parseSummaryArgs(append(base, "--idempotency-key", key)); err == nil {
+			t.Fatal("malformed preparation key accepted")
+		}
+	}
+	if _, err := parseSummaryArgs(append(base, "--idempotency-key", "summary-preparation-key-0001", "--idempotency-key", "summary-preparation-key-0001")); err == nil {
+		t.Fatal("duplicate preparation key flag accepted")
 	}
 	if _, err := parseSummaryArgs([]string{"--config", "c", "--task", "t", "--model", "m"}); err == nil {
 		t.Fatal("missing keep accepted")
