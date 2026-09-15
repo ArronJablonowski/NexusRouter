@@ -7949,3 +7949,9 @@ health composition, panic containment, settings drift, and daemon startup failur
 ordering. Remaining work includes causal/confounder controls, repeated-look
 policy, reactivation attribution, durable scheduling, broader production-domain
 qualification, and safe long-term outcome-record retention.
+
+Final verification passed `make check`: formatting and the 1,000-line source
+limit, `go vet ./...`, the complete race-enabled suite with its 35-minute bound,
+and `go build ./...`. The slowest successful packages were release packaging
+(1,520 seconds), telemetry (1,495 seconds), application (1,407 seconds), and the
+versioned SDK (178 seconds).
