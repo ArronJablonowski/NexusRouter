@@ -7928,8 +7928,8 @@ activation and fixed-source evidence guards intact.
 Version-one `skills.outcome_rollback_supervisor` policy is disabled by default
 and binds interval, exact model, domain/profile, evidence source, privacy, sample
 minimum, drop threshold, and tasks per version. Creative and unknown domains
-require operator-owned `user_feedback`; objective domains may also select
-deterministic or tool-result evidence. Judge-only evidence is rejected, and an
+require operator-owned `user_feedback`; objective domains require deterministic
+or tool-result evidence and reject feedback-only rollback. Judge-only evidence is rejected, and an
 LLM judge never becomes rollback or supervisor authority. All outcome reports
 remain observational/advisory rather than causal or deterministic proof.
 

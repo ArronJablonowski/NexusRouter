@@ -43,8 +43,8 @@ are each 20 through 100, with `min_samples <= tasks_per_version`; `min_drop` is
 greater than zero and at most one.
 
 Creative and unknown domains accept only `user_feedback`. Code, coding,
-debugging, math, and structured-JSON domains accept `deterministic`,
-`tool_result`, or `user_feedback`. `llm_judge` is rejected. Privacy must be
+debugging, math, and structured-JSON domains require `deterministic` or
+`tool_result`; feedback-only objective rollback is rejected. `llm_judge` is rejected. Privacy must be
 `local_only` or `cloud_allowed`; selection still applies the configured model,
 deployment, privacy, credential, attribution, and current-evidence checks.
 

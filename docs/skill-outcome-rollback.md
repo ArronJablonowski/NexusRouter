@@ -46,8 +46,9 @@ the catalog root and scope, both rollback switches, and an exact configured
 model. Intervals range from one second to 24 hours; sample and per-version task
 limits range from 20 to 100. Creative and unknown domains require
 `user_feedback`. Coding, debugging, math and structured-JSON domains may use
-`deterministic`, `tool_result` or `user_feedback`. `llm_judge` is rejected for
-every domain. Privacy is fixed to `local_only` or `cloud_allowed` and remains
+only `deterministic` or `tool_result`; feedback-only objective rollback is
+rejected. `llm_judge` is rejected for every domain. Privacy is fixed to
+`local_only` or `cloud_allowed` and remains
 subject to the normal model/evidence admission checks.
 
 The versioned SDK exposes:

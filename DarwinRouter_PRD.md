@@ -970,8 +970,10 @@ This receipt is a consistency seam, not a production validation result or
 tamper-proof attestation. It does not load telemetry, authenticate source events,
 reconstruct workflow selection, invoke a validator or authorize activation;
 candidate-authored validation cases remain untrusted. Coherent observed-tool
-provenance validation and protected daemon/SDK validator wiring are now present;
-activation-bound outcome supervision remains a separate required increment.
+provenance validation, protected daemon/SDK validator wiring, and activation-bound
+outcome supervision are now present. Durable outcome scheduling records,
+lifecycle events, and long-term retention remain required before the supervisor
+is fully qualified.
 
 The stock `darwin_observed_tools_activation_v1` validator closes the next
 provenance layer without claiming semantic correctness. It binds the callback's complete immutable version
@@ -999,8 +1001,10 @@ settings-bound, lazy read-only callback before configured-learning preflight.
 Configuration remains explicit opt-in; unknown IDs and host attempts to claim the
 protected identity fail before listeners, database initialization, or supervisors.
 Qualification covers generation, publication, activation, progressive reuse,
-restart idempotence and deterministic stale-evidence rollback. Activation-bound
-outcome supervision and subjective user-feedback weighting remain separate work.
+restart idempotence and deterministic stale-evidence rollback. Outcome
+supervision now requires objective evidence for auditable domains and
+authenticated user feedback for creative/unknown work; durable scheduling and
+lifecycle-event qualification remain open.
 
 ## 10. Sessions, Context, and Memory
 

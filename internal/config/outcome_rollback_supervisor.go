@@ -53,7 +53,7 @@ func outcomeRollbackDomainSource(domain, source string) bool {
 	case "creative", "unknown":
 		return source == "user_feedback"
 	case "code", "coding", "debugging", "math", "structured_json":
-		return source == "deterministic" || source == "tool_result" || source == "user_feedback"
+		return source == "deterministic" || source == "tool_result"
 	default:
 		return false
 	}

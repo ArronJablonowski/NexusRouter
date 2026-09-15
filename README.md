@@ -310,7 +310,9 @@ Waiting scans are read-only and create no intent. Once both cohorts are ready,
 the selected evidence and intent are prepared atomically before adjudication.
 The scan cursor is in-memory only, not a durable monitor record. Subjective
 creative/unknown supervision requires operator-owned `user_feedback`; judge-only
-evidence never qualifies and an LLM judge has no supervisor authority. The daemon
+evidence never qualifies and an LLM judge has no supervisor authority. Auditable
+code, math, schema, and tool domains require deterministic or tool-result
+evidence; feedback alone cannot trigger objective rollback. The daemon
 adds the supervisor to readiness and cancels and joins it on shutdown. See
 [configured outcome supervision](docs/configured-outcome-supervision.md) for the
 SDK lifecycle, policy bounds, and observational limitations.

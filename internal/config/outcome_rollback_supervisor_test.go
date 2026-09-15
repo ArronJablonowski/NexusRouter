@@ -88,15 +88,17 @@ func TestOutcomeRollbackSupervisorStrictPolicy(t *testing.T) {
 		}
 	}
 	for _, domain := range []string{"code", "coding", "debugging", "math", "structured_json"} {
-		for _, source := range []string{"deterministic", "tool_result", "user_feedback"} {
+		for _, source := range []string{"deterministic", "tool_result"} {
 			s.Skills.OutcomeRollbackSupervisor.Domain, s.Skills.OutcomeRollbackSupervisor.Source = domain, source
 			if err := s.Validate(); err != nil {
 				t.Fatalf("%s rejected for %s: %v", source, domain, err)
 			}
 		}
-		s.Skills.OutcomeRollbackSupervisor.Source = "llm_judge"
-		if s.Validate() == nil {
-			t.Fatalf("llm judge admitted for %s", domain)
+		for _, source := range []string{"user_feedback", "llm_judge"} {
+			s.Skills.OutcomeRollbackSupervisor.Source = source
+			if s.Validate() == nil {
+				t.Fatalf("%s admitted for %s", source, domain)
+			}
 		}
 	}
 }
