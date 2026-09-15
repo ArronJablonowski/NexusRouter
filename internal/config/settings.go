@@ -138,18 +138,19 @@ type DecayOverride struct {
 	HalfLife string `yaml:"half_life" json:"half_life"`
 }
 type Skills struct {
-	Learning         Learning         `yaml:"learning" json:"learning"`
-	GenerationBudget GenerationBudget `yaml:"generation_budget" json:"generation_budget"`
-	Enabled          bool             `yaml:"enabled" json:"enabled"`
-	AutoDraft        bool             `yaml:"auto_draft" json:"auto_draft"`
-	AutoActivate     bool             `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
-	Rollback         bool             `yaml:"rollback_on_regression" json:"rollback_on_regression"`
-	OutcomeRollback  bool             `yaml:"outcome_rollback" json:"outcome_rollback,omitempty"`
-	Root             string           `yaml:"root" json:"root"`
-	Scope            string           `yaml:"scope" json:"scope"`
-	LocalOnly        bool             `yaml:"local_only" json:"local_only"`
-	MaxSkills        int              `yaml:"max_skills" json:"max_skills"`
-	MaxBytes         int              `yaml:"max_bytes" json:"max_bytes"`
+	Learning                  Learning                  `yaml:"learning" json:"learning"`
+	GenerationBudget          GenerationBudget          `yaml:"generation_budget" json:"generation_budget"`
+	OutcomeRollbackSupervisor OutcomeRollbackSupervisor `yaml:"outcome_rollback_supervisor" json:"outcome_rollback_supervisor"`
+	Enabled                   bool                      `yaml:"enabled" json:"enabled"`
+	AutoDraft                 bool                      `yaml:"auto_draft" json:"auto_draft"`
+	AutoActivate              bool                      `yaml:"auto_activate_after_validation" json:"auto_activate_after_validation"`
+	Rollback                  bool                      `yaml:"rollback_on_regression" json:"rollback_on_regression"`
+	OutcomeRollback           bool                      `yaml:"outcome_rollback" json:"outcome_rollback,omitempty"`
+	Root                      string                    `yaml:"root" json:"root"`
+	Scope                     string                    `yaml:"scope" json:"scope"`
+	LocalOnly                 bool                      `yaml:"local_only" json:"local_only"`
+	MaxSkills                 int                       `yaml:"max_skills" json:"max_skills"`
+	MaxBytes                  int                       `yaml:"max_bytes" json:"max_bytes"`
 }
 type Memory struct {
 	Enabled   bool   `yaml:"enabled" json:"enabled"`
@@ -197,7 +198,9 @@ func Defaults() Settings {
 		Workboard: Workboard{Enabled: true, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},
-		Skills:  Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"}, Enabled: true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
+		Skills: Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"},
+			OutcomeRollbackSupervisor: OutcomeRollbackSupervisor{Version: 1, Interval: "5m", Domain: "unknown", Profile: "default", Source: "user_feedback", Privacy: "local_only", MinSamples: 20, MinDrop: .1, TasksPerVersion: 20},
+			Enabled:                   true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
 		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
 }
@@ -393,6 +396,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Skills.OutcomeRollback && (!s.Skills.Enabled || !s.Skills.Rollback || s.Skills.Root == "" || s.Skills.Scope == "") {
 		return errors.New("outcome rollback requires enabled skills, rollback policy, and configured root and scope")
+	}
+	if err := s.validateOutcomeRollbackSupervisor(); err != nil {
+		return err
 	}
 	if err := s.Skills.GenerationBudget.Validate(); err != nil {
 		return err

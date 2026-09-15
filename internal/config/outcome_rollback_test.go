@@ -45,7 +45,7 @@ func TestOutcomeRollbackJSONCompatibilityAndLayering(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Exact pre-feature bytes retain all existing fields and ordering.
-	want := `{"learning":{"enabled":false,"name":"default","domain":"general","model_id":"","interval":"1m","max_cost":0,"scan_limit":20},"generation_budget":{"enabled":false,"window":"24h","max_cost":0,"max_attempts":10,"max_in_flight":1,"cooldown":"1h"},"enabled":true,"auto_draft":true,"auto_activate_after_validation":true,"rollback_on_regression":true,"root":"","scope":"","local_only":true,"max_skills":3,"max_bytes":16384}`
+	want := `{"learning":{"enabled":false,"name":"default","domain":"general","model_id":"","interval":"1m","max_cost":0,"scan_limit":20},"generation_budget":{"enabled":false,"window":"24h","max_cost":0,"max_attempts":10,"max_in_flight":1,"cooldown":"1h"},"outcome_rollback_supervisor":{"version":1,"enabled":false,"interval":"5m","model_id":"","domain":"unknown","profile":"default","source":"user_feedback","privacy":"local_only","min_samples":20,"min_drop":0.1,"tasks_per_version":20},"enabled":true,"auto_draft":true,"auto_activate_after_validation":true,"rollback_on_regression":true,"root":"","scope":"","local_only":true,"max_skills":3,"max_bytes":16384}`
 	if string(body) != want {
 		t.Fatal("default skills JSON changed", string(body))
 	}

@@ -84,6 +84,10 @@ skills:
   enabled: false
   auto_draft: false
   auto_activate_after_validation: false
+  # Unattended outcome-based rollback remains a separate, versioned opt-in.
+  outcome_rollback_supervisor:
+    version: 1
+    enabled: false
   learning:
     enabled: false
     # The stock provenance validator is opt-in and does not prove subjective
