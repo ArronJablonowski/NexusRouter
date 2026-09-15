@@ -17,29 +17,30 @@ import (
 // projects already-terminal histories without reexecution. Partial work is
 // never replayed automatically.
 type Dispatcher struct {
-	cancel               context.CancelFunc
-	done                 chan struct{}
-	db                   *telemetry.Store
-	eventSink            runtime.EventSink
-	eventSinkSequencer   *configuredSinkSequencer
-	lifecycle            context.Context
-	recoverySecrets      func() []string
-	once                 sync.Once
-	mu                   sync.Mutex
-	err                  error
-	configuredWorkers    int
-	startedWorkers       int
-	workerAlive          map[int]bool
-	workerBeats          map[int]time.Time
-	reconcilerStarted    bool
-	reconcilerAlive      bool
-	reconcilerBeat       time.Time
-	closing              bool
-	closed               bool
-	healthNow            func() time.Time
-	renewInterval        time.Duration
-	workboardRecovery    *WorkboardRecoveryCoordinator
-	summaryRecoveryAfter string
+	cancel                  context.CancelFunc
+	done                    chan struct{}
+	db                      *telemetry.Store
+	eventSink               runtime.EventSink
+	eventSinkSequencer      *configuredSinkSequencer
+	lifecycle               context.Context
+	recoverySecrets         func() []string
+	once                    sync.Once
+	mu                      sync.Mutex
+	err                     error
+	configuredWorkers       int
+	startedWorkers          int
+	workerAlive             map[int]bool
+	workerBeats             map[int]time.Time
+	reconcilerStarted       bool
+	reconcilerAlive         bool
+	reconcilerBeat          time.Time
+	closing                 bool
+	closed                  bool
+	healthNow               func() time.Time
+	renewInterval           time.Duration
+	workboardRecovery       *WorkboardRecoveryCoordinator
+	compactionRecoveryAfter string
+	summaryRecoveryAfter    string
 }
 
 func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
@@ -60,6 +61,15 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 	}
 	// Reconcile one bounded page before workers or the HTTP daemon can dispatch
 	// new work. Remaining pages are drained by the periodic reconciler.
+	// Recover context-compaction owners first because that transaction also
+	// closes its in-flight summary attempt. Running the generic summary sweep
+	// first would strand the enclosing plan lifecycle in `started`.
+	d.compactionRecoveryAfter, _, err = db.ReconcileContextCompactionPlansPage(ctx, "", 32, time.Now().UTC())
+	if err != nil {
+		db.Close()
+		cancel()
+		return nil, ErrSubmission
+	}
 	d.summaryRecoveryAfter, _, err = db.ReconcileSummaryAttemptsPage(ctx, "", 32, time.Now().UTC())
 	if err != nil {
 		db.Close()
