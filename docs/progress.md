@@ -7845,3 +7845,33 @@ prove semantic success, invoke a trusted validator or authorize activation.
 Candidate-authored validation cases remain untrusted, and the stock daemon remains
 draft-only. DAR-117 through DAR-119 retain those production-validation and
 outcome-supervision responsibilities.
+
+## 2026-09-14 — DAR-117 coherent observed-tools provenance validator
+
+The application now contains the bounded deterministic `observed-tools-v1`
+validator. It byte-compares the complete callback version with the exact stored
+immutable body before and after validation, rechecks the publication receipt, and
+binds the canonical generation-attempt digest to the same selection ID and skill
+key. All mutable telemetry evidence—the drafted attempt, content-addressed
+workflow selection, current accepted evaluations, task snapshots and actual paired
+tool lifecycle events—is read and re-derived in one read-only SQLite transaction.
+A connection data-version fence rejects commits concurrent with that snapshot.
+
+The validator reconstructs the exact observed tool order and repetitions, source
+candidate metadata, sessions, evaluation digests and effective privacy. It rejects
+stale or judge-only evidence, failed/uncertain tools, mismatched policy records,
+privacy downgrades and required tools absent from the observed sequence. Candidate
+`validation_cases` remain inert data. Success returns deterministic evidence only
+for publication provenance and current source freshness; validation performs no
+write, provider call, tool call or activation.
+
+Targeted race tests cover the end-to-end tool/group/generate/publish/validate path,
+parallel reads, stale and concurrently revised feedback, judge-only evidence,
+full-version and receipt drift, attempt/policy corruption, changed tool sequences,
+privacy downgrade, unobserved required tools, panic/cancellation containment and
+inert candidate validation text. The saved selection content-addresses its policy
+identity, but the validator does not reconstruct the historical full configuration
+or generation prompt digest, authenticate a tamper-capable SQLite operator, prove
+semantic equivalence or attest tool arguments/implementation versions. Stock
+daemon/SDK registration remains DAR-118; activation-bound outcome supervision
+remains DAR-119.

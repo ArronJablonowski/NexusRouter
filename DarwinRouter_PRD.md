@@ -970,6 +970,27 @@ candidate-authored validation cases remain untrusted. Coherent observed-tool
 provenance validation, protected daemon/SDK validator wiring and activation-bound
 outcome supervision remain separate required increments.
 
+The stock `observed-tools-v1` validator closes the next provenance layer without
+claiming semantic correctness. It binds the callback's complete immutable version
+to the publication receipt and canonical generation-attempt digest, then reads the
+drafted attempt, content-addressed workflow selection, current accepted source
+evaluations and durable tool lifecycle events in one read-only SQLite transaction.
+It re-derives the exact `observed_tools_v1` group, ordered tool sequence, source
+sessions, evaluation digests and privacy requirement. A changed evaluation,
+failed or uncertain tool, judge-only result, privacy downgrade, unobserved required
+tool, concurrent database commit or publication/version revision fails closed.
+The catalog and database are re-opened read-only; validation performs no provider,
+tool, activation or persistence call, and candidate `validation_cases` remain inert
+bytes.
+
+Passing evidence is deterministic only for this bounded provenance/freshness
+claim. The selection ID content-addresses its saved policy identity, but this
+validator does not independently reconstruct the historical full configuration or
+generation prompt digest, authenticate a tamper-capable database operator, prove
+tool arguments/implementation versions or establish workflow usefulness. Required
+tools must have been observed, but a draft may conservatively omit observed tools.
+Protected daemon and SDK registration remains a separate lifecycle increment.
+
 ## 10. Sessions, Context, and Memory
 
 ### 10.1 Durable Sessions

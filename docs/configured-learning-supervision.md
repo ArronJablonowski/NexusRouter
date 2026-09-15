@@ -29,6 +29,23 @@ or treat model-authored validation cases as trusted. A host validator must still
 reconstruct and verify the durable workflow evidence before it can make any
 activation decision. The stock binary therefore remains draft-only.
 
+The runtime now contains the narrow `observed-tools-v1` validator needed for that
+reconstruction. It checks the complete stored version and receipt before and after
+one coherent read-only SQLite snapshot, re-derives current accepted source records
+and paired successful tool events, and rejects concurrent database revisions. It
+also binds the attempt digest, content-addressed selection policy identity, exact
+tool sequence, source sessions/evaluation digests, current local-only policy and
+every declared required tool. It returns deterministic evidence only for this
+provenance claim; it never interprets `validation_cases`, calls a provider/tool or
+claims semantic workflow correctness.
+
+This validator engine is not yet automatically registered by the stock daemon or
+SDK lifecycle. Until that protected construction and identity wiring is complete,
+the shipped binary remains draft-only. A selection's saved policy identity is
+content-addressed, but the validator does not independently reproduce the entire
+historical configuration or generation input digest, authenticate direct database
+tampering, or attest tool arguments and implementation versions.
+
 ## Explicit selection
 
 These optional fields supplement an already valid learning/model/budget setup:
