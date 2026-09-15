@@ -77,12 +77,13 @@ func runSummary(args []string, stdout, stderr io.Writer) int {
 
 func runSummaries(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin summaries list|show --db path [--task id --after id --limit n] [--id id]")
+		fmt.Fprintln(stderr, "usage: darwin summaries list|show|recoveries --db path [--task id --after id --limit n] [--id id]")
 		return 2
 	}
-	if len(args) == 0 || (args[0] != "list" && args[0] != "show") {
+	if len(args) == 0 || (args[0] != "list" && args[0] != "show" && args[0] != "recoveries") {
 		return usage()
 	}
+	verb := args[0]
 	fs := flag.NewFlagSet("summaries", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := fs.String("db", "", "existing database")
@@ -90,16 +91,23 @@ func runSummaries(args []string, stdout, stderr io.Writer) int {
 	id := fs.String("id", "", "summary attempt ID")
 	after := fs.String("after", "", "exclusive attempt ID cursor")
 	limit := fs.Int("limit", 100, "page size")
-	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || *limit < 1 || *limit > 100 || (args[0] == "show" && (*id == "" || *task != "" || *after != "")) || (args[0] == "list" && *id != "") {
+	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || *limit < 1 || *limit > 100 ||
+		(*id != "" && !validSummaryReviewLabel(*id)) || (*task != "" && !validSummaryReviewLabel(*task)) || (*after != "" && !validSummaryReviewLabel(*after)) ||
+		(verb == "show" && (*id == "" || *task != "" || *after != "")) || (verb == "list" && *id != "") {
 		return usage()
 	}
 	listFlag := false
+	idFlag := false
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "task" || f.Name == "after" || f.Name == "limit" {
 			listFlag = true
 		}
+		if f.Name == "id" {
+			idFlag = true
+		}
 	})
-	if args[0] == "show" && listFlag {
+	exactRecovery := verb == "recoveries" && idFlag
+	if (verb == "show" || exactRecovery) && listFlag || (exactRecovery && *id == "") || (verb == "list" && idFlag) {
 		return usage()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -111,8 +119,12 @@ func runSummaries(args []string, stdout, stderr io.Writer) int {
 	}
 	defer db.Close()
 	var output any
-	if args[0] == "show" {
+	if verb == "show" {
 		output, err = db.SummaryAttempt(ctx, *id)
+	} else if verb == "recoveries" && *id != "" {
+		output, err = db.SummaryAttemptRecovery(ctx, *id)
+	} else if verb == "recoveries" {
+		output, err = db.ListSummaryAttemptRecoveries(ctx, *task, *after, *limit)
 	} else {
 		output, err = db.ListSummaryAttempts(ctx, *task, *after, *limit)
 	}

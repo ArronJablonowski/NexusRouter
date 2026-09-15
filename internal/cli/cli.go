@@ -74,7 +74,7 @@ Usage:
   darwin audit --config path --task id --reviewer model-id [--max-cost amount]
   darwin summary --config path --task id --model id --keep n [--max-cost amount]
     Generate a stored summary draft; does not activate compaction
-  darwin summaries list|show --db path [--task id --after id --limit n] [--id id]
+  darwin summaries list|show|recoveries --db path [--task id --after id --limit n] [--id id]
   darwin summary-review --config path --attempt id [--expected review-id] --decision approved|rejected --note text
   darwin summary-reviews --db path --attempt id
   darwin run --config path --model id --continue-task id --summary-attempt approved-attempt-id < prompt.txt
