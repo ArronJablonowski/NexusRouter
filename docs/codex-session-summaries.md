@@ -58,8 +58,33 @@ records keep their historical identities; rotation does not rewrite history.
 Success atomically stores a `drafted` attempt. Failure uses the existing bounded
 cleanup and generic lifecycle codes. An unavailable store or crash can leave
 `started` indeterminate; that is neither proof of a live process nor retry
-authority. No automatic retry, fitness update, source redispatch or summary
-activation occurs.
+authority. When the daemon starts, it synchronously scans at most 32 started
+attempts before workers can dispatch new work. Its periodic reconciler continues
+with bounded pages on roughly five-second ticks. Only an exact guarded local
+owner independently proven stopped is closed as `interrupted` with code
+`owner_interrupted`; active or unverifiable owners remain unchanged. A startup
+scan failure prevents dispatcher startup. No automatic retry, fitness update,
+source redispatch or summary activation occurs.
+
+The periodic scan position advances past checked owners so one active or
+unverifiable attempt does not starve later entries. Once it reaches the end it
+begins a new live scan on a later tick. The public SDK also offers an explicit
+1–100-item recovery page with an opaque decimal scan cursor. This mutating
+reconciliation operation is distinct from the read-only lexical ID cursors used
+to list attempts and recovery receipts. See
+[SDK interrupted-attempt recovery](sdk-session-summaries.md#interrupted-attempt-recovery)
+for inspection calls and exact cursor semantics.
+
+An interrupted attempt deliberately contains no draft, partial output, token
+usage or elapsed measurement. Its separate receipt retains only correlation and
+source-checkpoint metadata, state/code and recovery time; it excludes generated
+content, provider/model details and private process/lock metadata. Accounting
+classifies the summarizer operation as failed with uncertain retry class and no
+measured usage. That preserves operational uncertainty rather than asserting
+that the provider did no work or that its configured cost estimate is a bill.
+Recovery never invokes a provider, creates a review, activates a summary, changes
+the source journal or contributes fitness evidence. A draft durably committed
+before acknowledgement is retained as drafted and is not recovered again.
 
 ## Review and remaining gaps
 
@@ -100,9 +125,12 @@ operator may supersede that advisory review through the existing compare-and-
 swap chain.
 
 An LLM self-review is not a deterministic validator. Configured unattended
-semantic approval, typed per-claim evidence, summary-attempt crash reconciliation
-and full PRD acceptance remain open. The native launch profile is experimental,
-not a host/process isolation certification.
+semantic approval, typed per-claim evidence and full PRD acceptance remain open.
+Recovery does not resolve provider billing, recover output, authorize retry, or
+prove semantic correctness. Owners that are active, remote or cannot be proven
+stopped remain fenced. Dedicated CLI/HTTP recovery-receipt inspection and live
+signed-in native crash/power-loss qualification remain open. The native launch
+profile is experimental, not a host/process isolation certification.
 
 ## Qualification
 
@@ -119,4 +147,5 @@ package 8.233 seconds), with one launch, one stream, one close, completion=true
 and 490 response bytes. It verified durable inactive output, source provenance,
 unchanged source events and removal of the owned working directory. No raw
 source/draft content was logged. This is not live Ollama inference, semantic
-summary qualification, native summary import or live crash-recovery evidence.
+summary qualification, native summary import or live signed-in crash-recovery
+evidence.

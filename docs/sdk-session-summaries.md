@@ -120,6 +120,60 @@ terminal write was uncertain. Inspect before requesting another potentially
 billable invocation. A successful draft remains inactive until reviewed and
 explicitly selected for a continuation; it does not update measured fitness.
 
+### Interrupted-attempt recovery
+
+After an abnormal owner-process exit, `InspectSummaryAttempt` or the existing
+`darwin summaries show` command may report `status: "interrupted"` with code
+`owner_interrupted`. This terminal state means the exact guarded local owner was
+independently proven stopped; it does not say whether the provider received or
+completed the request. The attempt therefore has no draft, token usage or
+elapsed measurement and cannot be reviewed or selected for continuation.
+
+The SDK exposes the associated redaction-safe evidence separately:
+
+```go
+receipt, err := client.InspectSummaryRecovery(ctx, attemptID)
+page, err := client.ListSummaryRecoveries(ctx, sourceTaskID, afterReceiptID, 100)
+```
+
+Each receipt binds its ID, attempt and source task, source sequence and digest,
+terminal state/code, and recovery time. It excludes generated text, partial
+output, provider/model details, token usage, process identity, guard paths and
+lock metadata. The task and attempt IDs and source digest remain correlation
+metadata, so exported receipts should still be access-controlled.
+
+`ListSummaryRecoveries` uses the same live lexical-page convention as summary
+attempt listing: an empty task includes all source tasks, an empty cursor starts
+the scan, `after` is the exclusive prior **receipt ID**, and `limit` is 1–100.
+Continue with the last returned receipt ID. Concurrent insertion before the
+cursor requires a fresh scan. Inspection is read-only, uses the same cooperative
+ten-second deadline and returns no partial page on failure. There is currently
+no dedicated CLI or HTTP receipt-inspection surface; CLI operators can still see
+the terminal attempt with `darwin summaries list|show`.
+
+Trusted hosts can request one mutating recovery scan page explicitly:
+
+```go
+next, recovered, err := client.ReconcileInterruptedSummaries(ctx, after, 100)
+```
+
+Here `after` is instead an opaque canonical positive decimal scan position, not
+an attempt or receipt ID. Use `""` for the first page and pass each nonempty
+`next` value unchanged; an empty `next` means that live scan reached its end.
+The limit is 1–100 and skipped active or unverifiable owners still advance the
+scan. This method opens writable storage and may migrate it, unlike inspection.
+It only changes eligible `started` attempts to `interrupted`, appends one receipt
+and records summarizer accounting as `failed` with retry class `uncertain` and
+no measured token usage. Any configured cost remains an admission estimate, not
+proof of provider billing.
+
+Recovery never constructs or calls a provider, redispatches summary work,
+salvages partial output, creates a review, approves or activates compaction,
+changes the source journal, or creates fitness evidence. Repeating a scan is
+inert after the single terminal transition. A terminal draft committed before a
+lost acknowledgement remains drafted and is not converted or given a recovery
+receipt.
+
 The task-start transaction rechecks the exact current review and records its ID
 in the new checkpoint. Rejection committed before that transaction blocks use.
 Rejection afterward blocks future direct reuse, but neither cancels the admitted
