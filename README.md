@@ -581,6 +581,10 @@ while execution remains guarded:
 ```yaml
 workboard:
   enabled: true
+  decomposition:
+    version: 1
+    max_depth: 4
+    max_children_per_parent: 8
   scheduler:
     enabled: false
     interval: 5s
@@ -595,6 +599,14 @@ workboard:
       max_output_tokens: 4096
       timeout: 30s
 ```
+
+`workboard.decomposition` is a versioned host policy for model-authored card
+hierarchies. A top-level card has depth 1; `max_children_per_parent` counts only
+direct parent/child links, not dependency edges. Version 1 defaults to depth 4
+and 8 children, and validates both values from 1 through the hard limit of 64.
+The effective numeric values appear in redacted `darwin config show` output and
+participate in the configuration fingerprint. Models cannot override the policy
+or its digest through card-tool arguments.
 
 The versioned scheduler boundary accepts an interval from `250ms` through
 `24h`, 1–64 active claims (never more than `workers.max_in_process`), and a card
@@ -1379,6 +1391,17 @@ requires durable approval authority, obeys
 uses a caller-supplied idempotency key without authorizing automatic retry.
 Mutation events carry a deterministic task-bound model actor; the task journal
 retains the selected provider/model provenance without placing it in tool input.
+For model-authored card placement, the host also binds the versioned
+decomposition policy (depth 4 and 8 direct children by default) and effective
+configuration digest. SQLite checks
+the resulting hierarchy depth and direct-child count in the same serialized
+transaction before allocation. Successful events expose an immutable,
+redaction-safe admission reference with configuration/policy digests, effective
+limits, resulting depth, and direct-child count. Exact replay retains the
+original policy; the same idempotency key conflicts after configuration drift,
+so a fresh operation is required. These audit fields are projected in Workboard
+event inspection without prompts, raw tool arguments, credentials, or card
+content.
 Returned board/card content becomes sensitive durable session content.
 Interactive `darwin chat` displays the exact model arguments, digest, tool,
 action, scope, behavior, and no-replay warning using an ASCII-safe terminal

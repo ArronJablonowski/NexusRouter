@@ -339,6 +339,27 @@ bounded retries, and stall/attention states prevent runaway work. Lease expiry
 makes work recoverable but does not prove execution stopped or authorize replay
 of confirmed or uncertain side effects.
 
+Agent decomposition policy is versioned and host-derived. Configuration version
+1 defaults to a maximum hierarchy depth of 4, counting a top-level card as depth
+1, and at most 8 direct children per parent. Both values are configurable from 1
+through the hard domain bound of 64. Dependency fan-out is a separate
+graph constraint and does not consume the direct-child allowance. The model
+cannot supply limits, configuration identity, policy identity, or admission
+identity in tool arguments. The application binds the effective configuration
+digest and exact limits before dispatch, and the store re-evaluates depth and
+direct-child count inside the serialized mutation before allocating a card or
+emitting an event.
+
+Every admitted model-authored hierarchy mutation records an immutable admission
+and a redaction-safe board-event projection containing its configuration and
+policy digests, effective limits, resulting depth, and direct-child count. Exact
+idempotent replay remains bound to the original configuration digest. Reusing a
+key after policy drift conflicts; the caller must inspect current state and issue
+a fresh operation under the new policy. Delegated and Workboard execution
+children receive no board-write tool authority. If a future child backend is
+allowed to decompose, its host policy must be equal to or component-wise stricter
+than both the current host policy and its parent admission.
+
 Trusted deterministic validators are selected by immutable, versioned identity
 and receive an owned copy of the exact frozen candidate and criterion binding.
 The host constructs their evidence records; validator callbacks and model
@@ -541,7 +562,11 @@ as recoverable no-effect results. Invalid durable replay receipts and ambiguous
 storage acknowledgements remain uncertain and are never automatically retried.
 Mutation events use a deterministic task-bound model actor while the task
 journal retains selected provider/model provenance. Child workers cannot
-inherit these tools. Interactive terminal chat renders an exact ASCII-safe,
+inherit these tools, including through an unadvertised direct tool call against
+a borrowed root registry. Model-authored card placement is additionally bound
+to the versioned effective decomposition policy and configuration digest; those
+host values are absent from the closed tool schema. Interactive terminal chat
+renders an exact ASCII-safe,
 credential-screened preview for each supported workboard proposal before an
 operator can approve its one-use authority. DAR-109 adds root-only criteria and
 candidate-decision proposal tools using the runtime event journal plus the
@@ -609,6 +634,10 @@ web_ui:
 
 workboard:
   enabled: true  # Required in configuration v1 while API/Web UI routes are mounted.
+  decomposition:
+    version: 1
+    max_depth: 4                 # Top-level card is depth 1; hard maximum is 64.
+    max_children_per_parent: 8   # Direct children only; hard maximum is 64.
   scheduler:
     enabled: false  # Stock daemon rejects true until supervised execution is wired.
     interval: 5s

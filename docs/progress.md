@@ -1,5 +1,36 @@
 # Implementation evidence
 
+## 2026-09-15 — DAR-110 configurable Workboard decomposition checkpoint
+
+Configuration version 1 now includes a versioned Workboard decomposition policy
+with defaults of depth 4 and 8 direct children per parent. A top-level card is
+depth 1; dependency edges remain governed by separate graph limits. Strict
+configuration validation caps both dimensions at 64, preserves normal
+user/project/environment/flag precedence, displays the effective non-sensitive
+values through redacted configuration output, and includes both values in the
+effective configuration fingerprint.
+
+The root-agent runtime derives policy only from validated settings and the host
+configuration digest, then constructs a policy-bound Workboard card service.
+Closed model schemas reject attempts to provide configuration, policy,
+decomposition, or admission identity. The domain and durable-store slices bind
+the exact policy to mutation replay, enforce authoritative depth and direct-child
+counts before allocation, and retain immutable admissions plus redaction-safe
+board-event references. Reusing an idempotency key under a changed policy cannot
+reinterpret the old decision; a new operation is required.
+
+Delegated children and Workboard execution children continue to receive no
+Workboard mutation tools. The borrowed-registry policy now explicitly denies
+every tool except the allowed `read_file`, preventing a parent `ask` decision
+from widening a child's local denial when it emits an unadvertised write name.
+The Web UI audit projection is limited to admission identity/digests, effective
+limits, resulting depth, and direct-child count; prompts, raw arguments,
+credentials, idempotency keys, and card content are absent.
+
+Focused configuration and application race tests have passed for their isolated
+slices. This checkpoint does not claim the final integrated race suite, schema
+migration qualification, DAR-110 completion, or release readiness.
+
 ## 2026-09-14 — Native qualification preflight and process-tree correction
 
 A fresh RC18 preflight froze and verified a schema-3 candidate, rendered final

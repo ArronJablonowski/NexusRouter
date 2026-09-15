@@ -7,6 +7,19 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- DAR-110 adds version-1 Workboard decomposition policy with safe defaults of
+  depth 4 and 8 direct children per parent, bounded by hard limits of 64. A
+  top-level card is depth 1; dependency fan-out remains separate. Root-agent
+  card placement receives the effective limits and configuration digest only
+  from trusted host wiring, while closed tool schemas reject forged policy,
+  config, or admission fields. SQLite evaluates current depth and sibling count
+  before mutation and records immutable admission evidence plus a redaction-safe
+  event projection for Web UI inspection. Exact replay remains under the
+  original digest; policy drift requires a fresh idempotency key. Delegated and
+  Workboard execution children retain no board-write authority, including for
+  unadvertised calls against a borrowed registry. Final integrated qualification
+  and issue closure are not claimed by this checkpoint.
+
 - DAR-104 separates fresh-cache compilation from license-evidence execution.
   Ordinary successful Go build/download diagnostics are suppressed, then the
   exact private regular binary is mode-restricted and executed under the same

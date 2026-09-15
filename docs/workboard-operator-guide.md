@@ -102,6 +102,46 @@ a definitive rejection followed by authoritative refresh. A lost or ambiguous
 acknowledgement is reconciled through the operation journal and is never
 automatically resubmitted.
 
+### Agent decomposition limits and audit evidence
+
+Model-authored parent/child placement uses this versioned configuration:
+
+```yaml
+workboard:
+  decomposition:
+    version: 1
+    max_depth: 4
+    max_children_per_parent: 8
+```
+
+Depth counts hierarchy nodes, so a top-level card is depth 1. The child limit is
+the number of direct children of one parent; dependency edges use separate graph
+limits. Both settings accept 1–64. The defaults are 4 and 8. They are visible in
+the redacted effective configuration and contribute to its digest.
+
+These values are host policy, not model input. The root create-card schema
+rejects `decomposition`, configuration/policy digests, and admission identifiers.
+Before mutation, the application binds the exact effective policy and config
+digest. SQLite then checks authoritative depth and direct-child count inside the
+single-writer transaction, before card allocation, revision movement, operation
+receipt, or event insertion. Concurrent child proposals therefore cannot exceed
+the same parent allowance.
+
+A successful model-authored placement creates an immutable decomposition
+admission. Workboard event inspection, including the Web UI activity projection,
+shows the admission reference, configuration and policy digests, effective
+limits, resulting depth, and direct-child count. It does not expose prompts,
+card content, raw tool arguments, credentials, or idempotency keys. Use these
+fields to audit which effective policy admitted a card.
+
+An exact retry under the same policy returns the original committed result. If
+configuration changes, reuse of the old idempotency key conflicts because its
+request remains bound to the original config digest. Refresh the board and use a
+fresh operation key to request evaluation under the new policy; DarwinRouter
+does not reinterpret the earlier admission. Delegated workers and Workboard
+execution children receive no Workboard write tools or execution authority. A
+parent `ask` policy cannot weaken that denial.
+
 ## Browser operations and approvals
 
 The Web UI supports board create/edit/archive; card create/edit; Backlog/Ready
@@ -157,7 +197,8 @@ approval-backed tools:
 
 Writes are confined to `workboards` for board creation and
 `workboard:<board_id>` for all per-board actions. Child workers do not inherit
-these root mutation tools. Agent transition tools intentionally move cards only
+these root mutation tools and cannot invoke them by emitting an unadvertised
+borrowed-registry tool name. Agent transition tools intentionally move cards only
 between Backlog and Ready; claim, heartbeat, safe-boundary acknowledgement,
 candidate submission, cancellation finalization, and recovery remain trusted
 host lifecycle operations. Criteria and candidate-decision tools are advisory
