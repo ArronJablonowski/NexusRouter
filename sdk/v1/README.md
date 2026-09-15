@@ -668,8 +668,9 @@ For activation-bound outcome supervision, use
 `OutcomeRollbackCandidate(ctx, key)` to inspect the exact current first
 activation and its validated predecessor, then
 `InspectOutcomeRollbackReadiness(ctx, key)` for a fresh bounded evidence
-snapshot. A `waiting` result is successful and read-only: it creates no outcome
-intent, selection checkpoint, receipt, or durable monitor state. The evidence is
+snapshot. A `waiting` result creates no outcome intent, selection checkpoint, or
+receipt. The durable monitor records only its scheduling identity and no-action
+settlement. The evidence is
 observational and advisory, not causal proof or deterministic validation.
 
 `OutcomeSupervisionStep(ctx, after)` advances one lexical active-skill position.
@@ -679,14 +680,18 @@ final adjudication. Subjective creative/unknown policy requires
 `user_feedback`. Judge-only evidence is rejected and a judge is never supervisor
 authority.
 
+`DurableOutcomeSupervisionStep(ctx)` drives the restart-safe named scheduler.
+Use `OutcomeSupervisionState(ctx)` and `OutcomeSupervisionCheck(ctx, checkID)` to
+inspect its content-bounded cursor and exact activation-bound checks.
+
 Call `StartOutcomeSupervision(ctx)` for a directly owned monitor or
 `StartConfiguredOutcomeSupervision(ctx)` for settings-frozen, read-only preflight
 and a composable disabled handle. Both returned handles must be closed to cancel
 and join their goroutine; `Health()` reports the content-free
 `outcome_supervision` component. The monitor runs one immediate step and one per
-configured interval. Its cursor is in memory only and resets at the end of a
-scan; restart begins again. There is no durable cursor/monitor record,
-cross-process election, missed-tick replay, CLI/HTTP mutation endpoint, or
+configured interval. Its durable cursor resets at the end of a scan and retains
+the next due time across restart. Catalog locking serializes competing drivers;
+missed ticks are not replayed. There is no CLI/HTTP mutation endpoint or
 automatic model judgment. See [configured outcome supervision](../../docs/configured-outcome-supervision.md).
 
 `Client.DiscoverSkillWorkflows(ctx, domain, after, scanLimit)` discovers accepted

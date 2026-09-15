@@ -7914,9 +7914,9 @@ and `go build ./...` all completed successfully.
 The file catalog now exposes read-only candidate inspection for the exact current
 first activation and its immediate deterministically validated predecessor.
 Application and SDK readiness inspection combines that binding with a fresh,
-bounded outcome selection. A `waiting` result is successful and leaves catalog
-bytes unchanged: it creates no intent, selection checkpoint, receipt, cursor, or
-monitor record.
+bounded outcome selection. A `waiting` result creates no outcome intent,
+selection checkpoint, or receipt; it records only an audit-safe scheduler
+no-action result and advances the durable cursor.
 
 When both cohorts meet the configured threshold, the prepared rollback path
 validates the fixed report and atomically persists its outcome intent and exact
@@ -7938,17 +7938,27 @@ monitor, and settings-frozen configured startup with a composable disabled
 handle. The daemon prepares policy before listener binding, performs read-only
 catalog/database preflight, starts the supervisor before task dispatch, composes
 its content-free health into readiness, and cancels and joins it during shutdown.
-The supervisor advances one lexical skill per iteration with an in-process cursor
-that resets at the end and on restart. No durable cursor, named monitor record,
-lease, missed-tick replay, or cross-process election is claimed.
+The supervisor advances one lexical skill per due iteration with a named durable
+cursor. Each pending check binds the exact activation/predecessor pair, policy,
+stable check ID, and stable operation ID before evidence selection. Catalog
+locking serializes competing drivers; restart returns the same pending check and
+reconciles a committed receipt without rediscovering mutable activation state.
+Missed wall-clock ticks are not replayed.
 
-Focused coverage exercises catalog eligibility, read-only waiting, deterministic
+SQLite schema 47 adds an immutable structural lifecycle journal bound to the
+operation, durable check, activation revision, and policy. Exact lost-ack event
+retries reconcile; prompts, output, tool arguments, secrets, and error text have
+no fields in its record shape. Old settled `no_action` evidence can be explicitly
+replaced with bounded tombstones while current revisions, pending work, rollback
+receipts, and operation/revision ownership remain protected.
+
+Focused coverage exercises catalog eligibility, no-action waiting, deterministic
 operation identity, ready execution from the inspected report, atomic prepare
-and retry, configuration bounds and layering, SDK ownership/disabled lifecycle,
-health composition, panic containment, settings drift, and daemon startup failure
-ordering. Remaining work includes causal/confounder controls, repeated-look
-policy, reactivation attribution, durable scheduling, broader production-domain
-qualification, and safe long-term outcome-record retention.
+and retry, crash-after-receipt restart reconciliation, configuration bounds and
+layering, SDK durable inspection, concurrent journal reconciliation, safe
+retention, health composition, panic containment, settings drift, and daemon
+startup failure ordering. Remaining work includes causal/confounder controls,
+repeated-look policy and broader production-domain qualification.
 
 Final verification passed `make check`: formatting and the 1,000-line source
 limit, `go vet ./...`, the complete race-enabled suite with its 35-minute bound,

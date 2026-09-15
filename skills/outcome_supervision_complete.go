@@ -15,7 +15,8 @@ func sameOutcomeSupervisionIntent(a, b OutcomeSupervisionCheck) bool {
 }
 
 func completionMatchesOutcomeSupervisionCheck(c OutcomeSupervisionCompletion, check OutcomeSupervisionCheck) bool {
-	return c.Code == check.Code && c.OutcomeOperationID == check.OutcomeOperationID
+	return c.Code == check.Code && (c.OutcomeOperationID == check.OutcomeOperationID ||
+		(c.Code == "waiting" || c.Code == "ineligible") && c.OutcomeOperationID == "")
 }
 
 // CompleteOutcomeSupervisionCheck commits one scheduling outcome. Waiting and
@@ -70,7 +71,7 @@ func (s *FileStore) CompleteOutcomeSupervisionCheck(ctx context.Context, check O
 		}
 		switch completion.Code {
 		case "waiting", "ineligible":
-			if stored.OutcomeOperationID != "" || current != stored.Candidate.Current {
+			if completion.OutcomeOperationID != "" && completion.OutcomeOperationID != stored.OutcomeOperationID || current != stored.Candidate.Current {
 				return ErrConflict
 			}
 		case "evaluated":
@@ -101,7 +102,9 @@ func (s *FileStore) CompleteOutcomeSupervisionCheck(ctx context.Context, check O
 			stored.Status = "failed"
 		}
 		stored.Code = completion.Code
-		stored.OutcomeOperationID = completion.OutcomeOperationID
+		if completion.OutcomeOperationID != "" {
+			stored.OutcomeOperationID = completion.OutcomeOperationID
+		}
 		stored.FinishedAt = time.Now().UTC()
 		state.Revision++
 		state.After = stored.Candidate.Current.Key.Name

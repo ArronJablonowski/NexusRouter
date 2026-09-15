@@ -50,18 +50,19 @@ deployment, privacy, credential, attribution, and current-evidence checks.
 
 ## Scan and decision lifecycle
 
-Each iteration reads at most one active skill in lexical name order. Candidate
-inspection derives the exact current activation and its immediate predecessor
-from one read-only catalog snapshot. The active version must be on its first
+Each due iteration reserves at most one active skill in lexical name order in a
+named durable supervisor record. The pending check binds the exact current
+activation, immediate predecessor, policy digest, stable check ID, and stable
+outcome operation ID before evidence is selected. The active version must be on its first
 activation, and the predecessor must retain passed deterministic validation.
 Initial versions, restored/reactivated versions, and malformed timelines are
 ineligible and are skipped without creating outcome state.
 
-Readiness selection observes a fresh bounded telemetry snapshot. `waiting` is a
-successful read-only result, including sparse or exclusion-heavy windows. It has
-a policy-and-activation-derived operation ID, but creates no durable intent,
-selection checkpoint, monitor record, or receipt. There is deliberately no
-claimed outcome operation while waiting.
+Readiness selection observes a bounded telemetry snapshot. `waiting` is a
+successful no-action result, including sparse or exclusion-heavy windows. It
+completes the scheduler check and advances the durable cursor, but creates no
+outcome intent, selected-evidence checkpoint, or rollback receipt. The stable
+operation binding is scheduling identity only and grants no outcome authority.
 
 When both cohorts meet `min_samples`, the step is `ready` and uses
 `OutcomeRollbackPrepared`. All catalog, settings, credential, fixed-source, and
@@ -77,6 +78,16 @@ The operation ID is deterministic for the activation revision and complete
 selection policy. A completed exact retry returns the historical receipt. A
 prepared unfinished retry reuses the saved checkpoint. Changed evidence or
 activation invalidates completion; it does not authorize replacement selection.
+If rollback commits before scheduler acknowledgement, restart finds the exact
+receipt through the pending check and settles it without rediscovering the
+activation. Stale, sparse, mixed, or unknown evidence completes as no action;
+only operational failure degrades supervisor health.
+
+SQLite schema 47 stores a separate immutable lifecycle journal containing only
+operation, check, skill, activation-revision, policy, fixed code, sequence, and
+timestamp fields. Exact lost-ack retries reconcile to the original event.
+Prompts, model output, tool arguments, secrets, and error text have no field in
+this record shape.
 
 ## SDK ownership and daemon lifecycle
 
@@ -87,6 +98,9 @@ owned scheduling:
 candidate, err := client.OutcomeRollbackCandidate(ctx, key)
 readiness, err := client.InspectOutcomeRollbackReadiness(ctx, key)
 next, readiness, err := client.OutcomeSupervisionStep(ctx, after)
+state, err := client.DurableOutcomeSupervisionStep(ctx)
+state, err = client.OutcomeSupervisionState(ctx)
+check, err := client.OutcomeSupervisionCheck(ctx, checkID)
 
 monitor, err := client.StartOutcomeSupervision(ctx)
 defer monitor.Close()
@@ -95,13 +109,12 @@ configured, err := client.StartConfiguredOutcomeSupervision(ctx)
 defer configured.Close()
 ```
 
-`OutcomeSupervisionStep` returns its next lexical cursor even when a later check
-fails. The monitor performs one immediate step and then one step per configured
-interval. Its cursor exists only in process memory. Reaching the end resets it;
-a process restart starts a new scan. There is no durable cursor, named monitor
-record, missed-tick replay, lease, or cross-process singleton election. Run only
-one supervisor for a catalog scope unless duplicate observation is acceptable;
-the catalog's operation/revision fences remain the mutation authority.
+`OutcomeSupervisionStep` remains the manual read-oriented compatibility surface.
+The owned monitor uses `DurableOutcomeSupervisionStep`: its catalog cursor,
+pending check, due time, exact activation pair, and operation binding survive
+restart. Catalog file locking serializes competing processes, and exact retries
+return the same pending or completed check. Reaching the end resets the lexical
+cursor and records the next due time; missed wall-clock ticks are not replayed.
 
 `StartOutcomeSupervision` starts directly from the client's validated settings.
 `StartConfiguredOutcomeSupervision` first freezes settings, performs bounded
@@ -121,9 +134,11 @@ back. A step error is reported generically and later intervals continue.
 ## Boundaries
 
 There is no automatic model judgment, new HTTP mutation endpoint, CLI approval
-surface, durable scheduling record, causal inference, statistical correction for
-repeated looks, reactivation attribution, or long-term outcome-record retention
-policy. The 1,000-record catalog bounds and schema-8 compatibility rules from
-[outcome-policy rollback](skill-outcome-rollback.md) still apply. Use
+surface, causal inference, or statistical correction for repeated looks.
+Terminal scheduler checks rotate deterministically at the 1,000-record bound.
+An explicit retention operation can replace old, settled `no_action` outcome
+records with compact tombstones while retaining operation and activation-revision
+ownership; pending work, rollback receipts, and the current revision are never
+pruned. Use
 [outcome comparison](skill-outcome-comparison.md) for evidence semantics and
 [automatic window selection](skill-comparison-selection.md) for cohort rules.

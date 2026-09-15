@@ -917,15 +917,16 @@ fresh bounded comparison read-only; `waiting` creates no intent. Once both
 cohorts are decision-ready, the prepared path atomically saves the intent and
 exact selected report before final adjudication. Exact recovery uses that fixed
 report and rechecks its source tasks, policy and activation without selecting a
-replacement window. The scan cursor is process-local and resets on restart; no
-durable named monitor or scheduling record is claimed. The daemon starts the
+replacement window. The named scan cursor, due time, pending check, exact
+activation/predecessor pair, and stable operation binding are persisted before
+evidence selection. Restart reconciles committed receipts without rediscovering
+mutable activation state. The daemon starts the
 supervisor before task dispatch, includes it in readiness, and joins it on
 shutdown. Reports remain observational/advisory and never fabricate deterministic
 evidence. Subjective creative/unknown policy requires operator-owned
 `user_feedback`; judge-only evidence is never supervisor authority. SQLite source
-checks are not atomic with catalog replacement. Reactivation attribution,
-causal/confounder controls, repeated-look policy and durable scheduling remain
-open.
+checks are not atomic with catalog replacement. Causal/confounder controls and
+repeated-look correction remain open.
 See [skill outcome attribution](docs/skill-outcome-attribution.md).
 See [outcome comparison and limitations](docs/skill-outcome-comparison.md).
 See [automatic window selection](docs/skill-comparison-selection.md).
@@ -971,9 +972,10 @@ tamper-proof attestation. It does not load telemetry, authenticate source events
 reconstruct workflow selection, invoke a validator or authorize activation;
 candidate-authored validation cases remain untrusted. Coherent observed-tool
 provenance validation, protected daemon/SDK validator wiring, and activation-bound
-outcome supervision are now present. Durable outcome scheduling records,
-lifecycle events, and long-term retention remain required before the supervisor
-is fully qualified.
+outcome supervision are now present. Durable scheduling records, a schema-47
+structural lifecycle journal, and bounded no-action retention tombstones are
+also implemented; causal attribution, repeated-look correction, and broader
+production qualification remain open.
 
 The stock `darwin_observed_tools_activation_v1` validator closes the next
 provenance layer without claiming semantic correctness. It binds the callback's complete immutable version

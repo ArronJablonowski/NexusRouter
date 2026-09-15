@@ -46,6 +46,13 @@ func TestSDKOutcomeSupervisionInspectionAndOwnedMonitor(t *testing.T) {
 	if check := monitor.Health(); check.Validate() != nil || check.Status != "healthy" || check.Component != "outcome_supervision" {
 		t.Fatal(check)
 	}
+	state, err := client.OutcomeSupervisionState(context.Background())
+	if err != nil || state.Validate() != nil || state.PendingCheckID != "" || state.After != expected.Key.Name {
+		t.Fatal(state, err)
+	}
+	if again, err := client.DurableOutcomeSupervisionStep(context.Background()); err != nil || again != state {
+		t.Fatal(again, err)
+	}
 	if err := monitor.Close(); err != nil {
 		t.Fatal(err)
 	}

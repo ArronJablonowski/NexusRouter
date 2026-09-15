@@ -69,6 +69,29 @@ func TestOutcomeSupervisionWaitingIsDurableAndDoesNotConsumeOutcome(t *testing.T
 	assertNoOutcomeRecords(t, reopened)
 }
 
+func TestOutcomeSupervisionBoundWaitingRetainsStableOperation(t *testing.T) {
+	store, _, key, _, _, _ := regressionFixture(t)
+	store.SetOutcomeRollback(true)
+	state, check := prepareOutcomeSupervisionFixture(t, store, key.Scope)
+	bound, err := store.BindOutcomeSupervisionOperation(context.Background(), check, "stable-operation", allowOutcomeSupervision)
+	if err != nil || bound.OutcomeOperationID != "stable-operation" {
+		t.Fatal(bound, err)
+	}
+	completed, err := store.CompleteOutcomeSupervisionCheck(context.Background(), bound,
+		OutcomeSupervisionCompletion{Code: "waiting"}, allowOutcomeSupervision)
+	if err != nil || completed.Revision != state.Revision+1 {
+		t.Fatal(completed, err)
+	}
+	terminal, err := store.OutcomeSupervisionCheck(context.Background(), key.Scope, "outcomes", check.CheckID)
+	if err != nil || terminal.Status != "completed" || terminal.Code != "waiting" || terminal.OutcomeOperationID != "stable-operation" {
+		t.Fatal(terminal, err)
+	}
+	if retry, err := store.CompleteOutcomeSupervisionCheck(context.Background(), bound,
+		OutcomeSupervisionCompletion{Code: "waiting"}, allowOutcomeSupervision); err != nil || retry != completed {
+		t.Fatal(retry, err)
+	}
+}
+
 func TestOutcomeSupervisionConcurrentPrepareIsSingleOwnerAcrossStores(t *testing.T) {
 	store, path, key, _, _, _ := regressionFixture(t)
 	store.SetOutcomeRollback(true)
@@ -147,6 +170,21 @@ func TestOutcomeSupervisionBoundReceiptSettlesAfterRestart(t *testing.T) {
 		OutcomeSupervisionCompletion{Code: "evaluated", OutcomeOperationID: "supervised"}, allowOutcomeSupervision)
 	if err != nil || completed.Revision != state.Revision+1 || completed.After != expected.Key.Name {
 		t.Fatal(completed, err)
+	}
+}
+
+func TestOutcomeSupervisionSkipsAlreadyAdjudicatedActivation(t *testing.T) {
+	store, _, expected, selection := outcomeRollbackFixture(t, false)
+	receipt, err := store.OutcomeRollbackPrepared(context.Background(), "already-checked", "", expected, selection.Policy, selection,
+		func(context.Context, OutcomeRollbackReceipt) error { return nil },
+		func(context.Context, OutcomeRollbackIntent) error { return nil },
+		func(context.Context, OutcomeSelectionCheckpoint) error { return nil })
+	if err != nil || receipt.Decision != "no_action" {
+		t.Fatal(receipt, err)
+	}
+	state, check, err := store.PrepareOutcomeSupervision(context.Background(), expected.Key.Scope, "outcomes", strings.Repeat("a", 64), time.Second, allowOutcomeSupervision)
+	if err != nil || check != (OutcomeSupervisionCheck{}) || state.PendingCheckID != "" || state.After != "" || !state.NextDue.After(time.Now()) {
+		t.Fatal(state, check, err)
 	}
 }
 

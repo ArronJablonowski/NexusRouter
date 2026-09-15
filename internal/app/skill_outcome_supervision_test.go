@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
 )
 
@@ -70,6 +71,136 @@ func TestOutcomeSupervisionReadyUsesPreparedSnapshot(t *testing.T) {
 	if err != nil || receipt.Validate() != nil || receipt.OperationID != readiness.OperationID || receipt.Expected != expected ||
 		!reflect.DeepEqual(receipt.Selection, readiness.Selection) {
 		t.Fatal(receipt, err)
+	}
+}
+
+func TestDurableOutcomeSupervisionWaitingPersistsCheckAndJournal(t *testing.T) {
+	svc, expected, request, _ := appOutcomeRollbackFixture(t, 20)
+	configureOutcomeSupervision(svc, request)
+	readiness, err := svc.InspectOutcomeRollbackReadiness(context.Background(), expected.Key)
+	if err != nil || readiness.Status != "waiting" {
+		t.Fatal(readiness, err)
+	}
+	state, err := svc.DurableOutcomeSupervisionStep(context.Background())
+	if err != nil || state.Validate() != nil || state.After != expected.Key.Name || state.PendingCheckID != "" {
+		t.Fatal(state, err)
+	}
+	inspected, err := svc.OutcomeSupervisionState(context.Background())
+	if err != nil || inspected != state {
+		t.Fatal(inspected, err)
+	}
+	db, err := telemetry.OpenReadOnly(context.Background(), svc.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	page, err := db.OutcomeSupervisionEvents(context.Background(), readiness.OperationID, 0, 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Code != telemetry.OutcomeSupervisionWaiting {
+		t.Fatal(page, err)
+	}
+	check, err := svc.OutcomeSupervisionCheck(context.Background(), page.Items[0].CheckID)
+	if err != nil || check.Status != "completed" || check.Code != "waiting" || check.OutcomeOperationID != readiness.OperationID {
+		t.Fatal(check, err)
+	}
+	again, err := svc.DurableOutcomeSupervisionStep(context.Background())
+	if err != nil || again != state {
+		t.Fatal(again, err)
+	}
+}
+
+func TestDurableOutcomeSupervisionReadySettlesExactReceipt(t *testing.T) {
+	svc, expected, request, _ := appOutcomeRollbackFixture(t, 40)
+	configureOutcomeSupervision(svc, request)
+	readiness, err := svc.InspectOutcomeRollbackReadiness(context.Background(), expected.Key)
+	if err != nil || readiness.Status != "ready" {
+		t.Fatal(readiness, err)
+	}
+	state, err := svc.DurableOutcomeSupervisionStep(context.Background())
+	if err != nil || state.Validate() != nil || state.PendingCheckID != "" {
+		t.Fatal(state, err)
+	}
+	receipt, err := svc.OutcomeRollbackOperation(context.Background(), expected.Key, readiness.OperationID)
+	if err != nil || receipt.Validate() != nil || receipt.Expected != expected {
+		t.Fatal(receipt, err)
+	}
+	db, err := telemetry.OpenReadOnly(context.Background(), svc.settings.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	page, err := db.OutcomeSupervisionEvents(context.Background(), readiness.OperationID, 0, 10)
+	if err != nil || len(page.Items) != 2 || page.Items[0].Code != telemetry.OutcomeSupervisionReady {
+		t.Fatal(page, err)
+	}
+	wantTerminal := telemetry.OutcomeSupervisionNoAction
+	if receipt.Decision == "rolled_back" {
+		wantTerminal = telemetry.OutcomeSupervisionRolledBack
+	}
+	if page.Items[1].Code != wantTerminal || page.Items[1].CheckID != page.Items[0].CheckID {
+		t.Fatal(page.Items)
+	}
+	check, err := svc.OutcomeSupervisionCheck(context.Background(), page.Items[0].CheckID)
+	if err != nil || check.Status != "completed" || check.Code != "evaluated" || check.OutcomeOperationID != receipt.OperationID {
+		t.Fatal(check, err)
+	}
+}
+
+func TestDurableOutcomeSupervisionReconcilesReceiptAfterLostCompletion(t *testing.T) {
+	svc, expected, request, _ := appOutcomeRollbackFixture(t, 40)
+	configureOutcomeSupervision(svc, request)
+	interval, err := configuredOutcomeSupervisionInterval(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyID, err := svc.outcomeSupervisionPolicyDigest(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := skills.Open(svc.settings.Skills.Root, []string{expected.Key.Scope})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.SetAutomatic(true)
+	store.SetOutcomeRollback(true)
+	guard := skills.OutcomeSupervisionGuard(func(context.Context, skills.OutcomeSupervisionState, skills.OutcomeSupervisionCheck) error {
+		return nil
+	})
+	_, check, err := store.PrepareOutcomeSupervision(context.Background(), expected.Key.Scope, configuredOutcomeSupervisorName, policyID, interval, guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectionPolicy, err := svc.skillComparisonSelectionPolicy(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationID := outcomeSupervisionOperationID(expected, selectionPolicy)
+	check, err = store.BindOutcomeSupervisionOperation(context.Background(), check, operationID, guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	readiness, err := svc.inspectOutcomeRollbackCandidate(context.Background(), check.Candidate)
+	if err != nil || readiness.Status != "ready" {
+		t.Fatal(readiness, err)
+	}
+	if err = svc.recordOutcomeSupervisionEvent(context.Background(), check, policyID, telemetry.OutcomeSupervisionReady); err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := svc.OutcomeRollbackPrepared(context.Background(), operationID, expected, request, readiness.Selection)
+	if err != nil || receipt.Validate() != nil {
+		t.Fatal(receipt, err)
+	}
+	// Simulate process loss here: the exact receipt exists but the durable
+	// scheduler check remains pending and has no terminal journal event.
+	state, err := svc.DurableOutcomeSupervisionStep(context.Background())
+	if err != nil || state.Validate() != nil || state.PendingCheckID != "" {
+		t.Fatal(state, err)
+	}
+	terminal, err := svc.OutcomeSupervisionCheck(context.Background(), check.CheckID)
+	if err != nil || terminal.Status != "completed" || terminal.OutcomeOperationID != operationID {
+		t.Fatal(terminal, err)
 	}
 }
 

@@ -76,6 +76,11 @@ func (s *FileStore) PrepareOutcomeSupervision(ctx context.Context, scope, name, 
 			}
 			candidate, err = outcomeRollbackCandidateForEntry(entry, expected)
 			if err == nil {
+				if outcomeSupervisionRevisionOwned(c, expected) {
+					state.After = next
+					candidate = OutcomeRollbackCandidate{}
+					continue
+				}
 				break
 			}
 			if !errors.Is(err, ErrConflict) && !errors.Is(err, ErrValidation) {
@@ -149,4 +154,23 @@ func (s *FileStore) PrepareOutcomeSupervision(ctx context.Context, scope, name, 
 		return zero, empty, err
 	}
 	return state, check, nil
+}
+
+func outcomeSupervisionRevisionOwned(c *catalog, expected ActivationState) bool {
+	for _, receipt := range c.OutcomeOperations {
+		if receipt.Expected.Key == expected.Key && receipt.Expected.Revision == expected.Revision {
+			return true
+		}
+	}
+	for _, intent := range c.OutcomeIntents {
+		if intent.Expected.Key == expected.Key && intent.Expected.Revision == expected.Revision {
+			return true
+		}
+	}
+	for _, settlement := range c.OutcomeSettlements {
+		if settlement.Expected.Key == expected.Key && settlement.Expected.Revision == expected.Revision {
+			return true
+		}
+	}
+	return false
 }

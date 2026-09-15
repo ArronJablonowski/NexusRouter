@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -57,7 +58,13 @@ func (p *ConfiguredOutcomeSupervisionPlan) Start(ctx context.Context) (*Configur
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	if err = catalog.Close(); err != nil {
+	interval, intervalErr := configuredOutcomeSupervisionInterval(p.service)
+	policyID, policyErr := p.service.outcomeSupervisionPolicyDigest(interval)
+	state, stateErr := catalog.OutcomeSupervisionState(preflight, p.service.settings.Skills.Scope, configuredOutcomeSupervisorName)
+	if stateErr == nil && (state.Validate() != nil || state.PolicyDigest != policyID || state.Interval != interval) {
+		stateErr = ErrAdmission
+	}
+	if err = catalog.Close(); err != nil || intervalErr != nil || policyErr != nil || stateErr != nil && !errors.Is(stateErr, skills.ErrNotFound) {
 		return nil, ErrAdmission
 	}
 	db, err := telemetry.OpenReadOnly(preflight, p.service.settings.Telemetry.Database)

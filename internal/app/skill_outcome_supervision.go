@@ -79,6 +79,16 @@ func (s *Service) InspectOutcomeRollbackReadiness(ctx context.Context, key skill
 	if err != nil {
 		return out, err
 	}
+	return s.inspectOutcomeRollbackCandidate(ctx, candidate)
+}
+
+// inspectOutcomeRollbackCandidate evaluates the exact activation pair already
+// reserved by a durable supervisor check. It deliberately does not rediscover
+// the current activation, so a restart cannot silently change the comparison.
+func (s *Service) inspectOutcomeRollbackCandidate(ctx context.Context, candidate skills.OutcomeRollbackCandidate) (out OutcomeRollbackReadiness, err error) {
+	if ctx == nil || ctx.Err() != nil || candidate.Validate() != nil || !s.outcomeSupervisionConfigured() {
+		return out, ErrAdmission
+	}
 	request, err := s.outcomeSupervisionRequest(candidate)
 	if err != nil {
 		return out, err
@@ -223,7 +233,6 @@ func (m *OutcomeSupervisionMonitor) run(ctx context.Context, s *Service, interva
 	}()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	after := ""
 	for {
 		if ctx.Err() != nil {
 			return
@@ -231,8 +240,7 @@ func (m *OutcomeSupervisionMonitor) run(ctx context.Context, s *Service, interva
 		m.mu.Lock()
 		m.stepStarted = time.Now()
 		m.mu.Unlock()
-		next, _, err := s.OutcomeSupervisionStep(ctx, after)
-		after = next
+		_, err := s.DurableOutcomeSupervisionStep(ctx)
 		if ctx.Err() != nil {
 			return
 		}

@@ -63,7 +63,7 @@ func (s OutcomeSupervisionState) Validate() error {
 func (c OutcomeSupervisionCompletion) Validate() error {
 	switch c.Code {
 	case "waiting", "ineligible":
-		if c.OutcomeOperationID != "" {
+		if c.OutcomeOperationID != "" && !identifier.MatchString(c.OutcomeOperationID) {
 			return ErrInvalid
 		}
 	case "evaluated":

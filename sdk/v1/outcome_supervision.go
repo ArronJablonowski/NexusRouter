@@ -10,6 +10,8 @@ import (
 
 type OutcomeRollbackCandidate = skills.OutcomeRollbackCandidate
 type OutcomeRollbackReadiness = app.OutcomeRollbackReadiness
+type OutcomeSupervisionState = skills.OutcomeSupervisionState
+type OutcomeSupervisionCheck = skills.OutcomeSupervisionCheck
 
 // OutcomeSupervisionMonitor owns an explicitly started configured supervisor.
 // The caller must Close it to cancel and join its background operation.
@@ -86,6 +88,31 @@ func (c *Client) OutcomeSupervisionStep(ctx context.Context, after string) (stri
 		return after, OutcomeRollbackReadiness{}, err
 	}
 	return c.service.OutcomeSupervisionStep(ctx, after)
+}
+
+// DurableOutcomeSupervisionStep advances the configured persisted supervisor.
+// Pending work is reconciled after restart without selecting another activation.
+func (c *Client) DurableOutcomeSupervisionStep(ctx context.Context) (OutcomeSupervisionState, error) {
+	if !c.valid(ctx) {
+		return OutcomeSupervisionState{}, ErrAdmission
+	}
+	return c.service.DurableOutcomeSupervisionStep(ctx)
+}
+
+// OutcomeSupervisionState reads the configured durable cursor.
+func (c *Client) OutcomeSupervisionState(ctx context.Context) (OutcomeSupervisionState, error) {
+	if !c.valid(ctx) {
+		return OutcomeSupervisionState{}, ErrAdmission
+	}
+	return c.service.OutcomeSupervisionState(ctx)
+}
+
+// OutcomeSupervisionCheck reads one durable check by its stable identifier.
+func (c *Client) OutcomeSupervisionCheck(ctx context.Context, checkID string) (OutcomeSupervisionCheck, error) {
+	if !c.valid(ctx) {
+		return OutcomeSupervisionCheck{}, ErrAdmission
+	}
+	return c.service.OutcomeSupervisionCheck(ctx, checkID)
 }
 
 // StartOutcomeSupervision starts one immediate configured scan step and then
