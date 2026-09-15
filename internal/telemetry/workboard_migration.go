@@ -466,8 +466,8 @@ func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCa
 	}
 	if eventCardIdentity {
 		shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0"
-		if browserTableShape(ctx, conn, "workboard_events", "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0") {
-			shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0"
+		if browserTableShape(ctx, conn, "workboard_events", "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_decision_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0") {
+			shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_decision_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0"
 		}
 	}
 	if reassignments {
@@ -613,7 +613,7 @@ func workboardNamedObjects(ctx context.Context, conn *sql.Conn, kind string, exp
 	// objects. Excluding only this closed set keeps the historical validators
 	// useful during migration without making arbitrary future objects invisible.
 	rows, err := conn.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type=? AND name GLOB 'workboard_*'
-		AND name NOT IN ('workboard_decomposition_admissions','workboard_decomposition_admissions_parent',
+		AND name NOT IN ('workboard_decomposition_admissions','workboard_decomposition_admissions_parent','workboard_decomposition_admissions_card',
 			'workboard_decomposition_admission_binding','workboard_decomposition_admission_immutable_update',
 			'workboard_decomposition_admission_immutable_delete','workboard_decomposition_event_binding',
 			'workboard_decomposition_event_immutable')
