@@ -407,6 +407,23 @@ func TestRootAgentWorkboardMutationSchemasAreClosedAndBounded(t *testing.T) {
 	}
 	authority := &workboardMutationAuthority{t: t, allowed: true}
 	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy(), Authority: authority}
+	criterion := map[string]any{"version": 1, "id": "criterion", "kind": "objective", "required_source": "deterministic",
+		"validator_id": "validator", "description": "Pass", "required": true}
+	for index, forged := range []map[string]any{
+		{"config_digest": strings.Repeat("a", 64)},
+		{"policy_digest": strings.Repeat("b", 64)},
+		{"decomposition": map[string]any{"version": 1, "max_depth": 64, "max_children": 64}},
+		{"admission_id": "forged-admission"},
+	} {
+		arguments := map[string]any{"idempotency_key": "forged-policy-key-0" + string(rune('1'+index)), "board_id": "board", "title": "Card",
+			"criteria": []any{criterion}, "expected_board_revision": 1, "expected_graph_revision": 1}
+		for key, value := range forged {
+			arguments[key] = value
+		}
+		if _, err := executeWorkboardMutation(t, executor, "forged-policy-call", "workboard_create_card", arguments); !errors.Is(err, tools.ErrArguments) {
+			t.Fatalf("forged policy case %d accepted: %v", index, err)
+		}
+	}
 	for index, arguments := range []map[string]any{
 		{"idempotency_key": "bad-extra-key-0001", "title": "Board", "actor_id": "operator"},
 		{"idempotency_key": "bad-revise-key-0001", "board_id": "board", "expected_board_revision": 1},

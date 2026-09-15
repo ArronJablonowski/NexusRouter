@@ -12,6 +12,7 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
@@ -88,6 +89,56 @@ func TestDelegateToolsBorrowedRootSurvivesPathReplacement(t *testing.T) {
 	out, err = executor.Execute(ctx, providers.ToolCall{ID: "escape", Name: "read_file", Arguments: json.RawMessage(`{"path":"escape"}`)})
 	if err != nil || strings.Contains(out.Content, "replacement") || !strings.Contains(out.Content, "file_unavailable") {
 		t.Fatal("escaped borrowed root", out, err)
+	}
+}
+
+func TestDelegateToolsExplicitlyDenyUnadvertisedBorrowedWrites(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "fact.txt"), []byte("trusted"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	registry, closeRoot, err := readTools(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeRoot()
+	called := 0
+	for _, name := range []string{"workboard_create_card", "extension_write"} {
+		if err := registry.Register(tools.Definition{Tool: providers.Tool{Name: name, Parameters: json.RawMessage(`{"type":"object","additionalProperties":false}`)},
+			Scope: "borrowed", Behavior: runtime.BehaviorIdempotentWrite, Handler: func(context.Context, json.RawMessage) (runtime.ToolResult, error) {
+				called++
+				return runtime.ToolResult{Effect: runtime.ConfirmedEffect}, nil
+			}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	parent := &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{
+		{Tool: "read_file", Scope: "workspace", Decision: tools.Allow},
+		{Tool: "workboard_create_card", Scope: "*", Decision: tools.Ask},
+		{Tool: "extension_write", Scope: "*", Decision: tools.Ask},
+	}}
+	ctx, err := inheritDelegateTools(context.Background(), registry, parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capability := ctx.Value(delegateToolsKey{}).(*delegateTools)
+	for _, name := range []string{"workboard_create_card", "extension_write"} {
+		if capability.Policy.Decide(name, "borrowed") != tools.Deny {
+			t.Fatalf("parent Ask widened child denial for %s", name)
+		}
+		out, executeErr := (tools.Executor{Registry: capability.Registry, Policy: capability.Policy}).Execute(ctx,
+			providers.ToolCall{ID: "unadvertised", Name: name, Arguments: json.RawMessage(`{}`)})
+		if !errors.Is(executeErr, tools.ErrDenied) || out.Effect != runtime.NoEffect {
+			t.Fatalf("unadvertised %s execution: out=%+v error=%v", name, out, executeErr)
+		}
+	}
+	if called != 0 {
+		t.Fatalf("denied borrowed handlers executed %d times", called)
+	}
+	out, err := (tools.Executor{Registry: capability.Registry, Policy: capability.Policy}).Execute(ctx,
+		providers.ToolCall{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{"path":"fact.txt"}`)})
+	if err != nil || !strings.Contains(out.Content, "trusted") {
+		t.Fatalf("allowed borrowed read failed: out=%+v error=%v", out, err)
 	}
 }
 

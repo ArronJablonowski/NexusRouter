@@ -24,6 +24,8 @@ type bridgeBoardRepository struct {
 	evaluation        workboard.EvaluationMutation
 	dependencyPage    workboard.DependencyPage
 	dependencyOptions workboard.DependencyOptions
+	graph             workboard.Graph
+	cardMutation      workboard.CardMutation
 }
 
 func (r *bridgeBoardRepository) CreateWorkboard(_ context.Context, scope string, _ workboard.CreateBoardRequest, actor workboard.Actor, _ time.Time) (workboard.OperationReceipt, error) {
@@ -54,13 +56,14 @@ func (r *bridgeBoardRepository) ListCards(context.Context, string, workboard.Car
 	return workboard.CardPage{}, nil
 }
 func (r *bridgeBoardRepository) LoadGraph(context.Context, string) (workboard.Graph, error) {
-	return workboard.Graph{}, nil
+	return r.graph, nil
 }
 func (r *bridgeBoardRepository) ListDependencyEdges(_ context.Context, _, _ string, options workboard.DependencyOptions) (workboard.DependencyPage, error) {
 	r.dependencyOptions = options
 	return r.dependencyPage, nil
 }
-func (r *bridgeBoardRepository) ApplyCardMutation(context.Context, workboard.CardMutation) (workboard.CardMutationResult, error) {
+func (r *bridgeBoardRepository) ApplyCardMutation(_ context.Context, mutation workboard.CardMutation) (workboard.CardMutationResult, error) {
+	r.cardMutation = mutation
 	return workboard.CardMutationResult{}, nil
 }
 func (r *bridgeBoardRepository) ApplyProgressMutation(context.Context, workboard.ProgressMutation) (workboard.OperationReceipt, error) {

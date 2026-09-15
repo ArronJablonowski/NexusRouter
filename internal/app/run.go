@@ -332,8 +332,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		}
 	}
 	if s.Tools.WorkboardWriteEnabled {
-		bridge, bridgeErr := NewWorkboardBridge(db, db, defaultWorkboardNow)
-		if bridgeErr != nil || registerWorkboardMutationTools(registry, bridge) != nil || registerWorkboardAgentProposalTools(registry, db) != nil {
+		decomposition, policyErr := configuredWorkboardDecompositionPolicy(s, configID)
+		bridge, bridgeErr := NewWorkboardBridgeWithDecomposition(db, db, defaultWorkboardNow, decomposition)
+		if policyErr != nil || bridgeErr != nil || registerWorkboardMutationTools(registry, bridge) != nil || registerWorkboardAgentProposalTools(registry, db) != nil {
 			return result, ErrAdmission
 		}
 	}

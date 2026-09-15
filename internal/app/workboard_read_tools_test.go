@@ -199,6 +199,8 @@ func TestConfiguredWorkboardToolsReachRootRuntimeButNotChild(t *testing.T) {
 	svc, _ := autoFixture(t)
 	svc.settings.Tools.WorkboardReadEnabled = true
 	svc.settings.Tools.WorkboardWriteEnabled = true
+	svc.settings.Workboard.Decomposition.MaxDepth = 1
+	svc.settings.Workboard.Decomposition.MaxChildrenPerParent = 1
 	svc.toolReviewer = func(context.Context, tools.ApprovalPrompt) (string, bool, error) { return "operator", true, nil }
 	svc.settings.Workers.DelegateModel = "z"
 	for index := range svc.settings.Models {
@@ -238,6 +240,10 @@ func TestConfiguredWorkboardToolsReachRootRuntimeButNotChild(t *testing.T) {
 	childContext, err := inheritDelegateTools(context.Background(), registry, applicationToolPolicy())
 	if err != nil {
 		t.Fatal(err)
+	}
+	inherited, ok := childContext.Value(delegateToolsKey{}).(*delegateTools)
+	if !ok || inherited.Policy.Decide("workboard_create_card", "workboard:board") != tools.Deny {
+		t.Fatal("delegated child inherited Workboard decomposition authority")
 	}
 	child, err := svc.runDelegate(childContext, "bounded child work", "", root.TaskID, true, "", "")
 	if err != nil || child.Text != "child complete" || streams.Load() != 2 {

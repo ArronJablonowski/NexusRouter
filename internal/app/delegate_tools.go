@@ -20,7 +20,16 @@ func inheritDelegateTools(ctx context.Context, registry *tools.Registry, parent 
 	if registry == nil || parent == nil || parent.Decide("read_file", "workspace") != tools.Allow {
 		return ctx, ErrAdmission
 	}
-	policy := &tools.Policy{Default: tools.Deny, Parent: parent, Rules: []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}}
+	rules := []tools.Rule{{Tool: "read_file", Scope: "workspace", Decision: tools.Allow}}
+	// The registry is borrowed from the root and can contain approved writes.
+	// Explicit child denials prevent a parent Ask rule from widening the child's
+	// deny-by-default policy if a model emits an unadvertised tool name.
+	for _, definition := range registry.Catalog() {
+		if definition.Name != "read_file" {
+			rules = append(rules, tools.Rule{Tool: definition.Name, Scope: "*", Decision: tools.Deny})
+		}
+	}
+	policy := &tools.Policy{Default: tools.Deny, Parent: parent, Rules: rules}
 	return context.WithValue(ctx, delegateToolsKey{}, &delegateTools{Registry: registry, Policy: policy}), nil
 }
 

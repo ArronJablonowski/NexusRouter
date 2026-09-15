@@ -61,7 +61,18 @@ func NewWorkboardBridge(repository workboard.BoardRepository, cards workboard.Ca
 	if err != nil {
 		return nil, err
 	}
-	return NewWorkboardBridgeWithBrowserAuthority(repository, cards, now, authority)
+	return newWorkboardBridge(repository, cards, now, authority, nil)
+}
+
+// NewWorkboardBridgeWithDecomposition binds agent-authored hierarchy changes
+// to one validated, host-derived effective policy. Browser and native operator
+// mutations continue to carry no agent decomposition authority.
+func NewWorkboardBridgeWithDecomposition(repository workboard.BoardRepository, cards workboard.CardStore, now func() time.Time, policy workboard.DecompositionPolicy) (*WorkboardBridge, error) {
+	authority, err := BrowserWorkboardAuthority("darwin-embedded-local-workspace-v1")
+	if err != nil {
+		return nil, err
+	}
+	return newWorkboardBridge(repository, cards, now, authority, &policy)
 }
 
 // BrowserWorkboardAuthority derives the stable local workspace operator used
@@ -83,6 +94,10 @@ func BrowserWorkboardAuthority(workspaceIdentity string) (workboard.Authority, e
 }
 
 func NewWorkboardBridgeWithBrowserAuthority(repository workboard.BoardRepository, cards workboard.CardStore, now func() time.Time, browserAuthority workboard.Authority) (*WorkboardBridge, error) {
+	return newWorkboardBridge(repository, cards, now, browserAuthority, nil)
+}
+
+func newWorkboardBridge(repository workboard.BoardRepository, cards workboard.CardStore, now func() time.Time, browserAuthority workboard.Authority, decomposition *workboard.DecompositionPolicy) (*WorkboardBridge, error) {
 	if browserAuthority.Validate() != nil || browserAuthority.Actor.Type != "operator" {
 		return nil, &workboard.Violation{Code: workboard.CodeInvalid, Field: "browser_authority"}
 	}
@@ -90,7 +105,12 @@ func NewWorkboardBridgeWithBrowserAuthority(repository workboard.BoardRepository
 	if err != nil {
 		return nil, err
 	}
-	cardService, err := workboard.NewCardService(cards, contextWorkboardAuthority{})
+	var cardService *workboard.CardService
+	if decomposition == nil {
+		cardService, err = workboard.NewCardService(cards, contextWorkboardAuthority{})
+	} else {
+		cardService, err = workboard.NewCardServiceWithDecomposition(cards, contextWorkboardAuthority{}, *decomposition)
+	}
 	if err != nil {
 		return nil, err
 	}
