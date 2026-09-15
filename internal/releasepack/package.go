@@ -223,6 +223,10 @@ func Package(ctx context.Context, o Options) (resultErr error) {
 	if err != nil {
 		return err
 	}
+	shared.notes, err = renderFinalReleaseNotes(shared.notes, o.Version, o.Commit, created)
+	if err != nil {
+		return err
+	}
 	sbomSources, err := discoverSBOMSourceFiles(ctx, buildSource, reconstructionEnv)
 	if err != nil {
 		return err

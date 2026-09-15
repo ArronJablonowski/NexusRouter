@@ -1,5 +1,35 @@
 # Implementation evidence
 
+## 2026-09-14 — DAR-47 candidate-bound final release notes
+
+Candidate schema 3 now binds both the immutable release-notes source template
+and a separately derived final-notes digest. The canonical derived body records
+the exact semantic version, full source commit, commit-derived UTC date, fixed
+Darwin/Linux amd64/arm64 target contract, and explicit limitations without
+requiring a committed file to contain its own commit hash. Template bodies that
+repeat generated identity fields are rejected. Packaging ships those derived
+bytes, approval-bound verification compares their digest to the candidate, and
+publication preflight independently re-renders and byte-compares the supplied
+body before accepting its authorization. The create-only `release-candidate
+notes` command materializes the reviewable publication body outside the source
+checkout; it grants no approval or publication authority.
+
+The unreleased source template now describes completed Web UI/Kanban and
+schema-46 auxiliary-classifier behavior truthfully and avoids transient Linear,
+tag, or GitHub Release state that could become false after publication. Release
+runbooks and the operator checklist track candidate schema 3 and the generated
+notes evidence. Focused final-notes, candidate, publication-preflight, release
+documentation, approved-signing/verification, collateral/package, published
+verification, and release-candidate CLI suites passed, as did affected-package
+vet, source formatting, diff, and 1,000-line checks. The complete
+`GOFLAGS='-p=1' make check` then passed formatting and 1,000-line enforcement,
+`go vet ./...`, every race-enabled package, and `go build ./...`. Notable
+uncached package times were application 1345.119s, releasepack 1500.879s,
+telemetry 1392.684s, SDK 148.624s, CLI 123.070s, toolgate 65.401s, API 58.527s,
+and workers 24.809s. No approved candidate, signature, tag, upload, or release
+was created; the preliminary schema-2 RC16 evidence generated before this gap
+was found was quarantined and receives no release credit.
+
 ## 2026-09-14 — DAR-107 policy-bounded auxiliary intent classification
 
 DarwinRouter now has an opt-in provider-neutral auxiliary classifier for an

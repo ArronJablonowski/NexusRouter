@@ -17,7 +17,7 @@ import (
 
 func run(ctx context.Context, args []string, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "required subcommand: freeze or verify")
+		fmt.Fprintln(stderr, "required subcommand: freeze, verify, or notes")
 		return 2
 	}
 	switch args[0] {
@@ -64,8 +64,29 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "notes":
+		flags := flag.NewFlagSet("release-candidate notes", flag.ContinueOnError)
+		flags.SetOutput(stderr)
+		record := flags.String("record", "", "candidate-record file")
+		source := flags.String("source", ".", "clean source repository")
+		out := flags.String("out", "", "new final release-notes file")
+		if err := flags.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return 0
+			}
+			return 2
+		}
+		if *record == "" || *out == "" || flags.NArg() != 0 {
+			fmt.Fprintln(stderr, "required: notes --record FILE --out NEW_FILE [--source REPOSITORY]")
+			return 2
+		}
+		if err := releasepack.WriteFinalReleaseNotes(ctx, *record, *source, *out); err != nil {
+			fmt.Fprintln(stderr, "candidate release-notes generation failed")
+			return 1
+		}
+		return 0
 	default:
-		fmt.Fprintln(stderr, "unknown subcommand; required: freeze or verify")
+		fmt.Fprintln(stderr, "unknown subcommand; required: freeze, verify, or notes")
 		return 2
 	}
 }

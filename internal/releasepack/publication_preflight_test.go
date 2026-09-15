@@ -1,9 +1,11 @@
 package releasepack
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -21,7 +23,7 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	notesFile := filepath.Join(signing.Source, "docs", "release-notes.md")
+	notesFile := candidateFinalNotesFixture(t, candidate, signing.Source)
 	notes, err := os.ReadFile(notesFile)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +59,7 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 		t.Fatal("preflight rejected", result, err)
 	}
 
-	for _, scenario := range []string{"record_digest", "repository", "notes", "asset", "signed_set", "canceled"} {
+	for _, scenario := range []string{"record_digest", "repository", "notes", "notes_identity", "asset", "signed_set", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			changed := options
 			ctx := context.Background()
@@ -72,6 +74,22 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 					t.Fatal(writeErr)
 				}
 				changed.ReleaseNotesFile = path
+			case "notes_identity":
+				wrong := bytes.Replace(notes, []byte(candidate.SourceCommit), []byte(strings.Repeat("f", 40)), 1)
+				path := filepath.Join(t.TempDir(), "notes.md")
+				if writeErr := os.WriteFile(path, wrong, 0644); writeErr != nil {
+					t.Fatal(writeErr)
+				}
+				tampered := clonePublicationAuthorization(record)
+				tampered.ReleaseNotesSHA256 = publicationDigest(wrong)
+				tamperedBody := canonicalPublicationAuthorization(t, tampered)
+				authorizationPath := filepath.Join(t.TempDir(), "publication.json")
+				if writeErr := os.WriteFile(authorizationPath, tamperedBody, 0644); writeErr != nil {
+					t.Fatal(writeErr)
+				}
+				changed.ReleaseNotesFile = path
+				changed.PublicationAuthorizationFile = authorizationPath
+				changed.ExpectedPublicationAuthorizationSHA256 = publicationDigest(tamperedBody)
 			case "asset":
 				tampered := clonePublicationAuthorization(record)
 				tampered.Assets[0].SHA256 = invalidPublicDigest()
@@ -96,4 +114,21 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func candidateFinalNotesFixture(t *testing.T, candidate CandidateRecord, source string) string {
+	t.Helper()
+	template, err := loadCollateral(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notes, err := renderFinalReleaseNotes(template.notes, candidate.ReleaseVersion, candidate.SourceCommit, candidate.ReleaseCreated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "RELEASE_NOTES.md")
+	if err = os.WriteFile(path, notes, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

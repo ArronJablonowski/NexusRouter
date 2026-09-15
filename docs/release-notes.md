@@ -1,12 +1,11 @@
 # DarwinRouter release notes — unreleased
 
-This is a development summary, not a completed v1.0.0 release announcement. The
-deterministic testable-MVP gate passes and 41 of the original 42 MVP issues are
-complete, but DAR-46 remains open. The Web UI/Kanban implementation and DAR-87
-release qualification are complete; final release approval remains open. A premature annotated `v1.0.0` tag was pushed
-outside the guarded publisher and is quarantined; no GitHub Release, signed
-production assets, supported-platform decision or canonical publication
-approval is claimed.
+This source template summarizes the candidate functionality and its known
+limitations. Release packaging derives a canonical final body that identifies
+the exact semantic version, full source commit, commit-derived UTC date, and
+four-target artifact contract. Candidate notes are authenticated evidence, not
+authority: legal, target, signing, and publication approvals remain separate
+operator records.
 
 - DAR-104 separates fresh-cache compilation from license-evidence execution.
   Ordinary successful Go build/download diagnostics are suppressed, then the
@@ -21,8 +20,8 @@ approval is claimed.
 - DAR-105 directly qualifies the credentialed production publisher against an
   existing annotated `v1.0.0` tag, an existing release, and ambiguous lookup
   results. Every case fails before journal creation or any remote mutation and
-  retains no credential or release-body data. The test does not change the
-  quarantined remote tag; DAR-97 still requires an explicit operator decision.
+  retains no credential or release-body data. The guarded publisher never
+  resolves or overwrites a conflicting remote identity automatically.
 
 - DAR-101 routes release packaging through a fresh private reconstruction for
   SBOM discovery, four-target dependency and notice capture, compilation, and
@@ -42,8 +41,8 @@ approval is claimed.
   telemetry are disabled. This remains mechanical evidence for separate human
   legal and distribution review, not hermetic build provenance or approval.
 
-- DAR-87 changes the release contract to canonical schema-2 candidate records,
-  schema-3 manifests, and seven-member target archives containing
+- DAR-87 introduced schema-2 candidate records, schema-3 manifests, and
+  seven-member target archives containing
   `SBOM.spdx.json`. Each target-specific SPDX 2.3 document binds the exact
   binary SHA-256, module-level Go dependency/toolchain closure, and every
   checked-in first-party Web UI source hash. Approved signing and verification
@@ -51,6 +50,11 @@ approval is claimed.
   metadata, and checksums. This is not vulnerability scanning, build provenance,
   a legal conclusion, or proof that licenses marked `NOASSERTION` were reviewed;
   separate notices and operator approval remain required.
+  Candidate schema 3 additionally binds the exact derived final-release-notes
+  digest. Those canonical notes identify the semantic version, full source
+  commit, commit-derived UTC date, four fixed targets, and release-contract
+  limitations without requiring a committed file to contain its own commit
+  hash.
   An adversarial SPDX review removed an invalid package-to-file containment
   claim while `filesAnalyzed` is false, stopped assigning MIT as the composite
   executable conclusion, modeled the Go compiler as a build tool, bound the
@@ -239,8 +243,8 @@ approval is claimed.
   failures release claims; uncertain effects remain blocked without replay.
   Independently derived stop proof, bounded attention pagination, lifecycle and
   dependency history, durable workspace identity, and cross-session operation
-  reconciliation complete the DAR-82 backend. Agent tools and the integrated
-  Kanban feature UI remain DAR-84 and DAR-83 work.
+  reconciliation complete the DAR-82 backend. DAR-83 and DAR-84 now complete
+  the integrated Kanban feature UI and policy-gated agent tool surface.
 
 - Schema 35 adds the native workboard storage foundation to the primary
   SQLite/WAL database. Normalized bounded tables cover boards, seven canonical
@@ -251,12 +255,9 @@ approval is claimed.
   limits where SQLite can do so; cycle, depth, and transaction-wide graph
   checks remain application-service responsibilities. Migration is serialized,
   restart-safe, and fails atomically on partial or forged retained objects.
-  DAR-81 itself is storage only. The subsequent partial DAR-82 work now covers
-  board metadata lifecycle, core card/dependency persistence, native JSON
-  routes, and browser BFF handler contracts. It does not yet provide browser
-  SSE, live CLI/daemon composition, the full claim/attempt/evaluation lifecycle,
-  agent tools, or the integrated Kanban UI; DAR-82, DAR-83, and DAR-84 still own
-  that remaining work.
+  DAR-81 itself established the storage boundary. DAR-82 through DAR-84 now
+  complete the authority-gated board service, browser and daemon composition,
+  claim/attempt/evaluation lifecycle, agent tools, and integrated Kanban UI.
 
 - Schema 34 adds the session-subject-bound browser operation journal and
   additive browser feedback revision chain to the primary SQLite/WAL database;
@@ -292,15 +293,16 @@ approval is claimed.
   duplicate normalized entries, and unsupported high-confidence anchors; clean
   or ambiguous drafts abstain for authenticated operator or domain validation.
 
-- The 1.0 PRD now includes an authenticated embedded Web UI for streaming chat
-  and a native durable Kanban for operator- and agent-managed long-running work.
-  This is specified scope and a dependency-linked Linear backlog, not completed
-  runtime functionality in this checkpoint.
+- The authenticated embedded Web UI now provides streaming chat and a native
+  durable Kanban for operator- and agent-managed long-running work. The Web UI
+  milestone is complete, including its browser qualification gate; the release
+  still preserves the documented approval and supported-browser limitations.
 
-- Schema 30 durable provider accounting now records evidence-bound
+- Schema 30 durable provider accounting records evidence-bound
   `primary_execution`, `fallback`, `summarizer`, `orchestrator_audit`, and
-  `optional_judge` operations while reserving `classifier` for a future
-  authoritative lifecycle. Task-scoped API/SDK inspection, automatic route
+  `optional_judge` operations. It initially reserved `classifier`; schema 46
+  now adds the restart-safe, policy-bounded auxiliary intent-classification
+  lifecycle without granting it task-success or fitness authority. Task-scoped API/SDK inspection, automatic route
   explanations, and identifier-free metrics
   keep routed and auxiliary totals separate. Missing usage remains unknown,
   configured estimates remain distinguishable from billed/reconciled cost, and
@@ -608,14 +610,13 @@ server ownership and recovery semantics first. Keep credentials outside source
 configuration and logs. Existing Codex login is used without copying credentials
 into DarwinRouter or artifacts.
 
-## Required before announcing v1.0.0
+## Operator-controlled release evidence
 
-The deterministic DAR-45 testable-MVP gate passes and DAR-46 is the only open
-MVP issue, but full PRD qualification,
-built-in side-effecting CLI tools,
-automatic skill validation/activation, learning-attention controls,
-configuration reload and supported-platform qualification remain
-open. This list is not exhaustive. Distribution also requires an approved
-third-party dependency notices, a dedicated signing identity with an independent public-key
-trust record, approved version-specific notes and explicit publication. Record
-the decisions and evidence in the [release checklist](release-checklist.md).
+The deterministic testable-MVP gate does not qualify every PRD scenario or
+support unlisted platforms. Built-in side-effecting CLI tools, unattended skill
+activation, learning-attention controls, and configuration reload are not
+claimed by these notes. Distribution approval, reviewed dependency notices,
+the dedicated signing identity, independent public-key trust, supported-target
+evidence, and publication authority live in separate operator records. Consult
+the [release checklist](release-checklist.md); neither this template nor its
+candidate-bound rendering grants or substitutes for those decisions.

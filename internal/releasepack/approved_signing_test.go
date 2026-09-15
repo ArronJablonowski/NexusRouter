@@ -462,6 +462,10 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	if err != nil {
 		t.Fatal(err)
 	}
+	shared.notes, err = renderFinalReleaseNotes(shared.notes, "1.0.0", commit, created)
+	if err != nil {
+		t.Fatal(err)
+	}
 	releaseDir := t.TempDir()
 	assets, err := readSBOMSourceFiles(source)
 	if err != nil {

@@ -24,6 +24,9 @@ func TestArguments(t *testing.T) {
 		{[]string{"verify"}, 2},
 		{[]string{"verify", "--record", "missing"}, 1},
 		{[]string{"verify", "--record", "x", "extra"}, 2},
+		{[]string{"notes", "--help"}, 0},
+		{[]string{"notes"}, 2},
+		{[]string{"notes", "--record", "missing", "--out", "notes.md"}, 1},
 	} {
 		var output bytes.Buffer
 		if got := run(context.Background(), tc.args, &output); got != tc.code {
@@ -70,6 +73,19 @@ func TestFreezeAndVerifyCommands(t *testing.T) {
 	}
 	if code := run(context.Background(), []string{"verify", "--record", record, "--source", source}, &output); code != 0 {
 		t.Fatalf("verify code %d: %s", code, output.String())
+	}
+	notes := filepath.Join(evidence, "DarwinRouter_1.0.0_RELEASE_NOTES.md")
+	if code := run(context.Background(), []string{"notes", "--record", record, "--source", source, "--out", notes}, &output); code != 0 {
+		t.Fatalf("notes code %d: %s", code, output.String())
+	}
+	notesBody, err := os.ReadFile(notes)
+	if err != nil || !bytes.Contains(notesBody, []byte("- Release version: `1.0.0`")) ||
+		!bytes.Contains(notesBody, []byte("- Source commit: `"+commit+"`")) ||
+		!bytes.Contains(notesBody, []byte("  - `linux/arm64`")) {
+		t.Fatal("candidate-bound notes missing identity", err)
+	}
+	if code := run(context.Background(), []string{"notes", "--record", record, "--source", source, "--out", notes}, &output); code != 1 {
+		t.Fatalf("existing notes destination code %d, want 1", code)
 	}
 	if code := run(context.Background(), freeze, &output); code != 1 {
 		t.Fatalf("existing destination code %d, want 1", code)

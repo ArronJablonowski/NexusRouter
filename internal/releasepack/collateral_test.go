@@ -336,7 +336,7 @@ func collateralSourceFixture(t *testing.T) string {
 	for name, body := range map[string][]byte{
 		"docs/release-install.md": []byte("# Install\n"),
 		licenseName:               []byte("MIT License\n"),
-		"docs/release-notes.md":   []byte("# Release notes\n"),
+		"docs/release-notes.md":   []byte(releaseNotesTemplateH1 + "\nFixture release summary.\n"),
 		"examples/local.yaml":     []byte(collateralConfigFixture),
 	} {
 		collateralWrite(t, filepath.Join(root, name), body)

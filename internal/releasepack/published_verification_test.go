@@ -224,7 +224,7 @@ func publishedFixtureFromSigningWithVerifier(t *testing.T, signing ApprovedSigni
 	if err != nil {
 		t.Fatal(err)
 	}
-	notesFile := filepath.Join(signing.Source, "docs", "release-notes.md")
+	notesFile := candidateFinalNotesFixture(t, candidate, signing.Source)
 	notes, err := os.ReadFile(notesFile)
 	if err != nil {
 		t.Fatal(err)

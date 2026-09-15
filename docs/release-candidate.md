@@ -31,7 +31,24 @@ the release snapshot rules, and records:
 - SHA-256 hashes of installation instructions, project license, release notes
   and conservative example configuration from the immutable snapshot.
 
-The canonical candidate record is schema 2. Its target-specific archive
+The canonical candidate record is schema 3. It binds both the immutable source
+release-notes template and the exact derived final-notes digest. Generate the
+reviewable final body without overwriting either input:
+
+```sh
+go run ./cmd/release-candidate notes \
+  --record "$candidate_parent/DarwinRouter_1.0.0_candidate.json" \
+  --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
+  --out "$candidate_parent/DarwinRouter_1.0.0_RELEASE_NOTES.md"
+```
+
+The generated body contains the exact semantic version, full source commit,
+commit-derived UTC date, fixed four-target contract, and explicit limitations.
+Changing any identity or the source template changes its candidate-bound
+digest. Generation is create-only, grants no approval, and requires the same
+clean exact checkout as candidate verification.
+
+The target-specific archive
 contract includes `SBOM.spdx.json` as a non-shared member between release notes
 and third-party notices. The SBOM is an SPDX 2.3 module-level inventory bound to
 the target binary, Go dependency/toolchain closure, and exact first-party Web UI

@@ -142,6 +142,12 @@ go run ./cmd/verify-publication-authorization \
   --release-notes /ABSOLUTE/APPROVED/RELEASE_NOTES.md
 ```
 
+`RELEASE_NOTES.md` above must be the create-only candidate-bound body produced
+by `release-candidate notes`, not the committed unreleased template. Preflight
+re-renders it from the independently verified candidate and clean source, then
+requires exact bytes and the schema-3 candidate digest before accepting the
+publication authorization.
+
 Success returns one JSON line containing only public identities and the seven
 observed files. Preflight performs the complete approval-bound signature and
 source verification twice around exact asset observation. It rejects altered or

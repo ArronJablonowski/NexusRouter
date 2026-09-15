@@ -73,7 +73,7 @@ been mechanically established use `NOASSERTION`; the separate notice bundle and
 human license review remain authoritative for release approval.
 
 The document creation time is the source commit's committer timestamp converted
-to whole-second UTC. Candidate schema 2 and manifest schema 3 freeze that value,
+to whole-second UTC. Candidate schema 3 and manifest schema 3 freeze that value,
 and approved verification re-derives it before key access. Qualification also
 validates generated documents offline against the official SPDX 2.3 JSON schema
 pinned to the dereferenced `v2.3` commit and recorded digest. The project package

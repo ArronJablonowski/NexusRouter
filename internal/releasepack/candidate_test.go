@@ -68,6 +68,8 @@ func TestCandidateRejectsContractDrift(t *testing.T) {
 		{"collateral_removed", func(r *CandidateRecord) { r.SourceCollateral = r.SourceCollateral[:3] }},
 		{"collateral_source", func(r *CandidateRecord) { r.SourceCollateral[0].Source = "other" }},
 		{"collateral_hash", func(r *CandidateRecord) { r.SourceCollateral[0].SHA256 = "bad" }},
+		{"notes_schema", func(r *CandidateRecord) { r.FinalReleaseNotes.SchemaVersion++ }},
+		{"notes_hash", func(r *CandidateRecord) { r.FinalReleaseNotes.SHA256 = "bad" }},
 		{"gate_removed", func(r *CandidateRecord) { r.OperatorGates = r.OperatorGates[:4] }},
 		{"gate_approved", func(r *CandidateRecord) { r.OperatorGates[0].Status = "approved" }},
 	}

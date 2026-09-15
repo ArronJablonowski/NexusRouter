@@ -1,6 +1,7 @@
 package releasepack
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -58,8 +59,10 @@ func verifyPublicationPreflightWithLicenseEvidenceVerifier(ctx context.Context, 
 	}
 	notes, err := readPublicationInput(options.ReleaseNotesFile, maxReleaseNotes)
 	notesRaw := sha256.Sum256(notes)
-	if err != nil || len(candidate.SourceCollateral) != 4 || candidate.SourceCollateral[2].Source != "docs/release-notes.md" ||
-		candidate.SourceCollateral[2].Entry != releaseNotesName || candidate.SourceCollateral[2].SHA256 != hex.EncodeToString(notesRaw[:]) {
+	template, templateErr := loadCollateral(options.Verification.Source)
+	expectedNotes, renderErr := renderFinalReleaseNotes(template.notes, candidate.ReleaseVersion, candidate.SourceCommit, candidate.ReleaseCreated)
+	if err != nil || templateErr != nil || renderErr != nil || !bytes.Equal(notes, expectedNotes) ||
+		candidate.FinalReleaseNotes.SHA256 != hex.EncodeToString(notesRaw[:]) {
 		return result, ErrPublicationAuthorization
 	}
 	notesSHA := publicationDigest(notes)

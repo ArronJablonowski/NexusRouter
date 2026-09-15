@@ -265,7 +265,11 @@ func approvedArtifactManifest(root *os.Root, candidate CandidateRecord) (Manifes
 		return Manifest{}, ErrSignature
 	}
 	for i, index := range indexes {
-		if manifest.Artifacts[0].Entries[index].SHA256 != candidate.SourceCollateral[i].SHA256 {
+		expected := candidate.SourceCollateral[i].SHA256
+		if index == 2 {
+			expected = candidate.FinalReleaseNotes.SHA256
+		}
+		if manifest.Artifacts[0].Entries[index].SHA256 != expected {
 			return Manifest{}, ErrSignature
 		}
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	candidateSchema = 2
+	candidateSchema = 3
 	maxCandidate    = 64 << 10
 )
 
@@ -23,15 +23,16 @@ const (
 // decisions as unapproved; a generated record is evidence of neither approval
 // nor qualification.
 type CandidateRecord struct {
-	SchemaVersion         int                   `json:"schema_version"`
-	ReleaseVersion        string                `json:"release_version"`
-	SourceCommit          string                `json:"source_commit"`
-	ReleaseCreated        string                `json:"release_created"`
-	ReleaseManifestSchema int                   `json:"release_manifest_schema"`
-	Targets               []CandidateTarget     `json:"targets"`
-	ArchiveEntries        []CandidateEntry      `json:"archive_entries"`
-	SourceCollateral      []CandidateCollateral `json:"source_collateral"`
-	OperatorGates         []CandidateGate       `json:"operator_gates"`
+	SchemaVersion         int                        `json:"schema_version"`
+	ReleaseVersion        string                     `json:"release_version"`
+	SourceCommit          string                     `json:"source_commit"`
+	ReleaseCreated        string                     `json:"release_created"`
+	ReleaseManifestSchema int                        `json:"release_manifest_schema"`
+	Targets               []CandidateTarget          `json:"targets"`
+	ArchiveEntries        []CandidateEntry           `json:"archive_entries"`
+	SourceCollateral      []CandidateCollateral      `json:"source_collateral"`
+	FinalReleaseNotes     CandidateFinalReleaseNotes `json:"final_release_notes"`
+	OperatorGates         []CandidateGate            `json:"operator_gates"`
 }
 
 type CandidateTarget struct {
@@ -287,6 +288,10 @@ func candidateRecord(version, commit, created, source string) (CandidateRecord, 
 		digest := sha256.Sum256(item.body)
 		sources[i] = CandidateCollateral{Source: item.source, Entry: item.entry, SHA256: hex.EncodeToString(digest[:])}
 	}
+	finalNotes, err := finalReleaseNotesRecord(shared.notes, version, commit, created)
+	if err != nil {
+		return CandidateRecord{}, err
+	}
 	return CandidateRecord{
 		SchemaVersion:         candidateSchema,
 		ReleaseVersion:        version,
@@ -296,6 +301,7 @@ func candidateRecord(version, commit, created, source string) (CandidateRecord, 
 		Targets:               append([]CandidateTarget(nil), candidateTargets...),
 		ArchiveEntries:        entries,
 		SourceCollateral:      sources,
+		FinalReleaseNotes:     finalNotes,
 		OperatorGates:         append([]CandidateGate(nil), candidateGates...),
 	}, nil
 }
@@ -322,7 +328,8 @@ func validateCandidateRecord(record CandidateRecord) error {
 		!validSPDXCreated(record.ReleaseCreated) ||
 		validate(Options{Version: record.ReleaseVersion, Commit: record.SourceCommit, Out: "release"}) != nil ||
 		len(record.Targets) != len(candidateTargets) || len(record.ArchiveEntries) != len(archiveContract) ||
-		len(record.SourceCollateral) != 4 || len(record.OperatorGates) != len(candidateGates) {
+		len(record.SourceCollateral) != 4 || record.FinalReleaseNotes.SchemaVersion != finalReleaseNotesSchema ||
+		!candidateDigestPattern.MatchString(record.FinalReleaseNotes.SHA256) || len(record.OperatorGates) != len(candidateGates) {
 		return ErrInvalid
 	}
 	for i := range candidateTargets {

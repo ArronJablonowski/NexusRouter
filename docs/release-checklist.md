@@ -19,6 +19,8 @@ and sensitive logs out of this record and the repository.
 - Candidate-record SHA-256:
 - Independent expected candidate-record SHA-256 source:
 - Candidate-record verification host/time/result:
+- Candidate-bound final release-notes location and SHA-256:
+- Final-notes generation/verification host and time:
 - [ ] The version is approved and has no leading `v` in package-tool inputs.
 - [ ] HEAD equals the recorded commit and the worktree is clean.
 - [ ] `release-candidate verify` re-derived the external candidate record from
@@ -26,6 +28,8 @@ and sensitive logs out of this record and the repository.
   intentionally unapproved and are resolved by this checklist.
 - [ ] Release notes identify this exact version, commit, date, supported targets
   and known limitations.
+- [ ] `release-candidate notes` created the canonical schema-3-bound final body;
+  the committed unreleased template was not supplied directly for publication.
 
 ## License and notices
 
@@ -182,7 +186,7 @@ be omitted.
 - Incomplete receipt/install quarantine and execution-state classification (if
   any):
 - [ ] Manifest version and commit equal the recorded candidate identity.
-- [ ] The candidate record is canonical schema 2, the release manifest is
+- [ ] The candidate record is canonical schema 3, the release manifest is
   canonical schema 3, and each archive has the exact seven-member contract.
 - [ ] `build-approved-release` performed two isolated builds and the retained
   unsigned directory is one of those byte-compared outputs, not a later rebuild.
