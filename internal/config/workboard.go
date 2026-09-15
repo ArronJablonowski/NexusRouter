@@ -10,6 +10,15 @@ import (
 
 const maxWorkboardJudgeCost = float64(workboard.MaxWorkCostMicros) / 1_000_000
 
+func (s Settings) validateWorkboardDecomposition() error {
+	limits := s.Workboard.Decomposition
+	if limits.Version != 1 || limits.MaxDepth < 1 || limits.MaxDepth > workboard.MaxGraphDepth ||
+		limits.MaxChildrenPerParent < 1 || limits.MaxChildrenPerParent > workboard.MaxChildrenPerParent {
+		return errors.New("invalid workboard decomposition limits")
+	}
+	return nil
+}
+
 // validateWorkboardSchedulerModels keeps unattended Workboard execution
 // fail-closed. The scheduler is not allowed to select either participant via
 // adaptive routing: both aliases resolve to one configured provider/model

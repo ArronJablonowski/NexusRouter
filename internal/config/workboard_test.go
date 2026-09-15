@@ -2,12 +2,101 @@ package config
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"math"
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/workboard"
 )
+
+func TestWorkboardDecompositionDefaultsLayersDisplayAndFingerprint(t *testing.T) {
+	defaults := Defaults()
+	if defaults.Workboard.Decomposition != (WorkboardDecomposition{Version: 1, MaxDepth: 4, MaxChildrenPerParent: 8}) {
+		t.Fatalf("unexpected decomposition defaults: %+v", defaults.Workboard.Decomposition)
+	}
+
+	settings, err := Load(Options{
+		UserFile:    file(t, "workboard:\n  decomposition:\n    max_depth: 6\n    max_children_per_parent: 12\n"),
+		ProjectFile: file(t, "workboard:\n  decomposition:\n    max_depth: 5\n"),
+		Env:         Environment([]string{"DARWIN__WORKBOARD__DECOMPOSITION__MAX_CHILDREN_PER_PARENT=10"}),
+		Flags:       map[string]string{"workboard.decomposition.max_depth": "3"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Workboard.Decomposition != (WorkboardDecomposition{Version: 1, MaxDepth: 3, MaxChildrenPerParent: 10}) {
+		t.Fatalf("decomposition layers decoded incorrectly: %+v", settings.Workboard.Decomposition)
+	}
+
+	display, err := settings.RedactedJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(display, []byte(`"decomposition"`)) || !bytes.Contains(display, []byte(`"max_depth": 3`)) ||
+		!bytes.Contains(display, []byte(`"version": 1`)) || !bytes.Contains(display, []byte(`"max_children_per_parent": 10`)) {
+		t.Fatalf("effective decomposition limits absent from redacted display: %s", display)
+	}
+	before := sha256.Sum256(display)
+	for name, mutate := range map[string]func(*Settings){
+		"depth":    func(s *Settings) { s.Workboard.Decomposition.MaxDepth++ },
+		"children": func(s *Settings) { s.Workboard.Decomposition.MaxChildrenPerParent++ },
+	} {
+		changedSettings := settings
+		mutate(&changedSettings)
+		changed, err := changedSettings.RedactedJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before == sha256.Sum256(changed) {
+			t.Fatalf("decomposition %s change absent from configuration fingerprint", name)
+		}
+	}
+	if settings.Workboard.Decomposition != (WorkboardDecomposition{Version: 1, MaxDepth: 3, MaxChildrenPerParent: 10}) {
+		t.Fatal("redacted display mutated effective settings")
+	}
+}
+
+func TestWorkboardDecompositionValidationBoundaries(t *testing.T) {
+	for _, limits := range []WorkboardDecomposition{
+		{Version: 1, MaxDepth: 1, MaxChildrenPerParent: 1},
+		{Version: 1, MaxDepth: workboard.MaxGraphDepth, MaxChildrenPerParent: workboard.MaxChildrenPerParent},
+	} {
+		s := Defaults()
+		s.Workboard.Decomposition = limits
+		if err := s.Validate(); err != nil {
+			t.Fatalf("valid decomposition boundary rejected: %+v: %v", limits, err)
+		}
+	}
+	for _, limits := range []WorkboardDecomposition{
+		{Version: 0, MaxDepth: 1, MaxChildrenPerParent: 1},
+		{Version: 2, MaxDepth: 1, MaxChildrenPerParent: 1},
+		{Version: 1, MaxDepth: 0, MaxChildrenPerParent: 1},
+		{Version: 1, MaxDepth: -1, MaxChildrenPerParent: 1},
+		{Version: 1, MaxDepth: workboard.MaxGraphDepth + 1, MaxChildrenPerParent: 1},
+		{Version: 1, MaxDepth: 1, MaxChildrenPerParent: 0},
+		{Version: 1, MaxDepth: 1, MaxChildrenPerParent: -1},
+		{Version: 1, MaxDepth: 1, MaxChildrenPerParent: workboard.MaxChildrenPerParent + 1},
+	} {
+		s := Defaults()
+		s.Workboard.Decomposition = limits
+		if err := s.Validate(); err == nil {
+			t.Fatalf("unsafe decomposition limits accepted: %+v", limits)
+		}
+	}
+}
+
+func TestWorkboardDecompositionStrictConfiguration(t *testing.T) {
+	for _, body := range []string{
+		"workboard:\n  decomposition:\n    max_depth: many\n",
+		"workboard:\n  decomposition:\n    max_children_per_parent: 2.5\n",
+		"workboard:\n  decomposition:\n    max_child_cards: 8\n",
+	} {
+		if _, err := Load(Options{ProjectFile: file(t, body)}); err == nil {
+			t.Fatalf("invalid decomposition configuration accepted: %s", body)
+		}
+	}
+}
 
 func TestWorkboardSchedulerDefaultsAndOverrides(t *testing.T) {
 	defaults := Defaults()

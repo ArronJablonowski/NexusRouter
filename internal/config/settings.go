@@ -48,8 +48,14 @@ type WebUI struct {
 	BrowserSessionTTL string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
 }
 type Workboard struct {
-	Enabled   bool               `yaml:"enabled" json:"enabled"`
-	Scheduler WorkboardScheduler `yaml:"scheduler" json:"scheduler"`
+	Enabled       bool                   `yaml:"enabled" json:"enabled"`
+	Decomposition WorkboardDecomposition `yaml:"decomposition" json:"decomposition"`
+	Scheduler     WorkboardScheduler     `yaml:"scheduler" json:"scheduler"`
+}
+type WorkboardDecomposition struct {
+	Version              int `yaml:"version" json:"version"`
+	MaxDepth             int `yaml:"max_depth" json:"max_depth"`
+	MaxChildrenPerParent int `yaml:"max_children_per_parent" json:"max_children_per_parent"`
 }
 type WorkboardScheduler struct {
 	Enabled         bool                     `yaml:"enabled" json:"enabled"`
@@ -195,7 +201,7 @@ type Runtime struct {
 
 func Defaults() Settings {
 	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h"},
-		Workboard: Workboard{Enabled: true, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
+		Workboard: Workboard{Enabled: true, Decomposition: WorkboardDecomposition{Version: 1, MaxDepth: 4, MaxChildrenPerParent: 8}, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},
 		Skills: Skills{Learning: Learning{Name: "default", Domain: "general", Interval: "1m", ScanLimit: 20}, GenerationBudget: GenerationBudget{Window: "24h", MaxAttempts: 10, MaxInFlight: 1, Cooldown: "1h"},
@@ -285,6 +291,9 @@ func (s Settings) Validate() error {
 		s.Workboard.Scheduler.MaxActiveClaims < 1 || s.Workboard.Scheduler.MaxActiveClaims > 64 || (s.Workboard.Scheduler.Enabled && s.Workboard.Scheduler.MaxActiveClaims > s.Workers.Max) ||
 		s.Workboard.Scheduler.CardScanLimit < 1 || s.Workboard.Scheduler.CardScanLimit > 10000 {
 		return errors.New("invalid workboard scheduler configuration")
+	}
+	if err := s.validateWorkboardDecomposition(); err != nil {
+		return err
 	}
 	if err := s.validateWorkboardSchedulerModels(); err != nil {
 		return err

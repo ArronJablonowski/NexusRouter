@@ -18,6 +18,12 @@ runtime:
   auto_use_approved_summary: false
 workboard:
   enabled: true
+  # Host-enforced ceilings for agent-created parent/child work. A top-level
+  # card is depth 1; configured limits may only lower the hard bound of 64.
+  decomposition:
+    version: 1
+    max_depth: 4
+    max_children_per_parent: 8
   scheduler:
     # Unattended execution is opt-in. Enabling it dispatches Ready cards, so
     # first configure independent bounded worker and local reviewer aliases.
