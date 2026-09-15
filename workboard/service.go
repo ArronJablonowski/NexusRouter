@@ -209,6 +209,9 @@ type CardMutation struct {
 	BeforeCardID           string       `json:"before_card_id"`
 	AfterCardID            string       `json:"after_card_id"`
 	DependencyID           string       `json:"dependency_id"`
+	// Decomposition is trusted host policy attached by a configured service.
+	// Its absence preserves legacy operator-authored mutations.
+	Decomposition *DecompositionPolicy `json:"decomposition,omitempty"`
 }
 
 type CardStore interface {
@@ -229,15 +232,31 @@ type CardReplayStore interface {
 // trusted attribution from application context; transport requests never
 // supply actors. Policy adapters may still enforce finer board-level roles.
 type CardService struct {
-	store     CardStore
-	authority AuthoritySource
+	store         CardStore
+	authority     AuthoritySource
+	decomposition *DecompositionPolicy
 }
 
 func NewCardService(store CardStore, authority AuthoritySource) (*CardService, error) {
 	if store == nil || authority == nil {
 		return nil, fail(CodeInvalid, "store")
 	}
-	return &CardService{store: store, authority: authority}, nil
+	policy, err := NewDecompositionPolicy(DefaultDecompositionLimits(), DefaultDecompositionConfigDigest)
+	if err != nil {
+		return nil, err
+	}
+	return &CardService{store: store, authority: authority, decomposition: &policy}, nil
+}
+
+// NewCardServiceWithDecomposition creates a service that binds every hierarchy
+// mutation to trusted host policy. Callers may only request equal or stricter
+// limits; they cannot replace the host configuration identity.
+func NewCardServiceWithDecomposition(store CardStore, authority AuthoritySource, policy DecompositionPolicy) (*CardService, error) {
+	if store == nil || authority == nil || policy.Validate() != nil {
+		return nil, fail(CodeInvalid, "decomposition_policy")
+	}
+	copy := policy
+	return &CardService{store: store, authority: authority, decomposition: &copy}, nil
 }
 
 type CreateCardRequest struct {
@@ -246,6 +265,9 @@ type CreateCardRequest struct {
 	IdempotencyKey        string
 	ExpectedBoardRevision int64
 	ExpectedGraphRevision int64
+	// Decomposition optionally narrows configured host limits for delegated
+	// child work. It is rejected by legacy services and can never loosen policy.
+	Decomposition *DecompositionLimits
 }
 
 type ReviseCardRequest struct {
@@ -307,8 +329,13 @@ func (s *CardService) CreateCard(ctx context.Context, request CreateCardRequest)
 	if err != nil {
 		return CardMutationResult{}, err
 	}
+	policy, err := s.createDecompositionPolicy(actor, request.Decomposition)
+	if err != nil {
+		return CardMutationResult{}, err
+	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationCreate, BoardID: request.BoardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedBoardRevision: request.ExpectedBoardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision, Create: copyNewCardPtr(request.Card)}
+	mutation.Decomposition = policy
 	if card, found, err := s.replay(ctx, mutation); found || err != nil {
 		return card, err
 	}
@@ -321,6 +348,11 @@ func (s *CardService) CreateCard(ctx context.Context, request CreateCardRequest)
 	}
 	if _, err = ValidateGraph(graph, request.ExpectedGraphRevision); err != nil {
 		return CardMutationResult{}, err
+	}
+	if policy != nil {
+		if _, err = AdmitDecomposition(graph, request.ExpectedGraphRevision, "", request.Card.ParentID, *policy); err != nil {
+			return CardMutationResult{}, err
+		}
 	}
 	if request.Card.ParentID != "" && !graphContains(graph, request.Card.ParentID) {
 		return CardMutationResult{}, fail(CodeMissingNode, "parent")
@@ -386,6 +418,9 @@ func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest)
 	}
 	mutation := CardMutation{Version: CardMutationVersion, Kind: MutationRevise, BoardID: request.BoardID, CardID: request.CardID, IdempotencyKey: request.IdempotencyKey, Actor: actor,
 		ExpectedCardRevision: request.ExpectedCardRevision, ExpectedGraphRevision: request.ExpectedGraphRevision, Patch: copyPatch(request.Patch)}
+	if request.Patch.ParentID != nil && actor.Type == "model" && s.decomposition != nil {
+		mutation.Decomposition = copyDecompositionPolicy(s.decomposition)
+	}
 	if card, found, err := s.replay(ctx, mutation); found || err != nil {
 		return card, err
 	}
@@ -399,6 +434,11 @@ func (s *CardService) ReviseCard(ctx context.Context, request ReviseCardRequest)
 		graph, err := s.store.LoadGraph(ctx, request.BoardID)
 		if err != nil {
 			return CardMutationResult{}, err
+		}
+		if mutation.Decomposition != nil {
+			if _, err = AdmitDecomposition(graph, request.ExpectedGraphRevision, request.CardID, *request.Patch.ParentID, *mutation.Decomposition); err != nil {
+				return CardMutationResult{}, err
+			}
 		}
 		found := false
 		for index := range graph.Nodes {
@@ -671,6 +711,32 @@ func (s *CardService) authorize(ctx context.Context) (Actor, error) {
 func (s *CardService) hasAtomicReplayStore() bool {
 	_, ok := s.store.(CardReplayStore)
 	return ok
+}
+
+func (s *CardService) createDecompositionPolicy(actor Actor, restriction *DecompositionLimits) (*DecompositionPolicy, error) {
+	if actor.Type != "model" || s.decomposition == nil {
+		if restriction != nil {
+			return nil, fail(CodeInvalid, "decomposition_restriction")
+		}
+		return nil, nil
+	}
+	policy := *s.decomposition
+	if restriction != nil {
+		restricted, err := policy.Restrict(*restriction)
+		if err != nil {
+			return nil, err
+		}
+		policy = restricted
+	}
+	return &policy, nil
+}
+
+func copyDecompositionPolicy(policy *DecompositionPolicy) *DecompositionPolicy {
+	if policy == nil {
+		return nil
+	}
+	copy := *policy
+	return &copy
 }
 
 func mutationDigest(mutation CardMutation) (string, error) {

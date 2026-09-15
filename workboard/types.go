@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	MaxIdentifierBytes = 128
-	MaxDependencies    = 64
-	MaxReverseFanout   = 64
-	MaxGraphDepth      = 64
-	MaxGraphVisits     = 10_000
-	MaxCardsPerBoard   = 10_000
-	MaxLeaseTTL        = 10 * time.Minute
-	MinLeaseTTL        = time.Millisecond
+	MaxIdentifierBytes   = 128
+	MaxDependencies      = 64
+	MaxReverseFanout     = 64
+	MaxGraphDepth        = 64
+	MaxChildrenPerParent = 64
+	MaxGraphVisits       = 10_000
+	MaxCardsPerBoard     = 10_000
+	MaxLeaseTTL          = 10 * time.Minute
+	MinLeaseTTL          = time.Millisecond
 )
 
 type ErrorCode string

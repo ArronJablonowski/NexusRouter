@@ -247,16 +247,25 @@ func (c Column) StateOrdinal() int {
 }
 
 type BoardEvent struct {
-	Version     int         `json:"version"`
-	ID          string      `json:"id"`
-	BoardID     string      `json:"board_id"`
-	Sequence    int64       `json:"sequence"`
-	OperationID string      `json:"operation_id"`
-	Kind        BoardAction `json:"kind"`
-	ActorID     string      `json:"actor_id"`
-	ActorType   string      `json:"actor_type"`
-	CardID      string      `json:"card_id,omitempty"`
-	CreatedAt   time.Time   `json:"created_at"`
+	Version                      int         `json:"version"`
+	ID                           string      `json:"id"`
+	BoardID                      string      `json:"board_id"`
+	Sequence                     int64       `json:"sequence"`
+	OperationID                  string      `json:"operation_id"`
+	Kind                         BoardAction `json:"kind"`
+	ActorID                      string      `json:"actor_id"`
+	ActorType                    string      `json:"actor_type"`
+	CardID                       string      `json:"card_id,omitempty"`
+	CreatedAt                    time.Time   `json:"created_at"`
+	DecompositionAdmissionID     string      `json:"decomposition_admission_id,omitempty"`
+	DecompositionAdmissionDigest string      `json:"decomposition_admission_digest,omitempty"`
+	DecompositionDecisionDigest  string      `json:"decomposition_decision_digest,omitempty"`
+	DecompositionConfigDigest    string      `json:"decomposition_config_digest,omitempty"`
+	DecompositionPolicyDigest    string      `json:"decomposition_policy_digest,omitempty"`
+	DecompositionMaxDepth        int         `json:"decomposition_max_depth,omitempty"`
+	DecompositionMaxChildren     int         `json:"decomposition_max_children,omitempty"`
+	DecompositionDepth           int         `json:"decomposition_depth,omitempty"`
+	DecompositionDirectChildren  int         `json:"decomposition_direct_children,omitempty"`
 }
 
 func (e BoardEvent) Validate() error {
@@ -264,6 +273,51 @@ func (e BoardEvent) Validate() error {
 		!validBoardAction(e.Kind) || (Actor{e.ActorID, e.ActorType}).Validate() != nil || !optionalID(e.CardID) ||
 		boardActionRequiresCard(e.Kind) != (e.CardID != "") || !validTime(e.CreatedAt) {
 		return fail(CodeInvalid, "event")
+	}
+	if err := e.validateDecompositionReference(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e BoardEvent) HasDecompositionAdmission() bool { return e.DecompositionAdmissionID != "" }
+
+// BindDecompositionAdmission projects only non-sensitive durable admission
+// evidence into the immutable board journal.
+func (e *BoardEvent) BindDecompositionAdmission(admission DecompositionAdmission) error {
+	if e == nil || admission.Validate() != nil || admission.BoardID != e.BoardID || admission.CardID != e.CardID ||
+		admission.OperationID != e.OperationID || admission.Actor.ID != e.ActorID || admission.Actor.Type != e.ActorType ||
+		(e.Kind != CardCreateAction && e.Kind != CardReviseAction) {
+		return fail(CodeInvalid, "decomposition_event")
+	}
+	e.DecompositionAdmissionID = admission.AdmissionID
+	e.DecompositionAdmissionDigest = admission.AdmissionDigest
+	e.DecompositionDecisionDigest = admission.DecisionDigest
+	e.DecompositionConfigDigest = admission.ConfigDigest
+	e.DecompositionPolicyDigest = admission.PolicyDigest
+	e.DecompositionMaxDepth = admission.Limits.MaxDepth
+	e.DecompositionMaxChildren = admission.Limits.MaxChildren
+	e.DecompositionDepth = admission.Depth
+	e.DecompositionDirectChildren = admission.DirectChildren
+	return nil
+}
+
+func (e BoardEvent) validateDecompositionReference() error {
+	if !e.HasDecompositionAdmission() {
+		if e.DecompositionAdmissionDigest != "" || e.DecompositionDecisionDigest != "" || e.DecompositionConfigDigest != "" ||
+			e.DecompositionPolicyDigest != "" || e.DecompositionMaxDepth != 0 || e.DecompositionMaxChildren != 0 ||
+			e.DecompositionDepth != 0 || e.DecompositionDirectChildren != 0 {
+			return fail(CodeInvalid, "decomposition_event")
+		}
+		return nil
+	}
+	if e.Kind != CardCreateAction && e.Kind != CardReviseAction || !validID(e.DecompositionAdmissionID) ||
+		!digest(e.DecompositionAdmissionDigest) || !digest(e.DecompositionDecisionDigest) || !digest(e.DecompositionConfigDigest) ||
+		!digest(e.DecompositionPolicyDigest) || e.DecompositionMaxDepth < 1 || e.DecompositionMaxDepth > MaxGraphDepth ||
+		e.DecompositionMaxChildren < 1 || e.DecompositionMaxChildren > MaxChildrenPerParent ||
+		e.DecompositionDepth < 1 || e.DecompositionDepth > e.DecompositionMaxDepth ||
+		e.DecompositionDirectChildren < 0 || e.DecompositionDirectChildren > e.DecompositionMaxChildren {
+		return fail(CodeInvalid, "decomposition_event")
 	}
 	return nil
 }
