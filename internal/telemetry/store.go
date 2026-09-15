@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 49 {
+		if err = discardEmptyFutureWorkboardDecompositionAdmissions(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 49 {
+		if err = validateWorkboardDecompositionAdmissionSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 48 {
 		if err = discardEmptyFutureSummaryAttemptRecoveries(ctx, conn); err != nil {
 			return err
@@ -215,6 +225,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 48 {
 		if err = discardFutureSummaryAttemptProcessColumn(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 49 {
+		if err = discardFutureWorkboardDecompositionAdmissionObjects(ctx, conn); err != nil {
 			return err
 		}
 	}
@@ -560,6 +575,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 48 {
 		if err = migrateSummaryAttemptRecoveries(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 49 {
+		if err = migrateWorkboardDecompositionAdmissions(ctx, conn); err != nil {
 			return err
 		}
 	}

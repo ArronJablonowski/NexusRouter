@@ -79,6 +79,9 @@ func dropWorkboardAuxiliaryReviewSchema45(t *testing.T, db *sql.DB) {
 
 func downgradeWorkboards(t *testing.T, db *sql.DB) {
 	t.Helper()
+	if err := downgradeWorkboardDecomposition49(db); err != nil {
+		t.Fatal(err)
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +192,7 @@ func TestWorkboardMigrationCreatesDurableBoundedSchema(t *testing.T) {
 	if err = store.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != currentStorageSchema {
 		t.Fatal("schema version", version, err)
 	}
-	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name LIKE 'workboard_%'`).Scan(&tables); err != nil || tables != len(workboardTables) {
+	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name LIKE 'workboard_%'`).Scan(&tables); err != nil || tables != len(workboardTables)+1 {
 		t.Fatal("workboard tables", tables, err)
 	}
 	if err = store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'workboard_%_limit'`).Scan(&triggers); err != nil || triggers != 12 {

@@ -11,6 +11,9 @@ import (
 
 func downgradeWorkboardEventsTo35(t *testing.T, db *sql.DB) {
 	t.Helper()
+	if err := downgradeWorkboardDecomposition49(db); err != nil {
+		t.Fatal(err)
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		t.Fatal(err)

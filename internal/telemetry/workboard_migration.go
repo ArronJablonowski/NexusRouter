@@ -466,6 +466,9 @@ func validateWorkboardSchemaVersion(ctx context.Context, conn *sql.Conn, eventCa
 	}
 	if eventCardIdentity {
 		shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0"
+		if browserTableShape(ctx, conn, "workboard_events", "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0") {
+			shapes["workboard_events"] = "id:TEXT:1:0,board_id:TEXT:1:1,sequence:INTEGER:1:2,operation_id:TEXT:1:0,kind:TEXT:1:0,actor_id:TEXT:1:0,actor_type:TEXT:1:0,card_id:TEXT:0:0,created_at:INTEGER:1:0,body:BLOB:1:0,decomposition_admission_id:TEXT:0:0,decomposition_admission_digest:TEXT:0:0,decomposition_config_digest:TEXT:0:0,decomposition_policy_digest:TEXT:0:0,decomposition_max_depth:INTEGER:0:0,decomposition_max_children:INTEGER:0:0,decomposition_depth:INTEGER:0:0,decomposition_direct_children:INTEGER:0:0"
+		}
 	}
 	if reassignments {
 		shapes["workboard_reassignments"] = "recovery_id:TEXT:1:1,board_id:TEXT:1:0,card_id:TEXT:1:0,predecessor_attempt_id:TEXT:1:0,predecessor_claim_id:TEXT:1:0,successor_attempt_id:TEXT:1:0,successor_claim_id:TEXT:1:0,created_at:INTEGER:1:0,body:BLOB:1:0"
@@ -605,7 +608,16 @@ func workboardObjectRules(ctx context.Context, conn *sql.Conn, kind, name string
 }
 
 func workboardNamedObjects(ctx context.Context, conn *sql.Conn, kind string, expected []string) error {
-	rows, err := conn.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type=? AND name GLOB 'workboard_*' ORDER BY name`, kind)
+	// Schema-49 decomposition admissions extend the Workboard namespace while
+	// retaining the exact schema-40 core. Their own validator proves these
+	// objects. Excluding only this closed set keeps the historical validators
+	// useful during migration without making arbitrary future objects invisible.
+	rows, err := conn.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type=? AND name GLOB 'workboard_*'
+		AND name NOT IN ('workboard_decomposition_admissions','workboard_decomposition_admissions_parent',
+			'workboard_decomposition_admission_binding','workboard_decomposition_admission_immutable_update',
+			'workboard_decomposition_admission_immutable_delete','workboard_decomposition_event_binding',
+			'workboard_decomposition_event_immutable')
+		ORDER BY name`, kind)
 	if err != nil {
 		return err
 	}
