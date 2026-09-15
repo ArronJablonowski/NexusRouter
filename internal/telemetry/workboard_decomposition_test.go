@@ -176,6 +176,24 @@ func TestWorkboardDecompositionParentLineageAndConcurrentFanout(t *testing.T) {
 	if err = store.db.QueryRow(`SELECT count(*) FROM workboard_cards WHERE board_id=? AND parent_id=?`, boardID, parent.ID).Scan(&children); err != nil || children != 2 {
 		t.Fatalf("children=%d error=%v", children, err)
 	}
+	var cardsBefore, eventsBefore, operationsBefore, admissionsBefore int
+	if err = store.db.QueryRow(`SELECT (SELECT count(*) FROM workboard_cards),(SELECT count(*) FROM workboard_events),
+		(SELECT count(*) FROM workboard_operations),(SELECT count(*) FROM workboard_decomposition_admissions)`).
+		Scan(&cardsBefore, &eventsBefore, &operationsBefore, &admissionsBefore); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = looser.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "fanout-exhausted-key", ExpectedBoardRevision: 4,
+		ExpectedGraphRevision: 4, Card: decompositionCard("Over capacity", parent.ID)}); !errors.Is(err, &workboard.Violation{Code: workboard.CodeLimitExceeded}) {
+		t.Fatalf("post-race fanout error=%v", err)
+	}
+	var cardsAfter, eventsAfter, operationsAfter, admissionsAfter int
+	if err = store.db.QueryRow(`SELECT (SELECT count(*) FROM workboard_cards),(SELECT count(*) FROM workboard_events),
+		(SELECT count(*) FROM workboard_operations),(SELECT count(*) FROM workboard_decomposition_admissions)`).
+		Scan(&cardsAfter, &eventsAfter, &operationsAfter, &admissionsAfter); err != nil ||
+		cardsAfter != cardsBefore || eventsAfter != eventsBefore || operationsAfter != operationsBefore || admissionsAfter != admissionsBefore {
+		t.Fatalf("post-race counts before=%d/%d/%d/%d after=%d/%d/%d/%d error=%v", cardsBefore, eventsBefore, operationsBefore,
+			admissionsBefore, cardsAfter, eventsAfter, operationsAfter, admissionsAfter, err)
+	}
 }
 
 func TestWorkboardDecompositionLineageUsesLatestReparentEvent(t *testing.T) {
@@ -212,7 +230,7 @@ func TestWorkboardDecompositionLineageUsesLatestReparentEvent(t *testing.T) {
 
 func TestWorkboardDecompositionRejectsBeforeMutationAndRollsBack(t *testing.T) {
 	ctx := context.Background()
-	limits := workboard.DecompositionLimits{Version: 1, MaxDepth: 1, MaxChildren: 1}
+	limits := workboard.DecompositionLimits{Version: 1, MaxDepth: 2, MaxChildren: 2}
 	store, service, boardID := decompositionStore(t, filepath.Join(t.TempDir(), "state.db"), limits, "d", workboard.Actor{ID: "model-a", Type: "model"})
 	defer store.Close()
 	root, err := service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "bounded-root-key1", ExpectedBoardRevision: 1,
@@ -220,26 +238,38 @@ func TestWorkboardDecompositionRejectsBeforeMutationAndRollsBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "too-deep-child-key", ExpectedBoardRevision: 2,
-		ExpectedGraphRevision: 2, Card: decompositionCard("Too deep", root.ID)}); !errors.Is(err, &workboard.Violation{Code: workboard.CodeDepthExhausted}) {
+	if _, err = service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "larger-child-key1", ExpectedBoardRevision: 2,
+		ExpectedGraphRevision: 2, Card: decompositionCard("Allowed child", root.ID)}); err != nil {
+		t.Fatalf("larger policy did not persist decomposition: %v", err)
+	}
+	smallerPolicy := mustDecompositionPolicy(t, workboard.DecompositionLimits{Version: 1, MaxDepth: 1, MaxChildren: 2}, "8")
+	smaller, err := workboard.NewCardServiceWithDecomposition(store, telemetryCardAuthority{authority: workboard.Authority{CreationScope: "session",
+		Actor: workboard.Actor{ID: "model-a", Type: "model"}}}, smallerPolicy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = smaller.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "smaller-child-key1", ExpectedBoardRevision: 3,
+		ExpectedGraphRevision: 3, Card: decompositionCard("Rejected child", root.ID)}); !errors.Is(err, &workboard.Violation{Code: workboard.CodeDepthExhausted}) {
 		t.Fatalf("depth error=%v", err)
 	}
-	var cards, events, admissions int
+	var cards, events, operations, admissions int
 	if err = store.db.QueryRow(`SELECT (SELECT count(*) FROM workboard_cards),(SELECT count(*) FROM workboard_events),
-		(SELECT count(*) FROM workboard_decomposition_admissions)`).Scan(&cards, &events, &admissions); err != nil || cards != 1 || events != 2 || admissions != 1 {
-		t.Fatalf("after rejection cards=%d events=%d admissions=%d error=%v", cards, events, admissions, err)
+		(SELECT count(*) FROM workboard_operations),(SELECT count(*) FROM workboard_decomposition_admissions)`).Scan(&cards, &events, &operations, &admissions); err != nil ||
+		cards != 2 || events != 3 || operations != 3 || admissions != 2 {
+		t.Fatalf("after rejection cards=%d events=%d operations=%d admissions=%d error=%v", cards, events, operations, admissions, err)
 	}
 	if _, err = store.db.Exec(`CREATE TRIGGER test_reject_decomposition BEFORE INSERT ON workboard_decomposition_admissions
 		BEGIN SELECT RAISE(ABORT,'test rejection'); END`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "rollback-root-key", ExpectedBoardRevision: 2,
-		ExpectedGraphRevision: 2, Card: decompositionCard("Rollback", "")}); err == nil {
+	if _, err = service.CreateCard(ctx, workboard.CreateCardRequest{BoardID: boardID, IdempotencyKey: "rollback-root-key", ExpectedBoardRevision: 3,
+		ExpectedGraphRevision: 3, Card: decompositionCard("Rollback", "")}); err == nil {
 		t.Fatal("admission insert rejection did not abort mutation")
 	}
 	if err = store.db.QueryRow(`SELECT (SELECT count(*) FROM workboard_cards),(SELECT count(*) FROM workboard_events),
-		(SELECT count(*) FROM workboard_decomposition_admissions)`).Scan(&cards, &events, &admissions); err != nil || cards != 1 || events != 2 || admissions != 1 {
-		t.Fatalf("rollback cards=%d events=%d admissions=%d error=%v", cards, events, admissions, err)
+		(SELECT count(*) FROM workboard_operations),(SELECT count(*) FROM workboard_decomposition_admissions)`).Scan(&cards, &events, &operations, &admissions); err != nil ||
+		cards != 2 || events != 3 || operations != 3 || admissions != 2 {
+		t.Fatalf("rollback cards=%d events=%d operations=%d admissions=%d error=%v", cards, events, operations, admissions, err)
 	}
 }
 

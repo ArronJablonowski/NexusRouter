@@ -168,6 +168,11 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	if err = insertWorkboardOperation(ctx, tx, "board", board.ID, keyDigest, receipt, response); err != nil {
 		return workboard.CardMutationResult{}, err
 	}
+	if decomposition != nil {
+		if err = insertDecompositionAdmission(ctx, tx, admission, admissionBody); err != nil {
+			return workboard.CardMutationResult{}, err
+		}
+	}
 	actor := workboard.Actor{ID: event.ActorID, Type: event.ActorType}
 	if decomposition == nil {
 		err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, actor, now, eventBody)
@@ -176,11 +181,6 @@ func (s *Store) ApplyCardMutation(ctx context.Context, mutation workboard.CardMu
 	}
 	if err != nil {
 		return workboard.CardMutationResult{}, err
-	}
-	if decomposition != nil {
-		if err = insertDecompositionAdmission(ctx, tx, admission, admissionBody); err != nil {
-			return workboard.CardMutationResult{}, err
-		}
 	}
 	if err = tx.Commit(); err != nil {
 		return workboard.CardMutationResult{}, err
