@@ -8036,3 +8036,39 @@ object-member order. The root catalog also adds
 `workboard_request_resume`; a provider-neutral fixture proves pause request,
 worker safe-boundary acknowledgement, resume request, acknowledgement, and
 completion attribution.
+
+## 2026-09-15 — DAR-110 closure and DAR-111 decomposition
+
+DAR-110 is complete. Configured Workboard decomposition limits now bind model
+and worker hierarchy mutations to immutable admission evidence, exact parent
+lineage, runtime provenance, and redaction-safe audit projections. The schema-49
+storage layout associates each admission one-to-one with an exact event ID,
+board sequence, and timestamp through deferred foreign keys and immutable
+triggers. Adversarial tests reject orphan, split, duplicate, partial,
+timestamp-mismatched, and tampered evidence. Removing nine event-table ALTER
+projections reduced fresh race-instrumented database initialization from about
+1.50 seconds to 1.03 seconds per open. The authoritative `make check` passed;
+application completed in 1,915.911 seconds and telemetry in 2,034.763 seconds,
+inside the 35-minute package limit. GitHub `origin/main` was verified at
+`8d3e493bc4fdfcaaf16f028e42d3b57b717b2ac2`, and Linear DAR-110 was closed.
+
+DAR-111 was audited against the current runtime and split into seven short,
+dependency-linked Linear sprints: DAR-121 defines the authority contract;
+DAR-122 persists an idempotent plan lifecycle; DAR-120 enables custom engines;
+DAR-123 adds multi-epoch replay; DAR-125 covers delegated workers; DAR-124 adds
+stateful Codex app-server rollover; and DAR-126 performs adversarial recovery
+qualification. The audit confirmed that the current one-shot built-in path is
+safe but intentionally excludes these surfaces.
+
+DAR-121 adds a canonical context-engine identity and an opt-in described
+selection API that fences selection with the same validated descriptor under a
+shared cooperative deadline. Custom engines cannot claim reserved `darwin.*`
+identities; panic, cancellation, malformed, missing, typed-nil, timed-out, and
+unstable descriptors fail closed. Legacy selection remains compatible. A new
+sealed compaction-plan contract binds the approved source range and checkpoint,
+summary attempt/review/draft, configuration and policy, prompt-tier digests,
+exact original and replacement prefixes, and the future live-suffix boundary.
+Its validator is structural only: DAR-122 must independently derive and
+cross-bind every supplied identity before the plan becomes durable authority.
+Existing version-one checkpoint JSON still replays but cannot validate as a
+new plan.

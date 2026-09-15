@@ -1136,6 +1136,17 @@ typed claim-level evidence and broader provider/context-engine mid-task
 compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
 and [compacted continuation](docs/codex-compacted-continuation.md).
 
+Extended compaction must use a versioned, immutable plan before any additional
+surface is enabled. The plan binds the exact approved checkpoint and source
+range, summary attempt/review/draft evidence, context-engine implementation
+identity, effective configuration and policy, stable/project/volatile tier
+digests, exact original and replacement prefixes, and the message boundary at
+which future live suffix history begins. Canonical structural validation is not
+authorization: durable admission independently derives and cross-checks every
+identity, then activation records the actual live-suffix count and digest. A
+legacy checkpoint may continue to replay under its original contract but cannot
+be interpreted as this stronger plan.
+
 ### 10.4 Memory
 
 Memory stores durable facts rather than procedures. Records include provenance, confidence, creation time, last-use time, optional expiry, and privacy classification. Users can inspect, export, correct, or delete records. Local-only policy prevents external memory providers and keeps stored memory on the host.

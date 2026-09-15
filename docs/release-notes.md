@@ -7,6 +7,16 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- DAR-121 introduces the provider-neutral authority contract for extended
+  compaction. A validated context-engine identity pins implementation revision;
+  a sealed plan binds the approved source checkpoint, review and draft,
+  configuration and policy digests, stable/project/volatile tier digests, exact
+  original and replacement prefixes, and the boundary where future live suffix
+  messages begin. Structural validation is deliberately not provenance proof;
+  the durable store must independently derive and cross-check those identities
+  before activation. Existing version-one checkpoints and undescribed legacy
+  engine selection retain their old behavior but gain no plan authority.
+
 - DAR-110 adds version-1 Workboard decomposition policy with safe defaults of
   depth 4 and 8 direct children per parent, bounded by hard limits of 64. A
   top-level card is depth 1; dependency fan-out remains separate. Root-agent
@@ -17,8 +27,8 @@ operator records.
   event projection for Web UI inspection. Exact replay remains under the
   original digest; policy drift requires a fresh idempotency key. Delegated and
   Workboard execution children retain no board-write authority, including for
-  unadvertised calls against a borrowed registry. Final integrated qualification
-  and issue closure are not claimed by this checkpoint.
+  unadvertised calls against a borrowed registry. Integrated formatting, LOC,
+  vet, full race, and build qualification passed before issue closure.
 
 - DAR-104 separates fresh-cache compilation from license-evidence execution.
   Ordinary successful Go build/download diagnostics are suppressed, then the

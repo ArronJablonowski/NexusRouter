@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -39,6 +41,14 @@ type Engine interface {
 	providers.ContextEstimator
 	Assemble(context.Context, Assembly) (Plan, error)
 	PrepareCompaction(context.Context, sessions.Snapshot, sessions.CompactionRequest) (sessions.CompactionRequest, error)
+}
+
+// DescribedEngine is required when a custom engine selects durable compaction
+// state. Ordinary assembly remains compatible with Engine implementations that
+// do not expose an identity. Descriptor must be deterministic and must not
+// contain credentials or other volatile runtime state.
+type DescribedEngine interface {
+	Descriptor(context.Context) runtime.ContextEngineIdentity
 }
 
 var ErrEngine = errors.New("context engine admission failed")
@@ -77,6 +87,48 @@ func chosenEngine(engine Engine) (Engine, error) {
 		}
 	}
 	return engine, nil
+}
+
+// DescribeEngine safely obtains a validated identity for compaction
+// admission. Nil selects the stable built-in engine identity. Custom engines
+// fail closed when they do not implement DescribedEngine, panic, return a
+// malformed identity, or are typed nil.
+func DescribeEngine(ctx context.Context, engine Engine) (identity runtime.ContextEngineIdentity, err error) {
+	defer func() {
+		if recover() != nil {
+			identity = runtime.ContextEngineIdentity{}
+			err = ErrEngine
+		}
+	}()
+	if ctx == nil || ctx.Err() != nil {
+		return runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	engine, err = chosenEngine(engine)
+	if err != nil {
+		return runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	// Match only the concrete built-in type. A custom engine that embeds
+	// Default must still declare its own descriptor instead of accidentally
+	// inheriting the built-in authority identity.
+	switch engine.(type) {
+	case Default, *Default:
+		identity, identityErr := runtime.NewContextEngineIdentity("darwin.default", "v1")
+		if identityErr != nil {
+			return runtime.ContextEngineIdentity{}, ErrEngine
+		}
+		return identity, nil
+	}
+	described, ok := engine.(DescribedEngine)
+	if !ok {
+		return runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	identity = described.Descriptor(bounded)
+	if bounded.Err() != nil || identity.Validate() != nil || strings.HasPrefix(identity.ID, "darwin.") {
+		return runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	return identity, nil
 }
 
 // Assemble permits only bundle selection/order. Engines cannot author messages,

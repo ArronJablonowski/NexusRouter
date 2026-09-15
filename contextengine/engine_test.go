@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -17,6 +18,15 @@ type fixtureEngine struct {
 	Default
 	assemble func(context.Context, Assembly) (Plan, error)
 	compact  func(context.Context, sessions.Snapshot, sessions.CompactionRequest) (sessions.CompactionRequest, error)
+	describe func(context.Context) runtime.ContextEngineIdentity
+}
+
+func (f *fixtureEngine) Descriptor(ctx context.Context) runtime.ContextEngineIdentity {
+	if f.describe != nil {
+		return f.describe(ctx)
+	}
+	identity, _ := runtime.NewContextEngineIdentity("fixture.engine", "v1")
+	return identity
 }
 
 func (f *fixtureEngine) Assemble(ctx context.Context, a Assembly) (Plan, error) {
@@ -219,6 +229,169 @@ func TestCompactionRejectsInvalidSourceBeforeCallback(t *testing.T) {
 	}
 	if _, _, err := Compact(nil, nil, source, request); err != ErrEngine {
 		t.Fatal("nil context accepted")
+	}
+}
+
+type undescribedEngine struct{}
+
+func (undescribedEngine) Estimate(ctx context.Context, r providers.Request) (int, error) {
+	return providers.EstimateWith(ctx, nil, r)
+}
+func (undescribedEngine) Assemble(ctx context.Context, a Assembly) (Plan, error) {
+	return (Default{}).Assemble(ctx, a)
+}
+func (undescribedEngine) PrepareCompaction(_ context.Context, _ sessions.Snapshot, r sessions.CompactionRequest) (sessions.CompactionRequest, error) {
+	return r, nil
+}
+
+func TestDescribeEngineDefaultAndCustomContract(t *testing.T) {
+	builtin, err := DescribeEngine(context.Background(), nil)
+	if err != nil || builtin.Validate() != nil || builtin.ID != "darwin.default" || builtin.Revision != "v1" {
+		t.Fatal("invalid built-in descriptor", builtin, err)
+	}
+	explicit, err := DescribeEngine(context.Background(), Default{})
+	if err != nil || explicit != builtin {
+		t.Fatal("nil and explicit defaults diverged", explicit, err)
+	}
+	pointer, err := DescribeEngine(context.Background(), &Default{})
+	if err != nil || pointer != builtin {
+		t.Fatal("default pointer identity diverged", pointer, err)
+	}
+	custom := &fixtureEngine{}
+	first, err := DescribeEngine(context.Background(), custom)
+	second, secondErr := DescribeEngine(context.Background(), custom)
+	if err != nil || secondErr != nil || first != second || first.Validate() != nil {
+		t.Fatal("custom descriptor is not stable", first, second, err, secondErr)
+	}
+	// Descriptor identity is required for compaction, but not ordinary context
+	// assembly while existing extensions migrate to the durable contract.
+	if _, err := DescribeEngine(context.Background(), undescribedEngine{}); err != ErrEngine {
+		t.Fatal("undescribed engine admitted", err)
+	}
+	if _, err := Assemble(context.Background(), undescribedEngine{}, assemblyFixture()); err != nil {
+		t.Fatal("descriptor requirement leaked into ordinary assembly", err)
+	}
+	// Embedding Default supplies behavior, not the built-in engine identity.
+	type embeddedDefault struct{ Default }
+	if _, err := DescribeEngine(context.Background(), embeddedDefault{}); err != ErrEngine {
+		t.Fatal("embedded default inherited built-in identity", err)
+	}
+	reserved, _ := runtime.NewContextEngineIdentity("darwin.default", "v1")
+	if _, err := DescribeEngine(context.Background(), &fixtureEngine{describe: func(context.Context) runtime.ContextEngineIdentity { return reserved }}); err != ErrEngine {
+		t.Fatal("custom engine claimed reserved built-in identity", err)
+	}
+}
+
+func TestDescribeEngineRejectsTypedNilPanicAndMalformedIdentity(t *testing.T) {
+	var typedNil *fixtureEngine
+	if _, err := DescribeEngine(context.Background(), typedNil); err != ErrEngine {
+		t.Fatal("typed nil descriptor admitted", err)
+	}
+	for _, mode := range []string{"panic", "malformed"} {
+		t.Run(mode, func(t *testing.T) {
+			engine := &fixtureEngine{describe: func(context.Context) runtime.ContextEngineIdentity {
+				if mode == "panic" {
+					panic("private descriptor failure")
+				}
+				return runtime.ContextEngineIdentity{Version: 1, ID: "fixture.engine", Revision: "v1", Digest: strings.Repeat("0", 64)}
+			}}
+			if identity, err := DescribeEngine(context.Background(), engine); err != ErrEngine || identity != (runtime.ContextEngineIdentity{}) {
+				t.Fatal("unsafe descriptor admitted", identity, err)
+			}
+		})
+	}
+}
+
+func TestCompactionRejectsMissingOrUnstableDescriptor(t *testing.T) {
+	source, request := compactionFixture()
+	if selected, identity, err := SelectCompactionDescribed(context.Background(), undescribedEngine{}, source, request); err != ErrEngine || selected.Keep != 0 || identity != (runtime.ContextEngineIdentity{}) {
+		t.Fatal("undescribed selector admitted", selected, err)
+	}
+	if selected, err := SelectCompaction(context.Background(), undescribedEngine{}, source, request); err != nil || !reflect.DeepEqual(selected, request) {
+		t.Fatal("legacy undescribed selector compatibility changed", selected, err)
+	}
+	first, _ := runtime.NewContextEngineIdentity("fixture.engine", "v1")
+	second, _ := runtime.NewContextEngineIdentity("fixture.engine", "v2")
+	descriptions, callbacks := 0, 0
+	engine := &fixtureEngine{
+		describe: func(context.Context) runtime.ContextEngineIdentity {
+			descriptions++
+			if descriptions == 1 {
+				return first
+			}
+			return second
+		},
+		compact: func(_ context.Context, _ sessions.Snapshot, r sessions.CompactionRequest) (sessions.CompactionRequest, error) {
+			callbacks++
+			return r, nil
+		},
+	}
+	if selected, identity, err := SelectCompactionDescribed(context.Background(), engine, source, request); err != ErrEngine || selected.Keep != 0 || identity != (runtime.ContextEngineIdentity{}) || callbacks != 1 || descriptions != 2 {
+		t.Fatal("descriptor drift admitted", selected, err, callbacks, descriptions)
+	}
+}
+
+func TestDescribedCompactionRejectsSecondDescriptorFailures(t *testing.T) {
+	for _, mode := range []string{"panic", "malformed", "cancel", "timeout"} {
+		t.Run(mode, func(t *testing.T) {
+			source, request := compactionFixture()
+			ctx, cancel := context.WithCancel(context.Background())
+			if mode == "timeout" {
+				ctx, cancel = context.WithTimeout(context.Background(), 20*time.Millisecond)
+			}
+			defer cancel()
+			valid, _ := runtime.NewContextEngineIdentity("fixture.engine", "v1")
+			calls := 0
+			engine := &fixtureEngine{describe: func(callCtx context.Context) runtime.ContextEngineIdentity {
+				calls++
+				if calls == 1 {
+					return valid
+				}
+				switch mode {
+				case "panic":
+					panic("private second descriptor failure")
+				case "malformed":
+					return runtime.ContextEngineIdentity{Version: 1, ID: "fixture.engine", Revision: "v1", Digest: strings.Repeat("0", 64)}
+				case "cancel":
+					cancel()
+				case "timeout":
+					<-callCtx.Done()
+				}
+				return valid
+			}}
+			selected, identity, err := SelectCompactionDescribed(ctx, engine, source, request)
+			if err != ErrEngine || selected.Keep != 0 || identity != (runtime.ContextEngineIdentity{}) || calls != 2 {
+				t.Fatal("unsafe second descriptor admitted", selected, identity, err, calls)
+			}
+		})
+	}
+}
+
+func TestDescribeEngineCooperativeTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	engine := &fixtureEngine{describe: func(callCtx context.Context) runtime.ContextEngineIdentity {
+		<-callCtx.Done()
+		identity, _ := runtime.NewContextEngineIdentity("fixture.engine", "v1")
+		return identity
+	}}
+	if identity, err := DescribeEngine(ctx, engine); err != ErrEngine || identity != (runtime.ContextEngineIdentity{}) {
+		t.Fatal("timed-out descriptor admitted", identity, err)
+	}
+}
+
+func TestDescribedCompactionCancellationPrecedesDescriptor(t *testing.T) {
+	source, request := compactionFixture()
+	calls := 0
+	engine := &fixtureEngine{describe: func(context.Context) runtime.ContextEngineIdentity {
+		calls++
+		identity, _ := runtime.NewContextEngineIdentity("fixture.engine", "v1")
+		return identity
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if selected, identity, err := SelectCompactionDescribed(ctx, engine, source, request); err != ErrEngine || selected.Keep != 0 || identity != (runtime.ContextEngineIdentity{}) || calls != 0 {
+		t.Fatal("canceled described selection reached descriptor", selected, identity, err, calls)
 	}
 }
 

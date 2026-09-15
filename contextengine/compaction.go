@@ -70,6 +70,42 @@ func SelectCompaction(ctx context.Context, engine Engine, source sessions.Snapsh
 	return out, nil
 }
 
+// SelectCompactionDescribed adds a stable engine-identity boundary around one
+// legacy selection call. Durable compaction planners use this opt-in API to
+// bind their proposal to the exact engine revision without changing existing
+// Engine implementations used only for assembly or manual compaction.
+func SelectCompactionDescribed(ctx context.Context, engine Engine, source sessions.Snapshot, request sessions.CompactionRequest) (sessions.CompactionRequest, runtime.ContextEngineIdentity, error) {
+	if ctx == nil || ctx.Err() != nil {
+		return sessions.CompactionRequest{}, runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	before, err := describeCompactionEngine(bounded, engine)
+	if err != nil {
+		return sessions.CompactionRequest{}, runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	selected, err := SelectCompaction(bounded, engine, source, request)
+	if err != nil || bounded.Err() != nil {
+		return sessions.CompactionRequest{}, runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	after, err := describeCompactionEngine(bounded, engine)
+	if err != nil || bounded.Err() != nil || after != before {
+		return sessions.CompactionRequest{}, runtime.ContextEngineIdentity{}, ErrEngine
+	}
+	return selected, before, nil
+}
+
+func describeCompactionEngine(ctx context.Context, engine Engine) (runtime.ContextEngineIdentity, error) {
+	if engine == nil {
+		identity, err := runtime.NewContextEngineIdentity("darwin.default", "v1")
+		if err != nil || ctx == nil || ctx.Err() != nil {
+			return runtime.ContextEngineIdentity{}, ErrEngine
+		}
+		return identity, nil
+	}
+	return DescribeEngine(ctx, engine)
+}
+
 // Compact materializes only canonical host-owned content after selection.
 func Compact(ctx context.Context, engine Engine, source sessions.Snapshot, request sessions.CompactionRequest) ([]providers.Message, *runtime.ContextCompaction, error) {
 	if ctx == nil || ctx.Err() != nil {
