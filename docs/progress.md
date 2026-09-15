@@ -7972,5 +7972,7 @@ and the SDK monitor's two-second race-build deadline was shorter than its new
 durable transaction path. Both were corrected and their exact releasepack and
 SDK race tests pass. A concurrent Chrome workboard CRUD qualification failed its
 authoritative-refetch timing bound once and passed unchanged on immediate exact
-rerun; it is unrelated to outcome supervision. A new complete `make check` run
-is required before this follow-on is called fully verified.
+rerun; it is unrelated to outcome supervision. The subsequent complete
+`make check` passed: formatting/LOC, vet, the full race-enabled suite, and build.
+The slowest successful packages were telemetry (1,641 seconds), application
+(1,557 seconds), release packaging (1,468 seconds), and the SDK (186 seconds).
