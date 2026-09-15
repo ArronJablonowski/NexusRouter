@@ -17,7 +17,6 @@ func (s *Store) ApplyProgressMutation(ctx context.Context, mutation workboard.Pr
 	if err != nil || requestDigest != mutation.RequestDigest {
 		return workboard.OperationReceipt{}, invalidWorkboard("request_digest")
 	}
-	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return workboard.OperationReceipt{}, err
@@ -26,6 +25,22 @@ func (s *Store) ApplyProgressMutation(ctx context.Context, mutation workboard.Pr
 	if err = reserveWorkboardWriter(ctx, tx); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
+	receipt, err := applyProgressMutationTx(ctx, tx, mutation)
+	if err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return workboard.OperationReceipt{}, err
+	}
+	return receipt, nil
+}
+
+func applyProgressMutationTx(ctx context.Context, tx *sql.Tx, mutation workboard.ProgressMutation) (workboard.OperationReceipt, error) {
+	requestDigest, err := workboard.ProgressDigest(mutation)
+	if err != nil || requestDigest != mutation.RequestDigest {
+		return workboard.OperationReceipt{}, invalidWorkboard("request_digest")
+	}
+	keyDigest := digestBytes([]byte(mutation.IdempotencyKey))
 	if receipt, found, replayErr := readWorkboardReceipt(ctx, tx, "board", mutation.BoardID, keyDigest, requestDigest); found || replayErr != nil {
 		return receipt, replayErr
 	}
@@ -36,9 +51,15 @@ func (s *Store) ApplyProgressMutation(ctx context.Context, mutation workboard.Pr
 	if board.State != "active" {
 		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "board_state"}
 	}
+	if mutation.ExpectedBoardRevision > 0 && board.Revision != mutation.ExpectedBoardRevision {
+		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "board_revision"}
+	}
 	card, cardBody, err := readStoredCard(ctx, tx, mutation.BoardID, mutation.CardID)
 	if err != nil {
 		return workboard.OperationReceipt{}, err
+	}
+	if mutation.ExpectedCriteriaDigest != "" && criteriaDigest(card.Criteria) != mutation.ExpectedCriteriaDigest {
+		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "criteria_digest"}
 	}
 	var claimRevision *int64
 	var durableBytes int
@@ -90,9 +111,6 @@ func (s *Store) ApplyProgressMutation(ctx context.Context, mutation workboard.Pr
 		return workboard.OperationReceipt{}, err
 	}
 	if err = insertWorkboardEvent(ctx, tx, eventID, board.ID, board.EventSequence, operationID, string(event.Kind), card.ID, mutation.Actor, mutation.Now, eventBody); err != nil {
-		return workboard.OperationReceipt{}, err
-	}
-	if err = tx.Commit(); err != nil {
 		return workboard.OperationReceipt{}, err
 	}
 	return receipt, nil

@@ -97,6 +97,10 @@ func readCheckpointAttempt(ctx context.Context, tx *sql.Tx, mutation workboard.P
 func validateProgressMutation(m workboard.ProgressMutation) error {
 	if m.Version != workboard.ProgressMutationVersion || !validWorkboardID(m.BoardID) || !validWorkboardID(m.CardID) ||
 		m.Actor.Validate() != nil || len(m.IdempotencyKey) < 16 || len(m.IdempotencyKey) > 128 || !validDigest(m.RequestDigest) ||
+		(m.AgentApprovalID == "") != (m.AgentProposalDigest == "") ||
+		(m.AgentApprovalID != "" && (!validWorkboardID(m.AgentApprovalID) || !validDigest(m.AgentProposalDigest))) ||
+		(m.AgentApprovalID == "") != (m.ExpectedBoardRevision == 0 && m.ExpectedCriteriaDigest == "") ||
+		(m.AgentApprovalID != "" && (m.ExpectedBoardRevision < 1 || !validDigest(m.ExpectedCriteriaDigest))) ||
 		m.Now.Location() != time.UTC || m.Now.Year() < 1970 || m.Now.Year() >= 2261 {
 		return invalidWorkboard("mutation")
 	}
@@ -115,7 +119,7 @@ func validateProgressMutation(m workboard.ProgressMutation) error {
 	case workboard.ProgressCheckpointAppend:
 		if m.Actor.Type != "worker" || !validWorkboardID(m.AttemptID) || !validWorkboardID(m.ClaimID) || m.ExpectedCardRevision < 1 ||
 			m.ExpectedClaimRevision < 1 || m.ExpectedCriteriaRevision != 0 || m.CriteriaRevision < 1 || m.Criteria != nil ||
-			workboard.ValidateCheckpointEvidence(m.Evidence) != nil {
+			workboard.ValidateCheckpointEvidence(m.Evidence) != nil || m.AgentApprovalID != "" || m.ExpectedBoardRevision != 0 || m.ExpectedCriteriaDigest != "" {
 			return invalidWorkboard("checkpoint")
 		}
 	default:

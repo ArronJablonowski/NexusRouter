@@ -366,6 +366,9 @@ func applyEvaluationMutationTx(ctx context.Context, tx *sql.Tx, mutation workboa
 	if board.State != "active" {
 		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeIllegalTransition, Field: "board_state"}
 	}
+	if mutation.ExpectedBoardRevision > 0 && board.Revision != mutation.ExpectedBoardRevision {
+		return workboard.OperationReceipt{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "board_revision"}
+	}
 	card, cardBody, err := readStoredCard(ctx, tx, mutation.BoardID, mutation.CardID)
 	if err != nil {
 		return workboard.OperationReceipt{}, err
@@ -582,6 +585,9 @@ func decideStoredCandidate(ctx context.Context, tx *sql.Tx, m workboard.Evaluati
 	attempt, oldBytes, err := readReviewEvaluationAttempt(ctx, tx, m)
 	if err != nil {
 		return 0, evaluationStoredResult{}, err
+	}
+	if m.ExpectedAttemptRevision > 0 && attempt.Revision != m.ExpectedAttemptRevision {
+		return 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeStaleRevision, Field: "attempt_revision"}
 	}
 	if attempt.WorkerID == m.Actor.ID || attempt.Claim.OwnerID == m.Actor.ID {
 		return 0, evaluationStoredResult{}, &workboard.Violation{Code: workboard.CodeInvalid, Field: "independent_accepter"}

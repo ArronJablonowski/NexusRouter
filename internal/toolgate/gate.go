@@ -98,11 +98,13 @@ func (g *Gate) ExecuteApproved(ctx context.Context, a tools.Authorization, handl
 		return noEffect, tools.ErrDenied
 	}
 	// Even an ambiguous consumption acknowledgement cannot authorize a retry.
-	if _, err = g.Store.ConsumeApproval(ctx, req, lease.Token, owner, time.Now().UTC()); err != nil {
+	consumed, consumeErr := g.Store.ConsumeApproval(ctx, req, lease.Token, owner, time.Now().UTC())
+	if consumeErr != nil {
 		g.release(lease.Token, owner)
 		return runtime.ToolResult{Effect: runtime.UncertainEffect}, tools.ErrExecution
 	}
 	workCtx, stop := context.WithCancel(ctx)
+	workCtx = tools.WithConsumedApproval(workCtx, tools.ConsumedApproval{ID: consumed.Request.ID})
 	done := make(chan struct{})
 	renewed := make(chan error, 1)
 	go func() { renewed <- g.renew(workCtx, stop, done, a.TaskID, lease.Token, owner) }()

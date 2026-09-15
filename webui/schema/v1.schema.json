@@ -610,8 +610,8 @@
         "decision": {"enum": ["accepted", "rejected"]}, "rationale": {"type": "string", "minLength": 1, "maxLength": 65536, "x-maxBytes": 65536}
       },
       "oneOf": [
-        {"properties": {"kind": {"const": "criteria_change"}}, "required": ["expected_criteria_revision", "expected_criteria_digest", "criteria"]},
-        {"properties": {"kind": {"const": "candidate_decision"}}, "required": ["attempt_id", "candidate_id", "expected_attempt_revision", "criteria_revision", "evidence_head_revision", "candidate_digest", "criteria_digest", "evidence_set_digest", "policy_digest", "decision", "rationale"]}
+        {"properties": {"kind": {"const": "criteria_change"}}, "required": ["expected_criteria_revision", "expected_criteria_digest", "criteria"], "not": {"anyOf": [{"required": ["attempt_id"]}, {"required": ["candidate_id"]}, {"required": ["expected_attempt_revision"]}, {"required": ["criteria_revision"]}, {"required": ["evidence_head_revision"]}, {"required": ["candidate_digest"]}, {"required": ["criteria_digest"]}, {"required": ["evidence_set_digest"]}, {"required": ["policy_digest"]}, {"required": ["decision"]}, {"required": ["rationale"]}]}},
+        {"properties": {"kind": {"const": "candidate_decision"}}, "required": ["attempt_id", "candidate_id", "expected_attempt_revision", "criteria_revision", "evidence_head_revision", "candidate_digest", "criteria_digest", "evidence_set_digest", "policy_digest", "decision", "rationale"], "not": {"anyOf": [{"required": ["expected_criteria_revision"]}, {"required": ["expected_criteria_digest"]}, {"required": ["criteria"]}]}}
       ]
     },
     "approval_summary": {

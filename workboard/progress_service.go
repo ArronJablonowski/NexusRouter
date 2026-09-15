@@ -38,6 +38,10 @@ type ProgressMutation struct {
 	CriteriaRevision         int64                 `json:"criteria_revision,omitempty"`
 	Criteria                 []AcceptanceCriterion `json:"criteria,omitempty"`
 	Evidence                 string                `json:"evidence,omitempty"`
+	AgentApprovalID          string                `json:"agent_approval_id,omitempty"`
+	AgentProposalDigest      string                `json:"agent_proposal_digest,omitempty"`
+	ExpectedBoardRevision    int64                 `json:"expected_board_revision,omitempty"`
+	ExpectedCriteriaDigest   string                `json:"expected_criteria_digest,omitempty"`
 	Now                      time.Time             `json:"-"`
 }
 

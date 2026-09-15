@@ -302,6 +302,10 @@ func readEvaluationAcceptance(ctx context.Context, tx *sql.Tx, boardID, cardID, 
 func validateEvaluationMutation(m workboard.EvaluationMutation, requireEvaluation bool) error {
 	if m.Version != 1 || !validWorkboardID(m.BoardID) || !validWorkboardID(m.CardID) || !validWorkboardID(m.AttemptID) || m.Actor.Validate() != nil ||
 		len(m.IdempotencyKey) < 16 || len(m.IdempotencyKey) > 128 || !validDigest(m.RequestDigest) || m.ExpectedCardRevision < 1 || m.CriteriaRevision < 1 ||
+		(m.AgentApprovalID == "") != (m.AgentProposalDigest == "") ||
+		(m.AgentApprovalID != "" && (!validWorkboardID(m.AgentApprovalID) || !validDigest(m.AgentProposalDigest))) ||
+		(m.AgentApprovalID == "") != (m.ExpectedBoardRevision == 0 && m.ExpectedAttemptRevision == 0) ||
+		(m.AgentApprovalID != "" && (m.ExpectedBoardRevision < 1 || m.ExpectedAttemptRevision < 1)) ||
 		m.Now.Location() != time.UTC || m.Now.Year() < 1970 || m.Now.Year() >= 2261 {
 		return invalidWorkboard("evaluation")
 	}
@@ -315,7 +319,7 @@ func validateEvaluationMutation(m workboard.EvaluationMutation, requireEvaluatio
 		if m.Actor.Type != "worker" || !validWorkboardID(m.ClaimID) || !validWorkboardID(m.CandidateID) || m.ExpectedClaimRevision < 1 || m.EvidenceHeadRevision != 0 ||
 			!validDigest(m.CandidateDigest) || m.CandidateDigest != workboard.CandidateContentDigest(m.Summary, m.ArtifactRefs) ||
 			m.CriteriaDigest != "" || m.EvidenceSetDigest != "" || m.PolicyDigest != "" || m.DecisionAuthorityID != "" ||
-			m.Summary == "" || len(m.ArtifactRefs) > workboard.MaxCandidateArtifacts || requireEvaluation && len(m.Evaluated) > workboard.MaxEvaluationEvidence || !requireEvaluation && m.Evaluated != nil {
+			m.Summary == "" || len(m.ArtifactRefs) > workboard.MaxCandidateArtifacts || requireEvaluation && len(m.Evaluated) > workboard.MaxEvaluationEvidence || !requireEvaluation && m.Evaluated != nil || m.AgentApprovalID != "" || m.ExpectedBoardRevision != 0 || m.ExpectedAttemptRevision != 0 {
 			return invalidWorkboard("candidate")
 		}
 		for _, item := range m.Evaluated {

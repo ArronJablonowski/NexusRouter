@@ -51,8 +51,12 @@ func TestApprovalConsumesExactlyOnce(t *testing.T) {
 		return "operator", true, nil
 	}
 	var calls atomic.Int32
-	handler := func(context.Context) (runtime.ToolResult, error) {
+	handler := func(ctx context.Context) (runtime.ToolResult, error) {
 		calls.Add(1)
+		consumed, ok := tools.ConsumedApprovalFromContext(ctx)
+		if !ok || consumed.ID != request.ID {
+			t.Errorf("consumed approval context=%+v ok=%v request=%s", consumed, ok, request.ID)
+		}
 		return runtime.ToolResult{Content: "done", Effect: runtime.ConfirmedEffect}, nil
 	}
 	out, err := g.ExecuteApproved(context.Background(), a, handler)
