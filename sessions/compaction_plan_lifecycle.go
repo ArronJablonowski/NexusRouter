@@ -100,13 +100,13 @@ func (s ContextCompactionPlanStart) CanonicalRequestDigest() (string, error) {
 	}
 	return lifecycleDigest(struct {
 		Version                                              int `json:"version"`
-		RequestID, TaskID, SourceDigest                      string
+		TaskID, SourceDigest                                 string
 		SourceSequence                                       int64
-		AttemptID, Model, Provider                           string
+		Model, Provider                                      string
 		Keep                                                 int
 		EstimatedCost                                        float64
 		ConfigDigest, PolicyDigest, EngineDigest, TierDigest string
-	}{s.Version, s.RequestID, s.TaskID, s.SourceDigest, s.SourceSequence, s.AttemptID, s.Model, s.Provider,
+	}{s.Version, s.TaskID, s.SourceDigest, s.SourceSequence, s.Model, s.Provider,
 		s.Keep, s.EstimatedCost, s.ConfigDigest, s.PolicyDigest, s.Engine.Digest, s.Tiers.Digest})
 }
 
