@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
@@ -111,7 +112,16 @@ func TestAutomaticPressureCloudAlternativeAndLocalRequired(t *testing.T) {
 }
 
 func TestAutomaticPressureDoesNotRetryProviderFailure(t *testing.T) {
-	s, _ := autoFixture(t)
+	s, cfg := autoFixture(t)
+	// Keep cold schema migration time outside the deliberately short pressure
+	// admission window so this test measures provider dispatch semantics.
+	db, err := telemetry.Open(context.Background(), cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 	var calls atomic.Int32
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/tags" {
