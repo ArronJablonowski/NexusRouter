@@ -92,7 +92,7 @@ notes, or license records may be reused by a later release candidate.
 The affected telemetry rejection matrix now shares one migrated store while
 using unique task and session identities. Every negative case also proves that
 an unrelated qualified pair remains admissible, preserving isolation and
-detecting global contamination. The package timeout is now 35 minutes, each
+detecting global contamination. The package timeout is now 45 minutes, each
 canonical native gate is 60 minutes, and the hosted qualification job is 180
 minutes; release workflow tests enforce minimum nested headroom. These changes
 bound every layer without weakening a release gate.

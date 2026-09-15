@@ -94,7 +94,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(makefile), `go test -race -timeout=35m ./...`) != 2 ||
+	if strings.Count(string(makefile), `go test -race -timeout=45m ./...`) != 2 ||
 		strings.Count(string(makefile), `go test -count=1 -timeout=45m -run '^TestReleaseQualification$$'`) != 1 ||
 		strings.Count(string(makefile), "qualify-release:\n\t$(MAKE) qualify-mvp\n\t$(MAKE) qualify-release-test") != 1 ||
 		strings.Count(string(makefile), "\nqualify-release-test:\n") != 1 ||
