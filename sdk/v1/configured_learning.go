@@ -10,10 +10,39 @@ import (
 
 type SkillValidatorRegistry = skills.ValidatorRegistry
 
+// ObservedToolsActivationValidatorID selects DarwinRouter's protected,
+// deterministic observed-tools provenance validator. Setting
+// skills.learning.validator_id to this value is an explicit opt-in; callers do
+// not register a callback for this identity.
+const ObservedToolsActivationValidatorID = app.ObservedToolsProvenanceValidatorID
+
+func reservedSkillValidatorID(id string) bool {
+	return id == ObservedToolsActivationValidatorID
+}
+
 // NewSkillValidatorRegistry snapshots a bounded set of trusted, named Go
 // validators. Identity must change when implementation semantics change.
 func NewSkillValidatorRegistry(entries map[string]skills.Validator) (*SkillValidatorRegistry, error) {
 	return skills.NewValidatorRegistry(entries)
+}
+
+// ConfiguredSkillValidatorRegistry snapshots host validators and adds the
+// protected DarwinRouter validators bound to this client's frozen settings.
+// It performs no I/O and is safe to call before durable stores exist. Passing
+// a protected identity in entries is rejected.
+func (c *Client) ConfiguredSkillValidatorRegistry(entries map[string]skills.Validator) (*SkillValidatorRegistry, error) {
+	if c == nil || c.service == nil {
+		return nil, ErrAdmission
+	}
+	host, err := skills.NewValidatorRegistry(entries)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	registry, err := app.BuildConfiguredSkillValidatorRegistry(c.service, host)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	return registry, nil
 }
 
 // ConfiguredLearningSupervisor owns the configured learner and optional durable
@@ -40,6 +69,10 @@ func (s *ConfiguredLearningSupervisor) Health() []health.Check {
 // never loaded from configuration, model output, shell commands or URLs.
 func (c *Client) StartConfiguredLearning(ctx context.Context, registry *SkillValidatorRegistry) (*ConfiguredLearningSupervisor, error) {
 	if !c.valid(ctx) {
+		return nil, ErrAdmission
+	}
+	registry, err := app.BuildConfiguredSkillValidatorRegistry(c.service, registry)
+	if err != nil {
 		return nil, ErrAdmission
 	}
 	plan, err := app.PrepareConfiguredLearning(c.service, registry)

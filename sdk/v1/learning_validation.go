@@ -31,7 +31,7 @@ func (l *LearningSupervisor) Health() health.Check {
 // LearningStepWithValidation advances bounded learning with a named trusted,
 // read-only, retry-safe validator. Model judgment is not acceptance evidence.
 func (c *Client) LearningStepWithValidation(ctx context.Context, validatorID string, validator skills.Validator) (skills.LearningState, error) {
-	if !c.valid(ctx) {
+	if !c.valid(ctx) || reservedSkillValidatorID(validatorID) {
 		return skills.LearningState{}, ErrAdmission
 	}
 	return c.service.LearningStepWithValidation(ctx, validatorID, validator)
@@ -41,7 +41,7 @@ func (c *Client) LearningStepWithValidation(ctx context.Context, validatorID str
 // learner. The caller must retain and close the returned supervisor. Validator
 // code is trusted, cancellation-cooperative host code, not a sandbox.
 func (c *Client) StartLearningWithValidation(ctx context.Context, validatorID string, validator skills.Validator) (*LearningSupervisor, error) {
-	if !c.valid(ctx) {
+	if !c.valid(ctx) || reservedSkillValidatorID(validatorID) {
 		return nil, ErrAdmission
 	}
 	learner, err := app.StartLearningWithValidation(ctx, c.service, validatorID, validator)

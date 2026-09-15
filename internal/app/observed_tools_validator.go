@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"slices"
 	"time"
@@ -15,7 +16,7 @@ import (
 // ObservedToolsProvenanceValidatorID is the stable identity for the stock
 // deterministic publication-provenance validator. Its evidence establishes no
 // semantic correctness beyond the checks described by Validate.
-const ObservedToolsProvenanceValidatorID = "observed-tools-v1"
+const ObservedToolsProvenanceValidatorID = "darwin_observed_tools_activation_v1"
 
 // ObservedToolsProvenanceValidator proves that an immutable generated skill is
 // still bound to fresh, successful observed-tool records. It is deliberately
@@ -27,27 +28,49 @@ type ObservedToolsProvenanceValidator struct {
 	// LocalOnly is the current host policy. Turning it on invalidates a public
 	// candidate even when every historical source allowed cloud disclosure.
 	LocalOnly bool
+	root      string
+	scope     string
 }
 
 var _ skills.Validator = ObservedToolsProvenanceValidator{}
 
-// Validate returns deterministic evidence for the provenance claim only. All
-// failures are collapsed to ErrValidation so corrupt private data is not
-// exposed through activation errors.
+// Validate returns deterministic evidence for the provenance claim only.
+// Readable source-evidence drift returns a deterministic failed proof so the
+// same policy can drive rollback. Operational, structural, cancellation and
+// concurrency failures collapse to ErrValidation and never authorize rollback.
 func (v ObservedToolsProvenanceValidator) Validate(ctx context.Context, version skills.Version) (proof skills.Evidence, err error) {
 	fail := func() (skills.Evidence, error) { return skills.Evidence{}, skills.ErrValidation }
+	reject := func() (skills.Evidence, error) {
+		return skills.Evidence{ID: ObservedToolsProvenanceValidatorID, Deterministic: true}, nil
+	}
 	defer func() {
 		if recover() != nil {
 			proof, err = fail()
 		}
 	}()
-	if ctx == nil || version.Validate() != nil || v.Database == "" || nilPublicationStore(v.Publications) {
+	if ctx == nil || version.Validate() != nil || v.Database == "" {
 		return fail()
 	}
 	bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if bounded.Err() != nil {
 		return fail()
+	}
+	publications := v.Publications
+	if nilPublicationStore(publications) {
+		if v.root == "" || v.scope == "" {
+			return fail()
+		}
+		opened, openErr := skills.OpenReadOnly(v.root, []string{v.scope})
+		if openErr != nil {
+			return fail()
+		}
+		defer func() {
+			if opened.Close() != nil {
+				proof, err = fail()
+			}
+		}()
+		publications = opened
 	}
 
 	// Snapshot the callback input before invoking either store. ValidationCases
@@ -61,12 +84,12 @@ func (v ObservedToolsProvenanceValidator) Validate(ctx context.Context, version 
 		return fail()
 	}
 
-	storedBefore, readErr := v.Publications.Load(bounded, candidate.Draft.Key, candidate.ID)
+	storedBefore, readErr := publications.Load(bounded, candidate.Draft.Key, candidate.ID)
 	storedBeforeBody, marshalErr := json.Marshal(storedBefore)
 	if readErr != nil || marshalErr != nil || !bytes.Equal(versionBody, storedBeforeBody) {
 		return fail()
 	}
-	before, readErr := v.Publications.PublicationBinding(bounded, candidate.Draft.Key, candidate.ID)
+	before, readErr := publications.PublicationBinding(bounded, candidate.Draft.Key, candidate.ID)
 	if readErr != nil || before.Validate() != nil {
 		return fail()
 	}
@@ -76,17 +99,21 @@ func (v ObservedToolsProvenanceValidator) Validate(ctx context.Context, version 
 	}
 	snapshot, readErr := db.ObservedToolsValidationSnapshot(bounded, candidate.Draft.Key.Scope, before.AttemptID)
 	closeErr := db.Close()
-	if readErr != nil || closeErr != nil || bounded.Err() != nil {
+	evidenceRejected := errors.Is(readErr, telemetry.ErrObservedToolsEvidence)
+	if (readErr != nil && !evidenceRejected) || closeErr != nil || bounded.Err() != nil {
 		return fail()
 	}
-	after, readErr := v.Publications.PublicationBinding(bounded, candidate.Draft.Key, candidate.ID)
+	after, readErr := publications.PublicationBinding(bounded, candidate.Draft.Key, candidate.ID)
 	if readErr != nil || after != before || after.Validate() != nil || bounded.Err() != nil {
 		return fail()
 	}
-	storedAfter, readErr := v.Publications.Load(bounded, candidate.Draft.Key, candidate.ID)
+	storedAfter, readErr := publications.Load(bounded, candidate.Draft.Key, candidate.ID)
 	storedAfterBody, marshalErr := json.Marshal(storedAfter)
 	if readErr != nil || marshalErr != nil || !bytes.Equal(versionBody, storedAfterBody) || bounded.Err() != nil {
 		return fail()
+	}
+	if evidenceRejected {
+		return reject()
 	}
 
 	attempt, selection, group := snapshot.Attempt, snapshot.Selection, snapshot.Group
@@ -113,11 +140,11 @@ func (v ObservedToolsProvenanceValidator) Validate(ctx context.Context, version 
 	slices.Sort(wantEvidence)
 	wantEvidence = slices.Compact(wantEvidence)
 	if !slices.Equal(attempt.SourceSessions, wantSessions) || !slices.Equal(attempt.SourceEvidence, wantEvidence) || snapshot.LocalOnly != localOnly || ((v.LocalOnly || localOnly) && candidate.Draft.Privacy != skills.PrivacyLocalOnly) {
-		return fail()
+		return reject()
 	}
 	for _, required := range candidate.Draft.RequiredTools {
 		if !slices.Contains(group.Tools, required) {
-			return fail()
+			return reject()
 		}
 	}
 	return skills.Evidence{ID: ObservedToolsProvenanceValidatorID, Passed: true, Deterministic: true}, nil

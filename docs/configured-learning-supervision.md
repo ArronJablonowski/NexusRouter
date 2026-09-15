@@ -7,16 +7,18 @@ Go host must register a concrete validator implementation under a stable identit
 Changing validation semantics requires a new identity; the registry does not
 authenticate code or infer its correctness.
 
-The stock `darwin` binary ships no qualified domain validator. Its default remains
-draft-only, and it rejects an enabled unknown validator selection before binding
-the listener or initializing the database. A custom host can supply a registry;
-the SDK exposes the same lifecycle without starting an HTTP server. This adds
-configuration/lifecycle integration, not a generic proof that generated workflows
-are safe, useful or correct.
+The stock `darwin` binary ships one deliberately narrow validator under the
+protected identity `darwin_observed_tools_activation_v1`. It is available only
+when configuration explicitly selects that identity; the default remains
+draft-only. Unknown identities and attempts by a host callback to claim the
+protected identity fail before listener binding or database initialization. A
+custom host can still supply other validators, and the SDK exposes the same
+lifecycle without starting an HTTP server. This is provenance validation, not a
+generic proof that generated workflows are safe, useful or correct.
 
 ## Publication provenance boundary
 
-Future production validators must begin from the exact generated-version
+Production validation begins from the exact generated-version
 publication binding exposed by `skills.PublicationStore`. The read-only lookup
 checks the receipt, catalog metadata and immutable version body together and
 returns the owning generation-attempt ID plus the canonical attempt digest.
@@ -27,10 +29,11 @@ That binding is necessary but not sufficient validation evidence. It does not
 read the telemetry database, authenticate source events, prove workflow quality
 or treat model-authored validation cases as trusted. A host validator must still
 reconstruct and verify the durable workflow evidence before it can make any
-activation decision. The stock binary therefore remains draft-only.
+activation decision. The stock binary therefore remains draft-only unless the
+protected validator is explicitly selected with every activation prerequisite.
 
-The runtime now contains the narrow `observed-tools-v1` validator needed for that
-reconstruction. It checks the complete stored version and receipt before and after
+The runtime contains the narrow `darwin_observed_tools_activation_v1` validator
+needed for that reconstruction. It checks the complete stored version and receipt before and after
 one coherent read-only SQLite snapshot, re-derives current accepted source records
 and paired successful tool events, and rejects concurrent database revisions. It
 also binds the attempt digest, content-addressed selection policy identity, exact
@@ -39,12 +42,19 @@ every declared required tool. It returns deterministic evidence only for this
 provenance claim; it never interprets `validation_cases`, calls a provider/tool or
 claims semantic workflow correctness.
 
-This validator engine is not yet automatically registered by the stock daemon or
-SDK lifecycle. Until that protected construction and identity wiring is complete,
-the shipped binary remains draft-only. A selection's saved policy identity is
-content-addressed, but the validator does not independently reproduce the entire
-historical configuration or generation input digest, authenticate direct database
-tampering, or attest tool arguments and implementation versions.
+A readable change to the selected evaluation set, judge-only evidence, privacy
+violation, or unobserved required tool returns attributable deterministic failed
+evidence and can drive rollback of a previously activated version. Malformed or
+missing state, catalog/version drift, cancellation, storage failure, panic, and
+concurrent revision remain validation errors and never authorize rollback.
+
+The daemon and SDK construct this product-owned binding lazily from immutable
+service settings before configured-learning preflight. Construction opens no
+catalog or database, and validation opens the catalog and telemetry store read
+only. A selection's saved policy identity is content-addressed, but the validator
+does not independently reproduce the entire historical configuration or generation
+input digest, authenticate direct database tampering, or attest tool arguments and
+implementation versions.
 
 ## Explicit selection
 
@@ -55,13 +65,15 @@ skills:
   auto_activate_after_validation: true
   rollback_on_regression: true
   learning:
-    validator_id: project-tests-v1
+    validator_id: darwin_observed_tools_activation_v1
     regression_name: project-regression
     regression_interval: 5m
 ```
 
 `validator_id` enables validated learning only when the named implementation is
-registered. An empty identity preserves draft-only behavior. The regression name
+available. The value above selects the protected stock provenance validator;
+custom Go hosts may select a separately registered identity. An empty identity
+preserves draft-only behavior. The regression name
 and interval must both be set or both omitted; they require a validator identity,
 and intervals range from one second to 24 hours. Enabled validated learning
 requires activation policy, and enabled regression requires rollback policy.
@@ -89,6 +101,17 @@ supervisor, err := client.StartConfiguredLearning(ctx, registry)
 defer supervisor.Close()
 checks := supervisor.Health()
 ```
+
+For the stock validator, configure its protected identity and pass `nil` to
+`StartConfiguredLearning`, or inspect the immutable merged registry first:
+
+```go
+registry, err := client.ConfiguredSkillValidatorRegistry(nil)
+supervisor, err := client.StartConfiguredLearning(ctx, registry)
+```
+
+Direct SDK callback methods reject a caller-supplied validator that claims the
+protected stock identity. Use a distinct versioned identity for host policy.
 
 The registry copies at most 64 entries and rejects invalid identities and nil,
 including typed-nil, validators. It retains callback state by reference: hosts
@@ -131,13 +154,14 @@ New model-generated drafts retain their verified source domain as a discovery
 tag even when the model omits it, without duplicating an existing matching tag.
 The complete tag set must fit the runtime metadata bound. This does not activate
 a draft, expand permissions, or rewrite existing generated records and receipts.
-An integration fixture covers scheduled generation and validation, activation,
-retrieval into a later task's actual model context, deterministic regression
-rollback, and restart without regeneration or reactivation. Context retrieval
-does not prove semantic execution of arbitrary generated workflows.
+Qualification combines stock daemon admission tests with a real observed-tools
+lifecycle fixture: two accepted tool-using sessions drive generation and immutable
+publication, the protected validator activates the candidate, later runtime context
+loads it progressively, restart does not regenerate, and a revised source evaluation
+produces deterministic failed evidence and restores the validated baseline. A
+second restart preserves rollback and immutable history. Context retrieval does
+not prove semantic execution of arbitrary generated workflows.
 
-The runtime tests use isolated fixture providers and trusted deterministic test
-validators, not an installed production domain-validation engine. Shipping such
-an engine, statistical outcome regression, safe long-term receipt retention and
-broad live-model qualification remain open. No user configuration is enabled by
+Statistical outcome regression, safe long-term receipt retention and broad
+live-model qualification remain open. No user configuration is enabled by
 installing this change.

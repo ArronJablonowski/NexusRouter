@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
 	"github.com/ArronJablonowski/DarwinRouter/skills"
@@ -57,6 +58,38 @@ func TestSDKConfiguredLearningDisabledAndGuards(t *testing.T) {
 	}
 }
 
+func TestSDKDirectValidatorCallbacksCannotClaimProtectedIdentity(t *testing.T) {
+	options, _ := sdkToolOptions(t)
+	c, err := sdk.New(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	validator := skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) {
+		calls.Add(1)
+		return skills.Evidence{ID: sdk.ObservedToolsActivationValidatorID, Passed: true, Deterministic: true}, nil
+	})
+	ctx := context.Background()
+	if _, err = c.LearningStepWithValidation(ctx, sdk.ObservedToolsActivationValidatorID, validator); err != sdk.ErrAdmission {
+		t.Fatal("direct learning claimed protected identity", err)
+	}
+	if learner, startErr := c.StartLearningWithValidation(ctx, sdk.ObservedToolsActivationValidatorID, validator); startErr != sdk.ErrAdmission || learner != nil {
+		t.Fatal("direct learner claimed protected identity", learner, startErr)
+	}
+	if _, err = c.RevalidateSkillVersionOnce(ctx, "operation", sdk.ObservedToolsActivationValidatorID, skills.ActivationState{}, validator); err != sdk.ErrAdmission {
+		t.Fatal("direct revalidation claimed protected identity", err)
+	}
+	if _, err = c.DurableSkillRegressionStep(ctx, "monitor", sdk.ObservedToolsActivationValidatorID, time.Second, validator); err != sdk.ErrAdmission {
+		t.Fatal("direct regression step claimed protected identity", err)
+	}
+	if monitor, startErr := c.StartDurableSkillRegression(ctx, "monitor", sdk.ObservedToolsActivationValidatorID, time.Second, validator); startErr != sdk.ErrAdmission || monitor != nil {
+		t.Fatal("direct regression monitor claimed protected identity", monitor, startErr)
+	}
+	if calls.Load() != 0 {
+		t.Fatal("protected identity invoked host callback", calls.Load())
+	}
+}
+
 func TestSDKConfiguredLearningPreflightWithoutDispatch(t *testing.T) {
 	for _, mode := range []string{"missing-validator", "missing-catalog"} {
 		t.Run(mode, func(t *testing.T) {
@@ -97,5 +130,72 @@ func TestSDKConfiguredLearningPreflightWithoutDispatch(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSDKConfiguredLearningExposesProtectedObservedToolsOptIn(t *testing.T) {
+	if sdk.ObservedToolsActivationValidatorID != "darwin_observed_tools_activation_v1" {
+		t.Fatal("unstable stock validator identity", sdk.ObservedToolsActivationValidatorID)
+	}
+	options, path := sdkToolOptions(t)
+	root := filepath.Join(t.TempDir(), "missing-catalog")
+	options.Overrides = map[string]string{
+		"skills.root":                      root,
+		"skills.scope":                     "project",
+		"skills.learning.enabled":          "true",
+		"skills.learning.model_id":         "chat",
+		"skills.learning.validator_id":     sdk.ObservedToolsActivationValidatorID,
+		"skills.generation_budget.enabled": "true",
+	}
+	c, err := sdk.New(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := c.ConfiguredSkillValidatorRegistry(nil)
+	if err != nil || prepared == nil {
+		t.Fatal("SDK did not expose configured validator builder", err)
+	}
+	if _, err = prepared.Resolve(sdk.ObservedToolsActivationValidatorID); err != nil {
+		t.Fatal("SDK builder omitted protected validator", err)
+	}
+	// The protected callback resolves without a host registry. Startup then
+	// fails closed at the absent durable-state preflight without creating it.
+	got, err := c.StartConfiguredLearning(context.Background(), prepared)
+	if got != nil || err != sdk.ErrAdmission {
+		t.Fatal("unexpected protected validator startup", got, err)
+	}
+	for _, candidate := range []string{path, root} {
+		if _, statErr := os.Stat(candidate); !os.IsNotExist(statErr) {
+			t.Fatal("preflight mutated missing storage", candidate, statErr)
+		}
+	}
+
+	spoof, err := sdk.NewSkillValidatorRegistry(map[string]skills.Validator{
+		sdk.ObservedToolsActivationValidatorID: skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) {
+			t.Fatal("protected identity invoked host callback")
+			return skills.Evidence{}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err = c.StartConfiguredLearning(context.Background(), spoof); got != nil || err != sdk.ErrAdmission {
+		t.Fatal("SDK accepted protected validator override", got, err)
+	}
+	if built, buildErr := c.ConfiguredSkillValidatorRegistry(map[string]skills.Validator{
+		sdk.ObservedToolsActivationValidatorID: skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) {
+			return skills.Evidence{}, nil
+		}),
+	}); built != nil || buildErr != sdk.ErrAdmission {
+		t.Fatal("SDK builder accepted protected validator override", built, buildErr)
+	}
+
+	disabledOptions, _ := sdkToolOptions(t)
+	disabled, err := sdk.New(disabledOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := disabled.StartConfiguredLearning(context.Background(), spoof); got != nil || err != sdk.ErrAdmission {
+		t.Fatal("disabled SDK accepted protected validator override", got, err)
 	}
 }

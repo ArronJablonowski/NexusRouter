@@ -26,14 +26,18 @@ func TestServeConfiguredLearningPreflight(t *testing.T) {
 	token := strings.Repeat("configured-learning-fixture-", 2)
 	t.Setenv("DARWIN_API_TOKEN", token)
 	for _, test := range []struct {
-		name               string
-		selected, injected bool
-		want               string
+		name                       string
+		validatorID                string
+		injected, injectStockSpoof bool
+		want                       string
 	}{
-		{"missing registry", true, false, "cannot prepare skill learning supervisor\n"},
-		{"empty registry", true, false, "cannot prepare skill learning supervisor\n"},
-		{"injected registry", true, true, "cannot bind daemon address\n"},
-		{"draft only", false, false, "cannot bind daemon address\n"},
+		{"missing registry", "private-policy-v1", false, false, "cannot prepare skill learning supervisor\n"},
+		{"empty registry", "private-policy-v1", false, false, "cannot prepare skill learning supervisor\n"},
+		{"injected registry", "private-policy-v1", true, false, "cannot bind daemon address\n"},
+		{"stock opt in", app.ObservedToolsProvenanceValidatorID, false, false, "cannot bind daemon address\n"},
+		{"stock override", app.ObservedToolsProvenanceValidatorID, false, true, "cannot prepare skill learning supervisor\n"},
+		{"stock override while disabled", "", false, true, "cannot prepare skill learning supervisor\n"},
+		{"draft only", "", false, false, "cannot bind daemon address\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -46,9 +50,7 @@ func TestServeConfiguredLearningPreflight(t *testing.T) {
 			cost := 0.1
 			s.Providers = []config.Provider{{ID: "ollama", Kind: "ollama", Endpoint: "http://127.0.0.1:11434"}}
 			s.Models = []config.Model{{ID: "local", Provider: "ollama", Model: "model", Locality: "local", Capabilities: []string{"general"}, ContextTokens: 4096, EstimatedCost: &cost, RAMBytes: 1024}}
-			if test.selected {
-				s.Skills.Learning.ValidatorID = "private-policy-v1"
-			}
+			s.Skills.Learning.ValidatorID = test.validatorID
 			if err := s.Validate(); err != nil {
 				t.Fatal(err)
 			}
@@ -64,6 +66,15 @@ func TestServeConfiguredLearningPreflight(t *testing.T) {
 			calls := 0
 			if test.injected {
 				registry, err = skills.NewValidatorRegistry(map[string]skills.Validator{"private-policy-v1": skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) { calls++; return skills.Evidence{}, nil })})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if test.injectStockSpoof {
+				registry, err = skills.NewValidatorRegistry(map[string]skills.Validator{app.ObservedToolsProvenanceValidatorID: skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) {
+					calls++
+					return skills.Evidence{ID: app.ObservedToolsProvenanceValidatorID, Passed: true, Deterministic: true}, nil
+				})})
 				if err != nil {
 					t.Fatal(err)
 				}

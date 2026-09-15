@@ -614,15 +614,20 @@ privacy policy. Core activation uses a cooperative three-second deadline and
 sanitizes callback failures; it cannot forcibly stop an uncooperative callback.
 Current credential collisions in the candidate or proof identifier reject, not
 silently rewrite evidence. There is no remote endpoint accepting self-declared
-validation proof; the ordinary daemon has no configured activation validator.
+validation proof. The daemon exposes the protected stock
+`darwin_observed_tools_activation_v1` provenance validator only through explicit
+configured-learning selection; an empty selection remains draft-only.
 
 Opt-in host learning can now connect that trusted validator to durable discovery
 and activation: use `LearningStepWithValidation(ctx, validatorID, validator)` or
 explicitly start `StartLearningWithValidation`. The returned supervisor is
 caller-owned and must be closed. The validator identity binds policy; a durable
 activation intent pins the exact candidate/revision before callback execution.
-Inspect it with `SkillLearningActivationIntent(ctx, selectionID)`. Ordinary
-daemon learning remains draft-only. See
+Inspect it with `SkillLearningActivationIntent(ctx, selectionID)`. The protected
+stock identity cannot be claimed through these direct callback methods; use
+`Client.ConfiguredSkillValidatorRegistry` and `StartConfiguredLearning` for stock
+policy. Ordinary daemon learning remains draft-only until that policy is
+explicitly selected. See
 [validated learning](../../docs/background-learning.md#opt-in-validated-learning-for-go-hosts).
 
 `Client.RevalidateSkillVersion(ctx, expected, validator)` checks the currently

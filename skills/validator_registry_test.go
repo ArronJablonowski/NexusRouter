@@ -101,3 +101,67 @@ func TestValidatorRegistryRejectsInvalidAndNilEntries(t *testing.T) {
 		t.Fatal("invalid lookup admitted", err)
 	}
 }
+
+func TestWithProtectedValidatorOwnsMergeAndRejectsOverride(t *testing.T) {
+	var hostCalls, stockCalls atomic.Int32
+	hostValidator := ValidatorFunc(func(context.Context, Version) (Evidence, error) {
+		hostCalls.Add(1)
+		return Evidence{ID: "host-proof", Passed: true, Deterministic: true}, nil
+	})
+	stockValidator := ValidatorFunc(func(context.Context, Version) (Evidence, error) {
+		stockCalls.Add(1)
+		return Evidence{ID: "stock-proof", Passed: true, Deterministic: true}, nil
+	})
+	host, err := NewValidatorRegistry(map[string]Validator{"host-v1": hostValidator})
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, err := WithProtectedValidator(host, "darwin_stock_v1", stockValidator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = merged.Resolve("host-v1"); err != nil {
+		t.Fatal("host binding lost", err)
+	}
+	got, err := merged.Resolve("darwin_stock_v1")
+	if err != nil {
+		t.Fatal("protected binding missing", err)
+	}
+	proof, err := got.Validate(context.Background(), Version{})
+	if err != nil || proof.ID != "stock-proof" || stockCalls.Load() != 1 || hostCalls.Load() != 0 {
+		t.Fatal("protected binding changed", proof, err)
+	}
+	if _, err = host.Resolve("darwin_stock_v1"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("merge mutated host registry", err)
+	}
+	if again, err := WithProtectedValidator(merged, "darwin_stock_v1", hostValidator); !errors.Is(err, ErrInvalid) || again != nil {
+		t.Fatal("protected identity was replaceable", err)
+	}
+
+	spoof, err := NewValidatorRegistry(map[string]Validator{"darwin_stock_v1": hostValidator})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := WithProtectedValidator(spoof, "darwin_stock_v1", stockValidator); !errors.Is(err, ErrInvalid) || got != nil {
+		t.Fatal("protected identity accepted host override", err)
+	}
+	if got, err := WithProtectedValidator(nil, "bad.name", stockValidator); !errors.Is(err, ErrInvalid) || got != nil {
+		t.Fatal("invalid protected identity accepted", err)
+	}
+	var nilValidator ValidatorFunc
+	if got, err := WithProtectedValidator(nil, "darwin_stock_v1", nilValidator); !errors.Is(err, ErrInvalid) || got != nil {
+		t.Fatal("nil protected callback accepted", err)
+	}
+
+	full := make(map[string]Validator, maxValidators)
+	for i := 0; i < maxValidators; i++ {
+		full[fmt.Sprintf("host-%d", i)] = hostValidator
+	}
+	fullRegistry, err := NewValidatorRegistry(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := WithProtectedValidator(fullRegistry, "darwin_stock_v1", stockValidator); !errors.Is(err, ErrInvalid) || got != nil {
+		t.Fatal("protected merge exceeded registry bound", err)
+	}
+}

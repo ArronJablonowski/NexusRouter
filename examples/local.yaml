@@ -86,6 +86,10 @@ skills:
   auto_activate_after_validation: false
   learning:
     enabled: false
+    # The stock provenance validator is opt-in and does not prove subjective
+    # quality. Enabling it also requires the documented learning, generation,
+    # automatic-activation, and resource settings.
+    # validator_id: darwin_observed_tools_activation_v1
 evaluation:
   # Subjective auxiliary judging is opt-in and may create provider traffic.
   llm_judge_enabled: false

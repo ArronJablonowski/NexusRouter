@@ -15,7 +15,7 @@ type SkillRegressionMonitorCheck = skills.RegressionMonitorCheck
 // can accompany an advanced cursor with a failed check; cursor movement is not
 // successful validation. Inspect retained checks to distinguish outcomes.
 func (c *Client) DurableSkillRegressionStep(ctx context.Context, name, validatorID string, interval time.Duration, validator skills.Validator) (skills.RegressionMonitorState, error) {
-	if !c.valid(ctx) {
+	if !c.valid(ctx) || reservedSkillValidatorID(validatorID) {
 		return skills.RegressionMonitorState{}, ErrAdmission
 	}
 	if err := ctx.Err(); err != nil {
@@ -50,7 +50,7 @@ func (c *Client) SkillRegressionMonitorCheck(ctx context.Context, name, operatio
 // validator contract identity and cadence. Call Close to cancel and join it.
 // Validators are trusted, read-only, retry-safe and cooperative, not sandboxed.
 func (c *Client) StartDurableSkillRegression(ctx context.Context, name, validatorID string, interval time.Duration, validator skills.Validator) (*SkillRegressionMonitor, error) {
-	if !c.valid(ctx) {
+	if !c.valid(ctx) || reservedSkillValidatorID(validatorID) {
 		return nil, ErrAdmission
 	}
 	if err := ctx.Err(); err != nil {

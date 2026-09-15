@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -112,7 +113,7 @@ func TestObservedToolsValidationSnapshotRejectsStaleAndConcurrentEvidence(t *tes
 				return
 			}
 			reviseWith(store)
-			if got, err := store.ObservedToolsValidationSnapshot(context.Background(), "project", attempt.ID); err == nil || !reflect.DeepEqual(got, ObservedToolsValidationSnapshot{}) {
+			if got, err := store.ObservedToolsValidationSnapshot(context.Background(), "project", attempt.ID); !errors.Is(err, ErrObservedToolsEvidence) || !reflect.DeepEqual(got, ObservedToolsValidationSnapshot{}) {
 				t.Fatal("stale evidence accepted", got, err)
 			}
 		})

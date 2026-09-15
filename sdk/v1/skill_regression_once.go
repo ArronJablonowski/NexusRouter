@@ -25,7 +25,7 @@ func (c *Client) SkillRegressionOperation(ctx context.Context, key skills.Key, o
 // rollback. The host owns stable validator identity and deterministic, read-only,
 // concurrent-safe, cancellation-cooperative callbacks; this is not a sandbox.
 func (c *Client) RevalidateSkillVersionOnce(ctx context.Context, operation, validatorID string, expected skills.ActivationState, validator skills.Validator) (skills.RegressionOperation, error) {
-	if !c.valid(ctx) {
+	if !c.valid(ctx) || reservedSkillValidatorID(validatorID) {
 		return skills.RegressionOperation{}, ErrAdmission
 	}
 	if err := ctx.Err(); err != nil {

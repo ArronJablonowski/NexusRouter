@@ -13,6 +13,12 @@ import (
 
 var errObservedToolsValidation = errors.New("observed tools validation unavailable")
 
+// ErrObservedToolsEvidence means the coherent snapshot was readable but the
+// current source evidence no longer proves the saved observed-tools selection.
+// Callers may treat this as a deterministic failed provenance check. Storage,
+// cancellation, corruption, and concurrency failures use a different error.
+var ErrObservedToolsEvidence = errors.New("observed tools evidence rejected")
+
 // ObservedToolsValidationSnapshot is a value-only view of one published
 // generation's durable telemetry provenance. All records and source
 // observations are read and re-derived in one SQLite transaction.
@@ -39,6 +45,8 @@ func (s *Store) observedToolsValidationSnapshot(ctx context.Context, scope, atte
 	defer func() {
 		if bounded.Err() != nil {
 			out, err = ObservedToolsValidationSnapshot{}, bounded.Err()
+		} else if errors.Is(err, ErrObservedToolsEvidence) {
+			out, err = ObservedToolsValidationSnapshot{}, ErrObservedToolsEvidence
 		} else if err != nil {
 			out, err = ObservedToolsValidationSnapshot{}, errObservedToolsValidation
 		}
@@ -69,6 +77,9 @@ func (s *Store) observedToolsValidationSnapshot(ctx context.Context, scope, atte
 	localOnly := false
 	for _, selected := range selection.Sources {
 		source, readErr := workflowSource(bounded, tx, selected.TaskID, &budget)
+		if errors.Is(readErr, errWorkflowIneligible) {
+			return out, ErrObservedToolsEvidence
+		}
 		if readErr != nil || len(source.Example.Checks) != 1 {
 			return out, errObservedToolsValidation
 		}
@@ -76,9 +87,12 @@ func (s *Store) observedToolsValidationSnapshot(ctx context.Context, scope, atte
 		// validation. Resolve(false), used by workflowSource, also rejects it;
 		// retain this explicit fence against future selector changes.
 		if source.Example.Checks[0].Source == evaluation.LLMJudge {
-			return out, errObservedToolsValidation
+			return out, ErrObservedToolsEvidence
 		}
 		procedure, readErr := workflowProcedure(bounded, tx, source)
+		if errors.Is(readErr, errWorkflowIneligible) {
+			return out, ErrObservedToolsEvidence
+		}
 		if readErr != nil {
 			return out, errObservedToolsValidation
 		}
@@ -87,11 +101,11 @@ func (s *Store) observedToolsValidationSnapshot(ctx context.Context, scope, atte
 		localOnly = localOnly || source.Privacy != "cloud_allowed"
 	}
 	if !slices.Equal(current, selection.Sources) {
-		return out, errObservedToolsValidation
+		return out, ErrObservedToolsEvidence
 	}
 	groups, err := skills.BuildWorkflowGroups(procedures)
 	if err != nil || len(groups) != 1 || groups[0].ID != selection.Group || groups[0].Algorithm != selection.Algorithm || !slices.Equal(groups[0].Sources, selection.Sources) {
-		return out, errObservedToolsValidation
+		return out, ErrObservedToolsEvidence
 	}
 
 	if err = tx.Commit(); err != nil {

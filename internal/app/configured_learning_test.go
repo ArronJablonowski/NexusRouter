@@ -101,6 +101,45 @@ func TestConfiguredLearningPreflightNoWork(t *testing.T) {
 	}
 }
 
+func TestConfiguredLearningInstallsProtectedObservedToolsValidator(t *testing.T) {
+	svc, _, calls := learningFixture(t)
+	svc.settings.Skills.Learning.ValidatorID = ObservedToolsProvenanceValidatorID
+	before, err := os.ReadDir(filepath.Dir(svc.settings.Skills.Root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := BuildConfiguredSkillValidatorRegistry(svc, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := PrepareConfiguredLearning(svc, registry)
+	if err != nil || plan == nil || plan.validatorID != ObservedToolsProvenanceValidatorID || plan.validator == nil || calls.Load() != 0 {
+		t.Fatal("stock validator was not prepared", plan, err, calls.Load())
+	}
+	after, err := os.ReadDir(filepath.Dir(svc.settings.Skills.Root))
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatal("validator preparation mutated storage", err)
+	}
+	if _, err = os.Stat(svc.settings.Skills.Root); !os.IsNotExist(err) {
+		t.Fatal("validator preparation created skill catalog", err)
+	}
+
+	spoof := skills.ValidatorFunc(func(context.Context, skills.Version) (skills.Evidence, error) {
+		calls.Add(1)
+		return skills.Evidence{ID: ObservedToolsProvenanceValidatorID, Passed: true, Deterministic: true}, nil
+	})
+	host, err := skills.NewValidatorRegistry(map[string]skills.Validator{ObservedToolsProvenanceValidatorID: spoof})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := BuildConfiguredSkillValidatorRegistry(svc, host); err == nil || got != nil || calls.Load() != 0 {
+		t.Fatal("host override of stock validator accepted", got, err, calls.Load())
+	}
+	if _, err = os.Stat(svc.settings.Skills.Root); !os.IsNotExist(err) {
+		t.Fatal("rejected override mutated skill storage", err)
+	}
+}
+
 func TestConfiguredLearningDurablePolicyConflictPreflight(t *testing.T) {
 	for _, mode := range []string{"learner", "regression"} {
 		t.Run(mode, func(t *testing.T) {

@@ -41,6 +41,10 @@ func observedToolsValidatorFixture(t *testing.T) (*Service, skills.PublicationSt
 	return svc, store, version, tasks, generationCalls
 }
 
+func observedToolsRejected(proof skills.Evidence, err error) bool {
+	return err == nil && proof == (skills.Evidence{ID: ObservedToolsProvenanceValidatorID, Deterministic: true})
+}
+
 func TestObservedToolsProvenanceValidatorEndToEndReadOnlyAndConcurrent(t *testing.T) {
 	svc, store, version, _, calls := observedToolsValidatorFixture(t)
 	validator := ObservedToolsProvenanceValidator{Publications: store, Database: svc.settings.Telemetry.Database, LocalOnly: svc.settings.Skills.LocalOnly}
@@ -137,7 +141,7 @@ func TestObservedToolsProvenanceValidatorRejectsStaleEvidenceAndUnobservedRequir
 			t.Fatal(err)
 		}
 		proof, err := (ObservedToolsProvenanceValidator{Publications: store, Database: svc.settings.Telemetry.Database}).Validate(context.Background(), version)
-		if !errors.Is(err, skills.ErrValidation) || proof != (skills.Evidence{}) {
+		if !observedToolsRejected(proof, err) {
 			t.Fatal("stale selection accepted", proof, err)
 		}
 	})
@@ -196,7 +200,7 @@ func TestObservedToolsProvenanceValidatorRejectsStaleEvidenceAndUnobservedRequir
 			}
 			defer store.Close()
 			proof, err := (ObservedToolsProvenanceValidator{Publications: store, Database: svc.settings.Telemetry.Database}).Validate(context.Background(), version)
-			if !errors.Is(err, skills.ErrValidation) || proof != (skills.Evidence{}) {
+			if !observedToolsRejected(proof, err) {
 				t.Fatal("unsafe published draft accepted", proof, err)
 			}
 		})

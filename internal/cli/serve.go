@@ -38,8 +38,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	return runServeWithValidators(args, stdout, stderr, nil)
 }
 
-// The stock CLI supplies no executable validation policy. Embedding hosts may
-// explicitly bind configured identities to trusted, cooperative callbacks.
+// The stock CLI supplies the protected observed-tools provenance policy only
+// when configuration selects it. Embedding hosts may bind other configured
+// identities to trusted, cooperative callbacks.
 func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *skills.ValidatorRegistry) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -77,6 +78,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	service, err := app.NewService(s, os.Getenv)
 	if err != nil {
 		fmt.Fprintln(stderr, "invalid application configuration")
+		return 1
+	}
+	registry, err = app.BuildConfiguredSkillValidatorRegistry(service, registry)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot prepare skill learning supervisor")
 		return 1
 	}
 	learningPlan, err := app.PrepareConfiguredLearning(service, registry)

@@ -967,18 +967,20 @@ This receipt is a consistency seam, not a production validation result or
 tamper-proof attestation. It does not load telemetry, authenticate source events,
 reconstruct workflow selection, invoke a validator or authorize activation;
 candidate-authored validation cases remain untrusted. Coherent observed-tool
-provenance validation, protected daemon/SDK validator wiring and activation-bound
-outcome supervision remain separate required increments.
+provenance validation and protected daemon/SDK validator wiring are now present;
+activation-bound outcome supervision remains a separate required increment.
 
-The stock `observed-tools-v1` validator closes the next provenance layer without
-claiming semantic correctness. It binds the callback's complete immutable version
+The stock `darwin_observed_tools_activation_v1` validator closes the next
+provenance layer without claiming semantic correctness. It binds the callback's complete immutable version
 to the publication receipt and canonical generation-attempt digest, then reads the
 drafted attempt, content-addressed workflow selection, current accepted source
 evaluations and durable tool lifecycle events in one read-only SQLite transaction.
 It re-derives the exact `observed_tools_v1` group, ordered tool sequence, source
-sessions, evaluation digests and privacy requirement. A changed evaluation,
-failed or uncertain tool, judge-only result, privacy downgrade, unobserved required
-tool, concurrent database commit or publication/version revision fails closed.
+sessions, evaluation digests and privacy requirement. Readable stale evaluation,
+judge-only, privacy, and required-tool mismatches return deterministic failed
+evidence suitable for rollback. Failed or uncertain tools, malformed state,
+concurrent database commits, cancellation, and publication/version revision fail
+as operational validation errors and never authorize rollback.
 The catalog and database are re-opened read-only; validation performs no provider,
 tool, activation or persistence call, and candidate `validation_cases` remain inert
 bytes.
@@ -989,7 +991,13 @@ validator does not independently reconstruct the historical full configuration o
 generation prompt digest, authenticate a tamper-capable database operator, prove
 tool arguments/implementation versions or establish workflow usefulness. Required
 tools must have been observed, but a draft may conservatively omit observed tools.
-Protected daemon and SDK registration remains a separate lifecycle increment.
+The daemon and versioned SDK now construct this identity as a protected,
+settings-bound, lazy read-only callback before configured-learning preflight.
+Configuration remains explicit opt-in; unknown IDs and host attempts to claim the
+protected identity fail before listeners, database initialization, or supervisors.
+Qualification covers generation, publication, activation, progressive reuse,
+restart idempotence and deterministic stale-evidence rollback. Activation-bound
+outcome supervision and subjective user-feedback weighting remain separate work.
 
 ## 10. Sessions, Context, and Memory
 

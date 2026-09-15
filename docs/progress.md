@@ -7848,7 +7848,8 @@ outcome-supervision responsibilities.
 
 ## 2026-09-14 — DAR-117 coherent observed-tools provenance validator
 
-The application now contains the bounded deterministic `observed-tools-v1`
+The application now contains the bounded deterministic
+`darwin_observed_tools_activation_v1`
 validator. It byte-compares the complete callback version with the exact stored
 immutable body before and after validation, rechecks the publication receipt, and
 binds the canonical generation-attempt digest to the same selection ID and skill
@@ -7875,3 +7876,35 @@ or generation prompt digest, authenticate a tamper-capable SQLite operator, prov
 semantic equivalence or attest tool arguments/implementation versions. Stock
 daemon/SDK registration remains DAR-118; activation-bound outcome supervision
 remains DAR-119.
+
+## 2026-09-15 — DAR-118 protected stock validator wiring
+
+The daemon and versioned Go SDK now construct the observed-tools validator under
+the reserved `darwin_observed_tools_activation_v1` identity after immutable
+service setup and before configured-learning preflight. Registry composition is
+pure and immutable, rejects host collisions even when learning is disabled, and
+opens the exact configured skill catalog lazily and read-only only when validation
+runs. Configuration remains the activation opt-in: an empty or custom validator
+identity does not install the stock callback or reduce custom registry capacity.
+Unknown and conflicting IDs fail before listener binding, database initialization,
+provider dispatch, callbacks, or supervisors.
+
+The SDK exports the stable identity and a settings-bound registry helper. Its
+direct host-callback learning and named-regression methods reject attempts to
+claim the protected identity. Readable current-evidence drift returns attributable
+deterministic failed evidence so a previously activated generated skill can roll
+back; malformed, missing, concurrent, canceled, or operational state remains a
+validation error and cannot authorize rollback.
+
+Race-enabled qualification covers protected/custom registry composition, lazy
+read-only validation, daemon admission ordering, SDK collision guards, exact
+observed-tools generation and publication, protected activation, progressive
+reuse in a later runtime prompt, restart without regeneration, stale-evaluation
+rollback to a validated baseline, and a second restart preserving immutable
+history. Candidate-authored validation text remains inert. This validator still
+proves provenance and freshness rather than semantic usefulness. Activation-bound
+outcome comparison and subjective user-feedback weighting remain DAR-119.
+
+Final verification passed `make check`: source formatting and the 1,000-line
+limit, `go vet ./...`, the complete `go test -race -timeout=35m ./...` suite,
+and `go build ./...` all completed successfully.
