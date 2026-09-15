@@ -33,6 +33,7 @@ func workboardMutationSpecs() []providers.Tool {
 		{Name: "workboard_add_dependency", Description: "Add one same-board card dependency using exact card and graph revisions after operator approval.", Parameters: workboardDependencyMutationSchema()},
 		{Name: "workboard_remove_dependency", Description: "Remove one same-board card dependency using exact card and graph revisions after operator approval.", Parameters: workboardDependencyMutationSchema()},
 		workboardControlMutationSpec("workboard_request_pause"),
+		workboardControlMutationSpec("workboard_request_resume"),
 		workboardControlMutationSpec("workboard_request_cancel"),
 	}
 }
@@ -74,7 +75,8 @@ func workboardMutationAction(name string) (webui.BoardAction, bool) {
 		"workboard_update_card": webui.CardRevise, "workboard_transition_card": webui.CardMove,
 		"workboard_reorder_card":   webui.CardReorder,
 		"workboard_add_dependency": webui.DependencyAdd, "workboard_remove_dependency": webui.DependencyRemove,
-		"workboard_request_pause": webui.CardPauseRequest, "workboard_request_cancel": webui.CardCancelRequest,
+		"workboard_request_pause": webui.CardPauseRequest, "workboard_request_resume": webui.CardResumeRequest,
+		"workboard_request_cancel": webui.CardCancelRequest,
 	}
 	action, ok := actions[name]
 	return action, ok

@@ -141,6 +141,7 @@ func TestApplicationToolPolicyUsesConfiguredWriteDecision(t *testing.T) {
 			{"workboard_add_dependency", "workboard:board_a"},
 			{"workboard_remove_dependency", "workboard:board_a"},
 			{"workboard_request_pause", "workboard:board_a"},
+			{"workboard_request_resume", "workboard:board_a"},
 			{"workboard_request_cancel", "workboard:board_a"},
 		} {
 			if got := policy.Decide(target.tool, target.scope); got != test.want {

@@ -49,6 +49,7 @@ func TestChatWorkboardApprovalPreviewSupportsMutationCatalog(t *testing.T) {
 		"workboard_add_dependency":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-add1", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
 		"workboard_remove_dependency": {"workboard:board_a", map[string]any{"idempotency_key": "approval-dependency-rm01", "board_id": "board_a", "card_id": "card_a", "dependency_id": "card_b", "expected_card_revision": 1, "expected_graph_revision": 1}},
 		"workboard_request_pause":     {"workboard:board_a", map[string]any{"idempotency_key": "approval-pause-request1", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
+		"workboard_request_resume":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-resume-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
 		"workboard_request_cancel":    {"workboard:board_a", map[string]any{"idempotency_key": "approval-cancel-request", "board_id": "board_a", "card_id": "card_a", "expected_card_revision": 1}},
 	}
 	for name, test := range cases {

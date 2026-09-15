@@ -140,7 +140,7 @@ func TestRootAgentWorkboardControlRequestsAreApprovedScopedAndTaskAttributed(t *
 }
 
 func TestWorkboardControlToolSchemasAreClosedAndPolicyGated(t *testing.T) {
-	for _, name := range []string{"workboard_request_pause", "workboard_request_cancel"} {
+	for _, name := range []string{"workboard_request_pause", "workboard_request_resume", "workboard_request_cancel"} {
 		spec := workboardControlMutationSpec(name)
 		if spec.Name != name || !strings.Contains(string(spec.Parameters), `"additionalProperties":false`) {
 			t.Fatalf("spec=%+v", spec)
@@ -150,8 +150,11 @@ func TestWorkboardControlToolSchemasAreClosedAndPolicyGated(t *testing.T) {
 				t.Fatalf("%s configured=%s got=%s want=%s", name, configured, got, want)
 			}
 		}
-		if name == "workboard_request_pause" && (!strings.Contains(spec.Description, "does not yet pause") || !strings.Contains(spec.Description, "not a pause acknowledgement")) {
-			t.Fatalf("pause description overpromises runtime behavior: %q", spec.Description)
+		if name == "workboard_request_pause" && (!strings.Contains(spec.Description, "safe-boundary pause") || !strings.Contains(spec.Description, "not a pause acknowledgement") || !strings.Contains(spec.Description, "records acknowledgement separately")) {
+			t.Fatalf("pause description does not explain request/acknowledgement semantics: %q", spec.Description)
+		}
+		if name == "workboard_request_resume" && (!strings.Contains(spec.Description, "worker-acknowledged paused card") || !strings.Contains(spec.Description, "not a resume acknowledgement") || !strings.Contains(spec.Description, "records acknowledgement separately")) {
+			t.Fatalf("resume description does not explain request/acknowledgement semantics: %q", spec.Description)
 		}
 	}
 }

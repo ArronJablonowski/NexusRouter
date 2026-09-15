@@ -50,6 +50,7 @@ func applicationToolPolicyFor(configured string) *tools.Policy {
 		{Tool: "workboard_add_dependency", Scope: "*", Decision: writeDecision},
 		{Tool: "workboard_remove_dependency", Scope: "*", Decision: writeDecision},
 		{Tool: "workboard_request_pause", Scope: "*", Decision: writeDecision},
+		{Tool: "workboard_request_resume", Scope: "*", Decision: writeDecision},
 		{Tool: "workboard_request_cancel", Scope: "*", Decision: writeDecision},
 		{Tool: "delegate", Scope: "delegation", Decision: tools.Allow},
 		{Tool: "delegate_batch", Scope: "delegation", Decision: tools.Allow},

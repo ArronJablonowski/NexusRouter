@@ -27,6 +27,7 @@ var chatWorkboardActions = map[string]webui.BoardAction{
 	"workboard_add_dependency":    webui.DependencyAdd,
 	"workboard_remove_dependency": webui.DependencyRemove,
 	"workboard_request_pause":     webui.CardPauseRequest,
+	"workboard_request_resume":    webui.CardResumeRequest,
 	"workboard_request_cancel":    webui.CardCancelRequest,
 }
 

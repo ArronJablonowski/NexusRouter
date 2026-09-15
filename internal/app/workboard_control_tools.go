@@ -7,8 +7,10 @@ import (
 )
 
 func workboardControlMutationSpec(name string) providers.Tool {
-	description := "Record a durable pause request for one active card after operator approval; the MVP worker only observes this flag and does not yet pause, so a committed request is not a pause acknowledgement."
-	if name == "workboard_request_cancel" {
+	description := "Request a safe-boundary pause for one active card after operator approval. A committed request is not a pause acknowledgement; the worker records acknowledgement separately when it reaches a safe boundary."
+	if name == "workboard_request_resume" {
+		description = "Request that one worker-acknowledged paused card resume after operator approval. A committed request is not a resume acknowledgement; the worker records acknowledgement separately before continuing."
+	} else if name == "workboard_request_cancel" {
 		description = "Request cancellation of one active card after operator approval; a committed request is not verified cancellation finalization."
 	}
 	return providers.Tool{Name: name, Description: description, Parameters: workboardControlRequestSchema()}
