@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 50 {
+		if err = discardEmptyFutureContextCompactionPlans(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 50 {
+		if err = validateContextCompactionPlanSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 49 {
 		if err = discardEmptyFutureWorkboardDecompositionAdmissions(ctx, conn); err != nil {
 			return err
@@ -580,6 +590,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 49 {
 		if err = migrateWorkboardDecompositionAdmissions(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 50 {
+		if err = migrateContextCompactionPlans(ctx, conn); err != nil {
 			return err
 		}
 	}

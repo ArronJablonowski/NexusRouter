@@ -37,7 +37,7 @@ func TestWorkboardDecompositionAdmissionMigrationPreservesLegacyEvents(t *testin
 	var version, events, admissions int
 	if err = store.db.QueryRow(`SELECT (SELECT user_version FROM pragma_user_version),
 		(SELECT count(*) FROM workboard_events),(SELECT count(*) FROM workboard_decomposition_admissions)`).
-		Scan(&version, &events, &admissions); err != nil || version != 49 || events != 1 || admissions != 0 {
+		Scan(&version, &events, &admissions); err != nil || version != currentStorageSchema || events != 1 || admissions != 0 {
 		t.Fatalf("schema=%d events=%d admissions=%d err=%v", version, events, admissions, err)
 	}
 	var decompositionColumns int
