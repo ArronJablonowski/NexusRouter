@@ -50,6 +50,16 @@ func TestAutomaticPressureWaitReplansAfterRelease(t *testing.T) {
 	s, cfg := autoFixture(t)
 	s.settings.Hardware.LocalPressurePolicy = "wait"
 	s.settings.Hardware.LocalQueueTimeout = "2s"
+	// Keep cold schema migration outside the deliberately bounded pressure
+	// window. Under race instrumentation migration can otherwise consume the
+	// timeout before the second planning pass signals that capacity is held.
+	db, err := telemetry.Open(context.Background(), cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Close(); err != nil {
+		t.Fatal(err)
+	}
 	release, err := s.reserveExplicit(context.Background(), cfg.Models[0])
 	if err != nil {
 		t.Fatal(err)
