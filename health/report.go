@@ -30,7 +30,7 @@ type Report struct {
 
 func (c Check) Validate() error {
 	switch c.Component {
-	case "daemon", "database", "supervisor", "workboard_scheduler", "learning", "skill_regression", "metrics_export", "trace_export", "resources", "provider", "model":
+	case "daemon", "database", "supervisor", "workboard_scheduler", "learning", "skill_regression", "outcome_supervision", "metrics_export", "trace_export", "resources", "provider", "model":
 	default:
 		return ErrInvalid
 	}
@@ -40,7 +40,7 @@ func (c Check) Validate() error {
 	if (c.Component == "provider" || c.Component == "model") && c.ID == "" {
 		return ErrInvalid
 	}
-	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "workboard_scheduler" || c.Component == "learning" || c.Component == "skill_regression" || c.Component == "metrics_export" || c.Component == "trace_export") && c.ID != "" {
+	if (c.Component == "daemon" || c.Component == "database" || c.Component == "supervisor" || c.Component == "workboard_scheduler" || c.Component == "learning" || c.Component == "skill_regression" || c.Component == "outcome_supervision" || c.Component == "metrics_export" || c.Component == "trace_export") && c.ID != "" {
 		return ErrInvalid
 	}
 	switch c.Status {
@@ -105,7 +105,7 @@ func Outcome(checks []Check) (string, bool) {
 		if c.Component == "workboard_scheduler" {
 			schedulerReady = schedulerReady && c.Status == "healthy"
 		}
-		if c.Component == "learning" || c.Component == "skill_regression" {
+		if c.Component == "learning" || c.Component == "skill_regression" || c.Component == "outcome_supervision" {
 			learningReady = learningReady && (c.Status == "healthy" || c.Status == "disabled")
 		}
 		if c.Status != "healthy" && c.Status != "disabled" {
