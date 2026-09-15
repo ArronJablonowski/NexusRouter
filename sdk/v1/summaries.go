@@ -8,6 +8,7 @@ import (
 )
 
 type SummaryAttempt = sessions.SummaryAttempt
+type SummaryRecovery = sessions.SummaryRecovery
 type SummaryReview = sessions.SummaryReview
 type SummaryValidationInput = sessions.SummaryValidationInput
 type SummaryValidationDecision = sessions.SummaryValidationDecision
@@ -95,6 +96,41 @@ func (c *Client) ListSummaryAttempts(ctx context.Context, task, after string, li
 		return nil, err
 	}
 	return app.ListSummaryAttempts(ctx, c.database, task, after, limit)
+}
+
+// ReconcileInterruptedSummaries performs one explicit bounded recovery page.
+// It never redispatches a provider or grants approval to uncertain output.
+func (c *Client) ReconcileInterruptedSummaries(ctx context.Context, after string, limit int) (string, int, error) {
+	if !c.valid(ctx) {
+		return "", 0, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+	return app.ReconcileInterruptedSummaries(ctx, c.database, after, limit)
+}
+
+// InspectSummaryRecovery reads one safe interruption receipt without exposing
+// process-lock metadata or generated output.
+func (c *Client) InspectSummaryRecovery(ctx context.Context, attempt string) (SummaryRecovery, error) {
+	if !c.valid(ctx) {
+		return SummaryRecovery{}, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return SummaryRecovery{}, err
+	}
+	return app.InspectSummaryRecovery(ctx, c.database, attempt)
+}
+
+// ListSummaryRecoveries reads one lexical page of interruption receipts.
+func (c *Client) ListSummaryRecoveries(ctx context.Context, task, after string, limit int) ([]SummaryRecovery, error) {
+	if !c.valid(ctx) {
+		return nil, ErrAdmission
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return app.ListSummaryRecoveries(ctx, c.database, task, after, limit)
 }
 
 // ReviewSummary records an explicit operator decision against the expected

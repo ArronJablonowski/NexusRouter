@@ -18,9 +18,21 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 	attentionAfter := ""
 	configAfter := ""
 	workboardAfter := ""
+	summaryAfter := d.summaryRecoveryAfter
 	for ctx.Err() == nil {
 		d.supervisorHeartbeat(-1)
 		query, cancel := context.WithTimeout(ctx, 5*time.Second)
+		nextSummary, _, summaryErr := d.db.ReconcileSummaryAttemptsPage(query, summaryAfter, 32, time.Now().UTC())
+		cancel()
+		summaryAfter = nextSummary
+		d.supervisorHeartbeat(-1)
+		if summaryErr != nil && ctx.Err() == nil {
+			d.recordError()
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		query, cancel = context.WithTimeout(ctx, 5*time.Second)
 		nextWorker, _, workerErr := d.db.RecoverOrphanWorkersPage(query, workerAfter, 32, time.Now().UTC())
 		cancel()
 		workerAfter = nextWorker

@@ -17,28 +17,29 @@ import (
 // projects already-terminal histories without reexecution. Partial work is
 // never replayed automatically.
 type Dispatcher struct {
-	cancel             context.CancelFunc
-	done               chan struct{}
-	db                 *telemetry.Store
-	eventSink          runtime.EventSink
-	eventSinkSequencer *configuredSinkSequencer
-	lifecycle          context.Context
-	recoverySecrets    func() []string
-	once               sync.Once
-	mu                 sync.Mutex
-	err                error
-	configuredWorkers  int
-	startedWorkers     int
-	workerAlive        map[int]bool
-	workerBeats        map[int]time.Time
-	reconcilerStarted  bool
-	reconcilerAlive    bool
-	reconcilerBeat     time.Time
-	closing            bool
-	closed             bool
-	healthNow          func() time.Time
-	renewInterval      time.Duration
-	workboardRecovery  *WorkboardRecoveryCoordinator
+	cancel               context.CancelFunc
+	done                 chan struct{}
+	db                   *telemetry.Store
+	eventSink            runtime.EventSink
+	eventSinkSequencer   *configuredSinkSequencer
+	lifecycle            context.Context
+	recoverySecrets      func() []string
+	once                 sync.Once
+	mu                   sync.Mutex
+	err                  error
+	configuredWorkers    int
+	startedWorkers       int
+	workerAlive          map[int]bool
+	workerBeats          map[int]time.Time
+	reconcilerStarted    bool
+	reconcilerAlive      bool
+	reconcilerBeat       time.Time
+	closing              bool
+	closed               bool
+	healthNow            func() time.Time
+	renewInterval        time.Duration
+	workboardRecovery    *WorkboardRecoveryCoordinator
+	summaryRecoveryAfter string
 }
 
 func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
@@ -52,6 +53,14 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, eventSink: s.eventSink, eventSinkSequencer: s.eventSinkSequencer, lifecycle: ctx, recoverySecrets: func() []string { return memorySecrets(s.settings, s.secret) }, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
 	d.workboardRecovery, err = NewWorkboardRecoveryCoordinator(db, time.Now)
+	if err != nil {
+		db.Close()
+		cancel()
+		return nil, ErrSubmission
+	}
+	// Reconcile one bounded page before workers or the HTTP daemon can dispatch
+	// new work. Remaining pages are drained by the periodic reconciler.
+	d.summaryRecoveryAfter, _, err = db.ReconcileSummaryAttemptsPage(ctx, "", 32, time.Now().UTC())
 	if err != nil {
 		db.Close()
 		cancel()

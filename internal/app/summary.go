@@ -102,23 +102,6 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		}
 		defer release()
 	}
-	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, provider, model, history.Privacy, key)
-	if err != nil {
-		return bad()
-	}
-	defer closeProvider()
-	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
-		// A changed credential must not silently alter the request after context
-		// estimation. Recheck the original source before launch and after startup.
-		native.beforeStream = func() error {
-			secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
-			clean, err := nativeSummaryMessages(history.Messages, secrets)
-			if err != nil || !reflect.DeepEqual(clean, input.Messages) || !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable}, secrets) {
-				return ErrAdmission
-			}
-			return nil
-		}
-	}
 	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		return bad()
@@ -141,6 +124,25 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 			return attempt, errors.Join(cause, errors.New("cannot persist summary terminal state"))
 		}
 		return attempt, cause
+	}
+	// Provider construction may launch a subprocess. The guarded started row
+	// must therefore be durable before construction, not merely before Stream.
+	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, provider, model, history.Privacy, key)
+	if err != nil {
+		return fail("summary_failed", errors.New("summary provider unavailable"))
+	}
+	defer closeProvider()
+	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
+		// A changed credential must not silently alter the request after context
+		// estimation. Recheck the original source before launch and after startup.
+		native.beforeStream = func() error {
+			secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
+			clean, err := nativeSummaryMessages(history.Messages, secrets)
+			if err != nil || !reflect.DeepEqual(clean, input.Messages) || !selectionValueClean([]string{task, history.SessionID, model.ID, model.Model, provider.ID, provider.Executable}, secrets) {
+				return ErrAdmission
+			}
+			return nil
+		}
 	}
 	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost, StructuredOutput: provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, input, keep)
@@ -183,6 +185,15 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 		return fail("summary_failed", errors.New("summary metadata unavailable"))
 	}
 	if err := write.CompleteSummary(ctx, attempt); err != nil {
+		// A commit acknowledgement can be lost after SQLite made the drafted row
+		// durable. Re-read once without inheriting caller cancellation and accept
+		// only the exact proposal; never invoke the provider again.
+		inspect, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		committed, readErr := write.SummaryAttempt(inspect, attempt.ID)
+		cancel()
+		if readErr == nil && reflect.DeepEqual(committed, attempt) {
+			return committed, nil
+		}
 		if draft.Usage != nil {
 			usage := *draft.Usage
 			attempt.Usage, attempt.Elapsed = &usage, draft.Elapsed
