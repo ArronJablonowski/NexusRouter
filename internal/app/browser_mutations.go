@@ -544,7 +544,8 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 		return nil, ErrBrowserMutation
 	}
 	pending, ok := snapshot.Pending[record.Request.ToolCallID]
-	if !ok || pending.Dispatched || pending.TurnID != record.Request.TurnID || pending.Call.ID != record.Request.ToolCallID || pending.Call.Name != record.Request.ToolName {
+	if !ok || !pending.Dispatched || pending.ToolBehavior != runtime.BehaviorIdempotentWrite || record.Request.ToolBehavior != runtime.BehaviorIdempotentWrite ||
+		pending.TurnID != record.Request.TurnID || pending.Call.ID != record.Request.ToolCallID || pending.Call.Name != record.Request.ToolName {
 		return nil, ErrBrowserMutation
 	}
 	digest := sha256.Sum256(pending.Call.Arguments)

@@ -12,9 +12,12 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
 	"github.com/ArronJablonowski/DarwinRouter/internal/browserops"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/DarwinRouter/tools"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
 
@@ -156,7 +159,7 @@ func TestBrowserWorkboardApprovalProjectionRequiresExactDurableProposal(t *testi
 	}
 	defer db.Close()
 	now := time.Now().UTC().Truncate(time.Second)
-	criterion := contract.AcceptanceCriterion{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go.test", Description: "Focused tests pass.", Required: true}
+	criterion := contract.AcceptanceCriterion{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go-test", Description: "Focused tests pass.", Required: true}
 	args, _ := json.Marshal(map[string]any{"idempotency_key": "proposal-key-0001", "board_id": "board", "card_id": "card", "expected_board_revision": 2, "expected_card_revision": 3, "expected_criteria_revision": 1, "expected_criteria_digest": strings.Repeat("a", 64), "criteria": []contract.AcceptanceCriterion{criterion}})
 	call := providers.ToolCall{ID: "proposal-call", Name: "workboard_propose_criteria", Arguments: args}
 	start := inspectionEvent("proposal-task", 1, runtime.TaskStarted, now)
@@ -164,12 +167,16 @@ func TestBrowserWorkboardApprovalProjectionRequiresExactDurableProposal(t *testi
 	turn.TurnID, turn.AttemptID, turn.Data.ModelID, turn.Data.ProviderID = "proposal-turn", "proposal-attempt", "model", "provider"
 	done := inspectionEvent("proposal-task", 3, runtime.TurnCompleted, now)
 	done.TurnID, done.AttemptID, done.Data.FinishReason, done.Data.ToolCalls = turn.TurnID, turn.AttemptID, "tool_calls", []providers.ToolCall{call}
-	for _, event := range []runtime.Event{start, turn, done} {
+	toolStarted := inspectionEvent("proposal-task", 4, runtime.ToolStarted, now)
+	toolStarted.TurnID, toolStarted.AttemptID = turn.TurnID, turn.AttemptID
+	toolStarted.Data.ToolCallID, toolStarted.Data.ToolName, toolStarted.Data.ToolBehavior, toolStarted.Data.Effect = call.ID, call.Name, runtime.BehaviorIdempotentWrite, runtime.UncertainEffect
+	for _, event := range []runtime.Event{start, turn, done, toolStarted} {
 		appendInspectionEvent(t, db, event)
 	}
 	sum := sha256.Sum256(args)
 	record := browserApprovalRecord(approvals.Pending, nil, now.Add(time.Minute))
 	record.Request.TaskID, record.Request.TurnID, record.Request.ToolCallID, record.Request.ToolName = "proposal-task", turn.TurnID, call.ID, call.Name
+	record.Request.ToolBehavior = runtime.BehaviorIdempotentWrite
 	record.Request.ArgumentsDigest = hex.EncodeToString(sum[:])
 	mutations := &BrowserMutations{service: svc}
 	summary, err := mutations.approvalSummary(context.Background(), record)
@@ -193,7 +200,10 @@ func TestBrowserWorkboardApprovalProjectionRequiresExactDurableProposal(t *testi
 	secretTurn.TurnID, secretTurn.AttemptID, secretTurn.Data.ModelID, secretTurn.Data.ProviderID = "secret-turn", "secret-attempt", "model", "provider"
 	secretDone := inspectionEvent("secret-proposal-task", 3, runtime.TurnCompleted, now)
 	secretDone.TurnID, secretDone.AttemptID, secretDone.Data.FinishReason, secretDone.Data.ToolCalls = secretTurn.TurnID, secretTurn.AttemptID, "tool_calls", []providers.ToolCall{secretCall}
-	for _, event := range []runtime.Event{secretStart, secretTurn, secretDone} {
+	secretToolStarted := inspectionEvent("secret-proposal-task", 4, runtime.ToolStarted, now)
+	secretToolStarted.TurnID, secretToolStarted.AttemptID = secretTurn.TurnID, secretTurn.AttemptID
+	secretToolStarted.Data.ToolCallID, secretToolStarted.Data.ToolName, secretToolStarted.Data.ToolBehavior, secretToolStarted.Data.Effect = secretCall.ID, secretCall.Name, runtime.BehaviorIdempotentWrite, runtime.UncertainEffect
+	for _, event := range []runtime.Event{secretStart, secretTurn, secretDone, secretToolStarted} {
 		appendInspectionEvent(t, db, event)
 	}
 	secretDigest := sha256.Sum256(secretArgs)
@@ -201,5 +211,99 @@ func TestBrowserWorkboardApprovalProjectionRequiresExactDurableProposal(t *testi
 	record.Request.ArgumentsDigest = hex.EncodeToString(secretDigest[:])
 	if _, err = mutations.approvalSummary(context.Background(), record); !errors.Is(err, ErrBrowserMutation) {
 		t.Fatal("credential-bearing proposal did not fail closed", err)
+	}
+}
+
+type browserBlockedProposalProvider struct {
+	arguments json.RawMessage
+	turn      int
+}
+
+func (*browserBlockedProposalProvider) Models(context.Context) ([]string, error) {
+	return []string{"coordinator"}, nil
+}
+
+func (p *browserBlockedProposalProvider) Stream(_ context.Context, request providers.Request, emit func(providers.Chunk) error) error {
+	p.turn++
+	if p.turn == 1 {
+		if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "browser-proposal-call", Name: "workboard_propose_criteria", Arguments: p.arguments}}); err != nil {
+			return err
+		}
+		return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+	}
+	if p.turn != 2 || len(request.Messages) == 0 || request.Messages[len(request.Messages)-1].Role != "tool" || !request.Messages[len(request.Messages)-1].ToolFailed {
+		return errors.New("denied proposal result missing")
+	}
+	return emit(providers.Chunk{Text: "The operator denied the proposal.", Done: true, FinishReason: "stop"})
+}
+
+func TestBrowserListsLiveBlockedProposalAfterToolStarted(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cfg := config.Defaults()
+	cfg.Mode, cfg.Telemetry.Database, cfg.Security.ToolPolicy = "local_only", t.TempDir()+"/state.db", "ask"
+	cfg.Tools.WorkboardReadEnabled, cfg.Tools.WorkboardWriteEnabled = true, true
+	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:1"}}
+	zero := 0.0
+	cfg.Models = []config.Model{{ID: "coordinator", Model: "coordinator", Provider: "local", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 200_000, EstimatedCost: &zero, RAMBytes: 100}}
+	criterion := map[string]any{"version": 1, "id": "tests", "kind": "objective", "required_source": "deterministic", "validator_id": "go-test", "description": "Focused tests pass.", "required": true}
+	arguments, _ := json.Marshal(map[string]any{"idempotency_key": "browser-proposal-key", "board_id": "board", "card_id": "card", "expected_board_revision": 2, "expected_card_revision": 3, "expected_criteria_revision": 1, "expected_criteria_digest": strings.Repeat("a", 64), "criteria": []any{criterion}})
+	provider := &browserBlockedProposalProvider{arguments: arguments}
+	presented := make(chan tools.ApprovalPrompt, 1)
+	svc, err := NewService(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.profile = func(context.Context) (resources.Snapshot, error) {
+		return resources.Snapshot{Time: time.Now(), TotalRAM: 1000, AvailableRAM: 1000}, nil
+	}
+	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) { return provider, nil })
+	svc.toolPresenter = func(_ context.Context, prompt tools.ApprovalPrompt) error { presented <- prompt; return nil }
+	type runOutcome struct {
+		result Result
+		err    error
+	}
+	finished := make(chan runOutcome, 1)
+	go func() {
+		result, runErr := svc.Run(ctx, Request{ModelID: "coordinator", Prompt: "Propose exact criteria."})
+		finished <- runOutcome{result: result, err: runErr}
+	}()
+	var prompt tools.ApprovalPrompt
+	select {
+	case prompt = <-presented:
+	case outcome := <-finished:
+		t.Fatalf("provider stopped before blocked approval: result=%+v err=%v", outcome.result, outcome.err)
+	case <-ctx.Done():
+		t.Fatal("provider did not reach blocked approval")
+	}
+	operationStore, err := browserops.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer operationStore.Close()
+	mutations, err := NewBrowserMutations(svc, operationStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := mutations.Approvals(ctx, prompt.Request.TaskID, "", 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Proposal == nil || !page.Items[0].CanAllow {
+		t.Fatalf("blocked proposal unavailable: page=%+v err=%v", page, err)
+	}
+	snapshot, err := InspectTask(ctx, cfg.Telemetry.Database, prompt.Request.TaskID)
+	pending := snapshot.Pending[prompt.Request.ToolCallID]
+	if err != nil || !pending.Dispatched || pending.ToolBehavior != runtime.BehaviorIdempotentWrite {
+		t.Fatalf("approval was not observed after ToolStarted: pending=%+v err=%v", pending, err)
+	}
+	decision := contract.ApprovalRequest{Version: 1, IdempotencyKey: "browser-deny-proposal", TaskID: prompt.Request.TaskID, ApprovalID: prompt.Request.ID, Action: contract.ApprovalDeny, ExpectedRevision: 1}
+	if receipt, decideErr := mutations.DecideApproval(ctx, browserMutationTestSubject, decision); decideErr != nil || receipt.State != approvals.Denied {
+		t.Fatalf("deny receipt=%+v err=%v", receipt, decideErr)
+	}
+	select {
+	case outcome := <-finished:
+		if outcome.err == nil || outcome.result.Text != "" || provider.turn != 1 {
+			t.Fatalf("result=%+v turns=%d err=%v", outcome.result, provider.turn, outcome.err)
+		}
+	case <-ctx.Done():
+		t.Fatal("denied provider run did not resume")
 	}
 }
