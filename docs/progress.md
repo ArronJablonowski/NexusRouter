@@ -8072,3 +8072,17 @@ Its validator is structural only: DAR-122 must independently derive and
 cross-bind every supplied identity before the plan becomes durable authority.
 Existing version-one checkpoint JSON still replays but cannot validate as a
 new plan.
+
+## 2026-09-15 — DAR-122 schema-50 persistence checkpoint
+
+Schema 50 now provides additive durable storage for idempotent context-
+compaction operations, sealed plans, ordered lifecycle facts, and conservative
+interrupted-owner recovery receipts. The migration preserves existing schema-49
+task, summary, review, and Workboard history without inventing compaction
+authority, and repository tests cover schema shape, immutable bindings,
+idempotent replay, transition ordering, and rollback on rejected writes.
+
+This is a persistence checkpoint, not DAR-122 completion. Application-service
+orchestration, public API integration, restart recovery dispatch, approved-plan
+activation against the live suffix, and the complete race-enabled project gate
+remain pending unless later checkpoints supply that evidence.
