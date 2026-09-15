@@ -39,7 +39,7 @@ func TestSDKOutcomeSupervisionInspectionAndOwnedMonitor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(15 * time.Second)
 	for monitor.Health().Status == "unknown" && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}

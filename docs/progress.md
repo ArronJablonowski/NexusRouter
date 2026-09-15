@@ -7965,3 +7965,12 @@ limit, `go vet ./...`, the complete race-enabled suite with its 35-minute bound,
 and `go build ./...`. The slowest successful packages were release packaging
 (1,520 seconds), telemetry (1,495 seconds), application (1,407 seconds), and the
 versioned SDK (178 seconds).
+
+The durable follow-on initially exposed two qualification-contract updates:
+the release workflow still named schema 46 after the schema-47 journal migration,
+and the SDK monitor's two-second race-build deadline was shorter than its new
+durable transaction path. Both were corrected and their exact releasepack and
+SDK race tests pass. A concurrent Chrome workboard CRUD qualification failed its
+authoritative-refetch timing bound once and passed unchanged on immediate exact
+rerun; it is unrelated to outcome supervision. A new complete `make check` run
+is required before this follow-on is called fully verified.
