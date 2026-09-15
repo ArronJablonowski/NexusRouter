@@ -30,7 +30,7 @@
 	const maxProvisionalText = 1 << 20;
 	const maxApprovals = 25;
 	const maxApprovalPrompt = 16 << 10;
-	const maxApprovalScope = 4096;
+	const maxApprovalScope = 4096, maxApprovalProposal = 128 << 10;
 	const maxOperationItems = 25;
 	const maxOperationScan = 100;
 	const maxSubmissionPolls = 60;
@@ -503,36 +503,34 @@
 		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
 	}
 	function loadTaskContext(taskID) {
-		selectedControls = null;
-		feedbackContext = null;
-		updateControls();
-		window.DarwinInspector.loadTask(taskID);
+		selectedControls = null; feedbackContext = null; updateControls(); window.DarwinInspector.loadTask(taskID);
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/controls").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const controls = validControls(body);
 			if (!controls || controls.taskID !== taskID) throw new Error("invalid task controls");
-			selectedControls = controls;
-			updateControls();
-			loadApprovals();
-		}).catch(() => {
-			if (selectedTaskID === taskID) {
-				selectedControls = null;
-				updateControls();
-			}
-		});
+			selectedControls = controls; updateControls(); loadApprovals();
+		}).catch(() => { if (selectedTaskID === taskID) { selectedControls = null; updateControls(); } });
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/feedback").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const context = parseFeedbackContext(body, taskID);
 			if (!context) throw new Error("invalid feedback context");
-			feedbackContext = context;
-			renderFeedbackContext(context);
-			updateControls();
-		}).catch(() => {
-			if (selectedTaskID === taskID) {
-				feedbackContext = null;
-				updateControls();
-			}
-		});
+			feedbackContext = context; renderFeedbackContext(context); updateControls();
+		}).catch(() => { if (selectedTaskID === taskID) { feedbackContext = null; updateControls(); } });
+	}
+	function validApprovalProposal(value, toolName) {
+		if (!value || typeof value !== "object" || Array.isArray(value) || value.version !== 1 || !presentationID.test(value.board_id) || !presentationID.test(value.card_id) || !Number.isSafeInteger(value.expected_board_revision) || value.expected_board_revision < 1 || !Number.isSafeInteger(value.expected_card_revision) || value.expected_card_revision < 1) return "";
+		const digest = /^[0-9a-f]{64}$/, integer = (number, minimum) => Number.isSafeInteger(number) && number >= minimum;
+		if (toolName === "workboard_propose_criteria") {
+			const keys = ["version", "kind", "board_id", "card_id", "expected_board_revision", "expected_card_revision", "expected_criteria_revision", "expected_criteria_digest", "criteria"];
+			if (value.kind !== "criteria_change" || Object.keys(value).some(key => !keys.includes(key)) || Object.keys(value).length !== keys.length || !integer(value.expected_criteria_revision, 1) || !digest.test(value.expected_criteria_digest) || !Array.isArray(value.criteria) || !value.criteria.length || value.criteria.length > 32) return "";
+			const ids = new Set();
+			for (const criterion of value.criteria) { if (!criterion || typeof criterion !== "object" || Array.isArray(criterion) || Object.keys(criterion).length !== 7 || !["version", "id", "kind", "required_source", "validator_id", "description", "required"].every(key => Object.hasOwn(criterion, key)) || criterion.version !== 1 || !presentationID.test(criterion.id) || ids.has(criterion.id) || typeof criterion.validator_id !== "string" || !criterion.validator_id || criterion.validator_id.length > 128 || typeof criterion.description !== "string" || !criterion.description.trim() || textBytes(criterion.description) > 4096 || typeof criterion.required !== "boolean" || criterion.kind === "objective" && criterion.required_source !== "deterministic" || criterion.kind === "subjective" && criterion.required_source !== "user_feedback" || !["objective", "subjective"].includes(criterion.kind)) return ""; ids.add(criterion.id); }
+		} else if (toolName === "workboard_request_candidate_decision") {
+			const keys = ["version", "kind", "board_id", "card_id", "attempt_id", "candidate_id", "expected_board_revision", "expected_card_revision", "expected_attempt_revision", "criteria_revision", "evidence_head_revision", "candidate_digest", "criteria_digest", "evidence_set_digest", "policy_digest", "decision", "rationale"];
+			if (value.kind !== "candidate_decision" || Object.keys(value).some(key => !keys.includes(key)) || Object.keys(value).length !== keys.length || !presentationID.test(value.attempt_id) || !presentationID.test(value.candidate_id) || !integer(value.expected_attempt_revision, 1) || !integer(value.criteria_revision, 1) || !integer(value.evidence_head_revision, 0) || ![value.candidate_digest, value.criteria_digest, value.evidence_set_digest, value.policy_digest].every(item => typeof item === "string" && digest.test(item)) || !["accepted", "rejected"].includes(value.decision) || typeof value.rationale !== "string" || !value.rationale.trim() || textBytes(value.rationale) > 65536) return "";
+		} else return "";
+		const rendered = JSON.stringify(value, null, 2);
+		return textBytes(rendered) <= maxApprovalProposal ? rendered : "";
 	}
 	function validApproval(item, taskID) {
 		if (!item || typeof item !== "object" || !presentationID.test(item.id) ||
@@ -547,9 +545,13 @@
 			item.state === "denied" && item.revision !== 2 || ["revoked", "consumed"].includes(item.state) && item.revision !== 3 ||
 			item.state === "expired" && ![1, 2].includes(item.revision) ||
 			!["pending", "approved"].includes(item.state) && (item.can_allow || item.can_deny || item.can_revoke)) return null;
+		const proposalTool = ["workboard_propose_criteria", "workboard_request_candidate_decision"].includes(item.tool_name);
+		const proposalRequired = proposalTool && ["pending", "approved"].includes(item.state);
+		const proposalText = proposalRequired ? validApprovalProposal(item.proposal, item.tool_name) : "";
+		if (proposalRequired && !proposalText || !proposalRequired && Object.hasOwn(item, "proposal")) return null;
 		return Object.freeze({id: item.id, taskID, revision: item.revision, state: item.state,
 			prompt: item.prompt, scopeSummary: item.scope_summary, toolName: item.tool_name, behavior: boundedText(item.tool_behavior) || "unspecified",
-			canAllow: item.can_allow, canDeny: item.can_deny, canRevoke: item.can_revoke});
+			proposalText, canAllow: item.can_allow, canDeny: item.can_deny, canRevoke: item.can_revoke});
 	}
 	function closeApproval() {
 		approvalDialog.hidden = true;
@@ -566,7 +568,7 @@
 		approvalOpener = opener;
 		approvalDialogMeta.textContent = item.toolName + " · " + stateLabel(item.behavior) + " · " + stateLabel(item.state);
 		approvalDialogScope.textContent = "Scope: " + item.scopeSummary;
-		approvalDialogPrompt.textContent = item.prompt;
+		approvalDialogPrompt.textContent = item.proposalText ? item.prompt + "\n\nExact proposal:\n" + item.proposalText : item.prompt;
 		approvalAllow.hidden = !item.canAllow;
 		approvalDeny.hidden = !item.canDeny;
 		approvalRevoke.hidden = !item.canRevoke;

@@ -135,7 +135,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "c188d3c53c6bfd3e2594fb25744621790c16cc8b6de9ee18b6009f3fa002d815" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "eb42179ad47f58ff08ed134228b10384c36ee7b3474c6b59817f88346a1e0afd" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -824,7 +824,7 @@ func TestEmbeddedChatMutationsAreExplicitFencedAndAccessible(t *testing.T) {
 		`expected_revision: controls.revision`, `action: revise ? "revise" : "record"`, "payload.attempt_cost = cost",
 		`attemptCost.value.trim() === "" || !Number.isFinite(cost) || cost < 0`,
 		`/controls`, `/feedback`, `/approvals?limit=`, "const maxApprovals = 25", "const maxApprovalPrompt = 16 << 10",
-		`approvalDialogScope.textContent = "Scope: " + item.scopeSummary`, `approvalDialogPrompt.textContent = item.prompt`, `item.canDeny ? approvalDeny : approvalClose`, `event.key === "Escape"`,
+		`approvalDialogScope.textContent = "Scope: " + item.scopeSummary`, `approvalDialogPrompt.textContent = item.proposalText ? item.prompt`, `"\n\nExact proposal:\n" + item.proposalText`, `item.canDeny ? approvalDeny : approvalClose`, `event.key === "Escape"`,
 		`event.key !== "Tab"`, `event.isComposing`, `!event.shiftKey`, "composer.requestSubmit()", `aria-busy`,
 		"window.setTimeout", "window.clearTimeout", "selectedControls.canResume",
 	} {
@@ -868,6 +868,7 @@ func TestEmbeddedMutationReconciliationIsReadOnlyBoundedAndContractShaped(t *tes
 		`if (approvalResolved && activeApproval)`, "closeApproval();", "loadApprovals();", "The operation was rejected. No request was replayed.",
 		`body.current_revision`, `body.retryable`, `body.operation_id`, `body.requested ? "Cancellation requested; submission is still "`,
 		`Number.isSafeInteger(item.reference_count)`, `String(item.reference_count)`, `textBytes(item.scope_summary) > maxApprovalScope`,
+		`validApprovalProposal(item.proposal, item.tool_name)`, `Object.hasOwn(item, "proposal")`, `const maxApprovalScope = 4096, maxApprovalProposal = 128 << 10`,
 		`event.key === "Escape" && !pendingIntent && unresolvedOperations.length === 0 && operationsReady`,
 	} {
 		if !strings.Contains(body, required) {

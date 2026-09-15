@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -311,7 +312,7 @@ func (b *BrowserMutations) Approvals(ctx context.Context, task, after string, li
 	}
 	out := contract.ApprovalPage{Version: 1, TaskID: task, Items: make([]contract.ApprovalSummary, 0, len(page.Records)), NextCursor: page.NextAfterCallID, HasMore: page.NextAfterCallID != ""}
 	for _, record := range page.Records {
-		summary, projectErr := b.approvalSummary(record)
+		summary, projectErr := b.approvalSummary(ctx, record)
 		if projectErr != nil {
 			return contract.ApprovalPage{}, projectErr
 		}
@@ -439,7 +440,7 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 		}
 	}
 	if !alreadyDecided {
-		summary, summaryErr := b.approvalSummary(current)
+		summary, summaryErr := b.approvalSummary(ctx, current)
 		if summaryErr != nil || summary.Revision != request.ExpectedRevision || !approvalActionAllowed(summary, request.Action) {
 			return contract.ApprovalDecisionReceipt{}, b.reject(ctx, subject, record, "approval", request.ApprovalID, browserops.ErrConflict)
 		}
@@ -454,7 +455,7 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 			decided = decision.Time
 		}
 	}
-	resultSummary, err := b.approvalSummary(result)
+	resultSummary, err := b.approvalSummary(ctx, result)
 	if err != nil || decided.IsZero() {
 		return contract.ApprovalDecisionReceipt{}, ErrBrowserMutation
 	}
@@ -465,7 +466,7 @@ func (b *BrowserMutations) DecideApproval(ctx context.Context, subject string, r
 	return receipt, b.commit(ctx, subject, record, receipt)
 }
 
-func (b *BrowserMutations) approvalSummary(record approvals.Record) (contract.ApprovalSummary, error) {
+func (b *BrowserMutations) approvalSummary(ctx context.Context, record approvals.Record) (contract.ApprovalSummary, error) {
 	if record.Validate() != nil {
 		return contract.ApprovalSummary{}, ErrBrowserMutation
 	}
@@ -488,10 +489,103 @@ func (b *BrowserMutations) approvalSummary(record approvals.Record) (contract.Ap
 		revision++
 	}
 	summary := contract.ApprovalSummary{ID: record.Request.ID, State: state, Revision: revision, Prompt: prompt, ScopeSummary: scopeSummary, ToolName: record.Request.ToolName, ToolBehavior: behavior, ExpiresAt: record.Request.ExpiresAt, CanAllow: state == approvals.Pending, CanDeny: state == approvals.Pending, CanRevoke: state == approvals.Approved}
+	if state == approvals.Pending || state == approvals.Approved {
+		proposal, proposalErr := b.approvalProposal(ctx, record)
+		if proposalErr != nil {
+			return contract.ApprovalSummary{}, proposalErr
+		}
+		summary.Proposal = proposal
+	}
 	if summary.Validate() != nil {
 		return contract.ApprovalSummary{}, ErrBrowserMutation
 	}
 	return summary, nil
+}
+
+type criteriaApprovalArguments struct {
+	IdempotencyKey           string                         `json:"idempotency_key"`
+	BoardID                  string                         `json:"board_id"`
+	CardID                   string                         `json:"card_id"`
+	ExpectedBoardRevision    int64                          `json:"expected_board_revision"`
+	ExpectedCardRevision     int64                          `json:"expected_card_revision"`
+	ExpectedCriteriaRevision int64                          `json:"expected_criteria_revision"`
+	ExpectedCriteriaDigest   string                         `json:"expected_criteria_digest"`
+	Criteria                 []contract.AcceptanceCriterion `json:"criteria"`
+}
+
+type candidateDecisionApprovalArguments struct {
+	IdempotencyKey          string `json:"idempotency_key"`
+	BoardID                 string `json:"board_id"`
+	CardID                  string `json:"card_id"`
+	AttemptID               string `json:"attempt_id"`
+	CandidateID             string `json:"candidate_id"`
+	ExpectedBoardRevision   int64  `json:"expected_board_revision"`
+	ExpectedCardRevision    int64  `json:"expected_card_revision"`
+	ExpectedAttemptRevision int64  `json:"expected_attempt_revision"`
+	CriteriaRevision        int64  `json:"criteria_revision"`
+	EvidenceHeadRevision    int64  `json:"evidence_head_revision"`
+	CandidateDigest         string `json:"candidate_digest"`
+	CriteriaDigest          string `json:"criteria_digest"`
+	EvidenceSetDigest       string `json:"evidence_set_digest"`
+	PolicyDigest            string `json:"policy_digest"`
+	Decision                string `json:"decision"`
+	Rationale               string `json:"rationale"`
+}
+
+func (b *BrowserMutations) approvalProposal(ctx context.Context, record approvals.Record) (*contract.ApprovalProposal, error) {
+	if record.Request.ToolName != "workboard_propose_criteria" && record.Request.ToolName != "workboard_request_candidate_decision" {
+		return nil, nil
+	}
+	if b == nil || b.service == nil || ctx == nil {
+		return nil, ErrBrowserMutation
+	}
+	snapshot, err := InspectTask(ctx, b.service.settings.Telemetry.Database, record.Request.TaskID)
+	if err != nil {
+		return nil, ErrBrowserMutation
+	}
+	pending, ok := snapshot.Pending[record.Request.ToolCallID]
+	if !ok || pending.Dispatched || pending.TurnID != record.Request.TurnID || pending.Call.ID != record.Request.ToolCallID || pending.Call.Name != record.Request.ToolName {
+		return nil, ErrBrowserMutation
+	}
+	digest := sha256.Sum256(pending.Call.Arguments)
+	if hex.EncodeToString(digest[:]) != record.Request.ArgumentsDigest || contract.RejectDuplicateJSONFields(pending.Call.Arguments) != nil ||
+		!selectionValueClean(pending.Call.Arguments, memorySecrets(b.service.settings, b.service.secret)) {
+		return nil, ErrBrowserMutation
+	}
+	decode := func(target any) error {
+		decoder := json.NewDecoder(strings.NewReader(string(pending.Call.Arguments)))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(target) != nil || decoder.Decode(&struct{}{}) != io.EOF {
+			return ErrBrowserMutation
+		}
+		return nil
+	}
+	var proposal contract.ApprovalProposal
+	switch record.Request.ToolName {
+	case "workboard_propose_criteria":
+		var args criteriaApprovalArguments
+		if decode(&args) != nil {
+			return nil, ErrBrowserMutation
+		}
+		proposal = contract.ApprovalProposal{Version: 1, Kind: "criteria_change", BoardID: args.BoardID, CardID: args.CardID,
+			ExpectedBoardRevision: args.ExpectedBoardRevision, ExpectedCardRevision: args.ExpectedCardRevision,
+			ExpectedCriteriaRevision: args.ExpectedCriteriaRevision, ExpectedCriteriaDigest: args.ExpectedCriteriaDigest, Criteria: args.Criteria}
+	case "workboard_request_candidate_decision":
+		var args candidateDecisionApprovalArguments
+		if decode(&args) != nil {
+			return nil, ErrBrowserMutation
+		}
+		proposal = contract.ApprovalProposal{Version: 1, Kind: "candidate_decision", BoardID: args.BoardID, CardID: args.CardID,
+			AttemptID: args.AttemptID, CandidateID: args.CandidateID, ExpectedBoardRevision: args.ExpectedBoardRevision,
+			ExpectedCardRevision: args.ExpectedCardRevision, ExpectedAttemptRevision: args.ExpectedAttemptRevision,
+			CriteriaRevision: args.CriteriaRevision, EvidenceHeadRevision: args.EvidenceHeadRevision, CandidateDigest: args.CandidateDigest,
+			CriteriaDigest: args.CriteriaDigest, EvidenceSetDigest: args.EvidenceSetDigest, PolicyDigest: args.PolicyDigest,
+			Decision: args.Decision, Rationale: args.Rationale}
+	}
+	if proposal.Validate() != nil {
+		return nil, ErrBrowserMutation
+	}
+	return &proposal, nil
 }
 
 func (b *BrowserMutations) TaskControls(ctx context.Context, task string) (contract.TaskControlStatus, error) {

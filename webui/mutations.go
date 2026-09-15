@@ -5,12 +5,68 @@ import (
 )
 
 const (
-	MaxApprovalPromptBytes = 16 << 10
-	MaxApprovalScopeBytes  = 4 << 10
-	MaxApprovalItems       = 100
-	MaxEvidenceSummaries   = 32
-	MaxOperationItems      = 100
+	MaxApprovalPromptBytes   = 16 << 10
+	MaxApprovalScopeBytes    = 4 << 10
+	MaxApprovalProposalBytes = 128 << 10
+	MaxApprovalItems         = 100
+	MaxEvidenceSummaries     = 32
+	MaxOperationItems        = 100
 )
+
+// ApprovalProposal is a bounded, operator-visible projection of an exact
+// workboard proposal. It deliberately excludes execution authority and the
+// browser operation key; those remain bound by the durable approval record.
+type ApprovalProposal struct {
+	Version                  int                   `json:"version"`
+	Kind                     string                `json:"kind"`
+	BoardID                  string                `json:"board_id"`
+	CardID                   string                `json:"card_id"`
+	AttemptID                string                `json:"attempt_id,omitempty"`
+	CandidateID              string                `json:"candidate_id,omitempty"`
+	ExpectedBoardRevision    int64                 `json:"expected_board_revision"`
+	ExpectedCardRevision     int64                 `json:"expected_card_revision"`
+	ExpectedAttemptRevision  int64                 `json:"expected_attempt_revision,omitempty"`
+	ExpectedCriteriaRevision int64                 `json:"expected_criteria_revision,omitempty"`
+	ExpectedCriteriaDigest   string                `json:"expected_criteria_digest,omitempty"`
+	CriteriaRevision         int64                 `json:"criteria_revision,omitempty"`
+	EvidenceHeadRevision     int64                 `json:"evidence_head_revision,omitempty"`
+	CandidateDigest          string                `json:"candidate_digest,omitempty"`
+	CriteriaDigest           string                `json:"criteria_digest,omitempty"`
+	EvidenceSetDigest        string                `json:"evidence_set_digest,omitempty"`
+	PolicyDigest             string                `json:"policy_digest,omitempty"`
+	Criteria                 []AcceptanceCriterion `json:"criteria,omitempty"`
+	Decision                 string                `json:"decision,omitempty"`
+	Rationale                string                `json:"rationale,omitempty"`
+}
+
+func (p ApprovalProposal) Validate() error {
+	if p.Version != ContractVersion || !validID(p.BoardID) || !validID(p.CardID) ||
+		p.ExpectedBoardRevision < 1 || p.ExpectedCardRevision < 1 {
+		return ErrContract
+	}
+	switch p.Kind {
+	case "criteria_change":
+		if p.AttemptID != "" || p.CandidateID != "" || p.ExpectedAttemptRevision != 0 ||
+			p.ExpectedCriteriaRevision < 1 || !validWorkboardDigest(p.ExpectedCriteriaDigest) ||
+			p.CriteriaRevision != 0 || p.EvidenceHeadRevision != 0 || p.CandidateDigest != "" ||
+			p.CriteriaDigest != "" || p.EvidenceSetDigest != "" || p.PolicyDigest != "" ||
+			p.Decision != "" || p.Rationale != "" || validateCriteria(p.Criteria, 1) != nil {
+			return ErrContract
+		}
+	case "candidate_decision":
+		if !validID(p.AttemptID) || !validID(p.CandidateID) || p.ExpectedAttemptRevision < 1 ||
+			p.ExpectedCriteriaRevision != 0 || p.ExpectedCriteriaDigest != "" || p.Criteria != nil ||
+			p.CriteriaRevision < 1 || p.EvidenceHeadRevision < 0 || !validWorkboardDigest(p.CandidateDigest) ||
+			!validWorkboardDigest(p.CriteriaDigest) || !validWorkboardDigest(p.EvidenceSetDigest) ||
+			!validWorkboardDigest(p.PolicyDigest) || (p.Decision != "accepted" && p.Decision != "rejected") ||
+			requireText(p.Rationale, MaxEvidenceBytes) != nil {
+			return ErrContract
+		}
+	default:
+		return ErrContract
+	}
+	return encodedWithin(p, MaxApprovalProposalBytes)
+}
 
 // ChatMutationReceipt is the content-free durable acknowledgement returned by
 // submit and follow-up operations. Provider output, usage, configuration and
@@ -236,17 +292,18 @@ func (r FeedbackReceipt) Validate() error {
 // ApprovalSummary is the complete browser allowlist. Prompt is a trusted,
 // bounded, redacted explanation; raw arguments and binding digests have no field.
 type ApprovalSummary struct {
-	ID           string    `json:"id"`
-	State        string    `json:"state"`
-	Revision     int64     `json:"revision"`
-	Prompt       string    `json:"prompt"`
-	ScopeSummary string    `json:"scope_summary"`
-	ToolName     string    `json:"tool_name"`
-	ToolBehavior string    `json:"tool_behavior"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	CanAllow     bool      `json:"can_allow"`
-	CanDeny      bool      `json:"can_deny"`
-	CanRevoke    bool      `json:"can_revoke"`
+	ID           string            `json:"id"`
+	State        string            `json:"state"`
+	Revision     int64             `json:"revision"`
+	Prompt       string            `json:"prompt"`
+	ScopeSummary string            `json:"scope_summary"`
+	ToolName     string            `json:"tool_name"`
+	ToolBehavior string            `json:"tool_behavior"`
+	ExpiresAt    time.Time         `json:"expires_at"`
+	CanAllow     bool              `json:"can_allow"`
+	CanDeny      bool              `json:"can_deny"`
+	CanRevoke    bool              `json:"can_revoke"`
+	Proposal     *ApprovalProposal `json:"proposal,omitempty"`
 }
 
 func (s ApprovalSummary) Validate() error {
@@ -280,7 +337,17 @@ func (s ApprovalSummary) Validate() error {
 	default:
 		return ErrContract
 	}
-	return encodedWithin(s, MaxApprovalPromptBytes+MaxApprovalScopeBytes+2048)
+	proposalTool := s.ToolName == "workboard_propose_criteria" || s.ToolName == "workboard_request_candidate_decision"
+	if proposalTool && (s.State == "pending" || s.State == "approved") {
+		if s.Proposal == nil || s.Proposal.Validate() != nil ||
+			s.ToolName == "workboard_propose_criteria" && s.Proposal.Kind != "criteria_change" ||
+			s.ToolName == "workboard_request_candidate_decision" && s.Proposal.Kind != "candidate_decision" {
+			return ErrContract
+		}
+	} else if s.Proposal != nil {
+		return ErrContract
+	}
+	return encodedWithin(s, MaxApprovalPromptBytes+MaxApprovalScopeBytes+MaxApprovalProposalBytes+2048)
 }
 
 type ApprovalPage struct {

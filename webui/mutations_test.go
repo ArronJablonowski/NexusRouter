@@ -113,6 +113,44 @@ func TestMutationProjectionRejectsAuthorityAndInvalidState(t *testing.T) {
 	}
 }
 
+func TestApprovalProposalIsExactAndRequiredOnlyWhileActionable(t *testing.T) {
+	now := mutationTime()
+	criterion := AcceptanceCriterion{Version: 1, ID: "tests", Kind: "objective", RequiredSource: "deterministic", ValidatorID: "go.test", Description: "Focused tests pass.", Required: true}
+	proposal := &ApprovalProposal{Version: 1, Kind: "criteria_change", BoardID: "board", CardID: "card", ExpectedBoardRevision: 2, ExpectedCardRevision: 3, ExpectedCriteriaRevision: 1, ExpectedCriteriaDigest: strings.Repeat("a", 64), Criteria: []AcceptanceCriterion{criterion}}
+	summary := ApprovalSummary{ID: "approval", State: "pending", Revision: 1, Prompt: "Review the exact criteria proposal.", ScopeSummary: "Workboard: board", ToolName: "workboard_propose_criteria", ToolBehavior: "idempotent_write", ExpiresAt: now.Add(time.Minute), CanAllow: true, CanDeny: true, Proposal: proposal}
+	if err := summary.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	missing := summary
+	missing.Proposal = nil
+	if !errors.Is(missing.Validate(), ErrContract) {
+		t.Fatal("actionable proposal without exact projection accepted")
+	}
+	wrong := summary
+	copyProposal := *proposal
+	copyProposal.Kind = "candidate_decision"
+	wrong.Proposal = &copyProposal
+	if !errors.Is(wrong.Validate(), ErrContract) {
+		t.Fatal("proposal kind mismatch accepted")
+	}
+	terminal := summary
+	terminal.State, terminal.Revision, terminal.CanAllow, terminal.CanDeny = "denied", 2, false, false
+	if !errors.Is(terminal.Validate(), ErrContract) {
+		t.Fatal("terminal approval retained proposal payload")
+	}
+	candidate := &ApprovalProposal{Version: 1, Kind: "candidate_decision", BoardID: "board", CardID: "card", AttemptID: "attempt", CandidateID: "candidate", ExpectedBoardRevision: 2, ExpectedCardRevision: 3, ExpectedAttemptRevision: 4, CriteriaRevision: 1, EvidenceHeadRevision: 0, CandidateDigest: strings.Repeat("b", 64), CriteriaDigest: strings.Repeat("c", 64), EvidenceSetDigest: strings.Repeat("d", 64), PolicyDigest: strings.Repeat("e", 64), Decision: "rejected", Rationale: "Required objective evidence did not pass."}
+	candidateSummary := summary
+	candidateSummary.ToolName, candidateSummary.Proposal = "workboard_request_candidate_decision", candidate
+	if err := candidateSummary.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	candidate.Decision = "accepted"
+	candidate.Rationale = ""
+	if !errors.Is(candidateSummary.Validate(), ErrContract) {
+		t.Fatal("candidate decision without rationale accepted")
+	}
+}
+
 func TestFeedbackRevisionForbidsAttemptCost(t *testing.T) {
 	revision := int64(1)
 	request := FeedbackRequest{Version: 1, IdempotencyKey: "contract-key-0001", TaskID: "task", FeedbackID: "feedback", Action: FeedbackRevise, Accepted: true, ExpectedRevision: &revision}
