@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -69,6 +70,7 @@ type Data struct {
 	SteeringID            string                   `json:"steering_id,omitempty"`
 	SubmissionID          string                   `json:"submission_id,omitempty"`
 	Compaction            *ContextCompaction       `json:"compaction,omitempty"`
+	ContextLineage        *ContextLineage          `json:"context_lineage,omitempty"`
 	Validation            string                   `json:"validation,omitempty"`
 	RetryOfTaskID         string                   `json:"retry_of_task_id,omitempty"`
 	RouteCandidates       []routing.Candidate      `json:"route_candidates,omitempty"`
@@ -102,6 +104,22 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if e.Data.Compaction != nil && e.Data.Compaction.Version == 2 && e.Data.ContextLineage == nil {
+		return errors.New("version two compaction requires context lineage")
+	}
+	if e.Data.ContextLineage != nil {
+		if (e.Kind != TaskStarted && e.Kind != ContextCompacted) || e.Data.ContextLineage.Validate() != nil {
+			return errors.New("invalid context lineage")
+		}
+		last := e.Data.ContextLineage.Epochs[len(e.Data.ContextLineage.Epochs)-1]
+		if e.Data.Compaction != nil {
+			if last.TaskID != e.TaskID || last.ActivationSequence != e.Sequence || !reflect.DeepEqual(last.Compaction, *e.Data.Compaction) {
+				return errors.New("invalid context lineage attribution")
+			}
+		} else if last.TaskID == e.TaskID {
+			return errors.New("invalid inherited context lineage")
+		}
+	}
 	if e.Data.IntentClassification != nil && (e.Kind != TaskStarted || e.Data.IntentClassification.Validate() != nil) {
 		return errors.New("invalid intent classification attribution placement")
 	}

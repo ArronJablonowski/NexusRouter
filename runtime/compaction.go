@@ -33,6 +33,8 @@ type ContextCompaction struct {
 	SourceTaskID          string         `json:"source_task_id"`
 	SourceSequence        int64          `json:"source_sequence"`
 	SourceDigest          string         `json:"source_digest"`
+	SourceStateDigest     string         `json:"source_state_digest,omitempty"`
+	SourceToolCallIDs     []string       `json:"source_tool_call_ids,omitempty"`
 	RemovedMessages       int            `json:"removed_messages"`
 	Summary               ContextSummary `json:"summary"`
 }
@@ -50,7 +52,8 @@ func (c ContextCompaction) Validate(parent string) error {
 	if c.FirstRetainedMessage < 0 || c.FirstRetainedSequence < 0 || c.FirstRetainedSequence > c.SourceSequence || c.BeforeContextTokens < 0 || c.AfterContextTokens < 0 || (c.BeforeContextTokens == 0) != (c.AfterContextTokens == 0) {
 		return bad
 	}
-	if c.Version != 1 || strings.TrimSpace(parent) == "" || c.SourceTaskID != parent || c.SourceSequence < 1 || c.RemovedMessages < 1 || len(c.SourceDigest) != 64 || strings.ToLower(c.SourceDigest) != c.SourceDigest {
+	if (c.Version != 1 && c.Version != 2) || strings.TrimSpace(parent) == "" || c.SourceTaskID != parent || c.SourceSequence < 1 || c.RemovedMessages < 1 || len(c.SourceDigest) != 64 || strings.ToLower(c.SourceDigest) != c.SourceDigest ||
+		(c.Version == 1 && (c.SourceStateDigest != "" || len(c.SourceToolCallIDs) != 0)) || (c.Version == 2 && (!validCompactionPlanDigest(c.SourceStateDigest) || !validContextToolCallIDs(c.SourceToolCallIDs))) {
 		return bad
 	}
 	if _, err := hex.DecodeString(c.SourceDigest); err != nil {

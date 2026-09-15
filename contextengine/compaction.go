@@ -14,7 +14,7 @@ func freezeCompaction(source sessions.Snapshot, request sessions.CompactionReque
 	if !sessions.ValidEventPageID(source.TaskID) || source.Sequence < 1 || source.State != "completed" || source.InterruptedTurn || source.UncertainEffects || len(source.Pending) > 0 || len(source.MessageSequences) > maxBytes/8 || !validBundles(source.Messages) || sessions.ValidateCompactionRequest(&request) != nil {
 		return sessions.Snapshot{}, sessions.CompactionRequest{}, ErrEngine
 	}
-	minimal := sessions.Snapshot{TaskID: source.TaskID, State: source.State, Sequence: source.Sequence, Messages: source.Messages, MessageSequences: source.MessageSequences}
+	minimal := sessions.Snapshot{TaskID: source.TaskID, State: source.State, Sequence: source.Sequence, Messages: source.Messages, MessageSequences: source.MessageSequences, ContextLineage: source.ContextLineage}
 	var frozen struct {
 		Source  sessions.Snapshot
 		Request sessions.CompactionRequest

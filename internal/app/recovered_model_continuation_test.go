@@ -41,9 +41,48 @@ func TestRecoveredModelExplicitContinuation(t *testing.T) {
 	}))
 	defer provider.Close()
 	s.settings.Providers[0].Endpoint = provider.URL
-	claim := recoveryClaim(t, s, db)
-	initial := []providers.Message{{Role: "user", Content: "historical question"}, {Role: "assistant", Content: "complete historical answer"}, {Role: "user", Content: "unfinished request"}}
-	start := runtime.Event{Version: 1, ID: "model-source-start", TaskID: "model-source", SessionID: "model-source-session", CorrelationID: "model-source", Sequence: 1, Time: time.Now().UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{SubmissionID: claim.Status.ID, ModelID: "fixture", ProviderID: "local", Privacy: "local_only", Messages: initial}}
+	grandparentMessages := []providers.Message{{Role: "user", Content: "older question"}, {Role: "assistant", Content: "older answer"}, {Role: "user", Content: "historical question"}, {Role: "assistant", Content: "complete historical answer"}}
+	grandparentStart := runtime.Event{Version: 1, ID: "model-grandparent-start", TaskID: "model-grandparent", SessionID: "model-source-session", CorrelationID: "model-grandparent", Sequence: 1, Time: time.Now().Add(-time.Minute).UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{ModelID: "fixture", ProviderID: "local", Privacy: "local_only", Messages: grandparentMessages}}
+	grandparentDone := runtime.Event{Version: 1, ID: "model-grandparent-complete", TaskID: grandparentStart.TaskID, SessionID: grandparentStart.SessionID, CorrelationID: grandparentStart.CorrelationID, Sequence: 2, Time: grandparentStart.Time.Add(time.Second), Kind: runtime.TaskCompleted}
+	if err := db.Append(ctx, 0, grandparentStart); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Append(ctx, 1, grandparentDone); err != nil {
+		t.Fatal(err)
+	}
+	grandparent, err := sessions.Replay(ctx, db, grandparentStart.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compacted, checkpoint, err := sessions.PrepareContinuation(grandparent, sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Requirements: []string{"preserve recovered history"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lineage, err := runtime.ExtendContextLineage(nil, "model-parent", 1, checkpoint, grandparent.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentStart := runtime.Event{Version: 1, ID: "model-parent-start", TaskID: "model-parent", SessionID: grandparent.SessionID, CorrelationID: "model-parent", Sequence: 1, Time: grandparentDone.Time.Add(time.Second), Kind: runtime.TaskStarted, Data: runtime.Data{ModelID: "fixture", ProviderID: "local", ParentTaskID: grandparent.TaskID, Privacy: "local_only", Compaction: checkpoint, ContextLineage: lineage, Messages: compacted}}
+	parentDone := runtime.Event{Version: 1, ID: "model-parent-complete", TaskID: parentStart.TaskID, SessionID: parentStart.SessionID, CorrelationID: parentStart.CorrelationID, Sequence: 2, Time: parentStart.Time.Add(time.Second), Kind: runtime.TaskCompleted}
+	if err = db.Append(ctx, 0, parentStart); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Append(ctx, 1, parentDone); err != nil {
+		t.Fatal(err)
+	}
+	parent, err := sessions.Replay(ctx, db, parentStart.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Submit(ctx, "0123456789abcdef", Request{ModelID: "chat", Prompt: "unfinished request", ContinueTaskID: parent.TaskID}); err != nil {
+		t.Fatal(err)
+	}
+	claim, err := db.ClaimSubmission(ctx, s.submissionConfigDigest(), time.Now().UTC(), 30*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := append(append([]providers.Message(nil), parent.Messages...), providers.Message{Role: "user", Content: "unfinished request"})
+	start := runtime.Event{Version: 1, ID: "model-source-start", TaskID: "model-source", SessionID: parent.SessionID, CorrelationID: "model-source", Sequence: 1, Time: time.Now().UTC(), Kind: runtime.TaskStarted, Data: runtime.Data{SubmissionID: claim.Status.ID, ModelID: "fixture", ProviderID: "local", ParentTaskID: parent.TaskID, Privacy: "local_only", ContextLineage: lineage, Messages: initial}}
 	turn := start
 	turn.ID = "model-source-turn"
 	turn.Sequence = 2
@@ -68,7 +107,7 @@ func TestRecoveredModelExplicitContinuation(t *testing.T) {
 	}
 	before, err := db.Read(ctx, start.TaskID, 0, 100)
 	if err != nil || len(before) != 4 || before[3].Kind != runtime.TaskFailed || before[3].Data.Code != "interrupted_model" {
-		t.Fatal("source not recovered", err)
+		t.Fatal("source not recovered", before, err)
 	}
 	raw, err := sessions.Replay(ctx, db, start.TaskID)
 	if err != nil || !raw.InterruptedTurn || raw.State != "failed" {
@@ -104,7 +143,12 @@ func TestRecoveredModelExplicitContinuation(t *testing.T) {
 	if calls.Load() != 0 {
 		t.Fatal("denied continuation dispatched")
 	}
-	result, err := s.Run(ctx, Request{ModelID: "chat", Prompt: "explicit follow-up", ContinueTaskID: start.TaskID})
+	restarted, err := NewService(s.settings, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted.profile = healthProfile
+	result, err := restarted.Run(ctx, Request{ModelID: "chat", Prompt: "explicit follow-up", ContinueTaskID: start.TaskID})
 	if err != nil {
 		t.Fatal("explicit continuation failed", err)
 	}
@@ -119,7 +163,7 @@ func TestRecoveredModelExplicitContinuation(t *testing.T) {
 		t.Fatal("partial output imported or complete history lost")
 	}
 	child, err := sessions.Replay(ctx, db, result.TaskID)
-	if err != nil || child.ParentTaskID != start.TaskID || child.SessionID != start.SessionID || child.State != "completed" || child.Privacy != "local_only" {
+	if err != nil || child.ParentTaskID != start.TaskID || child.SessionID != start.SessionID || child.State != "completed" || child.Privacy != "local_only" || child.ContextLineage == nil || child.ContextLineage.Digest != lineage.Digest {
 		t.Fatal("new task lineage", err)
 	}
 	after, err := db.Read(ctx, start.TaskID, 0, 100)

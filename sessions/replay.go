@@ -25,6 +25,7 @@ type Pending struct {
 type Snapshot struct {
 	SkillContext             *runtime.SkillContextUse `json:"SkillContext,omitempty"`
 	Compaction               *runtime.ContextCompaction
+	ContextLineage           *runtime.ContextLineage `json:"ContextLineage,omitempty"`
 	RetryOfTaskID            string
 	ParentTaskID, Privacy    string
 	TaskID, SessionID, State string
@@ -80,6 +81,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				s.RetryOfTaskID = e.Data.RetryOfTaskID
 				s.Privacy = e.Data.Privacy
 				s.Compaction = e.Data.Compaction
+				s.ContextLineage = e.Data.ContextLineage
 				s.SkillContext = e.Data.SkillContext.Clone()
 				s.Messages = e.Data.Messages
 				initialMessages = len(e.Data.Messages)
@@ -95,6 +97,11 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 						for _, call := range m.ToolCalls {
 							toolIDs[call.ID] = true
 						}
+					}
+				}
+				if s.ContextLineage != nil {
+					for _, id := range s.ContextLineage.ToolCallIDs {
+						toolIDs[id] = true
 					}
 				}
 			case runtime.TurnStarted:
@@ -116,8 +123,14 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				// Compaction is a one-shot replacement of the exact initial
 				// continuation prefix. Everything appended by this task remains
 				// in the suffix, including steering and complete tool batches.
-				if turn != "" || attempt != "" || !completedTurn || len(s.Pending) > 0 || s.UncertainEffects || s.Compaction != nil || e.TurnID != "" || e.AttemptID != "" || e.Data.Compaction == nil || e.Data.ParentTaskID != s.ParentTaskID || initialMessages < 1 || e.Data.ReplacedMessages != initialMessages || e.Data.ReplacedMessages > len(s.Messages) || len(e.Data.Messages) == 0 {
+				if turn != "" || attempt != "" || !completedTurn || len(s.Pending) > 0 || s.UncertainEffects || s.Compaction != nil && (s.ContextLineage == nil || e.Data.ContextLineage == nil) || e.TurnID != "" || e.AttemptID != "" || e.Data.Compaction == nil || e.Data.ParentTaskID != s.ParentTaskID || initialMessages < 1 || e.Data.ReplacedMessages != initialMessages || e.Data.ReplacedMessages > len(s.Messages) || len(e.Data.Messages) == 0 {
 					return s, ErrHistory
+				}
+				if s.ContextLineage != nil || e.Data.ContextLineage != nil {
+					expected, lineageErr := runtime.ExtendContextLineage(s.ContextLineage, task, e.Sequence, e.Data.Compaction, s.Messages)
+					if lineageErr != nil || e.Data.ContextLineage == nil || expected.Digest != e.Data.ContextLineage.Digest {
+						return s, ErrHistory
+					}
 				}
 				candidate := append([]providers.Message(nil), e.Data.Messages...)
 				candidate = append(candidate, s.Messages[e.Data.ReplacedMessages:]...)
@@ -139,7 +152,8 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 					sequences[i] = e.Sequence
 				}
 				sequences = append(sequences, s.MessageSequences[e.Data.ReplacedMessages:]...)
-				s.Messages, s.MessageSequences, s.Compaction = candidate, sequences, e.Data.Compaction
+				s.Messages, s.MessageSequences, s.Compaction, s.ContextLineage = candidate, sequences, e.Data.Compaction, e.Data.ContextLineage
+				initialMessages = len(e.Data.Messages)
 			case runtime.ModelDelta:
 				if turn == "" || turn != e.TurnID || attempt != e.AttemptID {
 					return s, ErrHistory

@@ -571,7 +571,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 50. Schema 30 added the immutable
+The current durable store uses SQLite schema 51. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -622,6 +622,12 @@ digests, approved replacement prefix, future live-suffix boundary, process
 owner, and ordered lifecycle transitions. The additive migration does not
 rewrite schema-49 task, summary, review, or Workboard history and does not grant
 older records synthetic compaction authority.
+Schema 51 adds an immutable normalized companion for ordered context-compaction
+lineage. New version-two checkpoints bind the exact source snapshot, inherited
+epochs, and the complete tool-call identity set so restart cannot silently
+fork, reorder, downgrade, or reuse retired identities. Existing version-one
+checkpoint events remain replay-compatible; the additive migration does not
+invent lineage for older history.
 Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,

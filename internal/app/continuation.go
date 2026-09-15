@@ -14,6 +14,7 @@ type continuationContext struct {
 	Messages           []providers.Message
 	SessionID, Privacy string
 	Compaction         *runtime.ContextCompaction
+	ContextLineage     *runtime.ContextLineage
 }
 
 type continuationReader interface {
@@ -30,7 +31,7 @@ func loadContinuation(ctx context.Context, db continuationReader, r Request, sec
 			return nil, ErrAdmission
 		}
 	}
-	result := &continuationContext{Messages: history.Messages, SessionID: history.SessionID, Privacy: history.Privacy}
+	result := &continuationContext{Messages: history.Messages, SessionID: history.SessionID, Privacy: history.Privacy, ContextLineage: history.ContextLineage}
 	if r.Compaction != nil {
 		// Redact before both provider assembly and checkpoint persistence.
 		request := *r.Compaction

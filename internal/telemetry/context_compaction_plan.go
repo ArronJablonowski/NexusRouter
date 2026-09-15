@@ -470,7 +470,7 @@ func validateContextCompactionPlanEvidence(ctx context.Context, tx *sql.Tx, star
 	}
 	checkpoint := *plan.Compaction
 	checkpoint.SummaryAttemptID, checkpoint.SummaryReviewID = "", ""
-	if !reflect.DeepEqual(&checkpoint, attempt.Draft.Checkpoint) {
+	if !canonicalJSONEqual(&checkpoint, attempt.Draft.Checkpoint) {
 		return sessions.ErrHistory
 	}
 	source, err := taskSnapshot(ctx, tx, start.TaskID)
@@ -597,11 +597,17 @@ func readContextCompactionPlanState(ctx context.Context, q contextCompactionQuer
 	// Recovery insertion is intentionally deferred until the schema binds the
 	// recovering process rather than the dead original owner. Existing rows are
 	// still decoded fail-closed for forward-compatible reads.
+	var recoveryID, recoveryDigest, recoveryProcess, failedFactID, failedFactDigest, recoveryReason, recoveredAt string
 	var recoveryBody []byte
-	err = q.QueryRowContext(ctx, "SELECT body FROM context_compaction_plan_recoveries WHERE operation_id=?", operationID).Scan(&recoveryBody)
+	err = q.QueryRowContext(ctx, `SELECT recovery_id,recovery_digest,process_id,failed_fact_id,failed_fact_digest,reason,recovered_at,body
+		FROM context_compaction_plan_recoveries WHERE operation_id=?`, operationID).Scan(&recoveryID, &recoveryDigest, &recoveryProcess,
+		&failedFactID, &failedFactDigest, &recoveryReason, &recoveredAt, &recoveryBody)
 	if err == nil {
 		var recovery sessions.ContextCompactionRecovery
-		if json.Unmarshal(recoveryBody, &recovery) != nil || recovery.Validate() != nil || recovery.OperationID != operationID {
+		if json.Unmarshal(recoveryBody, &recovery) != nil || recovery.Validate() != nil || recovery.OperationID != operationID ||
+			recovery.ID != recoveryID || recovery.Digest != recoveryDigest || recovery.ProcessID != recoveryProcess ||
+			recovery.FailedFactID != failedFactID || recovery.FailedFactDigest != failedFactDigest || recovery.Reason != recoveryReason ||
+			recovery.RecoveredAt.Format(time.RFC3339Nano) != recoveredAt {
 			return zero, sessions.ErrContextCompactionLifecycle
 		}
 		state.Recovery = &recovery

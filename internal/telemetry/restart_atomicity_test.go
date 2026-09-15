@@ -68,7 +68,7 @@ func TestReviewedCompactionStartRollbackSurvivesRestart(t *testing.T) {
 	if _, err := store.db.Exec(`CREATE TRIGGER fail_compaction_start BEFORE INSERT ON events WHEN NEW.task_id='continuation' BEGIN SELECT RAISE(ABORT,'fixture'); END`); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Append(ctx, 0, reviewedStart(attempt, review, "continuation")); err == nil {
+	if err := store.Append(ctx, 0, reviewedStart(t, store, attempt, review, "continuation")); err == nil {
 		t.Fatal("injected compaction-start failure committed")
 	}
 	if err := store.Close(); err != nil {

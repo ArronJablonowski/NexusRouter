@@ -46,8 +46,34 @@ func contextCompactionFixture(t *testing.T, store *Store, task string) (runtime.
 	}
 	replacement = append(replacement, stableTail...)
 	checkpoint.SummaryAttemptID, checkpoint.SummaryReviewID = attempt.ID, review.ID
-	activation := runtime.Event{Version: 1, ID: task + "-compact", TaskID: task, SessionID: start.SessionID, CorrelationID: task, Sequence: 4, Time: start.Time.Add(3 * time.Second), Kind: runtime.ContextCompacted, Data: runtime.Data{Compaction: checkpoint, ParentTaskID: source.TaskID, Messages: replacement, ReplacedMessages: len(initial)}}
+	current, err := store.TaskSnapshot(ctx, task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lineage, err := runtime.ExtendContextLineage(current.ContextLineage, task, 4, checkpoint, current.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	activation := runtime.Event{Version: 1, ID: task + "-compact", TaskID: task, SessionID: start.SessionID, CorrelationID: task, Sequence: 4, Time: start.Time.Add(3 * time.Second), Kind: runtime.ContextCompacted, Data: runtime.Data{Compaction: checkpoint, ContextLineage: lineage, ParentTaskID: source.TaskID, Messages: replacement, ReplacedMessages: len(initial)}}
+	if err := activation.Validate(); err != nil {
+		t.Fatalf("activation fixture: %v epoch=%#v checkpoint=%#v", err, lineage.Epochs[len(lineage.Epochs)-1], *checkpoint)
+	}
 	return activation, review, initial
+}
+
+func refreshCompactionLineage(t *testing.T, store *Store, event *runtime.Event, messages []providers.Message) {
+	t.Helper()
+	current, err := store.TaskSnapshot(context.Background(), event.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if messages == nil {
+		messages = current.Messages
+	}
+	event.Data.ContextLineage, err = runtime.ExtendContextLineage(current.ContextLineage, event.TaskID, event.Sequence, event.Data.Compaction, messages)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestContextCompactionSupportsCompletePostActivationLifecycle(t *testing.T) {
@@ -214,6 +240,7 @@ func TestContextCompactionGateCommitsOnceAndReplays(t *testing.T) {
 	}
 	second := activation
 	second.ID, second.Sequence = "second-compaction", 5
+	refreshCompactionLineage(t, store, &second, nil)
 	if err := store.Append(ctx, 4, second); !errors.Is(err, sessions.ErrHistory) {
 		t.Fatal("second activation admitted", err)
 	}
@@ -276,6 +303,7 @@ func TestContextCompactionRequiresCompletedTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	activation.ID, activation.TaskID, activation.SessionID, activation.CorrelationID, activation.Sequence = "early-compact", "early", "early-session", "early", 2
+	refreshCompactionLineage(t, store, &activation, nil)
 	if err := store.Append(ctx, 1, activation); !errors.Is(err, sessions.ErrHistory) {
 		t.Fatal("pre-turn activation admitted", err)
 	}
@@ -317,6 +345,12 @@ func TestContextCompactionRejectsCumulativeHistoryOverflow(t *testing.T) {
 	done.ID, done.Sequence, done.Kind, done.Time = "large-done", 6, runtime.TurnCompleted, turn.Time.Add(2*time.Second)
 	done.Data.FinishReason = "stop"
 	activation.Sequence, activation.Time = 7, done.Time.Add(time.Second)
+	lineageMessages, err := store.TaskSnapshot(ctx, activation.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prospectiveMessages := append(append([]providers.Message(nil), lineageMessages.Messages...), providers.Message{Role: "assistant"})
+	refreshCompactionLineage(t, store, &activation, prospectiveMessages)
 
 	prior, err := store.Read(ctx, activation.TaskID, 0, 100)
 	if err != nil {

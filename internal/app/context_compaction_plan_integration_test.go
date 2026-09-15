@@ -138,6 +138,125 @@ func TestCustomContextEnginePlanActivatesAfterToolTurn(t *testing.T) {
 	if strings.Contains(string(body), "immutable-source-") || !strings.Contains(string(body), "trusted evidence") || !strings.Contains(string(body), "custom plan answer") {
 		t.Fatal("replay lost compacted context or live suffix", string(body))
 	}
+
+	// Prepare and activate a second epoch from the already-compacted child. The
+	// inherited lineage must survive app admission instead of flattening the
+	// first checkpoint into untracked prompt text.
+	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+		return delegateEstimatorProvider(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			return emit(providers.Chunk{Text: `{"version":1,"summary":{"requirements":["Preserve the second-epoch requirement"]}}`, Done: true, FinishReason: "stop"})
+		}), nil
+	})
+	secondOperation, err := svc.PrepareSummary(ctx, "custom-engine-summary-plan-0002", PrepareSummaryRequest{
+		Version: 1, TaskID: out.TaskID, ModelID: "a", Keep: 1, MaxCost: 0,
+	})
+	if err != nil || secondOperation.TerminalAttempt == nil || secondOperation.TerminalAttempt.Draft == nil {
+		t.Fatal("second summary preparation failed", secondOperation, err)
+	}
+	secondAttempt := *secondOperation.TerminalAttempt
+	secondReview, err := svc.ValidateSummary(ctx, secondAttempt.ID, "", "custom-engine-validation-0002", "project-tests-v1", registry)
+	if err != nil || secondReview.Version != 2 || secondReview.Decision != "approved" {
+		t.Fatal("second trusted validation failed", secondReview, err)
+	}
+
+	secondPrompt := "use the lookup in epoch two"
+	secondInitial := providers.Request{Model: "a", Messages: append(append([]providers.Message(nil), replayed.Messages...), providers.Message{Role: "user", Content: secondPrompt}), Tools: extension.Catalog()}
+	secondLimit, err := providers.EstimateContext(secondInitial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = secondLimit
+	}
+	var secondStreams atomic.Int32
+	svc.providerFactory = applicationProviderFactory(func(_ context.Context, connection providers.Connection) (providers.Provider, error) {
+		if connection.Purpose != providers.PurposeExecution {
+			t.Fatalf("unexpected second-epoch provider purpose %q", connection.Purpose)
+		}
+		return delegateEstimatorProvider(func(_ context.Context, request providers.Request, emit func(providers.Chunk) error) error {
+			switch secondStreams.Add(1) {
+			case 1:
+				if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "custom-plan-lookup-two", Name: "lookup", Arguments: json.RawMessage(`{}`)}}); err != nil {
+					return err
+				}
+				return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+			case 2:
+				encoded, _ := json.Marshal(request.Messages)
+				if strings.Contains(string(encoded), "immutable-source-") || !strings.Contains(string(encoded), "second-epoch requirement") {
+					t.Error("second epoch did not replace the inherited compacted prefix")
+				}
+				return emit(providers.Chunk{Text: "second epoch answer", Done: true, FinishReason: "stop"})
+			default:
+				t.Error("unexpected second-epoch redispatch")
+				return nil
+			}
+		}), nil
+	})
+	second, err := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: out.TaskID, Prompt: secondPrompt})
+	if err != nil || second.Text != "second epoch answer" || secondStreams.Load() != 2 {
+		t.Fatalf("second epoch result=%+v err=%v streams=%d", second, err, secondStreams.Load())
+	}
+	secondSnapshot, err := sessions.Replay(ctx, reopened, second.TaskID)
+	if err != nil || secondSnapshot.ContextLineage == nil || len(secondSnapshot.ContextLineage.Epochs) != 2 || secondSnapshot.Compaction == nil || secondSnapshot.Compaction.SummaryAttemptID != secondAttempt.ID {
+		t.Fatal("second epoch lineage did not replay", secondSnapshot, err)
+	}
+	secondBody, _ := json.Marshal(secondSnapshot.Messages)
+	if strings.Count(string(secondBody), "The following session_summary is an operator-supplied summary") != 1 {
+		t.Fatal("prior summary envelope was retained as stable context", string(secondBody))
+	}
+	toolsBeforeReuse := toolCalls.Load()
+	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+		return delegateEstimatorProvider(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "custom-plan-lookup", Name: "lookup", Arguments: json.RawMessage(`{}`)}}); err != nil {
+				return err
+			}
+			return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+		}), nil
+	})
+	reused, reuseErr := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: second.TaskID, Prompt: "reuse an old tool identity"})
+	if reuseErr == nil || reused.TaskID == "" || toolCalls.Load() != toolsBeforeReuse {
+		t.Fatalf("retired tool identity was executable: result=%+v err=%v tools=%d", reused, reuseErr, toolCalls.Load())
+	}
+	reusedSnapshot, replayErr := sessions.Replay(ctx, reopened, reused.TaskID)
+	if replayErr != nil || reusedSnapshot.State != "failed" || len(reusedSnapshot.Pending) != 0 || reusedSnapshot.UncertainEffects {
+		t.Fatalf("retired identity rejection left corrupt history: snapshot=%+v err=%v", reusedSnapshot, replayErr)
+	}
+
+	// Descriptor fencing remains per-operation after lineage rollover.
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 1 << 20
+	}
+	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+		return delegateEstimatorProvider(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			return emit(providers.Chunk{Text: `{"version":1,"summary":{"requirements":["Preserve the third-epoch requirement"]}}`, Done: true, FinishReason: "stop"})
+		}), nil
+	})
+	thirdOperation, err := svc.PrepareSummary(ctx, "custom-engine-summary-plan-0003", PrepareSummaryRequest{
+		Version: 1, TaskID: second.TaskID, ModelID: "a", Keep: 1, MaxCost: 0,
+	})
+	if err != nil || thirdOperation.TerminalAttempt == nil || thirdOperation.TerminalAttempt.Draft == nil {
+		t.Fatal("third summary preparation failed", thirdOperation, err)
+	}
+	thirdAttempt := *thirdOperation.TerminalAttempt
+	if _, checkpoint, checkpointErr := sessions.PrepareContinuation(secondSnapshot, thirdAttempt.Draft.Request); checkpointErr != nil || checkpoint == nil || checkpoint.SourceDigest != thirdAttempt.SourceDigest {
+		t.Fatal("third summary checkpoint did not replay", checkpoint, checkpointErr)
+	}
+	if thirdReview, validateErr := svc.ValidateSummary(ctx, thirdAttempt.ID, "", "custom-engine-validation-0003", "project-tests-v1", registry); validateErr != nil || thirdReview.Decision != "approved" {
+		t.Fatal("third trusted validation failed", thirdReview, validateErr)
+	}
+	engine.identity, err = runtime.NewContextEngineIdentity("test.context-engine", "dar-123-drift")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var driftConstructions atomic.Int32
+	svc.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+		driftConstructions.Add(1)
+		return nil, context.Canceled
+	})
+	drifted, driftErr := svc.Run(ctx, Request{ModelID: "a", ContinueTaskID: second.TaskID, Prompt: "continue after second-epoch drift"})
+	if driftErr != ErrAdmission || drifted.TaskID != "" || driftConstructions.Load() != 0 {
+		t.Fatalf("second-epoch descriptor drift reached execution: result=%+v err=%v constructions=%d", drifted, driftErr, driftConstructions.Load())
+	}
 }
 
 func TestCustomContextEnginePlanRejectsDescriptorDrift(t *testing.T) {

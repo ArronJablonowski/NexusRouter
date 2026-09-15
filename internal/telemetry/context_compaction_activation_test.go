@@ -91,9 +91,17 @@ func planActivationEventFixture(t *testing.T, store *Store, plan runtime.Context
 			t.Fatal(err)
 		}
 	}
+	current, err := store.TaskSnapshot(ctx, task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lineage, err := runtime.ExtendContextLineage(current.ContextLineage, task, 4, plan.Compaction, current.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return runtime.Event{Version: 1, ID: task + "-compact", TaskID: task, SessionID: start.SessionID, CorrelationID: task,
 		Sequence: 4, Time: base.Add(3 * time.Second), Kind: runtime.ContextCompacted,
-		Data: runtime.Data{Compaction: plan.Compaction, ParentTaskID: plan.Compaction.SourceTaskID,
+		Data: runtime.Data{Compaction: plan.Compaction, ContextLineage: lineage, ParentTaskID: plan.Compaction.SourceTaskID,
 			Messages: append([]providers.Message(nil), plan.ReplacementPrefix...), ReplacedMessages: len(plan.OriginalPrefix)}}
 }
 
@@ -145,6 +153,33 @@ func TestAppendContextCompactionCommitsEventAndActivationAtomically(t *testing.T
 		(SELECT count(*) FROM events WHERE id=?),
 		(SELECT count(*) FROM context_compaction_plan_facts WHERE operation_id=? AND kind='activated')`, event.ID, plan.OperationID).Scan(&eventCount, &activationCount); err != nil || eventCount != 1 || activationCount != 1 {
 		t.Fatalf("duplicate atomic records: events=%d activations=%d err=%v", eventCount, activationCount, err)
+	}
+}
+
+func TestContextCompactionActivationMissingFactFailsReopen(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "activation-corrupt.db")
+	store, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, _ := approvedContextCompactionPlanFixture(t, store)
+	event := planActivationEventFixture(t, store, plan, "activation-task")
+	if err = store.AppendContextCompaction(ctx, 3, event, plan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.Exec(`DROP TRIGGER context_compaction_plan_fact_immutable_delete;
+		DELETE FROM context_compaction_plan_facts WHERE operation_id=? AND kind='activated';
+		CREATE TRIGGER context_compaction_plan_fact_immutable_delete BEFORE DELETE ON context_compaction_plan_facts
+		BEGIN SELECT RAISE(ABORT,'context compaction plan fact immutable'); END;`, plan.OperationID); err != nil {
+		t.Fatal(err)
+	}
+	if err = store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if reopened, openErr := Open(ctx, path); openErr == nil {
+		reopened.Close()
+		t.Fatal("planned ContextCompacted event without activation fact reopened")
 	}
 }
 

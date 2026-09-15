@@ -159,4 +159,25 @@ func TestHTTPCompactedContinuationPersistsBeforeProvider(t *testing.T) {
 	if continued.State != "completed" || continued.ParentTaskID != first.TaskID || continued.SessionID != source.SessionID || !reflect.DeepEqual(continued.Compaction, dispatch.compaction) {
 		t.Fatalf("durable compaction inspection differs: %#v", continued)
 	}
+	var third struct {
+		TaskID string `json:"task_id"`
+	}
+	secondBody, err := json.Marshal(map[string]any{"model_id": "chat", "prompt": "third question", "continue_task_id": second.TaskID, "compaction": sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Decisions: []string{"newer operator summary"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	call("POST", "/v1/tasks", string(secondBody), 201, &third)
+	thirdDispatch := <-observations
+	if thirdDispatch.compaction == nil || thirdDispatch.compaction.Version != 2 || thirdDispatch.compaction.SourceTaskID != second.TaskID {
+		t.Fatal("second compaction epoch did not reach provider", thirdDispatch.compaction)
+	}
+	var twiceCompacted sessions.Snapshot
+	call("GET", "/v1/tasks/"+third.TaskID, "", 200, &twiceCompacted)
+	if twiceCompacted.ContextLineage == nil || len(twiceCompacted.ContextLineage.Epochs) != 2 || twiceCompacted.Compaction == nil || !reflect.DeepEqual(twiceCompacted.Compaction, thirdDispatch.compaction) {
+		t.Fatal("HTTP inspection lost multi-epoch lineage", twiceCompacted)
+	}
+	encodedTwice, _ := json.Marshal(twiceCompacted.Messages)
+	if strings.Count(string(encodedTwice), "The following session_summary is an operator-supplied summary") != 1 || strings.Contains(string(encodedTwice), "operator chosen summary") {
+		t.Fatal("HTTP continuation retained obsolete summary envelope", string(encodedTwice))
+	}
 }

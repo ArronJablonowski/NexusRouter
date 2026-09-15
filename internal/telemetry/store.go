@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 51 {
+		if err = discardEmptyFutureContextLineage(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 51 {
+		if err = validateContextLineageSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 50 {
 		if err = discardEmptyFutureContextCompactionPlans(ctx, conn); err != nil {
 			return err
@@ -598,6 +608,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 51 {
+		if err = migrateContextLineage(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
 		return errors.New("migration did not reach current database version")
 	}
@@ -695,6 +710,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		if err := validateSubmissionStreamRetry(ctx, tx, e, body, id); err != nil {
 			return err
 		}
+		if err := validateContextLineageEventRetry(ctx, tx, e); err != nil {
+			return err
+		}
 		if compactionPlan != nil {
 			if err := validateContextCompactionActivationRetry(ctx, tx, e, *compactionPlan); err != nil {
 				return err
@@ -737,6 +755,10 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	}
 	if seq != expected || session != e.SessionID || state != "running" || (seq > 0 && e.Kind == runtime.TaskStarted) {
 		return ErrConflict
+	}
+	lineageEvent, err := prepareContextLineageEvent(ctx, tx, e)
+	if err != nil {
+		return err
 	}
 	var compactionActivation *sessions.ContextCompactionLifecycleFact
 	if e.Kind == runtime.ContextCompacted {
@@ -812,6 +834,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		return err
 	}
 	if err = appendSubmissionStreamEvent(ctx, tx, e, body, id); err != nil {
+		return err
+	}
+	if err = insertContextLineageEvent(ctx, tx, e, lineageEvent); err != nil {
 		return err
 	}
 	if err = appendSkillExposures(ctx, tx, e); err != nil {

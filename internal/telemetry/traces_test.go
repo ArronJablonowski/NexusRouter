@@ -16,6 +16,15 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 	db, _ := submissionStore(t)
 	ctx := context.Background()
 	base := time.Unix(1_700_000_000, 0).UTC()
+	parentStart := event("private-parent-start", 1, runtime.TaskStarted)
+	parentStart.TaskID, parentStart.SessionID, parentStart.CorrelationID = "private-parent-task", "parent-session", "private-parent-task"
+	parentDone := event("private-parent-done", 2, runtime.TaskCompleted)
+	parentDone.TaskID, parentDone.SessionID, parentDone.CorrelationID = parentStart.TaskID, parentStart.SessionID, parentStart.CorrelationID
+	for i, parent := range []runtime.Event{parentStart, parentDone} {
+		if err := db.Append(ctx, int64(i), parent); err != nil {
+			t.Fatal(err)
+		}
+	}
 	kinds := []runtime.Kind{runtime.TaskStarted, runtime.RouteSelected, runtime.TurnStarted, runtime.TurnCompleted, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerCompleted, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.TaskCompleted}
 	for i, kind := range kinds {
 		e := event("private-event-"+string(rune('a'+i)), int64(i+1), kind)
@@ -23,7 +32,7 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		e.Time = base.Add(time.Duration(i) * time.Second)
 		if kind == runtime.TaskStarted {
 			e.Data.RetryOfTaskID, e.Data.ParentTaskID = "private-prior-task", "private-parent-task"
-			e.Data.Compaction = &runtime.ContextCompaction{Version: 1, SourceTaskID: "private-parent-task", SourceSequence: 1, SourceDigest: strings.Repeat("a", 64), RemovedMessages: 1, Summary: runtime.ContextSummary{Requirements: []string{"retain"}}}
+			e.Data.Compaction = &runtime.ContextCompaction{Version: 1, SourceTaskID: "private-parent-task", SourceSequence: 2, SourceDigest: strings.Repeat("a", 64), RemovedMessages: 1, Summary: runtime.ContextSummary{Requirements: []string{"retain"}}}
 			e.Data.SkillContext = &runtime.SkillContextUse{Version: 1, Complete: true}
 		}
 		if kind == runtime.RouteSelected {

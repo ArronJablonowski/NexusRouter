@@ -38,7 +38,7 @@ func TestContextCompactionPlanMigrationFreshReopenAndSchema49Preservation(t *tes
 		(SELECT count(*) FROM sqlite_master WHERE type='table' AND name GLOB 'context_compaction_*'),
 		(SELECT count(*) FROM sqlite_master WHERE type='index' AND name GLOB 'context_compaction_*'),
 		(SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name GLOB 'context_compaction_*')`).
-		Scan(&version, &legacy, &tables, &indexes, &triggers); err != nil || version != 50 || legacy != 1 || tables != 4 || indexes != 4 || triggers != 12 {
+		Scan(&version, &legacy, &tables, &indexes, &triggers); err != nil || version != 51 || legacy != 1 || tables != 4 || indexes != 4 || triggers != 12 {
 		t.Fatalf("version=%d legacy=%d tables=%d indexes=%d triggers=%d err=%v", version, legacy, tables, indexes, triggers, err)
 	}
 	if err = store.Close(); err != nil {
@@ -49,7 +49,7 @@ func TestContextCompactionPlanMigrationFreshReopenAndSchema49Preservation(t *tes
 		t.Fatal(err)
 	}
 	defer store.Close()
-	if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 50 {
+	if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 51 {
 		t.Fatalf("reopened version=%d err=%v", version, err)
 	}
 }
@@ -224,7 +224,7 @@ func TestContextCompactionPlanMigrationCleanupTamperAndRollback(t *testing.T) {
 		}
 		defer store.Close()
 		var version int
-		if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 50 {
+		if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 51 {
 			t.Fatalf("version=%d err=%v", version, err)
 		}
 	})

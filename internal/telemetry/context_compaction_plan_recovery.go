@@ -59,7 +59,7 @@ func (s *Store) ReconcileContextCompactionPlansPage(ctx context.Context, after s
 		JOIN summary_attempts attempt ON attempt.id=operation.attempt_id AND attempt.task_id=operation.task_id
 		WHERE operation.rowid>? AND NOT EXISTS(SELECT 1 FROM context_compaction_plan_recoveries recovery WHERE recovery.operation_id=operation.operation_id)
 		AND (SELECT fact.kind FROM context_compaction_plan_facts fact WHERE fact.operation_id=operation.operation_id ORDER BY fact.sequence DESC LIMIT 1)
-			='started' AND json_extract(attempt.body,'$.Status')='started'
+			='started' AND json_extract(attempt.body,'$.Status') IN('started','interrupted')
 		ORDER BY operation.rowid LIMIT ?`, cursor, limit)
 	if err != nil {
 		return after, 0, fmt.Errorf("%w: list: %v", ErrContextCompactionRecovery, err)
@@ -164,7 +164,7 @@ func (s *Store) recoverContextCompactionCandidate(ctx context.Context, candidate
 		if decodeErr != nil {
 			return false, ErrContextCompactionRecovery
 		}
-		if attempt.Status != "started" {
+		if attempt.Status != "started" && attempt.Status != "interrupted" {
 			return false, tx.Commit()
 		}
 	case sessions.ContextCompactionPrepared, sessions.ContextCompactionValidated, sessions.ContextCompactionApproved:

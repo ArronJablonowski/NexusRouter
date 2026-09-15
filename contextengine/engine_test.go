@@ -168,6 +168,33 @@ func TestCompactionCanonicalAndIsolated(t *testing.T) {
 	}
 }
 
+func TestCompactionPreservesAndIsolatesContextLineage(t *testing.T) {
+	prior, request := compactionFixture()
+	messages, checkpoint, err := sessions.PrepareContinuation(prior, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lineage, err := runtime.ExtendContextLineage(nil, "prior-child", 1, checkpoint, prior.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := sessions.Snapshot{TaskID: "prior-child", State: "completed", Sequence: 10, Messages: messages, ContextLineage: lineage}
+	engine := &fixtureEngine{compact: func(_ context.Context, got sessions.Snapshot, selected sessions.CompactionRequest) (sessions.CompactionRequest, error) {
+		if got.ContextLineage == nil || got.ContextLineage.Digest != lineage.Digest {
+			t.Fatal("lineage missing from callback snapshot")
+		}
+		got.ContextLineage.Epochs[0].TaskID = "mutated"
+		got.ContextLineage.ToolCallIDs = append(got.ContextLineage.ToolCallIDs, "forged")
+		return selected, nil
+	}}
+	if _, err = SelectCompaction(context.Background(), engine, source, request); err != nil {
+		t.Fatal(err)
+	}
+	if source.ContextLineage.Digest != lineage.Digest || source.ContextLineage.Epochs[0].TaskID != "prior-child" || len(source.ContextLineage.ToolCallIDs) != len(lineage.ToolCallIDs) {
+		t.Fatal("callback mutation escaped isolated lineage")
+	}
+}
+
 func TestCompactionRejectsUnsafeSelection(t *testing.T) {
 	for _, mode := range []string{"drop", "summary", "overkeep", "panic", "error", "cancel"} {
 		source, request := compactionFixture()

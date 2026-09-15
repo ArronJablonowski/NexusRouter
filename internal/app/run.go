@@ -496,10 +496,12 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		inference.MaxOutputTokens = r.runtimeHostAdmission.maxOutputTokens
 	}
 	var compaction *runtime.ContextCompaction
+	var contextLineage *runtime.ContextLineage
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
+		contextLineage = r.continuation.ContextLineage
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {

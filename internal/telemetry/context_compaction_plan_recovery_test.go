@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -55,6 +56,11 @@ func TestContextCompactionPlanDeadOwnerRecovery(t *testing.T) {
 	before, err := store.ContextCompactionPlan(ctx, "compaction-operation")
 	if err != nil || before.Status != sessions.ContextCompactionStarted || before.Start.ProcessID == "" {
 		t.Fatalf("pre-recovery state: %+v %v", before, err)
+	}
+	// The generic summary sweeper may run in another process before the enclosing
+	// compaction sweep. Its valid receipt must not strand the plan in started.
+	if _, recovered, summaryErr := store.ReconcileSummaryAttemptsPage(ctx, "", 100, time.Unix(399, 0).UTC()); summaryErr != nil || recovered != 1 {
+		t.Fatalf("generic summary recovery: recovered=%d err=%v", recovered, summaryErr)
 	}
 	now := time.Unix(400, 0).UTC()
 	type result struct {
@@ -111,6 +117,13 @@ func TestContextCompactionPlanDeadOwnerRecovery(t *testing.T) {
 	replayedReceiptBytes, _ := json.Marshal(replayedReceipt)
 	if err != nil || receiptErr != nil || string(stateBytes) != string(replayedStateBytes) || string(receiptBytes) != string(replayedReceiptBytes) {
 		t.Fatal("recovery replay changed immutable evidence", err, receiptErr)
+	}
+	if _, err = store.db.Exec(`DROP TRIGGER context_compaction_plan_recovery_immutable_update;
+		UPDATE context_compaction_plan_recoveries SET failed_fact_digest=? WHERE operation_id=?`, strings.Repeat("f", 64), before.Start.OperationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.ContextCompactionPlan(ctx, before.Start.OperationID); !errors.Is(err, sessions.ErrContextCompactionLifecycle) {
+		t.Fatal("normalized recovery corruption was trusted", err)
 	}
 }
 

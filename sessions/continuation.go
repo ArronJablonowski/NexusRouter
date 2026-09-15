@@ -30,7 +30,8 @@ func ValidateCompactionRequest(r *CompactionRequest) error {
 // Summary accuracy is an operator responsibility, not inferred from structure.
 func PrepareContinuation(source Snapshot, request CompactionRequest) ([]providers.Message, *runtime.ContextCompaction, error) {
 	if ValidateCompactionRequest(&request) != nil || source.State != "completed" || source.TaskID == "" || source.Sequence < 1 ||
-		source.InterruptedTurn || source.UncertainEffects || len(source.Pending) != 0 {
+		source.InterruptedTurn || source.UncertainEffects || len(source.Pending) != 0 ||
+		source.ContextLineage != nil && source.ContextLineage.Validate() != nil {
 		return nil, nil, ErrHistory
 	}
 	if source.MessageSequences != nil {
@@ -39,7 +40,7 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 		}
 		var previous int64
 		for _, sequence := range source.MessageSequences {
-			if sequence < 1 || sequence > source.Sequence || sequence < previous {
+			if sequence < 1 || sequence > source.Sequence || source.ContextLineage == nil && sequence < previous {
 				return nil, nil, ErrHistory
 			}
 			previous = sequence
@@ -50,9 +51,23 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 		return nil, nil, err
 	}
 	stable := []providers.Message{}
-	for _, message := range source.Messages[:selected.RemovedMessages] {
-		if message.Role == "system" {
-			stable = append(stable, message)
+	if source.ContextLineage != nil {
+		latest := source.ContextLineage.Epochs[len(source.ContextLineage.Epochs)-1].Compaction
+		stableCount := latest.FirstRetainedMessage - latest.RemovedMessages
+		if stableCount < 0 || stableCount > selected.RemovedMessages || stableCount > len(source.Messages) {
+			return nil, nil, ErrHistory
+		}
+		for _, message := range source.Messages[:stableCount] {
+			if message.Role != "system" {
+				return nil, nil, ErrHistory
+			}
+		}
+		stable = append(stable, source.Messages[:stableCount]...)
+	} else {
+		for _, message := range source.Messages[:selected.RemovedMessages] {
+			if message.Role == "system" {
+				stable = append(stable, message)
+			}
 		}
 	}
 	removed := selected.RemovedMessages - len(stable)
@@ -65,10 +80,18 @@ func PrepareContinuation(source Snapshot, request CompactionRequest) ([]provider
 	}
 	digest := sha256.Sum256(encoded)
 	record := &runtime.ContextCompaction{
-		Version: 1, SourceTaskID: source.TaskID, SourceSequence: source.Sequence,
+		Version: 2, SourceTaskID: source.TaskID, SourceSequence: source.Sequence,
 		SourceDigest: hex.EncodeToString(digest[:]), RemovedMessages: removed,
 		Summary:              selected.Summary,
 		FirstRetainedMessage: selected.RemovedMessages,
+	}
+	record.SourceStateDigest, err = runtime.ContextSourceStateDigest(source.Messages, source.ContextLineage)
+	if err != nil {
+		return nil, nil, ErrHistory
+	}
+	record.SourceToolCallIDs, err = runtime.ContextSourceToolCallIDs(source.Messages, source.ContextLineage)
+	if err != nil {
+		return nil, nil, ErrHistory
 	}
 	if source.MessageSequences != nil {
 		record.FirstRetainedSequence = source.MessageSequences[selected.RemovedMessages]

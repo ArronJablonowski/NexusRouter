@@ -193,9 +193,9 @@ func TestSDKContextEngineCompactionRetainsCustomSuffix(t *testing.T) {
 	options, _ := sdkToolOptions(t)
 	var compacted atomic.Int32
 	options.ContextEngine = &sdkFullContextEngine{compact: func(_ context.Context, source sessions.Snapshot, r sessions.CompactionRequest) (sessions.CompactionRequest, error) {
-		compacted.Add(1)
-		if len(source.Messages) != 4 {
-			t.Error("wrong source length")
+		call := compacted.Add(1)
+		if (call == 1 && len(source.Messages) != 4) || (call == 2 && len(source.Messages) != 7) {
+			t.Error("wrong source length", call, len(source.Messages))
 		}
 		source.Messages[0].Content = "MUTATED_SOURCE"
 		r.Keep = 3
@@ -236,5 +236,17 @@ func TestSDKContextEngineCompactionRetainsCustomSuffix(t *testing.T) {
 	after, err := client.InspectTask(ctx, second.TaskID)
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("source history mutated", err)
+	}
+	fourth, err := client.Run(ctx, sdk.Request{Version: 1, ModelID: "chat", Prompt: "fourth question", ContinueTaskID: out.TaskID, Compaction: &sessions.CompactionRequest{Keep: 1, Summary: sessions.Summary{Decisions: []string{"Retain the latest decisions"}}}})
+	if err != nil || fourth.TaskID == "" || compacted.Load() != 2 {
+		t.Fatal(fourth, err, compacted.Load())
+	}
+	inspected, err := client.InspectTask(ctx, fourth.TaskID)
+	if err != nil || inspected.ContextLineage == nil || len(inspected.ContextLineage.Epochs) != 2 || inspected.Compaction == nil || inspected.Compaction.Version != 2 {
+		t.Fatal("SDK did not preserve multi-epoch lineage", inspected, err)
+	}
+	body, _ := json.Marshal(inspected.Messages)
+	if strings.Count(string(body), "The following session_summary is an operator-supplied summary") != 1 {
+		t.Fatal("SDK retained an obsolete summary envelope", string(body))
 	}
 }

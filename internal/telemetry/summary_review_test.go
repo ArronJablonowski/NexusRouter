@@ -27,13 +27,24 @@ func reviewDraftFixture(t *testing.T, s *Store) (sessions.SummaryAttempt, sessio
 	r := sessions.SummaryReview{Version: 1, ID: "review-a", AttemptID: a.ID, Decision: "approved", Note: "Checked requirements and source", Time: time.Unix(300, 0).UTC()}
 	return a, r
 }
-func reviewedStart(a sessions.SummaryAttempt, r sessions.SummaryReview, id string) runtime.Event {
+func reviewedStart(t *testing.T, s *Store, a sessions.SummaryAttempt, r sessions.SummaryReview, id string) runtime.Event {
+	t.Helper()
 	e := event(id, 1, runtime.TaskStarted)
 	e.TaskID = id
 	e.Data.ParentTaskID = a.TaskID
 	c := *a.Draft.Checkpoint
 	c.SummaryAttemptID, c.SummaryReviewID = a.ID, r.ID
 	e.Data.Compaction = &c
+	if c.Version >= 2 {
+		source, err := s.TaskSnapshot(context.Background(), a.TaskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.Data.ContextLineage, err = runtime.ExtendContextLineage(source.ContextLineage, e.TaskID, e.Sequence, &c, source.Messages)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	return e
 }
 
@@ -45,7 +56,7 @@ func TestSummaryReviewHistoryAndRevocationGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, r := reviewDraftFixture(t, s)
-	e := reviewedStart(a, r, "continuation")
+	e := reviewedStart(t, s, a, r, "continuation")
 	if err := s.Append(ctx, 0, e); err == nil {
 		t.Fatal("unreviewed draft admitted")
 	}
@@ -55,7 +66,7 @@ func TestSummaryReviewHistoryAndRevocationGate(t *testing.T) {
 	if err := s.RecordSummaryReview(ctx, r); err != nil {
 		t.Fatal("review retry", err)
 	}
-	forged := reviewedStart(a, r, "forged")
+	forged := reviewedStart(t, s, a, r, "forged")
 	forged.Data.Compaction.BeforeContextTokens++
 	if err := s.Append(ctx, 0, forged); err == nil {
 		t.Fatal("different checkpoint admitted")
@@ -74,7 +85,7 @@ func TestSummaryReviewHistoryAndRevocationGate(t *testing.T) {
 	if err := s.Append(ctx, 0, e); err != nil {
 		t.Fatal("durable start retry after revocation", err)
 	}
-	if err := s.Append(ctx, 0, reviewedStart(a, r, "revoked")); err == nil {
+	if err := s.Append(ctx, 0, reviewedStart(t, s, a, r, "revoked")); err == nil {
 		t.Fatal("revoked review admitted")
 	}
 	var n int
@@ -137,7 +148,7 @@ func TestValidatedSummaryReviewMustBindStoredDraft(t *testing.T) {
 	if err := s.RecordSummaryReview(ctx, base); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Append(ctx, 0, reviewedStart(a, base, "validated-continuation")); err != nil {
+	if err := s.Append(ctx, 0, reviewedStart(t, s, a, base, "validated-continuation")); err != nil {
 		t.Fatal("bound validation did not authorize continuation", err)
 	}
 }

@@ -78,6 +78,7 @@ type RunRequest struct {
 	// replacement. Unlike the legacy ApprovedCompaction path, activation must
 	// atomically persist both the ContextCompacted event and lifecycle evidence.
 	CompactionPlan *ContextCompactionPlan
+	ContextLineage *ContextLineage
 	Validation     string
 	RetryOfTaskID  string
 	// ConfigID is the trusted host's digest of the effective, redacted runtime
@@ -154,6 +155,16 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
 	}
+	var contextLineage *ContextLineage
+	if r.ContextLineage != nil {
+		if r.ContextLineage.Validate() != nil {
+			return Result{}, ErrInvalidRun
+		}
+		body, lineageErr := json.Marshal(r.ContextLineage)
+		if lineageErr != nil || json.Unmarshal(body, &contextLineage) != nil {
+			return Result{}, ErrInvalidRun
+		}
+	}
 	if r.ApprovedCompaction != nil && (r.Compaction != nil || r.CompactionPlan != nil || r.MaxContextTokens < 1 || r.ApprovedCompaction.validate(r.ParentTaskID, r.Inference.Messages) != nil) {
 		return Result{}, ErrInvalidRun
 	}
@@ -196,6 +207,12 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	var inference providers.Request
 	if json.Unmarshal(b, &inference) != nil {
 		return Result{}, ErrInvalidRun
+	}
+	if compaction != nil && (compaction.Version >= 2 || contextLineage != nil) {
+		contextLineage, err = ExtendContextLineage(contextLineage, r.TaskID, 1, compaction, inference.Messages)
+		if err != nil {
+			return Result{}, ErrInvalidRun
+		}
 	}
 	// A nil RawMessage round-trips through JSON as the literal bytes "null".
 	// Preserve absence so adapters do not interpret it as a requested schema.
@@ -267,7 +284,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		cost := *r.RouteEstimatedCost
 		routeEstimatedCost = &cost
 	}
-	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, IntentClassification: intentClassification, SubmissionID: r.SubmissionID, Compaction: compaction, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile, Capabilities: capabilities}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, IntentClassification: intentClassification, SubmissionID: r.SubmissionID, Compaction: compaction, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile, Capabilities: capabilities}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}
@@ -347,6 +364,17 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		return result, err
 	}
+	seen := map[string]bool{}
+	if contextLineage != nil {
+		for _, id := range contextLineage.ToolCallIDs {
+			seen[id] = true
+		}
+	}
+	for _, message := range inference.Messages {
+		for _, call := range message.ToolCalls {
+			seen[call.ID] = true
+		}
+	}
 	// fitForDispatch may shorten only the frozen initial prefix. The additional
 	// messages argument represents prospective, not-yet-durable steering and is
 	// never installed until its own event commits. Live task messages are always
@@ -387,8 +415,22 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if compactEstimate > r.MaxContextTokens || compactEstimate >= estimate {
 			return base, prospective, ErrContextOverflow
 		}
-		if persistErr := persistWithPlan(ctx, ContextCompacted, Data{Compaction: pendingCompaction.Compaction, ParentTaskID: r.ParentTaskID, Messages: pendingCompaction.ReplacementPrefix, ReplacedMessages: len(pendingCompaction.OriginalPrefix)}, pendingCompactionPlan); persistErr != nil {
+		nextLineage := contextLineage
+		if pendingCompaction.Compaction.Version >= 2 || contextLineage != nil {
+			var lineageErr error
+			nextLineage, lineageErr = ExtendContextLineage(contextLineage, r.TaskID, seq+1, pendingCompaction.Compaction, base.Messages)
+			if lineageErr != nil {
+				return base, prospective, ErrProtocol
+			}
+		}
+		if persistErr := persistWithPlan(ctx, ContextCompacted, Data{Compaction: pendingCompaction.Compaction, ContextLineage: nextLineage, ParentTaskID: r.ParentTaskID, Messages: pendingCompaction.ReplacementPrefix, ReplacedMessages: len(pendingCompaction.OriginalPrefix)}, pendingCompactionPlan); persistErr != nil {
 			return base, prospective, persistErr
+		}
+		contextLineage = nextLineage
+		if contextLineage != nil {
+			for _, id := range contextLineage.ToolCallIDs {
+				seen[id] = true
+			}
 		}
 		compactionActivated = true
 		if ctx.Err() != nil {
@@ -471,7 +513,6 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	usageComplete := true
 	totalUsage := providers.Usage{}
 	outputTokenBudget := inference.MaxOutputTokens
-	seen := map[string]bool{}
 	for n := 0; n < r.MaxTurns; n++ {
 		if ctx.Err() != nil {
 			return fail(ctx.Err())

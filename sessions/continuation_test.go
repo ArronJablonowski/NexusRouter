@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
 func continuationSnapshot() Snapshot {
@@ -34,7 +35,7 @@ func TestPrepareContinuationPreservesRulesPairsAndAttribution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record == nil || record.Version != 1 || record.SourceTaskID != source.TaskID || record.SourceSequence != source.Sequence || record.SourceDigest != hex.EncodeToString(wantDigest[:]) || record.RemovedMessages != 1 {
+	if record == nil || record.Version != 2 || record.SourceTaskID != source.TaskID || record.SourceSequence != source.Sequence || record.SourceDigest != hex.EncodeToString(wantDigest[:]) || record.SourceStateDigest == "" || record.RemovedMessages != 1 {
 		t.Fatalf("incorrect attribution: %+v", record)
 	}
 	if !reflect.DeepEqual(record.Summary, request.Summary) {
@@ -61,6 +62,28 @@ func TestPrepareContinuationPreservesRulesPairsAndAttribution(t *testing.T) {
 	after, _ := json.Marshal(source)
 	if string(before) != string(after) {
 		t.Fatal("source history mutated")
+	}
+}
+
+func TestPrepareContinuationCarriesLegacyToolCallIdentityDomain(t *testing.T) {
+	call := providers.ToolCall{ID: " call with surrounding space ", Name: "lookup", Arguments: json.RawMessage(`{}`)}
+	source := Snapshot{TaskID: "legacy-source", SessionID: "session", State: "completed", Sequence: 4, Messages: []providers.Message{
+		{Role: "assistant", ToolCalls: []providers.ToolCall{call}},
+		{Role: "tool", ToolCallID: call.ID, Content: "legacy result"},
+		{Role: "user", Content: "new question"},
+		{Role: "assistant", Content: "new answer"},
+	}}
+	_, checkpoint, err := PrepareContinuation(source, CompactionRequest{Keep: 1, Summary: Summary{Decisions: []string{"retain"}}})
+	if err != nil || checkpoint.Version != 2 || !reflect.DeepEqual(checkpoint.SourceToolCallIDs, []string{call.ID}) {
+		t.Fatal("previously valid tool identity was not carried into v2", checkpoint, err)
+	}
+}
+
+func TestPrepareContinuationRejectsMalformedLineageWithoutPanic(t *testing.T) {
+	source := continuationSnapshot()
+	source.ContextLineage = &runtime.ContextLineage{Version: runtime.ContextLineageVersion}
+	if _, _, err := PrepareContinuation(source, CompactionRequest{Keep: 1, Summary: Summary{Decisions: []string{"retain"}}}); err == nil {
+		t.Fatal("malformed lineage was accepted")
 	}
 }
 

@@ -106,6 +106,50 @@ func TestDurableToolLoop(t *testing.T) {
 	}
 }
 
+func TestLoopRejectsInheritedToolCallIdentityBeforeExecution(t *testing.T) {
+	checkpoint := compactionFixture()
+	checkpoint.Version = 2
+	checkpoint.SourceStateDigest = strings.Repeat("c", 64)
+	checkpoint.SourceToolCallIDs = []string{"retired-call"}
+	lineage, err := runtime.ExtendContextLineage(nil, "prior-task", 1, checkpoint, []providers.Message{{Role: "user", Content: "prior"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := runRequest()
+	request.ContextLineage = lineage
+	request.ParentTaskID = "prior-task"
+	events := []runtime.Event{}
+	executions := 0
+	loop := runtime.Loop{
+		Journal: journal(func(_ context.Context, _ int64, event runtime.Event) error {
+			events = append(events, event)
+			return nil
+		}),
+		Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "retired-call", Name: "lookup", Arguments: json.RawMessage(`{}`)}}); err != nil {
+				return err
+			}
+			return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+		}),
+		Tools: executor(func(context.Context, providers.ToolCall) (runtime.ToolResult, error) {
+			executions++
+			return runtime.ToolResult{Content: "must not run", Effect: runtime.NoEffect}, nil
+		}),
+	}
+	result, err := loop.Run(context.Background(), request)
+	if err == nil || result.Text != "" || executions != 0 {
+		t.Fatal("retired identity reached execution", result, executions, err)
+	}
+	for _, event := range events {
+		if event.Kind == runtime.ToolStarted || event.Kind == runtime.ToolCompleted {
+			t.Fatal("retired identity reached durable tool dispatch", event.Kind)
+		}
+	}
+	if len(events) == 0 || events[len(events)-1].Kind != runtime.TaskFailed {
+		t.Fatal("identity rejection was not terminalized", events)
+	}
+}
+
 func TestLoopFreezesIntentClassificationOnTaskStartedBeforeRoute(t *testing.T) {
 	var events []runtime.Event
 	use := &runtime.IntentClassificationUse{

@@ -8118,5 +8118,46 @@ descriptor drift, and legacy compatibility. The complete non-race runtime,
 telemetry, and application packages also pass. The repository-wide `make check`
 then passed formatting/LOC, vet, the complete race-enabled suite, and build;
 application completed in 2,132.801 seconds, telemetry in 2,220.471 seconds,
-release packaging in 866.000 seconds, and the runtime in 128.363 seconds. A
-GitHub checkpoint remains required before closing DAR-120.
+release packaging in 866.000 seconds, and the runtime in 128.363 seconds.
+GitHub `origin/main` was verified at
+`bf1eacc94922a57bca1596d2ced1faa4841bb0d0`, and Linear DAR-120 was closed.
+
+## 2026-09-15 — DAR-123 multi-epoch compaction replay checkpoint
+
+Version-two context checkpoints now carry a bounded, ordered lineage of every
+activated compaction epoch. Each epoch binds its immediate durable source state,
+the inherited lineage digest, and the complete sorted set of tool-call
+identities, including calls removed from visible provider context. Ordinary
+continuations preserve that authority across task boundaries, and a later
+compaction extends only the exact prior lineage plus the current live suffix.
+
+Runtime and session replay preserve version-one checkpoint compatibility while
+new checkpoints use version two. Replay rejects malformed, stale, forked,
+reordered, downgraded, or identity-losing lineage and never separates tool calls
+from results. Application, HTTP, and Go SDK integration exercise two activated
+epochs, restart inspection, summary-envelope replacement, retired tool-ID
+rejection, and context-engine descriptor drift after rollover.
+
+SQLite schema 51 adds an immutable normalized lineage companion committed in the
+same writer transaction as its runtime event. Reopen validates both event-table
+directions, normalized columns against canonical bodies, exact predecessor and
+source snapshots, and the separate schema-50 compaction activation fact. The
+migration is additive and leaves pre-lineage version-one history unchanged.
+
+Independent review found and closed lineage-downgrade paths, cross-session and
+cross-privacy forks, malformed lineage panic/replay cases, recovered-failure
+continuation compatibility, and a live dispatch gap that could otherwise reuse
+a retired tool identity before replay detected it. Generated tests cover two to
+ten epochs, and focused restart, corruption, application, API, SDK, release
+documentation, and legacy-compatibility suites pass.
+
+The first repository-wide race gate failed closed on a stale schema-50 literal
+in the hosted release workflow and one timing-sensitive browser approval test.
+The workflow now requires schema 51; its exact authority test passed, and the
+unchanged browser test passed three consecutive isolated race-enabled reruns.
+The subsequent complete `umask 077; make check` passed formatting/LOC, vet,
+every race-enabled package, and `go build ./...`. Notable uncached package times
+were telemetry 2,242.261 seconds, application 2,195.906 seconds, releasepack
+858.794 seconds, SDK 259.821 seconds, CLI 177.005 seconds, runtime 130.128
+seconds, toolgate 105.021 seconds, API 96.845 seconds, and workers 41.638
+seconds. A GitHub checkpoint and Linear closure remain pending.

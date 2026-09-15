@@ -52,6 +52,10 @@ func TestSteeringReplayProvenanceCompactionAndContinuation(t *testing.T) {
 	continued[0].Data.Compaction = checkpoint
 	// New task attribution must match the compaction checkpoint source.
 	continued[0].TaskID, continued[0].SessionID, continued[0].CorrelationID = "next", "next", "next"
+	continued[0].Data.ContextLineage, err = runtime.ExtendContextLineage(nil, "next", 1, checkpoint, s.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
 	got, err := Replay(context.Background(), continued, "next")
 	if err != nil || !reflect.DeepEqual(got.Messages, messages) {
 		t.Fatal(got, err)

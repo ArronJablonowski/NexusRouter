@@ -44,6 +44,22 @@ func TestCompactionMetadataValidation(t *testing.T) {
 	}
 }
 
+func TestVersionTwoCompactionRequiresLineageEvent(t *testing.T) {
+	checkpoint := compactionFixture()
+	checkpoint.Version = 2
+	checkpoint.SourceStateDigest = strings.Repeat("a", 64)
+	for _, kind := range []runtime.Kind{runtime.TaskStarted, runtime.ContextCompacted} {
+		event := runtime.Event{Version: 1, ID: "event", TaskID: "task", SessionID: "session", CorrelationID: "task", Sequence: 1, Time: time.Now().UTC(), Kind: kind,
+			Data: runtime.Data{ParentTaskID: "parent", Compaction: checkpoint, Messages: []providers.Message{{Role: "user", Content: "replacement"}}, ReplacedMessages: 1}}
+		if kind == runtime.TaskStarted {
+			event.Data.ReplacedMessages = 0
+		}
+		if event.Validate() == nil {
+			t.Fatalf("%s accepted version-two compaction without lineage", kind)
+		}
+	}
+}
+
 func TestCompactionPersistedBeforeProviderAndDetached(t *testing.T) {
 	s, _ := store(t)
 	r := runRequest()
