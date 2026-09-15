@@ -470,7 +470,18 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				}
 				used += len(c.Text)
 				if c.ToolCall != nil {
-					used += len(c.ToolCall.Arguments) + len(c.ToolCall.Name) + len(c.ToolCall.ID)
+					call := *c.ToolCall
+					arguments, canonicalErr := canonicalToolArguments(call.Arguments)
+					if call.ID == "" || call.Name == "" || seen[call.ID] || len(calls) >= 128 || canonicalErr != nil {
+						return ErrProtocol
+					}
+					seen[call.ID] = true
+					// Persist and execute one canonical byte representation. Durable
+					// approval digests can then be re-derived after restart without
+					// depending on provider whitespace or object-member ordering.
+					call.Arguments = arguments
+					used += len(call.Arguments) + len(call.Name) + len(call.ID)
+					calls = append(calls, call)
 				}
 				if used > r.MaxOutputBytes {
 					return ErrLimit
@@ -484,19 +495,6 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}
-				}
-				if c.ToolCall != nil {
-					call := *c.ToolCall
-					arguments, canonicalErr := canonicalToolArguments(call.Arguments)
-					if call.ID == "" || call.Name == "" || seen[call.ID] || len(calls) >= 128 || canonicalErr != nil {
-						return ErrProtocol
-					}
-					seen[call.ID] = true
-					// Persist and execute one canonical byte representation. Durable
-					// approval digests can then be re-derived after restart without
-					// depending on provider whitespace or object-member ordering.
-					call.Arguments = arguments
-					calls = append(calls, call)
 				}
 				if c.Usage != nil {
 					if c.Usage.InputTokens < 0 || c.Usage.OutputTokens < 0 {
