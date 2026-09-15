@@ -14,6 +14,21 @@ the SDK exposes the same lifecycle without starting an HTTP server. This adds
 configuration/lifecycle integration, not a generic proof that generated workflows
 are safe, useful or correct.
 
+## Publication provenance boundary
+
+Future production validators must begin from the exact generated-version
+publication binding exposed by `skills.PublicationStore`. The read-only lookup
+checks the receipt, catalog metadata and immutable version body together and
+returns the owning generation-attempt ID plus the canonical attempt digest.
+Missing receipts on manual, legacy or unpublished versions fail closed, and the
+lookup performs no repair, validation callback, activation or other write.
+
+That binding is necessary but not sufficient validation evidence. It does not
+read the telemetry database, authenticate source events, prove workflow quality
+or treat model-authored validation cases as trusted. A host validator must still
+reconstruct and verify the durable workflow evidence before it can make any
+activation decision. The stock binary therefore remains draft-only.
+
 ## Explicit selection
 
 These optional fields supplement an already valid learning/model/budget setup:

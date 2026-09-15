@@ -3,8 +3,6 @@ package skills
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"time"
 )
@@ -27,13 +25,15 @@ func (s *FileStore) PublishGeneration(ctx context.Context, a GenerationAttempt, 
 	if s.readOnly || (automatic && !s.automatic.Load()) {
 		return Version{}, ErrDisabled
 	}
+	attemptDigest, err := GenerationAttemptDigest(a)
+	if err != nil {
+		return Version{}, err
+	}
 	a.StartedAt, a.FinishedAt = a.StartedAt.UTC(), a.FinishedAt.UTC()
 	body, err := json.Marshal(a)
 	if err != nil || len(body) > maxFile {
 		return Version{}, ErrInvalid
 	}
-	hash := sha256.Sum256(body)
-	attemptDigest := hex.EncodeToString(hash[:])
 	// Own all slices before entering the critical section. Caller mutation is not
 	// permitted during this snapshot, but cannot affect the subsequent commit.
 	var owned GenerationAttempt

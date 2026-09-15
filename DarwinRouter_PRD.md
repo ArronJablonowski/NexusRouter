@@ -954,6 +954,22 @@ stale sources and incompatible policy require visible operator attention rather
 than silent reset. Provide read-only persisted state inspection even when
 scheduling is disabled, metadata-only health and cancellation/join on shutdown.
 
+Generated-version inspection begins with an exact, read-only publication-binding
+lookup. Given a permitted skill key and immutable version ID, the store returns
+the unique generation-attempt ID and canonical attempt digest only after the
+catalog receipt, catalog metadata and stored version body pass structural and
+integrity validation. Manual, legacy and unpublished versions have no such
+binding and fail closed. The lookup creates, repairs, activates and rewrites
+nothing, and its canonical digest implementation is shared with publication so
+the read and write paths cannot drift.
+
+This receipt is a consistency seam, not a production validation result or
+tamper-proof attestation. It does not load telemetry, authenticate source events,
+reconstruct workflow selection, invoke a validator or authorize activation;
+candidate-authored validation cases remain untrusted. Coherent observed-tool
+provenance validation, protected daemon/SDK validator wiring and activation-bound
+outcome supervision remain separate required increments.
+
 ## 10. Sessions, Context, and Memory
 
 ### 10.1 Durable Sessions

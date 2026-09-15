@@ -7823,3 +7823,25 @@ binary provenance, verifier-host evidence and independent receipt retention
 remain operator responsibilities; the evidence is not hardware provenance,
 workflow attestation, vulnerability scanning, legal approval or publication
 authority.
+
+## 2026-09-14 — DAR-116 immutable publication receipt lookup
+
+The skills store now exposes an optional `PublicationStore` extension for exact,
+read-only lookup of the generation receipt owning a permitted immutable skill
+version. The returned value binds the skill key/version to the generation-attempt
+ID and canonical attempt digest. Lookup validates the catalog, receipt, metadata
+and complete stored version without creating, repairing, activating or rewriting
+files. Publication and lookup share `GenerationAttemptDigest`, preventing digest
+serialization drift while preserving existing receipts.
+
+Focused coverage includes exact retry, read-only restart, cancellation, nil and
+mismatched inputs, handwritten/unpublished versions, corrupt receipts, duplicate
+bindings, missing or altered bodies, invalid version structure, metadata mismatch,
+canonical timestamps and unchanged store bytes after reads and rejections.
+
+This increment establishes publication consistency only. It does not read the
+SQLite attempt or workflow-selection records, authenticate underlying tool events,
+prove semantic success, invoke a trusted validator or authorize activation.
+Candidate-authored validation cases remain untrusted, and the stock daemon remains
+draft-only. DAR-117 through DAR-119 retain those production-validation and
+outcome-supervision responsibilities.

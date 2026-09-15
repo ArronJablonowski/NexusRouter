@@ -22,10 +22,7 @@ func validatePublications(c *catalog) error {
 	}
 	versions := map[string]bool{}
 	for id, p := range c.Publications {
-		if !identifier.MatchString(id) || !p.Key.valid() || !versionID(p.Version) || len(p.AttemptDigest) != 64 || strings.ToLower(p.AttemptDigest) != p.AttemptDigest {
-			return ErrInvalid
-		}
-		if _, err := hex.DecodeString(p.AttemptDigest); err != nil {
+		if !identifier.MatchString(id) || !p.Key.valid() || !versionID(p.Version) || !validHexDigest(p.AttemptDigest) {
 			return ErrInvalid
 		}
 		if versions[p.Version] {
@@ -48,4 +45,12 @@ func validatePublications(c *catalog) error {
 		}
 	}
 	return nil
+}
+
+func validHexDigest(value string) bool {
+	if len(value) != 64 || strings.ToLower(value) != value {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
