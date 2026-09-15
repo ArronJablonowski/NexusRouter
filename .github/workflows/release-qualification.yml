@@ -24,7 +24,7 @@ permissions:
 jobs:
   qualify:
     name: Qualify ${{ matrix.target }}
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       # Use only the setup-go toolchain and repository module/workspace state.
       CGO_ENABLED: "0"

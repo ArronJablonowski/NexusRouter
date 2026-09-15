@@ -300,9 +300,15 @@ func (s *Service) RunSubmission(ctx context.Context, key string, r Request) (sub
 			return status, ctx.Err()
 		case <-ticker.C:
 		}
-		status, err = db.Submission(ctx, status.ID)
-		if err != nil || status.State != "queued" && status.State != "running" {
-			return status, submissionError(err)
+		next, readErr := db.Submission(ctx, status.ID)
+		if readErr != nil {
+			// Preserve the last durable status when cancellation races the poll.
+			// Callers use it to resume or inspect the detached submission.
+			return status, submissionError(readErr)
+		}
+		status = next
+		if status.State != "queued" && status.State != "running" {
+			return status, nil
 		}
 	}
 }

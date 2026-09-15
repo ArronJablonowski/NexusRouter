@@ -395,7 +395,7 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	// The release qualification test itself has a 45-minute ceiling. Preserve
 	// that meaningful gate instead of inheriting the short metadata-command
 	// timeout, while still bounding hung build processes and captured output.
-	gateCtx, cancel := context.WithTimeout(ctx, 50*time.Minute)
+	gateCtx, cancel := context.WithTimeout(ctx, nativeGateTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(gateCtx, "make", target)
 	cmd.WaitDelay = 2 * time.Second
@@ -414,6 +414,8 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	}
 	return nil
 }
+
+const nativeGateTimeout = 60 * time.Minute
 
 type boundedNativeGateLog struct {
 	destination io.Writer

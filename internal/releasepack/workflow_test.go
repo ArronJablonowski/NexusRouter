@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"go.yaml.in/yaml/v3"
@@ -85,9 +86,21 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		{"linux/amd64", "ubuntu-24.04", "linux", "amd64"},
 		{"linux/arm64", "ubuntu-24.04-arm", "linux", "arm64"},
 	}
-	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 90 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
+	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 180 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
 		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 9 {
 		t.Fatal("unexpected job structure")
+	}
+	makefile, err := os.ReadFile("../../Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(makefile), `go test -race -timeout=35m ./...`) != 2 ||
+		strings.Count(string(makefile), `go test -count=1 -timeout=45m -run '^TestReleaseQualification$$'`) != 1 ||
+		nativeGateTimeout != 60*time.Minute ||
+		nativeGateTimeout < 35*time.Minute+20*time.Minute ||
+		nativeGateTimeout < 45*time.Minute+10*time.Minute ||
+		time.Duration(job.Timeout)*time.Minute <= 2*nativeGateTimeout+45*time.Minute {
+		t.Fatal("release timeout hierarchy has insufficient headroom")
 	}
 	for i, expected := range expectedMatrix {
 		got := job.Strategy.Matrix.Include[i]

@@ -150,12 +150,15 @@ func workflowSourceRawBodies(t *testing.T, s *Store) []string {
 }
 
 func TestSkillWorkflowSourcesRejectsUnqualifiedInputs(t *testing.T) {
+	s, _ := generationStore(t)
 	for _, mode := range []string{"noevaluation", "judgeonly", "objectivefailure", "failed", "canceled", "duplicate_tasks", "duplicate_sessions", "mixed_domain", "wrong_model", "wrong_attempt"} {
 		t.Run(mode, func(t *testing.T) {
-			s, _ := generationStore(t)
 			ctx := context.Background()
-			workflowSourceFixture(t, s, "task-a", "session-a", "creative", runtime.TaskCompleted, evaluation.Deterministic, true, true)
-			session, domain := "session-b", "creative"
+			prefix := mode + "-"
+			taskA, taskB := prefix+"task-a", prefix+"task-b"
+			sessionA := prefix + "session-a"
+			workflowSourceFixture(t, s, taskA, sessionA, "creative", runtime.TaskCompleted, evaluation.Deterministic, true, true)
+			session, domain := prefix+"session-b", "creative"
 			terminal := runtime.TaskCompleted
 			source := evaluation.UserFeedback
 			passed, record := true, true
@@ -172,11 +175,11 @@ func TestSkillWorkflowSourcesRejectsUnqualifiedInputs(t *testing.T) {
 			case "canceled":
 				terminal = runtime.TaskCanceled
 			case "duplicate_sessions":
-				session = "session-a"
+				session = sessionA
 			case "mixed_domain":
 				domain = "code"
 			}
-			b := workflowSourceFixture(t, s, "task-b", session, domain, terminal, source, passed, record)
+			b := workflowSourceFixture(t, s, taskB, session, domain, terminal, source, passed, record)
 			if mode == "wrong_model" || mode == "wrong_attempt" {
 				column := "model"
 				value := "different"
@@ -194,13 +197,19 @@ func TestSkillWorkflowSourcesRejectsUnqualifiedInputs(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			tasks := []string{"task-a", "task-b"}
+			tasks := []string{taskA, taskB}
 			if mode == "duplicate_tasks" {
-				tasks[1] = "task-a"
+				tasks[1] = taskA
 			}
 			got, err := s.SkillWorkflowSources(ctx, tasks)
 			if err == nil || len(got) != 0 {
 				t.Fatal("unqualified source admitted", mode, got, err)
+			}
+			controlA := workflowSourceFixture(t, s, prefix+"control-a", prefix+"control-session-a", "creative", runtime.TaskCompleted, evaluation.Deterministic, true, true)
+			controlB := workflowSourceFixture(t, s, prefix+"control-b", prefix+"control-session-b", "creative", runtime.TaskCompleted, evaluation.UserFeedback, true, true)
+			qualified, err := s.SkillWorkflowSources(ctx, []string{controlA.TaskID, controlB.TaskID})
+			if err != nil || len(qualified) != 2 || qualified[0].Example.TaskID != controlA.TaskID || qualified[1].Example.TaskID != controlB.TaskID {
+				t.Fatal("unrelated qualified sources were contaminated", mode, qualified, err)
 			}
 		})
 	}

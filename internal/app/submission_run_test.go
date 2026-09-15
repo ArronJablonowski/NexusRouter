@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -116,6 +117,8 @@ func TestRunSubmissionCallerCancellationStopsOnlyWait(t *testing.T) {
 	dispatchCtx, stopDispatcher := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stopDispatcher()
 	started, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	releaseProvider := func() { releaseOnce.Do(func() { close(release) }) }
 	s, provider := runSubmissionService(t, func(w http.ResponseWriter, r *http.Request) {
 		close(started)
 		select {
@@ -130,6 +133,7 @@ func TestRunSubmissionCallerCancellationStopsOnlyWait(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
+	defer releaseProvider()
 
 	waitCtx, cancelWait := context.WithCancel(context.Background())
 	type outcome struct {
@@ -157,7 +161,7 @@ func TestRunSubmissionCallerCancellationStopsOnlyWait(t *testing.T) {
 	case <-dispatchCtx.Done():
 		t.Fatal("canceled waiter did not return")
 	}
-	close(release)
+	releaseProvider()
 	terminal := awaitSubmission(t, dispatchCtx, s, interrupted.ID, "succeeded")
 	if terminal.CancelRequested || terminal.Result == nil || terminal.Result.Text != "survived waiter cancellation" {
 		t.Fatal(terminal)

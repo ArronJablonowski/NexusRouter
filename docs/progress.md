@@ -1,5 +1,41 @@
 # Implementation evidence
 
+## 2026-09-14 — DAR-114 qualification timeout and cancellation correction
+
+RC17 failed closed during its Darwin/arm64 `make check` gate before native or
+install evidence was written. The race-enabled telemetry package exhausted the
+old 25-minute package ceiling while repeatedly initializing full migrated test
+stores. The attempt transcript is quarantined outside the repository with
+SHA-256 `b0a859b356c9f2a0d84f44a60cc7c0d08df5a16f93c6b33e9b8f44b9bd6b7882`;
+the campaign receives no native qualification credit and none of its candidate,
+notes, or license records may be reused by a later release candidate.
+
+The affected telemetry rejection matrix now shares one migrated store while
+using unique task and session identities. Every negative case also proves that
+an unrelated qualified pair remains admissible, preserving isolation and
+detecting global contamination. The package timeout is now 35 minutes, each
+canonical native gate is 60 minutes, and the hosted qualification job is 180
+minutes; release workflow tests enforce minimum nested headroom. These changes
+bound every layer without weakening a release gate.
+
+The first full rerun exposed a separate application cancellation race:
+`RunSubmission` could overwrite its last durable queued/running status when a
+canceled context raced an SQLite poll. It now assigns a new status only after a
+successful read, so caller cancellation stops only the wait and retains the
+identifier needed to inspect the detached task. The regression server release
+is idempotent and deferred ahead of dispatcher and HTTP-server teardown, so a
+future assertion cannot strand an active connection. The focused race test
+passed 100 repetitions, and the broader submission/dispatcher set passed.
+
+After both corrections, a complete `umask 077; make check` passed source
+formatting and the 1,000-line limit, `go vet ./...`, every race-enabled package,
+and `go build ./...`. Notable uncached package times were application 1409.455s,
+releasepack 1497.066s, telemetry 1493.942s, SDK 163.361s, CLI 127.646s,
+toolgate 70.741s, and workers 25.588s. This is corrective source evidence only;
+it grants no target, collateral, legal, signing, tag, upload, publication, or
+native qualification approval. A fresh campaign must start from the exact new
+clean pushed commit.
+
 ## 2026-09-14 — DAR-47 candidate-bound final release notes
 
 Candidate schema 3 now binds both the immutable release-notes source template
