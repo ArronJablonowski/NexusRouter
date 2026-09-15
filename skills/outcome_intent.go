@@ -42,8 +42,15 @@ func validateOutcomeIntents(c *catalog) error {
 		return ErrInvalid
 	}
 	seen := map[string]string{}
+	for id, settlement := range c.OutcomeSettlements {
+		seen[settlement.Expected.Key.index()+":"+settlement.Expected.Revision] = id
+	}
 	for id, r := range c.OutcomeOperations {
-		seen[r.Expected.Key.index()+":"+r.Expected.Revision] = id
+		key := r.Expected.Key.index() + ":" + r.Expected.Revision
+		if prior := seen[key]; prior != "" && prior != id {
+			return ErrInvalid
+		}
+		seen[key] = id
 		if r.IntentID != "" {
 			i, ok := c.OutcomeIntents[r.IntentID]
 			if !ok || !outcomeIntentReceiptMatches(i, r) {
@@ -95,6 +102,9 @@ func lookupOutcomeIntent(c *catalog, key Key, id string) (OutcomeRollbackIntent,
 }
 
 func matchingOutcomeIntent(c *catalog, id, model string, expected ActivationState, policy ComparisonSelectionPolicy) (OutcomeRollbackIntent, error) {
+	if _, settled := c.OutcomeSettlements[id]; settled {
+		return OutcomeRollbackIntent{}, ErrConflict
+	}
 	i, err := lookupOutcomeIntent(c, expected.Key, id)
 	if err == nil {
 		if i.Expected != expected || i.Policy != policy || i.ConfiguredModelID != model {
@@ -116,6 +126,11 @@ func matchingOutcomeIntent(c *catalog, id, model string, expected ActivationStat
 			}
 		}
 	}
+	for _, prior := range c.OutcomeSettlements {
+		if prior.Expected.Key == expected.Key && prior.Expected.Revision == expected.Revision {
+			return OutcomeRollbackIntent{}, ErrConflict
+		}
+	}
 	return OutcomeRollbackIntent{}, ErrNotFound
 }
 
@@ -123,6 +138,14 @@ func matchingOutcomeIntent(c *catalog, id, model string, expected ActivationStat
 // different key must not free the original revision. Ordinary catalog reads
 // remain structural, and exact receipt/intent lookup verifies only that record.
 func validateOutcomeAdmission(ctx context.Context, c *catalog) error {
+	for id, settlement := range c.OutcomeSettlements {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, err := lookupOutcomeSettlement(c, settlement.Expected.Key, id); err != nil {
+			return err
+		}
+	}
 	for id, checkpoint := range c.OutcomeSelections {
 		if err := ctx.Err(); err != nil {
 			return err

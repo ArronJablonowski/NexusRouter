@@ -331,6 +331,9 @@ func (s *FileStore) outcomeRollbackOnce(ctx context.Context, id, configuredModel
 }
 
 func matchingOutcomeOperation(c *catalog, id string, expected ActivationState, policy ComparisonSelectionPolicy) (OutcomeRollbackReceipt, error) {
+	if _, settled := c.OutcomeSettlements[id]; settled {
+		return OutcomeRollbackReceipt{}, ErrConflict
+	}
 	r, err := lookupOutcomeOperation(c, expected.Key, id)
 	if err == nil {
 		if r.Expected != expected || r.Policy != policy {
@@ -350,6 +353,11 @@ func matchingOutcomeOperation(c *catalog, id string, expected ActivationState, p
 			if verified.Expected.Revision == expected.Revision {
 				return OutcomeRollbackReceipt{}, ErrConflict
 			}
+		}
+	}
+	for _, prior := range c.OutcomeSettlements {
+		if prior.Expected.Key == expected.Key && prior.Expected.Revision == expected.Revision {
+			return OutcomeRollbackReceipt{}, ErrConflict
 		}
 	}
 	return OutcomeRollbackReceipt{}, ErrNotFound

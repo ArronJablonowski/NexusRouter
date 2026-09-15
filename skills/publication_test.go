@@ -164,7 +164,7 @@ func TestPublishGenerationRejectsCorruptReceiptWithoutRepair(t *testing.T) {
 			case "legacy-schema":
 				c.Schema = 1
 			case "future-schema":
-				c.Schema = 9
+				c.Schema = 11
 			case "duplicate-version":
 				c.Publications["other-generation"] = receipt
 			case "digest":
