@@ -90,6 +90,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot prepare skill learning supervisor")
 		return 1
 	}
+	outcomeSupervisionPlan, err := app.PrepareConfiguredOutcomeSupervision(service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot prepare outcome supervision")
+		return 1
+	}
 	// Binding is the single-instance gate. Do not migrate or dispatch against
 	// storage if another process already owns this endpoint.
 	listener, err := net.Listen("tcp", net.JoinHostPort(host, port))
@@ -142,6 +147,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	}
 	var dispatcher *app.Dispatcher
 	var learner *app.ConfiguredLearning
+	var outcomeSupervisor *app.ConfiguredOutcomeSupervision
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
 	var workboardScheduler *app.WorkboardScheduleSupervisor
@@ -155,6 +161,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return health.Report{}, err
 		}
 		report, err = withConfiguredLearningHealth(report, learner.Health())
+		if err != nil {
+			return health.Report{}, err
+		}
+		report, err = withConfiguredOutcomeSupervisionHealth(report, outcomeSupervisor.Health())
 		if err != nil {
 			return health.Report{}, err
 		}
@@ -276,7 +286,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health()) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler)) {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health()) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler)) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -363,7 +373,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return app.InspectLeaseAttentionHistory(ctx, s.Telemetry.Database, id, options)
 		},
 		Health: func(ctx context.Context) error {
-			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler) {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler) {
 				return errors.New("supervisor unavailable")
 			}
 			_, err := db.Read(ctx, "__health__", 0, 1)
@@ -398,6 +408,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer learner.Close()
+	outcomeSupervisor, err = outcomeSupervisionPlan.Start(ctx)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start outcome supervision")
+		return 1
+	}
+	defer outcomeSupervisor.Close()
 	dispatcher, err = app.StartDispatcher(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start task dispatcher")
@@ -451,6 +467,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	}
 	if err := learner.Close(); err != nil {
 		fmt.Fprintln(stderr, "skill learning supervisor requires inspection")
+		return 1
+	}
+	if err := outcomeSupervisor.Close(); err != nil {
+		fmt.Fprintln(stderr, "outcome supervision requires inspection")
 		return 1
 	}
 	if err := dispatcher.Close(); err != nil {

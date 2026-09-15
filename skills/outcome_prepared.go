@@ -24,6 +24,8 @@ func (s *FileStore) OutcomeRollbackPrepared(ctx context.Context, id, configuredM
 		(configuredModelID != "" && !identifier.MatchString(configuredModelID)) || expected.Validate() != nil ||
 		policy.Validate() != nil || policy.Comparison.Key != expected.Key || policy.Comparison.CandidateVersion != expected.Active ||
 		selection.Validate() != nil || selection.Policy != policy || selection.ConfiguredModelID != configuredModelID ||
+		selection.Comparison == nil || selection.Comparison.Baseline.Samples < policy.Comparison.MinSamples ||
+		selection.Comparison.Candidate.Samples < policy.Comparison.MinSamples ||
 		guard == nil || intentGuard == nil || selectionGuard == nil {
 		return out, ErrInvalid
 	}

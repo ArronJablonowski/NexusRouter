@@ -17,6 +17,27 @@ type OutcomeSupervisionMonitor struct {
 	monitor *app.OutcomeSupervisionMonitor
 }
 
+// ConfiguredOutcomeSupervision owns the configured supervisor lifecycle. A
+// disabled policy returns a valid disabled handle so hosts can compose health
+// and shutdown uniformly.
+type ConfiguredOutcomeSupervision struct {
+	supervisor *app.ConfiguredOutcomeSupervision
+}
+
+func (s *ConfiguredOutcomeSupervision) Close() error {
+	if s == nil || s.supervisor == nil {
+		return nil
+	}
+	return s.supervisor.Close()
+}
+
+func (s *ConfiguredOutcomeSupervision) Health() health.Check {
+	if s == nil || s.supervisor == nil {
+		return (*app.ConfiguredOutcomeSupervision)(nil).Health()
+	}
+	return s.supervisor.Health()
+}
+
 func (m *OutcomeSupervisionMonitor) Close() error {
 	if m == nil {
 		return nil
@@ -78,4 +99,21 @@ func (c *Client) StartOutcomeSupervision(ctx context.Context) (*OutcomeSupervisi
 		return nil, err
 	}
 	return &OutcomeSupervisionMonitor{monitor: monitor}, nil
+}
+
+// StartConfiguredOutcomeSupervision freezes configured policy, performs
+// read-only durable-store preflight, and starts supervision when enabled.
+func (c *Client) StartConfiguredOutcomeSupervision(ctx context.Context) (*ConfiguredOutcomeSupervision, error) {
+	if !c.valid(ctx) {
+		return nil, ErrAdmission
+	}
+	plan, err := app.PrepareConfiguredOutcomeSupervision(c.service)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	supervisor, err := plan.Start(ctx)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	return &ConfiguredOutcomeSupervision{supervisor: supervisor}, nil
 }

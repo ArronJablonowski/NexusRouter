@@ -85,3 +85,24 @@ func TestOutcomeRollbackPreparedGuardsBeforeAtomicPersistence(t *testing.T) {
 		})
 	}
 }
+
+func TestOutcomeRollbackPreparedRejectsInsufficientEvidenceBeforeClaim(t *testing.T) {
+	store, _, expected, report := outcomeRollbackFixture(t, true)
+	report.Comparison.Baseline.Samples = report.Policy.Comparison.MinSamples - 1
+	report.Comparison.Baseline.Accepted = report.Comparison.Baseline.Samples
+	report.Comparison.Excluded["unknown_quality"] = 1
+	setComparisonInterval(&report.Comparison.Baseline)
+	report.Comparison.Status = comparisonStatus(*report.Comparison)
+	if report.Validate() != nil {
+		t.Fatal("invalid insufficient fixture")
+	}
+	if _, err := store.OutcomeRollbackPrepared(context.Background(), "premature", "", expected, report.Policy, report,
+		func(context.Context, OutcomeRollbackReceipt) error { return nil },
+		func(context.Context, OutcomeRollbackIntent) error { return nil },
+		func(context.Context, OutcomeSelectionCheckpoint) error { return nil }); err == nil {
+		t.Fatal("insufficient evidence claimed")
+	}
+	if _, err := store.OutcomeRollbackIntent(context.Background(), expected.Key, "premature"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("insufficient evidence persisted intent", err)
+	}
+}

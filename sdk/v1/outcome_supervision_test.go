@@ -56,3 +56,23 @@ func TestSDKOutcomeSupervisionInspectionAndOwnedMonitor(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSDKConfiguredOutcomeSupervisionDisabledHandle(t *testing.T) {
+	client, err := sdk.New(sdk.ConfigOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := client.StartConfiguredOutcomeSupervision(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if check := supervisor.Health(); check.Validate() != nil || check.Status != "disabled" || check.Component != "outcome_supervision" {
+		t.Fatal(check)
+	}
+	if err = supervisor.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = (*sdk.ConfiguredOutcomeSupervision)(nil).Close(); err != nil {
+		t.Fatal(err)
+	}
+}
