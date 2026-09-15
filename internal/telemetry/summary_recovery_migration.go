@@ -50,7 +50,9 @@ func migrateSummaryAttemptRecoveries(ctx context.Context, conn *sql.Conn) error 
 }
 
 // A lowered user_version must not reinterpret durable schema-48 ownership.
-// Empty test/rehearsal remnants can be removed and rebuilt deterministically.
+// Empty test/rehearsal objects are removed early. The added process_id column
+// is intentionally removed later, after older future-object cleanup, because
+// ALTER TABLE makes SQLite reparse every remaining trigger in the database.
 func discardEmptyFutureSummaryAttemptRecoveries(ctx context.Context, conn *sql.Conn) error {
 	var processColumn, objects int
 	rows, err := conn.QueryContext(ctx, `PRAGMA table_info(summary_attempts)`)
@@ -111,9 +113,44 @@ func discardEmptyFutureSummaryAttemptRecoveries(ctx context.Context, conn *sql.C
 		DROP TRIGGER IF EXISTS summary_attempt_process_required;
 		DROP INDEX IF EXISTS summary_attempt_recoveries_task;
 		DROP TABLE IF EXISTS summary_attempt_recoveries;`)
-	if err == nil && processColumn == 1 {
-		_, err = conn.ExecContext(ctx, `ALTER TABLE summary_attempts DROP COLUMN process_id`)
+	return err
+}
+
+func discardFutureSummaryAttemptProcessColumn(ctx context.Context, conn *sql.Conn) error {
+	rows, err := conn.QueryContext(ctx, `PRAGMA table_info(summary_attempts)`)
+	if err != nil {
+		return err
 	}
+	processColumn := 0
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, kind string
+		var defaultValue any
+		if rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &pk) != nil {
+			rows.Close()
+			return errors.New("invalid summary attempts schema before schema 48")
+		}
+		if name == "process_id" {
+			processColumn++
+		}
+	}
+	if rows.Err() != nil || rows.Close() != nil {
+		return errors.New("invalid summary attempts schema before schema 48")
+	}
+	if processColumn == 0 {
+		return nil
+	}
+	if processColumn != 1 {
+		return errors.New("invalid summary process ownership before schema 48")
+	}
+	var authority int
+	if err = conn.QueryRowContext(ctx, `SELECT count(*) FROM summary_attempts WHERE process_id IS NOT NULL`).Scan(&authority); err != nil {
+		return err
+	}
+	if authority != 0 {
+		return errors.New("summary recovery authority exists before schema 48")
+	}
+	_, err = conn.ExecContext(ctx, `ALTER TABLE summary_attempts DROP COLUMN process_id`)
 	return err
 }
 

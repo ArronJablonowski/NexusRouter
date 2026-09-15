@@ -213,6 +213,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 48 {
+		if err = discardFutureSummaryAttemptProcessColumn(ctx, conn); err != nil {
+			return err
+		}
+	}
 	workboardSchemaValidated := false
 	if version == 0 {
 		_, err = conn.ExecContext(ctx, `CREATE TABLE task_heads (
