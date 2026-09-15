@@ -206,6 +206,10 @@ func TestContextCompactionPlanTypedLifecycleAndImmutableEvidence(t *testing.T) {
 	if err = store.CompleteSummary(ctx, attempt); err != nil {
 		t.Fatal(err)
 	}
+	draftedState, created, err := store.BeginContextCompactionPlan(ctx, start)
+	if err != nil || created || draftedState.Status != sessions.ContextCompactionStarted || draftedState.TerminalAttempt == nil || draftedState.TerminalAttempt.Status != "drafted" {
+		t.Fatalf("lost-ack replay omitted terminal draft: created=%v state=%+v err=%v", created, draftedState, err)
+	}
 	draftDigest, err := sessions.SummaryDraftDigest(*draft)
 	if err != nil {
 		t.Fatal(err)

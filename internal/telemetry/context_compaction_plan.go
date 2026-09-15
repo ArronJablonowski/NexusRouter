@@ -480,7 +480,7 @@ func readContextCompactionPlanState(ctx context.Context, q contextCompactionQuer
 		return zero, sessions.ErrContextCompactionLifecycle
 	}
 	state.Status = state.Facts[len(state.Facts)-1].Kind
-	if state.Plan != nil || state.Status == sessions.ContextCompactionFailed && (attempt.Status == "failed" || attempt.Status == "interrupted") {
+	if attempt.Status != "started" {
 		state.TerminalAttempt = &attempt
 	}
 	// Recovery insertion is intentionally deferred until the schema binds the

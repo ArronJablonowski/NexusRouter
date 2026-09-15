@@ -466,9 +466,6 @@ func (s ContextCompactionOperationState) validateBase() error {
 	if needsPlan != (s.Plan != nil) || (s.Plan != nil && (latest.PlanDigest != s.Plan.PlanDigest || s.TerminalAttempt == nil || s.TerminalAttempt.Status != "drafted")) {
 		return ErrContextCompactionLifecycle
 	}
-	if latest.Kind == ContextCompactionStarted && s.TerminalAttempt != nil || latest.Kind == ContextCompactionFailed && latest.PlanDigest == "" && s.TerminalAttempt != nil && s.TerminalAttempt.Status == "drafted" {
-		return ErrContextCompactionLifecycle
-	}
 	if s.Recovery != nil {
 		if s.Recovery.Validate() != nil || s.Recovery.OperationID != s.Start.OperationID || s.Recovery.ProcessID == s.Start.ProcessID ||
 			latest.Kind != ContextCompactionFailed || latest.Code != "owner_interrupted" || s.Recovery.FailedFactID != latest.ID || s.Recovery.FailedFactDigest != latest.Digest {
