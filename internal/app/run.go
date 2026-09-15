@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ type Request struct {
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
 	approvedCompaction              *runtime.ApprovedCompaction
+	compactionPlan                  *runtime.ContextCompactionPlan
 	continuation                    *continuationContext
 	skillPrepared                   bool
 	skillContext                    *skillContext
@@ -111,7 +113,7 @@ func withRuntimeHostAdmission(r Request, admission runtimeHostAdmission) (Reques
 
 func invalidRuntimeHostRequestState(r Request) bool {
 	return r.submissionID != "" || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil ||
-		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.continuation != nil || r.retryOfTaskID != "" ||
+		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.compactionPlan != nil || r.continuation != nil || r.retryOfTaskID != "" ||
 		r.onlyModelID != "" || r.autoCompactionTried || r.intentClassification != nil || r.intentClassificationUse != nil || r.intentClassificationCharged || r.taskID != "" || r.sessionID != ""
 }
 
@@ -497,7 +499,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.continuation != nil {
 		compaction = r.continuation.Compaction
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {
@@ -546,6 +548,13 @@ func (j redactingJournal) Append(ctx context.Context, expected int64, e runtime.
 	return j.appendLeased(ctx, expected, e, "", "")
 }
 
+// AppendContextCompaction preserves ordinary journal redaction, fencing and
+// delivery while requiring storage to commit the replacement event and plan
+// activation as one transaction.
+func (j redactingJournal) AppendContextCompaction(ctx context.Context, expected int64, e runtime.Event, plan runtime.ContextCompactionPlan) error {
+	return j.appendJournal(ctx, expected, e, "", "", false, &plan)
+}
+
 func (j redactingJournal) AppendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
 	return j.appendLeased(ctx, expected, e, token, owner)
 }
@@ -553,14 +562,14 @@ func (j redactingJournal) AppendLeased(ctx context.Context, expected int64, e ru
 // FinishLeased preserves the same redaction, submission fencing and committed
 // event delivery as normal appends while atomically finalizing joined work.
 func (j redactingJournal) FinishLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
-	return j.appendJournal(ctx, expected, e, token, owner, true)
+	return j.appendJournal(ctx, expected, e, token, owner, true, nil)
 }
 
 func (j redactingJournal) appendLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {
-	return j.appendJournal(ctx, expected, e, token, owner, false)
+	return j.appendJournal(ctx, expected, e, token, owner, false, nil)
 }
 
-func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e runtime.Event, token, owner string, finish bool) error {
+func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e runtime.Event, token, owner string, finish bool, plan *runtime.ContextCompactionPlan) error {
 	rawText := e.Data.Text
 	// Partial deltas can split a credential across records. Persist lifecycle
 	// markers without delta text; the complete turn contains redacted text.
@@ -603,6 +612,11 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 		return errors.New("cannot redact event")
 	}
 	e.Data = redacted
+	if plan != nil && (finish || j.runtimeHostAdmission != nil || plan.Validate() != nil || !selectionValueClean(*plan, j.secrets) ||
+		e.Kind != runtime.ContextCompacted || !reflect.DeepEqual(e.Data.Compaction, plan.Compaction) ||
+		e.Data.ReplacedMessages != plan.LiveSuffixBoundary || !sameMessages(e.Data.Messages, plan.ReplacementPrefix)) {
+		return ErrAdmission
+	}
 	commit := func() error {
 		// Durable cancellation may stop provider I/O immediately before or after
 		// this closure, but never while SQLite is deciding whether an append won.
@@ -617,6 +631,15 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 			if expected == 0 {
 				return j.runtimeHostAdmission.commit(ctx, e)
 			}
+		}
+		if plan != nil {
+			if token != "" {
+				return j.db.AppendWorkerContextCompaction(ctx, expected, e, *plan, token, owner, j.submissionID, j.submissionToken)
+			}
+			if j.submissionID != "" {
+				return j.db.AppendSubmissionContextCompaction(ctx, expected, e, *plan, j.submissionID, j.submissionToken)
+			}
+			return j.db.AppendContextCompaction(ctx, expected, e, *plan)
 		}
 		if finish {
 			return j.db.FinishWorker(ctx, expected, e, token, owner, j.submissionID, j.submissionToken)

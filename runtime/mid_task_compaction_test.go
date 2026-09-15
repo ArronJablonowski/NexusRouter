@@ -21,6 +21,52 @@ func approvedMidTaskCompaction(r runtime.RunRequest) *runtime.ApprovedCompaction
 	}
 }
 
+func plannedMidTaskCompaction(t *testing.T, r runtime.RunRequest) *runtime.ContextCompactionPlan {
+	t.Helper()
+	plan := compactionPlanFixture(t)
+	plan.OriginalPrefix = append([]providers.Message(nil), r.Inference.Messages...)
+	plan.ReplacementPrefix = []providers.Message{{Role: "user", Content: "approved summary"}}
+	plan.LiveSuffixBoundary = len(plan.OriginalPrefix)
+	sealed, err := runtime.SealContextCompactionPlan(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &sealed
+}
+
+type compactionJournal struct {
+	events      []runtime.Event
+	plans       []runtime.ContextCompactionPlan
+	atomicCalls int
+	atomic      func(context.Context, int64, runtime.Event, runtime.ContextCompactionPlan) error
+}
+
+func (j *compactionJournal) Append(_ context.Context, _ int64, event runtime.Event) error {
+	clone, err := event.Clone()
+	if err != nil {
+		return err
+	}
+	j.events = append(j.events, clone)
+	return nil
+}
+
+func (j *compactionJournal) AppendContextCompaction(ctx context.Context, expected int64, event runtime.Event, plan runtime.ContextCompactionPlan) error {
+	j.atomicCalls++
+	if j.atomic != nil {
+		return j.atomic(ctx, expected, event, plan)
+	}
+	if expected != int64(len(j.events)) || event.Sequence != expected+1 {
+		return errors.New("invalid atomic append sequence")
+	}
+	clone, err := event.Clone()
+	if err != nil {
+		return err
+	}
+	j.events = append(j.events, clone)
+	j.plans = append(j.plans, plan)
+	return nil
+}
+
 func growingContextEstimator(_ context.Context, request providers.Request) (int, error) {
 	if len(request.Messages) == 1 {
 		return 2000, nil
@@ -82,6 +128,147 @@ func TestApprovedCompactionActivatesBeforeLaterToolTurn(t *testing.T) {
 	}
 	if compactions != 1 {
 		t.Fatal("activation was not exactly once", compactions)
+	}
+}
+
+func TestCompactionPlanActivatesThroughAtomicJournal(t *testing.T) {
+	r := runRequest()
+	r.ParentTaskID = "source-task"
+	r.MaxContextTokens = 4000
+	r.CompactionPlan = plannedMidTaskCompaction(t, r)
+	planDigest := r.CompactionPlan.PlanDigest
+	j := &compactionJournal{}
+	providerCalls := 0
+	loop := runtime.Loop{
+		ContextEstimator: loopContextEstimator(growingContextEstimator), Journal: j,
+		Provider: model(func(_ context.Context, request providers.Request, emit func(providers.Chunk) error) error {
+			providerCalls++
+			if providerCalls == 1 {
+				r.CompactionPlan.ReplacementPrefix[0].Content = "caller mutation"
+				return emitCall(emit)
+			}
+			if len(request.Messages) != 3 || request.Messages[0].Content != "approved summary" ||
+				len(request.Messages[1].ToolCalls) != 1 || request.Messages[2].ToolCallID != "call1" {
+				t.Fatalf("plan activation lost live suffix: %+v", request.Messages)
+			}
+			return emit(providers.Chunk{Text: "done", Done: true, FinishReason: "stop"})
+		}),
+		Tools: executor(func(context.Context, providers.ToolCall) (runtime.ToolResult, error) {
+			return runtime.ToolResult{Content: "evidence", Effect: runtime.NoEffect}, nil
+		}),
+	}
+	result, err := loop.Run(context.Background(), r)
+	if err != nil || result.Text != "done" || providerCalls != 2 || j.atomicCalls != 1 || len(j.plans) != 1 {
+		t.Fatal(result, providerCalls, j.atomicCalls, len(j.plans), err)
+	}
+	if j.plans[0].PlanDigest != planDigest || j.plans[0].Validate() != nil || j.plans[0].ReplacementPrefix[0].Content != "approved summary" {
+		t.Fatal("runtime did not own the atomic plan")
+	}
+	compactions := 0
+	for _, event := range j.events {
+		if event.Kind == runtime.ContextCompacted {
+			compactions++
+		}
+	}
+	if compactions != 1 {
+		t.Fatal("atomic path did not persist exactly one compaction", compactions)
+	}
+}
+
+func TestCompactionPlanRequiresAtomicJournalBeforePersistence(t *testing.T) {
+	r := runRequest()
+	r.ParentTaskID = "source-task"
+	r.MaxContextTokens = 4000
+	r.CompactionPlan = plannedMidTaskCompaction(t, r)
+	loop := runtime.Loop{
+		Journal: journal(func(context.Context, int64, runtime.Event) error {
+			t.Fatal("plan without atomic journal persisted")
+			return nil
+		}),
+		Provider: model(func(context.Context, providers.Request, func(providers.Chunk) error) error {
+			t.Fatal("plan without atomic journal dispatched")
+			return nil
+		}),
+	}
+	if _, err := loop.Run(context.Background(), r); !errors.Is(err, runtime.ErrInvalidRun) {
+		t.Fatal(err)
+	}
+}
+
+func TestCompactionPlanAtomicFailureIsAmbiguousAndStopsDispatch(t *testing.T) {
+	for _, mode := range []string{"error", "panic"} {
+		t.Run(mode, func(t *testing.T) {
+			r := runRequest()
+			r.ParentTaskID = "source-task"
+			r.MaxContextTokens = 4000
+			r.CompactionPlan = plannedMidTaskCompaction(t, r)
+			j := &compactionJournal{atomic: func(context.Context, int64, runtime.Event, runtime.ContextCompactionPlan) error {
+				if mode == "panic" {
+					panic("unknown commit state")
+				}
+				return errors.New("unknown commit state")
+			}}
+			providerCalls := 0
+			loop := runtime.Loop{
+				ContextEstimator: loopContextEstimator(growingContextEstimator), Journal: j,
+				Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+					providerCalls++
+					return emitCall(emit)
+				}),
+				Tools: executor(func(context.Context, providers.ToolCall) (runtime.ToolResult, error) {
+					return runtime.ToolResult{Content: "evidence", Effect: runtime.NoEffect}, nil
+				}),
+			}
+			_, err := loop.Run(context.Background(), r)
+			if !errors.Is(err, runtime.ErrPersistence) || providerCalls != 1 || j.atomicCalls != 1 {
+				t.Fatal(err, providerCalls, j.atomicCalls)
+			}
+			for _, event := range j.events {
+				if event.Kind == runtime.ContextCompacted || event.Kind == runtime.TaskFailed {
+					t.Fatal("ambiguous activation invented durable state", j.events)
+				}
+			}
+		})
+	}
+}
+
+func TestCompactionPlanRejectsMutuallyExclusiveLegacyCompaction(t *testing.T) {
+	r := runRequest()
+	r.ParentTaskID = "source-task"
+	r.MaxContextTokens = 4000
+	r.CompactionPlan = plannedMidTaskCompaction(t, r)
+	r.ApprovedCompaction = approvedMidTaskCompaction(r)
+	loop := runtime.Loop{Journal: &compactionJournal{}, Provider: model(func(context.Context, providers.Request, func(providers.Chunk) error) error {
+		t.Fatal("mutually exclusive compactions dispatched")
+		return nil
+	})}
+	if _, err := loop.Run(context.Background(), r); !errors.Is(err, runtime.ErrInvalidRun) {
+		t.Fatal(err)
+	}
+}
+
+func TestApprovedCompactionUsesLegacyAppendOnAtomicJournal(t *testing.T) {
+	r := runRequest()
+	r.ParentTaskID = "parent"
+	r.MaxContextTokens = 4000
+	r.ApprovedCompaction = approvedMidTaskCompaction(r)
+	j := &compactionJournal{}
+	providerCalls := 0
+	loop := runtime.Loop{
+		ContextEstimator: loopContextEstimator(growingContextEstimator), Journal: j,
+		Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			providerCalls++
+			if providerCalls == 1 {
+				return emitCall(emit)
+			}
+			return emit(providers.Chunk{Text: "done", Done: true, FinishReason: "stop"})
+		}),
+		Tools: executor(func(context.Context, providers.ToolCall) (runtime.ToolResult, error) {
+			return runtime.ToolResult{Content: "evidence", Effect: runtime.NoEffect}, nil
+		}),
+	}
+	if _, err := loop.Run(context.Background(), r); err != nil || j.atomicCalls != 0 {
+		t.Fatal(err, j.atomicCalls)
 	}
 }
 

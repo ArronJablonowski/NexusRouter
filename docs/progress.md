@@ -8086,3 +8086,37 @@ This is a persistence checkpoint, not DAR-122 completion. Application-service
 orchestration, public API integration, restart recovery dispatch, approved-plan
 activation against the live suffix, and the complete race-enabled project gate
 remain pending unless later checkpoints supply that evidence.
+
+DAR-122 subsequently completed its application, SDK, API, CLI, recovery, and
+qualification work. The repository-wide race gate passed with application at
+2,113.342 seconds and telemetry at 2,222.126 seconds; the bounded package
+timeout was raised from 35 to 45 minutes without reducing test scope. A clean
+`go build ./...` followed, and GitHub `origin/main` was verified at
+`6e9551e7f7f56b8a6aa431ec1ed39ce7a5c464a8` before Linear DAR-122 closed.
+
+## 2026-09-15 — DAR-120 atomic custom-engine compaction
+
+Described custom context engines can now supply a deferred mid-task compaction
+only through a schema-50 operation with a current deterministic version-two
+review. Admission freezes the engine identity before full assembly and verifies
+it again after compact assembly, preserves byte-identical non-history tails,
+requires a real token reduction, seals the exact original and replacement
+prefixes, and idempotently advances the durable plan through prepared,
+validated, and approved states. Legacy nil-engine compaction remains compatible;
+legacy manual reviews, undescribed or drifting engines, Codex app-server work,
+and delegated execution remain fail-closed for their dedicated follow-on sprints.
+
+The runtime exposes an optional atomic compaction-journal capability and refuses
+plan-backed execution when the journal lacks it. SQLite commits the canonical
+`context.compacted` event, task projection, exact live-suffix evidence, and the
+single activated lifecycle fact in one writer transaction. Exact lost-ack
+replay verifies both records, plain append cannot bypass a planned activation,
+and submission/worker fencing, cancellation serialization, redaction, and
+post-commit event delivery remain intact. Focused race tests cover atomic
+failure ambiguity, rollback, concurrent replay, custom-engine tool suffixes,
+descriptor drift, and legacy compatibility. The complete non-race runtime,
+telemetry, and application packages also pass. The repository-wide `make check`
+then passed formatting/LOC, vet, the complete race-enabled suite, and build;
+application completed in 2,132.801 seconds, telemetry in 2,220.471 seconds,
+release packaging in 866.000 seconds, and the runtime in 128.363 seconds. A
+GitHub checkpoint remains required before closing DAR-120.

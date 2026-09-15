@@ -150,6 +150,36 @@ func (s *Store) ContextCompactionPlan(ctx context.Context, operationID string) (
 	return state, nil
 }
 
+// ContextCompactionPlanForAttempt resolves the unique schema-50 operation
+// owning a summary attempt. It returns the same fully validated projection as
+// ContextCompactionPlan and never treats indexed columns as trusted state.
+func (s *Store) ContextCompactionPlanForAttempt(ctx context.Context, attemptID string) (sessions.ContextCompactionOperationState, error) {
+	zero := sessions.ContextCompactionOperationState{}
+	if ctx == nil || attemptID == "" || len(attemptID) > 128 {
+		return zero, sessions.ErrContextCompactionLifecycle
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return zero, err
+	}
+	defer tx.Rollback()
+	var operationID string
+	if err = tx.QueryRowContext(ctx, "SELECT operation_id FROM context_compaction_operations WHERE attempt_id=?", attemptID).Scan(&operationID); err != nil {
+		return zero, err
+	}
+	state, err := readContextCompactionPlanState(ctx, tx, operationID)
+	if err != nil || state.Start.AttemptID != attemptID {
+		if err != nil {
+			return zero, err
+		}
+		return zero, sessions.ErrContextCompactionLifecycle
+	}
+	if err = tx.Commit(); err != nil {
+		return zero, err
+	}
+	return state, nil
+}
+
 func summaryAttemptForCompactionStart(start sessions.ContextCompactionPlanStart) sessions.SummaryAttempt {
 	return sessions.SummaryAttempt{Version: 1, ID: start.AttemptID, TaskID: start.TaskID, SourceDigest: start.SourceDigest,
 		Model: start.Model, Provider: start.Provider, Status: "started", SourceSequence: start.SourceSequence,
@@ -200,6 +230,87 @@ func (s *Store) ActivateContextCompactionPlan(ctx context.Context, fact sessions
 	// writer transaction. A standalone lifecycle write would create false
 	// authority if the event insert failed or named an absent live suffix.
 	return sessions.ContextCompactionOperationState{}, sessions.ErrContextCompactionLifecycle
+}
+
+func contextCompactionPlanExists(ctx context.Context, tx *sql.Tx, event runtime.Event) (bool, error) {
+	if event.Data.Compaction == nil {
+		return false, sessions.ErrContextCompactionLifecycle
+	}
+	var exists bool
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM context_compaction_plans
+		WHERE summary_attempt_id=? AND summary_review_id=?)`, event.Data.Compaction.SummaryAttemptID, event.Data.Compaction.SummaryReviewID).Scan(&exists)
+	return exists, err
+}
+
+// prepareContextCompactionActivation derives the suffix from the journal while
+// the same SQLite writer transaction is held. The caller inserts both this fact
+// and the ContextCompacted event before committing, so neither can become
+// durable without the other.
+func prepareContextCompactionActivation(ctx context.Context, tx *sql.Tx, event runtime.Event, plan runtime.ContextCompactionPlan) (sessions.ContextCompactionLifecycleFact, error) {
+	zero := sessions.ContextCompactionLifecycleFact{}
+	if plan.Validate() != nil || event.Kind != runtime.ContextCompacted || event.Data.Compaction == nil ||
+		!reflect.DeepEqual(event.Data.Compaction, plan.Compaction) || !reflect.DeepEqual(event.Data.Messages, plan.ReplacementPrefix) ||
+		event.Data.ReplacedMessages != len(plan.OriginalPrefix) {
+		return zero, sessions.ErrContextCompactionLifecycle
+	}
+	state, err := readContextCompactionPlanState(ctx, tx, plan.OperationID)
+	if err != nil {
+		return zero, err
+	}
+	if state.Status != sessions.ContextCompactionApproved || state.Plan == nil || !reflect.DeepEqual(*state.Plan, plan) {
+		return zero, sessions.ErrContextCompactionLifecycle
+	}
+	if err = validateContextCompactionPlanEvidence(ctx, tx, state.Start, plan, true); err != nil {
+		return zero, err
+	}
+	current, err := taskSnapshot(ctx, tx, event.TaskID)
+	if err != nil || current.State != "running" || current.SessionID != event.SessionID || current.Sequence != event.Sequence-1 ||
+		len(current.Messages) < plan.LiveSuffixBoundary || !reflect.DeepEqual(current.Messages[:plan.LiveSuffixBoundary], plan.OriginalPrefix) {
+		return zero, sessions.ErrHistory
+	}
+	suffix := current.Messages[plan.LiveSuffixBoundary:]
+	suffixDigest, err := sessions.ContextCompactionLiveSuffixDigest(suffix)
+	if err != nil {
+		return zero, err
+	}
+	activation, err := sessions.SealContextCompactionActivation(sessions.ContextCompactionActivation{
+		OperationID: plan.OperationID, PlanDigest: plan.PlanDigest, TaskID: event.TaskID, EventID: event.ID,
+		EventSequence: event.Sequence, LiveSuffixBoundary: plan.LiveSuffixBoundary, LiveSuffixCount: len(suffix),
+		LiveSuffixDigest: suffixDigest, ActivatedAt: event.Time,
+	})
+	if err != nil {
+		return zero, err
+	}
+	latest := state.Facts[len(state.Facts)-1]
+	fact, err := sessions.SealContextCompactionLifecycleFact(sessions.ContextCompactionLifecycleFact{
+		ID: "cpf_" + activation.ActivationDigest, OperationID: plan.OperationID, Sequence: latest.Sequence + 1,
+		PreviousID: latest.ID, Kind: sessions.ContextCompactionActivated, PlanDigest: plan.PlanDigest,
+		SummaryAttemptID: plan.Compaction.SummaryAttemptID, SummaryReviewID: plan.Compaction.SummaryReviewID,
+		Activation: &activation, CreatedAt: event.Time,
+	})
+	if err != nil || sessions.ValidateContextCompactionTransition(&latest, fact) != nil {
+		return zero, sessions.ErrContextCompactionLifecycle
+	}
+	return fact, nil
+}
+
+func validateContextCompactionActivationRetry(ctx context.Context, tx *sql.Tx, event runtime.Event, plan runtime.ContextCompactionPlan) error {
+	state, err := readContextCompactionPlanState(ctx, tx, plan.OperationID)
+	if err != nil {
+		return err
+	}
+	if state.Status != sessions.ContextCompactionActivated || state.Plan == nil || !reflect.DeepEqual(*state.Plan, plan) || len(state.Facts) == 0 {
+		return ErrConflict
+	}
+	fact := state.Facts[len(state.Facts)-1]
+	activation := fact.Activation
+	if fact.Kind != sessions.ContextCompactionActivated || activation == nil || fact.PlanDigest != plan.PlanDigest ||
+		activation.OperationID != plan.OperationID || activation.PlanDigest != plan.PlanDigest || activation.TaskID != event.TaskID ||
+		activation.EventID != event.ID || activation.EventSequence != event.Sequence || activation.LiveSuffixBoundary != plan.LiveSuffixBoundary ||
+		!activation.ActivatedAt.Equal(event.Time) {
+		return ErrConflict
+	}
+	return nil
 }
 
 func (s *Store) FailContextCompactionPlan(ctx context.Context, fact sessions.ContextCompactionLifecycleFact) (sessions.ContextCompactionOperationState, error) {

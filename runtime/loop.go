@@ -19,6 +19,15 @@ type Journal interface {
 	Append(context.Context, int64, Event) error
 }
 
+// ContextCompactionJournal is an optional atomic extension used only for a
+// lifecycle-backed context compaction plan. Implementations must commit the
+// ContextCompacted event and the plan's activation evidence in one transaction
+// before returning nil. A runtime supplied with a CompactionPlan fails closed
+// unless its Journal implements this capability.
+type ContextCompactionJournal interface {
+	AppendContextCompaction(context.Context, int64, Event, ContextCompactionPlan) error
+}
+
 // ToolExecutor is an authorization boundary, not a bare function dispatcher.
 // Implementations must validate schemas, enforce inherited permissions and own
 // the resource lease before performing an effect. They must not retry uncertain
@@ -65,8 +74,12 @@ type RunRequest struct {
 	WorkerID           string
 	Compaction         *ContextCompaction
 	ApprovedCompaction *ApprovedCompaction
-	Validation         string
-	RetryOfTaskID      string
+	// CompactionPlan is host-admitted durable evidence for one future prefix
+	// replacement. Unlike the legacy ApprovedCompaction path, activation must
+	// atomically persist both the ContextCompacted event and lifecycle evidence.
+	CompactionPlan *ContextCompactionPlan
+	Validation     string
+	RetryOfTaskID  string
 	// ConfigID is the trusted host's digest of the effective, redacted runtime
 	// configuration. When supplied it is persisted on task.started so an
 	// enclosing admission protocol can bind execution to that exact generation.
@@ -141,8 +154,22 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if r.Compaction != nil && r.Compaction.Validate(r.ParentTaskID) != nil {
 		return Result{}, ErrInvalidRun
 	}
-	if r.ApprovedCompaction != nil && (r.Compaction != nil || r.MaxContextTokens < 1 || r.ApprovedCompaction.validate(r.ParentTaskID, r.Inference.Messages) != nil) {
+	if r.ApprovedCompaction != nil && (r.Compaction != nil || r.CompactionPlan != nil || r.MaxContextTokens < 1 || r.ApprovedCompaction.validate(r.ParentTaskID, r.Inference.Messages) != nil) {
 		return Result{}, ErrInvalidRun
+	}
+	if r.CompactionPlan != nil && (r.Compaction != nil || r.MaxContextTokens < 1 || r.CompactionPlan.Validate() != nil ||
+		r.CompactionPlan.Compaction == nil || r.CompactionPlan.Compaction.SourceTaskID != r.ParentTaskID) {
+		return Result{}, ErrInvalidRun
+	}
+	if r.CompactionPlan != nil {
+		if _, ok := l.Journal.(ContextCompactionJournal); !ok {
+			return Result{}, ErrInvalidRun
+		}
+		original, encodeErr := json.Marshal(r.CompactionPlan.OriginalPrefix)
+		initial, initialErr := json.Marshal(r.Inference.Messages)
+		if encodeErr != nil || initialErr != nil || !bytes.Equal(original, initial) {
+			return Result{}, ErrInvalidRun
+		}
 	}
 	if r.MaxContextTokens < 0 || (l.ContextEstimator != nil && r.MaxContextTokens == 0) || (r.Validation != "" && r.Validation != "go_source") || (r.Validation != "" && !r.RequireText) ||
 		(r.ConfigID != "" && !validConfigID(r.ConfigID)) || r.Inference.MaxOutputTokens < 0 || r.Inference.MaxOutputTokens > providers.MaxOutputTokens {
@@ -179,10 +206,26 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if err != nil || pendingCompaction != nil && pendingCompaction.validate(r.ParentTaskID, inference.Messages) != nil {
 		return Result{}, ErrInvalidRun
 	}
+	var pendingCompactionPlan *ContextCompactionPlan
+	if r.CompactionPlan != nil {
+		owned, cloneErr := cloneContextCompactionPlan(*r.CompactionPlan)
+		if cloneErr != nil || owned.Validate() != nil {
+			return Result{}, ErrInvalidRun
+		}
+		pendingCompactionPlan = &owned
+		pendingCompaction = &ApprovedCompaction{
+			Compaction:        owned.Compaction,
+			OriginalPrefix:    owned.OriginalPrefix,
+			ReplacementPrefix: owned.ReplacementPrefix,
+		}
+		if pendingCompaction.validate(r.ParentTaskID, inference.Messages) != nil {
+			return Result{}, ErrInvalidRun
+		}
+	}
 	seq := int64(0)
 	turn := ""
 	attempt := ""
-	persist := func(ctx context.Context, k Kind, d Data) error {
+	persistWithPlan := func(ctx context.Context, k Kind, d Data, plan *ContextCompactionPlan) error {
 		e := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, WorkerID: r.WorkerID, Sequence: seq + 1, Time: time.Now().UTC(), Kind: k, TurnID: turn, AttemptID: attempt, Data: d}
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
@@ -190,7 +233,15 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if k == SteeringApplied || k == ContextCompacted {
 			e.TurnID, e.AttemptID = "", ""
 		}
-		if err := invokeJournalAppend(ctx, l.Journal, seq, e); err != nil {
+		var err error
+		if plan == nil {
+			err = invokeJournalAppend(ctx, l.Journal, seq, e)
+		} else if journal, ok := l.Journal.(ContextCompactionJournal); ok && k == ContextCompacted {
+			err = invokeJournalContextCompaction(ctx, journal, seq, e, *plan)
+		} else {
+			err = ErrPersistence
+		}
+		if err != nil {
 			if errors.Is(err, ErrSteeringPending) {
 				return ErrSteeringPending
 			}
@@ -207,6 +258,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		seq++
 		return nil
+	}
+	persist := func(ctx context.Context, k Kind, d Data) error {
+		return persistWithPlan(ctx, k, d, nil)
 	}
 	var routeEstimatedCost *float64
 	if r.RouteEstimatedCost != nil {
@@ -333,7 +387,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if compactEstimate > r.MaxContextTokens || compactEstimate >= estimate {
 			return base, prospective, ErrContextOverflow
 		}
-		if persistErr := persist(ctx, ContextCompacted, Data{Compaction: pendingCompaction.Compaction, ParentTaskID: r.ParentTaskID, Messages: pendingCompaction.ReplacementPrefix, ReplacedMessages: len(pendingCompaction.OriginalPrefix)}); persistErr != nil {
+		if persistErr := persistWithPlan(ctx, ContextCompacted, Data{Compaction: pendingCompaction.Compaction, ParentTaskID: r.ParentTaskID, Messages: pendingCompaction.ReplacementPrefix, ReplacedMessages: len(pendingCompaction.OriginalPrefix)}, pendingCompactionPlan); persistErr != nil {
 			return base, prospective, persistErr
 		}
 		compactionActivated = true
@@ -393,7 +447,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			applied = true
 		}
 	}
-	steeringFailure := func(err error) (Result, error) {
+	boundaryFailure := func(err error) (Result, error) {
 		if errors.Is(err, ErrPersistence) || errors.Is(err, ErrCancellationRequested) || errors.Is(err, ErrExecutionLeaseLost) {
 			return result, err
 		}
@@ -423,7 +477,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			return fail(ctx.Err())
 		}
 		if _, err := drain(); err != nil {
-			return steeringFailure(err)
+			return boundaryFailure(err)
 		}
 		if body, err := json.Marshal(inference.Messages); err != nil || len(body) > 4<<20 {
 			return fail(ErrLimit)
@@ -432,7 +486,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			var fitErr error
 			inference, _, fitErr = fitForDispatch(inference, nil)
 			if fitErr != nil {
-				return fail(fitErr)
+				return boundaryFailure(fitErr)
 			}
 		}
 		if outputTokenBudget > 0 {
@@ -564,7 +618,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if len(calls) == 0 {
 			inference.Messages = append(inference.Messages, providers.Message{Role: "assistant", Content: text.String()})
 			if applied, err := drain(); err != nil {
-				return steeringFailure(err)
+				return boundaryFailure(err)
 			} else if applied {
 				continue
 			}
@@ -606,7 +660,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				if errors.Is(err, ErrSteeringPending) {
 					applied, drainErr := drain()
 					if drainErr != nil {
-						return steeringFailure(drainErr)
+						return boundaryFailure(drainErr)
 					}
 					if !applied {
 						return fail(ErrProtocol)

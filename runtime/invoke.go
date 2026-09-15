@@ -62,6 +62,19 @@ func invokeJournalAppend(ctx context.Context, journal Journal, sequence int64, e
 	return journal.Append(ctx, sequence, event)
 }
 
+// invokeJournalContextCompaction contains an atomic lifecycle-backed append at
+// the same ambiguity boundary as an ordinary journal append. A panic cannot
+// prove whether either half committed, so the runtime must not retry, append a
+// terminal, or dispatch another provider turn.
+func invokeJournalContextCompaction(ctx context.Context, journal ContextCompactionJournal, sequence int64, event Event, plan ContextCompactionPlan) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = ErrPersistence
+		}
+	}()
+	return journal.AppendContextCompaction(ctx, sequence, event, plan)
+}
+
 // invokeTool contains both legacy and scoped executor panics. Because arbitrary
 // executor code may have performed an effect before panicking, the only safe
 // disposition is an empty, uncertain failure. The loop persists that evidence

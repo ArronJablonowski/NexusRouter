@@ -17,7 +17,7 @@ func (s *Store) FinishWorker(ctx context.Context, expected int64, e runtime.Even
 	if leaseToken == "" || owner == "" || e.WorkerID != owner || (e.Kind != runtime.TaskCompleted && e.Kind != runtime.TaskFailed && e.Kind != runtime.TaskCanceled) {
 		return runtime.ErrExecutionLeaseLost
 	}
-	return s.appendFencedFinal(ctx, expected, e, submissionID, submissionToken, leaseToken, owner, true)
+	return s.appendFencedFinal(ctx, expected, e, submissionID, submissionToken, leaseToken, owner, true, nil)
 }
 
 func (s *Store) FinishLeased(ctx context.Context, expected int64, e runtime.Event, token, owner string) error {

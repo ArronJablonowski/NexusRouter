@@ -634,10 +634,34 @@ func (s *Store) AppendWorker(ctx context.Context, expected int64, e runtime.Even
 }
 
 func (s *Store) appendFenced(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string) error {
-	return s.appendFencedFinal(ctx, expected, e, id, token, leaseToken, owner, false)
+	return s.appendFencedFinal(ctx, expected, e, id, token, leaseToken, owner, false, nil)
 }
 
-func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string, finish bool) error {
+// AppendContextCompaction atomically commits the runtime replacement and the
+// approved plan's activation fact. Plain Append remains available for legacy
+// compactions that have no schema-50 plan.
+func (s *Store) AppendContextCompaction(ctx context.Context, expected int64, e runtime.Event, plan runtime.ContextCompactionPlan) error {
+	return s.appendFencedFinal(ctx, expected, e, "", "", "", "", false, &plan)
+}
+
+func (s *Store) AppendSubmissionContextCompaction(ctx context.Context, expected int64, e runtime.Event, plan runtime.ContextCompactionPlan, id, token string) error {
+	if id == "" || token == "" {
+		return runtime.ErrExecutionLeaseLost
+	}
+	return s.appendFencedFinal(ctx, expected, e, id, token, "", "", false, &plan)
+}
+
+func (s *Store) AppendWorkerContextCompaction(ctx context.Context, expected int64, e runtime.Event, plan runtime.ContextCompactionPlan, leaseToken, owner, submissionID, submissionToken string) error {
+	if leaseToken == "" || owner == "" {
+		return runtime.ErrExecutionLeaseLost
+	}
+	return s.appendFencedFinal(ctx, expected, e, submissionID, submissionToken, leaseToken, owner, false, &plan)
+}
+
+func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime.Event, id, token, leaseToken, owner string, finish bool, compactionPlan *runtime.ContextCompactionPlan) error {
+	if compactionPlan != nil && (e.Kind != runtime.ContextCompacted || compactionPlan.Validate() != nil) {
+		return sessions.ErrContextCompactionLifecycle
+	}
 	body, err := e.Encode()
 	if err != nil {
 		return err
@@ -671,6 +695,17 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 		if err := validateSubmissionStreamRetry(ctx, tx, e, body, id); err != nil {
 			return err
 		}
+		if compactionPlan != nil {
+			if err := validateContextCompactionActivationRetry(ctx, tx, e, *compactionPlan); err != nil {
+				return err
+			}
+		} else if e.Kind == runtime.ContextCompacted {
+			if planned, plannedErr := contextCompactionPlanExists(ctx, tx, e); plannedErr != nil {
+				return plannedErr
+			} else if planned {
+				return sessions.ErrContextCompactionLifecycle
+			}
+		}
 		if finish {
 			if err := finishedWorkerLease(ctx, tx, e, leaseToken, owner); err != nil {
 				return err
@@ -703,9 +738,21 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	if seq != expected || session != e.SessionID || state != "running" || (seq > 0 && e.Kind == runtime.TaskStarted) {
 		return ErrConflict
 	}
+	var compactionActivation *sessions.ContextCompactionLifecycleFact
 	if e.Kind == runtime.ContextCompacted {
 		if err := validateContextCompactionGate(ctx, tx, e); err != nil {
 			return err
+		}
+		if compactionPlan != nil {
+			fact, activationErr := prepareContextCompactionActivation(ctx, tx, e, *compactionPlan)
+			if activationErr != nil {
+				return activationErr
+			}
+			compactionActivation = &fact
+		} else if planned, plannedErr := contextCompactionPlanExists(ctx, tx, e); plannedErr != nil {
+			return plannedErr
+		} else if planned {
+			return sessions.ErrContextCompactionLifecycle
 		}
 	}
 	if err := validatePostCompactionJournalBudget(ctx, tx, e, body); err != nil {
@@ -780,6 +827,15 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 	}
 	if err = appendRoutedUsage(ctx, tx, e); err != nil {
 		return err
+	}
+	if compactionActivation != nil {
+		factBody, marshalErr := json.Marshal(compactionActivation)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if err = insertContextCompactionFact(ctx, tx, *compactionActivation, factBody); err != nil {
+			return err
+		}
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=?, state=? WHERE task_id=?", e.Sequence, state, e.TaskID); err != nil {
 		return err

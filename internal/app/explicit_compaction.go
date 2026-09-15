@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ArronJablonowski/DarwinRouter/contextengine"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -28,6 +29,13 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 		return r, ErrAdmission
 	}
 	defer db.Close()
+	var preparedEngine runtime.ContextEngineIdentity
+	if s.contextEngine != nil {
+		// A schema-50 plan may use a custom engine only when its identity is
+		// stable across both complete assemblies. Undescribed legacy engines
+		// remain usable for ordinary, non-planned context assembly.
+		preparedEngine, _ = contextengine.DescribeEngine(ctx, s.contextEngine)
+	}
 	secrets := memorySecrets(s.settings, s.secret)
 	full, inference, err := s.prepareExplicitInference(ctx, db, r, model, secrets)
 	if err != nil {
@@ -37,14 +45,11 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if err != nil {
 		return full, err
 	}
-	// Mid-task prefix replacement currently requires the built-in history-first
-	// assembly and a stateless request adapter. Explicit initial compaction keeps
-	// its existing broader provider/context-engine support.
-	pendingEligible := fullEstimate <= model.ContextTokens && s.contextEngine == nil && midTaskCompactionProvider(s.settings, model)
+	pendingEligible := fullEstimate <= model.ContextTokens && midTaskCompactionProvider(s.settings, model)
 	if fullEstimate <= model.ContextTokens && !pendingEligible {
 		return full, nil
 	}
-	attempt, _, err := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
+	attempt, review, err := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return full, nil
 	}
@@ -78,11 +83,19 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if !sameMessages(fullTail, compactTail) {
 		return full, nil
 	}
-	full.approvedCompaction = &runtime.ApprovedCompaction{
-		Compaction:        compact.continuation.Compaction,
-		OriginalPrefix:    inference.Messages,
-		ReplacementPrefix: compactInference.Messages,
+	if s.contextEngine == nil {
+		full.approvedCompaction = &runtime.ApprovedCompaction{
+			Compaction:        compact.continuation.Compaction,
+			OriginalPrefix:    inference.Messages,
+			ReplacementPrefix: compactInference.Messages,
+		}
+		return full, nil
 	}
+	plan, err := s.prepareCustomCompactionPlan(ctx, db, attempt, review, inference.Messages, compactInference.Messages, compact.continuation.Compaction, preparedEngine)
+	if err != nil {
+		return r, err
+	}
+	full.compactionPlan = plan
 	return full, nil
 }
 
