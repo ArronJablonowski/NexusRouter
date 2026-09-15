@@ -115,7 +115,11 @@ func TestSummaryAttemptsRecoverAcrossFourSIGKILLBoundaries(t *testing.T) {
 	}
 }
 
-func qualifySummaryAttemptCrash(t *testing.T, boundary string) {
+func TestSummaryRecoveryRunsBeforeDispatcherWorkers(t *testing.T) {
+	qualifySummaryAttemptCrash(t, "before_dispatch", true)
+}
+
+func qualifySummaryAttemptCrash(t *testing.T, boundary string, recoverWithDispatcher ...bool) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -273,7 +277,28 @@ func qualifySummaryAttemptCrash(t *testing.T, boundary string) {
 	assertSummaryOwnerStopped(t, ctx, cfg.Telemetry.Database, before.ID)
 
 	recoveryTime := before.StartedAt.Add(2 * time.Second).UTC()
-	next, recovered, err := db.ReconcileSummaryAttemptsPage(ctx, "", 100, recoveryTime)
+	next, recovered := "", 0
+	if len(recoverWithDispatcher) != 0 && recoverWithDispatcher[0] {
+		recoveryService, serviceErr := NewService(cfg, nil)
+		if serviceErr != nil {
+			t.Fatal(serviceErr)
+		}
+		dispatcher, startErr := StartDispatcher(ctx, recoveryService)
+		if startErr != nil {
+			t.Fatal("dispatcher startup recovery failed", startErr)
+		}
+		defer dispatcher.Close()
+		// StartDispatcher must not return until its first bounded reconciliation
+		// page is durable. Workers have no authority to dispatch this auxiliary
+		// operation, and the provider must remain untouched.
+		terminal, readErr := db.SummaryAttempt(ctx, before.ID)
+		if readErr != nil || terminal.Status != "interrupted" || calls.Load() != 0 {
+			t.Fatal("dispatcher returned before summary recovery", terminal, calls.Load(), readErr)
+		}
+		recovered = 1
+	} else {
+		next, recovered, err = db.ReconcileSummaryAttemptsPage(ctx, "", 100, recoveryTime)
+	}
 	wantRecovered := 1
 	if boundary == "after_commit_before_ack" {
 		wantRecovered = 0
