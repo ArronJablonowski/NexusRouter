@@ -363,25 +363,12 @@ func outcomeCandidate(e entry, expected ActivationState, policy ComparisonSelect
 	if state != expected {
 		return ErrConflict
 	}
-	stack, err := activationStack(e)
+	candidate, err := outcomeRollbackCandidateForEntry(e, state)
 	if err != nil {
 		return err
 	}
-	if len(stack) == 0 || stack[len(stack)-1].From != policy.Comparison.BaselineVersion || stack[len(stack)-1].To != expected.Active {
+	if candidate.Predecessor != policy.Comparison.BaselineVersion {
 		return ErrConflict
-	}
-	count := 0
-	for _, a := range e.Activations {
-		if a.To == expected.Active {
-			count++
-		}
-	}
-	if count != 1 || len(e.Activations) == 0 || e.Activations[len(e.Activations)-1].Rollback || e.Activations[len(e.Activations)-1].To != expected.Active {
-		return ErrConflict
-	}
-	proof := e.Validated[policy.Comparison.BaselineVersion]
-	if !proof.Passed || !proof.Deterministic || !identifier.MatchString(proof.ID) {
-		return ErrValidation
 	}
 	return nil
 }
