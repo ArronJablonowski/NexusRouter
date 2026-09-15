@@ -2,6 +2,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -571,7 +572,9 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 		return err
 	}
 	var values any
-	if json.Unmarshal(data, &values) != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if decoder.Decode(&values) != nil {
 		return errors.New("cannot redact event")
 	}
 	var scrub func(any) any

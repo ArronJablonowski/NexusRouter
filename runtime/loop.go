@@ -487,12 +487,15 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				}
 				if c.ToolCall != nil {
 					call := *c.ToolCall
-					var object map[string]json.RawMessage
-					if call.ID == "" || call.Name == "" || seen[call.ID] || len(calls) >= 128 || json.Unmarshal(call.Arguments, &object) != nil || object == nil {
+					arguments, canonicalErr := canonicalToolArguments(call.Arguments)
+					if call.ID == "" || call.Name == "" || seen[call.ID] || len(calls) >= 128 || canonicalErr != nil {
 						return ErrProtocol
 					}
 					seen[call.ID] = true
-					call.Arguments = append(json.RawMessage(nil), call.Arguments...)
+					// Persist and execute one canonical byte representation. Durable
+					// approval digests can then be re-derived after restart without
+					// depending on provider whitespace or object-member ordering.
+					call.Arguments = arguments
 					calls = append(calls, call)
 				}
 				if c.Usage != nil {
