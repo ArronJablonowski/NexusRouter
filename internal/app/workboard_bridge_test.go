@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -103,11 +104,15 @@ func (r *bridgeBoardRepository) PrepareCandidateEvaluation(context.Context, work
 
 func TestWorkboardBridgeMapsTrustedListAndEvents(t *testing.T) {
 	now := time.Date(2026, 9, 9, 19, 0, 0, 0, time.UTC)
+	digest := strings.Repeat("a", 64)
 	board := workboard.Board{Version: 1, ID: "board-a", Revision: 1, LayoutRevision: 1, EventSequence: 1, State: "active", Title: "Board", CardCount: 0, CreatedAt: now, UpdatedAt: now}
 	repository := &bridgeBoardRepository{
 		page: workboard.BoardPage{Version: 1, Items: []workboard.Board{board}},
 		events: workboard.BoardEventPage{Version: 1, BoardID: board.ID, HighWaterSequence: 1, Items: []workboard.BoardEvent{{Version: 1, ID: "event-a", BoardID: board.ID,
-			Sequence: 1, OperationID: "operation-key-01", Kind: workboard.BoardCreateAction, ActorID: "api_operator", ActorType: "operator", CreatedAt: now}}},
+			Sequence: 1, OperationID: "operation-key-01", Kind: workboard.CardCreateAction, ActorID: "model-a", ActorType: "model", CardID: "card-a", CreatedAt: now,
+			DecompositionAdmissionID: "admission-a", DecompositionAdmissionDigest: digest, DecompositionDecisionDigest: digest,
+			DecompositionConfigDigest: digest, DecompositionPolicyDigest: digest, DecompositionMaxDepth: 4, DecompositionMaxChildren: 8,
+			DecompositionDepth: 1, DecompositionDirectChildren: 0}}},
 	}
 	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
 	if err != nil {
@@ -118,8 +123,20 @@ func TestWorkboardBridgeMapsTrustedListAndEvents(t *testing.T) {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
 	events, err := bridge.BrowserEvents(context.Background(), strings.Repeat("a", 64), board.ID, webui.BoardEventOptions{Limit: 100, TailAfterSequence: 1})
-	if err != nil || events.Validate() != nil || len(events.Items) != 1 || events.Items[0].Kind != webui.BoardCreate || repository.eventOptions.TailAfterSequence != 1 {
+	if err != nil || events.Validate() != nil || len(events.Items) != 1 || events.Items[0].Kind != webui.CardCreate ||
+		events.Items[0].Decomposition == nil || events.Items[0].Decomposition.AdmissionID != "admission-a" ||
+		events.Items[0].Decomposition.Limits.MaxChildren != 8 || events.Items[0].Decomposition.DirectChildren != 0 ||
+		repository.eventOptions.TailAfterSequence != 1 {
 		t.Fatalf("events=%+v err=%v", events, err)
+	}
+	body, err := json.Marshal(events)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"origin", "model_id", "provider_id", "raw_config", "prompt", "secret"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("event projection leaked %q: %s", forbidden, body)
+		}
 	}
 }
 
@@ -131,6 +148,21 @@ func TestWorkboardBridgeRejectsUntrustedBrowserSubject(t *testing.T) {
 	}
 	if _, err := bridge.BrowserList(context.Background(), "bad subject", webui.BoardListOptions{Limit: 25}); err == nil {
 		t.Fatal("invalid browser subject accepted")
+	}
+}
+
+func TestWorkboardBridgeFailsClosedOnPartialDecompositionEvent(t *testing.T) {
+	now := time.Date(2026, 9, 9, 19, 0, 0, 0, time.UTC)
+	repository := &bridgeBoardRepository{events: workboard.BoardEventPage{Version: 1, BoardID: "board-a", HighWaterSequence: 1,
+		Items: []workboard.BoardEvent{{Version: 1, ID: "event-a", BoardID: "board-a", Sequence: 1, OperationID: "operation-key-01",
+			Kind: workboard.CardCreateAction, ActorID: "model-a", ActorType: "model", CardID: "card-a", CreatedAt: now,
+			DecompositionAdmissionDigest: strings.Repeat("a", 64)}}}}
+	bridge, err := NewWorkboardBridge(repository, repository, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = bridge.NativeEvents(context.Background(), "board-a", webui.BoardEventOptions{Limit: 1}); err == nil {
+		t.Fatal("partial durable decomposition event was silently projected")
 	}
 }
 

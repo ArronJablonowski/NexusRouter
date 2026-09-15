@@ -191,17 +191,50 @@ func (o BoardEventOptions) Validate() error {
 // represent command bodies, evidence, tool payloads, or credentials; clients
 // reconcile authoritative state through the snapshot endpoints.
 type BoardEvent struct {
-	Version     int         `json:"version"`
-	ID          string      `json:"id"`
-	BoardID     string      `json:"board_id"`
-	Sequence    int64       `json:"sequence"`
-	OperationID string      `json:"operation_id"`
-	Kind        BoardAction `json:"kind"`
-	ActorID     string      `json:"actor_id"`
-	ActorType   string      `json:"actor_type"`
-	CardID      string      `json:"card_id,omitempty"`
-	ClaimID     string      `json:"claim_id,omitempty"`
-	CreatedAt   time.Time   `json:"created_at"`
+	Version       int                            `json:"version"`
+	ID            string                         `json:"id"`
+	BoardID       string                         `json:"board_id"`
+	Sequence      int64                          `json:"sequence"`
+	OperationID   string                         `json:"operation_id"`
+	Kind          BoardAction                    `json:"kind"`
+	ActorID       string                         `json:"actor_id"`
+	ActorType     string                         `json:"actor_type"`
+	CardID        string                         `json:"card_id,omitempty"`
+	ClaimID       string                         `json:"claim_id,omitempty"`
+	CreatedAt     time.Time                      `json:"created_at"`
+	Decomposition *DecompositionAdmissionSummary `json:"decomposition,omitempty"`
+}
+
+// DecompositionAdmissionSummary is a redacted proof that host policy admitted
+// a model/worker hierarchy mutation. It exposes immutable identities, digests,
+// and numeric bounds only; runtime origin and raw configuration remain private.
+type DecompositionAdmissionSummary struct {
+	Version         int                        `json:"version"`
+	AdmissionID     string                     `json:"admission_id"`
+	AdmissionDigest string                     `json:"admission_digest"`
+	DecisionDigest  string                     `json:"decision_digest"`
+	ConfigDigest    string                     `json:"config_digest"`
+	PolicyDigest    string                     `json:"policy_digest"`
+	Limits          DecompositionLimitsSummary `json:"limits"`
+	Depth           int                        `json:"depth"`
+	DirectChildren  int                        `json:"direct_children"`
+}
+
+type DecompositionLimitsSummary struct {
+	Version     int `json:"version"`
+	MaxDepth    int `json:"max_depth"`
+	MaxChildren int `json:"max_children"`
+}
+
+func (s DecompositionAdmissionSummary) Validate() error {
+	if s.Version != ContractVersion || !validID(s.AdmissionID) || !validWorkboardDigest(s.AdmissionDigest) ||
+		!validWorkboardDigest(s.DecisionDigest) || !validWorkboardDigest(s.ConfigDigest) || !validWorkboardDigest(s.PolicyDigest) ||
+		s.Limits.Version != ContractVersion || s.Limits.MaxDepth < 1 || s.Limits.MaxDepth > 64 ||
+		s.Limits.MaxChildren < 1 || s.Limits.MaxChildren > 64 || s.Depth < 1 || s.Depth > s.Limits.MaxDepth ||
+		s.DirectChildren < 0 || s.DirectChildren > s.Limits.MaxChildren {
+		return ErrContract
+	}
+	return nil
 }
 
 func (e BoardEvent) Validate() error {
@@ -209,6 +242,10 @@ func (e BoardEvent) Validate() error {
 		!validKey(e.OperationID) || !validBoardAction(e.Kind) || !validID(e.ActorID) ||
 		!validActorType(e.ActorType) || !optionalID(e.CardID) || !optionalID(e.ClaimID) ||
 		(e.ClaimID != "" && e.CardID == "") || !validWorkboardTime(e.CreatedAt) {
+		return ErrContract
+	}
+	if e.Decomposition != nil && (e.Decomposition.Validate() != nil || e.CardID == "" ||
+		(e.Kind != CardCreate && e.Kind != CardRevise) || (e.ActorType != "model" && e.ActorType != "worker")) {
 		return ErrContract
 	}
 	return encodedWithin(e, 16<<10)

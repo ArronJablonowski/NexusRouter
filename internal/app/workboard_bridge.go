@@ -577,8 +577,20 @@ func (b *WorkboardBridge) events(ctx context.Context, boardID string, options we
 	result := webui.BoardEventPage{Version: webui.ContractVersion, BoardID: page.BoardID, HighWaterSequence: page.HighWaterSequence,
 		NextCursor: page.NextCursor, HasMore: page.HasMore, Items: make([]webui.BoardEvent, len(page.Items))}
 	for index, event := range page.Items {
+		if event.Validate() != nil {
+			return webui.BoardEventPage{}, errors.New("invalid durable workboard event")
+		}
 		result.Items[index] = webui.BoardEvent{Version: webui.ContractVersion, ID: event.ID, BoardID: event.BoardID, Sequence: event.Sequence,
 			OperationID: event.OperationID, Kind: webui.BoardAction(event.Kind), ActorID: event.ActorID, ActorType: event.ActorType, CardID: event.CardID, CreatedAt: event.CreatedAt}
+		if event.HasDecompositionAdmission() {
+			result.Items[index].Decomposition = &webui.DecompositionAdmissionSummary{Version: webui.ContractVersion,
+				AdmissionID: event.DecompositionAdmissionID, AdmissionDigest: event.DecompositionAdmissionDigest,
+				DecisionDigest: event.DecompositionDecisionDigest, ConfigDigest: event.DecompositionConfigDigest,
+				PolicyDigest: event.DecompositionPolicyDigest,
+				Limits: webui.DecompositionLimitsSummary{Version: webui.ContractVersion, MaxDepth: event.DecompositionMaxDepth,
+					MaxChildren: event.DecompositionMaxChildren},
+				Depth: event.DecompositionDepth, DirectChildren: event.DecompositionDirectChildren}
+		}
 	}
 	if result.Validate() != nil {
 		return webui.BoardEventPage{}, errors.New("invalid workboard event projection")

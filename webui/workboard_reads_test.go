@@ -59,6 +59,42 @@ func TestWorkboardReadContracts(t *testing.T) {
 	}
 }
 
+func TestBoardEventDecompositionSummaryIsClosedAndBounded(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	summary := &DecompositionAdmissionSummary{Version: 1, AdmissionID: "admission-a", AdmissionDigest: digest,
+		DecisionDigest: digest, ConfigDigest: digest, PolicyDigest: digest,
+		Limits: DecompositionLimitsSummary{Version: 1, MaxDepth: 4, MaxChildren: 8}, Depth: 2, DirectChildren: 1}
+	event := BoardEvent{Version: 1, ID: "event-a", BoardID: "board-a", Sequence: 1, OperationID: "operation-key-01",
+		Kind: CardCreate, ActorID: "model-a", ActorType: "model", CardID: "card-a", CreatedAt: workboardTime(), Decomposition: summary}
+	if err := event.Validate(); err != nil {
+		t.Fatal("valid decomposition summary rejected", err)
+	}
+	body, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"origin", "model_id", "provider_id", "raw_config", "prompt", "secret"} {
+		if strings.Contains(string(body), forbidden) {
+			t.Fatalf("projection leaked %q: %s", forbidden, body)
+		}
+	}
+	invalid := []BoardEvent{event, event, event, event, event}
+	invalid[0].ActorType = "operator"
+	invalid[1].Kind = CardMove
+	invalid[2].Decomposition = &DecompositionAdmissionSummary{Version: 1}
+	copy := *summary
+	copy.Depth = 5
+	invalid[3].Decomposition = &copy
+	copy = *summary
+	copy.DirectChildren = 9
+	invalid[4].Decomposition = &copy
+	for _, candidate := range invalid {
+		if candidate.Validate() == nil {
+			t.Fatalf("invalid decomposition event accepted: %+v", candidate)
+		}
+	}
+}
+
 func TestNewBoardActionsRequireExactFences(t *testing.T) {
 	revision := int64(2)
 	title := "Renamed"
@@ -166,7 +202,12 @@ func TestWorkboardReadSchemaParity(t *testing.T) {
 		}
 	}
 	link := DependencyLink{Version: 1, BoardID: "board-a", CardID: "card-a", DependencyID: "card-b"}
-	event := BoardEvent{Version: 1, ID: "event-a", BoardID: "board-a", Sequence: 1, OperationID: "operation-key-01", Kind: CardCreate, ActorID: "operator-a", ActorType: "operator", CardID: "card-a", CreatedAt: workboardTime()}
+	digest := strings.Repeat("a", 64)
+	event := BoardEvent{Version: 1, ID: "event-a", BoardID: "board-a", Sequence: 1, OperationID: "operation-key-01", Kind: CardCreate,
+		ActorID: "worker-a", ActorType: "worker", CardID: "card-a", CreatedAt: workboardTime(),
+		Decomposition: &DecompositionAdmissionSummary{Version: 1, AdmissionID: "admission-a", AdmissionDigest: digest,
+			DecisionDigest: digest, ConfigDigest: digest, PolicyDigest: digest,
+			Limits: DecompositionLimitsSummary{Version: 1, MaxDepth: 4, MaxChildren: 8}, Depth: 1, DirectChildren: 0}}
 	values := map[string]any{
 		"board_list_options":     BoardListOptions{Limit: 25},
 		"board_snapshot_options": BoardSnapshotOptions{Limit: 25, ClaimState: "unclaimed"},
@@ -191,9 +232,14 @@ func TestWorkboardReadSchemaParity(t *testing.T) {
 		"board_snapshot_options": `{"limit":1,"state":"active"}`,
 		"dependency_page":        `{"version":1,"board_id":"board-a","card_id":"card-a","direction":"prerequisites","graph_revision":1,"graph_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","items":[],"has_more":true}`,
 		"board_event":            `{"version":1,"id":"event-a","board_id":"board-a","sequence":1,"operation_id":"operation-key-01","kind":"secret.dump","actor_id":"operator-a","actor_type":"operator","created_at":"2026-09-09T12:00:00Z"}`,
+		"board_event_partial":    `{"version":1,"id":"event-a","board_id":"board-a","sequence":1,"operation_id":"operation-key-01","kind":"card.create","actor_id":"model-a","actor_type":"model","card_id":"card-a","created_at":"2026-09-09T12:00:00Z","decomposition":{}}`,
 		"board_event_page":       `{"version":1,"board_id":"board-a","items":[],"has_more":false,"high_water_sequence":0,"raw_payload":"secret"}`,
 	} {
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+definition, json.RawMessage(body), false)
+		schemaDefinition := definition
+		if definition == "board_event_partial" {
+			schemaDefinition = "board_event"
+		}
+		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+schemaDefinition, json.RawMessage(body), false)
 	}
 }
 

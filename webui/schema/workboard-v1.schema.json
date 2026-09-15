@@ -1257,6 +1257,33 @@
         "limit": {"type": "integer", "minimum": 1, "maximum": 100}
       }
     },
+    "decomposition_limits_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "max_depth", "max_children"],
+      "properties": {
+        "version": {"const": 1},
+        "max_depth": {"type": "integer", "minimum": 1, "maximum": 64},
+        "max_children": {"type": "integer", "minimum": 1, "maximum": 64}
+      }
+    },
+    "decomposition_admission_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "admission_id", "admission_digest", "decision_digest", "config_digest", "policy_digest", "limits", "depth", "direct_children"],
+      "properties": {
+        "version": {"const": 1},
+        "admission_id": {"$ref": "v1#/$defs/id"},
+        "admission_digest": {"$ref": "#/$defs/digest"},
+        "decision_digest": {"$ref": "#/$defs/digest"},
+        "config_digest": {"$ref": "#/$defs/digest"},
+        "policy_digest": {"$ref": "#/$defs/digest"},
+        "limits": {"$ref": "#/$defs/decomposition_limits_summary"},
+        "depth": {"type": "integer", "minimum": 1, "maximum": 64},
+        "direct_children": {"type": "integer", "minimum": 0, "maximum": 64}
+      },
+      "x-invariants": ["depth does not exceed limits.max_depth", "direct_children does not exceed limits.max_children"]
+    },
     "board_event": {
       "type": "object",
       "additionalProperties": false,
@@ -1272,9 +1299,16 @@
         "actor_type": {"enum": ["operator", "worker", "validator", "model", "system"]},
         "card_id": {"$ref": "v1#/$defs/id"},
         "claim_id": {"$ref": "v1#/$defs/id"},
-        "created_at": {"$ref": "#/$defs/time"}
+        "created_at": {"$ref": "#/$defs/time"},
+        "decomposition": {"$ref": "#/$defs/decomposition_admission_summary"}
       },
-      "allOf": [{"if": {"required": ["claim_id"]}, "then": {"required": ["card_id"]}}]
+      "allOf": [
+        {"if": {"required": ["claim_id"]}, "then": {"required": ["card_id"]}},
+        {"if": {"required": ["decomposition"]}, "then": {
+          "required": ["card_id"],
+          "properties": {"kind": {"enum": ["card.create", "card.revise"]}, "actor_type": {"enum": ["model", "worker"]}}
+        }}
+      ]
     },
     "board_event_page": {
       "type": "object",
