@@ -161,16 +161,18 @@ func validateAuxiliaryUsage(ctx context.Context, tx *sql.Tx, r accounting.Record
 			return accounting.ErrUsage
 		}
 		var usage = r.Usage
-		wantDisposition := accounting.Failed
+		wantDisposition, wantRetry := accounting.Failed, accounting.NonRetryable
 		if a.Status == "drafted" {
-			wantDisposition, usage = accounting.Completed, a.Draft.Usage
+			wantDisposition, wantRetry, usage = accounting.Completed, accounting.NotApplicable, a.Draft.Usage
+		} else if a.Status == "interrupted" {
+			wantRetry, usage = accounting.Uncertain, nil
 		} else if a.Code == "canceled" {
-			wantDisposition = accounting.Canceled
+			wantDisposition, wantRetry = accounting.Canceled, accounting.NonRetryable
 			usage = nil
 		} else {
 			usage = a.Usage
 		}
-		if wantDisposition != r.Disposition || (matchMeasurement && !accounting.SameUsage(r.Usage, usage)) {
+		if wantDisposition != r.Disposition || wantRetry != r.RetryClass || (matchMeasurement && !accounting.SameUsage(r.Usage, usage)) {
 			return accounting.ErrUsage
 		}
 	case accounting.ReviewEvidence:

@@ -142,6 +142,8 @@ func appendSummaryUsage(ctx context.Context, tx *sql.Tx, attempt sessions.Summar
 	if attempt.Status == "drafted" {
 		r.Usage = cloneUsage(attempt.Draft.Usage)
 		r.Disposition, r.RetryClass = accounting.Completed, accounting.NotApplicable
+	} else if attempt.Status == "interrupted" {
+		r.RetryClass = accounting.Uncertain
 	} else if attempt.Code == "canceled" {
 		r.Disposition = accounting.Canceled
 	} else {

@@ -10,6 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
 )
 
@@ -42,6 +43,10 @@ func (s *Store) BeginSummary(ctx context.Context, a sessions.SummaryAttempt) err
 	if a.Validate() != nil || a.Status != "started" {
 		return sessions.ErrHistory
 	}
+	process, err := processguard.Current(ctx)
+	if err != nil || process.Validate() != nil {
+		return sessions.ErrHistory
+	}
 	if err := s.verifySummarySource(ctx, a); err != nil {
 		return err
 	}
@@ -58,10 +63,14 @@ func (s *Store) BeginSummary(ctx context.Context, a sessions.SummaryAttempt) err
 	if _, err = tx.ExecContext(ctx, "UPDATE task_heads SET sequence=sequence WHERE task_id=?", a.TaskID); err != nil {
 		return err
 	}
+	if err = registerLeaseProcess(ctx, tx, process); err != nil {
+		return err
+	}
 	var prior []byte
-	err = tx.QueryRowContext(ctx, "SELECT body FROM summary_attempts WHERE id=?", a.ID).Scan(&prior)
+	var priorProcess sql.NullString
+	err = tx.QueryRowContext(ctx, "SELECT body,process_id FROM summary_attempts WHERE id=?", a.ID).Scan(&prior, &priorProcess)
 	if err == nil {
-		if !bytes.Equal(body, prior) {
+		if !bytes.Equal(body, prior) || !priorProcess.Valid || priorProcess.String != process.ID {
 			return ErrConflict
 		}
 		return tx.Commit()
@@ -69,7 +78,7 @@ func (s *Store) BeginSummary(ctx context.Context, a sessions.SummaryAttempt) err
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO summary_attempts VALUES(?,?,?)", a.ID, a.TaskID, body); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO summary_attempts(id,task_id,body,process_id) VALUES(?,?,?,?)", a.ID, a.TaskID, body, process.ID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -111,7 +120,8 @@ func (s *Store) finishSummary(ctx context.Context, a sessions.SummaryAttempt) er
 	}
 	var priorBody []byte
 	var task string
-	if err = tx.QueryRowContext(ctx, "SELECT task_id,body FROM summary_attempts WHERE id=?", a.ID).Scan(&task, &priorBody); err != nil {
+	var processID sql.NullString
+	if err = tx.QueryRowContext(ctx, "SELECT task_id,body,process_id FROM summary_attempts WHERE id=?", a.ID).Scan(&task, &priorBody, &processID); err != nil {
 		return err
 	}
 	prior, err := decodeSummaryAttempt(priorBody, a.ID, task)
@@ -123,6 +133,9 @@ func (s *Store) finishSummary(ctx context.Context, a sessions.SummaryAttempt) er
 			return ErrConflict
 		}
 		return tx.Commit()
+	}
+	if !processID.Valid || summaryProcessGate(ctx, tx, processID.String) != nil {
+		return ErrConflict
 	}
 	if prior.TaskID != a.TaskID || prior.SourceSequence != a.SourceSequence || prior.SourceDigest != a.SourceDigest || prior.Keep != a.Keep || prior.Model != a.Model || prior.Provider != a.Provider || prior.EstimatedCost != a.EstimatedCost || !prior.StartedAt.Equal(a.StartedAt) {
 		return ErrConflict

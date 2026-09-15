@@ -49,6 +49,13 @@ func (a SummaryAttempt) Validate() error {
 		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Draft != nil || (a.Code != "summary_failed" && a.Code != "canceled" && a.Code != "persistence_failed") || a.Elapsed < 0 || a.Elapsed > time.Minute || a.Elapsed > a.FinishedAt.Sub(a.StartedAt) || (a.Usage != nil && (a.Usage.InputTokens < 0 || a.Usage.OutputTokens < 0)) || (a.Usage == nil && a.Elapsed != 0) || (a.Code == "canceled" && (a.Usage != nil || a.Elapsed != 0)) {
 			return ErrHistory
 		}
+	case "interrupted":
+		// A recovered attempt has unknown provider state. It deliberately carries
+		// no draft or accounting: neither partial output nor an unacknowledged
+		// provider completion is evidence that can be approved or scored.
+		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Code != "owner_interrupted" || a.Draft != nil || a.Usage != nil || a.Elapsed != 0 {
+			return ErrHistory
+		}
 	case "drafted":
 		if a.FinishedAt.IsZero() || a.FinishedAt.Before(a.StartedAt) || a.Code != "" || a.Draft == nil || a.Usage != nil || a.Elapsed != 0 {
 			return ErrHistory
