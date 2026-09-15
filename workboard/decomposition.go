@@ -184,7 +184,27 @@ func AdmitDecomposition(graph Graph, expectedGraphRevision int64, cardID, parent
 			depth++
 		}
 	}
-	if depth > policy.Limits.MaxDepth {
+	deepest := depth
+	if cardID != "" {
+		childrenByParent := make(map[string][]string, len(graph.Nodes))
+		for _, node := range graph.Nodes {
+			if node.ParentID != "" && node.ID != cardID {
+				childrenByParent[node.ParentID] = append(childrenByParent[node.ParentID], node.ID)
+			}
+		}
+		var subtreeHeight func(string) int
+		subtreeHeight = func(id string) int {
+			height := 1
+			for _, child := range childrenByParent[id] {
+				if candidate := 1 + subtreeHeight(child); candidate > height {
+					height = candidate
+				}
+			}
+			return height
+		}
+		deepest += subtreeHeight(cardID) - 1
+	}
+	if deepest > policy.Limits.MaxDepth {
 		return DecompositionDecision{}, fail(CodeDepthExhausted, "parent_depth")
 	}
 	if children > policy.Limits.MaxChildren {

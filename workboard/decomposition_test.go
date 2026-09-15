@@ -73,6 +73,23 @@ func TestDecompositionIgnoresDependencyDepthAndExcludesMovedCard(t *testing.T) {
 	}
 }
 
+func TestDecompositionReparentIncludesDescendantDepth(t *testing.T) {
+	graph := decompositionGraph(
+		Node{ID: "new-parent", BoardID: "board-a", Dependencies: []string{}},
+		Node{ID: "moved", BoardID: "board-a", Dependencies: []string{}},
+		Node{ID: "descendant", BoardID: "board-a", ParentID: "moved", Dependencies: []string{}},
+	)
+	policy := decompositionPolicy(t, 2, 4, "1")
+	if _, err := AdmitDecomposition(graph, 3, "moved", "new-parent", policy); !errors.Is(err, &Violation{Code: CodeDepthExhausted}) {
+		t.Fatalf("reparented subtree exceeded depth without rejection: %v", err)
+	}
+	policy = decompositionPolicy(t, 3, 4, "1")
+	decision, err := AdmitDecomposition(graph, 3, "moved", "new-parent", policy)
+	if err != nil || decision.Depth != 2 {
+		t.Fatalf("valid reparent decision=%+v error=%v", decision, err)
+	}
+}
+
 func TestDecompositionPolicyDigestAndRestriction(t *testing.T) {
 	base := decompositionPolicy(t, 8, 6, "c")
 	equal, err := base.Restrict(base.Limits)
