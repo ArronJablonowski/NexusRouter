@@ -564,7 +564,7 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 	switch record.Request.ToolName {
 	case "workboard_propose_criteria":
 		var args criteriaApprovalArguments
-		if decode(&args) != nil {
+		if decode(&args) != nil || !validApprovalProposalKey(args.IdempotencyKey) {
 			return nil, ErrBrowserMutation
 		}
 		proposal = contract.ApprovalProposal{Version: 1, Kind: "criteria_change", BoardID: args.BoardID, CardID: args.CardID,
@@ -572,7 +572,7 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 			ExpectedCriteriaRevision: args.ExpectedCriteriaRevision, ExpectedCriteriaDigest: args.ExpectedCriteriaDigest, Criteria: args.Criteria}
 	case "workboard_request_candidate_decision":
 		var args candidateDecisionApprovalArguments
-		if decode(&args) != nil {
+		if decode(&args) != nil || !validApprovalProposalKey(args.IdempotencyKey) {
 			return nil, ErrBrowserMutation
 		}
 		proposal = contract.ApprovalProposal{Version: 1, Kind: "candidate_decision", BoardID: args.BoardID, CardID: args.CardID,
@@ -586,6 +586,18 @@ func (b *BrowserMutations) approvalProposal(ctx context.Context, record approval
 		return nil, ErrBrowserMutation
 	}
 	return &proposal, nil
+}
+
+func validApprovalProposalKey(value string) bool {
+	if len(value) < contract.MinIdempotencyBytes || len(value) > contract.MaxIdempotencyBytes {
+		return false
+	}
+	for _, char := range []byte(value) {
+		if char < '!' || char > '~' {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *BrowserMutations) TaskControls(ctx context.Context, task string) (contract.TaskControlStatus, error) {

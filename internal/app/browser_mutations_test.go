@@ -140,6 +140,9 @@ func TestBrowserApprovalExpiredProjectionRemovesAuthority(t *testing.T) {
 }
 
 func TestBrowserWorkboardApprovalProjectionRequiresExactDurableProposal(t *testing.T) {
+	if validApprovalProposalKey("short") || validApprovalProposalKey(strings.Repeat("x", contract.MaxIdempotencyBytes+1)) || validApprovalProposalKey("proposal key with spaces") || !validApprovalProposalKey("proposal-key-0001") {
+		t.Fatal("proposal idempotency key bounds changed")
+	}
 	svc, cfg := autoFixture(t)
 	svc.secret = func(name string) string {
 		if name == "DARWIN_API_TOKEN" {
