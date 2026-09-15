@@ -41,6 +41,9 @@ type catalog struct {
 	OutcomeOperations       map[string]OutcomeRollbackReceipt     `json:"outcome_operations,omitempty"`
 	OutcomeIntents          map[string]OutcomeRollbackIntent      `json:"outcome_intents,omitempty"`
 	OutcomeSelections       map[string]OutcomeSelectionCheckpoint `json:"outcome_selections,omitempty"`
+	OutcomeSupervisors      map[string]OutcomeSupervisionState    `json:"outcome_supervisors,omitempty"`
+	OutcomeSupervisorChecks map[string]OutcomeSupervisionCheck    `json:"outcome_supervisor_checks,omitempty"`
+	OutcomeSettlements      map[string]OutcomeSettlement          `json:"outcome_settlements,omitempty"`
 }
 type entry struct {
 	Key         Key                 `json:"key"`
@@ -172,7 +175,7 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := s.read("catalog.json", &c); err != nil && (s.readOnly || !os.IsNotExist(err)) {
 		return err
 	}
-	if (c.Schema < 1 || c.Schema > 8) || c.Skills == nil || len(c.Skills) > 1000 {
+	if (c.Schema < 1 || c.Schema > 10) || c.Skills == nil || len(c.Skills) > 1000 {
 		return ErrInvalid
 	}
 	for index, e := range c.Skills {
@@ -212,6 +215,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 	if err := validateRegressionMonitors(&c); err != nil {
 		return err
 	}
+	if err := validateOutcomeSettlements(&c); err != nil {
+		return err
+	}
 	if err := validateOutcomeOperations(&c); err != nil {
 		return err
 	}
@@ -219,6 +225,9 @@ func (s *FileStore) with(ctx context.Context, fn func(*catalog) error, write boo
 		return err
 	}
 	if err := validateOutcomeSelections(&c); err != nil {
+		return err
+	}
+	if err := validateOutcomeSupervision(&c); err != nil {
 		return err
 	}
 	if err := fn(&c); err != nil {

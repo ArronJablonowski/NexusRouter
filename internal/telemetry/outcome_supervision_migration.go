@@ -79,6 +79,7 @@ func validateOutcomeSupervisionEventSchema(ctx context.Context, conn *sql.Conn) 
 	if !browserTableShape(ctx, conn, "outcome_supervision_events",
 		"id:TEXT:0:1,operation_id:TEXT:1:0,check_id:TEXT:1:0,sequence:INTEGER:1:0,code:TEXT:1:0,skill_scope:TEXT:1:0,skill_name:TEXT:1:0,activation_id:TEXT:1:0,activation_revision:TEXT:1:0,policy_id:TEXT:1:0,recorded_at:INTEGER:1:0,body:BLOB:1:0") ||
 		!browserTableRules(ctx, conn, "outcome_supervision_events", []string{
+			"idtextprimarykeycheck(length(cast(idasblob))=64)",
 			"operation_idtextnotnullcheck(length(cast(operation_idasblob))=64)",
 			"check_idtextnotnullcheck(length(cast(check_idasblob))=32)",
 			"sequenceintegernotnullcheck(sequencebetween1and1000000000)",
@@ -88,6 +89,7 @@ func validateOutcomeSupervisionEventSchema(ctx context.Context, conn *sql.Conn) 
 			"activation_idtextnotnullcheck(length(cast(activation_idasblob))=32)",
 			"activation_revisiontextnotnullcheck(length(cast(activation_revisionasblob))=64)",
 			"policy_idtextnotnullcheck(length(cast(policy_idasblob))=64)",
+			"bodyblobnotnullcheck(length(body)between1and4096)",
 			"unique(operation_id,sequence)",
 			"unique(operation_id,check_id,code)",
 		}) || !workboardObjectRules(ctx, conn, "index", "outcome_supervision_events_operation", []string{
