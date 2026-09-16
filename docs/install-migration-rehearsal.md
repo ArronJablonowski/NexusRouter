@@ -90,11 +90,11 @@ canonical bytes and every independently expected identity:
 go run ./cmd/verify-install-rehearsal \
   --record /ABSOLUTE/EXTERNAL/EVIDENCE/install-TARGET.json \
   --record-sha256 sha256:EXPECTED_RECORD \
-  --version 1.0.0 \
+  --version 1.0.1 \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
   --target-os darwin \
   --target-arch arm64 \
-  --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
+  --artifact DarwinRouter_1.0.1_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 \
   --current-schema 52 \
@@ -119,10 +119,10 @@ go run ./cmd/verify-native-release-evidence \
   --record-sha256 sha256:EXPECTED_NATIVE_RECORD \
   --install-rehearsal-record /ABSOLUTE/EXTERNAL/EVIDENCE/install-TARGET.json \
   --install-rehearsal-record-sha256 sha256:EXPECTED_INSTALL_RECORD \
-  --version 1.0.0 \
+  --version 1.0.1 \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
   --target-os darwin --target-arch arm64 --go-version go1.27.1 \
-  --artifact DarwinRouter_1.0.0_darwin_arm64.tar.gz \
+  --artifact DarwinRouter_1.0.1_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 --current-schema 52 \
   --backup-sha256 sha256:EXPECTED_BACKUP \

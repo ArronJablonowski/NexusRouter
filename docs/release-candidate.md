@@ -11,10 +11,10 @@ candidate_parent=/ABSOLUTE/OPERATOR_CONTROLLED/DIRECTORY
 candidate_commit=FULL_LOWERCASE_40_CHARACTER_COMMIT
 
 go run ./cmd/release-candidate freeze \
-  --version 1.0.0 \
+  --version 1.0.1 \
   --commit "$candidate_commit" \
   --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
-  --out "$candidate_parent/DarwinRouter_1.0.0_candidate.json"
+  --out "$candidate_parent/DarwinRouter_1.0.1_candidate.json"
 ```
 
 The destination must not already exist, must be outside the source checkout,
@@ -37,9 +37,9 @@ reviewable final body without overwriting either input:
 
 ```sh
 go run ./cmd/release-candidate notes \
-  --record "$candidate_parent/DarwinRouter_1.0.0_candidate.json" \
+  --record "$candidate_parent/DarwinRouter_1.0.1_candidate.json" \
   --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
-  --out "$candidate_parent/DarwinRouter_1.0.0_RELEASE_NOTES.md"
+  --out "$candidate_parent/DarwinRouter_1.0.1_RELEASE_NOTES.md"
 ```
 
 The generated body contains the exact semantic version, full source commit,
@@ -70,7 +70,7 @@ using it as candidate evidence:
 
 ```sh
 go run ./cmd/release-candidate verify \
-  --record "$candidate_parent/DarwinRouter_1.0.0_candidate.json" \
+  --record "$candidate_parent/DarwinRouter_1.0.1_candidate.json" \
   --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter
 ```
 

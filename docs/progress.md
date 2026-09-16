@@ -8346,3 +8346,20 @@ and independently verified, including license evidence and Darwin/arm64 native
 install/migration/backup/rollback records. Those records remain exact evidence
 for `40d5673` only; this follow-on source change requires a new candidate identity
 and fresh native evidence before any later commit can advance release approval.
+
+## 2026-09-16 — Upcoming release identity changed to v1.0.1
+
+The project owner explicitly selected `1.0.1` for the upcoming release and
+required the existing annotated `v1.0.0` tag to remain unchanged. A fresh remote
+read of `origin` and the local tag database agreed: tag object
+`d3dbb322c2372ed4b0b3bd9de3d7a236be006574` peels to commit
+`ca07106cae194a5f02226f1e40fef0348d70f59d`. No tag was created, moved, deleted,
+or overwritten.
+
+Active candidate, native qualification, install rehearsal, rollback-readiness,
+and publication-authorization examples now use `1.0.1` and `v1.0.1`. Historical
+evidence, the PRD document version, dependency versions, and the existing tag
+remain unchanged. A documentation contract test rejects a return to active
+`1.0.0` examples while requiring the exact preserved tag identity and the
+approved next-release identity. Create-only publication remains fail-closed;
+this decision is not signing or publication authority.

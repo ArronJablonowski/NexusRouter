@@ -1,8 +1,19 @@
 # Release packaging and verification
 
-Status: release preparation, not a published or fully qualified v1.0.0. The
+Status: release preparation, not a published or fully qualified v1.0.1. The
 tooling below creates local artifacts only. It does not create Git tags, upload
 files, change a GitHub release, install binaries, or use the Git SSH key.
+
+## Release identity decision
+
+The project owner selected `1.0.1` as the next release version on 2026-09-16.
+The existing annotated `v1.0.0` tag is immutable release history: tag object
+`d3dbb322c2372ed4b0b3bd9de3d7a236be006574` peels to commit
+`ca07106cae194a5f02226f1e40fef0348d70f59d`. It must not be moved, deleted, or
+overwritten. Candidate, signing, publication, and post-publication records for
+the upcoming release must use version `1.0.1` and tag `v1.0.1`. Create-only
+publication must continue to fail closed if either remote identity already
+exists or cannot be established unambiguously.
 
 ## Build the retained reviewed candidate
 
@@ -351,7 +362,7 @@ symlink switch or system-wide write is provided.
 After committing changes and with a clean worktree, run:
 
 ```sh
-DARWIN_RELEASE_VERSION=1.0.0-rc.1 \
+DARWIN_RELEASE_VERSION=1.0.1-rc.1 \
 DARWIN_RELEASE_COMMIT=FULL_REVIEWED_COMMIT_ID \
   make qualify-release
 ```
@@ -388,8 +399,9 @@ Before a real release:
 - Review version-specific installation/migration notes and known limitations,
   back up user databases, and stop old writers before schema upgrades.
 - Produce approved signed artifacts and release notes from the reviewed commit,
-  then explicitly authorize publication. No `v1.0.0` tag is implied by the PRD's
-  document version or this development checkpoint.
+  then explicitly authorize publication. The PRD's document version does not
+  authorize a release tag; the next approved tag is `v1.0.1`, and the existing
+  `v1.0.0` tag remains immutable history.
 
 Use the recordable [release checklist](release-checklist.md) to bind these gates,
 the signing identity, publication authorization and post-publication verification

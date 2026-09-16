@@ -33,11 +33,11 @@ digest is `sha256:` plus 64 lowercase hexadecimal characters.
   "scope": "darwinrouter-github-publication-authorization",
   "github_host": "github.com",
   "repository": "OWNER/REPOSITORY",
-  "release_version": "1.0.0",
+  "release_version": "1.0.1",
   "source_commit": "REPLACE_WITH_40_LOWERCASE_HEX_CHARACTERS",
-  "tag": "v1.0.0",
-  "release_title": "DarwinRouter v1.0.0",
-  "tag_message": "DarwinRouter release v1.0.0",
+  "tag": "v1.0.1",
+  "release_title": "DarwinRouter v1.0.1",
+  "tag_message": "DarwinRouter release v1.0.1",
   "tagger": {
     "name": "REPLACE_WITH_APPROVED_TAGGER_NAME",
     "email": "REPLACE_WITH_APPROVED_TAGGER_EMAIL",
@@ -54,22 +54,22 @@ digest is `sha256:` plus 64 lowercase hexadecimal characters.
   "signing_authorization_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",
   "assets": [
     {
-      "name": "DarwinRouter_1.0.0_darwin_amd64.tar.gz",
+      "name": "DarwinRouter_1.0.1_darwin_amd64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.0_darwin_arm64.tar.gz",
+      "name": "DarwinRouter_1.0.1_darwin_arm64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.0_linux_amd64.tar.gz",
+      "name": "DarwinRouter_1.0.1_linux_amd64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.0_linux_arm64.tar.gz",
+      "name": "DarwinRouter_1.0.1_linux_arm64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
