@@ -1106,8 +1106,10 @@ turn emitted no output, invoked no tool and created no confirmed or uncertain
 effect. It preserves ordered retry lineage and aggregate route cost, observes
 the terminal-tree attempt cap, and reruns all admission plus the transactional
 approval check. It never replays the failed provider call. Partial streams,
-delegated work, cancellation, ambiguous model identity and absent or stale
-approval remain terminal.
+cancellation, ambiguous model identity and absent or stale approval remain
+terminal. Delegated work is eligible only for the separate plan-backed
+mid-task path described below after every child has completed and its
+acceptance, lease, policy and result evidence can be rederived exactly.
 For a built-in history-first continuation whose complete initial request still
 fits, the same off-by-default policy may freeze that currently approved summary
 as a one-shot later-turn alternative. The first turn receives full history. If
@@ -1119,9 +1121,14 @@ budget; replay preserves all live suffix messages and tool pairs. The journal
 budget reserves both terminal bytes and the final event slot, and definitive
 exhaustion terminalizes without another provider dispatch. Revocation,
 redaction drift, estimator/persistence failure, or an insufficient compact form
-fails closed. This implemented slice excludes delegated work, custom context
-engines, already-compacted continuations and the stateful Codex app-server
-adapter pending provider-specific continuation semantics.
+fails closed. Version-two plans extend this path to described custom context
+engines, already-compacted multi-epoch continuations, completed bounded
+delegation, and stateful Codex app-server rollover. Each surface adds its own
+immutable evidence: engine and prompt-tier identities; complete ordered
+lineage; exact parent/child policy, lease, context and accepted-result bindings;
+or completed native-turn and provider-generation retirement checks. No surface
+may infer success from a model self-assessment, an expired lease, or in-memory
+provider state that cannot be reconstructed after restart.
 Trusted Go hosts can opt into a named deterministic semantic validator after
 drafting. Version-two review evidence binds the exact source sequence and
 digest, complete draft digest, validator identity and previous review head;
@@ -1131,10 +1138,13 @@ abstention remain inactive and append-only. The stock runtime does not infer a
 validator or treat an LLM self-review as deterministic approval. The SDK ships
 an explicitly selected deterministic integrity linter which can reject bounded
 mechanical defects but never returns approval; clean or ambiguous drafts
-abstain for operator/domain review. Configured unattended semantic validation,
-typed claim-level evidence and broader provider/context-engine mid-task
-compaction remain required work; see [native summary drafting](docs/codex-session-summaries.md)
-and [compacted continuation](docs/codex-compacted-continuation.md).
+abstain for operator/domain review. Configured unattended semantic validation
+and typed claim-level summary evidence remain required work. Release
+qualification must distinguish deterministic local/SIGKILL recovery evidence
+from live-provider, filesystem, power-loss and hardware durability claims; see
+[native summary drafting](docs/codex-session-summaries.md),
+[compacted continuation](docs/codex-compacted-continuation.md), and
+[crash recovery](docs/crash-recovery-matrix.md).
 
 Extended compaction must use a versioned, immutable plan before any additional
 surface is enabled. The plan binds the exact approved checkpoint and source

@@ -28,11 +28,26 @@ telemetry, then removes the workspace. Freeze and verification each perform
 dependency reconstruction in a separate fresh cache, so the job cannot succeed
 from a populated setup-go or runner cache. Each job also records the requested version, verified commit,
 actual Go host OS/architecture, Go version and other gate outcomes in its job
-summary. The native wrapper itself runs `make check`, `make qualify-mvp`, and
-`make qualify-release-test` as independently bounded commands. It rechecks the
-source after every command before creating its record; the public
-`make qualify-release` target preserves the same sequential MVP-then-release
-ordering for operators.
+summary. The native wrapper itself runs `make check`, `make qualify-mvp`,
+`make qualify-context-recovery`, and `make qualify-release-test` as
+independently bounded commands. It rechecks the source after every command
+before creating its record; the public `make qualify-release` target preserves
+the same sequential ordering for operators.
+
+`qualify-context-recovery` is the deterministic DAR-126 gate. It exercises
+local-fixture plan activation and rollback, exact retry, restart/reopen
+validation, plan-owner recovery, delegation evidence and policy isolation,
+stateful rollover failure ordering, and the existing Unix SIGKILL summary and
+delegation recovery fixtures. Its direct race-enabled Go test is bounded to 45
+minutes. The gate captures and replays the Go JSON event stream, and fails when
+any event reports a skipped test; the retained native transcript therefore
+preserves both the test events and the no-skip decision. It also requires
+top-level pass events for the plan-preparation, activation, delegation,
+planned-parent, summary, interrupted-delegation, Codex-rollover and completed-task
+recovery roots, so a narrowed or empty test selection cannot qualify. This gate is not a live-provider run and
+does not establish power-loss, filesystem flush, disk-failure, or physical-host
+durability. The separately opt-in live Codex rollover test is not run by this
+workflow.
 The four-job matrix uses explicit standard hosted-runner labels:
 `macos-15-intel` for Darwin/amd64, `macos-15` for Darwin/arm64,
 `ubuntu-24.04` for Linux/amd64 and `ubuntu-24.04-arm` for Linux/arm64. Each job

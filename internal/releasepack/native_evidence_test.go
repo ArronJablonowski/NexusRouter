@@ -211,11 +211,11 @@ func TestQualifyNativeReleaseRunsBoundGatesBeforeWritingEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "check|||\nqualify-mvp|1.0.0-rc.3|" + commit + "|" + installOut + "\nqualify-release-test|1.0.0-rc.3|" + commit + "|" + installOut + "\n"
+	want := "check|||\nqualify-mvp|1.0.0-rc.3|" + commit + "|" + installOut + "\nqualify-context-recovery|1.0.0-rc.3|" + commit + "|" + installOut + "\nqualify-release-test|1.0.0-rc.3|" + commit + "|" + installOut + "\n"
 	if string(logBody) != want {
 		t.Fatalf("gate invocation mismatch: %q", logBody)
 	}
-	for _, marker := range []string{"darwin-native-evidence version=1.0.0-rc.3 commit=" + commit, "== make check ==", "== make check passed ==", "== make qualify-mvp ==", "== make qualify-mvp passed ==", "== make qualify-release-test ==", "== make qualify-release-test passed =="} {
+	for _, marker := range []string{"darwin-native-evidence version=1.0.0-rc.3 commit=" + commit, "== make check ==", "== make check passed ==", "== make qualify-mvp ==", "== make qualify-mvp passed ==", "== make qualify-context-recovery ==", "== make qualify-context-recovery passed ==", "== make qualify-release-test ==", "== make qualify-release-test passed =="} {
 		if !bytes.Contains(transcript.Bytes(), []byte(marker)) {
 			t.Fatal("complete transcript missing marker", marker)
 		}
@@ -370,12 +370,14 @@ func TestQualifyNativeReleasePreflightsBothEvidenceDestinations(t *testing.T) {
 
 func TestQualifyNativeReleaseFailureBoundariesLeaveNoEvidence(t *testing.T) {
 	for name, body := range map[string]string{
-		"failed_check":           `if [ "$1" = check ]; then exit 7; fi`,
-		"failed_mvp":             `if [ "$1" = qualify-mvp ]; then exit 7; fi`,
-		"failed_release_test":    `if [ "$1" = qualify-release-test ]; then exit 7; fi`,
-		"mutation_after_check":   `if [ "$1" = check ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
-		"mutation_after_mvp":     `if [ "$1" = qualify-mvp ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
-		"mutation_after_qualify": `if [ "$1" = qualify-release-test ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"failed_check":                    `if [ "$1" = check ]; then exit 7; fi`,
+		"failed_mvp":                      `if [ "$1" = qualify-mvp ]; then exit 7; fi`,
+		"failed_context_recovery":         `if [ "$1" = qualify-context-recovery ]; then exit 7; fi`,
+		"failed_release_test":             `if [ "$1" = qualify-release-test ]; then exit 7; fi`,
+		"mutation_after_check":            `if [ "$1" = check ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"mutation_after_mvp":              `if [ "$1" = qualify-mvp ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"mutation_after_context_recovery": `if [ "$1" = qualify-context-recovery ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
+		"mutation_after_qualify":          `if [ "$1" = qualify-release-test ]; then touch "$NATIVE_TEST_SOURCE/dirty"; fi`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			source, commit := nativeEvidenceGitFixture(t)

@@ -1,5 +1,40 @@
 # Implementation evidence
 
+## 2026-09-15 — DAR-126 extended compaction recovery qualification
+
+Extended compaction now has a dedicated deterministic release gate spanning
+plan preparation, atomic activation, delegated acceptance, context rollover,
+and restart recovery. Unix child-process fixtures kill execution both before
+and after plan or activation commit. A stateful submitted Codex fixture kills
+the owner after activation, after old-generation retirement but before
+replacement dispatch, and after terminal commit but before submission
+acknowledgement. Reopen and repeated recovery prove the exact committed event
+prefix, one activation, one terminal result, one recovery receipt, stable
+submission state, and no provider redispatch.
+
+Adversarial delegated-parent coverage now checks review revocation, policy and
+context-engine drift, cancellation, timeout, provider panic, oversized output,
+and exact durable child failure references. Failed or ambiguous evidence leaves
+the plan inactive, does not redispatch or terminalize the parent, and cannot
+gain authority through the compaction path. The release gate captures Go JSON,
+rejects every skip, and requires top-level pass events for the critical plan,
+activation, delegation, planned-parent, summary, interrupted-worker, rollover,
+and completed-task recovery roots. It is wired between the MVP and release
+packaging gates and remains explicitly limited to deterministic local-process
+evidence rather than live-provider, physical power-loss, filesystem-flush,
+disk-failure, or hardware-provenance claims.
+
+`make qualify-context-recovery` passed twice on the settled tree; its retained
+output was 180,472 bytes, below the native wrapper's 1 MiB per-gate bound. The
+plan/activation SIGKILL tests passed three race-enabled repetitions, and the
+delegation plus three rollover crash boundaries passed three race-enabled
+repetitions. The subsequent full `umask 077; make check` passed formatting and
+the 1,000-line limit, vet, every race-enabled package, and `go build ./...`.
+Notable uncached package times were application 2,360.236 seconds, telemetry
+2,349.649 seconds, release packaging 867.563 seconds, SDK 273.586 seconds, CLI
+182.661 seconds, toolgate 110.121 seconds, API 103.077 seconds, and workers
+49.470 seconds.
+
 ## 2026-09-15 — DAR-125 delegated compaction checkpoint
 
 Completed `delegate` and `delegate_batch` work can now remain in the live suffix

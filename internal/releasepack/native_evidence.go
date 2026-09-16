@@ -208,6 +208,15 @@ func QualifyNativeRelease(ctx context.Context, o Options, log io.Writer) error {
 		}
 		return err
 	}
+	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-context-recovery", transcript); err != nil {
+		return err
+	}
+	if err = verifyCandidateCheckout(ctx, source, o.Commit, env); err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
+		return err
+	}
 	if err = nativeGateCommand(ctx, source, qualificationEnv, "qualify-release-test", transcript); err != nil {
 		return err
 	}

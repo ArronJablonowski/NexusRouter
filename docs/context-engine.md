@@ -80,6 +80,19 @@ its frozen identity and tier digests to match the durable plan; descriptor drift
 fails closed. Stateful Codex execution additionally requires the provider
 rollover capability and a completed native `stop` boundary before activation.
 
+Completed `delegate` and `delegate_batch` calls may remain in a planned
+parent's live suffix. The accepted worker start freezes a child-local prompt,
+distinct child session, inherited context-engine identity, delegation scope,
+and parent/child tool-policy snapshots. The child policy must be provably equal
+or stricter; ambient parent history, memory, skills, tools, and permissions are
+not imported. Activation independently reconstructs the exact parent tool
+origin, work and execution journals, worker lease, completed model/tool
+boundary, accepted result, and policy/engine digests. Failed or uncertain tool
+effects, cancellation, owner or lease recovery, unreleased leases, policy or
+engine drift, shared child sessions, and ambiguous historical delegations all
+fail before activation. Exact retry and reopen validation rederive these facts
+from the durable journals rather than trusting the normalized binding alone.
+
 ## SDK example
 
 ```go

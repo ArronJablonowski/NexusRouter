@@ -7,6 +7,19 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- DAR-126 adds a required deterministic context-recovery qualification gate.
+  Race-enabled local fixtures and Unix child-process `SIGKILL` checkpoints
+  cover extended-plan preparation and atomic activation before and after
+  commit, delegated cancellation, timeout, panic, oversized output, review and
+  policy/engine drift, summary and worker recovery, and stateful Codex rollover
+  after activation, retirement, and terminal commit. Reopen and repeated
+  recovery must preserve the exact committed prefix, emit one terminal and one
+  recovery receipt, retain one compaction activation, and never redispatch an
+  uncertain provider or tool. Machine-checked Go JSON rejects skips and missing
+  critical root passes. This establishes deterministic local-process evidence,
+  not live-provider, physical power-loss, filesystem-flush, disk-failure, or
+  hardware-provenance evidence.
+
 - DAR-124 adds plan-backed context rollover for the stateful Codex app-server
   coordinator. A read-only native-boundary check must prove the exact prior
   turn completed before SQLite atomically activates the reviewed compaction

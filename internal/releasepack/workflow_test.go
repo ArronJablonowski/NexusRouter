@@ -94,15 +94,50 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(makefile), `go test -race -timeout=45m ./...`) != 2 ||
+	makefileBody := string(makefile)
+	targetStart := strings.Index(makefileBody, "\nqualify-context-recovery:\n")
+	targetEnd := strings.Index(makefileBody[targetStart+1:], "\n# Deterministic DAR-86 browser qualification.")
+	if targetStart < 0 || targetEnd < 0 {
+		t.Fatal("context-recovery target boundary changed")
+	}
+	contextRecoveryTarget := makefileBody[targetStart : targetStart+1+targetEnd]
+	contextRecoveryManifest := []string{
+		`DARWIN_PROCESS_OWNER_DIR="$$owner_dir" go test -race -timeout=45m ./runtime ./sessions ./workers ./internal/telemetry ./internal/app`,
+		`-run '^(TestDAR126.*|`,
+		`TestContextCompactionActivation(MissingFactFailsReopen|SurvivesSIGKILLBoundaries)`,
+		`TestContextCompactionPlan(DeadOwnerRecovery|LiveOwnerCannotRecover|DeadOwnerPreservesDurableDraft|PreparationSurvivesSIGKILLBoundaries)`,
+		`TestDAR126DelegationCompactionAdversarialQualification`,
+		`TestPlannedParentCompactionAfterDelegationCompletion`,
+		`TestPlannedParentCompactionFailsClosedOnDelegationPolicyDrift`,
+		`TestSummaryAttemptsRecoverAcrossFourSIGKILLBoundaries`,
+		`TestInterruptedDelegationRecoveredAfterAbruptProcessDeath`,
+		`TestDAR126CodexRolloverRecoversAcrossSIGKILLBoundaries`,
+		`TestCompletedTaskRecoveredAfterOwnerProcessKilled`,
+		`-count=1 -json > "$$json_log"`,
+		`cat "$$json_log"`,
+		`grep -Eq '"Action":"skip"' "$$json_log"`,
+		`go test reported a skipped test`,
+		`for required_test in TestContextCompactionPlanPreparationSurvivesSIGKILLBoundaries TestContextCompactionActivationSurvivesSIGKILLBoundaries TestDAR126DelegationCompactionAdversarialQualification TestPlannedParentCompactionAfterDelegationCompletion TestPlannedParentCompactionFailsClosedOnDelegationPolicyDrift TestSummaryAttemptsRecoverAcrossFourSIGKILLBoundaries TestInterruptedDelegationRecoveredAfterAbruptProcessDeath TestDAR126CodexRolloverRecoversAcrossSIGKILLBoundaries TestCompletedTaskRecoveredAfterOwnerProcessKilled; do`,
+		`grep -Eq "\"Action\":\"pass\".*\"Test\":\"$$required_test\"(,|})" "$$json_log"`,
+		`missing root pass event for $$required_test`,
+		`DAR-126 qualification JSON checks passed: no skips and all required root pass events present`,
+	}
+	for _, required := range contextRecoveryManifest {
+		if !strings.Contains(contextRecoveryTarget, required) {
+			t.Fatal("context-recovery command manifest changed", required)
+		}
+	}
+	if strings.Count(contextRecoveryTarget, " go test -race ") != 1 ||
+		strings.Count(makefileBody, `go test -race -timeout=45m ./...`) != 2 ||
 		strings.Count(string(makefile), `go test -count=1 -timeout=45m -run '^TestReleaseQualification$$'`) != 1 ||
-		strings.Count(string(makefile), "qualify-release:\n\t$(MAKE) qualify-mvp\n\t$(MAKE) qualify-release-test") != 1 ||
+		strings.Count(string(makefile), "qualify-release:\n\t$(MAKE) qualify-mvp\n\t$(MAKE) qualify-context-recovery\n\t$(MAKE) qualify-release-test") != 1 ||
+		strings.Count(string(makefile), "\nqualify-context-recovery:\n") != 1 ||
 		strings.Count(string(makefile), "\nqualify-release-test:\n") != 1 ||
 		nativeGateTimeout != 60*time.Minute ||
 		nativeGateTimeout < 35*time.Minute+20*time.Minute ||
 		nativeGateTimeout < 45*time.Minute+15*time.Minute ||
-		time.Duration(job.Timeout)*time.Minute <= 3*nativeGateTimeout+90*time.Minute ||
-		time.Duration(job.Timeout)*time.Minute-3*nativeGateTimeout != 120*time.Minute {
+		time.Duration(job.Timeout)*time.Minute <= 4*nativeGateTimeout+30*time.Minute ||
+		time.Duration(job.Timeout)*time.Minute-4*nativeGateTimeout != 60*time.Minute {
 		t.Fatal("release timeout hierarchy has insufficient headroom")
 	}
 	for i, expected := range expectedMatrix {

@@ -109,8 +109,20 @@ be omitted.
 - Workflow-dispatched expected license-evidence SHA-256:
 - Ubuntu job native OS/architecture and outcomes:
 - macOS job native OS/architecture and outcomes:
+- DAR-126 context-recovery gate host/OS, exact commit, command and UTC time:
+- DAR-126 no-skip result and retained bounded transcript/digest:
+- DAR-126 SIGKILL checkpoint results for summary and delegation recovery:
+- DAR-126 plan activation/retry/reopen and schema-52 binding results:
+- Unqualified recovery surfaces accepted for this candidate (including live
+  provider, power loss, filesystem flush or disk failure):
 - [ ] Hosted and local evidence refer to the recorded candidate version and
   commit.
+- [ ] `make qualify-context-recovery` passed its bounded race run and the
+      machine-enforced JSON event check found no skipped tests and every
+      required critical root pass event, preventing a narrowed or empty test
+      selection from qualifying; its output
+  is retained and was not interpreted as live-provider, physical power-loss,
+  filesystem-flush, disk-failure, or hardware provenance evidence.
 - [ ] Failed or skipped gates are resolved; none are counted as qualification.
 - [ ] Remaining non-hermetic build and runner/action trust assumptions are
   accepted by the release approver.
