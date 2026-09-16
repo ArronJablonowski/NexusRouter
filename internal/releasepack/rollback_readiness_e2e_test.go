@@ -13,7 +13,7 @@ import (
 
 func TestFirstReleaseRollbackReadinessCanonicalChain(t *testing.T) {
 	fixture := newReconstructionFixture(t)
-	reconstructionRoot := rollbackPrivateEnvironment(t, fixture.policy)
+	reconstructionRoot := privateReconstructionEnvironment(t, fixture.policy)
 	preflight, signedDir, licenseVerifier := publishedControlledExecutableFixture(t, fixture.policy)
 	assertRollbackUsedControlledReconstruction(t, fixture)
 	sourceHead := rollbackSourceHead(t, preflight.Verification.Source)
@@ -60,7 +60,7 @@ func TestFirstReleaseRollbackReadinessCanonicalChain(t *testing.T) {
 
 func TestFirstReleaseRollbackReadinessCanonicalChainFailsClosed(t *testing.T) {
 	fixture := newReconstructionFixture(t)
-	reconstructionRoot := rollbackPrivateEnvironment(t, fixture.policy)
+	reconstructionRoot := privateReconstructionEnvironment(t, fixture.policy)
 	preflight, signedDir, licenseVerifier := publishedControlledExecutableFixture(t, fixture.policy)
 	assertRollbackUsedControlledReconstruction(t, fixture)
 	sourceHead := rollbackSourceHead(t, preflight.Verification.Source)
@@ -208,7 +208,7 @@ func firstReleaseRollbackChainFixture(t *testing.T, preflight PublicationPreflig
 	}
 }
 
-func rollbackPrivateEnvironment(t *testing.T, policy goReconstructionPolicyOptions) string {
+func privateReconstructionEnvironment(t *testing.T, policy goReconstructionPolicyOptions) string {
 	t.Helper()
 	root := t.TempDir()
 	t.Cleanup(func() {

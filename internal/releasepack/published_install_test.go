@@ -137,8 +137,10 @@ func TestPublishedInstallEvidenceRejectsCanonicalFieldTampering(t *testing.T) {
 
 func publishedInstallFixture(t *testing.T) (string, string, PublishedInstallExpectations) {
 	t.Helper()
-	preflight, signedDir := publishedExecutableFixture(t)
-	return publishedInstallFixtureFromRelease(t, preflight, signedDir, nil)
+	fixture := newReconstructionFixture(t)
+	privateReconstructionEnvironment(t, fixture.policy)
+	preflight, signedDir, verifyEvidence := publishedControlledExecutableFixture(t, fixture.policy)
+	return publishedInstallFixtureFromRelease(t, preflight, signedDir, verifyEvidence)
 }
 
 func publishedInstallFixtureFromRelease(t *testing.T, preflight PublicationPreflightOptions, signedDir string, verifyEvidence licenseEvidenceRecordVerifier) (string, string, PublishedInstallExpectations) {

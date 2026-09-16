@@ -1,5 +1,35 @@
 # Implementation evidence
 
+## 2026-09-16 — DAR-51 native-evidence fixture hardening
+
+A proposed Darwin/arm64 native-evidence run at clean, pushed commit
+`930ff5ea2d65bb8434ac15b6484d91bcb1421dc3` correctly failed closed during
+`make check`. Every package except `internal/releasepack` passed; the failing
+`preexisting_install` case could not sign its generated publication fixture.
+The failed run produced only a bounded diagnostic transcript and no native or
+install-rehearsal record, so it receives no qualification credit.
+
+Review found that the published-install test family rebuilt candidate-bound
+license evidence through the public Go module proxy once for every adversarial
+scenario. Dedicated reconstruction integration tests already cover the public
+policy. Published-install tests now use the repository's signed controlled
+module proxy, checksum database, and private HOME, temporary directory, module
+cache, build cache, and GOPATH. Rollback-readiness tests share the same renamed
+private-environment helper. This preserves fresh-cache, signature, candidate,
+license-evidence, and protected-path validation while removing an unrelated
+external-service timing dependency from the release gate.
+
+The affected adversarial published-install family passed three consecutive
+race-enabled repetitions in 274.616 seconds. The combined published-install
+and first-release rollback-readiness suites then passed under the race detector
+in 181.147 seconds. The subsequent full `umask 077; make check` passed
+formatting and the 1,000-line limit, vet, every race-enabled package, and
+`go build ./...`. Notable package times were telemetry 2,364.319 seconds,
+application 2,303.312 seconds, release packaging 821.656 seconds, SDK 271.677
+seconds, CLI 181.306 seconds, toolgate 108.335 seconds, API 100.066 seconds,
+and workers 46.491 seconds. A fresh canonical native-evidence attempt remains
+required before DAR-51 receives any platform evidence.
+
 ## 2026-09-15 — DAR-126 extended compaction recovery qualification
 
 Extended compaction now has a dedicated deterministic release gate spanning
