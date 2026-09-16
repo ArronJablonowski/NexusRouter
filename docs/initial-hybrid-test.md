@@ -83,7 +83,12 @@ No HTTP endpoint or API-key setting belongs on this provider. Select the model
 explicitly with `--model coordinator`. Fresh tasks and bounded explicit history
 continuations are supported; see [the continuation guide](codex-history-continuation.md).
 Bounded [output audits](codex-output-audits.md) are also supported. Automatic
-health/routing discovery and compaction remain unsupported for this provider.
+health discovery and automatic route selection remain unsupported for this
+provider. A reviewed version-two compaction plan can roll a completed native
+turn into a checked replacement session; see the
+[plan-backed rollover contract](codex-coordinator-integration.md#plan-backed-context-rollover).
+This is host-directed durable rollover, not provider-native automatic
+compaction, and a paused tool call remains ineligible.
 Memory, skills and judging remain off in the sample.
 
 The first CLI-backed application attempt created durable task

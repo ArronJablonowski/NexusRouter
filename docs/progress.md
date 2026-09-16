@@ -8303,3 +8303,20 @@ race-enabled package, and `go build ./...`. Notable uncached times were telemetr
 2,367.139 seconds, application 2,350.551 seconds, releasepack 849.678 seconds,
 SDK 271.773 seconds, CLI 184.208 seconds, toolgate 110.543 seconds, workers
 47.950 seconds, and hostresources 8.500 seconds.
+
+## 2026-09-16 — Codex rollover documentation correction
+
+The initial Sol/local-worker guide now distinguishes unsupported provider-native
+automatic compaction from the implemented, host-directed version-two rollover
+contract. It links the reviewed plan-backed flow, records that only completed
+native turns are eligible, and preserves the explicit limitations: Codex
+app-server health discovery and automatic route selection remain unsupported.
+
+Implementation inspection confirmed that automatic routing requires discovery
+through the provider HTTP adapter, which intentionally does not accept the
+`codex_app_server` kind. A release-documentation contract test rejects the stale
+blanket claim that Codex compaction remains unsupported and requires the current
+rollover constraints. This documentation-only checkpoint follows the retained
+Darwin/arm64 release evidence for commit `7204da7`; that prior evidence must not
+be attributed to the new commit, and fresh candidate/native evidence is required
+before release qualification advances.
