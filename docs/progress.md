@@ -8254,3 +8254,22 @@ seconds, toolgate 105.021 seconds, API 96.845 seconds, and workers 41.638
 seconds. The implementation was pushed and `origin/main` verified at
 `576e1c42857902b2e2496ae7cc76bc9d5820cfc1`; the same evidence was posted to
 Linear and DAR-123 was closed, unblocking DAR-124, DAR-125, and DAR-126.
+
+## 2026-09-15 — DAR-112 host-wide resource admission
+
+Daemon processes now share a private SQLite/WAL resource coordinator with exact
+process and daemon ownership, immutable execution bindings, bounded leases,
+conservative expiry, and positive-proof orphan recovery. Fixed and adaptive
+policies fail closed on drift or non-canonical schema. Native-process tests cover
+single-slot contention, SIGKILL, stale owners, replay, skew, and recovery.
+
+Primary and auxiliary local inference retain the process-local fast path while
+daemon work additionally acquires the durable claim. Lease loss cancels model
+execution, provider teardown precedes release, and coordinated daemons never use
+peer-unaware unload authority. Health and metrics export aggregates only.
+
+The complete `umask 077; make check` passed formatting/LOC, vet, every
+race-enabled package, and `go build ./...`. Notable uncached times were telemetry
+2,367.139 seconds, application 2,350.551 seconds, releasepack 849.678 seconds,
+SDK 271.773 seconds, CLI 184.208 seconds, toolgate 110.543 seconds, workers
+47.950 seconds, and hostresources 8.500 seconds.

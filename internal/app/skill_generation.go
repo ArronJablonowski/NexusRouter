@@ -165,16 +165,18 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 	if !metadataClean() {
 		return bad()
 	}
+	release := func() error { return nil }
 	if local {
 		if model.RAMBytes == 0 {
 			return bad()
 		}
-		release, err := s.reserveExplicit(ctx, model)
+		ctx, release, err = s.reserveAuxiliaryExecution(ctx, model)
 		if err != nil {
 			return bad()
 		}
-		defer release()
 	}
+	cleanup := auxiliaryCleanup(nil, release)
+	defer func() { _ = cleanup() }()
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if !metadataClean() {
 		return bad()
@@ -187,7 +189,7 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 	if err != nil {
 		return bad()
 	}
-	defer closeProvider()
+	cleanup = auxiliaryCleanup(closeProvider, release)
 	secrets = append(secrets, memorySecrets(s.settings, s.secret)...)
 	if !metadataClean() {
 		return bad()
@@ -284,6 +286,9 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 	g := skills.ModelGenerator{Provider: adapter, ContextEstimator: s.contextEstimator, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: 30 * time.Second, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 	g.StructuredOutput = provider.Kind == "codex_app_server"
 	result, err := g.GenerateDetailed(ctx, key, examples)
+	if cleanupErr := cleanup(); cleanupErr != nil {
+		err = errors.Join(err, cleanupErr)
+	}
 	if err != nil {
 		code := "generation_failed"
 		if ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

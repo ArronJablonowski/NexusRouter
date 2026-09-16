@@ -118,8 +118,17 @@ func TestPressureRejectDefaultAndWaitRetries(t *testing.T) {
 	s.settings.Hardware.LocalPressurePolicy = "wait"
 	s.settings.Hardware.LocalQueueTimeout = "1s"
 	calls = 0
-	out, err := s.runWithPressure(context.Background(), Request{}, func(context.Context, Request) (Result, error) {
+	var admittedTaskID, admittedSessionID string
+	out, err := s.runWithPressure(context.Background(), Request{}, func(_ context.Context, request Request) (Result, error) {
 		calls++
+		if admittedTaskID == "" {
+			admittedTaskID, admittedSessionID = request.taskID, request.sessionID
+		} else if request.taskID != admittedTaskID || request.sessionID != admittedSessionID {
+			t.Fatal("pressure retry changed frozen execution identity")
+		}
+		if request.taskID == "" || request.sessionID != request.taskID {
+			t.Fatal("pressure retry did not preallocate a fresh task and session identity")
+		}
 		if calls == 1 {
 			return Result{}, resources.ErrCapacity
 		}

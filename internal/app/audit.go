@@ -309,6 +309,8 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 		}
 	}
 	var out evaluation.ReviewResult
+	cleanupAuxiliary := func() error { return nil }
+	defer func() { _ = cleanupAuxiliary() }()
 	if injected {
 		started := time.Now()
 		result, invokeErr := evaluation.InvokeEvaluator(ctx, s.evaluator, evaluatorRequest, time.Minute)
@@ -317,21 +319,23 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 		}
 		out.Audit, out.Elapsed, err = result.Audit, time.Since(started), invokeErr
 	} else {
+		release := func() error { return nil }
 		if local {
 			if model.RAMBytes == 0 {
 				return failAdmitted(ErrAdmission)
 			}
-			release, reserveErr := s.reserveExplicit(ctx, model)
+			var reserveErr error
+			ctx, release, reserveErr = s.reserveAuxiliaryExecution(ctx, model)
 			if reserveErr != nil {
 				return failAdmitted(ErrAdmission)
 			}
-			defer release()
 		}
+		cleanupAuxiliary = auxiliaryCleanup(nil, release)
 		adapter, closeProvider, openErr := s.openAuxiliaryProvider(ctx, provider, model, history.Privacy, key)
 		if openErr != nil {
 			return failAdmitted(ErrAdmission)
 		}
-		defer closeProvider()
+		cleanupAuxiliary = auxiliaryCleanup(closeProvider, release)
 		reviewer := evaluation.Reviewer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 		reviewer.StructuredOutput = provider.Kind == "codex_app_server"
 		if operation == nil {
@@ -348,6 +352,9 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 			}
 		}
 		out, err = reviewer.Review(ctx, evaluation.ReviewRequest{Domain: domain, Requirements: requirements, Candidate: candidate, Evidence: evidence})
+		if cleanupErr := cleanupAuxiliary(); cleanupErr != nil {
+			err = errors.Join(err, cleanupErr)
+		}
 	}
 	// A canceled caller must not prevent recording the review's terminal state.
 	// Bound cleanup independently; a crash or unavailable store leaves started

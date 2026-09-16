@@ -341,18 +341,21 @@ func (s *Service) executePreparedSummary(ctx context.Context, write *telemetry.S
 	if admission.provider.APIKeyEnv != "" && admission.key == "" {
 		return fail("summary_failed")
 	}
+	release := func() error { return nil }
 	if admission.local {
-		release, err := s.reserveExplicit(ctx, admission.model)
-		if err != nil {
+		var reserveErr error
+		ctx, release, reserveErr = s.reserveAuxiliaryExecution(ctx, admission.model)
+		if reserveErr != nil {
 			return fail("summary_failed")
 		}
-		defer release()
 	}
+	cleanup := auxiliaryCleanup(nil, release)
+	defer func() { _ = cleanup() }()
 	adapter, closeProvider, err := s.openAuxiliaryProvider(ctx, admission.provider, admission.model, admission.history.Privacy, admission.key)
 	if err != nil {
 		return fail("summary_failed")
 	}
-	defer closeProvider()
+	cleanup = auxiliaryCleanup(closeProvider, release)
 	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
 		native.beforeStream = func() error {
 			secrets := append(admission.secrets, memorySecrets(s.settings, s.secret)...)
@@ -367,6 +370,9 @@ func (s *Service) executePreparedSummary(ctx context.Context, write *telemetry.S
 		ContextTokens: admission.model.ContextTokens, Timeout: time.Minute, EstimatedCost: *admission.model.EstimatedCost,
 		MaxCost: admission.maxCost, StructuredOutput: admission.provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, admission.input, admission.selection.Keep)
+	if cleanupErr := cleanup(); cleanupErr != nil {
+		err = errors.Join(err, cleanupErr)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return fail("canceled")

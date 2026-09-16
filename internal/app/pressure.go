@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"time"
 
@@ -14,6 +15,15 @@ var ErrPressureTimeout = errors.New("resource pressure admission timed out")
 // runWithPressure retries only pre-task resource denials. The queue deadline is
 // carried separately from execution: admitted work keeps the caller's context.
 func (s *Service) runWithPressure(ctx context.Context, r Request, execute func(context.Context, Request) (Result, error)) (Result, error) {
+	// Freeze one execution identity across pressure retries. A denied attempt
+	// never becomes durable, while an admitted retry binds its resource claim
+	// and TaskStarted event to the same identity.
+	if r.runtimeHostAdmission == nil && r.taskID == "" {
+		r.taskID = rand.Text()
+	}
+	if r.runtimeHostAdmission == nil && r.sessionID == "" && r.ContinueTaskID == "" {
+		r.sessionID = r.taskID
+	}
 	if s.settings.Hardware.LocalPressurePolicy != "wait" {
 		return execute(ctx, r)
 	}

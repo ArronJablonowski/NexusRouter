@@ -126,6 +126,13 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 	} else {
 		add("resources", "thermal", "healthy", "capacity_available")
 	}
+	if _, installed, reservationErr := s.hostReservationSnapshot(ctx, time.Now().UTC()); installed {
+		if reservationErr != nil {
+			add("resources", "reservations", "unknown", "metrics_unknown")
+		} else {
+			add("resources", "reservations", "healthy", "available")
+		}
+	}
 	enabled := make([]bool, len(s.settings.Models))
 	policyBlocked := make([]bool, len(s.settings.Models))
 	for i, m := range s.settings.Models {

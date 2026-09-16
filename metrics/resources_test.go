@@ -24,9 +24,14 @@ func TestResourcesFromSnapshotFixedVocabularyAndOwnership(t *testing.T) {
 		t.Fatal(got, err)
 	}
 	want := []int64{12, 1000, 600, 7, 100, 40, 1, 1}
-	for i, measurement := range got.Measurements {
+	for i, measurement := range got.Measurements[:8] {
 		if !measurement.Available || measurement.Name != resourceDefinitions[i].name || measurement.Value != want[i] {
 			t.Fatal(i, measurement)
+		}
+	}
+	for i, measurement := range got.Measurements[8:] {
+		if measurement.Available || measurement.Value != 0 {
+			t.Fatal(i+8, measurement)
 		}
 	}
 	*source.SwapUsed = 99
@@ -34,6 +39,34 @@ func TestResourcesFromSnapshotFixedVocabularyAndOwnership(t *testing.T) {
 	body, _ := json.Marshal(got)
 	if strings.Contains(string(body), "private") || got.Measurements[3].Value != 7 || got.Measurements[4].Value != 100 {
 		t.Fatal(string(body))
+	}
+}
+
+func TestWithReservationSnapshotUsesFixedIdentifierFreeGauges(t *testing.T) {
+	at := time.Unix(1_800_000_000, 0).UTC()
+	base, err := ResourcesFromSnapshot(resources.Snapshot{Time: at, CPUs: 8, TotalRAM: 100, AvailableRAM: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attached, err := WithReservationSnapshot(base, resources.ReservationSnapshot{
+		Version: 1, ObservedAt: at, Active: 2, Expired: 3, Released: 4, RAMBytes: 20,
+		AggregateVRAMBytes: 5, DevicePools: []resources.ReservationPoolSnapshot{{Active: 1, VRAMBytes: 7}},
+	})
+	if err != nil || attached.validate(at) != nil {
+		t.Fatal(attached, err)
+	}
+	want := []int64{1, 2, 3, 4, 20, 12}
+	for index, value := range want {
+		measurement := attached.Measurements[8+index]
+		if !measurement.Available || measurement.Value != value {
+			t.Fatal(index, measurement)
+		}
+	}
+	body, _ := json.Marshal(attached)
+	for _, forbidden := range []string{"task-", "model-", "provider-", "gpu-", "process-", "config-"} {
+		if strings.Contains(strings.ToLower(string(body)), forbidden) {
+			t.Fatal("identifier leaked", string(body))
+		}
 	}
 }
 

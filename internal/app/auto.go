@@ -33,30 +33,37 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
-	toolExtension        *tools.Extension
-	toolReviewer         tools.ApprovalReviewer
-	toolPresenter        tools.ApprovalPresenter
-	providerFactory      providers.Factory
-	codexLauncher        codexLaunch
-	contextEstimator     providers.ContextEstimator
-	contextEngine        contextengine.Engine
-	evaluator            evaluation.Evaluator
-	eventSink            runtime.EventSink
-	eventSinkSequencer   *configuredSinkSequencer
-	presentationTextSink PresentationTextSink
-	memoryStore          memory.Store
-	skillStore           skills.Store
-	execution            chan struct{}
-	discovery            *modelHealthCache
-	settings             config.Settings
-	secret               func(string) string
-	budget               *resources.Budget
-	residencyMu          sync.Mutex
-	residencies          map[string]*residencyEndpoint
-	profile              func(context.Context) (resources.Snapshot, error)
-	draw                 func() float64
-	now                  func() time.Time
-	mu                   sync.Mutex
+	toolExtension              *tools.Extension
+	toolReviewer               tools.ApprovalReviewer
+	toolPresenter              tools.ApprovalPresenter
+	providerFactory            providers.Factory
+	codexLauncher              codexLaunch
+	contextEstimator           providers.ContextEstimator
+	contextEngine              contextengine.Engine
+	evaluator                  evaluation.Evaluator
+	eventSink                  runtime.EventSink
+	eventSinkSequencer         *configuredSinkSequencer
+	presentationTextSink       PresentationTextSink
+	memoryStore                memory.Store
+	skillStore                 skills.Store
+	execution                  chan struct{}
+	discovery                  *modelHealthCache
+	settings                   config.Settings
+	secret                     func(string) string
+	budget                     *resources.Budget
+	resourceLimits             resources.Limits
+	resourceCoordinatorMu      sync.Mutex
+	resourceCoordinator        resources.Coordinator
+	resourceOwner              resources.ReservationOwner
+	resourceReservationStarted bool
+	resourceReservationTTL     time.Duration
+	resourceRenewTimeout       time.Duration
+	residencyMu                sync.Mutex
+	residencies                map[string]*residencyEndpoint
+	profile                    func(context.Context) (resources.Snapshot, error)
+	draw                       func() float64
+	now                        func() time.Time
+	mu                         sync.Mutex
 }
 
 func NewService(s config.Settings, secret func(string) string) (*Service, error) {
@@ -101,7 +108,7 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 		// must not invent capacity or allow local execution without admission.
 		profile = func(context.Context) (resources.Snapshot, error) { return resources.Snapshot{}, resources.ErrProfile }
 	}
-	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, profile: profile, draw: rand.Float64, now: time.Now}, nil
+	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, resourceLimits: limits, resourceReservationTTL: hostResourceTTL, resourceRenewTimeout: hostResourceRenewTimeout, profile: profile, draw: rand.Float64, now: time.Now}, nil
 }
 
 func (s *Service) routingNow() time.Time {
@@ -538,7 +545,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	s.mu.Unlock()
 	var selected routing.Selection
 	var model config.Model
-	var release func()
+	var release func() error
 	capacityDenied := false
 	for {
 		if profileErr != nil {
@@ -561,6 +568,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		}
 		candidateRequest := r
 		candidateRequest.ModelID = model.ID
+		if candidateRequest.continuation != nil {
+			candidateRequest.sessionID = candidateRequest.continuation.SessionID
+		}
 		candidateRequest, err = s.prepareExplicitApprovedCompaction(ctx, candidateRequest, model)
 		if err != nil {
 			return Result{}, ErrAdmission
@@ -569,9 +579,11 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 			r = candidateRequest
 			break
 		}
-		release, err = s.reserveExplicit(ctx, model)
+		var reservedContext context.Context
+		reservedContext, release, err = s.reservePrimary(executionCtx, ctx, model, candidateRequest)
 		if err == nil {
 			r = candidateRequest
+			executionCtx = reservedContext
 			for _, provider := range cfg.Providers {
 				if provider.ID == model.Provider && provider.ManageResidency {
 					// Never attach a pre-unload observation to a managed route.
@@ -612,7 +624,12 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		return Result{}, err
 	}
 	if release != nil {
-		defer release()
+		defer func() {
+			if releaseErr := release(); releaseErr != nil {
+				result = Result{}
+				runErr = errors.Join(runErr, releaseErr)
+			}
+		}()
 	}
 	// Fingerprint configuration without persisting endpoints or local paths.
 	redacted, _ := cfg.RedactedJSON()

@@ -331,6 +331,12 @@ confirmed low-memory model switching. This requires exclusive use by one
 DarwinRouter Service; shared servers must leave it disabled. Logical reservation
 release alone does not unload a model. See [model residency](docs/model-residency.md).
 
+Daemon processes also share a private per-host SQLite admission coordinator, so
+different DarwinRouter workspaces cannot independently overcommit the same local
+slot. Claims are process/daemon fenced, renewed during execution, conservatively
+recovered after crashes, and reported only as identifier-free aggregates. See
+[host resource admission](docs/host-resource-admission.md).
+
 ### Replaceable context planning
 
 Embedding applications can replace context assembly, estimation and compaction

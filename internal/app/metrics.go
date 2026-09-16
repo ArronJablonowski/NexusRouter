@@ -37,6 +37,11 @@ func (s *Service) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 			}
 		}
 	}
+	if reservations, installed, reservationErr := s.hostReservationSnapshot(ctx, observedAt); installed && reservationErr == nil {
+		if measured, measurementErr := metrics.WithReservationSnapshot(resourceMetrics, reservations); measurementErr == nil {
+			resourceMetrics = measured
+		}
+	}
 	if ctx.Err() != nil {
 		return metrics.Snapshot{}, ErrMetrics
 	}

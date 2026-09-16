@@ -68,7 +68,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	token := strings.Repeat("lifecycle-fixture-", 3)
 	run := func(action string) (daemon.Status, error) {
 		cmd := exec.CommandContext(ctx, binary, "daemon", action, "--config", configuration)
-		cmd.Env = append(os.Environ(), "DARWIN_API_TOKEN="+token)
+		cmd.Env = append(os.Environ(), "DARWIN_API_TOKEN="+token, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(dir, "owners"))
 		var out, diagnostic bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &out, &diagnostic
 		err := cmd.Run()

@@ -13,7 +13,7 @@ import (
 
 var ErrInvalid = errors.New("invalid metrics snapshot")
 
-const SnapshotVersion = 9
+const SnapshotVersion = 10
 
 type Count struct {
 	State string `json:"state"`

@@ -111,6 +111,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		fmt.Fprintln(stderr, "cannot initialize daemon identity")
 		return 1
 	}
+	closeResourceCoordinator, err := app.InstallHostResourceCoordinator(ctx, service, *instance)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot initialize host resource coordinator")
+		return 1
+	}
+	defer closeResourceCoordinator()
 	db, err := telemetry.Open(ctx, s.Telemetry.Database)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot open daemon storage")
@@ -477,6 +483,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	}
 	if err := dispatcher.Close(); err != nil {
 		fmt.Fprintln(stderr, "task dispatcher requires inspection")
+		return 1
+	}
+	if err := closeResourceCoordinator(); err != nil {
+		fmt.Fprintln(stderr, "host resource coordinator requires inspection")
 		return 1
 	}
 	return 0

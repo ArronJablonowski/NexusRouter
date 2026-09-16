@@ -56,7 +56,7 @@ func TestDaemonLearningAdvancesAndResumesAcrossProcesses(t *testing.T) {
 	token := strings.Repeat("learning-process-token-", 2)
 	start := func() func() {
 		cmd := exec.CommandContext(ctx, binary, "serve", "--config", path)
-		cmd.Env = append(os.Environ(), "DARWIN_API_TOKEN="+token)
+		cmd.Env = append(os.Environ(), "DARWIN_API_TOKEN="+token, "DARWIN_PROCESS_OWNER_DIR="+filepath.Join(dir, "owners"))
 		var output bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &output, &output
 		if err := cmd.Start(); err != nil {

@@ -31,7 +31,7 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 	return svc.runWithPressure(ctx, r, svc.runExplicit)
 }
 
-func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
+func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, runErr error) {
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
 	if classifyErr != nil {
@@ -98,18 +98,27 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 			if provider.APIKeyEnv != "" && (s.secret == nil || s.secret(provider.APIKeyEnv) == "") {
 				return Result{}, ErrAdmission
 			}
-			if r.ContinueTaskID != "" && r.continuation == nil {
-				db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
-				if err != nil {
-					return Result{}, ErrAdmission
-				}
-				r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(s.settings, s.secret))
-				db.Close()
-				if err != nil {
-					return Result{}, ErrAdmission
-				}
-			}
 		}
+	}
+	// A durable local reservation must bind the same session identity that the
+	// eventual TaskStarted event will use. Resolve continuation lineage before
+	// capacity admission instead of discovering it after a claim is held.
+	if model.Locality == "local" && r.ContinueTaskID != "" && r.continuation == nil {
+		db, openErr := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+		if openErr != nil {
+			return Result{}, ErrAdmission
+		}
+		r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(s.settings, s.secret))
+		closeErr := db.Close()
+		if err != nil || closeErr != nil {
+			return Result{}, ErrAdmission
+		}
+	}
+	if r.continuation != nil {
+		if r.sessionID != "" && r.sessionID != r.continuation.SessionID {
+			return Result{}, ErrAdmission
+		}
+		r.sessionID = r.continuation.SessionID
 	}
 	admission := ctx
 	if r.admissionContext != nil {
@@ -119,11 +128,17 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 		if model.RAMBytes == 0 {
 			return Result{}, ErrAdmission
 		}
-		release, err := s.reserveExplicit(admission, model)
-		if err != nil {
-			return Result{}, errors.Join(ErrAdmission, err)
+		reservedContext, release, reserveErr := s.reservePrimary(ctx, admission, model, r)
+		if reserveErr != nil {
+			return Result{}, errors.Join(ErrAdmission, reserveErr)
 		}
-		defer release()
+		ctx = reservedContext
+		defer func() {
+			if releaseErr := release(); releaseErr != nil {
+				result = Result{}
+				runErr = errors.Join(runErr, releaseErr)
+			}
+		}()
 	}
 	if ctx.Err() != nil || admission.Err() != nil {
 		return Result{}, ErrAdmission
@@ -138,6 +153,10 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (Result, error) {
 }
 
 func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (release func(), err error) {
+	return s.reserveAuxiliary(ctx, model)
+}
+
+func (s *Service) reserveExplicitLocal(ctx context.Context, model config.Model) (release func(), err error) {
 	for _, provider := range s.settings.Providers {
 		if provider.ID == model.Provider && provider.ManageResidency {
 			return s.reserveManagedResidency(ctx, provider, model)

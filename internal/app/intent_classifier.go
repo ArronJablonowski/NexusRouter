@@ -91,16 +91,17 @@ func (s *Service) prepareAuxiliaryIntent(ctx context.Context, db *telemetry.Stor
 		state.loaded, state.skipped = true, true
 		return r, nil
 	}
-	release := func() {}
+	release := func() error { return nil }
 	if model.Locality == "local" {
 		var err error
-		release, err = s.reserveExplicit(ctx, model)
+		ctx, release, err = s.reserveAuxiliaryExecution(ctx, model)
 		if err != nil {
 			state.loaded, state.skipped = true, true
 			return r, nil
 		}
 	}
-	defer release()
+	cleanup := auxiliaryCleanup(nil, release)
+	defer func() { _ = cleanup() }()
 	taskID := rand.Text()
 	sessionID := taskID
 	if r.continuation != nil {
@@ -136,10 +137,12 @@ func (s *Service) prepareAuxiliaryIntent(ctx context.Context, db *telemetry.Stor
 	}
 	adapter, closeProvider, openErr := s.openAuxiliaryProvider(ctx, provider, model, privacy, key)
 	if openErr != nil {
+		_ = cleanup()
 		failure := s.finishClassifierFailure(ctx, db, state, attempt, classification.CodeProviderFailed, nil, 0)
 		return bindFailedClassification(r, state), failure
 	}
-	defer closeProvider()
+	cleanup = auxiliaryCleanup(closeProvider, release)
+	defer func() { _ = cleanup() }()
 	timeout, _ := config.Duration(s.settings.Routing.Classifier.Timeout)
 	classifier, buildErr := classification.NewModelClassifier(adapter, classification.ModelConfig{
 		Model: model.Model, Timeout: timeout, MaxInputTokens: s.settings.Routing.Classifier.MaxInputTokens,
@@ -152,6 +155,9 @@ func (s *Service) prepareAuxiliaryIntent(ctx context.Context, db *telemetry.Stor
 		return bindFailedClassification(r, state), failure
 	}
 	result, classifyErr := classifier.Classify(ctx, input)
+	if cleanupErr := cleanup(); cleanupErr != nil {
+		classifyErr = errors.Join(classifyErr, cleanupErr)
+	}
 	finished := time.Now().UTC()
 	if classifyErr != nil {
 		code := classification.CodeProviderFailed

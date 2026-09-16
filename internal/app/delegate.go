@@ -54,7 +54,8 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 	default:
 		return Result{}, ErrAdmission
 	}
-	r := Request{ModelID: s.settings.Workers.DelegateModel, Prompt: prompt, Validation: validation, LocalRequired: localOnly, delegatedParent: parent, submissionID: submissionID, submissionToken: submissionToken, eventDelivery: delivery}
+	childID := rand.Text()
+	r := Request{taskID: childID, sessionID: childID, ModelID: s.settings.Workers.DelegateModel, Prompt: prompt, Validation: validation, LocalRequired: localOnly, delegatedParent: parent, submissionID: submissionID, submissionToken: submissionToken, eventDelivery: delivery}
 	if s.settings.Workers.DelegateReadTools {
 		capability, ok := ctx.Value(delegateToolsKey{}).(*delegateTools)
 		if !ok || capability == nil || capability.Registry == nil || capability.Policy == nil || capability.Policy.Decide("read_file", "workspace") != tools.Allow {

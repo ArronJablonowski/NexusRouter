@@ -38,6 +38,12 @@ var resourceDefinitions = []resourceDefinition{
 	{"vram_available_bytes", "By"},
 	{"thermal_pressure", "{bool}"},
 	{"unified_memory", "{bool}"},
+	{"reservation_coordinator", "{bool}"},
+	{"reservations_active", "{reservation}"},
+	{"reservations_expired", "{reservation}"},
+	{"reservations_released", "{reservation}"},
+	{"reserved_ram_bytes", "By"},
+	{"reserved_vram_bytes", "By"},
 }
 
 // UnavailableResources creates the canonical explicit-unavailability block.
@@ -110,6 +116,35 @@ func ResourcesFromSnapshot(snapshot resources.Snapshot) (Resources, error) {
 	return r, nil
 }
 
+// WithReservationSnapshot attaches fixed, identifier-free durable admission
+// gauges. It never exposes reservation, owner, task, model, device or config
+// identities.
+func WithReservationSnapshot(r Resources, snapshot resources.ReservationSnapshot) (Resources, error) {
+	if r.validate(time.Time{}) != nil || snapshot.Validate() != nil || snapshot.Active > math.MaxInt64 || snapshot.Expired > math.MaxInt64 || snapshot.Released > math.MaxInt64 {
+		return Resources{}, ErrInvalid
+	}
+	reservedVRAM := snapshot.AggregateVRAMBytes
+	for _, pool := range snapshot.DevicePools {
+		if math.MaxUint64-reservedVRAM < pool.VRAMBytes {
+			return Resources{}, ErrInvalid
+		}
+		reservedVRAM += pool.VRAMBytes
+	}
+	values := []uint64{1, uint64(snapshot.Active), uint64(snapshot.Expired), uint64(snapshot.Released), snapshot.RAMBytes, reservedVRAM}
+	for offset, value := range values {
+		if value > math.MaxInt64 {
+			return Resources{}, ErrInvalid
+		}
+		measurement := &r.Measurements[8+offset]
+		measurement.Available = true
+		measurement.Value = int64(value)
+	}
+	if r.validate(time.Time{}) != nil {
+		return Resources{}, ErrInvalid
+	}
+	return r, nil
+}
+
 func (s Snapshot) validateResources() error {
 	return s.Resources.validate(s.ObservedAt)
 }
@@ -126,7 +161,7 @@ func (r Resources) validate(parent time.Time) error {
 		if m.Name != def.name || m.Value < 0 || (!m.Available && m.Value != 0) {
 			return ErrInvalid
 		}
-		if (i == 6 || i == 7) && m.Value > 1 {
+		if (i == 6 || i == 7 || i == 8) && m.Value > 1 {
 			return ErrInvalid
 		}
 	}

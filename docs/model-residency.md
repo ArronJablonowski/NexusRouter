@@ -21,8 +21,10 @@ providers:
 The default is false. This setting authorizes unloading configured idle models;
 it does not delete models from disk, prune routing candidates, pull models, or
 change tool permissions. Existing user configuration is not changed automatically.
-An embedding host must reuse a Service to share coordination. Separate one-shot
-CLI processes and multiple daemons are not coordinated with each other.
+An embedding host must reuse a Service to share process-local coordination.
+Daemon processes additionally use the private per-host resource coordinator,
+so independent DarwinRouter workspaces contend for the same bounded local
+capacity rather than trusting separate in-memory counters.
 
 Managed providers require a loopback root endpoint, local models and distinct
 canonical model identities. Duplicate provider entries sharing a loopback port
@@ -50,9 +52,13 @@ RAM/VRAM/concurrency budget must still admit the replacement. Reported model
 sizes are never credited as reclaimed physical memory. A failed or ambiguous
 unload does not dispatch the replacement. The next admission must inspect
 current provider state rather than assume that the previous operation succeeded.
-Within the Service, an uncertain unload remains blocked until fresh inventory
-shows both its identity and original digest absent; queued retries do not send
-that unload again. This uncertainty state is not durable across process restart.
+Within an uncoordinated embedding Service, an uncertain unload remains blocked
+until fresh inventory shows both its identity and original digest absent;
+queued retries do not send that unload again. A daemon with host coordination
+does not invoke this process-local unload authority at all. Ollama may load the
+selected model during inference, but DarwinRouter will not unload or steal a
+peer daemon's active or uncertain resident model. Durable provider-lifecycle
+operations remain a separate post-MVP enhancement.
 
 Residency management is authorized admission-time maintenance, not a guarantee
 that the task will subsequently run. Basic request constraints, credentials and
@@ -75,12 +81,14 @@ they are never silently evicted.
 
 ## Qualification limits
 
-The implementation is Ollama-first. Custom provider factories and other inference
-engines do not acquire unload authority implicitly. No shared host lock, external
-client fencing, GPU placement verification, or durable residency ownership is
-claimed. Provider absence is an observation, not protection against another
-client immediately reloading that model. Physical memory recovery is separately
-checked through the resource profiler and remains subject to its limitations.
+The optional unload implementation is Ollama-first. Custom provider factories
+and other inference engines do not acquire unload authority implicitly. The
+daemon's durable host reservation coordinates DarwinRouter processes only; it
+does not fence outside clients, prove GPU placement, or claim durable provider
+residency ownership. Provider absence is an observation, not protection against
+another client immediately reloading that model. Physical memory recovery is
+separately checked through the resource profiler and remains subject to its
+limitations.
 
 Tests use controlled local HTTP servers and injected hardware observations;
 they do not establish physical VRAM release on all supported hardware classes.

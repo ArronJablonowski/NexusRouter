@@ -92,16 +92,19 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	if !selectionValueClean(attempt, secrets) {
 		return bad()
 	}
+	release := func() error { return nil }
 	if local {
 		if model.RAMBytes == 0 {
 			return bad()
 		}
-		release, profileErr := s.reserveExplicit(ctx, model)
+		var profileErr error
+		ctx, release, profileErr = s.reserveAuxiliaryExecution(ctx, model)
 		if profileErr != nil {
 			return bad()
 		}
-		defer release()
 	}
+	cleanup := auxiliaryCleanup(nil, release)
+	defer func() { _ = cleanup() }()
 	write, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		return bad()
@@ -131,7 +134,7 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	if err != nil {
 		return fail("summary_failed", errors.New("summary provider unavailable"))
 	}
-	defer closeProvider()
+	cleanup = auxiliaryCleanup(closeProvider, release)
 	if native, ok := adapter.(*codexAuxiliaryProvider); ok {
 		// A changed credential must not silently alter the request after context
 		// estimation. Recheck the original source before launch and after startup.
@@ -146,6 +149,9 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 	}
 	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost, StructuredOutput: provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, input, keep)
+	if cleanupErr := cleanup(); cleanupErr != nil {
+		err = errors.Join(err, cleanupErr)
+	}
 	if err != nil {
 		code := "summary_failed"
 		if ctx.Err() != nil {
