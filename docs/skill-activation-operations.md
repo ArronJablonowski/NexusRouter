@@ -65,5 +65,11 @@ qualification remains separate.
 
 The opt-in Go-host learning controller now uses these receipts with a durable
 activation intent and a named trusted validator; see
-[background learning](background-learning.md). Standalone daemon validator
-configuration and automatic regression monitoring remain open.
+[background learning](background-learning.md). The configured daemon/SDK
+lifecycle can select a registered trusted validator and own durable automatic
+regression monitoring; the stock binary exposes only the protected
+`darwin_observed_tools_activation_v1` provenance validator. General semantic
+domain validators, causal/confounder controls, repeated-look correction, safe
+long-term receipt retention and cross-store power-loss qualification remain
+open. Outcome-based rollback has a separate disabled-by-default configured
+supervisor; see [configured outcome supervision](configured-outcome-supervision.md).

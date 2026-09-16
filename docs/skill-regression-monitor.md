@@ -76,13 +76,16 @@ joined cancellation, policy gates, and restart-safe catalog revisions. These are
 synthetic local fixtures, not evidence that an arbitrary validator detects
 semantic or subjective regressions.
 
-This implements periodic deterministic revalidation for Go hosts. Statistical
-outcome-based regression detection still needs skill-version attribution,
-baselines, minimum samples, and task-appropriate user-feedback weighting.
+This implements periodic deterministic revalidation for Go hosts. The separate
+disabled-by-default [configured outcome supervisor](configured-outcome-supervision.md)
+implements exposure-attributed, bounded comparison and activation-bound rollback
+with task-appropriate evidence-source rules. It remains observational rather
+than causal and has no statistical correction for repeated looks.
 Explicit [regression operations](skill-regression-operations.md) now provide
 passing-check audit and exact lost-acknowledgement recognition for Go hosts; this
 legacy monitor retains its in-memory cursor. The separate opt-in
 [durable named monitor](durable-skill-regression-monitor.md) now persists operation
 identities, scheduling progress and failed-check fences across restarts.
-Standalone daemon validator configuration and cross-store power-loss
-qualification remain open. No user monitor is enabled by this change.
+The [configured daemon/SDK lifecycle](configured-learning-supervision.md) can
+select a registered trusted validator and own that durable monitor. Cross-store
+power-loss qualification remains open. No user monitor is enabled by default.

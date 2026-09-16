@@ -6,8 +6,10 @@ The ordinary daemon path does not manufacture validation evidence or activate a
 skill automatically. An explicitly configured Go host can additionally supply
 a trusted validator through the opt-in path described below or the
 [configured learning lifecycle](configured-learning-supervision.md), which also
-owns optional durable regression monitoring. The stock CLI has no registered
-domain validator and rejects unknown enabled selections.
+owns optional durable regression monitoring. The stock CLI registers only the
+protected `darwin_observed_tools_activation_v1` provenance validator; custom
+semantic domain validators require trusted Go-host registration, and unknown
+enabled selections are rejected.
 The default remains off; upgrading DarwinRouter does not enable model calls.
 
 ## Enable deliberately
@@ -151,8 +153,11 @@ Stop older writers and back up the database before schema-26 migration. The
 activation itself separately upgrades the file catalog to schema 3. Named trusted
 validators can now be selected through [configured supervision](configured-learning-supervision.md).
 The stock binary has no installed qualified domain validator. Production validator
-qualification, operator intent resolution, statistical outcome regression monitoring,
-and power-loss qualification across both stores remain open.
+qualification, operator intent resolution, causal/confounder controls,
+repeated-look correction and power-loss qualification across both stores remain
+open. A separate [configured outcome supervisor](configured-outcome-supervision.md)
+provides disabled-by-default exposure-attributed monitoring and activation-bound
+rollback without claiming causal proof.
 
 Trusted Go hosts can separately start [periodic deterministic regression
 monitoring](skill-regression-monitor.md). Its rollback policy is independent of
@@ -195,7 +200,7 @@ process tests verify that ticks advance and resume durable empty-workflow state
 without contacting a provider. Migration, CAS, corruption and rollback tests
 cover storage; CLI/SDK tests cover scoped read-only inspection.
 
-This is not semantic equivalence proof, standalone daemon validation/activation,
+This is not semantic equivalence proof, broad semantic domain validation,
 cross-tenant isolation, large-history performance qualification, or live learning
 enabled on the user's data. Recovery controls for discarding permanently stale
 sources and reconciling uncertain generation outcomes remain future work.

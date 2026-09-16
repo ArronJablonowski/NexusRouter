@@ -99,9 +99,9 @@ or guarantee validity under repeated testing. Privacy stratification and global
 session exclusions reduce specific ambiguities; they do not prove independence.
 
 This operation does not activate or roll back skills, change routing fitness,
-run validation commands or dispatch models. Qualified production validators,
-durable repeated-monitoring policy, confounder handling, and activation-bound
-outcome rollback supervision remain required for fully automatic outcome-based
-learning. A separate [trusted-host, opt-in outcome action](skill-outcome-rollback.md)
-now binds one committed decision to a first candidate activation and its validated
-predecessor. Read-only selection itself grants no mutation authority.
+run validation commands or dispatch models. A separate
+[configured outcome supervisor](configured-outcome-supervision.md) now owns
+durable repeated monitoring and activation-bound rollback for an explicitly
+enabled policy. Qualified semantic validators, causal/confounder controls and
+repeated-look correction remain required; read-only selection itself grants no
+mutation authority.

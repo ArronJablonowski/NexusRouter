@@ -8320,3 +8320,29 @@ rollover constraints. This documentation-only checkpoint follows the retained
 Darwin/arm64 release evidence for commit `7204da7`; that prior evidence must not
 be attributed to the new commit, and fresh candidate/native evidence is required
 before release qualification advances.
+
+## 2026-09-16 — Configured skill-supervision documentation reconciliation
+
+Implementation and PRD inspection found a stale documentation cluster that still
+described daemon validator selection, durable regression scheduling and
+activation-bound outcome supervision as unimplemented. The configured daemon/SDK
+learning lifecycle already resolves registered trusted validators, owns the
+durable named deterministic monitor and exposes only the protected
+`darwin_observed_tools_activation_v1` validator in the stock binary. A separate
+disabled-by-default configured outcome supervisor already owns durable,
+exposure-attributed comparisons and activation-bound rollback.
+
+The activation, background-learning, deterministic-regression, durable-monitor,
+outcome-comparison, outcome-selection, outcome-rollback, configured-supervision
+and release-note guides now describe those implemented boundaries consistently.
+They retain the actual limitations: no broad semantic validator, causal proof,
+confounder control, repeated-look correction, automatic enablement, arbitrary
+generated validation command, safe unbounded retention or cross-store
+power-loss qualification. A release-documentation contract test requires the
+current lifecycle claims and rejects the superseded statements.
+
+Before this documentation audit, a clean pushed `40d5673` candidate was frozen
+and independently verified, including license evidence and Darwin/arm64 native
+install/migration/backup/rollback records. Those records remain exact evidence
+for `40d5673` only; this follow-on source change requires a new candidate identity
+and fresh native evidence before any later commit can advance release approval.

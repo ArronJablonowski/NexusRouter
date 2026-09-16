@@ -82,10 +82,14 @@ binding is checked on retrieval rather than repeatedly hashing every historical
 prefix during all unrelated reads. These are consistency checks on trusted local
 storage, not cryptographic attestation of executed validation.
 
-The existing periodic monitor still uses its in-memory cursor and legacy check
-method. Persisted scheduling identities/fairness, standalone daemon validator
-configuration, statistical outcome regression detection and crash/power-loss
-qualification remain open. No user learner or monitor is enabled by this change.
+The legacy `StartSkillRegression` periodic monitor still uses its in-memory
+cursor and legacy check method. The separate durable named monitor persists
+scheduling identity, fairness state and exact pending operations, and the
+configured daemon/SDK lifecycle can own it with a registered trusted validator.
+Outcome-based rollback uses a separate disabled-by-default configured supervisor;
+its causal/confounder controls and repeated-look correction remain open. Safe
+long-term receipt retention and cross-store crash/power-loss qualification also
+remain open. No user learner or monitor is enabled by default.
 
 An owned-subprocess test qualifies the narrower boundary after the catalog commit
 returns but before its wrapper delivers the result: SIGKILL, reopen, exact receipt

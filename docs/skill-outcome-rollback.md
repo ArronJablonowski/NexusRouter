@@ -157,7 +157,9 @@ complete through the application/SDK. Direct core hosts remain responsible for
 their explicit selection guard; the core itself has no SQLite dependency.
 
 This provides fixed-source invalidation, not a refreshed latest-window report or
-checkpoint age/expiry policy. Workload drift and repeated monitoring remain open.
+checkpoint age/expiry policy. The configured supervisor performs repeated
+monitoring, but workload-drift controls and statistical correction for repeated
+looks remain open.
 
 An intent with no checkpoint and no receipt remains unresolved and cannot
 reselect. This includes old schema7 attempts and death before checkpoint save.
@@ -251,4 +253,7 @@ evidence, SDK-owned lifecycle, and daemon startup/health/shutdown composition.
 An owned subprocess is killed after commit but before wrapper
 acknowledgement; retry invokes no selector and adds no rollback. This does not
 qualify interruption during rename/fsync, physical power loss, production domain
-validators, causal outcome attribution, or durable supervisor scheduling.
+validators, causal outcome attribution, or repeated-look correction. Durable
+supervisor scheduling is qualified separately through restart, readiness and
+shutdown fixtures described in
+[configured outcome supervision](configured-outcome-supervision.md).

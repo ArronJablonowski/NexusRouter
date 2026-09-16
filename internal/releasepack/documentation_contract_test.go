@@ -69,3 +69,81 @@ func TestInitialHybridGuideTracksCodexRolloverContract(t *testing.T) {
 		t.Errorf("initial hybrid guide retains stale Codex rollover claim %q", stale)
 	}
 }
+
+func TestSkillSupervisionDocumentationTracksConfiguredLifecycle(t *testing.T) {
+	root, err := command(t.Context(), ".", environment(), "git", "rev-parse", "--show-toplevel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	required := map[string][]string{
+		"docs/skill-activation-operations.md": {
+			"The configured daemon/SDK",
+			"darwin_observed_tools_activation_v1",
+		},
+		"docs/background-learning.md": {
+			"The stock CLI registers only the",
+			"darwin_observed_tools_activation_v1",
+		},
+		"docs/skill-regression-operations.md": {
+			"The separate durable named monitor persists",
+			"configured daemon/SDK lifecycle can own it",
+		},
+		"docs/skill-regression-monitor.md": {
+			"[configured daemon/SDK lifecycle](configured-learning-supervision.md)",
+		},
+		"docs/durable-skill-regression-monitor.md": {
+			"configured daemon/SDK lifecycle can bind the monitor",
+			"Outcome-based rollback uses a separate configured",
+		},
+		"docs/configured-learning-supervision.md": {
+			"[configured supervisor](configured-outcome-supervision.md)",
+		},
+		"docs/skill-comparison-selection.md": {
+			"[configured outcome supervisor](configured-outcome-supervision.md)",
+			"durable repeated monitoring and activation-bound rollback",
+		},
+		"docs/skill-outcome-comparison.md": {
+			"[configured outcome supervisor](configured-outcome-supervision.md)",
+			"durable repeated monitoring and activation-bound rollback",
+		},
+		"docs/skill-outcome-rollback.md": {
+			"The configured supervisor performs repeated",
+			"supervisor scheduling is qualified separately",
+		},
+		"docs/release-notes.md": {
+			"opt-in configured daemon/SDK",
+			"[configured supervision](configured-learning-supervision.md)",
+			"separate outcome supervisor",
+		},
+	}
+	stale := []string{
+		"Standalone daemon validator configuration and automatic regression monitoring remain open",
+		"Persisted scheduling identities/fairness, standalone daemon validator configuration",
+		"Standalone daemon validator configuration and cross-store power-loss",
+		"subjective user-feedback weighting and standalone daemon configuration remain open",
+		"daemon validation and durable monitor scheduling remain open",
+		"statistical outcome regression monitoring",
+		"Statistical outcome regression, safe long-term",
+		"durable repeated-monitoring policy, confounder handling",
+		"durable activation-bound outcome rollback are still required",
+		"Workload drift and repeated monitoring remain open",
+		"causal outcome attribution, or durable supervisor scheduling",
+	}
+	for name, phrases := range required {
+		body, readErr := os.ReadFile(filepath.Join(root, name))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		text := string(body)
+		for _, phrase := range phrases {
+			if !strings.Contains(text, phrase) {
+				t.Errorf("%s does not track configured skill supervision %q", name, phrase)
+			}
+		}
+		for _, phrase := range stale {
+			if strings.Contains(text, phrase) {
+				t.Errorf("%s retains stale skill-supervision claim %q", name, phrase)
+			}
+		}
+	}
+}

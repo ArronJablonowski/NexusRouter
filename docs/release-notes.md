@@ -417,8 +417,13 @@ operator records.
 
 - Operation-keyed deterministic skill checks with durable pass receipts,
   atomic failure/rollback receipts and historical retry recognition. Explicit
-  Go-host control only; daemon validation and durable monitor scheduling remain
-  open. See [regression operations](skill-regression-operations.md).
+  Go-host control remains available, while the opt-in configured daemon/SDK
+  lifecycle can select a registered trusted validator and own durable monitor
+  scheduling. The stock binary exposes only the protected observed-tools
+  provenance validator; broader semantic validators remain open. Outcome-based
+  rollback has its own disabled-by-default configured supervisor, while
+  causal/confounder controls and repeated-look correction remain open. See
+  [configured supervision](configured-learning-supervision.md).
 
 - Linux thermal trip-point observations now gate new local reservations,
   preserving unknown readings and existing cgroup limits. Fixture tests ran on
@@ -480,8 +485,9 @@ operator records.
 
 - Opt-in periodic skill regression monitoring for trusted Go hosts: paginated
   active-state inspection, revision-fenced deterministic rollback, failure
-  isolation, sticky health and joined cancellation. No daemon validator or
-  statistical outcome detector is enabled. See
+  isolation, sticky health and joined cancellation. The configured daemon/SDK
+  lifecycle can own a durable named monitor, and the separate outcome supervisor
+  can apply exposure-attributed rollback; both remain disabled by default. See
   [regression monitoring](skill-regression-monitor.md).
 
 - Opt-in validated learning for trusted Go hosts, with a named validator,

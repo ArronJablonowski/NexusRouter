@@ -77,6 +77,10 @@ Tests cover reopened pending work, cadence, fairness, both concurrent commit
 orderings, cancellation, guard denial, capacity, corruption, schema preservation,
 rotating secrets, SDK inspection and joined lifecycle. These are synthetic
 deterministic checks, not semantic skill-quality or physical power-loss evidence.
-No user monitor, daemon validator, generated validation command or new inference
-is enabled. Statistical outcome attribution, baseline/sample policy, subjective
-user-feedback weighting and standalone daemon configuration remain open.
+No user monitor, generated validation command or new inference is enabled by
+default. The configured daemon/SDK lifecycle can bind the monitor to a registered
+trusted validator, and the stock binary offers only its protected observed-tools
+provenance validator. Outcome-based rollback uses a separate configured
+supervisor; causal/confounder controls and repeated-look correction, broader
+semantic validators, safe retention and cross-store power-loss qualification
+remain open.

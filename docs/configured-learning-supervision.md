@@ -167,6 +167,8 @@ produces deterministic failed evidence and restores the validated baseline. A
 second restart preserves rollback and immutable history. Context retrieval does
 not prove semantic execution of arbitrary generated workflows.
 
-Statistical outcome regression, safe long-term receipt retention and broad
+Outcome-based rollback uses its own disabled-by-default
+[configured supervisor](configured-outcome-supervision.md). Causal/confounder
+controls, repeated-look correction, safe long-term receipt retention and broad
 live-model qualification remain open. No user configuration is enabled by
 installing this change.

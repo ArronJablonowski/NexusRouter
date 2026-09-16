@@ -97,7 +97,8 @@ An [automatic latest-window selector](skill-comparison-selection.md) now uses
 indexed recorded exposures and snapshot-wide session exclusions before comparing
 current feedback. It selects before inspecting outcomes, not only from successes.
 
-Difficulty controls, repeated
-monitoring policy, qualified production validators, and durable activation-bound
-outcome rollback are still required. This diagnostic must not be substituted for
-those PRD requirements or wired directly to mutation authority.
+The [configured outcome supervisor](configured-outcome-supervision.md) now owns
+durable repeated monitoring and activation-bound rollback for an explicitly
+enabled policy. Difficulty and causal/confounder controls, repeated-look
+correction and qualified semantic validators remain required. This diagnostic
+alone must not be substituted for mutation authority.
