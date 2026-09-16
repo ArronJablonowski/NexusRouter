@@ -24,7 +24,7 @@ func delegateSafetyExecutor(t *testing.T, db *telemetry.Store, journal runtime.J
 	cfg := config.Defaults()
 	cfg.Workers.DelegateMaxCalls = 1
 	registry := &tools.Registry{}
-	if err := registerDelegate(registry, db, journal, cfg, "parent", "session", "", true, run, nil); err != nil {
+	if err := registerDelegate(registry, db, journal, cfg, "parent", "session", "", true, run, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	return scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}}
@@ -196,7 +196,7 @@ func TestDelegateSafetyStaleSubmissionCannotDispatch(t *testing.T) {
 	if err = registerDelegate(registry, db, journal, cfg, "parent", "session", status.ID, true, func(context.Context, string, string, string, bool) (Result, error) {
 		called = true
 		return Result{}, nil
-	}, nil); err != nil {
+	}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: &tools.Policy{Default: tools.Deny, Rules: []tools.Rule{{Tool: "delegate", Scope: "delegation", Decision: tools.Allow}}}}}

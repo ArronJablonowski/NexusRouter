@@ -66,7 +66,7 @@ func (s *Service) runDelegate(ctx context.Context, prompt, validation, parent st
 	return s.runExplicit(ctx, r)
 }
 
-func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, audit delegateAuditRunner, policies ...*tools.Policy) error {
+func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal runtime.Journal, cfg config.Settings, parent, session, submissionID string, localOnly bool, run delegateRunner, audit delegateAuditRunner, compactionAuthority *runtime.DelegationCompactionAuthority, policies ...*tools.Policy) error {
 	var cancellationBoundary *sync.Mutex
 	if guarded, ok := journal.(redactingJournal); ok {
 		cancellationBoundary = guarded.cancellationBoundary
@@ -153,7 +153,8 @@ func registerDelegate(registry *tools.Registry, db *telemetry.Store, journal run
 		var entered, returned atomic.Bool
 		answer, err := supervisor.Run(childCtx, workers.Work{
 			TaskID: workID, SessionID: session, ParentID: parent, Scope: "delegation-" + parent, SubmissionID: submissionID,
-			DelegationOrigin: origin, DelegationAuditIntent: auditIntent, Review: review,
+			DelegationCompaction: compactionAuthority,
+			DelegationOrigin:     origin, DelegationAuditIntent: auditIntent, Review: review,
 			Execute: func(ctx context.Context) (string, error) {
 				entered.Store(true)
 				result, err := run(ctx, input.Prompt, input.Validation, workID, localOnly)

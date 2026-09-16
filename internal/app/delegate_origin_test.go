@@ -49,7 +49,7 @@ func TestDelegationOriginPersistsBeforeSingleAndBatchExecution(t *testing.T) {
 		seen[prompt] = *o.Clone()
 		mu.Unlock()
 		return Result{TaskID: "execution-" + work, Text: prompt}, nil
-	}, nil, applicationToolPolicy()); err != nil {
+	}, nil, nil, applicationToolPolicy()); err != nil {
 		t.Fatal(err)
 	}
 	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy()}

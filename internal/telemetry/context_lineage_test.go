@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	"github.com/ArronJablonowski/DarwinRouter/sessions"
@@ -299,7 +300,7 @@ func TestContextLineageMigrationFromSchema50(t *testing.T) {
 	defer store.Close()
 	var version, tables int
 	if err = store.db.QueryRow(`SELECT (SELECT user_version FROM pragma_user_version),
-		(SELECT count(*) FROM sqlite_master WHERE type='table' AND name='context_lineage_events')`).Scan(&version, &tables); err != nil || version != 51 || tables != 1 {
+		(SELECT count(*) FROM sqlite_master WHERE type='table' AND name='context_lineage_events')`).Scan(&version, &tables); err != nil || version != stateschema.Current || tables != 1 {
 		t.Fatal("schema-50 migration did not reach lineage schema", version, tables, err)
 	}
 }

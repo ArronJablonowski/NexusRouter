@@ -17,6 +17,16 @@ operator records.
   bridge, application, and restart evidence is part of the normal suite; live
   Sol rollover remains separately opt-in and account-consuming.
 
+- DAR-125 preserves completed delegated work across reviewed parent compaction
+  without granting a child the parent's authority. A frozen parent/child tool
+  policy and inherited context-engine identity are sealed into each worker
+  start. Schema 52 independently derives and stores immutable bindings for the
+  exact delegation origin, parent/work/execution tasks, worker and scope,
+  lifecycle boundary events, child context and accepted result, and policy and
+  engine digests. Failed or uncertain calls, drift, cancellation or recovery,
+  unreleased leases, and missing, forged, or ambiguous child evidence fail
+  closed; migration fabricates no evidence for older activations.
+
 - DAR-121 introduces the provider-neutral authority contract for extended
   compaction. A validated context-engine identity pins implementation revision;
   a sealed plan binds the approved source checkpoint, review and draft,
@@ -581,7 +591,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 51. Schema 30 added the immutable
+The current durable store uses SQLite schema 52. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -638,6 +648,11 @@ epochs, and the complete tool-call identity set so restart cannot silently
 fork, reorder, downgrade, or reuse retired identities. Existing version-one
 checkpoint events remain replay-compatible; the additive migration does not
 invent lineage for older history.
+Schema 52 adds an immutable normalized companion for delegation evidence bound
+to a context-compaction activation. It records the exact parent, work and child
+tasks, worker, scope, policy and engine digests, completed boundary events,
+child-context digest, and accepted result digest without inventing evidence for
+older activations.
 Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,

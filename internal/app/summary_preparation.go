@@ -84,6 +84,20 @@ type summaryPreparationConfigSnapshot struct {
 	} `json:"provider"`
 }
 
+type summaryPreparationPolicySnapshot struct {
+	Version              int                        `json:"version"`
+	Privacy              string                     `json:"privacy"`
+	RequestedKeep        int                        `json:"requested_keep"`
+	MaxCost              float64                    `json:"max_cost"`
+	LocalOnly            bool                       `json:"local_only"`
+	Egress               string                     `json:"egress"`
+	CredentialEnv        []string                   `json:"credential_env"`
+	RedactEnv            []string                   `json:"redact_env"`
+	MetricsCredentialEnv string                     `json:"metrics_credential_env,omitempty"`
+	TraceCredentialEnv   string                     `json:"trace_credential_env,omitempty"`
+	Delegation           delegationCompactionPolicy `json:"delegation"`
+}
+
 // PrepareSummary durably starts exactly one caller-keyed summary operation
 // before provider construction. Repeating the same semantic request returns
 // its current durable projection without dispatch; changing it conflicts.
@@ -257,19 +271,16 @@ func (s *Service) prepareSummaryAdmission(ctx context.Context, key string, reque
 	// Bind every configured redaction source by name, never by resolved value.
 	// Changing the policy under a reused caller key must conflict even when the
 	// selected provider and the source task are otherwise unchanged.
-	policySnapshot, err := json.Marshal(struct {
-		Version              int      `json:"version"`
-		Privacy              string   `json:"privacy"`
-		RequestedKeep        int      `json:"requested_keep"`
-		MaxCost              float64  `json:"max_cost"`
-		LocalOnly            bool     `json:"local_only"`
-		Egress               string   `json:"egress"`
-		CredentialEnv        []string `json:"credential_env"`
-		RedactEnv            []string `json:"redact_env"`
-		MetricsCredentialEnv string   `json:"metrics_credential_env,omitempty"`
-		TraceCredentialEnv   string   `json:"trace_credential_env,omitempty"`
-	}{prepareSummaryVersion, history.Privacy, request.Keep, request.MaxCost, s.settings.Mode == "local_only", s.settings.Security.Egress,
-		credentialEnv, append([]string(nil), s.settings.Security.RedactEnv...), metricsEnv, traceEnv})
+	delegationPolicy, err := sealDelegationCompactionPolicy(s.settings)
+	if err != nil {
+		return out, ErrAdmission
+	}
+	policySnapshot, err := json.Marshal(summaryPreparationPolicySnapshot{
+		Version: prepareSummaryVersion, Privacy: history.Privacy, RequestedKeep: request.Keep, MaxCost: request.MaxCost,
+		LocalOnly: s.settings.Mode == "local_only", Egress: s.settings.Security.Egress,
+		CredentialEnv: credentialEnv, RedactEnv: append([]string(nil), s.settings.Security.RedactEnv...),
+		MetricsCredentialEnv: metricsEnv, TraceCredentialEnv: traceEnv, Delegation: delegationPolicy,
+	})
 	if err != nil || !selectionValueClean([]string{string(configSnapshot), string(policySnapshot)}, secrets) {
 		return out, ErrAdmission
 	}

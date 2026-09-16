@@ -104,7 +104,12 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 		// unchanged and carries no pending compaction into execution.
 		return full, nil
 	}
+	delegationPolicy, err := s.delegationCompactionPolicyForPlan(ctx, db, plan)
+	if err != nil {
+		return r, err
+	}
 	full.compactionPlan = plan
+	full.delegationCompactionPolicy = delegationPolicy
 	return full, nil
 }
 

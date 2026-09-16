@@ -21,6 +21,7 @@ const (
 	ContextCompactionLifecycleVersion  = 1
 	MaxContextCompactionLifecycleBytes = 16 << 20
 	maxContextCompactionSnapshotBytes  = 1 << 20
+	MaxDelegationCompactionBindings    = 64
 )
 
 var ErrContextCompactionLifecycle = errors.New("invalid context compaction lifecycle")
@@ -151,25 +152,143 @@ func (s ContextCompactionPlanStart) validateBase() error {
 	return nil
 }
 
+// DelegationCompactionBinding is immutable evidence naming one delegated work
+// tree observed in a compaction's live suffix. It contains identities and
+// canonical evidence digests only; it grants no worker or tool authority.
+type DelegationCompactionBinding struct {
+	Version                      int                      `json:"version"`
+	ParentTaskID                 string                   `json:"parent_task_id"`
+	WorkTaskID                   string                   `json:"work_task_id"`
+	ExecutionTaskID              string                   `json:"execution_task_id"`
+	WorkerID                     string                   `json:"worker_id"`
+	Scope                        string                   `json:"scope"`
+	Origin                       runtime.DelegationOrigin `json:"origin"`
+	WorkStartEventID             string                   `json:"work_start_event_id"`
+	WorkStartEventDigest         string                   `json:"work_start_event_digest"`
+	WorkTerminalEventID          string                   `json:"work_terminal_event_id"`
+	WorkTerminalEventDigest      string                   `json:"work_terminal_event_digest"`
+	ExecutionStartEventID        string                   `json:"execution_start_event_id"`
+	ExecutionStartEventDigest    string                   `json:"execution_start_event_digest"`
+	ExecutionContextDigest       string                   `json:"execution_context_digest"`
+	ExecutionTerminalEventID     string                   `json:"execution_terminal_event_id"`
+	ExecutionTerminalEventDigest string                   `json:"execution_terminal_event_digest"`
+	PlanDigest                   string                   `json:"plan_digest"`
+	AuthorityDigest              string                   `json:"authority_digest"`
+	EngineDigest                 string                   `json:"engine_digest"`
+	ParentPolicyDigest           string                   `json:"parent_policy_digest"`
+	ChildPolicyDigest            string                   `json:"child_policy_digest"`
+	ResultDigest                 string                   `json:"result_digest"`
+	BindingDigest                string                   `json:"binding_digest"`
+}
+
+// SealDelegationCompactionBinding owns the optional batch index and derives
+// the binding digest. It does not decide policy dominance or prove that the
+// named durable records exist; the activation repository must rederive those
+// facts while holding its writer transaction.
+func SealDelegationCompactionBinding(in DelegationCompactionBinding) (DelegationCompactionBinding, error) {
+	in.Version, in.BindingDigest = ContextCompactionLifecycleVersion, ""
+	if in.Origin.BatchIndex != nil {
+		index := *in.Origin.BatchIndex
+		in.Origin.BatchIndex = &index
+	}
+	digest, err := in.CanonicalDigest()
+	if err != nil {
+		return DelegationCompactionBinding{}, err
+	}
+	in.BindingDigest = digest
+	if in.Validate() != nil {
+		return DelegationCompactionBinding{}, ErrContextCompactionLifecycle
+	}
+	return in, nil
+}
+
+func (b DelegationCompactionBinding) CanonicalDigest() (string, error) {
+	if b.validateBase() != nil {
+		return "", ErrContextCompactionLifecycle
+	}
+	b.BindingDigest = ""
+	return lifecycleDigest(b)
+}
+
+func (b DelegationCompactionBinding) Validate() error {
+	digest, err := b.CanonicalDigest()
+	if err != nil || !validLifecycleDigest(b.BindingDigest) || digest != b.BindingDigest {
+		return ErrContextCompactionLifecycle
+	}
+	return lifecycleSize(b)
+}
+
+func (b DelegationCompactionBinding) validateBase() error {
+	if b.Version != ContextCompactionLifecycleVersion || !validLifecycleID(b.ParentTaskID) ||
+		!validLifecycleID(b.WorkTaskID) || !validLifecycleID(b.ExecutionTaskID) || !validLifecycleID(b.WorkerID) ||
+		b.ParentTaskID == b.WorkTaskID || b.ParentTaskID == b.ExecutionTaskID || b.WorkTaskID == b.ExecutionTaskID ||
+		b.Scope != "delegation-"+b.ParentTaskID || !validDelegationCompactionScope(b.Scope) || b.Origin.Validate() != nil ||
+		!validLifecycleID(b.WorkStartEventID) || !validLifecycleDigest(b.WorkStartEventDigest) ||
+		!validLifecycleID(b.WorkTerminalEventID) || !validLifecycleDigest(b.WorkTerminalEventDigest) ||
+		!validLifecycleID(b.ExecutionStartEventID) || !validLifecycleDigest(b.ExecutionStartEventDigest) ||
+		!validLifecycleDigest(b.ExecutionContextDigest) ||
+		!validLifecycleID(b.ExecutionTerminalEventID) || !validLifecycleDigest(b.ExecutionTerminalEventDigest) ||
+		!distinctLifecycleIDs(b.WorkStartEventID, b.WorkTerminalEventID, b.ExecutionStartEventID, b.ExecutionTerminalEventID) ||
+		!validLifecycleDigest(b.PlanDigest) || !validLifecycleDigest(b.AuthorityDigest) || !validLifecycleDigest(b.EngineDigest) || !validLifecycleDigest(b.ParentPolicyDigest) ||
+		!validLifecycleDigest(b.ChildPolicyDigest) || !validLifecycleDigest(b.ResultDigest) {
+		return ErrContextCompactionLifecycle
+	}
+	return nil
+}
+
+func validDelegationCompactionScope(value string) bool {
+	return len(value) >= len("delegation-")+1 && len(value) <= 512 && strings.TrimSpace(value) == value && utf8.ValidString(value) &&
+		!strings.ContainsFunc(value, func(r rune) bool { return unicode.IsControl(r) })
+}
+
+func distinctLifecycleIDs(values ...string) bool {
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		if seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
 // ContextCompactionActivation binds suffix evidence that was necessarily
-// unknown when the immutable plan was prepared.
+// unknown when the immutable plan was prepared. Delegations are sorted by
+// origin and then work identity so one evidence set has one representation.
 type ContextCompactionActivation struct {
-	Version            int       `json:"version"`
-	OperationID        string    `json:"operation_id"`
-	PlanDigest         string    `json:"plan_digest"`
-	TaskID             string    `json:"task_id"`
-	EventID            string    `json:"event_id"`
-	EventSequence      int64     `json:"event_sequence"`
-	LiveSuffixBoundary int       `json:"live_suffix_boundary"`
-	LiveSuffixCount    int       `json:"live_suffix_count"`
-	LiveSuffixDigest   string    `json:"live_suffix_digest"`
-	ActivatedAt        time.Time `json:"activated_at"`
-	ActivationDigest   string    `json:"activation_digest"`
+	Version            int                           `json:"version"`
+	OperationID        string                        `json:"operation_id"`
+	PlanDigest         string                        `json:"plan_digest"`
+	TaskID             string                        `json:"task_id"`
+	EventID            string                        `json:"event_id"`
+	EventSequence      int64                         `json:"event_sequence"`
+	LiveSuffixBoundary int                           `json:"live_suffix_boundary"`
+	LiveSuffixCount    int                           `json:"live_suffix_count"`
+	LiveSuffixDigest   string                        `json:"live_suffix_digest"`
+	Delegations        []DelegationCompactionBinding `json:"delegations,omitempty"`
+	ActivatedAt        time.Time                     `json:"activated_at"`
+	ActivationDigest   string                        `json:"activation_digest"`
 }
 
 func SealContextCompactionActivation(in ContextCompactionActivation) (ContextCompactionActivation, error) {
 	in.Version, in.ActivationDigest = ContextCompactionLifecycleVersion, ""
 	in.ActivatedAt = in.ActivatedAt.UTC()
+	if in.Delegations == nil {
+		in.Delegations = []DelegationCompactionBinding{}
+	} else {
+		owned := make([]DelegationCompactionBinding, len(in.Delegations))
+		for i := range in.Delegations {
+			if in.Delegations[i].Validate() != nil {
+				return ContextCompactionActivation{}, ErrContextCompactionLifecycle
+			}
+			owned[i] = in.Delegations[i]
+			if owned[i].Origin.BatchIndex != nil {
+				index := *owned[i].Origin.BatchIndex
+				owned[i].Origin.BatchIndex = &index
+			}
+		}
+		in.Delegations = owned
+	}
 	digest, err := in.CanonicalDigest()
 	if err != nil {
 		return ContextCompactionActivation{}, err
@@ -185,11 +304,63 @@ func (a ContextCompactionActivation) CanonicalDigest() (string, error) {
 	if a.Version != ContextCompactionLifecycleVersion || !validLifecycleID(a.OperationID) || !validLifecycleID(a.TaskID) ||
 		!validLifecycleID(a.EventID) || !validLifecycleDigest(a.PlanDigest) || !validLifecycleDigest(a.LiveSuffixDigest) ||
 		a.EventSequence < 1 || a.LiveSuffixBoundary < 1 || a.LiveSuffixCount < 0 || a.LiveSuffixCount > 100000 ||
-		a.ActivatedAt.IsZero() || a.ActivatedAt.Location() != time.UTC {
+		a.ActivatedAt.IsZero() || a.ActivatedAt.Location() != time.UTC || validateDelegationCompactionBindings(a.TaskID, a.Delegations) != nil {
 		return "", ErrContextCompactionLifecycle
 	}
 	a.ActivationDigest = ""
 	return lifecycleDigest(a)
+}
+
+func validateDelegationCompactionBindings(parent string, bindings []DelegationCompactionBinding) error {
+	if len(bindings) > MaxDelegationCompactionBindings {
+		return ErrContextCompactionLifecycle
+	}
+	work, execution, origins, events := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for i := range bindings {
+		binding := bindings[i]
+		origin := delegationCompactionOriginKey(binding.Origin)
+		if binding.Validate() != nil || binding.ParentTaskID != parent || work[binding.WorkTaskID] || execution[binding.ExecutionTaskID] ||
+			work[binding.ExecutionTaskID] || execution[binding.WorkTaskID] || origins[origin] {
+			return ErrContextCompactionLifecycle
+		}
+		for _, event := range []string{binding.WorkStartEventID, binding.WorkTerminalEventID, binding.ExecutionStartEventID, binding.ExecutionTerminalEventID} {
+			if events[event] {
+				return ErrContextCompactionLifecycle
+			}
+			events[event] = true
+		}
+		work[binding.WorkTaskID], execution[binding.ExecutionTaskID] = true, true
+		origins[origin] = true
+		if i > 0 && compareDelegationCompactionBinding(bindings[i-1], binding) >= 0 {
+			return ErrContextCompactionLifecycle
+		}
+	}
+	return nil
+}
+
+func delegationCompactionOriginKey(origin runtime.DelegationOrigin) string {
+	return origin.TurnID + "\x00" + origin.AttemptID + "\x00" + origin.ToolCallID + "\x00" + origin.ToolName + "\x00" + delegationBatchSortKey(origin)
+}
+
+func compareDelegationCompactionBinding(a, b DelegationCompactionBinding) int {
+	left := []string{a.Origin.TurnID, a.Origin.AttemptID, a.Origin.ToolCallID, a.Origin.ToolName, delegationBatchSortKey(a.Origin), a.WorkTaskID}
+	right := []string{b.Origin.TurnID, b.Origin.AttemptID, b.Origin.ToolCallID, b.Origin.ToolName, delegationBatchSortKey(b.Origin), b.WorkTaskID}
+	for i := range left {
+		if left[i] < right[i] {
+			return -1
+		}
+		if left[i] > right[i] {
+			return 1
+		}
+	}
+	return 0
+}
+
+func delegationBatchSortKey(origin runtime.DelegationOrigin) string {
+	if origin.BatchIndex == nil {
+		return "-"
+	}
+	return string(rune('0' + *origin.BatchIndex))
 }
 
 func (a ContextCompactionActivation) Validate() error {
@@ -236,6 +407,16 @@ func SealContextCompactionLifecycleFact(in ContextCompactionLifecycleFact) (Cont
 	in.CreatedAt = in.CreatedAt.UTC()
 	if in.Activation != nil {
 		copy := *in.Activation
+		if in.Activation.Delegations != nil {
+			copy.Delegations = make([]DelegationCompactionBinding, len(in.Activation.Delegations))
+			for i := range in.Activation.Delegations {
+				copy.Delegations[i] = in.Activation.Delegations[i]
+				if in.Activation.Delegations[i].Origin.BatchIndex != nil {
+					index := *in.Activation.Delegations[i].Origin.BatchIndex
+					copy.Delegations[i].Origin.BatchIndex = &index
+				}
+			}
+		}
 		in.Activation = &copy
 	}
 	digest, err := in.CanonicalDigest()

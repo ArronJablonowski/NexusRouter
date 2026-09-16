@@ -46,7 +46,7 @@ func TestDelegateSingleAndBatchPublishSanitizedAudits(t *testing.T) {
 		}
 		return Result{TaskID: "execution-" + workID, Text: "answer-" + prompt}, nil
 	}
-	if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true, run, audit, applicationToolPolicy()); err != nil {
+	if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true, run, audit, nil, applicationToolPolicy()); err != nil {
 		t.Fatal(err)
 	}
 	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}
@@ -109,7 +109,7 @@ func TestDelegateNeverAuditsInvalidChild(t *testing.T) {
 		}, func(context.Context, string, string) (*runtime.DelegationAudit, error) {
 			reviews.Add(1)
 			return nil, ErrAdmission
-		}, applicationToolPolicy()); err != nil {
+		}, nil, applicationToolPolicy()); err != nil {
 		t.Fatal(err)
 	}
 	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}

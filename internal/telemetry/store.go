@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 52 {
+		if err = discardEmptyFutureContextCompactionDelegations(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 52 {
+		if err = validateContextCompactionDelegationSchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 51 {
 		if err = discardEmptyFutureContextLineage(ctx, conn); err != nil {
 			return err
@@ -613,6 +623,11 @@ func (s *Store) initialize(ctx context.Context) error {
 			return err
 		}
 	}
+	if version < 52 {
+		if err = migrateContextCompactionDelegations(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
 		return errors.New("migration did not reach current database version")
 	}
@@ -859,6 +874,9 @@ func (s *Store) appendFencedFinal(ctx context.Context, expected int64, e runtime
 			return marshalErr
 		}
 		if err = insertContextCompactionFact(ctx, tx, *compactionActivation, factBody); err != nil {
+			return err
+		}
+		if err = insertContextCompactionDelegations(ctx, tx, *compactionActivation); err != nil {
 			return err
 		}
 	}

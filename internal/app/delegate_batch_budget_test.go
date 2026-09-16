@@ -36,7 +36,7 @@ func TestDelegateBatchSharesAtomicParentBudget(t *testing.T) {
 			if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true, func(_ context.Context, prompt, validation, work string, local bool) (Result, error) {
 				calls.Add(1)
 				return Result{TaskID: "child-" + work, Text: prompt}, nil
-			}, nil, applicationToolPolicy()); err != nil {
+			}, nil, nil, applicationToolPolicy()); err != nil {
 				t.Fatal(err)
 			}
 			executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}

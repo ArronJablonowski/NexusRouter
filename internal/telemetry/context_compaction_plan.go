@@ -263,7 +263,8 @@ func prepareContextCompactionActivation(ctx context.Context, tx *sql.Tx, event r
 	if err = validateContextCompactionPlanEvidence(ctx, tx, state.Start, plan, true); err != nil {
 		return zero, err
 	}
-	current, err := taskSnapshot(ctx, tx, event.TaskID)
+	var parentEvents []runtime.Event
+	current, err := taskSnapshotWithEvents(ctx, tx, event.TaskID, &parentEvents)
 	if err != nil || current.State != "running" || current.SessionID != event.SessionID || current.Sequence != event.Sequence-1 ||
 		len(current.Messages) < plan.LiveSuffixBoundary || !reflect.DeepEqual(current.Messages[:plan.LiveSuffixBoundary], plan.OriginalPrefix) {
 		return zero, sessions.ErrHistory
@@ -273,10 +274,14 @@ func prepareContextCompactionActivation(ctx context.Context, tx *sql.Tx, event r
 	if err != nil {
 		return zero, err
 	}
+	delegations, err := deriveDelegationCompactionBindings(ctx, tx, parentEvents, suffix, event.TaskID, state.Start, plan)
+	if err != nil {
+		return zero, err
+	}
 	activation, err := sessions.SealContextCompactionActivation(sessions.ContextCompactionActivation{
 		OperationID: plan.OperationID, PlanDigest: plan.PlanDigest, TaskID: event.TaskID, EventID: event.ID,
 		EventSequence: event.Sequence, LiveSuffixBoundary: plan.LiveSuffixBoundary, LiveSuffixCount: len(suffix),
-		LiveSuffixDigest: suffixDigest, ActivatedAt: event.Time,
+		LiveSuffixDigest: suffixDigest, Delegations: delegations, ActivatedAt: event.Time,
 	})
 	if err != nil {
 		return zero, err
@@ -310,7 +315,20 @@ func validateContextCompactionActivationRetry(ctx context.Context, tx *sql.Tx, e
 		!activation.ActivatedAt.Equal(event.Time) {
 		return ErrConflict
 	}
-	return nil
+	parentEvents, messages, err := parentEventsBeforeCompaction(ctx, tx, event.TaskID, event.Sequence)
+	if err != nil || len(messages) < plan.LiveSuffixBoundary || !reflect.DeepEqual(messages[:plan.LiveSuffixBoundary], plan.OriginalPrefix) {
+		return ErrConflict
+	}
+	suffix := messages[plan.LiveSuffixBoundary:]
+	digest, err := sessions.ContextCompactionLiveSuffixDigest(suffix)
+	if err != nil || digest != activation.LiveSuffixDigest || len(suffix) != activation.LiveSuffixCount {
+		return ErrConflict
+	}
+	bindings, err := deriveDelegationCompactionBindings(ctx, tx, parentEvents, suffix, event.TaskID, state.Start, plan)
+	if err != nil {
+		return ErrConflict
+	}
+	return validateContextCompactionDelegationRetry(ctx, tx, fact, bindings)
 }
 
 func (s *Store) FailContextCompactionPlan(ctx context.Context, fact sessions.ContextCompactionLifecycleFact) (sessions.ContextCompactionOperationState, error) {

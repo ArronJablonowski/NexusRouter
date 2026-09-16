@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
 )
 
 func TestContextCompactionPlanMigrationFreshReopenAndSchema49Preservation(t *testing.T) {
@@ -38,7 +40,7 @@ func TestContextCompactionPlanMigrationFreshReopenAndSchema49Preservation(t *tes
 		(SELECT count(*) FROM sqlite_master WHERE type='table' AND name GLOB 'context_compaction_*'),
 		(SELECT count(*) FROM sqlite_master WHERE type='index' AND name GLOB 'context_compaction_*'),
 		(SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name GLOB 'context_compaction_*')`).
-		Scan(&version, &legacy, &tables, &indexes, &triggers); err != nil || version != 51 || legacy != 1 || tables != 4 || indexes != 4 || triggers != 12 {
+		Scan(&version, &legacy, &tables, &indexes, &triggers); err != nil || version != stateschema.Current || legacy != 1 || tables != 5 || indexes != 7 || triggers != 15 {
 		t.Fatalf("version=%d legacy=%d tables=%d indexes=%d triggers=%d err=%v", version, legacy, tables, indexes, triggers, err)
 	}
 	if err = store.Close(); err != nil {
@@ -49,7 +51,7 @@ func TestContextCompactionPlanMigrationFreshReopenAndSchema49Preservation(t *tes
 		t.Fatal(err)
 	}
 	defer store.Close()
-	if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 51 {
+	if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != stateschema.Current {
 		t.Fatalf("reopened version=%d err=%v", version, err)
 	}
 }
@@ -224,7 +226,7 @@ func TestContextCompactionPlanMigrationCleanupTamperAndRollback(t *testing.T) {
 		}
 		defer store.Close()
 		var version int
-		if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 51 {
+		if err = store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != stateschema.Current {
 			t.Fatalf("version=%d err=%v", version, err)
 		}
 	})

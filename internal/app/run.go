@@ -51,6 +51,7 @@ type Request struct {
 	Compaction                      *sessions.CompactionRequest
 	approvedCompaction              *runtime.ApprovedCompaction
 	compactionPlan                  *runtime.ContextCompactionPlan
+	delegationCompactionPolicy      *delegationCompactionPolicy
 	continuation                    *continuationContext
 	skillPrepared                   bool
 	skillContext                    *skillContext
@@ -113,7 +114,7 @@ func withRuntimeHostAdmission(r Request, admission runtimeHostAdmission) (Reques
 
 func invalidRuntimeHostRequestState(r Request) bool {
 	return r.submissionID != "" || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil ||
-		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.compactionPlan != nil || r.continuation != nil || r.retryOfTaskID != "" ||
+		r.SummaryAttemptID != "" || r.approvedCompaction != nil || r.compactionPlan != nil || r.delegationCompactionPolicy != nil || r.continuation != nil || r.retryOfTaskID != "" ||
 		r.onlyModelID != "" || r.autoCompactionTried || r.intentClassification != nil || r.intentClassificationUse != nil || r.intentClassificationCharged || r.taskID != "" || r.sessionID != ""
 }
 
@@ -450,7 +451,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if registry == nil {
 			registry = &tools.Registry{}
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, toolPolicy); err != nil {
+		compactionAuthority, authorityErr := sealDelegationCompactionAuthority(result.TaskID, r.compactionPlan, r.delegationCompactionPolicy)
+		if authorityErr != nil {
+			return result, authorityErr
+		}
+		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority, toolPolicy); err != nil {
 			return result, ErrAdmission
 		}
 	}

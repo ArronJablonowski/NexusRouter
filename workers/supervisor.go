@@ -45,6 +45,7 @@ type Work struct {
 	WorkerID              string
 	SubmissionID          string
 	DelegationOrigin      *runtime.DelegationOrigin
+	DelegationCompaction  *runtime.DelegationCompactionAuthority
 	DelegationAuditIntent *runtime.DelegationAuditIntent
 	// Execute must honor cancellation. Only inference and read-only tools are
 	// admitted here; there is no safe forced termination of arbitrary Go code.
@@ -85,6 +86,14 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 	if w.DelegationOrigin != nil {
 		w.DelegationOrigin = w.DelegationOrigin.Clone()
 		if w.DelegationOrigin.Validate() != nil {
+			return "", ErrWork
+		}
+	}
+	if w.DelegationCompaction != nil {
+		w.DelegationCompaction = w.DelegationCompaction.Clone()
+		if w.DelegationCompaction.Validate() != nil || w.DelegationOrigin == nil ||
+			w.ParentID != w.DelegationCompaction.RootTaskID || w.Scope != w.DelegationCompaction.Scope ||
+			w.TaskID == w.DelegationCompaction.RootTaskID {
 			return "", ErrWork
 		}
 	}
@@ -148,7 +157,7 @@ func (s *Supervisor) Run(ctx context.Context, w Work) (output string, runErr err
 		}
 		return cause
 	}
-	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID, DelegationOrigin: w.DelegationOrigin, DelegationAuditIntent: w.DelegationAuditIntent}); err != nil {
+	if err := persist(ctx, runtime.TaskStarted, runtime.Data{ParentTaskID: w.ParentID, SubmissionID: w.SubmissionID, DelegationOrigin: w.DelegationOrigin, DelegationCompaction: w.DelegationCompaction, DelegationAuditIntent: w.DelegationAuditIntent}); err != nil {
 		return "", err
 	}
 	l, err := s.store.AcquireLease(ctx, w.TaskID, worker, w.Scope, false, time.Now(), s.ttl)

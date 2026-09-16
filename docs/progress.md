@@ -1,6 +1,34 @@
 # Implementation evidence
 
-## 2026-09-15 — DAR-124 Codex app-server rollover checkpoint
+## 2026-09-15 — DAR-125 delegated compaction checkpoint
+
+Completed `delegate` and `delegate_batch` work can now remain in the live suffix
+when a reviewed parent compaction plan activates. The plan freezes the exact
+parent and child tool-policy snapshots; each accepted worker start carries a
+sealed authority bound to the parent task, plan, inherited context engine, and
+delegation scope. Child execution remains isolated and cannot gain recursive
+delegation authority or broader read access than the configured parent policy.
+
+SQLite schema 52 adds an immutable normalized companion for each accepted
+delegation binding. Activation independently derives the exact tool origin,
+parent/work/execution task identities, worker and scope, lifecycle boundary
+events, child-context and accepted-result digests, and engine and policy
+digests from durable journals. Failed or uncertain calls, policy drift,
+cancellation or recovery evidence, unreleased leases, forged boundaries, and
+missing or ambiguous child execution fail closed; migration invents no binding
+for older activations.
+
+Focused runtime, session, worker, telemetry migration/integrity, application
+policy, and end-to-end single/batch delegation tests pass. This is an
+implementation checkpoint only; live-provider and release qualification remain
+separate. The subsequent full `umask 077; make check` passed formatting and the
+1,000-line limit, vet, every race-enabled package, and `go build ./...`.
+Notable uncached package times were telemetry 2,445.637 seconds, application
+2,374.960 seconds, release packaging 889.932 seconds, SDK 276.652 seconds,
+CLI 186.383 seconds, runtime 133.874 seconds, toolgate 111.325 seconds, and
+workers 48.067 seconds.
+
+## 2026-09-15 — DAR-124 Codex app-server rollover completion
 
 Stateful Codex execution now participates in deferred mid-task compaction only
 through a current version-two reviewed, durable plan. The active native session
@@ -22,6 +50,11 @@ cover activation/close/open ordering, stop-only eligibility, exact request
 binding, historical tool safety, cancellation, panic, process/close/import
 failure, and no duplicate provider work. The opt-in signed-in Sol qualification
 is intentionally separate from normal CI and must not be claimed until run.
+DAR-124 source implementation and its deterministic acceptance coverage are
+complete. Its final repository-wide `umask 077; make check` passed and
+`origin/main` was verified at `869b448c28a435714a2ef32e6150033261a8fedc`
+before Linear DAR-124 closed. That result does not qualify the subsequent
+DAR-125 changes recorded above.
 
 ## 2026-09-15 — DAR-110 configurable Workboard decomposition checkpoint
 
