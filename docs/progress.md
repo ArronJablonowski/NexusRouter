@@ -8398,3 +8398,17 @@ Ollama models plus one configured cloud model, marked the configured
 `gemma4:12b-it-q4_K_M` route installed and usable, and reported a deduplicated
 local total of 292,474,343,457 bytes (272.4 GiB) with no unknown sizes. The same
 projection was also fetched through a fresh CLI-approved browser session.
+
+The inventory cards were subsequently condensed into disclosure rows. Each row
+keeps the model identity, provider, current availability/configuration badges,
+and local size visible; its bounded detail list is hidden until the row's native
+button is activated. The button publishes `aria-expanded` and `aria-controls`,
+works with keyboard activation, and preserves expansion state across automatic
+inventory refreshes while dropping state for models that disappear. Responsive
+layout keeps the identity and disclosure control on the first row and wraps
+badges beneath them on narrow screens. `make qualify-webui` passed after this
+change, including the real-Chrome, browser-auth, application, and daemon race
+gates. The complete `umask 077; make check` also passed formatting/LOC, vet,
+the repository-wide race suite, and the final build; the two longest uncached
+packages were telemetry at 2,379.249 seconds and application at 2,319.559
+seconds.

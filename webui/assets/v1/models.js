@@ -13,6 +13,7 @@
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	const intervalMS = 10000;
+	const expanded = new Set();
 	let timer = 0, loading = false, loaded = false, stopped = false;
 	chat.hidden = true; workboards.hidden = true; settings.hidden = true; view.hidden = false;
 
@@ -49,13 +50,18 @@
 	function notice(node, message, failed) { node.textContent = message; node.classList.toggle("error", Boolean(failed)); node.hidden = false; }
 	function badge(label, className) { return element("span", "model-badge" + (className ? " " + className : ""), label); }
 	function card(item) {
-		const node = element("li", "model-card"), heading = element("div", "model-card-heading"), identity = element("div"), badges = element("div", "model-badges");
-		identity.append(element("h3", "", item.model), element("p", "model-card-provider", item.provider));
+		const node = element("li", "model-card"), heading = element("button", "model-card-toggle"), identity = element("span", "model-card-identity"), badges = element("span", "model-badges");
+		const open = expanded.has(item.id), detailsID = "model-details-" + item.id;
+		heading.type = "button"; heading.setAttribute("aria-expanded", String(open)); heading.setAttribute("aria-controls", detailsID);
+		identity.append(element("strong", "model-card-name", item.model), element("span", "model-card-provider", item.provider));
 		badges.append(badge(item.usable ? "Usable" : item.health === "disabled" ? "Disabled" : "Unavailable", item.usable ? "usable" : "unavailable"));
 		if (item.locality === "local") badges.append(badge(item.installed ? "Installed" : "Not installed"));
 		if (item.configured) badges.append(badge("Configured"));
-		heading.append(identity, badges); node.append(heading);
+		if (item.locality === "local") badges.append(badge(bytes(item.size_bytes), "model-size-badge"));
+		const disclosure = element("span", "model-disclosure", open ? "−" : "+"); disclosure.setAttribute("aria-hidden", "true");
+		heading.append(identity, badges, disclosure); node.append(heading);
 		const details = element("dl", "model-details");
+		details.id = detailsID; details.hidden = !open; node.classList.toggle("expanded", open);
 		if (item.locality === "local") detail(details, "Size on disk", bytes(item.size_bytes));
 		detail(details, "Health", item.health + (item.status_code ? " · " + item.status_code.replaceAll("_", " ") : ""));
 		detail(details, "Capabilities", item.capabilities.length ? item.capabilities.join(", ") : "None declared");
@@ -65,10 +71,17 @@
 		if (item.family) detail(details, "Family", item.family);
 		if (item.modified_at) detail(details, "Modified", time(item.modified_at));
 		if (item.digest) detail(details, "Digest", item.digest.slice(0, 12) + "…");
+		heading.addEventListener("click", () => {
+			const next = heading.getAttribute("aria-expanded") !== "true";
+			heading.setAttribute("aria-expanded", String(next)); details.hidden = !next; node.classList.toggle("expanded", next);
+			disclosure.textContent = next ? "−" : "+";
+			if (next) expanded.add(item.id); else expanded.delete(item.id);
+		});
 		node.append(details); return node;
 	}
 	function render(page) {
 		const locals = page.models.filter(item => item.locality === "local"), clouds = page.models.filter(item => item.locality === "cloud");
+		const present = new Set(page.models.map(item => item.id)); expanded.forEach(id => { if (!present.has(id)) expanded.delete(id); });
 		localList.replaceChildren(...locals.map(card)); cloudList.replaceChildren(...clouds.map(card));
 		localCount.textContent = String(locals.length); cloudCount.textContent = String(clouds.length);
 		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0;
