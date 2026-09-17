@@ -46,6 +46,7 @@ type WebUI struct {
 	PathPrefix        string   `yaml:"path_prefix" json:"path_prefix"`
 	AllowedOrigins    []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
 	BrowserSessionTTL string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
+	DefaultModel      string   `yaml:"default_model,omitempty" json:"default_model,omitempty"`
 }
 type Workboard struct {
 	Enabled       bool                   `yaml:"enabled" json:"enabled"`
@@ -536,6 +537,9 @@ func (s Settings) Validate() error {
 			}
 			capabilities[c] = true
 		}
+	}
+	if s.WebUI.DefaultModel != "" && !models[s.WebUI.DefaultModel] {
+		return errors.New("unknown web UI default model")
 	}
 	return nil
 }

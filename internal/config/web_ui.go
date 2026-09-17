@@ -16,10 +16,13 @@ var webUIPath = regexp.MustCompile(`^/[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 // sole same-origin value from the request's validated listener authority.
 func (w WebUI) Validate(listen string) error {
 	if !w.Enabled {
-		if w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || len(w.AllowedOrigins) != 0 {
+		if w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" {
 			return errors.New("disabled web UI must retain inert defaults")
 		}
 		return nil
+	}
+	if w.DefaultModel != "" && !identifier.MatchString(w.DefaultModel) {
+		return errors.New("invalid web UI default model")
 	}
 	if !webUIPath.MatchString(w.PathPrefix) || w.PathPrefix == "/v1" || w.PathPrefix == "/health" {
 		return errors.New("invalid web UI path prefix")

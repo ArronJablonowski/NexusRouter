@@ -29,6 +29,12 @@ DarwinRouter serves only standards-based, vendored HTML, CSS, JavaScript,
 `fetch`, `EventSource` and same-origin cookies. Support claims are intentionally
 narrower than standards compatibility:
 
+New browser chats use adaptive routing by default. An operator may set
+`web_ui.default_model` to a configured model alias when a supervised surface
+must use one explicit coordinator. Follow-ups preserve that model through the
+durable session lineage. Configuration validation rejects unknown aliases, and
+disabling the Web UI requires clearing the override.
+
 | Browser | Status for 1.0 | Evidence |
 | --- | --- | --- |
 | Current stable Google Chrome on macOS | Qualified when the real-Chrome tests run without skips | Headless Chrome DevTools Protocol navigation, keyboard, accessibility-tree, content-injection, CRUD and conflict fixtures. |

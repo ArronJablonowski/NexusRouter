@@ -47,3 +47,27 @@ func TestWebUIDisabledDefaultsRemainValid(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWebUIDefaultModelMustReferenceConfiguredModel(t *testing.T) {
+	s := Defaults()
+	zero := 0.0
+	s.Providers = []Provider{{ID: "local", Kind: "ollama"}}
+	s.Models = []Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 1024, EstimatedCost: &zero}}
+	s.WebUI.DefaultModel = "chat"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.DefaultModel = "missing"
+	if s.Validate() == nil {
+		t.Fatal("unknown web UI default model accepted")
+	}
+	s.WebUI.DefaultModel = "bad model"
+	if s.Validate() == nil {
+		t.Fatal("invalid web UI default model accepted")
+	}
+	s.WebUI.DefaultModel = "chat"
+	s.WebUI.Enabled = false
+	if s.Validate() == nil {
+		t.Fatal("disabled web UI retained an active default model")
+	}
+}

@@ -23,6 +23,32 @@ import (
 
 const browserMutationTestSubject = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
+func TestBrowserChatUsesConfiguredDefaultModel(t *testing.T) {
+	svc, cfg := autoFixture(t)
+	svc.settings.WebUI.DefaultModel = "z"
+	ctx := context.Background()
+	store, err := browserops.Open(ctx, cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	mutations, err := NewBrowserMutations(svc, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := contract.ChatRequest{Version: 1, Action: contract.ChatSubmit, IdempotencyKey: "browser-default-model-01", Text: "hello"}
+	receipt, err := mutations.Chat(ctx, browserMutationTestSubject, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.ResumeSubmission(ctx, receipt.OperationID, Request{ModelID: "z", Prompt: "hello"}); err != nil {
+		t.Fatal("configured browser model was not persisted", err)
+	}
+	if _, err = svc.ResumeSubmission(ctx, receipt.OperationID, Request{ModelID: "auto", Prompt: "hello"}); err == nil {
+		t.Fatal("browser submission unexpectedly retained automatic routing")
+	}
+}
+
 func browserApprovalRecord(state string, decisions []approvals.Decision, expires time.Time) approvals.Record {
 	now := time.Now().UTC().Truncate(time.Second)
 	request := approvals.Request{Version: 1, ID: "approval", TaskID: "task", TurnID: "turn", ToolCallID: "call", ToolName: "replace_file", ToolBehavior: runtime.BehaviorNonIdempotentWrite, Scope: "private-secret-scope", ArgumentsDigest: strings.Repeat("a", 64), SchemaDigest: strings.Repeat("b", 64), PolicyDigest: strings.Repeat("c", 64), CreatedAt: now.Add(-time.Minute), ExpiresAt: expires}

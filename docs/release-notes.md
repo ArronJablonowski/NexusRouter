@@ -7,6 +7,13 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- The Web UI now accepts an optional validated `web_ui.default_model`. New
+  browser chats use that configured alias when present and retain adaptive
+  routing when it is absent. This lets supervised deployments pin a signed-in
+  coordinator that intentionally cannot participate in automatic provider
+  discovery, without hard-coding a provider into browser assets. Unknown model
+  aliases and active defaults on a disabled Web UI fail configuration checks.
+
 - DAR-126 adds a required deterministic context-recovery qualification gate.
   Race-enabled local fixtures and Unix child-process `SIGKILL` checkpoints
   cover extended-plan preparation and atomic activation before and after

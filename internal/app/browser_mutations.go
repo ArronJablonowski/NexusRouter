@@ -56,7 +56,10 @@ func (b *BrowserMutations) Chat(ctx context.Context, subject string, request con
 	}
 	model := request.ModelID
 	if model == "" {
-		model = "auto"
+		model = b.service.settings.WebUI.DefaultModel
+		if model == "" {
+			model = "auto"
+		}
 	}
 	input := Request{ModelID: model, Prompt: request.Text}
 	var status submissions.Status
