@@ -105,6 +105,31 @@ type guardedProvider struct {
 	timeout  time.Duration
 }
 
+func (p guardedProvider) InstalledModels(ctx context.Context) (out []InstalledModel, err error) {
+	defer func() {
+		if recover() != nil {
+			out, err = nil, adapterFailure(false)
+		}
+	}()
+	if ctx == nil {
+		return nil, adapterFailure(false)
+	}
+	inventory, ok := p.provider.(ModelInventoryProvider)
+	if !ok {
+		return nil, adapterFailure(false)
+	}
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	models, err := inventory.InstalledModels(ctx)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil || len(models) > 4096 {
+		return nil, normalizeAdapterError(err, false)
+	}
+	return append([]InstalledModel(nil), models...), nil
+}
+
 func (p guardedProvider) Models(ctx context.Context) (out []string, err error) {
 	defer func() {
 		if recover() != nil {

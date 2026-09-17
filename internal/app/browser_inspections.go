@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"strconv"
 	"time"
@@ -32,21 +34,83 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	if err != nil || len(catalog.Models) > contract.MaxInspectionModels {
 		return zero, nil
 	}
-	modelHealth := map[string]string{}
+	type healthFact struct{ status, code string }
+	modelHealth, providerHealth := map[string]healthFact{}, map[string]healthFact{}
 	if report.Validate() == nil {
 		for _, check := range report.Checks {
 			if check.Component == "model" {
-				modelHealth[check.ID] = check.Status
+				modelHealth[check.ID] = healthFact{check.Status, check.Code}
+			} else if check.Component == "provider" {
+				providerHealth[check.ID] = healthFact{check.Status, check.Code}
 			}
 		}
 	}
-	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, Models: make([]contract.ModelInspection, len(catalog.Models))}
+	refreshed := time.Now().UTC()
+	total := uint64(0)
+	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
+		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", Models: make([]contract.ModelInspection, len(catalog.Models))}
+	configured := map[string]int{}
 	for i, model := range catalog.Models {
-		healthState := modelHealth[model.ID]
-		if healthState != "healthy" && healthState != "degraded" && healthState != "unavailable" {
-			healthState = "unknown"
+		fact := modelHealth[model.ID]
+		if fact.status != "healthy" && fact.status != "degraded" && fact.status != "unavailable" && fact.status != "disabled" {
+			fact.status = "unknown"
 		}
-		out.Models[i] = browserModel(model, healthState)
+		enabled := (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
+		out.Models[i] = browserModel(model, fact.status)
+		out.Models[i].Configured, out.Models[i].Enabled = true, enabled
+		out.Models[i].Usable, out.Models[i].StatusCode = enabled && fact.status == "healthy", fact.code
+		configured[model.Provider+"\x00"+model.Model] = i
+	}
+	discoverable := map[string]bool{}
+	for provider, fact := range providerHealth {
+		discoverable[provider] = fact.status == "healthy" || fact.status == "degraded"
+	}
+	inventories := s.localModelInventory(ctx, discoverable)
+	counted := map[string]bool{}
+	for provider, inventory := range inventories {
+		if inventory.err != nil {
+			continue
+		}
+		for _, installed := range inventory.models {
+			key := provider + "\x00" + installed.Name
+			index, exists := configured[key]
+			if !exists {
+				digest := sha256.Sum256([]byte(key))
+				fact := providerHealth[provider]
+				status := fact.status
+				if status != "healthy" && status != "degraded" && status != "unavailable" && status != "disabled" {
+					status = "unknown"
+				}
+				out.Models = append(out.Models, contract.ModelInspection{ID: "inventory_" + hex.EncodeToString(digest[:8]), Provider: provider,
+					Model: installed.Name, Locality: "local", Installed: true, Capabilities: []string{}, Health: status, StatusCode: fact.code})
+				index = len(out.Models) - 1
+			} else {
+				out.Models[index].Installed = true
+			}
+			item := &out.Models[index]
+			if installed.SizeBytes > 0 {
+				size := installed.SizeBytes
+				item.SizeBytes = &size
+				physicalKey := provider + "\x00" + installed.Digest
+				if installed.Digest == "" {
+					physicalKey = key
+				}
+				if !counted[physicalKey] {
+					if ^uint64(0)-total < size {
+						return zero, ErrInspection
+					}
+					total += size
+					counted[physicalKey] = true
+				}
+			} else {
+				out.LocalUnknownSizeCount++
+			}
+			item.Digest, item.Family, item.ParameterSize, item.Quantization = installed.Digest, installed.Family, installed.ParameterSize, installed.Quantization
+			if !installed.ModifiedAt.IsZero() {
+				modified := installed.ModifiedAt.UTC()
+				item.ModifiedAt = &modified
+			}
+		}
 	}
 	if out.Validate() != nil || !selectionValueClean(out, memorySecrets(s.settings, s.secret)) {
 		return zero, ErrInspection

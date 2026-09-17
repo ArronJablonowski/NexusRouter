@@ -2859,33 +2859,53 @@
     "model_inspection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "provider", "model", "locality", "capabilities", "health"],
+      "required": ["id", "provider", "model", "locality", "configured", "enabled", "installed", "usable", "capabilities", "health"],
       "properties": {
         "id": {"$ref": "#/$defs/model_id"},
         "provider": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
         "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
         "locality": {"enum": ["local", "cloud"]},
+        "configured": {"type": "boolean"},
+        "enabled": {"type": "boolean"},
+        "installed": {"type": "boolean"},
+        "usable": {"type": "boolean"},
         "capabilities": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128}},
         "context_tokens": {"type": "integer", "minimum": 0},
         "estimated_cost": {"type": "number", "minimum": 0},
         "ram_bytes": {"type": "integer", "minimum": 0},
         "vram_bytes": {"type": "integer", "minimum": 0},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64, "x-maxBytes": 64},
+        "family": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
+        "parameter_size": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
+        "quantization": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
+        "modified_at": {"type": "string", "format": "date-time"},
         "failure_domain": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
-        "health": {"enum": ["healthy", "degraded", "unavailable", "unknown"]}
-      }
+        "health": {"enum": ["healthy", "degraded", "unavailable", "disabled", "unknown"]},
+        "status_code": {"type": "string", "maxLength": 128, "x-maxBytes": 128}
+      },
+      "allOf": [
+        {"if": {"properties": {"usable": {"const": true}}}, "then": {"properties": {"configured": {"const": true}, "enabled": {"const": true}, "health": {"const": "healthy"}}}},
+        {"if": {"properties": {"enabled": {"const": true}}}, "then": {"properties": {"configured": {"const": true}}}},
+        {"if": {"properties": {"locality": {"const": "cloud"}}}, "then": {"properties": {"installed": {"const": false}, "size_bytes": false, "digest": false, "modified_at": false}}}
+      ]
     },
     "model_inspection_page": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "availability", "models"],
+      "required": ["version", "availability", "local_unknown_size_count", "models"],
       "properties": {
         "version": {"const": 1},
         "availability": {"$ref": "#/$defs/availability"},
         "config_id": {"type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64, "x-maxBytes": 64},
+        "refreshed_at": {"type": "string", "format": "date-time"},
+        "local_total_bytes": {"type": "integer", "minimum": 0},
+        "local_total_kind": {"const": "logical_deduplicated"},
+        "local_unknown_size_count": {"type": "integer", "minimum": 0, "maximum": 256},
         "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}}
       },
       "allOf": [
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id"]}, "else": {"properties": {"config_id": false, "models": {"maxItems": 0}}}}
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "refreshed_at", "local_total_bytes", "local_total_kind"]}, "else": {"properties": {"config_id": false, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_unknown_size_count": {"const": 0}, "models": {"maxItems": 0}}}}
       ]
     },
     "usage_total_inspection": {

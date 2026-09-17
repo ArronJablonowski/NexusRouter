@@ -971,12 +971,12 @@
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	const workboardRoute = window.DarwinRoutes.workboards(relativePath), settingsRoute = window.DarwinRoutes.settings(relativePath);
+	const workboardRoute = window.DarwinRoutes.workboards(relativePath), settingsRoute = window.DarwinRoutes.settings(relativePath), modelsRoute = window.DarwinRoutes.models(relativePath);
 	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
-	if (!workboardRoute && !settingsRoute) {
+	if (!workboardRoute && !settingsRoute && !modelsRoute) {
 	loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals(); updateControls();
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
@@ -991,7 +991,7 @@
 		if (!selectedChat) connection.textContent = "Connected";
 	}).catch(() => { connection.textContent = "Session needs attention"; }); }
 	for (const link of document.querySelectorAll("[data-view]")) {
-		const selected = link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : window.DarwinRoutes.chats(relativePath);
+		const selected = link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : link.dataset.view === "models" ? modelsRoute : window.DarwinRoutes.chats(relativePath);
 		if (selected) link.setAttribute("aria-current", "page");
 		else link.removeAttribute("aria-current");
 	}

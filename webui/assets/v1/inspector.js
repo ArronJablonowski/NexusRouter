@@ -154,20 +154,22 @@
 		showNotice(modelsState, "Loading models…", false);
 		requestJSON("/api/v1/models").then(body => {
 			if (!body || body.version !== 1 || !["available", "unavailable"].includes(body.availability) || !Array.isArray(body.models) || body.models.length > maxInspectedModels ||
-				(body.availability === "available") !== printable(body.config_id, 128, false)) throw new Error("invalid models");
+				(body.availability === "available") !== printable(body.config_id, 128, false) || body.availability === "available" &&
+				(!Number.isFinite(Date.parse(body.refreshed_at)) || !integer(body.local_total_bytes) || body.local_total_kind !== "logical_deduplicated" || !integer(body.local_unknown_size_count))) throw new Error("invalid models");
 			const seen = new Set();
 			for (const item of body.models) {
 				if (!item || !printable(item.id, 128, false) || seen.has(item.id) || !printable(item.provider, 128, false) || !printable(item.model, 512, false) ||
-					!["local", "cloud"].includes(item.locality) || !Array.isArray(item.capabilities) || item.capabilities.length > 128 ||
-					item.capabilities.some(value => !printable(value, 128, false)) || !["healthy", "degraded", "unavailable", "unknown"].includes(item.health) ||
+					!["local", "cloud"].includes(item.locality) || ["configured", "enabled", "installed", "usable"].some(key => typeof item[key] !== "boolean") || !Array.isArray(item.capabilities) || item.capabilities.length > 128 ||
+					item.capabilities.some(value => !printable(value, 128, false)) || !["healthy", "degraded", "unavailable", "disabled", "unknown"].includes(item.health) ||
 					!optionalInteger(item.context_tokens) || !optionalNumber(item.estimated_cost) || !optionalInteger(item.ram_bytes) || !optionalInteger(item.vram_bytes) ||
-					!printable(item.failure_domain || "", 128, true)) throw new Error("invalid model");
+					!optionalInteger(item.size_bytes) || !printable(item.failure_domain || "", 128, true) || !printable(item.status_code || "", 128, true)) throw new Error("invalid model");
 				seen.add(item.id);
 				const lines = [item.provider + " / " + item.model, stateLabel(item.locality) + " · health " + stateLabel(item.health),
 					"Capabilities: " + (item.capabilities.length ? item.capabilities.join(", ") : "None declared"),
 					"Context: " + (item.context_tokens === undefined ? "Unknown" : String(item.context_tokens)),
 					"Estimated cost: " + (item.estimated_cost === undefined ? "Unknown" : String(item.estimated_cost)),
 					"RAM / VRAM: " + formatBytes(item.ram_bytes) + " / " + formatBytes(item.vram_bytes),
+					"Installed size: " + formatBytes(item.size_bytes),
 					"Failure domain: " + (item.failure_domain || "Unknown")];
 				modelList.append(element("li", "", lines.join("\n")));
 			}

@@ -17,6 +17,7 @@
     <nav class="rail" aria-label="Primary">
       <a href="__DARWIN_BASE_PATH__/chats" data-view="chats" aria-current="page">Chats</a>
       <a href="__DARWIN_BASE_PATH__/workboards" data-view="workboards">Workboards</a>
+      <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
@@ -137,6 +138,30 @@
             </section>
           </div>
         </aside>
+      </section>
+      <section id="models-view" class="models-view" aria-labelledby="models-page-title" hidden>
+        <header class="models-heading">
+          <div><p class="eyebrow">Live inventory</p><h1 id="models-page-title">LLM inventory</h1></div>
+          <button id="refresh-models" class="secondary" type="button">Refresh</button>
+        </header>
+        <output id="models-live-status" class="live-status models-live-status" role="status" aria-live="polite">Loading model inventory…</output>
+        <section class="model-summary" aria-labelledby="local-size-title">
+          <div><p class="eyebrow">Local storage</p><h2 id="local-size-title">Total local model size</h2></div>
+          <strong id="local-model-total">Loading…</strong>
+          <p id="local-model-total-detail" class="help"></p>
+        </section>
+        <div class="model-inventory-layout">
+          <section class="model-inventory-section" aria-labelledby="local-models-title">
+            <div class="control-heading"><div><p class="eyebrow">On this host</p><h2 id="local-models-title">Local models</h2></div><output id="local-model-count" class="count"></output></div>
+            <div id="local-model-state" class="notice" role="status">Loading local models…</div>
+            <ul id="local-model-list" class="model-cards" aria-label="Installed and configured local models"></ul>
+          </section>
+          <section class="model-inventory-section" aria-labelledby="cloud-models-title">
+            <div class="control-heading"><div><p class="eyebrow">Configured providers</p><h2 id="cloud-models-title">Cloud models</h2></div><output id="cloud-model-count" class="count"></output></div>
+            <div id="cloud-model-state" class="notice" role="status">Loading cloud models…</div>
+            <ul id="cloud-model-list" class="model-cards" aria-label="Configured cloud models"></ul>
+          </section>
+        </div>
       </section>
       <section id="settings-view" class="settings-view" aria-labelledby="settings-title" hidden>
         <header class="settings-heading">
@@ -400,6 +425,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboards.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

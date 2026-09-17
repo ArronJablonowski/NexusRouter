@@ -145,7 +145,9 @@ func TestInspectionGoValidationRejectsAmbiguity(t *testing.T) {
 
 func TestInspectionExpandedBoundsMatchSchema(t *testing.T) {
 	compiler, location := compileInspectionSchema(t)
-	models := ModelInspectionPage{Version: 1, Availability: Available, ConfigID: strings.Repeat("a", 64), Models: []ModelInspection{}}
+	now, total := time.Now().UTC(), uint64(0)
+	models := ModelInspectionPage{Version: 1, Availability: Available, ConfigID: strings.Repeat("a", 64), RefreshedAt: &now,
+		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", Models: []ModelInspection{}}
 	for index := 0; index < 101; index++ {
 		models.Models = append(models.Models, ModelInspection{ID: "model_" + strconv.Itoa(index), Provider: "provider", Model: "model", Locality: "local", Capabilities: []string{}, Health: "unknown"})
 	}

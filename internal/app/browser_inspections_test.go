@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -111,6 +114,37 @@ func TestBrowserModelsResourcesAndUsagePreserveAvailability(t *testing.T) {
 	usage, err := service.BrowserTaskUsage(context.Background(), "usage_task")
 	if err != nil || usage.Validate() != nil || usage.Availability != contract.Available || usage.Usage == nil || usage.Usage.Routed.Records != 0 || usage.Usage.Auxiliary.Records != 0 {
 		t.Fatal(usage, err)
+	}
+}
+
+func TestBrowserModelsDiscoversInstalledLocalModelsAndDeduplicatesAliases(t *testing.T) {
+	digest := strings.Repeat("b", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/tags" {
+			t.Errorf("unexpected path %s", request.URL.Path)
+		}
+		_, _ = fmt.Fprintf(writer, `{"models":[`+
+			`{"name":"fixture:latest","modified_at":"2026-09-17T12:00:00Z","size":1024,"digest":%q,"details":{"family":"fixture","parameter_size":"1B","quantization_level":"Q4"}},`+
+			`{"name":"fixture:alias","modified_at":"2026-09-17T12:00:00Z","size":1024,"digest":%q,"details":{"family":"fixture","parameter_size":"1B","quantization_level":"Q4"}}]}`, digest, digest)
+	}))
+	defer server.Close()
+	service := submissionService(t)
+	service.settings.Providers = []config.Provider{{ID: "ollama", Kind: "ollama", Endpoint: server.URL}}
+	service.settings.Models = []config.Model{{ID: "configured", Provider: "ollama", Model: "fixture:latest", Locality: "local", Capabilities: []string{"chat"}, RAMBytes: 1}}
+	report := health.Report{Version: 1, CheckedAt: time.Now().UTC(), Status: "healthy", Ready: true, Checks: []health.Check{
+		{Component: "daemon", Status: "healthy", Code: "serving"}, {Component: "database", Status: "healthy", Code: "available"},
+		{Component: "supervisor", Status: "healthy", Code: "supervisor_ok"}, {Component: "resources", ID: "host", Status: "healthy", Code: "capacity_available"},
+		{Component: "provider", ID: "ollama", Status: "healthy", Code: "available"}, {Component: "model", ID: "configured", Status: "healthy", Code: "available"},
+	}}
+	page, err := service.BrowserModels(context.Background(), report)
+	if err != nil || page.Validate() != nil || len(page.Models) != 2 || page.LocalTotalBytes == nil || *page.LocalTotalBytes != 1024 || page.LocalUnknownSizeCount != 0 {
+		t.Fatalf("unexpected inventory page: %+v, %v", page, err)
+	}
+	if !page.Models[0].Configured || !page.Models[0].Installed || !page.Models[0].Usable || page.Models[0].SizeBytes == nil || *page.Models[0].SizeBytes != 1024 {
+		t.Fatalf("configured model not enriched: %+v", page.Models[0])
+	}
+	if page.Models[1].Configured || !page.Models[1].Installed || page.Models[1].Usable || page.Models[1].Model != "fixture:alias" {
+		t.Fatalf("unconfigured install not represented: %+v", page.Models[1])
 	}
 }
 

@@ -3,7 +3,7 @@
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	if (!window.DarwinRoutes || !window.DarwinRoutes.settings(relative)) return;
-	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view");
+	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), models = document.querySelector("#models-view");
 	const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools");
 	const root = document.querySelector("#tools-read-root"), validation = document.querySelector("#settings-validation"), status = document.querySelector("#settings-status");
 	const save = document.querySelector("#save-settings"), reset = document.querySelector("#reset-settings"), refresh = document.querySelector("#refresh-settings");
@@ -11,7 +11,7 @@
 	const connection = document.querySelector("#connection-state");
 	const digestPattern = /^[0-9a-f]{64}$/;
 	let csrf = "", projection = null, loading = false;
-	chat.hidden = true; workboards.hidden = true; view.hidden = false;
+	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
 		return value && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}

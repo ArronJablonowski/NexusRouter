@@ -29,30 +29,46 @@ const (
 func validAvailability(value Availability) bool { return value == Available || value == Unavailable }
 
 type ModelInspection struct {
-	ID            string   `json:"id"`
-	Provider      string   `json:"provider"`
-	Model         string   `json:"model"`
-	Locality      string   `json:"locality"`
-	Capabilities  []string `json:"capabilities"`
-	ContextTokens *int64   `json:"context_tokens,omitempty"`
-	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
-	RAMBytes      *uint64  `json:"ram_bytes,omitempty"`
-	VRAMBytes     *uint64  `json:"vram_bytes,omitempty"`
-	FailureDomain string   `json:"failure_domain,omitempty"`
-	Health        string   `json:"health"`
+	ID            string     `json:"id"`
+	Provider      string     `json:"provider"`
+	Model         string     `json:"model"`
+	Locality      string     `json:"locality"`
+	Configured    bool       `json:"configured"`
+	Enabled       bool       `json:"enabled"`
+	Installed     bool       `json:"installed"`
+	Usable        bool       `json:"usable"`
+	Capabilities  []string   `json:"capabilities"`
+	ContextTokens *int64     `json:"context_tokens,omitempty"`
+	EstimatedCost *float64   `json:"estimated_cost,omitempty"`
+	RAMBytes      *uint64    `json:"ram_bytes,omitempty"`
+	VRAMBytes     *uint64    `json:"vram_bytes,omitempty"`
+	SizeBytes     *uint64    `json:"size_bytes,omitempty"`
+	Digest        string     `json:"digest,omitempty"`
+	Family        string     `json:"family,omitempty"`
+	ParameterSize string     `json:"parameter_size,omitempty"`
+	Quantization  string     `json:"quantization,omitempty"`
+	ModifiedAt    *time.Time `json:"modified_at,omitempty"`
+	FailureDomain string     `json:"failure_domain,omitempty"`
+	Health        string     `json:"health"`
+	StatusCode    string     `json:"status_code,omitempty"`
 }
 
 func (m ModelInspection) Validate() error {
 	if !optionalModelID(m.ID) || m.ID == "" || !boundedPrintable(m.Provider, 1, 128) ||
 		!boundedPrintable(m.Model, 1, 512) || (m.Locality != "local" && m.Locality != "cloud") ||
-		m.Capabilities == nil || len(m.Capabilities) > 128 || !boundedPrintable(m.FailureDomain, 0, 128) {
+		m.Capabilities == nil || len(m.Capabilities) > 128 || !boundedPrintable(m.FailureDomain, 0, 128) ||
+		!boundedPrintable(m.Digest, 0, 64) || !boundedPrintable(m.Family, 0, 128) || !boundedPrintable(m.ParameterSize, 0, 128) ||
+		!boundedPrintable(m.Quantization, 0, 128) || !boundedPrintable(m.StatusCode, 0, 128) ||
+		m.Digest != "" && !validInspectionDigest(m.Digest, true) || m.ModifiedAt != nil && !validBrowserTime(*m.ModifiedAt) ||
+		m.Usable && (!m.Configured || !m.Enabled || m.Health != "healthy") || m.Enabled && !m.Configured ||
+		m.Installed && m.Locality != "local" || m.Locality == "cloud" && (m.Installed || m.SizeBytes != nil || m.Digest != "" || m.ModifiedAt != nil) {
 		return ErrContract
 	}
 	if m.ContextTokens != nil && *m.ContextTokens < 0 || m.EstimatedCost != nil && !finiteNonnegative(*m.EstimatedCost) {
 		return ErrContract
 	}
 	switch m.Health {
-	case "healthy", "degraded", "unavailable", "unknown":
+	case "healthy", "degraded", "unavailable", "disabled", "unknown":
 	default:
 		return ErrContract
 	}
@@ -67,16 +83,22 @@ func (m ModelInspection) Validate() error {
 }
 
 type ModelInspectionPage struct {
-	Version      int               `json:"version"`
-	Availability Availability      `json:"availability"`
-	ConfigID     string            `json:"config_id,omitempty"`
-	Models       []ModelInspection `json:"models"`
+	Version               int               `json:"version"`
+	Availability          Availability      `json:"availability"`
+	ConfigID              string            `json:"config_id,omitempty"`
+	RefreshedAt           *time.Time        `json:"refreshed_at,omitempty"`
+	LocalTotalBytes       *uint64           `json:"local_total_bytes,omitempty"`
+	LocalTotalKind        string            `json:"local_total_kind,omitempty"`
+	LocalUnknownSizeCount int               `json:"local_unknown_size_count"`
+	Models                []ModelInspection `json:"models"`
 }
 
 func (p ModelInspectionPage) Validate() error {
 	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || len(p.Models) > MaxInspectionModels ||
 		(p.Availability == Available) != (p.ConfigID != "") || !validInspectionDigest(p.ConfigID, p.Availability == Available) ||
-		p.Availability == Unavailable && len(p.Models) != 0 {
+		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
+		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated") ||
+		p.Availability == Unavailable && (len(p.Models) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalUnknownSizeCount != 0) {
 		return ErrContract
 	}
 	seen := map[string]bool{}

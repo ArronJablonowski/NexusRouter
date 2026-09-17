@@ -92,8 +92,29 @@ input, select { padding: .55rem .7rem; }
 .inspector-list + .secondary { width: 100%; margin-top: .65rem; }
 .state-running { color: #73e6b1; }
 .state-failed, .state-canceled { color: #ffb6b6; }
-.workboard-view, .settings-view { min-width: 0; }
-.workboard-view[hidden], .chat-view[hidden], .settings-view[hidden] { display: none; }
+.workboard-view, .settings-view, .models-view { min-width: 0; }
+.workboard-view[hidden], .chat-view[hidden], .settings-view[hidden], .models-view[hidden] { display: none; }
+.models-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; }
+.models-heading h1, .model-inventory-section h2, .model-summary h2 { margin: .15rem 0 0; }
+.models-live-status { display: block; min-height: 1.4rem; padding: .45rem 0 .8rem; }
+.models-live-status.error { color: #ffb6b6; }
+.model-summary { display: grid; grid-template-columns: minmax(15rem, 1fr) auto; gap: .25rem 1.25rem; align-items: center; margin-bottom: 1rem; padding: 1.2rem 1.35rem; border: 1px solid #3d4d6d; border-radius: 1rem; background: linear-gradient(135deg, #14213a, #10192b); }
+.model-summary strong { color: #73e6b1; font-size: clamp(1.5rem, 3vw, 2.4rem); text-align: right; }
+.model-summary .help { grid-column: 1 / -1; margin: .3rem 0 0; }
+.model-inventory-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.model-inventory-section { min-width: 0; padding: 1.2rem; border: 1px solid #34415d; border-radius: 1rem; background: #111a2ddd; box-shadow: 0 1rem 3rem #0003; }
+.model-cards { display: grid; gap: .75rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.model-card { padding: 1rem; border: 1px solid #34415d; border-radius: .75rem; background: #0d1628; }
+.model-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; }
+.model-card h3 { margin: 0; overflow-wrap: anywhere; font-size: 1rem; }
+.model-card-provider { margin: .25rem 0 0; color: #9fb0ce; font-size: .78rem; }
+.model-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .3rem; }
+.model-badge { padding: .22rem .48rem; border: 1px solid #52617e; border-radius: 999px; color: #cbd6e9; font-size: .7rem; white-space: nowrap; }
+.model-badge.usable { border-color: #4a9a78; color: #73e6b1; }
+.model-badge.unavailable { border-color: #a95d5d; color: #ffb6b6; }
+.model-details { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.3fr); gap: .42rem .8rem; margin: .85rem 0 0; font-size: .78rem; }
+.model-details dt { color: #9fb0ce; }
+.model-details dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .settings-heading, .settings-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .settings-heading { margin-bottom: 1rem; }
 .settings-heading h1, .settings-card h2 { margin: .15rem 0 0; }
@@ -212,6 +233,7 @@ input, select { padding: .55rem .7rem; }
   #task-inspector[hidden] { display: none; }
   .workboard-layout { grid-template-columns: 1fr; }
   .settings-layout { grid-template-columns: 1fr; }
+  .model-inventory-layout { grid-template-columns: 1fr; }
   .workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workboard-filters label, .workboard-filters input, .workboard-filters select, .workboard-filters button { grid-row: auto; }
   .budget-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -231,6 +253,9 @@ input, select { padding: .55rem .7rem; }
   .inspector-details dd { justify-content: flex-start; margin-bottom: .6rem; border-top: 0; border-left: 1px solid #2d3a55; border-radius: 0 0 .55rem .55rem; text-align: left; }
   .workboard-layout { grid-template-columns: 1fr; }
   .settings-layout { grid-template-columns: 1fr; }
+  .model-summary { grid-template-columns: 1fr; }
+  .model-summary strong { text-align: left; }
+  .model-inventory-layout { grid-template-columns: 1fr; }
   .setting-toggle { align-items: flex-start; }
   .board-index { min-height: 15rem; }
   .workboard-filters { grid-template-columns: 1fr; }

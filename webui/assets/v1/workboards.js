@@ -2,7 +2,7 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path), settings: path => path === "/settings"});
+	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path), models: path => path === "/models", settings: path => path === "/settings"});
 	const route = window.DarwinRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
 	if (!route) return;
 	const client = window.DarwinWorkboardClient;
@@ -12,7 +12,7 @@
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const states = ["backlog", "ready", "in_progress", "blocked", "review", "done", "canceled"];
 	const boardPageLimit = 25, cardPageLimit = 100, dependencyLimit = 100, attemptLimit = 25, maxBoards = 100, maxCards = 10000;
-	const view = document.querySelector("#workboard-view"), chat = document.querySelector("#chat-view");
+	const view = document.querySelector("#workboard-view"), chat = document.querySelector("#chat-view"), models = document.querySelector("#models-view"), settings = document.querySelector("#settings-view");
 	const list = document.querySelector("#board-list"), listState = document.querySelector("#board-list-state"), boardCount = document.querySelector("#board-count");
 	const loadMoreBoards = document.querySelector("#load-more-boards"), refresh = document.querySelector("#refresh-workboards"), boardStateFilter = document.querySelector("#board-state-filter");
 	const selectedTitle = document.querySelector("#selected-board-title"), selectedMeta = document.querySelector("#selected-board-meta"), liveStatus = document.querySelector("#workboard-live-status");
@@ -26,7 +26,7 @@
 	let pendingFocusAnchor = null, pendingFocusVersion = 0;
 	const contextObservers = new Set();
 	const boardIDs = new Set(), boardCursors = new Set(), cardIDs = new Set(), cardCursors = new Set(), laneLists = new Map(), laneCounts = new Map(), laneRanks = new Map(), cardNodes = new Map(), lifecycleByCard = new Map(), supervisionByCard = new Map();
-	chat.hidden = true;
+	chat.hidden = true; models.hidden = true; settings.hidden = true;
 	view.hidden = false;
 	function element(name, className, text) {
 		const node = document.createElement(name);

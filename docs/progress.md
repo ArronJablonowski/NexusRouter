@@ -8363,3 +8363,31 @@ remain unchanged. A documentation contract test rejects a return to active
 `1.0.0` examples while requiring the exact preserved tag identity and the
 approved next-release identity. Create-only publication remains fail-closed;
 this decision is not signing or publication authority.
+
+## 2026-09-17 — DAR-130 dynamic LLM inventory Web UI
+
+The authenticated Web UI now has a dedicated Models page that separates local
+and cloud inventory. Local Ollama discovery reports every installed model,
+provider-reported size, digest, family, parameter size, quantization, modified
+time, configured state, health and current usability. Configured cloud models
+show enabled, health and usability state without exposing endpoints or
+credentials. One provider failure cannot remove the other providers' entries.
+
+The page refreshes its authoritative read-only projection every ten seconds
+while visible, suppresses overlapping requests, pauses background refresh while
+hidden, retains the last verified snapshot after a failed refresh, and supports
+manual refresh. The aggregate local total deduplicates aliases with the same
+provider digest and explicitly identifies itself as provider-reported logical
+storage; the UI warns that shared provider layers may occupy less physical disk
+space and identifies unknown model sizes.
+
+Provider, application-contract, schema, static-browser and real-Chrome tests
+cover bounded inventory decoding, invalid size/digest rejection, configured and
+unconfigured local models, alias deduplication, cloud separation, redaction,
+responsive markup and dynamic-refresh guards. `make qualify-webui` passed all
+race-enabled Web UI, browser-auth, application and daemon-lifecycle gates. The
+complete `umask 077; make check` also passed formatting/LOC, vet, every
+race-enabled package, and `go build ./...`. Notable uncached package times were
+telemetry 2,399.272 seconds, application 2,326.064 seconds, releasepack 854.645
+seconds, SDK 270.633 seconds, CLI 184.744 seconds, runtime 131.058 seconds,
+toolgate 110.426 seconds, and workers 46.825 seconds.
