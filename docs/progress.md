@@ -8412,3 +8412,12 @@ gates. The complete `umask 077; make check` also passed formatting/LOC, vet,
 the repository-wide race suite, and the final build; the two longest uncached
 packages were telemetry at 2,379.249 seconds and application at 2,319.559
 seconds.
+
+The compact summary badges were then assigned semantic status, installation,
+configuration, and size classes and placed in fixed centered grid columns on
+wide layouts. This keeps equivalent information horizontally aligned across
+cards even when label widths differ or an optional badge is absent. The narrow
+layout deliberately returns to wrapping flex badges so small screens do not
+overflow. `make qualify-webui` and the complete `umask 077; make check` passed
+after the alignment change; the longest uncached packages were telemetry at
+2,343.438 seconds and application at 2,327.083 seconds.

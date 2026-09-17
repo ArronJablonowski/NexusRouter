@@ -54,9 +54,9 @@
 		const open = expanded.has(item.id), detailsID = "model-details-" + item.id;
 		heading.type = "button"; heading.setAttribute("aria-expanded", String(open)); heading.setAttribute("aria-controls", detailsID);
 		identity.append(element("strong", "model-card-name", item.model), element("span", "model-card-provider", item.provider));
-		badges.append(badge(item.usable ? "Usable" : item.health === "disabled" ? "Disabled" : "Unavailable", item.usable ? "usable" : "unavailable"));
-		if (item.locality === "local") badges.append(badge(item.installed ? "Installed" : "Not installed"));
-		if (item.configured) badges.append(badge("Configured"));
+		badges.append(badge(item.usable ? "Usable" : item.health === "disabled" ? "Disabled" : "Unavailable", "model-status-badge " + (item.usable ? "usable" : "unavailable")));
+		if (item.locality === "local") badges.append(badge(item.installed ? "Installed" : "Not installed", "model-install-badge"));
+		if (item.configured) badges.append(badge("Configured", "model-config-badge"));
 		if (item.locality === "local") badges.append(badge(bytes(item.size_bytes), "model-size-badge"));
 		const disclosure = element("span", "model-disclosure", open ? "−" : "+"); disclosure.setAttribute("aria-hidden", "true");
 		heading.append(identity, badges, disclosure); node.append(heading);

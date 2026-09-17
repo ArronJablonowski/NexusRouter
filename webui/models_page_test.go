@@ -17,7 +17,8 @@ func TestEmbeddedModelInventoryIsDynamicBoundedAndReadOnly(t *testing.T) {
 		`local_unknown_size_count`, `Showing the last verified snapshot`, `credentials: "same-origin"`, `cache: "no-store"`,
 		`node.textContent = value`, `locality === "local"`, `locality === "cloud"`, `const expanded = new Set()`,
 		`heading.setAttribute("aria-expanded", String(open))`, `details.hidden = !open`, `expanded.add(item.id)`,
-		`expanded.delete(item.id)`, `if (!present.has(id)) expanded.delete(id)`,
+		`expanded.delete(item.id)`, `if (!present.has(id)) expanded.delete(id)`, `model-status-badge`, `model-install-badge`,
+		`model-config-badge`, `model-size-badge`,
 	} {
 		if !strings.Contains(body, required) {
 			t.Fatalf("model inventory client lost required guard %q", required)

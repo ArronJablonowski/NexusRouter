@@ -112,11 +112,14 @@ input, select { padding: .55rem .7rem; }
 .model-card-name, .model-card-provider { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-card-name { font-size: .86rem; }
 .model-card-provider { margin-top: .12rem; color: #9fb0ce; font-size: .68rem; }
-.model-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .22rem; }
+.model-badges { display: grid; grid-template-columns: 5rem 4.4rem 5rem 4.5rem; gap: .22rem; align-items: center; justify-items: center; }
 .model-badge { padding: .14rem .38rem; border: 1px solid #52617e; border-radius: 999px; color: #cbd6e9; font-size: .63rem; white-space: nowrap; }
 .model-badge.usable { border-color: #4a9a78; color: #73e6b1; }
 .model-badge.unavailable { border-color: #a95d5d; color: #ffb6b6; }
-.model-size-badge { color: #eef4ff; }
+.model-status-badge { grid-column: 1; }
+.model-install-badge { grid-column: 2; }
+.model-config-badge { grid-column: 3; }
+.model-size-badge { grid-column: 4; color: #eef4ff; }
 .model-disclosure { width: 1.2rem; color: #9fb0ce; font-size: 1.15rem; line-height: 1; text-align: center; }
 .model-details { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.3fr); gap: .42rem .8rem; margin: 0 .7rem .7rem; padding: .7rem .15rem 0; border-top: 1px solid #34415d; font-size: .78rem; }
 .model-details[hidden] { display: none; }
@@ -264,7 +267,7 @@ input, select { padding: .55rem .7rem; }
   .model-summary strong { text-align: left; }
   .model-inventory-layout { grid-template-columns: 1fr; }
   .model-card-toggle { grid-template-columns: minmax(7rem, 1fr) auto; }
-  .model-badges { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .model-badges { display: flex; grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
   .model-disclosure { grid-column: 2; grid-row: 1; }
   .setting-toggle { align-items: flex-start; }
   .board-index { min-height: 15rem; }
