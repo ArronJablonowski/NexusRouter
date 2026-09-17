@@ -72,10 +72,12 @@ func authenticateBrowser(t *testing.T, handler *Handler) (*http.Cookie, string) 
 
 func TestBrowserBootstrapShellAndLogout(t *testing.T) {
 	handler := handlerFixture(t)
-	unauthorized := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorized, browserRequest(http.MethodGet, "/app", ""))
-	if unauthorized.Code != http.StatusFound || unauthorized.Header().Get("Location") != "/app/bootstrap" {
-		t.Fatal("shell did not enter bounded bootstrap", unauthorized.Code)
+	for _, target := range []string{"/app", "/app/", "/app/chats", "/app/chats/session-1", "/app/workboards", "/app/workboards/board-1"} {
+		unauthorized := httptest.NewRecorder()
+		handler.ServeHTTP(unauthorized, browserRequest(http.MethodGet, target, ""))
+		if unauthorized.Code != http.StatusFound || unauthorized.Header().Get("Location") != "/app/bootstrap" {
+			t.Fatal("shell route did not enter bounded bootstrap", target, unauthorized.Code)
+		}
 	}
 	bootstrap := httptest.NewRecorder()
 	handler.ServeHTTP(bootstrap, browserRequest(http.MethodGet, "/app/bootstrap", ""))
@@ -100,8 +102,19 @@ func TestBrowserBootstrapShellAndLogout(t *testing.T) {
 	}
 	shell = httptest.NewRecorder()
 	handler.ServeHTTP(shell, shellRequest)
-	if shell.Code != http.StatusUnauthorized {
-		t.Fatal("revoked session accepted", shell.Code)
+	if shell.Code != http.StatusFound || shell.Header().Get("Location") != "/app/bootstrap" {
+		t.Fatal("revoked session did not re-enter bootstrap", shell.Code)
+	}
+}
+
+func TestBrowserBootstrapRedirectDoesNotMaskAssetsOrUnknownRoutes(t *testing.T) {
+	handler := handlerFixture(t)
+	for _, target := range []string{"/app/assets/v1/app.js", "/app/chats/not/one-id", "/app/workboards/not/one-id", "/app/unknown"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, browserRequest(http.MethodGet, target, ""))
+		if response.Code == http.StatusFound {
+			t.Fatal("non-navigation path entered bootstrap", target)
+		}
 	}
 }
 

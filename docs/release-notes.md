@@ -7,6 +7,13 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- Unauthenticated browser navigation to the chat and Workboard shell routes,
+  including bookmarked session and board URLs, now redirects to the bounded
+  one-time bootstrap page. Browser API calls, static assets, malformed paths,
+  and unknown routes retain their fail-closed error behavior. This removes the
+  bare `Unauthorized` page previously shown when a new browser opened
+  `/app/chats` directly without weakening cookie or CSRF enforcement.
+
 - The Web UI now accepts an optional validated `web_ui.default_model`. New
   browser chats use that configured alias when present and retain adaptive
   routing when it is absent. This lets supervised deployments pin a signed-in

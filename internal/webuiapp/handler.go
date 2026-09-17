@@ -174,13 +174,25 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 			h.authenticatedAPINotFound(writer, request)
 			return
 		}
-		if (request.URL.Path == h.basePath || request.URL.Path == h.basePath+"/") && !h.authenticated(request) && (request.Method == http.MethodGet || request.Method == http.MethodHead) {
+		if browserShellNavigation(h.basePath, request.URL.Path) && !h.authenticated(request) && (request.Method == http.MethodGet || request.Method == http.MethodHead) {
 			writer.Header().Set("Location", h.basePath+"/bootstrap")
 			writer.WriteHeader(http.StatusFound)
 			return
 		}
 		h.shell.ServeHTTP(writer, request)
 	}
+}
+
+func browserShellNavigation(base, requestPath string) bool {
+	if requestPath == base || requestPath == base+"/" || requestPath == base+"/chats" || requestPath == base+"/workboards" {
+		return true
+	}
+	for _, prefix := range []string{base + "/chats/", base + "/workboards/"} {
+		if strings.HasPrefix(requestPath, prefix) && contract.ValidID(strings.TrimPrefix(requestPath, prefix)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) ApproveChallenge(id, displayCode string) error {
