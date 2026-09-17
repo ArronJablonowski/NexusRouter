@@ -17,6 +17,7 @@
     <nav class="rail" aria-label="Primary">
       <a href="__DARWIN_BASE_PATH__/chats" data-view="chats" aria-current="page">Chats</a>
       <a href="__DARWIN_BASE_PATH__/workboards" data-view="workboards">Workboards</a>
+      <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
       <section id="chat-view" class="chat-view" aria-labelledby="chat-title">
@@ -136,6 +137,37 @@
             </section>
           </div>
         </aside>
+      </section>
+      <section id="settings-view" class="settings-view" aria-labelledby="settings-title" hidden>
+        <header class="settings-heading">
+          <div><p class="eyebrow">Operator controls</p><h1 id="settings-title">Settings</h1></div>
+          <button id="refresh-settings" class="secondary" type="button">Refresh</button>
+        </header>
+        <div class="settings-layout">
+          <form id="tool-settings-form" class="settings-card" novalidate>
+            <div class="settings-card-heading"><div><p class="eyebrow">Permissions</p><h2>Tool access</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
+            <p class="settings-intro">Grant local models narrowly scoped, read-only file access. Saved changes take effect after the DarwinRouter daemon restarts.</p>
+            <label class="setting-toggle" for="tools-enabled">
+              <span><strong>File tools</strong><small>Expose the built-in read-only file tool to eligible local execution.</small></span>
+              <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-toggle" for="delegate-read-tools">
+              <span><strong>Delegated read access</strong><small>Let the configured local worker inherit read-only access within the approved root.</small></span>
+              <span class="switch"><input id="delegate-read-tools" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
+            </label>
+            <label class="setting-field" for="tools-read-root"><strong>Approved read root</strong><small>Use an absolute directory path. Models cannot read outside this boundary.</small></label>
+            <input id="tools-read-root" type="text" maxlength="4096" autocomplete="off" spellcheck="false" placeholder="/Users/name/project" aria-describedby="settings-validation">
+            <p id="settings-validation" class="field-error" role="alert" hidden></p>
+            <div class="button-row"><button id="save-settings" type="submit">Save settings</button><button id="reset-settings" class="secondary" type="button">Reset changes</button></div>
+            <output id="settings-status" class="settings-status" role="status" aria-live="polite">Loading settings…</output>
+          </form>
+          <aside class="settings-card" aria-labelledby="active-settings-title">
+            <p class="eyebrow">Running daemon</p><h2 id="active-settings-title">Active policy</h2>
+            <p class="settings-intro">These values remain active until the daemon restarts.</p>
+            <dl id="active-settings" class="settings-summary"></dl>
+            <div class="settings-advisory"><strong>Safety boundary</strong><p>This page cannot enable shell commands, write access, or expand access beyond the configured directory.</p></div>
+          </aside>
+        </div>
       </section>
       <section id="workboard-view" class="workboard-view" aria-labelledby="workboard-title" hidden>
         <header class="workboard-heading">
@@ -367,6 +399,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-client.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboards.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

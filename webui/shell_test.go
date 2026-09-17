@@ -45,6 +45,7 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 		{"/console/assets/v1/workboard-client.js", "text/javascript", "DarwinWorkboardClient"},
 		{"/console/assets/v1/workboards.js", "text/javascript", "kanban"},
 		{"/console/assets/v1/workboard-mutations.js", "text/javascript", "idempotency_key"},
+		{"/console/assets/v1/settings.js", "text/javascript", "delegate_read_tools"},
 		{"/console/assets/v1/app.js", "text/javascript", "aria-current"},
 	} {
 		response := shellRequest(t, handler, http.MethodGet, test.target, true)
@@ -135,10 +136,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "4f542829bdf0feca2ddae3cd42cad30e526d6e7561468ba9d4e7dd9d9f4e361f" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "4c34daf67d3c3992ab161b4b8fc1add7132b9c3806fc908abcef90bb9d26be32" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -260,7 +261,7 @@ func TestEmbeddedInspectorIsBoundedInertAndExplicit(t *testing.T) {
 }
 
 func TestEmbeddedJavaScriptSourcesStayBelowSourceLimit(t *testing.T) {
-	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/app.js", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/bootstrap.js"} {
 		body, err := embeddedShellAssets.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -447,11 +448,25 @@ func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
 	guard := strings.Index(body, `const workboardRoute = window.DarwinRoutes.workboards(relativePath)`)
 	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals()`)
 	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
-	if guard < 0 || !strings.Contains(body[guard:chat], `if (!workboardRoute)`) || chat < guard || csrf < chat {
+	if guard < 0 || !strings.Contains(body[guard:chat], `if (!workboardRoute && !settingsRoute)`) || chat < guard || csrf < chat {
 		t.Fatal("workboard route does not guard unrelated startup requests")
 	}
 	if !strings.Contains(body, `for (const link of document.querySelectorAll("[data-view]"))`) || !strings.Contains(body, `link.setAttribute("aria-current", "page")`) {
 		t.Fatal("workboard navigation cannot expose its current page")
+	}
+}
+
+func TestSettingsShellUsesBoundedToggleControls(t *testing.T) {
+	html, _ := embeddedShellAssets.ReadFile("assets/v1/index.html")
+	script, _ := embeddedShellAssets.ReadFile("assets/v1/settings.js")
+	styles, _ := embeddedShellAssets.ReadFile("assets/v1/app.css")
+	for _, required := range []string{`data-view="settings"`, `id="settings-view"`, `id="tools-enabled" type="checkbox" role="switch"`, `id="delegate-read-tools" type="checkbox" role="switch"`, `id="tools-read-root"`} {
+		if !strings.Contains(string(html), required) {
+			t.Fatal("settings control missing", required)
+		}
+	}
+	if !strings.Contains(string(script), `expected_digest: projection.digest`) || !strings.Contains(string(script), `"X-Darwin-CSRF": csrf`) || !strings.Contains(string(styles), `.switch input:checked + span`) {
+		t.Fatal("settings mutation boundary or toggle styling missing")
 	}
 }
 

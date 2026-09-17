@@ -7,6 +7,14 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- The authenticated Web UI adds a Settings page for bounded tool permissions.
+  File tools and delegated read access use accessible toggle switches, while an
+  absolute read-root field defines the only readable directory. Saves require
+  same-origin CSRF authority, compare the exact source configuration digest,
+  validate the complete resulting configuration, and atomically replace the
+  project file. The page distinguishes saved policy from the running daemon
+  and reports when a restart is required; it cannot grant shell or write access.
+
 - The Web UI Inspector now reserves more horizontal space on desktop and
   presents Health, resource, and model details as padded label/value rows.
   Narrow layouts stack each label above its value, preserving readability

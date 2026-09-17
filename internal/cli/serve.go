@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -191,6 +192,38 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return report, nil
 	}
 	if s.WebUI.Enabled {
+		activeToolSettings := webui.ToolAccessSettings{ToolsEnabled: s.Tools.Enabled, DelegateReadTools: s.Workers.DelegateReadTools, ReadRoot: s.Tools.ReadRoot}
+		var settingsMu sync.Mutex
+		settingsProjection := func(ctx context.Context) (webui.SettingsInspection, error) {
+			if err := ctx.Err(); err != nil {
+				return webui.SettingsInspection{}, err
+			}
+			settingsMu.Lock()
+			defer settingsMu.Unlock()
+			saved, digest, readErr := config.ReadProjectToolAccess(*path)
+			if readErr != nil {
+				return webui.SettingsInspection{}, readErr
+			}
+			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot}
+			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
+		}
+		updateSettings := func(ctx context.Context, request webui.SettingsUpdateRequest) (webui.SettingsInspection, error) {
+			if err := ctx.Err(); err != nil {
+				return webui.SettingsInspection{}, err
+			}
+			settingsMu.Lock()
+			defer settingsMu.Unlock()
+			next := config.ToolAccess{Enabled: request.Settings.ToolsEnabled, DelegateReadTools: request.Settings.DelegateReadTools, ReadRoot: request.Settings.ReadRoot}
+			saved, digest, updateErr := config.UpdateProjectToolAccess(*path, request.ExpectedDigest, next)
+			if errors.Is(updateErr, config.ErrConfigConflict) {
+				return webui.SettingsInspection{}, webuiapp.ErrSettingsConflict
+			}
+			if updateErr != nil {
+				return webui.SettingsInspection{}, updateErr
+			}
+			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot}
+			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
+		}
 		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)
 		if operationErr != nil {
 			fmt.Fprintln(stderr, "cannot initialize Web UI operation journal")
@@ -237,6 +270,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,
 			Operations: browserMutations.Operations, Submission: browserMutations.Submission,
+			UpdateSettings: updateSettings,
 		}, Reads: webuiapp.ReadServices{
 			Chats: service.ListChats, History: service.ChatHistory,
 			CommittedEvents: func(ctx context.Context, options sessions.EventLogOptions) (sessions.CommittedEventPage, error) {
@@ -258,6 +292,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Resources: func(ctx context.Context) (webui.ResourceInspection, error) {
 				return service.BrowserResources(ctx), nil
 			},
+			Settings: settingsProjection,
 		}, Workboards: webuiapp.WorkboardServices{
 			List: workboards.BrowserList, Read: workboards.BrowserRead, Events: workboards.BrowserEvents,
 			AttemptHistory: workboards.BrowserAttemptHistory, AttemptDetail: workboards.BrowserAttemptDetail,

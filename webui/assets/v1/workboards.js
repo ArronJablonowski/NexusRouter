@@ -2,7 +2,7 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path)});
+	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path), settings: path => path === "/settings"});
 	const route = window.DarwinRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
 	if (!route) return;
 	const client = window.DarwinWorkboardClient;

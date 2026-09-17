@@ -19,6 +19,7 @@ type InspectionServices struct {
 	Audits    func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
 	Health    func(context.Context) (contract.HealthInspection, error)
 	Resources func(context.Context) (contract.ResourceInspection, error)
+	Settings  func(context.Context) (contract.SettingsInspection, error)
 }
 
 func inspectionQueryPath(base, path string) bool {
@@ -97,6 +98,13 @@ func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.R
 			}
 			return h.inspections.Resources(ctx)
 		})
+	case path == base+"/settings":
+		serveInspection(h, writer, request, "settings_unavailable", func(ctx context.Context) (contract.SettingsInspection, error) {
+			if h.inspections.Settings == nil {
+				return contract.SettingsInspection{}, errors.New("unavailable")
+			}
+			return h.inspections.Settings(ctx)
+		})
 	default:
 		return false
 	}
@@ -109,7 +117,7 @@ func canonicalToolCursor(value string) bool {
 }
 
 type inspectionResponse interface {
-	contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection
+	contract.ModelInspectionPage | contract.RouteInspection | contract.TaskUsageInspection | contract.ToolInspectionPage | contract.AuditInspectionPage | contract.HealthInspection | contract.ResourceInspection | contract.SettingsInspection
 }
 
 func serveInspection[T inspectionResponse](h *Handler, writer http.ResponseWriter, request *http.Request, code string, read func(context.Context) (T, error)) {
@@ -162,6 +170,8 @@ func inspectionInvalid[T inspectionResponse](value T) bool {
 	case contract.HealthInspection:
 		return typed.Validate() != nil
 	case contract.ResourceInspection:
+		return typed.Validate() != nil
+	case contract.SettingsInspection:
 		return typed.Validate() != nil
 	default:
 		return true

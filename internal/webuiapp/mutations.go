@@ -33,7 +33,10 @@ type MutationServices struct {
 	DecideApproval  func(context.Context, string, contract.ApprovalRequest) (contract.ApprovalDecisionReceipt, error)
 	Operations      func(context.Context, string, string, int) (contract.OperationPage, error)
 	Submission      func(context.Context, string, string) (contract.SubmissionStatus, error)
+	UpdateSettings  func(context.Context, contract.SettingsUpdateRequest) (contract.SettingsInspection, error)
 }
+
+var ErrSettingsConflict = errors.New("settings changed")
 
 func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Request) bool {
 	base := h.basePath + "/api/v1"
@@ -66,6 +69,9 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 	case path == base+"/feedback/revisions":
 		h.serveFeedbackMutation(writer, request, contract.FeedbackRevise)
 		return true
+	case path == base+"/settings" && request.Method == http.MethodPost:
+		h.serveSettingsMutation(writer, request)
+		return true
 	case taskActionID(h.basePath, path, "controls") != "":
 		h.serveTaskControls(writer, request, taskActionID(h.basePath, path, "controls"))
 		return true
@@ -89,6 +95,38 @@ func (h *Handler) serveMutationAPI(writer http.ResponseWriter, request *http.Req
 		}
 	}
 	return false
+}
+
+func (h *Handler) serveSettingsMutation(writer http.ResponseWriter, request *http.Request) {
+	if !h.requireMutationAuthority(writer, request) {
+		return
+	}
+	if !mutationSlot(h, false) {
+		h.writeError(writer, request, http.StatusServiceUnavailable, "mutation_capacity")
+		return
+	}
+	defer releaseMutationSlot(h, false)
+	var input contract.SettingsUpdateRequest
+	if decodeMutationJSON(request, &input, 16<<10) != nil || input.Validate() != nil {
+		h.writeError(writer, request, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	if h.mutations.UpdateSettings == nil {
+		h.writeError(writer, request, http.StatusServiceUnavailable, "settings_unavailable")
+		return
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
+	defer cancel()
+	result, err := safeCall(func() (contract.SettingsInspection, error) { return h.mutations.UpdateSettings(ctx, input) })
+	if errors.Is(err, ErrSettingsConflict) {
+		h.writeError(writer, request, http.StatusConflict, "settings_changed")
+		return
+	}
+	if err != nil || result.Validate() != nil {
+		h.writeError(writer, request, http.StatusServiceUnavailable, "settings_unavailable")
+		return
+	}
+	h.writeJSON(writer, http.StatusOK, result)
 }
 
 func (h *Handler) serveChatMutation(writer http.ResponseWriter, request *http.Request, action contract.ChatAction, pathID string, control bool) {

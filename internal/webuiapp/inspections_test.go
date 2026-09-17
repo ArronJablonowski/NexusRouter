@@ -52,6 +52,10 @@ func inspectionHandlerFixture(t *testing.T) (*Handler, *atomic.Int32) {
 			calls.Add(1)
 			return contract.ResourceInspection{Version: 1, Availability: contract.Unavailable}, nil
 		},
+		Settings: func(context.Context) (contract.SettingsInspection, error) {
+			calls.Add(1)
+			return contract.SettingsInspection{Version: 1, Digest: strings.Repeat("a", 64), Active: contract.ToolAccessSettings{}, Saved: contract.ToolAccessSettings{}}, nil
+		},
 	}
 	return handler, calls
 }
@@ -60,7 +64,7 @@ func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 	handler, calls := inspectionHandlerFixture(t)
 	for _, target := range []string{
 		"/app/api/v1/models", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
-		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources",
+		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources", "/app/api/v1/settings",
 	} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, browserGET(target, nil))
@@ -74,7 +78,7 @@ func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 	cookie, _ := authenticateBrowser(t, handler)
 	for _, target := range []string{
 		"/app/api/v1/models", "/app/api/v1/tasks/task/route", "/app/api/v1/tasks/task/usage",
-		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources",
+		"/app/api/v1/tasks/task/tools?after=1&limit=1", "/app/api/v1/tasks/task/audits", "/app/api/v1/health", "/app/api/v1/resources", "/app/api/v1/settings",
 	} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, browserGET(target, cookie))
@@ -82,7 +86,7 @@ func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {
 			t.Fatalf("inspection %s returned %d %s", target, response.Code, response.Body.String())
 		}
 	}
-	if calls.Load() != 7 {
+	if calls.Load() != 8 {
 		t.Fatal("missing inspection callback", calls.Load())
 	}
 

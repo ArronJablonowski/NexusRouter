@@ -72,7 +72,7 @@ func authenticateBrowser(t *testing.T, handler *Handler) (*http.Cookie, string) 
 
 func TestBrowserBootstrapShellAndLogout(t *testing.T) {
 	handler := handlerFixture(t)
-	for _, target := range []string{"/app", "/app/", "/app/chats", "/app/chats/session-1", "/app/workboards", "/app/workboards/board-1"} {
+	for _, target := range []string{"/app", "/app/", "/app/chats", "/app/chats/session-1", "/app/workboards", "/app/workboards/board-1", "/app/settings"} {
 		unauthorized := httptest.NewRecorder()
 		handler.ServeHTTP(unauthorized, browserRequest(http.MethodGet, target, ""))
 		if unauthorized.Code != http.StatusFound || unauthorized.Header().Get("Location") != "/app/bootstrap" {

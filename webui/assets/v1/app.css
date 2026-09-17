@@ -92,8 +92,33 @@ input, select { padding: .55rem .7rem; }
 .inspector-list + .secondary { width: 100%; margin-top: .65rem; }
 .state-running { color: #73e6b1; }
 .state-failed, .state-canceled { color: #ffb6b6; }
-.workboard-view { min-width: 0; }
-.workboard-view[hidden], .chat-view[hidden] { display: none; }
+.workboard-view, .settings-view { min-width: 0; }
+.workboard-view[hidden], .chat-view[hidden], .settings-view[hidden] { display: none; }
+.settings-heading, .settings-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.settings-heading { margin-bottom: 1rem; }
+.settings-heading h1, .settings-card h2 { margin: .15rem 0 0; }
+.settings-layout { display: grid; grid-template-columns: minmax(28rem, 1.5fr) minmax(18rem, .8fr); gap: 1rem; align-items: start; }
+.settings-card { min-width: 0; padding: 1.3rem; border: 1px solid #34415d; border-radius: 1rem; background: #111a2ddd; box-shadow: 0 1rem 3rem #0003; }
+.settings-intro { margin: .7rem 0 1.1rem; color: #9fb0ce; line-height: 1.5; }
+.setting-toggle { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-top: .7rem; padding: 1rem; border: 1px solid #34415d; border-radius: .7rem; background: #0d1628; cursor: pointer; }
+.setting-toggle strong, .setting-field strong { display: block; }
+.setting-toggle small, .setting-field small { display: block; margin-top: .3rem; color: #9fb0ce; line-height: 1.4; }
+.switch { position: relative; flex: 0 0 auto; width: 3rem; height: 1.7rem; }
+.switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.switch span { position: absolute; inset: 0; border: 1px solid #66799b; border-radius: 999px; background: #26324a; transition: background .15s ease; }
+.switch span::after { content: ""; position: absolute; top: .18rem; left: .2rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: #dbe5f7; transition: transform .15s ease; }
+.switch input:checked + span { border-color: #73e6b1; background: #286f5a; }
+.switch input:checked + span::after { transform: translateX(1.3rem); background: #fff; }
+.switch input:focus-visible + span { outline: 3px solid #73e6b1; outline-offset: 3px; }
+.switch input:disabled + span { opacity: .5; cursor: not-allowed; }
+.setting-field { display: block; margin: 1.1rem 0 .5rem; }
+.settings-status { display: block; min-height: 1.4rem; margin-top: 1rem; color: #9fb0ce; }
+.settings-status.error { color: #ffb6b6; }
+.settings-summary { display: grid; grid-template-columns: 1fr auto; gap: .65rem 1rem; margin: 1rem 0; }
+.settings-summary dt { color: #9fb0ce; }
+.settings-summary dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
+.settings-advisory { margin-top: 1.2rem; padding: .9rem; border-left: .25rem solid #ffcf70; background: #211f1b; }
+.settings-advisory p { margin: .4rem 0 0; color: #cbd6e9; font-size: .85rem; line-height: 1.45; }
 .workboard-heading, .kanban-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .workboard-heading { margin-bottom: 1rem; }
 .workboard-heading h1, .kanban-heading h2, .board-index h2 { margin: .15rem 0 0; }
@@ -186,6 +211,7 @@ input, select { padding: .55rem .7rem; }
   #task-inspector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
   #task-inspector[hidden] { display: none; }
   .workboard-layout { grid-template-columns: 1fr; }
+  .settings-layout { grid-template-columns: 1fr; }
   .workboard-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workboard-filters label, .workboard-filters input, .workboard-filters select, .workboard-filters button { grid-row: auto; }
   .budget-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -204,6 +230,8 @@ input, select { padding: .55rem .7rem; }
   .inspector-details dt { border-right: 1px solid #2d3a55; border-bottom: 0; border-radius: .55rem .55rem 0 0; }
   .inspector-details dd { justify-content: flex-start; margin-bottom: .6rem; border-top: 0; border-left: 1px solid #2d3a55; border-radius: 0 0 .55rem .55rem; text-align: left; }
   .workboard-layout { grid-template-columns: 1fr; }
+  .settings-layout { grid-template-columns: 1fr; }
+  .setting-toggle { align-items: flex-start; }
   .board-index { min-height: 15rem; }
   .workboard-filters { grid-template-columns: 1fr; }
   .workboard-filters label, .workboard-filters input, .workboard-filters select, .workboard-filters button { grid-row: auto; }
