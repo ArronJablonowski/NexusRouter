@@ -8391,3 +8391,10 @@ race-enabled package, and `go build ./...`. Notable uncached package times were
 telemetry 2,399.272 seconds, application 2,326.064 seconds, releasepack 854.645
 seconds, SDK 270.633 seconds, CLI 184.744 seconds, runtime 131.058 seconds,
 toolgate 110.426 seconds, and workers 46.825 seconds.
+
+The rebuilt live daemon was restarted on `127.0.0.1:7788` and the authenticated
+Firefox page was exercised end to end. Its live projection discovered 18 local
+Ollama models plus one configured cloud model, marked the configured
+`gemma4:12b-it-q4_K_M` route installed and usable, and reported a deduplicated
+local total of 292,474,343,457 bytes (272.4 GiB) with no unknown sizes. The same
+projection was also fetched through a fresh CLI-approved browser session.
