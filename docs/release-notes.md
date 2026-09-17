@@ -7,6 +7,11 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- The Web UI Inspector now reserves more horizontal space on desktop and
+  presents Health, resource, and model details as padded label/value rows.
+  Narrow layouts stack each label above its value, preserving readability
+  without changing the underlying health projections or access controls.
+
 - Unauthenticated browser navigation to the chat and Workboard shell routes,
   including bookmarked session and board URLs, now redirects to the bounded
   one-time bootstrap page. Browser API calls, static assets, malformed paths,
