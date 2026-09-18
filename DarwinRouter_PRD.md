@@ -1355,7 +1355,9 @@ and policy checks and does not disable task or learning execution. Explicit
 CLI/SDK trace export now reconstructs bounded recent terminal-task roots with
 successfully paired provider-turn, tool-call and worker children plus fixed
 route/exploration, evaluation, fallback, compaction, skill-context, steering
-and error observations. A linked top-level submission also emits one fixed
+and error observations. Schema 4 additionally emits fixed thermal/swap pressure
+observations from the canonical task-start resource snapshot without exporting
+host measurements or source strings. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
 exact arrival time; retries and delegated children are excluded. Paired tool
 completions expose only their authoritative none/confirmed/uncertain effect

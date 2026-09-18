@@ -2,7 +2,8 @@
 
 DarwinRouter can explicitly export a bounded, content-free view of recent
 terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
-fixed queue-residency observation; version 3 adds fixed tool-effect evidence:
+fixed queue-residency observation, version 3 added fixed tool-effect evidence,
+and version 4 adds content-free resource-pressure observations:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -55,7 +56,12 @@ fixed `route_constraint` observation per present mode, privacy, health, policy,
 credential, capacity, context, budget or capability exclusion reason. Candidate
 identity and counts are not exported. An unknown exclusion reason fails the
 snapshot rather than opening label cardinality. Names and outcomes use a closed
-vocabulary. Prompt/output text,
+vocabulary. When the canonical task-start resource snapshot reports active
+thermal or swap pressure, the trace contains an instantaneous
+`resource_pressure` observation with outcome `thermal` or `swap`. It does not
+export memory totals, available bytes, CPU counts, thermal state/source strings,
+device identities, or measurements; absent or unknown pressure produces no
+span, and malformed retained pressure data fails the snapshot. Prompt/output text,
 messages, tool arguments/results, error details, model/provider/tool names and
 all durable task, submission, session, event, route, worker, turn, attempt and
 call IDs are never selected into the public snapshot. Exact submission arrival
@@ -76,7 +82,7 @@ legacy/interrupted child operations are omitted; the separate metrics snapshot
 retains explicit missing-start and missing-end counts.
 
 This trace slice does not include running tasks, model deltas, worker
-heartbeats, resource leases/pressure, provider health, fitness mutations,
+heartbeats, resource leases, provider health, fitness mutations,
 automatic skill draft/activation/rollback operations or queue arrival/service
 rates. Queue residency is historical only for a successfully linked top-level
 task start; current queue pressure remains available through aggregate metrics.

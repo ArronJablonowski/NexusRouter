@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	tracewire "github.com/ArronJablonowski/DarwinRouter/traces"
@@ -80,6 +81,61 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatal("missing spans", want)
+	}
+}
+
+func TestTraceSnapshotExportsResourcePressureWithoutMeasurements(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	thermal, swap := true, true
+	start := event("private-pressure-start", 1, runtime.TaskStarted)
+	start.Time = base
+	start.Data.Resources = &resources.Snapshot{
+		Time: base, CPUs: 8, TotalRAM: 64 << 30, AvailableRAM: 4 << 30,
+		SwapPressure: &swap, ThermalPressure: &thermal, ThermalState: "critical", Source: "private-profiler",
+	}
+	done := event("private-pressure-done", 2, runtime.TaskCompleted)
+	done.Time = base.Add(time.Millisecond)
+	if db.Append(ctx, 0, start) != nil || db.Append(ctx, 1, done) != nil {
+		t.Fatal("fixture")
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 3 {
+		t.Fatal(snapshot, err)
+	}
+	for i, outcome := range []string{"thermal", "swap"} {
+		span := snapshot.Traces[0].Spans[i+1]
+		if span.Name != "resource_pressure" || span.Outcome != outcome || !span.StartedAt.Equal(base) || !span.EndedAt.Equal(base) {
+			t.Fatal(span)
+		}
+	}
+	encoded, marshalErr := json.Marshal(snapshot)
+	otlp, otlpErr := tracewire.MarshalOTLP(snapshot)
+	for _, private := range []string{"private-pressure", "private-profiler", "critical", "68719476736"} {
+		if strings.Contains(string(encoded), private) || strings.Contains(string(otlp), private) {
+			t.Fatal("private resource data escaped", private)
+		}
+	}
+	if marshalErr != nil || otlpErr != nil {
+		t.Fatal(marshalErr, otlpErr)
+	}
+}
+
+func TestTraceSnapshotRejectsCorruptResourcePressure(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	start := event("pressure-start", 1, runtime.TaskStarted)
+	done := event("pressure-done", 2, runtime.TaskCompleted)
+	start.Time, done.Time = time.Now().UTC().Add(-time.Second), time.Now().UTC()
+	if db.Append(ctx, 0, start) != nil || db.Append(ctx, 1, done) != nil {
+		t.Fatal("fixture")
+	}
+	if _, err := db.db.ExecContext(ctx, "UPDATE events SET body=json_set(body,'$.data.resources',json(?)) WHERE id='pressure-start'", `{"ThermalPressure":"private"}`); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("corrupt pressure escaped", snapshot, err)
 	}
 }
 

@@ -8528,3 +8528,22 @@ The final integrated `umask 077; make check` then passed formatting/LOC, vet,
 every race-enabled package, and `go build ./...`; application completed in
 2,290.892 seconds, telemetry in 2,315.829 seconds, SDK in 266.337 seconds, CLI
 in 182.397 seconds, toolgate in 107.853 seconds, and workers in 46.311 seconds.
+
+## 2026-09-18 — content-free resource-pressure trace observations
+
+The optional OTLP trace snapshot now closes one explicit PRD observability gap.
+Schema 4 derives instantaneous `resource_pressure/thermal` and
+`resource_pressure/swap` observations from the canonical resource snapshot on
+`task.started`. The public trace continues to omit CPU counts, memory and device
+measurements, thermal state/source strings, durable identities, and task
+content. Absent or unknown pressure produces no observation; malformed retained
+pressure fields fail the complete snapshot instead of opening label cardinality
+or silently reporting a false state.
+
+Focused race-enabled trace and telemetry tests cover the closed vocabulary,
+OTLP schema identity, simultaneous thermal/swap pressure, absence of private
+resource measurements, and corrupt-pressure rejection. Resource leases,
+provider health, fitness mutations, automatic skill lifecycle operations,
+running tasks, and durable trace delivery remain separate unfinished span
+families; this checkpoint does not claim the full PRD instrumentation list or
+change any Linear issue state.

@@ -101,6 +101,22 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	  WHEN json_extract(body,'$.kind')<>'tool.completed' THEN ''
 	  WHEN json_extract(body,'$.data.effect') IN ('none','confirmed','uncertain') THEN json_extract(body,'$.data.effect')
 	  ELSE '!invalid!'
+	 END,
+	 CASE
+	  WHEN json_extract(body,'$.kind')<>'task.started' OR json_type(body,'$.data.resources') IS NULL THEN -1
+	  WHEN json_type(body,'$.data.resources')<>'object' THEN -2
+	  WHEN json_type(body,'$.data.resources.ThermalPressure') IS NULL THEN -1
+	  WHEN json_type(body,'$.data.resources.ThermalPressure')='true' THEN 1
+	  WHEN json_type(body,'$.data.resources.ThermalPressure')='false' THEN 0
+	  ELSE -2
+	 END,
+	 CASE
+	  WHEN json_extract(body,'$.kind')<>'task.started' OR json_type(body,'$.data.resources') IS NULL THEN -1
+	  WHEN json_type(body,'$.data.resources')<>'object' THEN -2
+	  WHEN json_type(body,'$.data.resources.swap_pressure') IS NULL THEN -1
+	  WHEN json_type(body,'$.data.resources.swap_pressure')='true' THEN 1
+	  WHEN json_type(body,'$.data.resources.swap_pressure')='false' THEN 0
+	  ELSE -2
 	 END
 	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
@@ -121,8 +137,8 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		}
 		var sequence int64
 		var kind, turn, attempt, call, toolName, worker, encodedTime, queuedAt, toolEffect string
-		var retry, compaction, skillContext, explored, accepted, routeConstraints int
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt, &toolEffect) != nil || sequence < 1 {
+		var retry, compaction, skillContext, explored, accepted, routeConstraints, thermalPressure, swapPressure int
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt, &toolEffect, &thermalPressure, &swapPressure) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -131,10 +147,16 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		}
 		switch kind {
 		case "task.started":
-			if !rootStart.IsZero() {
+			if !rootStart.IsZero() || thermalPressure < -1 || thermalPressure > 1 || swapPressure < -1 || swapPressure > 1 {
 				return traces.Trace{}, errTraces
 			}
 			rootStart = at
+			if thermalPressure == 1 {
+				children = append(children, traceInstant("resource_pressure", "thermal", at))
+			}
+			if swapPressure == 1 {
+				children = append(children, traceInstant("resource_pressure", "swap", at))
+			}
 			if queuedAt != "" {
 				created, parseErr := time.Parse(time.RFC3339Nano, queuedAt)
 				if parseErr != nil || created.Location() != time.UTC || created.After(at) {
