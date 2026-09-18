@@ -35,4 +35,17 @@ func TestEmbeddedModelInventoryIsDynamicBoundedAndReadOnly(t *testing.T) {
 			t.Fatalf("model inventory markup missing %q", required)
 		}
 	}
+	styles := string(mustAsset(t, "assets/v1/app.css"))
+	for _, required := range []string{
+		`.model-card-toggle { display: grid; grid-template-columns: minmax(8rem, 1fr) 19.56rem 1.2rem;`,
+		`.model-badges { display: grid; grid-template-columns: 5rem 4.4rem 5rem 4.5rem;`,
+		`.model-badge { justify-self: center;`,
+		`.model-status-badge { grid-column: 1; }`, `.model-install-badge { grid-column: 2; }`,
+		`.model-config-badge { grid-column: 3; }`, `.model-size-badge { grid-column: 4;`,
+		`.model-badges { display: flex; grid-column: 1 / -1; grid-row: 2;`,
+	} {
+		if !strings.Contains(styles, required) {
+			t.Fatalf("model inventory styling lost aligned metadata contract %q", required)
+		}
+	}
 }

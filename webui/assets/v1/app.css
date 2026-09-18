@@ -106,14 +106,14 @@ input, select { padding: .55rem .7rem; }
 .model-cards { display: grid; gap: .42rem; margin: .7rem 0 0; padding: 0; list-style: none; }
 .model-card { border: 1px solid #34415d; border-radius: .65rem; background: #0d1628; transition: border-color .15s ease, background .15s ease; }
 .model-card:hover, .model-card.expanded { border-color: #526887; background: #101b30; }
-.model-card-toggle { display: grid; grid-template-columns: minmax(8rem, 1fr) auto auto; gap: .55rem; align-items: center; width: 100%; padding: .58rem .7rem; border: 0; background: transparent; color: inherit; text-align: left; }
+.model-card-toggle { display: grid; grid-template-columns: minmax(8rem, 1fr) 19.56rem 1.2rem; gap: .55rem; align-items: center; width: 100%; padding: .58rem .7rem; border: 0; background: transparent; color: inherit; text-align: left; }
 .model-card-toggle:hover { background: #17233a; }
 .model-card-identity { min-width: 0; }
 .model-card-name, .model-card-provider { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-card-name { font-size: .86rem; }
 .model-card-provider { margin-top: .12rem; color: #9fb0ce; font-size: .68rem; }
 .model-badges { display: grid; grid-template-columns: 5rem 4.4rem 5rem 4.5rem; gap: .22rem; align-items: center; justify-items: center; }
-.model-badge { padding: .14rem .38rem; border: 1px solid #52617e; border-radius: 999px; color: #cbd6e9; font-size: .63rem; white-space: nowrap; }
+.model-badge { justify-self: center; padding: .14rem .38rem; border: 1px solid #52617e; border-radius: 999px; color: #cbd6e9; font-size: .63rem; text-align: center; white-space: nowrap; }
 .model-badge.usable { border-color: #4a9a78; color: #73e6b1; }
 .model-badge.unavailable { border-color: #a95d5d; color: #ffb6b6; }
 .model-status-badge { grid-column: 1; }

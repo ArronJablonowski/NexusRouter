@@ -8422,6 +8422,16 @@ overflow. `make qualify-webui` and the complete `umask 077; make check` passed
 after the alignment change; the longest uncached packages were telemetry at
 2,343.438 seconds and application at 2,327.083 seconds.
 
+A follow-up alignment pass fixed the outer card row to the exact combined
+width of those four metadata columns and centered every pill within its
+assigned slot. This prevents the status, installation, configuration, and size
+groups from drifting as model names and badge labels vary. The existing mobile
+wrap remains active below 42rem. The focused asset contract and the full
+real-Chrome `make qualify-webui` gate passed after the change. The complete
+`umask 077; make check` also passed formatting/LOC, vet, every race-enabled
+package, and the final build. The longest uncached packages were telemetry at
+2,350.569 seconds and application at 2,331.099 seconds.
+
 ## 2026-09-18 — DAR-128 delegated-chat transcript replay repair
 
 Completed Web UI chats no longer lose their transcript when newer delegated
