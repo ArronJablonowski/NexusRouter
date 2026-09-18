@@ -8421,3 +8421,30 @@ layout deliberately returns to wrapping flex badges so small screens do not
 overflow. `make qualify-webui` and the complete `umask 077; make check` passed
 after the alignment change; the longest uncached packages were telemetry at
 2,343.438 seconds and application at 2,327.083 seconds.
+
+## 2026-09-18 — DAR-128 delegated-chat transcript replay repair
+
+Completed Web UI chats no longer lose their transcript when newer delegated
+work records share the parent session. The history projection now walks durable
+session tasks newest first, skips bounded orchestration-only tasks with no
+user-facing conversation, and selects the newest authoritative conversational
+transcript. It still fails closed on malformed replay or projection state,
+preserves complete tool-call/result pairing before presentation filtering, and
+caps lineage inspection at the transcript message limit.
+
+The regression fixture persists a completed parent with two delegate tool
+calls, two results, sparse conversational source revisions, and two newer empty
+delegation tasks. It closes and reopens storage, verifies that the parent remains
+authoritative, proves pagination has no duplicate or missing message, and
+requires an identical result on retry. Focused application and Web UI tests
+passed, followed by `make qualify-webui` including the real-Chrome and daemon
+lifecycle gates. The complete `umask 077; make check` passed formatting/LOC,
+vet, every race-enabled package, and the final build; the longest packages were
+telemetry at 2,454.924 seconds and application at 2,422.149 seconds.
+
+The rebuilt live daemon was restarted against the preserved database and
+process-owner/resource-coordinator stores. A fresh CLI-approved browser session
+and re-authenticated Firefox both loaded the previously failing
+`W53BC3B2REGASAXVTIHTGUNJRS` chat after restart. They rendered its three
+committed user/assistant messages while the inspector retained both normalized,
+paired delegate lifecycles. No transcript retry error remained.

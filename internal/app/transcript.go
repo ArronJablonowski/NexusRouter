@@ -13,6 +13,8 @@ import (
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
 
+const historyTaskPageSize = 100
+
 type historyCursor struct {
 	Version int    `json:"version"`
 	ChatID  string `json:"chat_id"`
@@ -61,19 +63,6 @@ func (s *Service) ChatHistory(ctx context.Context, chat string, options contract
 	if !selectionValueClean([]any{chat, options}, secrets) {
 		return contract.HistoryPage{}, ErrAdmission
 	}
-	tasks, err := s.ListSessionTasks(ctx, chat, sessions.SessionTaskListOptions{Limit: 1})
-	if err != nil || len(tasks.Items) != 1 {
-		return contract.HistoryPage{}, ErrInspection
-	}
-	head := tasks.Items[0]
-	offset := 0
-	if options.After != "" {
-		cursor, cursorErr := decodeHistoryCursor(options.After)
-		if cursorErr != nil || cursor.ChatID != chat || cursor.TaskID != head.TaskID || cursor.Head != head.Fence.HeadSequence {
-			return contract.HistoryPage{}, ErrAdmission
-		}
-		offset = cursor.Offset
-	}
 	reader, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -82,13 +71,17 @@ func (s *Service) ChatHistory(ctx context.Context, chat string, options contract
 		return contract.HistoryPage{}, ErrInspection
 	}
 	defer reader.Close()
-	snapshot, err := sessions.Replay(ctx, reader, head.TaskID)
-	if err != nil || snapshot.SessionID != chat || snapshot.Sequence != head.Fence.HeadSequence {
-		return contract.HistoryPage{}, ErrInspection
-	}
-	transcript, err := sessions.ProjectTranscript(snapshot)
+	head, snapshot, transcript, err := selectChatTranscript(ctx, reader, chat, secrets)
 	if err != nil {
 		return contract.HistoryPage{}, ErrInspection
+	}
+	offset := 0
+	if options.After != "" {
+		cursor, cursorErr := decodeHistoryCursor(options.After)
+		if cursorErr != nil || cursor.ChatID != chat || cursor.TaskID != head.TaskID || cursor.Head != head.Fence.HeadSequence {
+			return contract.HistoryPage{}, ErrAdmission
+		}
+		offset = cursor.Offset
 	}
 	clean, err := redactCodexHistoryMessages(transcript.Messages, secrets)
 	if err != nil {
@@ -118,4 +111,56 @@ func (s *Service) ChatHistory(ctx context.Context, chat string, options contract
 		return contract.HistoryPage{}, ErrInspection
 	}
 	return page, nil
+}
+
+// selectChatTranscript walks newest-first task lineage while ignoring durable
+// orchestration records that have no user-facing conversation. Delegated work
+// tasks share the parent session and can be newer than the parent task; they
+// must not replace the authoritative conversational transcript. The scan is
+// bounded by the same limit as the transcript projection.
+func selectChatTranscript(ctx context.Context, reader *telemetry.Store, chat string, secrets []string) (sessions.SessionTask, sessions.Snapshot, sessions.Transcript, error) {
+	var emptyHead sessions.SessionTask
+	var emptySnapshot sessions.Snapshot
+	var emptyTranscript sessions.Transcript
+	after, scanned := "", 0
+	for scanned < sessions.MaxTranscriptMessages {
+		limit := historyTaskPageSize
+		if remaining := sessions.MaxTranscriptMessages - scanned; remaining < limit {
+			limit = remaining
+		}
+		page, err := reader.ListSessionTasks(ctx, chat, sessions.SessionTaskListOptions{After: after, Limit: limit})
+		if err != nil || page.Validate() != nil || page.SessionID != chat || len(page.Items) > limit || !selectionValueClean(page, secrets) {
+			return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
+		}
+		for _, head := range page.Items {
+			snapshot, replayErr := sessions.Replay(ctx, reader, head.TaskID)
+			if replayErr != nil || snapshot.SessionID != chat || snapshot.Sequence != head.Fence.HeadSequence {
+				return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
+			}
+			transcript, projectErr := sessions.ProjectTranscript(snapshot)
+			if projectErr != nil {
+				return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
+			}
+			if emptyHead.TaskID == "" {
+				emptyHead, emptySnapshot, emptyTranscript = head, snapshot, transcript
+			}
+			for _, message := range transcript.Messages {
+				if (message.Role == "user" || message.Role == "assistant") && message.Content != "" {
+					return head, snapshot, transcript, nil
+				}
+			}
+		}
+		scanned += len(page.Items)
+		if !page.HasMore {
+			if emptyHead.TaskID != "" {
+				return emptyHead, emptySnapshot, emptyTranscript, nil
+			}
+			return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
+		}
+		if len(page.Items) == 0 || page.NextCursor == "" {
+			return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
+		}
+		after = page.NextCursor
+	}
+	return sessions.SessionTask{}, sessions.Snapshot{}, sessions.Transcript{}, ErrInspection
 }
