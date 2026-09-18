@@ -3,7 +3,8 @@
 DarwinRouter can explicitly export a bounded, content-free view of recent
 terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
 fixed queue-residency observation, version 3 added fixed tool-effect evidence,
-and version 4 adds content-free resource-pressure observations:
+version 4 added content-free resource-pressure observations, and version 5
+adds bounded resource-lease state observations:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -67,6 +68,17 @@ all durable task, submission, session, event, route, worker, turn, attempt and
 call IDs are never selected into the public snapshot. Exact submission arrival
 times are used only inside the bounded storage read and are not exported.
 
+Terminal tasks with durable resource leases receive at most one instantaneous
+`resource_lease` observation for each state class present:
+`reader_live`, `reader_expired`, `reader_released`, `writer_live`,
+`writer_expired`, and `writer_released`. The marker is placed at task
+termination; it is not a fabricated acquisition-to-release duration. Live and
+expired are classified against the coherent export observation time, not the
+task end time, so they describe current retained state and do not prove process
+health, death, cleanup safety, or retry authority. Lease counts, capabilities,
+owners, scopes, expiry instants, and process references remain private. More
+than 1,000 task leases or malformed retained lease data fails the snapshot.
+
 OTLP trace and span IDs are freshly generated for every serialization. They are
 not hashes or stable pseudonyms for durable DarwinRouter records. Consequently,
 separate exports cannot be joined by their wire IDs. Operators requiring
@@ -82,7 +94,7 @@ legacy/interrupted child operations are omitted; the separate metrics snapshot
 retains explicit missing-start and missing-end counts.
 
 This trace slice does not include running tasks, model deltas, worker
-heartbeats, resource leases, provider health, fitness mutations,
+heartbeats, lease heartbeat/renewal timing, provider health, fitness mutations,
 automatic skill draft/activation/rollback operations or queue arrival/service
 rates. Queue residency is historical only for a successfully linked top-level
 task start; current queue pressure remains available through aggregate metrics.

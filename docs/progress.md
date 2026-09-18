@@ -8547,3 +8547,23 @@ provider health, fitness mutations, automatic skill lifecycle operations,
 running tasks, and durable trace delivery remain separate unfinished span
 families; this checkpoint does not claim the full PRD instrumentation list or
 change any Linear issue state.
+
+## 2026-09-18 — bounded resource-lease trace observations
+
+Trace snapshot schema 5 now projects durable task lease state without exposing
+lease capabilities or holder metadata. Each terminal task receives at most one
+instantaneous observation for every present reader/writer ×
+live/expired/released class. The observation sits at task termination rather
+than pretending SQLite's historical lease rows contain acquisition/release
+times. Live and expired classifications use the coherent export observation
+time and grant no process-health, recovery, release, reassignment, or retry
+authority.
+
+The trace reader validates and bounds the underlying rows to 1,000 per task;
+malformed tokens, owners, scopes, expiry values, writer flags, or release flags
+fail the snapshot. Public JSON and OTLP fixtures prove that counts, tokens,
+owners, scopes, process references, and durable task/session identities remain
+absent. Focused race-enabled trace and telemetry suites pass. Provider-health,
+fitness-mutation, automatic skill lifecycle, lease-heartbeat timing, running
+task, and durable-delivery traces remain unfinished, and no Linear issue state
+is changed by this checkpoint.

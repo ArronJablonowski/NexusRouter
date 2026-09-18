@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -136,6 +137,73 @@ func TestTraceSnapshotRejectsCorruptResourcePressure(t *testing.T) {
 	}
 	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
 		t.Fatal("corrupt pressure escaped", snapshot, err)
+	}
+}
+
+func TestTraceSnapshotExportsResourceLeaseStatesWithoutIdentities(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Minute)
+	start := event("private-lease-start", 1, runtime.TaskStarted)
+	start.TaskID, start.SessionID, start.CorrelationID, start.Time = "private-lease-task", "private-lease-session", "private-lease-task", base
+	done := event("private-lease-done", 2, runtime.TaskCompleted)
+	done.TaskID, done.SessionID, done.CorrelationID, done.Time = start.TaskID, start.SessionID, start.CorrelationID, base.Add(time.Second)
+	if db.Append(ctx, 0, start) != nil || db.Append(ctx, 1, done) != nil {
+		t.Fatal("fixture")
+	}
+	rows := []struct {
+		writer, released int
+		expires          time.Time
+	}{
+		{0, 0, base.Add(time.Hour)}, {0, 0, base}, {0, 1, base},
+		{1, 0, base.Add(time.Hour)}, {1, 0, base}, {1, 1, base},
+	}
+	for i, row := range rows {
+		if _, err := db.db.ExecContext(ctx, `INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires,released) VALUES(?,?,?,?,?,?,?)`,
+			fmt.Sprintf("private-token-%d", i), start.TaskID, "private-owner", fmt.Sprintf("private-scope-%d", i), row.writer, row.expires.UnixNano(), row.released); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 7 {
+		t.Fatal(snapshot, err)
+	}
+	want := []string{"reader_live", "reader_expired", "reader_released", "writer_live", "writer_expired", "writer_released"}
+	for i, outcome := range want {
+		span := snapshot.Traces[0].Spans[i+1]
+		if span.Name != "resource_lease" || span.Outcome != outcome || !span.StartedAt.Equal(done.Time) || !span.EndedAt.Equal(done.Time) {
+			t.Fatal(span)
+		}
+	}
+	encoded, marshalErr := json.Marshal(snapshot)
+	otlp, otlpErr := tracewire.MarshalOTLP(snapshot)
+	for _, private := range []string{"private-lease", "private-token", "private-owner", "private-scope"} {
+		if strings.Contains(string(encoded), private) || strings.Contains(string(otlp), private) {
+			t.Fatal("private lease data escaped", private)
+		}
+	}
+	if marshalErr != nil || otlpErr != nil {
+		t.Fatal(marshalErr, otlpErr)
+	}
+}
+
+func TestTraceSnapshotRejectsCorruptResourceLease(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	start := event("lease-start", 1, runtime.TaskStarted)
+	done := event("lease-done", 2, runtime.TaskCompleted)
+	start.Time, done.Time = time.Now().UTC().Add(-time.Second), time.Now().UTC()
+	if db.Append(ctx, 0, start) != nil || db.Append(ctx, 1, done) != nil {
+		t.Fatal("fixture")
+	}
+	if _, err := db.db.ExecContext(ctx, `INSERT INTO resource_leases(token,task_id,owner,scope,writer,expires) VALUES('lease',?,'owner','scope',0,?)`, start.TaskID, done.Time.UnixNano()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.ExecContext(ctx, "UPDATE resource_leases SET owner=char(10) WHERE token='lease'"); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("corrupt lease escaped", snapshot, err)
 	}
 }
 
