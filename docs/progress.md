@@ -8489,3 +8489,42 @@ loop under the race detector. The focused application suite and the full
 non-race application package also passed. No live Desktop read root was saved,
 no daemon authority was changed, and no Sol account usage was consumed; the
 operator-approved live restart and exact Desktop count remain pending.
+
+## 2026-09-18 — DAR-127 full-suite timing evidence
+
+The supported `make check` command already applies an explicit 45-minute
+package timeout without removing release-security tests. DAR-127 now also has
+a repeatable `make profile-releasepack` evidence gate. It executes the complete
+ordinary `internal/releasepack` package under the race detector, consumes the
+Go JSON event stream, requires the historical
+`TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity` failure
+point to pass, rejects failures and every unexpected root or nested skip, and
+prints the slowest top-level test groups plus exact timeout margin. The one
+expected skip is frozen to `TestReleaseQualification`, whose eight-build clean
+checkout campaign remains an explicit required `make qualify-release-test`
+gate; any change to that skip set fails profiling.
+
+The historical failure-point test passed independently in 9.077 seconds. The
+complete new profile then passed 172 top-level tests in 13m14.148s, leaving
+31m45.852s under the declared timeout. Its slowest groups were published-install
+download/root adversarial checks at 1m36.7s, clean-commit license freeze/verify
+at 1m30.11s, approved-install tamper and unsafe-input checks at 1m3.8s,
+publication-adapter boundary mutation at 45.73s, and published-attestation
+rejection at 36.1s. The profiling report is metadata-only timing evidence and
+does not replace the full repository gate.
+
+The first integrated `make check` correctly failed rather than being reported
+as DAR-127 completion: under the full concurrent race workload,
+`TestRunSubmissionCallerCancellationStopsOnlyWait` exposed a load-sensitive
+classification race. When cancellation interrupted an SQLite status poll, the
+driver could return an error that did not wrap `context.Canceled`; the wait
+returned generic `ErrSubmission` even though it preserved the correct durable
+running status and detached execution. The wait helper now gives an observed
+caller cancellation precedence over that driver translation while retaining
+the last durable status. An uncanceled storage failure still returns
+`ErrSubmission`. The actual cancellation flow and the deterministic translated
+driver-error boundary passed 100 race-enabled repetitions in 185.587 seconds.
+The final integrated `umask 077; make check` then passed formatting/LOC, vet,
+every race-enabled package, and `go build ./...`; application completed in
+2,290.892 seconds, telemetry in 2,315.829 seconds, SDK in 266.337 seconds, CLI
+in 182.397 seconds, toolgate in 107.853 seconds, and workers in 46.311 seconds.

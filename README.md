@@ -444,6 +444,13 @@ make build
 
 `make check` checks formatting without rewriting files, enforces the 1,000-line maximum on handwritten Go files (including tests), runs `go vet`, tests with the race detector, and builds every package. `make fmt` intentionally rewrites Go formatting. CI runs the same checks on Linux and macOS once this repository is pushed to GitHub.
 
+`make profile-releasepack` runs the complete ordinary release-security package
+under the same declared 45-minute package timeout and reports its slowest
+top-level tests plus remaining margin. It rejects failures, unexpected skips,
+and loss of the historical DAR-127 failure-point test. See
+[full-suite timing evidence](docs/test-suite-timing.md); profiling supplements
+rather than replaces `make check`.
+
 ## Layout
 
 - `cmd/darwin`: thin executable entry point.

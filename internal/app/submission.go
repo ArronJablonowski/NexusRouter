@@ -294,16 +294,26 @@ func (s *Service) RunSubmission(ctx context.Context, key string, r Request) (sub
 	defer db.Close()
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
+	return waitForSubmission(ctx, status, ticker.C, db.Submission)
+}
+
+func waitForSubmission(ctx context.Context, status submissions.Status, ticks <-chan time.Time, read func(context.Context, string) (submissions.Status, error)) (submissions.Status, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			return status, ctx.Err()
-		case <-ticker.C:
+		case <-ticks:
 		}
-		next, readErr := db.Submission(ctx, status.ID)
+		next, readErr := read(ctx, status.ID)
 		if readErr != nil {
-			// Preserve the last durable status when cancellation races the poll.
-			// Callers use it to resume or inspect the detached submission.
+			// Drivers may translate an interrupted query into an error that does
+			// not wrap the context cause. Cancellation is authoritative for this
+			// wait only; detached execution retains its durable status.
+			if ctx.Err() != nil {
+				return status, ctx.Err()
+			}
+			// Preserve the last durable status when a poll fails. Callers use it
+			// to resume or inspect the detached submission.
 			return status, submissionError(readErr)
 		}
 		status = next

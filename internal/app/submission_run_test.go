@@ -168,6 +168,27 @@ func TestRunSubmissionCallerCancellationStopsOnlyWait(t *testing.T) {
 	}
 }
 
+func TestWaitForSubmissionCancellationOverridesDriverInterrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	initial := submissions.Status{Version: 1, ID: "cancel-driver-race", State: "running"}
+	ticks := make(chan time.Time, 1)
+	ticks <- time.Now()
+	status, err := waitForSubmission(ctx, initial, ticks, func(context.Context, string) (submissions.Status, error) {
+		cancel()
+		return submissions.Status{}, errors.New("driver interrupted without wrapping context")
+	})
+	if !errors.Is(err, context.Canceled) || status.ID != initial.ID || status.State != initial.State {
+		t.Fatal(status, err)
+	}
+	ticks <- time.Now()
+	status, err = waitForSubmission(context.Background(), initial, ticks, func(context.Context, string) (submissions.Status, error) {
+		return submissions.Status{}, errors.New("independent storage failure")
+	})
+	if !errors.Is(err, ErrSubmission) || status.ID != initial.ID || status.State != initial.State {
+		t.Fatal(status, err)
+	}
+}
+
 func TestRunSubmissionConflictingKeyAndBodyPreservesOriginal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
