@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/tools"
 )
 
@@ -14,6 +15,18 @@ type delegateToolsKey struct{}
 type delegateTools struct {
 	Registry *tools.Registry
 	Policy   *tools.Policy
+}
+
+func delegatedReadCatalog(registry *tools.Registry) []providers.Tool {
+	if registry == nil {
+		return nil
+	}
+	for _, candidate := range registry.Catalog() {
+		if candidate.Name == "read_file" {
+			return []providers.Tool{candidate}
+		}
+	}
+	return nil
 }
 
 func inheritDelegateTools(ctx context.Context, registry *tools.Registry, parent *tools.Policy) (context.Context, error) {

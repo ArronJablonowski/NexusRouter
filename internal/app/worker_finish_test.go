@@ -109,7 +109,7 @@ func TestWorkerFinishApplicationJournalPublishesOnlyAfterLeaseRelease(t *testing
 				}
 			}}
 			registry := &tools.Registry{}
-			err = registerDelegate(registry, db, journal, cfg, "parent", "session", "", true, func(ctx context.Context, prompt, validation, work string, _ bool) (Result, error) {
+			err = registerDelegate(registry, nil, db, journal, cfg, "parent", "session", "", true, func(ctx context.Context, prompt, validation, work string, _ bool) (Result, error) {
 				defer joined.Store(true)
 				return svc.Run(ctx, Request{ModelID: "child", Prompt: prompt, Validation: validation, delegatedParent: work})
 			}, nil, nil)

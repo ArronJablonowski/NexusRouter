@@ -38,6 +38,14 @@ per-call review rules are unchanged. There is no new built-in arbitrary writer.
 SDK hosts may register an explicitly idempotent implementation through the
 existing reviewed tool-extension interface.
 
+`read_file` also supports the deterministic `count_regular_files` operation.
+It returns bounded aggregate direct/recursive counts and skipped-entry totals,
+never names or contents, and does not follow symlinks. When a cloud coordinator
+uses operator-approved delegated reads, the local child receives a stricter
+schema that requires this operation; the cloud parent never receives
+`read_file`, and the child cannot request ordinary file contents. Local-only
+parents retain the existing bounded content-reading schema.
+
 ## Durable binding
 
 The runtime obtains the declaration from an optional trusted

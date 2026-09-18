@@ -1186,6 +1186,15 @@ Known effect-free failures may explicitly permit a new model turn, without autom
 
 Current implementation increment: opt-in local `create_file` creates new UTF-8 files only after exact per-call review in terminal chat or a trusted SDK host. It uses pinned directories, atomic no-replace publication and durable approval consumption under the shared filesystem writer lease. Opt-in `replace_file` adds complete existing-file replacement up to 64 KiB per old/new content, exact preimage checks, reviewed content and retained private recovery copies. Replacement preserves basic permission bits, not extended metadata; its rename is atomic visibility, not external-writer compare-and-swap. Children retain read-only capabilities. General patch editing, delegated writes, unattended/headless approvals and stronger isolation remain later work. See [reviewed file creation](docs/reviewed-file-creation.md) and [reviewed replacement](docs/reviewed-file-replacement.md) for configuration and cooperative-filesystem limits.
 
+For operator-approved cloud-coordinator/local-worker inspection, separate the
+parent and child catalogs: the cloud coordinator receives delegation tools but
+never direct filesystem authority. The child receives a count-only
+`read_file` schema requiring `count_regular_files`; its result contains bounded
+direct and recursive regular-file totals and skipped-entry diagnostics without
+file names or contents. Symlinks, root escapes, writes and shell execution are
+excluded. Both file-tools and delegated-read settings plus an absolute root are
+required, and saved changes become authority only after daemon restart.
+
 ### 11.2 Permission Model
 
 Rules support `allow`, `deny`, and `ask`, scoped by tool and resource. Child workers inherit every parent denial and may add stricter rules. Later rules cannot weaken a non-overridable organizational or local-only policy.

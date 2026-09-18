@@ -33,10 +33,10 @@ func TestDelegateBatchSharesAtomicParentBudget(t *testing.T) {
 			cfg := config.Defaults()
 			cfg.Workers.DelegateMaxCalls = 3
 			var calls atomic.Int32
-			if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true, func(_ context.Context, prompt, validation, work string, local bool) (Result, error) {
+			if err = registerDelegate(registry, nil, db, db, cfg, "parent", "session", "", true, func(_ context.Context, prompt, validation, work string, local bool) (Result, error) {
 				calls.Add(1)
 				return Result{TaskID: "child-" + work, Text: prompt}, nil
-			}, nil, nil, applicationToolPolicy()); err != nil {
+			}, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}

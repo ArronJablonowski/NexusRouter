@@ -7,6 +7,16 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- DAR-129 adds a count-only delegated filesystem inspection path for a cloud
+  coordinator and local worker. The cloud model receives only delegation tools;
+  the local child receives a constrained `read_file` schema requiring
+  `count_regular_files`, which returns bounded direct/recursive regular-file
+  totals without names or contents and skips symlinks. The capability requires
+  both Settings toggles plus an explicit absolute root, activates only after
+  restart, and disappears when either toggle is disabled. Direct file reads,
+  writes, shell execution, path escapes, and permission expansion remain
+  unavailable on this route.
+
 - The authenticated Web UI adds a Settings page for bounded tool permissions.
   File tools and delegated read access use accessible toggle switches, while an
   absolute read-root field defines the only readable directory. Saves require

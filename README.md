@@ -1049,11 +1049,17 @@ the cloud, even in hybrid mode.
 
 To permit workspace inspection, explicitly enable `workers.delegate_read_tools`
 alongside the parent's `tools.enabled` and `tools.read_root`. The worker must be
-local. It receives only `read_file`, borrowing the parent's already-open root;
-it cannot reopen a changed path, escape the root, write files or acquire new
-permissions. Its allow rule is subordinate to the parent's policy: deny or ask
-does not become permission. The registry stays open until all child work has
-joined. Disabled delegation tools remain inference-only.
+local. For a local parent, it receives the ordinary `read_file` schema,
+borrowing the parent's already-open root; it cannot reopen a changed path,
+escape the root, write files or acquire new permissions. For a cloud parent,
+the coordinator receives only `delegate`/`delegate_batch`, and the local worker
+receives a stricter `read_file` schema that requires
+`operation: count_regular_files`. That operation returns only bounded direct
+and recursive regular-file totals plus skipped-entry diagnostics—never file
+names or contents. Its allow rule is subordinate to the parent's policy: deny
+or ask does not become permission. The registry stays open until all child work
+has joined. Disabling either permission toggle removes the delegated read
+capability after restart; disabled delegation tools remain inference-only.
 
 Read-tool children use at most `delegate_max_turns` (2–8), additionally capped
 by `runtime.max_turns` and `tools.max_turns`. Tool-call/result pairs and validation
@@ -1378,7 +1384,26 @@ tools:
   max_turns: 8
 ```
 
-This allows local models to read UTF-8 regular files up to 64 KiB within that directory. Relative paths and symlinks cannot escape the configured root. Do not include credentials or other files the model should not see in this scope. Enabling file tools excludes cloud execution; explicit cloud selection is denied. Tool results become sensitive durable session content. Tools default off. Separately opt in to `create_enabled` and an absolute `create_root` for terminal-reviewed new-file creation; see [reviewed file creation](docs/reviewed-file-creation.md). Opt-in `replace_enabled` with an absolute `replace_root` supports [reviewed existing-file replacement](docs/reviewed-file-replacement.md), with exact old/new content and retained recovery copies. Delegated writes and unattended approvals remain unfinished. Tool-enabled models require `context_tokens` metadata. Each turn checks serialized context including tools and schemas plus a 1,024-token reserve; overflow ends the task without discarding durable tool results. Tokenizer-based accounting, automatic compaction and budget-exhaustion recovery remain unfinished.
+This allows local models to read UTF-8 regular files up to 64 KiB within that
+directory. They may instead request `operation: count_regular_files` for a
+bounded aggregate directory count that skips symlinks and discloses no names or
+contents. Relative paths and symlinks cannot escape the configured root. Do not
+include credentials or other files the model should not see in this scope.
+Direct file-tool execution remains local-only; explicit cloud selection is
+denied unless the exact delegated-count mode described above is enabled. In
+that mode the cloud coordinator never receives `read_file` and the child never
+receives file-content authority. Ordinary file-read results remain sensitive
+durable session content. Tools default off. Separately opt in to
+`create_enabled` and an absolute `create_root` for terminal-reviewed new-file
+creation; see [reviewed file creation](docs/reviewed-file-creation.md). Opt-in
+`replace_enabled` with an absolute `replace_root` supports
+[reviewed existing-file replacement](docs/reviewed-file-replacement.md), with
+exact old/new content and retained recovery copies. Delegated writes and
+unattended approvals remain unfinished. Tool-enabled models require
+`context_tokens` metadata. Each turn checks serialized context including tools
+and schemas plus a 1,024-token reserve; overflow ends the task without
+discarding durable tool results. Tokenizer-based accounting, automatic
+compaction and budget-exhaustion recovery remain unfinished.
 
 `workboard_read_enabled` independently opts the root coordinator into the
 read-only `workboard_list` and `workboard_read` Kanban tools. Both use bounded

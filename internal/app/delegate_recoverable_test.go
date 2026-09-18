@@ -69,7 +69,7 @@ func TestDelegateRunnerPanicNeverBecomesRecoverable(t *testing.T) {
 			cfg.Workers.DelegateMaxCalls = 2
 			registry := &tools.Registry{}
 			var entered atomic.Int32
-			if err := registerDelegate(registry, db, db, cfg, "parent", "session", "", true, func(context.Context, string, string, string, bool) (Result, error) {
+			if err := registerDelegate(registry, nil, db, db, cfg, "parent", "session", "", true, func(context.Context, string, string, string, bool) (Result, error) {
 				entered.Add(1)
 				panic("private runner failure")
 			}, nil, nil); err != nil {

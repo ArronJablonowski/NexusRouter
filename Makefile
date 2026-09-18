@@ -1,4 +1,4 @@
-.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-context-recovery qualify-webui qualify-release qualify-release-test qualify-license-evidence qualify-codex-repair qualify-codex-rollover
+.PHONY: build check test fmt qualify-linux-cgroup qualify-performance qualify-mvp qualify-context-recovery qualify-webui qualify-delegated-count qualify-release qualify-release-test qualify-license-evidence qualify-codex-repair qualify-codex-rollover
 
 build:
 	go build -trimpath -buildvcs=false -o bin/darwin ./cmd/darwin
@@ -60,6 +60,13 @@ qualify-webui:
 	DARWIN_REQUIRE_CHROME=1 DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./webui ./internal/browserauth ./internal/webuiapp
 	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./internal/app -run '^(TestExplicitTaskEndToEnd|TestMVPCloudOnlyOpenAICompatible|TestHybridSolCoordinatorDelegatesToIsolatedOllama|TestLocalOnlyBlocksCloudAndUnapprovedTransportsAcrossRuntimeSurfaces|TestBrowser.*|TestWorkboardScheduler.*)$$'
 	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./internal/cli -run '^(TestDaemonLifecycleAcrossCLIProcesses|TestDaemonBranchAndRecoveredResumeAcrossRestart|TestEnabledWorkboardSchedulerDaemonExecutesAndJoinsOnSIGTERM|TestEnabledWorkboardSchedulerDaemonAfterSIGKILLDoesNotRedispatch)$$'
+
+# Deterministic DAR-129 qualification. The settings and provider calls use
+# local fixtures; this target never expands the operator's live filesystem
+# scope or consumes cloud-model usage.
+qualify-delegated-count:
+	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./webui ./internal/webuiapp ./internal/config -run '^(TestSettingsShellUsesBoundedToggleControls|TestSettingsMutationRequiresAuthorityAndDetectsConflict|TestSettingsMutationRejectsInvalidDependencies|TestProjectToolAccessAtomicUpdate|TestProjectToolAccessRejectsInvalidAndSymlink)$$'
+	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -race -count=1 ./internal/app -run '^(TestReadToolConfinement|TestReadToolReturnsBoundedAggregateDirectoryCounts|TestCloudDelegatedCountToolRejectsFileContentReads|TestDelegatedReadModeRequiresExactOperatorAuthority|TestCloudDelegatedReadModeRejectsDirectOrChildUse|TestDelegateReadToolsInheritedScopeAndNoRecursion|TestCloudCoordinatorDelegatesBoundedCountWithoutDirectFilesystemAuthority|TestHybridSolCoordinatorDelegatesToIsolatedOllama)$$'
 
 # Explicit supervised signed-in cloud inference with controlled local results.
 # Uses account usage; never included in check/test or ordinary CI.

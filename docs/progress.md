@@ -8448,3 +8448,34 @@ and re-authenticated Firefox both loaded the previously failing
 `W53BC3B2REGASAXVTIHTGUNJRS` chat after restart. They rendered its three
 committed user/assistant messages while the inspector retained both normalized,
 paired delegate lifecycles. No transcript retry error remained.
+
+## 2026-09-18 — DAR-129 bounded delegated directory counting
+
+DAR-129 now has a deterministic count-only execution path without expanding
+the live operator configuration. The existing `read_file` identity gained a
+bounded `count_regular_files` operation that walks beneath an already-open
+`os.Root`, counts direct and recursive regular files, skips symlinks and special
+entries, enforces entry/directory/depth limits, and returns aggregate JSON only.
+Tests reject traversal, absolute paths, file and symlink roots, unknown
+operations, cancellation, writes and unadvertised tools while proving that file
+names and contents never enter the count result.
+
+The runtime now separates cloud-parent and local-child authority. With both
+file tools and delegated reads explicitly enabled, a cloud coordinator receives
+only `delegate`/`delegate_batch`; the local child receives a distinct
+count-only `read_file` schema requiring the aggregate operation. It cannot
+request ordinary file contents. Local-only parents retain the prior bounded
+content-reader behavior. Direct cloud file tools, tool extensions, workboard
+tools and any write capability still fail closed. Disabling either toggle no
+longer satisfies the exact delegated-count mode, and the Settings client clears
+the dependent delegation toggle when file tools are switched off.
+
+`make qualify-delegated-count` is the repeatable local fixture gate. It covers
+authenticated Settings mutation, CSRF and digest conflict handling, atomic
+project-config save/reload, restart-required projection, dependent toggles,
+root and symlink validation, aggregate confinement, local child tool use, and
+the complete cloud coordinator → local worker → count evidence → coordinator
+loop under the race detector. The focused application suite and the full
+non-race application package also passed. No live Desktop read root was saved,
+no daemon authority was changed, and no Sol account usage was consumed; the
+operator-approved live restart and exact Desktop count remain pending.

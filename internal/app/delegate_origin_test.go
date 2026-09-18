@@ -33,7 +33,7 @@ func TestDelegationOriginPersistsBeforeSingleAndBatchExecution(t *testing.T) {
 	cfg.Workers.DelegateMaxCalls = 3
 	var mu sync.Mutex
 	seen := map[string]runtime.DelegationOrigin{}
-	if err := registerDelegate(registry, db, db, cfg, "parent", "session", "", true, func(ctx context.Context, prompt, validation, work string, local bool) (Result, error) {
+	if err := registerDelegate(registry, nil, db, db, cfg, "parent", "session", "", true, func(ctx context.Context, prompt, validation, work string, local bool) (Result, error) {
 		page, err := db.ReadEventPage(ctx, work, 0, 100)
 		if err != nil || len(page.Events) < 1 {
 			t.Error("origin unavailable before execution", err)
@@ -49,7 +49,7 @@ func TestDelegationOriginPersistsBeforeSingleAndBatchExecution(t *testing.T) {
 		seen[prompt] = *o.Clone()
 		mu.Unlock()
 		return Result{TaskID: "execution-" + work, Text: prompt}, nil
-	}, nil, nil, applicationToolPolicy()); err != nil {
+	}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	executor := tools.Executor{Registry: registry, Policy: applicationToolPolicy()}

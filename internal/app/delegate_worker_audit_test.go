@@ -46,7 +46,7 @@ func TestDelegateSingleAndBatchPublishSanitizedAudits(t *testing.T) {
 		}
 		return Result{TaskID: "execution-" + workID, Text: "answer-" + prompt}, nil
 	}
-	if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true, run, audit, nil, applicationToolPolicy()); err != nil {
+	if err = registerDelegate(registry, nil, db, db, cfg, "parent", "session", "", true, run, audit, nil); err != nil {
 		t.Fatal(err)
 	}
 	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}
@@ -103,13 +103,13 @@ func TestDelegateNeverAuditsInvalidChild(t *testing.T) {
 	cfg.Evaluation.Judge, cfg.Evaluation.AutoReviewModel = true, "reviewer"
 	registry := &tools.Registry{}
 	var reviews atomic.Int32
-	if err = registerDelegate(registry, db, db, cfg, "parent", "session", "", true,
+	if err = registerDelegate(registry, nil, db, db, cfg, "parent", "session", "", true,
 		func(_ context.Context, _, _ string, workID string, _ bool) (Result, error) {
 			return Result{TaskID: "execution-" + workID, Text: " "}, nil
 		}, func(context.Context, string, string) (*runtime.DelegationAudit, error) {
 			reviews.Add(1)
 			return nil, ErrAdmission
-		}, nil, applicationToolPolicy()); err != nil {
+		}, nil); err != nil {
 		t.Fatal(err)
 	}
 	executor := scopedDelegateTestExecutor{tools.Executor{Registry: registry, Policy: applicationToolPolicy()}}

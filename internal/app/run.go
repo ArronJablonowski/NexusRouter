@@ -227,25 +227,41 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
-	// File tools are local-only until an explicit data-egress approval exists.
-	if (s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0) && (model.Locality != "local" || model.ContextTokens == 0) {
+	// Direct file tools are local-only. A cloud coordinator may hold only the
+	// delegate tool while an independently scoped local worker borrows read_file.
+	toolingEnabled := s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
+	if toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s, r, model)) {
 		return result, ErrAdmission
 	}
 	if s.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return result, ErrAdmission
 	}
 	var registry *tools.Registry
+	var delegatedReadCapability *delegateTools
 	toolPolicy := applicationToolPolicyFor(s.Security.ToolPolicy)
 	if r.delegatedTools != nil {
 		registry, toolPolicy = r.delegatedTools.Registry, r.delegatedTools.Policy
 	} else if s.Tools.Enabled {
 		var closeTools func()
 		var err error
-		registry, closeTools, err = readTools(s.Tools.ReadRoot)
+		var readRegistry *tools.Registry
+		if cloudDelegatedReads(s, r, model) {
+			readRegistry, closeTools, err = delegatedCountTools(s.Tools.ReadRoot)
+		} else {
+			readRegistry, closeTools, err = readTools(s.Tools.ReadRoot)
+		}
 		if err != nil {
 			return result, err
 		}
 		defer closeTools()
+		if cloudDelegatedReads(s, r, model) {
+			delegatedReadCapability = &delegateTools{Registry: readRegistry, Policy: toolPolicy}
+		} else {
+			registry = readRegistry
+			if s.Workers.DelegateReadTools {
+				delegatedReadCapability = &delegateTools{Registry: readRegistry, Policy: toolPolicy}
+			}
+		}
 	}
 	if s.Tools.CreateEnabled {
 		closeCreate, scope, err := registerCreateTool(registry, s.Tools.CreateRoot)
@@ -455,7 +471,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		if authorityErr != nil {
 			return result, authorityErr
 		}
-		if err := registerDelegate(registry, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority, toolPolicy); err != nil {
+		if err := registerDelegate(registry, delegatedReadCapability, db, redactingJournal{db: db, secrets: secrets, eventDelivery: r.eventDelivery, submissionID: r.submissionID, submissionToken: r.submissionToken, cancellationBoundary: cancellationBoundary}, s, result.TaskID, sessionID, r.submissionID, privacy == "local_only", r.delegate, r.delegateAudit, compactionAuthority); err != nil {
 			return result, ErrAdmission
 		}
 	}
@@ -495,7 +511,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	if r.delegatedParent != "" {
 		parentID, maxTurns, maxOutput = r.delegatedParent, 1, 64<<10
 		if r.delegatedTools != nil {
-			inference.Tools = []providers.Tool{readFileSpec()}
+			inference.Tools = delegatedReadCatalog(r.delegatedTools.Registry)
+			if len(inference.Tools) != 1 {
+				return result, ErrAdmission
+			}
 			maxTurns = min(s.Workers.DelegateMaxTurns, s.Tools.MaxTurns, s.Runtime.MaxTurns)
 		}
 	}

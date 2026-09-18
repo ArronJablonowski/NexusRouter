@@ -466,7 +466,9 @@ func TestSettingsShellUsesBoundedToggleControls(t *testing.T) {
 			t.Fatal("settings control missing", required)
 		}
 	}
-	if !strings.Contains(string(script), `expected_digest: projection.digest`) || !strings.Contains(string(script), `"X-Darwin-CSRF": csrf`) || !strings.Contains(string(styles), `.switch input:checked + span`) {
+	if !strings.Contains(string(script), `expected_digest: projection.digest`) || !strings.Contains(string(script), `"X-Darwin-CSRF": csrf`) ||
+		!strings.Contains(string(script), `if (!tools.checked) delegated.checked = false`) || !strings.Contains(string(script), `delegated.disabled = loading || !tools.checked`) ||
+		!strings.Contains(string(styles), `.switch input:checked + span`) {
 		t.Fatal("settings mutation boundary or toggle styling missing")
 	}
 }
