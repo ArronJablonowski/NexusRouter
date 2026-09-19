@@ -45,7 +45,7 @@ func TestMarshalOTLPContentFreeShapeAndFreshIDs(t *testing.T) {
 	if json.Unmarshal(first, &body) != nil || len(body.ResourceSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans[0].Spans) != 4 {
 		t.Fatal(string(first))
 	}
-	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "6" {
+	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "7" {
 		t.Fatal("wrong schema version", body.ResourceSpans[0].ScopeSpans[0].Scope.Version)
 	}
 	spans := body.ResourceSpans[0].ScopeSpans[0].Spans
@@ -75,6 +75,20 @@ func TestSnapshotRejectsInvalidGraphsAndBounds(t *testing.T) {
 		if candidate.Validate() == nil {
 			t.Fatal(candidate)
 		}
+	}
+}
+
+func TestSnapshotAcceptsRunningRootEndingAtObservation(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0).UTC()
+	snapshot := Snapshot{Version: SnapshotVersion, ObservedAt: base.Add(time.Second), Traces: []Trace{{Spans: []Span{{
+		Name: "task", Outcome: "running", Parent: -1, StartedAt: base, EndedAt: base.Add(time.Second),
+	}}}}}
+	if snapshot.Validate() != nil {
+		t.Fatal(snapshot)
+	}
+	snapshot.Traces[0].Spans[0].EndedAt = base
+	if snapshot.Validate() == nil {
+		t.Fatal("running root not bound to observation time")
 	}
 }
 

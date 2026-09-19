@@ -8589,3 +8589,24 @@ identities remain absent. Missing/corrupt aggregate state fails the whole
 snapshot. Focused race-enabled trace and telemetry suites pass. Provider-health,
 automatic skill lifecycle, lease-heartbeat timing, running-task, and durable
 delivery traces remain unfinished; no Linear issue state is changed.
+
+## 2026-09-18 — coherent running-task trace snapshots
+
+Trace snapshot schema 7 now includes recent running tasks in the same bounded
+SQLite read snapshot as terminal tasks. A running root begins at its canonical
+`task.started` event and ends at the public snapshot observation instant. Only
+provider, tool, and worker operations with both start and completion durably
+present in that snapshot are exported; an unpaired in-flight operation is
+omitted rather than represented as completed. The running root is therefore a
+coherent lifecycle observation, not evidence that its process is alive,
+healthy, progressing, or safe to recover.
+
+Validation requires every running root to end exactly at `observed_at` and
+fails closed if a terminal event is retained behind a running task projection.
+Running tasks do not receive fitness-mutation markers because those validate
+terminal evaluation history. Current resource-lease classes remain observable
+at the same snapshot boundary. Focused race-enabled trace and telemetry tests
+cover running roots, completed and pending child operations, private identity
+exclusion, and contradictory-state rejection. Automatic skill lifecycle,
+provider-health, lease-heartbeat timing, model-delta, and durable-delivery
+traces remain unfinished; no Linear issue state is changed.

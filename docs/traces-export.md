@@ -1,11 +1,12 @@
 # OTLP trace export
 
-DarwinRouter can explicitly export a bounded, content-free view of recent
-terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
+DarwinRouter can explicitly export a bounded, content-free view of recent task
+lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
 fixed queue-residency observation, version 3 added fixed tool-effect evidence,
 version 4 added content-free resource-pressure observations, and version 5
-added bounded resource-lease state observations. Version 6 adds validated,
-content-free fitness-mutation observations:
+added bounded resource-lease state observations. Version 6 added validated,
+content-free fitness-mutation observations. Version 7 includes coherent
+running-task snapshots without inventing completion for in-flight operations:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -41,7 +42,7 @@ restart the owned exporter to apply new settings. The legacy
 
 ## Scope and privacy
 
-Each trace contains one terminal task root plus successfully paired
+Each trace contains one task root plus successfully paired
 provider-turn, tool-call and worker child spans. Fixed zero-duration
 observations additionally represent route selection/exploration, evaluation
 acceptance/rejection, fallback lineage, compaction, progressive skill-context
@@ -98,17 +99,21 @@ not hashes or stable pseudonyms for durable DarwinRouter records. Consequently,
 separate exports cannot be joined by their wire IDs. Operators requiring
 cross-export correlation must add it outside this privacy-preserving interface.
 
-The reader selects at most 32 terminal tasks (16 by default), in reverse task
-creation order, and accepts at most 512 relevant lifecycle events per task and
-512 exported spans total. It reads a single SQLite snapshot with a three-second
+The reader selects at most 32 tasks (16 by default), in reverse task creation
+order, and accepts at most 512 relevant lifecycle events per task and 512
+exported spans total. It reads a single SQLite snapshot with a three-second
 deadline. The application deadline is four seconds and delivery is bounded by
-ten seconds. Invalid terminal timing, contradictory state, duplicate operation
-starts, mismatched tool pairs or any exceeded bound fail the export. Unpaired
-legacy/interrupted child operations are omitted; the separate metrics snapshot
-retains explicit missing-start and missing-end counts.
+ten seconds. A running root ends at the snapshot `observed_at` instant and
+contains only child operations whose start and completion are both durable in
+that same SQLite snapshot. This is an observation boundary, not a claim that
+the task or its process is healthy. Invalid timing, a terminal event behind a
+running projection, contradictory terminal state, duplicate operation starts,
+mismatched tool pairs or any exceeded bound fail the export. Unpaired
+in-flight, legacy or interrupted child operations are omitted; the separate
+metrics snapshot retains explicit missing-start and missing-end counts.
 
-This trace slice does not include running tasks, model deltas, worker
-heartbeats, lease heartbeat/renewal timing, provider health,
+This trace slice does not include model deltas, worker heartbeats, lease
+heartbeat/renewal timing, provider health,
 automatic skill draft/activation/rollback operations or queue arrival/service
 rates. Queue residency is historical only for a successfully linked top-level
 task start; current queue pressure remains available through aggregate metrics.

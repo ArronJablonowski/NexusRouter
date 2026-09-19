@@ -16,8 +16,8 @@ import (
 
 var ErrTraces = errors.New("traces unavailable")
 
-// TraceSnapshot reconstructs recent terminal task lifecycles without creating
-// or migrating storage and without exposing their durable identities/content.
+// TraceSnapshot reconstructs recent task lifecycles without creating or
+// migrating storage and without exposing their durable identities/content.
 func (s *Service) TraceSnapshot(ctx context.Context, limit int) (traces.Snapshot, error) {
 	if s == nil || ctx == nil || limit < 1 || limit > traces.MaxTraces {
 		return traces.Snapshot{}, ErrTraces

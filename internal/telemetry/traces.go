@@ -25,10 +25,11 @@ type traceStart struct {
 	toolName string
 }
 
-// Traces reconstructs a bounded recent terminal-task view inside one SQLite
-// read snapshot. Only pairing fields and a bounded top-level submission time
-// are selected; event bodies, durable IDs, model/provider/tool names and session
-// content never enter the returned value.
+// Traces reconstructs a bounded recent-task view inside one SQLite read
+// snapshot. Running roots end at ObservedAt and include only durably completed
+// child operations. Only pairing fields and a bounded top-level submission
+// time are selected; event bodies, durable IDs, model/provider/tool names and
+// session content never enter the returned value.
 func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) {
 	if limit < 1 || limit > traces.MaxTraces {
 		return traces.Snapshot{}, errTraces
@@ -40,7 +41,7 @@ func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) 
 		return traces.Snapshot{}, errTraces
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT task_id,state FROM task_heads WHERE state IN ('completed','failed','canceled') ORDER BY rowid DESC LIMIT ?`, limit)
+	rows, err := tx.QueryContext(ctx, `SELECT task_id,state FROM task_heads WHERE state IN ('running','completed','failed','canceled') ORDER BY rowid DESC LIMIT ?`, limit)
 	if err != nil {
 		return traces.Snapshot{}, errTraces
 	}
@@ -129,6 +130,7 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	pending := map[tracePairKey]traceStart{}
 	children := make([]traces.Span, 0)
 	var rootStart, rootEnd time.Time
+	terminalSeen := false
 	count := 0
 	for rows.Next() {
 		count++
@@ -174,9 +176,10 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				children = append(children, traceInstant("skill_context", "loaded", at))
 			}
 		case "task.completed", "task.failed", "task.canceled":
-			if !rootEnd.IsZero() || kind != "task."+task.state {
+			if terminalSeen || task.state == "running" || kind != "task."+task.state {
 				return traces.Trace{}, errTraces
 			}
+			terminalSeen = true
 			rootEnd = at
 		case "turn.started", "turn.completed", "tool.started", "tool.completed":
 			group := "provider"
@@ -267,6 +270,12 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			return traces.Trace{}, errTraces
 		}
 	}
+	if task.state == "running" {
+		if terminalSeen {
+			return traces.Trace{}, errTraces
+		}
+		rootEnd = observedAt
+	}
 	if rows.Err() != nil || count > 512 || rootStart.IsZero() || rootEnd.IsZero() || rootEnd.Before(rootStart) {
 		return traces.Trace{}, errTraces
 	}
@@ -278,11 +287,13 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		return traces.Trace{}, errTraces
 	}
 	children = append(children, leaseObservations...)
-	fitnessObservations, err := readTaskFitnessTrace(ctx, tx, task.id, rootEnd, observedAt)
-	if err != nil {
-		return traces.Trace{}, errTraces
+	if task.state != "running" {
+		fitnessObservations, err := readTaskFitnessTrace(ctx, tx, task.id, rootEnd, observedAt)
+		if err != nil {
+			return traces.Trace{}, errTraces
+		}
+		children = append(children, fitnessObservations...)
 	}
-	children = append(children, fitnessObservations...)
 	sort.SliceStable(children, func(i, j int) bool { return children[i].StartedAt.Before(children[j].StartedAt) })
 	spans := make([]traces.Span, 1, len(children)+1)
 	spans[0] = traces.Span{Name: "task", Outcome: task.state, Parent: -1, StartedAt: rootStart, EndedAt: rootEnd}

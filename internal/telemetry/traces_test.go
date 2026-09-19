@@ -86,6 +86,61 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 	}
 }
 
+func TestTraceSnapshotIncludesRunningTaskWithoutInventingPendingCompletion(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	events := []runtime.Event{
+		event("private-running-start", 1, runtime.TaskStarted),
+		event("private-running-turn-start", 2, runtime.TurnStarted),
+		event("private-running-turn-done", 3, runtime.TurnCompleted),
+		event("private-running-tool-start", 4, runtime.ToolStarted),
+	}
+	for i := range events {
+		events[i].TaskID, events[i].SessionID, events[i].CorrelationID = "private-running-task", "private-running-session", "private-running-task"
+		events[i].Time = base.Add(time.Duration(i) * time.Millisecond)
+		if events[i].Kind == runtime.TurnStarted || events[i].Kind == runtime.TurnCompleted || events[i].Kind == runtime.ToolStarted {
+			events[i].TurnID, events[i].AttemptID = "private-running-turn", "private-running-attempt"
+		}
+		if events[i].Kind == runtime.ToolStarted {
+			events[i].Data.ToolCallID, events[i].Data.ToolName, events[i].Data.Effect = "private-running-call", "private-running-tool", runtime.NoEffect
+		}
+		if err := db.Append(ctx, int64(i), events[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 2 {
+		t.Fatal(snapshot, err)
+	}
+	root, provider := snapshot.Traces[0].Spans[0], snapshot.Traces[0].Spans[1]
+	if root.Name != "task" || root.Outcome != "running" || !root.StartedAt.Equal(base) || !root.EndedAt.Equal(snapshot.ObservedAt) ||
+		provider.Name != "provider" || provider.Outcome != "completed" || !provider.StartedAt.Equal(events[1].Time) || !provider.EndedAt.Equal(events[2].Time) {
+		t.Fatal(root, provider)
+	}
+	body, marshalErr := json.Marshal(snapshot)
+	if marshalErr != nil || strings.Contains(string(body), "private") || strings.Contains(string(body), "tool") {
+		t.Fatal(string(body), marshalErr)
+	}
+}
+
+func TestTraceSnapshotRejectsTerminalEventBehindRunningProjection(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	start := event("running-corrupt-start", 1, runtime.TaskStarted)
+	done := event("running-corrupt-done", 2, runtime.TaskCompleted)
+	start.Time, done.Time = time.Now().UTC().Add(-time.Second), time.Now().UTC()
+	if db.Append(ctx, 0, start) != nil || db.Append(ctx, 1, done) != nil {
+		t.Fatal("fixture")
+	}
+	if _, err := db.db.ExecContext(ctx, `UPDATE task_heads SET state='running' WHERE task_id=?`, start.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("terminal event escaped running projection", snapshot, err)
+	}
+}
+
 func TestTraceSnapshotExportsResourcePressureWithoutMeasurements(t *testing.T) {
 	db, _ := submissionStore(t)
 	ctx := context.Background()

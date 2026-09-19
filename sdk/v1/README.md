@@ -112,11 +112,12 @@ share an in-memory hardware budget. Construction does not start a daemon or hold
 an open task database; no `Close` is needed. Calls open bounded-lived storage as
 required. Callers own cancellation and should set appropriate deadlines.
 
-`Client.TraceSnapshot(ctx, limit)` reads a content-free recent terminal-task
+`Client.TraceSnapshot(ctx, limit)` reads a content-free recent-task
 view, and `Client.ExportTraces(ctx, TraceExportOptions{...})` explicitly sends
 it as OTLP/HTTP JSON. The limit is 1–32; export defaults to 16. Wire trace/span
 IDs are fresh for every serialization and do not expose or stably represent
-DarwinRouter identities. `Client.StartTraceExport` returns an owned periodic
+DarwinRouter identities. Running roots end at snapshot observation time and
+contain only durably paired child operations. `Client.StartTraceExport` returns an owned periodic
 exporter whose `Health` is inspectable and whose `Close` cancels and joins it;
 attempts are sequential, non-durable and non-retrying. See
 [trace export](../../docs/traces-export.md).

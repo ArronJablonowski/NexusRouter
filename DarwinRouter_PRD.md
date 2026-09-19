@@ -1352,7 +1352,7 @@ without blocking task readiness on collector failure. The legacy
 `opentelemetry_enabled` switch is supported as an alias for enabling the
 configured periodic metrics exporter; it requires the same explicit destination
 and policy checks and does not disable task or learning execution. Explicit
-CLI/SDK trace export now reconstructs bounded recent terminal-task roots with
+CLI/SDK trace export now reconstructs bounded recent task roots with
 successfully paired provider-turn, tool-call and worker children plus fixed
 route/exploration, evaluation, fallback, compaction, skill-context, steering
 and error observations. Schema 4 additionally emits fixed thermal/swap pressure
@@ -1361,7 +1361,10 @@ host measurements or source strings. Schema 5 adds terminal, content-free
 reader/writer lease-state observations without exporting counts, capabilities,
 owners, scopes, expiry instants, or process references. Schema 6 adds validated
 base/revised fitness-mutation observations without exporting routing keys,
-scores, samples, evidence, or evaluator identities. A linked top-level submission also emits one fixed
+scores, samples, evidence, or evaluator identities. Schema 7 includes running
+roots ending at the coherent observation instant, with only durably completed
+child operations; it does not infer process health or fabricate completion for
+in-flight operations. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
 exact arrival time; retries and delegated children are excluded. Paired tool
 completions expose only their authoritative none/confirmed/uncertain effect

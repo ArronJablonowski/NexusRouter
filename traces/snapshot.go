@@ -9,7 +9,7 @@ import (
 var ErrInvalid = errors.New("invalid trace snapshot")
 var ErrExport = errors.New("trace export unavailable")
 
-const SnapshotVersion = 6
+const SnapshotVersion = 7
 const MaxTraces = 32
 const MaxSpans = 512
 
@@ -46,6 +46,9 @@ func (s Snapshot) Validate() error {
 		total += len(trace.Spans)
 		root := trace.Spans[0]
 		if root.Name != "task" || root.Parent != -1 || !taskOutcome(root.Outcome) || invalidTimes(root, s.ObservedAt) {
+			return ErrInvalid
+		}
+		if root.Outcome == "running" && !root.EndedAt.Equal(s.ObservedAt) {
 			return ErrInvalid
 		}
 		for i, span := range trace.Spans[1:] {
@@ -127,5 +130,5 @@ func invalidTimes(span Span, observedAt time.Time) bool {
 }
 
 func taskOutcome(value string) bool {
-	return value == "completed" || value == "failed" || value == "canceled"
+	return value == "running" || value == "completed" || value == "failed" || value == "canceled"
 }

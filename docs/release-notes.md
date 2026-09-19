@@ -437,7 +437,7 @@ operator records.
   virtual route record rather than ownership of upstream model weights.
 
 - Explicit one-shot OTLP/HTTP trace export through CLI and Go SDK for bounded
-  recent terminal task/provider/tool/worker lifecycles plus fixed route,
+  recent task/provider/tool/worker lifecycles plus fixed route,
   evaluation, fallback, compaction, skill-context, steering and error
   observations. It uses fresh wire identities, exports no session content or
   durable IDs, and now has an independently
@@ -449,6 +449,8 @@ operator records.
   retries/delegated children are excluded.
   Paired tool completions expose only their fixed none/confirmed/uncertain
   effect class, without tool identity, result content or retry claims.
+  Running task roots end at snapshot observation time and contain only durably
+  paired child operations, without claiming process health or completion.
   Delivery remains ephemeral and broader lifecycle spans are open. See
   [trace export](traces-export.md).
 

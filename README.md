@@ -1972,7 +1972,7 @@ can now send one aggregate snapshot through the network policy. Opt-in daemon
 configuration and an owned SDK exporter also support periodic fresh snapshots,
 supplemental health and cancellation. The legacy `opentelemetry_enabled` switch
 now aliases configured periodic metrics export. A separate explicit CLI/SDK
-[OTLP trace export](docs/traces-export.md) sends up to 32 recent terminal task
+[OTLP trace export](docs/traces-export.md) sends up to 32 recent task
 roots with paired provider/tool/worker children and fixed route, evaluation,
 fallback, compaction, skill-context, steering, error and top-level submission
 queue-residency observations. Queue waits use seven fixed buckets and expose no
@@ -1980,6 +1980,8 @@ submission identity or exact arrival time. Every paired tool completion also
 emits its fixed none/confirmed/uncertain effect class without tool identity or
 result content. It uses
 fresh non-durable wire IDs and no session content or durable identities.
+Running roots end at the coherent observation time and include only durably
+paired child operations; they do not assert process health or completion.
 Fixed route-constraint observations expose only mode/privacy/health/policy/
 credential/capacity/context/budget/capability reason classes, never candidates.
 `telemetry.trace_export` enables an
