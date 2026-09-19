@@ -15,10 +15,21 @@ import (
 	"github.com/ArronJablonowski/DarwinRouter/health"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
+
+type namesOnlyInventoryProvider struct{}
+
+func (namesOnlyInventoryProvider) Models(context.Context) ([]string, error) {
+	return []string{"unknown-size:latest"}, nil
+}
+
+func (namesOnlyInventoryProvider) Stream(context.Context, providers.Request, func(providers.Chunk) error) error {
+	return errors.New("not used")
+}
 
 func appendInspectionEvent(t *testing.T, db *telemetry.Store, event runtime.Event) {
 	t.Helper()
@@ -96,7 +107,8 @@ func TestBrowserModelsResourcesAndUsagePreserveAvailability(t *testing.T) {
 		{Component: "model", ID: "model", Status: "healthy", Code: "available"},
 	}}
 	models, err := service.BrowserModels(context.Background(), report)
-	if err != nil || models.Validate() != nil || models.Availability != contract.Available || len(models.Models) != 1 || models.Models[0].Health != "healthy" {
+	if err != nil || models.Validate() != nil || models.Availability != contract.Available || len(models.Models) != 1 || models.Models[0].Health != "healthy" ||
+		models.Models[0].HealthCheckedAt == nil || !models.Models[0].HealthCheckedAt.Equal(report.CheckedAt) || models.RefreshIntervalMS != 10000 {
 		t.Fatal(models, err)
 	}
 	service.profile = func(context.Context) (resources.Snapshot, error) {
@@ -114,6 +126,52 @@ func TestBrowserModelsResourcesAndUsagePreserveAvailability(t *testing.T) {
 	usage, err := service.BrowserTaskUsage(context.Background(), "usage_task")
 	if err != nil || usage.Validate() != nil || usage.Availability != contract.Available || usage.Usage == nil || usage.Usage.Routed.Records != 0 || usage.Usage.Auxiliary.Records != 0 {
 		t.Fatal(usage, err)
+	}
+}
+
+func TestBrowserModelsKeepsHealthyProviderWhenAnotherInventoryFails(t *testing.T) {
+	digest := strings.Repeat("c", 64)
+	healthy := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(writer, `{"models":[{"name":"healthy:latest","modified_at":"2026-09-17T12:00:00Z","size":2048,"digest":%q}]}`, digest)
+	}))
+	defer healthy.Close()
+	failed := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		http.Error(writer, "private provider failure", http.StatusInternalServerError)
+	}))
+	defer failed.Close()
+	service := submissionService(t)
+	service.settings.WebUI.ModelInventoryRefreshInterval = "30s"
+	service.settings.Providers = []config.Provider{
+		{ID: "healthy-local", Kind: "ollama", Endpoint: healthy.URL},
+		{ID: "failed-local", Kind: "ollama", Endpoint: failed.URL},
+	}
+	service.settings.Models = []config.Model{
+		{ID: "healthy-model", Provider: "healthy-local", Model: "healthy:latest", Locality: "local", Capabilities: []string{"chat"}, RAMBytes: 1},
+		{ID: "failed-model", Provider: "failed-local", Model: "failed:latest", Locality: "local", Capabilities: []string{"chat"}, RAMBytes: 1},
+	}
+	checked := time.Now().UTC()
+	report := health.Report{Version: 1, CheckedAt: checked, Status: "degraded", Ready: true, Checks: []health.Check{
+		{Component: "daemon", Status: "healthy", Code: "serving"}, {Component: "database", Status: "healthy", Code: "available"},
+		{Component: "supervisor", Status: "healthy", Code: "supervisor_ok"}, {Component: "resources", ID: "host", Status: "healthy", Code: "capacity_available"},
+		{Component: "provider", ID: "healthy-local", Status: "healthy", Code: "available"}, {Component: "provider", ID: "failed-local", Status: "unavailable", Code: "discovery_failed"},
+		{Component: "model", ID: "healthy-model", Status: "healthy", Code: "available"}, {Component: "model", ID: "failed-model", Status: "unavailable", Code: "discovery_failed"},
+	}}
+	page, err := service.BrowserModels(context.Background(), report)
+	if err != nil || page.Validate() != nil || page.RefreshIntervalMS != 30000 || page.LocalTotalCoverage != "partial" ||
+		page.LocalTotalBytes == nil || *page.LocalTotalBytes != 2048 || len(page.LocalProviders) != 2 || len(page.Models) != 2 {
+		t.Fatalf("partial inventory was not retained: %+v, %v", page, err)
+	}
+	if page.LocalProviders[0].Provider != "healthy-local" || page.LocalProviders[0].Status != "available" ||
+		page.LocalProviders[1].Provider != "failed-local" || page.LocalProviders[1].Status != "unavailable" {
+		t.Fatal("provider state not isolated", page.LocalProviders)
+	}
+	if !page.Models[0].Installed || page.Models[0].SizeBytes == nil || page.Models[1].Installed || page.Models[1].HealthCheckedAt == nil ||
+		!page.Models[1].HealthCheckedAt.Equal(checked) {
+		t.Fatal("model state not preserved", page.Models)
+	}
+	body, marshalErr := json.Marshal(page)
+	if marshalErr != nil || strings.Contains(string(body), "private provider failure") {
+		t.Fatal("private provider response escaped", string(body), marshalErr)
 	}
 }
 
@@ -145,6 +203,25 @@ func TestBrowserModelsDiscoversInstalledLocalModelsAndDeduplicatesAliases(t *tes
 	}
 	if page.Models[1].Configured || !page.Models[1].Installed || page.Models[1].Usable || page.Models[1].Model != "fixture:alias" {
 		t.Fatalf("unconfigured install not represented: %+v", page.Models[1])
+	}
+}
+
+func TestBrowserModelsMarksNamesOnlyInventoryAccountingPartial(t *testing.T) {
+	service := submissionService(t)
+	service.settings.Providers = []config.Provider{{ID: "ollama", Kind: "ollama"}}
+	service.settings.Models = nil
+	service.providerFactory = applicationProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+		return namesOnlyInventoryProvider{}, nil
+	})
+	report := health.Report{Version: 1, CheckedAt: time.Now().UTC(), Status: "healthy", Ready: true, Checks: []health.Check{
+		{Component: "daemon", Status: "healthy", Code: "serving"}, {Component: "database", Status: "healthy", Code: "available"},
+		{Component: "supervisor", Status: "healthy", Code: "supervisor_ok"}, {Component: "resources", ID: "host", Status: "healthy", Code: "capacity_available"},
+		{Component: "provider", ID: "ollama", Status: "healthy", Code: "available"},
+	}}
+	page, err := service.BrowserModels(context.Background(), report)
+	if err != nil || page.Validate() != nil || page.LocalTotalCoverage != "partial" || page.LocalUnknownSizeCount != 1 ||
+		page.LocalTotalBytes == nil || *page.LocalTotalBytes != 0 || len(page.Models) != 1 || !page.Models[0].Installed || page.Models[0].SizeBytes != nil {
+		t.Fatalf("names-only provider produced false disk precision: %+v, %v", page, err)
 	}
 }
 

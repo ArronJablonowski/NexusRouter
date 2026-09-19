@@ -12,9 +12,8 @@
 	const connection = document.querySelector("#connection-state");
 	const digestPattern = /^[0-9a-f]{64}$/;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
-	const intervalMS = 10000;
 	const expanded = new Set();
-	let timer = 0, loading = false, loaded = false, stopped = false;
+	let timer = 0, refreshMS = 10000, loading = false, loaded = false, stopped = false;
 	chat.hidden = true; workboards.hidden = true; settings.hidden = true; view.hidden = false;
 
 	function bytes(value) {
@@ -28,6 +27,10 @@
 	function text(value, max, empty = true) { return typeof value === "string" && value.length <= max && (empty || value.length > 0) && !/[\u0000-\u001f\u007f-\u009f]/u.test(value); }
 	function optionalInteger(value) { return value === undefined || Number.isSafeInteger(value) && value >= 0; }
 	function optionalTime(value) { return value === undefined || typeof value === "string" && Number.isFinite(Date.parse(value)); }
+	function validLocalProvider(item) {
+		return item && idPattern.test(item.provider) && ((item.status === "available" && item.status_code === "available") ||
+			(item.status === "unavailable" && item.status_code === "discovery_failed")) && typeof item.checked_at === "string" && Number.isFinite(Date.parse(item.checked_at));
+	}
 	function validModel(item) {
 		return item && idPattern.test(item.id) && text(item.provider, 128, false) && text(item.model, 512, false) && ["local", "cloud"].includes(item.locality) &&
 			["configured", "enabled", "installed", "usable"].every(key => typeof item[key] === "boolean") && Array.isArray(item.capabilities) && item.capabilities.length <= 128 &&
@@ -35,14 +38,15 @@
 			["healthy", "degraded", "unavailable", "disabled", "unknown"].includes(item.health) && optionalInteger(item.context_tokens) &&
 			(typeof item.estimated_cost === "undefined" || typeof item.estimated_cost === "number" && Number.isFinite(item.estimated_cost) && item.estimated_cost >= 0) &&
 			optionalInteger(item.ram_bytes) && optionalInteger(item.vram_bytes) && optionalInteger(item.size_bytes) &&
-			(item.digest === undefined || digestPattern.test(item.digest)) && ["family", "parameter_size", "quantization", "failure_domain", "status_code"].every(key => item[key] === undefined || text(item[key], 128)) && optionalTime(item.modified_at) &&
+			(item.digest === undefined || digestPattern.test(item.digest)) && ["family", "parameter_size", "quantization", "failure_domain", "status_code"].every(key => item[key] === undefined || text(item[key], 128)) && optionalTime(item.modified_at) && optionalTime(item.health_checked_at) &&
 			(!item.usable || item.configured && item.enabled && item.health === "healthy") && (!item.enabled || item.configured) &&
 			(item.locality !== "cloud" || !item.installed && item.size_bytes === undefined && item.digest === undefined && item.modified_at === undefined);
 	}
 	function validPage(value) {
 		return value && value.version === 1 && value.availability === "available" && digestPattern.test(value.config_id) && Number.isFinite(Date.parse(value.refreshed_at)) &&
 			Number.isSafeInteger(value.local_total_bytes) && value.local_total_bytes >= 0 && value.local_total_kind === "logical_deduplicated" &&
-			Number.isSafeInteger(value.local_unknown_size_count) && value.local_unknown_size_count >= 0 && value.local_unknown_size_count <= 256 &&
+			["complete", "partial"].includes(value.local_total_coverage) && Number.isSafeInteger(value.refresh_interval_ms) && value.refresh_interval_ms >= 5000 && value.refresh_interval_ms <= 300000 &&
+			Number.isSafeInteger(value.local_unknown_size_count) && value.local_unknown_size_count >= 0 && value.local_unknown_size_count <= 256 && Array.isArray(value.local_providers) && value.local_providers.length <= 64 && value.local_providers.every(validLocalProvider) && new Set(value.local_providers.map(item => item.provider)).size === value.local_providers.length &&
 			Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && new Set(value.models.map(item => item.id)).size === value.models.length;
 	}
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
@@ -64,6 +68,7 @@
 		details.id = detailsID; details.hidden = !open; node.classList.toggle("expanded", open);
 		if (item.locality === "local") detail(details, "Size on disk", bytes(item.size_bytes));
 		detail(details, "Health", item.health + (item.status_code ? " · " + item.status_code.replaceAll("_", " ") : ""));
+		if (item.health_checked_at) detail(details, "Health checked", time(item.health_checked_at));
 		detail(details, "Capabilities", item.capabilities.length ? item.capabilities.join(", ") : "None declared");
 		if (item.context_tokens !== undefined) detail(details, "Context", item.context_tokens.toLocaleString() + " tokens");
 		if (item.parameter_size) detail(details, "Parameters", item.parameter_size);
@@ -89,13 +94,18 @@
 		if (!clouds.length) notice(cloudState, "No cloud models are configured.", false);
 		total.textContent = bytes(page.local_total_bytes);
 		total.title = page.local_total_bytes.toLocaleString() + " bytes";
-		const qualifier = page.local_unknown_size_count ? " · " + page.local_unknown_size_count + " model size" + (page.local_unknown_size_count === 1 ? " is" : "s are") + " unknown" : "";
-		totalDetail.textContent = page.local_total_bytes.toLocaleString() + " bytes reported by local providers; duplicate model digests are counted once" + qualifier + ". Shared provider storage layers may use less physical space.";
-		liveStatus.textContent = "Inventory refreshed " + time(page.refreshed_at) + ". Updates automatically every 10 seconds while this page is visible.";
+		const unknown = page.local_unknown_size_count ? " " + page.local_unknown_size_count + " model size" + (page.local_unknown_size_count === 1 ? " is" : "s are") + " unknown." : "";
+		const unavailable = page.local_providers.filter(item => item.status === "unavailable").map(item => item.provider);
+		const partial = page.local_total_coverage === "partial" ? "Partial logical total." : "Complete provider-reported logical total.";
+		const failed = unavailable.length ? " Unavailable local provider" + (unavailable.length === 1 ? ": " : "s: ") + unavailable.join(", ") + "." : "";
+		totalDetail.textContent = partial + " " + page.local_total_bytes.toLocaleString() + " bytes are reported; duplicate model digests are counted once." + unknown + failed + " Shared provider layers may use less physical space.";
+		refreshMS = page.refresh_interval_ms;
+		liveStatus.textContent = "Inventory refreshed " + time(page.refreshed_at) + ". Updates automatically every " + (refreshMS / 1000).toLocaleString() + " seconds while this page is visible.";
 		liveStatus.classList.remove("error"); connection.textContent = "Connected"; loaded = true;
 	}
 	async function load() {
 		if (loading || stopped || document.hidden) return;
+		window.clearTimeout(timer);
 		loading = true; refresh.disabled = true;
 		if (!loaded) liveStatus.textContent = "Loading model inventory…";
 		try {
@@ -107,11 +117,11 @@
 		} catch (_) {
 			liveStatus.textContent = loaded ? "Inventory refresh failed. Showing the last verified snapshot; retrying automatically." : "Model inventory could not be loaded.";
 			liveStatus.classList.add("error"); connection.textContent = "Inventory needs attention";
-		} finally { loading = false; refresh.disabled = false; }
+		} finally { loading = false; refresh.disabled = false; schedule(); }
 	}
-	function schedule() { window.clearInterval(timer); timer = window.setInterval(load, intervalMS); }
+	function schedule() { window.clearTimeout(timer); if (!stopped && !document.hidden) timer = window.setTimeout(load, refreshMS); }
 	refresh.addEventListener("click", load);
-	document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
-	window.addEventListener("beforeunload", () => { stopped = true; window.clearInterval(timer); });
-	schedule(); load();
+	document.addEventListener("visibilitychange", () => { if (document.hidden) window.clearTimeout(timer); else load(); });
+	window.addEventListener("beforeunload", () => { stopped = true; window.clearTimeout(timer); });
+	load();
 })();

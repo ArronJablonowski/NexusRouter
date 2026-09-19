@@ -137,7 +137,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "785d45325e1633a24f2635edb5b4eb7943f3c7b7df5c55d8cb5d4720ea755c67" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "f4f5ea0ee2242c81b70ae33c6e6b8555f3d8fda2d39fc177e30dbfeee03befa7" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {

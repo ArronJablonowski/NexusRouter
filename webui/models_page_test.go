@@ -12,9 +12,11 @@ func TestEmbeddedModelInventoryIsDynamicBoundedAndReadOnly(t *testing.T) {
 	}
 	body := string(script)
 	for _, required := range []string{
-		`fetch(base + "/api/v1/models"`, `const intervalMS = 10000`, `document.addEventListener("visibilitychange"`,
+		`fetch(base + "/api/v1/models"`, `let timer = 0, refreshMS = 10000`, `document.addEventListener("visibilitychange"`,
 		`if (loading || stopped || document.hidden) return`, `duplicate model digests are counted once`, `local_total_bytes`,
-		`local_unknown_size_count`, `Showing the last verified snapshot`, `credentials: "same-origin"`, `cache: "no-store"`,
+		`local_total_coverage`, `local_unknown_size_count`, `local_providers`, `health_checked_at`, `refresh_interval_ms`,
+		`window.setTimeout(load, refreshMS)`, `if (document.hidden) window.clearTimeout(timer)`,
+		`Showing the last verified snapshot`, `credentials: "same-origin"`, `cache: "no-store"`,
 		`node.textContent = value`, `locality === "local"`, `locality === "cloud"`, `const expanded = new Set()`,
 		`heading.setAttribute("aria-expanded", String(open))`, `details.hidden = !open`, `expanded.add(item.id)`,
 		`expanded.delete(item.id)`, `if (!present.has(id)) expanded.delete(id)`, `model-status-badge`, `model-install-badge`,

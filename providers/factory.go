@@ -114,12 +114,23 @@ func (p guardedProvider) InstalledModels(ctx context.Context) (out []InstalledMo
 	if ctx == nil {
 		return nil, adapterFailure(false)
 	}
-	inventory, ok := p.provider.(ModelInventoryProvider)
-	if !ok {
-		return nil, adapterFailure(false)
-	}
 	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
+	inventory, ok := p.provider.(ModelInventoryProvider)
+	if !ok {
+		names, modelsErr := p.provider.Models(ctx)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if modelsErr != nil || len(names) > 4096 {
+			return nil, normalizeAdapterError(modelsErr, false)
+		}
+		models := make([]InstalledModel, 0, len(names))
+		for _, name := range names {
+			models = append(models, InstalledModel{Name: name})
+		}
+		return models, nil
+	}
 	models, err := inventory.InstalledModels(ctx)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

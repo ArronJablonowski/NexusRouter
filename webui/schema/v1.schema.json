@@ -2862,7 +2862,7 @@
       "required": ["id", "provider", "model", "locality", "configured", "enabled", "installed", "usable", "capabilities", "health"],
       "properties": {
         "id": {"$ref": "#/$defs/model_id"},
-        "provider": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "provider": {"$ref": "#/$defs/model_id"},
         "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
         "locality": {"enum": ["local", "cloud"]},
         "configured": {"type": "boolean"},
@@ -2880,6 +2880,7 @@
         "parameter_size": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
         "quantization": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
         "modified_at": {"type": "string", "format": "date-time"},
+        "health_checked_at": {"type": "string", "format": "date-time"},
         "failure_domain": {"type": "string", "maxLength": 128, "x-maxBytes": 128},
         "health": {"enum": ["healthy", "degraded", "unavailable", "disabled", "unknown"]},
         "status_code": {"type": "string", "maxLength": 128, "x-maxBytes": 128}
@@ -2890,10 +2891,24 @@
         {"if": {"properties": {"locality": {"const": "cloud"}}}, "then": {"properties": {"installed": {"const": false}, "size_bytes": false, "digest": false, "modified_at": false}}}
       ]
     },
+    "local_provider_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "status", "status_code", "checked_at"],
+      "properties": {
+        "provider": {"$ref": "#/$defs/model_id"},
+        "status": {"enum": ["available", "unavailable"]},
+        "status_code": {"enum": ["available", "discovery_failed"]},
+        "checked_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "available"}}}, "then": {"properties": {"status_code": {"const": "available"}}}, "else": {"properties": {"status_code": {"const": "discovery_failed"}}}}
+      ]
+    },
     "model_inspection_page": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "availability", "local_unknown_size_count", "models"],
+      "required": ["version", "availability", "local_unknown_size_count", "refresh_interval_ms", "local_providers", "models"],
       "properties": {
         "version": {"const": 1},
         "availability": {"$ref": "#/$defs/availability"},
@@ -2901,11 +2916,14 @@
         "refreshed_at": {"type": "string", "format": "date-time"},
         "local_total_bytes": {"type": "integer", "minimum": 0},
         "local_total_kind": {"const": "logical_deduplicated"},
+        "local_total_coverage": {"enum": ["complete", "partial"]},
         "local_unknown_size_count": {"type": "integer", "minimum": 0, "maximum": 256},
+        "refresh_interval_ms": {"type": "integer", "minimum": 5000, "maximum": 300000},
+        "local_providers": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/local_provider_inspection"}},
         "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}}
       },
       "allOf": [
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "refreshed_at", "local_total_bytes", "local_total_kind"]}, "else": {"properties": {"config_id": false, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_unknown_size_count": {"const": 0}, "models": {"maxItems": 0}}}}
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}}}}
       ]
     },
     "usage_total_inspection": {

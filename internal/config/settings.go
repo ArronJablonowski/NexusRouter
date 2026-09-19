@@ -42,11 +42,12 @@ type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
 }
 type WebUI struct {
-	Enabled           bool     `yaml:"enabled" json:"enabled"`
-	PathPrefix        string   `yaml:"path_prefix" json:"path_prefix"`
-	AllowedOrigins    []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
-	BrowserSessionTTL string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
-	DefaultModel      string   `yaml:"default_model,omitempty" json:"default_model,omitempty"`
+	Enabled                       bool     `yaml:"enabled" json:"enabled"`
+	PathPrefix                    string   `yaml:"path_prefix" json:"path_prefix"`
+	AllowedOrigins                []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
+	BrowserSessionTTL             string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
+	ModelInventoryRefreshInterval string   `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
+	DefaultModel                  string   `yaml:"default_model,omitempty" json:"default_model,omitempty"`
 }
 type Workboard struct {
 	Enabled       bool                   `yaml:"enabled" json:"enabled"`
@@ -201,7 +202,7 @@ type Runtime struct {
 }
 
 func Defaults() Settings {
-	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h"},
+	return Settings{Version: 1, Mode: "hybrid", Daemon: Daemon{"127.0.0.1:7788"}, WebUI: WebUI{Enabled: true, PathPrefix: "/app", BrowserSessionTTL: "8h", ModelInventoryRefreshInterval: "10s"},
 		Workboard: Workboard{Enabled: true, Decomposition: WorkboardDecomposition{Version: 1, MaxDepth: 4, MaxChildrenPerParent: 8}, Scheduler: WorkboardScheduler{Interval: "5s", MaxActiveClaims: 3, CardScanLimit: 10000, AcceptanceJudge: WorkboardAcceptanceJudge{Timeout: "30s"}}},
 		Hardware:  Hardware{AutoProfile: true, MaxRAM: 80, MaxVRAM: 85, Concurrent: "auto", LocalPressurePolicy: "reject", LocalQueueTimeout: "30s"}, Workers: Workers{Max: 3, Heartbeat: "5s", Lease: "30s", EffectPolicy: "single_writer", DelegateMaxCalls: 4, DelegateMaxCost: 0, DelegateMaxTurns: 4},
 		Routing: Routing{Exploration: 0.05, MinSamples: 20, HalfLife: "30d", Weights: map[string]float64{"quality": 0.35, "schema_compliance": 0.15, "reliability": 0.20, "latency": 0.10, "cost": 0.10, "recency": 0.05, "uncertainty": 0.05}, Classifier: RoutingClassifier{MaxInputTokens: 4096, MaxOutputTokens: 256, Timeout: "30s"}},

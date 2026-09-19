@@ -20,7 +20,7 @@ func inspectionHandlerFixture(t *testing.T) (*Handler, *atomic.Int32) {
 	handler.inspections = InspectionServices{
 		Models: func(context.Context) (contract.ModelInspectionPage, error) {
 			calls.Add(1)
-			return contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, Models: []contract.ModelInspection{}}, nil
+			return contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}}, nil
 		},
 		Route: func(_ context.Context, task string) (contract.RouteInspection, error) {
 			calls.Add(1)

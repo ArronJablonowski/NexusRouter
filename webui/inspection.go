@@ -10,13 +10,14 @@ import (
 )
 
 const (
-	MaxInspectionItems    = 100
-	MaxInspectionModels   = 256
-	MaxRouteCandidates    = 256
-	MaxHealthChecks       = 512
-	MaxInspectionReasons  = 16
-	MaxInspectionFindings = 64
-	MaxInspectionText     = 4096
+	MaxInspectionItems     = 100
+	MaxInspectionModels    = 256
+	MaxInspectionProviders = 64
+	MaxRouteCandidates     = 256
+	MaxHealthChecks        = 512
+	MaxInspectionReasons   = 16
+	MaxInspectionFindings  = 64
+	MaxInspectionText      = 4096
 )
 
 type Availability string
@@ -29,37 +30,39 @@ const (
 func validAvailability(value Availability) bool { return value == Available || value == Unavailable }
 
 type ModelInspection struct {
-	ID            string     `json:"id"`
-	Provider      string     `json:"provider"`
-	Model         string     `json:"model"`
-	Locality      string     `json:"locality"`
-	Configured    bool       `json:"configured"`
-	Enabled       bool       `json:"enabled"`
-	Installed     bool       `json:"installed"`
-	Usable        bool       `json:"usable"`
-	Capabilities  []string   `json:"capabilities"`
-	ContextTokens *int64     `json:"context_tokens,omitempty"`
-	EstimatedCost *float64   `json:"estimated_cost,omitempty"`
-	RAMBytes      *uint64    `json:"ram_bytes,omitempty"`
-	VRAMBytes     *uint64    `json:"vram_bytes,omitempty"`
-	SizeBytes     *uint64    `json:"size_bytes,omitempty"`
-	Digest        string     `json:"digest,omitempty"`
-	Family        string     `json:"family,omitempty"`
-	ParameterSize string     `json:"parameter_size,omitempty"`
-	Quantization  string     `json:"quantization,omitempty"`
-	ModifiedAt    *time.Time `json:"modified_at,omitempty"`
-	FailureDomain string     `json:"failure_domain,omitempty"`
-	Health        string     `json:"health"`
-	StatusCode    string     `json:"status_code,omitempty"`
+	ID              string     `json:"id"`
+	Provider        string     `json:"provider"`
+	Model           string     `json:"model"`
+	Locality        string     `json:"locality"`
+	Configured      bool       `json:"configured"`
+	Enabled         bool       `json:"enabled"`
+	Installed       bool       `json:"installed"`
+	Usable          bool       `json:"usable"`
+	Capabilities    []string   `json:"capabilities"`
+	ContextTokens   *int64     `json:"context_tokens,omitempty"`
+	EstimatedCost   *float64   `json:"estimated_cost,omitempty"`
+	RAMBytes        *uint64    `json:"ram_bytes,omitempty"`
+	VRAMBytes       *uint64    `json:"vram_bytes,omitempty"`
+	SizeBytes       *uint64    `json:"size_bytes,omitempty"`
+	Digest          string     `json:"digest,omitempty"`
+	Family          string     `json:"family,omitempty"`
+	ParameterSize   string     `json:"parameter_size,omitempty"`
+	Quantization    string     `json:"quantization,omitempty"`
+	ModifiedAt      *time.Time `json:"modified_at,omitempty"`
+	HealthCheckedAt *time.Time `json:"health_checked_at,omitempty"`
+	FailureDomain   string     `json:"failure_domain,omitempty"`
+	Health          string     `json:"health"`
+	StatusCode      string     `json:"status_code,omitempty"`
 }
 
 func (m ModelInspection) Validate() error {
-	if !optionalModelID(m.ID) || m.ID == "" || !boundedPrintable(m.Provider, 1, 128) ||
+	if !optionalModelID(m.ID) || m.ID == "" || !optionalModelID(m.Provider) || m.Provider == "" ||
 		!boundedPrintable(m.Model, 1, 512) || (m.Locality != "local" && m.Locality != "cloud") ||
 		m.Capabilities == nil || len(m.Capabilities) > 128 || !boundedPrintable(m.FailureDomain, 0, 128) ||
 		!boundedPrintable(m.Digest, 0, 64) || !boundedPrintable(m.Family, 0, 128) || !boundedPrintable(m.ParameterSize, 0, 128) ||
 		!boundedPrintable(m.Quantization, 0, 128) || !boundedPrintable(m.StatusCode, 0, 128) ||
 		m.Digest != "" && !validInspectionDigest(m.Digest, true) || m.ModifiedAt != nil && !validBrowserTime(*m.ModifiedAt) ||
+		m.HealthCheckedAt != nil && !validBrowserTime(*m.HealthCheckedAt) ||
 		m.Usable && (!m.Configured || !m.Enabled || m.Health != "healthy") || m.Enabled && !m.Configured ||
 		m.Installed && m.Locality != "local" || m.Locality == "cloud" && (m.Installed || m.SizeBytes != nil || m.Digest != "" || m.ModifiedAt != nil) {
 		return ErrContract
@@ -82,23 +85,56 @@ func (m ModelInspection) Validate() error {
 	return nil
 }
 
+type LocalProviderInspection struct {
+	Provider   string    `json:"provider"`
+	Status     string    `json:"status"`
+	StatusCode string    `json:"status_code"`
+	CheckedAt  time.Time `json:"checked_at"`
+}
+
+func (p LocalProviderInspection) Validate() error {
+	if !optionalModelID(p.Provider) || p.Provider == "" || !validBrowserTime(p.CheckedAt) {
+		return ErrContract
+	}
+	if p.Status == "available" && p.StatusCode == "available" || p.Status == "unavailable" && p.StatusCode == "discovery_failed" {
+		return nil
+	}
+	return ErrContract
+}
+
 type ModelInspectionPage struct {
-	Version               int               `json:"version"`
-	Availability          Availability      `json:"availability"`
-	ConfigID              string            `json:"config_id,omitempty"`
-	RefreshedAt           *time.Time        `json:"refreshed_at,omitempty"`
-	LocalTotalBytes       *uint64           `json:"local_total_bytes,omitempty"`
-	LocalTotalKind        string            `json:"local_total_kind,omitempty"`
-	LocalUnknownSizeCount int               `json:"local_unknown_size_count"`
-	Models                []ModelInspection `json:"models"`
+	Version               int                       `json:"version"`
+	Availability          Availability              `json:"availability"`
+	ConfigID              string                    `json:"config_id,omitempty"`
+	RefreshedAt           *time.Time                `json:"refreshed_at,omitempty"`
+	LocalTotalBytes       *uint64                   `json:"local_total_bytes,omitempty"`
+	LocalTotalKind        string                    `json:"local_total_kind,omitempty"`
+	LocalTotalCoverage    string                    `json:"local_total_coverage,omitempty"`
+	LocalUnknownSizeCount int                       `json:"local_unknown_size_count"`
+	RefreshIntervalMS     int64                     `json:"refresh_interval_ms"`
+	LocalProviders        []LocalProviderInspection `json:"local_providers"`
+	Models                []ModelInspection         `json:"models"`
 }
 
 func (p ModelInspectionPage) Validate() error {
-	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || len(p.Models) > MaxInspectionModels ||
+	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || len(p.Models) > MaxInspectionModels ||
 		(p.Availability == Available) != (p.ConfigID != "") || !validInspectionDigest(p.ConfigID, p.Availability == Available) ||
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
-		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated") ||
-		p.Availability == Unavailable && (len(p.Models) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalUnknownSizeCount != 0) {
+		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated" ||
+			(p.LocalTotalCoverage != "complete" && p.LocalTotalCoverage != "partial") || p.RefreshIntervalMS < 5000 || p.RefreshIntervalMS > 300000 || p.LocalProviders == nil || len(p.LocalProviders) > MaxInspectionProviders) ||
+		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0) {
+		return ErrContract
+	}
+	partial := p.LocalUnknownSizeCount > 0
+	providerSeen := map[string]bool{}
+	for _, provider := range p.LocalProviders {
+		if provider.Validate() != nil || providerSeen[provider.Provider] {
+			return ErrContract
+		}
+		providerSeen[provider.Provider] = true
+		partial = partial || provider.Status == "unavailable"
+	}
+	if p.Availability == Available && (p.LocalTotalCoverage == "partial") != partial {
 		return ErrContract
 	}
 	seen := map[string]bool{}

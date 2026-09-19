@@ -69,6 +69,25 @@ func TestFactoryReceivesConnectionAndBoundedContext(t *testing.T) {
 	}
 }
 
+func TestGuardedProviderFallsBackToNamesOnlyInventory(t *testing.T) {
+	p, err := Build(context.Background(), testFactory(func(context.Context, Connection) (Provider, error) {
+		return &factoryTestProvider{models: func(context.Context) ([]string, error) {
+			return []string{"first:latest", "second:latest"}, nil
+		}}, nil
+	}), factoryConnection())
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory, ok := p.(ModelInventoryProvider)
+	if !ok {
+		t.Fatal("guarded provider did not expose the optional inventory facade")
+	}
+	models, err := inventory.InstalledModels(context.Background())
+	if err != nil || !reflect.DeepEqual(models, []InstalledModel{{Name: "first:latest"}, {Name: "second:latest"}}) {
+		t.Fatalf("names-only inventory fallback: models=%+v err=%v", models, err)
+	}
+}
+
 func TestFactoryFailuresAreSanitized(t *testing.T) {
 	for name, f := range map[string]testFactory{
 		"error":     func(context.Context, Connection) (Provider, error) { return nil, errors.New("credential-secret") },

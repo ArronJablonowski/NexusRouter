@@ -26,7 +26,7 @@ const browserInspectionTimeout = 5 * time.Second
 // Invalid health input does not make configuration disappear; it leaves each
 // model explicitly unknown.
 func (s *Service) BrowserModels(ctx context.Context, report health.Report) (contract.ModelInspectionPage, error) {
-	zero := contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, Models: []contract.ModelInspection{}}
+	zero := contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}}
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return zero, ErrAdmission
 	}
@@ -36,7 +36,8 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	}
 	type healthFact struct{ status, code string }
 	modelHealth, providerHealth := map[string]healthFact{}, map[string]healthFact{}
-	if report.Validate() == nil {
+	healthValid := report.Validate() == nil
+	if healthValid {
 		for _, check := range report.Checks {
 			if check.Component == "model" {
 				modelHealth[check.ID] = healthFact{check.Status, check.Code}
@@ -46,37 +47,55 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		}
 	}
 	refreshed := time.Now().UTC()
+	refreshInterval, intervalErr := time.ParseDuration(s.settings.WebUI.ModelInventoryRefreshInterval)
+	if intervalErr != nil || refreshInterval < 5*time.Second || refreshInterval > 5*time.Minute || refreshInterval%time.Millisecond != 0 {
+		return zero, ErrInspection
+	}
 	total := uint64(0)
 	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
-		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", Models: make([]contract.ModelInspection, len(catalog.Models))}
+		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
+		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models))}
 	configured := map[string]int{}
 	for i, model := range catalog.Models {
-		fact := modelHealth[model.ID]
+		fact, observed := modelHealth[model.ID]
 		if fact.status != "healthy" && fact.status != "degraded" && fact.status != "unavailable" && fact.status != "disabled" {
 			fact.status = "unknown"
 		}
 		enabled := (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
 		out.Models[i] = browserModel(model, fact.status)
+		if observed {
+			checked := report.CheckedAt
+			out.Models[i].HealthCheckedAt = &checked
+		}
 		out.Models[i].Configured, out.Models[i].Enabled = true, enabled
 		out.Models[i].Usable, out.Models[i].StatusCode = enabled && fact.status == "healthy", fact.code
 		configured[model.Provider+"\x00"+model.Model] = i
 	}
-	discoverable := map[string]bool{}
-	for provider, fact := range providerHealth {
-		discoverable[provider] = fact.status == "healthy" || fact.status == "degraded"
-	}
-	inventories := s.localModelInventory(ctx, discoverable)
+	inventories := s.localModelInventory(ctx)
 	counted := map[string]bool{}
-	for provider, inventory := range inventories {
-		if inventory.err != nil {
+	for _, configuredProvider := range s.settings.Providers {
+		provider := configuredProvider.ID
+		inventory, exists := inventories[provider]
+		if !exists {
 			continue
 		}
+		providerStatus := contract.LocalProviderInspection{Provider: provider, Status: "available", StatusCode: "available", CheckedAt: inventory.checkedAt}
+		if inventory.err != nil {
+			providerStatus.Status, providerStatus.StatusCode = "unavailable", "discovery_failed"
+			out.LocalProviders = append(out.LocalProviders, providerStatus)
+			out.LocalTotalCoverage = "partial"
+			continue
+		}
+		out.LocalProviders = append(out.LocalProviders, providerStatus)
 		for _, installed := range inventory.models {
 			key := provider + "\x00" + installed.Name
 			index, exists := configured[key]
 			if !exists {
+				if len(out.Models) == contract.MaxInspectionModels {
+					return zero, ErrInspection
+				}
 				digest := sha256.Sum256([]byte(key))
-				fact := providerHealth[provider]
+				fact, healthObserved := providerHealth[provider]
 				status := fact.status
 				if status != "healthy" && status != "degraded" && status != "unavailable" && status != "disabled" {
 					status = "unknown"
@@ -84,6 +103,10 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 				out.Models = append(out.Models, contract.ModelInspection{ID: "inventory_" + hex.EncodeToString(digest[:8]), Provider: provider,
 					Model: installed.Name, Locality: "local", Installed: true, Capabilities: []string{}, Health: status, StatusCode: fact.code})
 				index = len(out.Models) - 1
+				if healthObserved {
+					checked := report.CheckedAt
+					out.Models[index].HealthCheckedAt = &checked
+				}
 			} else {
 				out.Models[index].Installed = true
 			}
@@ -104,6 +127,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 				}
 			} else {
 				out.LocalUnknownSizeCount++
+				out.LocalTotalCoverage = "partial"
 			}
 			item.Digest, item.Family, item.ParameterSize, item.Quantization = installed.Digest, installed.Family, installed.ParameterSize, installed.Quantization
 			if !installed.ModifiedAt.IsZero() {

@@ -8711,3 +8711,36 @@ production build. Application took 2291.038s, telemetry 2335.931s, release
 packaging 806.776s, SDK 273.877s, tool-gate 109.034s, traces 2.659s, and workers
 47.657s. Provider health, lease renewal timing, and durable trace delivery
 remain unfinished; no Linear issue state is changed.
+
+## 2026-09-19 — DAR-130 resilient model-inventory refresh and accounting
+
+The authenticated Models page now receives a bounded refresh interval from the
+validated `web_ui.model_inventory_refresh_interval` setting (default 10 seconds,
+range 5 seconds through 5 minutes). Its timer is non-overlapping, pauses while
+the document is hidden, resumes with an immediate authoritative read, and keeps
+the last verified snapshot visibly stale after a transient failure. Model
+health rows include the report observation time rather than implying a fresh
+probe at render time.
+
+Local discovery now inspects every configured Ollama provider independently,
+including providers whose latest health check failed. A failure produces a
+sanitized provider-level `discovery_failed` state and partial coverage without
+removing healthy providers or exposing upstream text. Installed names from a
+custom provider that lacks authoritative storage metadata remain visible with
+unknown size; the page never fabricates disk precision. Digest aliases are
+still counted once per provider, totals remain explicitly provider-reported
+logical bytes, and either an unknown size or unavailable provider changes total
+coverage from complete to partial.
+
+The versioned browser contract, JSON Schema, fixtures, configuration tests, and
+static JavaScript guards were updated together. A real-Chrome same-origin test
+now exercises populated local/cloud inventory, compact disclosure expansion,
+health-check time, partial-provider messaging, narrow layout without horizontal
+overflow, failed-refresh snapshot retention and redaction, recovery to a newer
+snapshot, and the empty state. Focused race-enabled provider, configuration,
+application, Web UI, and browser-adapter tests passed. The complete
+`umask 077; make check` gate passed formatting/LOC, vet, every race-enabled
+package, and the production build; application took 2,356.462s, telemetry
+2,414.577s, release packaging 841.883s, SDK 273.623s, tool-gate 109.152s, Web UI
+10.336s, browser BFF 5.111s, providers 3.114s, and workers 47.867s. Linear was
+not mutated during this continuation.

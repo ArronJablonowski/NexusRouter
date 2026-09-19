@@ -7,6 +7,15 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- The authenticated Models page now receives its validated refresh interval
+  from configuration, polls without overlapping requests, pauses while hidden,
+  and retains a visibly stale last verified snapshot through transient errors.
+  Local provider failures and unknown sizes produce explicit partial accounting
+  without hiding healthy providers. A names-only custom provider remains
+  visible with unknown size instead of fabricating disk precision. Real-Chrome
+  coverage exercises compact disclosure cards, failed-refresh recovery,
+  populated and empty states, and a narrow viewport.
+
 - DAR-129 adds a count-only delegated filesystem inspection path for a cloud
   coordinator and local worker. The cloud model receives only delegation tools;
   the local child receives a constrained `read_file` schema requiring

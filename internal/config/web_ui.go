@@ -16,7 +16,7 @@ var webUIPath = regexp.MustCompile(`^/[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 // sole same-origin value from the request's validated listener authority.
 func (w WebUI) Validate(listen string) error {
 	if !w.Enabled {
-		if w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" {
+		if w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || w.ModelInventoryRefreshInterval != "10s" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" {
 			return errors.New("disabled web UI must retain inert defaults")
 		}
 		return nil
@@ -30,6 +30,10 @@ func (w WebUI) Validate(listen string) error {
 	ttl, err := Duration(w.BrowserSessionTTL)
 	if err != nil || ttl < 5*time.Minute || ttl > 24*time.Hour {
 		return errors.New("invalid browser session TTL")
+	}
+	refresh, err := Duration(w.ModelInventoryRefreshInterval)
+	if err != nil || refresh < 5*time.Second || refresh > 5*time.Minute || refresh%time.Millisecond != 0 {
+		return errors.New("invalid model inventory refresh interval")
 	}
 	if len(w.AllowedOrigins) > 8 {
 		return errors.New("too many web UI origins")

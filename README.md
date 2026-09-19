@@ -168,6 +168,15 @@ Configuration, browser authorization, board lifecycle, agent-tool gates, and
 safe backup/restore procedures are documented in the
 [Web UI and Workboard operator guide](docs/workboard-operator-guide.md).
 
+The authenticated Models page is a read-only live inventory of installed local
+models and configured cloud routes. Its `web_ui.model_inventory_refresh_interval`
+defaults to `10s` and accepts `5s` through `5m`. Refreshes are serialized and
+pause while the page is hidden; failures preserve and visibly label the last
+verified snapshot. Local totals are provider-reported logical bytes, deduplicate
+same-provider digest aliases, and explicitly become partial when a provider is
+unavailable or an installed model has unknown size. Shared layers can make
+physical disk use smaller than this logical total.
+
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), and the accessibility
 target, automated gates, manual checklist, and explicit browser matrix are in

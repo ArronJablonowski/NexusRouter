@@ -6,10 +6,13 @@
     "refreshed_at": "2026-09-09T12:00:00Z",
     "local_total_bytes": 4294967296,
     "local_total_kind": "logical_deduplicated",
+    "local_total_coverage": "complete",
     "local_unknown_size_count": 0,
+    "refresh_interval_ms": 10000,
+    "local_providers": [{"provider":"ollama","status":"available","status_code":"available","checked_at":"2026-09-09T12:00:00Z"}],
     "models": [
-      {"id":"local-fast","provider":"ollama","model":"qwen:latest","locality":"local","configured":true,"enabled":true,"installed":true,"usable":true,"capabilities":["chat","code"],"context_tokens":8192,"ram_bytes":4294967296,"vram_bytes":2147483648,"size_bytes":4294967296,"digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","family":"qwen","parameter_size":"7B","quantization":"Q4_K_M","failure_domain":"host-local","health":"healthy","status_code":"available"},
-      {"id":"cloud-deep","provider":"openai","model":"gpt-5.6-sol","locality":"cloud","configured":true,"enabled":true,"installed":false,"usable":false,"capabilities":["chat","reasoning"],"estimated_cost":0.01,"failure_domain":"cloud-a","health":"unknown"}
+      {"id":"local-fast","provider":"ollama","model":"qwen:latest","locality":"local","configured":true,"enabled":true,"installed":true,"usable":true,"capabilities":["chat","code"],"context_tokens":8192,"ram_bytes":4294967296,"vram_bytes":2147483648,"size_bytes":4294967296,"digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","family":"qwen","parameter_size":"7B","quantization":"Q4_K_M","failure_domain":"host-local","health":"healthy","status_code":"available","health_checked_at":"2026-09-09T12:00:00Z"},
+      {"id":"cloud-deep","provider":"openai","model":"gpt-5.6-sol","locality":"cloud","configured":true,"enabled":true,"installed":false,"usable":false,"capabilities":["chat","reasoning"],"estimated_cost":0.01,"failure_domain":"cloud-a","health":"unknown","health_checked_at":"2026-09-09T12:00:00Z"}
     ]
   },
   "route": {

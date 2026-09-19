@@ -307,6 +307,18 @@ Conversation history is reconstructed from the same durable session records used
 by the CLI, SDK, and HTTP API. A browser refresh or daemon restart must not
 silently convert partial output into committed history.
 
+The Web UI also provides a read-only, dynamically refreshed model inventory.
+It separates installed local models from configured cloud routes; reports
+provider health, usability, last-check time, bounded metadata, and known local
+size; and labels aggregate storage coverage as complete or partial. Alias
+digests are counted once per provider, while unknown sizes and unavailable
+providers remain explicit. The page must not present provider-reported logical
+size as unique physical disk usage. Refresh cadence is configurable, refreshes
+never overlap, polling pauses while hidden, a failed provider cannot erase
+healthy providers, and a transient refresh failure retains a visibly stale last
+verified snapshot. Inventory is inspection-only and never pulls, removes, or
+loads a model.
+
 The same Web UI includes native DarwinRouter Kanban boards for larger and
 long-running work; they are not proxies for Linear or another external service.
 Multiple boards are supported. At a minimum each board provides backlog, ready,
@@ -631,6 +643,7 @@ web_ui:
   path_prefix: "/app"
   allowed_origins: ["http://127.0.0.1:7788"]
   browser_session_ttl: 8h
+  model_inventory_refresh_interval: 10s  # 5s through 5m; pauses while hidden.
 
 workboard:
   enabled: true  # Required in configuration v1 while API/Web UI routes are mounted.
