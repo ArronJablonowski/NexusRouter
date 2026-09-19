@@ -2024,8 +2024,19 @@ observability qualification remain unfinished.
 
 ## Next sprints
 
-1. Close the verified DAR-91 through DAR-96 Workboard review, decision, supervision, and stock-daemon scheduling slice in Linear.
-2. Continue the remaining Linear backlog, prioritizing Web UI/Kanban security, recovery, accessibility, packaging, and release qualification.
+1. Reconcile the acceptance-ready DAR-127, DAR-128, and DAR-130 repository
+   evidence with Linear after an operator authorizes those external status
+   changes.
+2. Complete DAR-129's supervised Sol-to-local-worker Desktop count only after
+   the operator explicitly approves the narrow read root, settings change, and
+   daemon restart. Do not expand filesystem authority automatically.
+3. Finish the DAR-47 through DAR-61 release chain in dependency order. Freeze
+   the final candidate only after development stops, then obtain hosted/native
+   target evidence, production signing trust, independent verification,
+   publication approval, and post-publication receipts.
+4. Continue post-MVP observability qualification for provider-health history,
+   lease-renewal timing, durable trace delivery, retention, and production-scale
+   cardinality/latency behavior without exposing identities or content.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 

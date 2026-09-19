@@ -8744,3 +8744,33 @@ package, and the production build; application took 2,356.462s, telemetry
 2,414.577s, release packaging 841.883s, SDK 273.623s, tool-gate 109.152s, Web UI
 10.336s, browser BFF 5.111s, providers 3.114s, and workers 47.867s. Linear was
 not mutated during this continuation.
+
+## 2026-09-19 — DAR-127/DAR-128 acceptance audit and backlog reconciliation
+
+A read-only local Linear audit found DAR-127, DAR-128, and DAR-130 still in
+Backlog despite completed repository work. No external issue state was changed.
+DAR-127 was requalified on source commit
+`3507623cb19ba1b295abc551bd96e6d65466fbab`: its historical failure-point test
+passed independently under the race detector in 11.345s, and the guarded
+releasepack profile passed 172 top-level tests in 12m54.892s with exactly the
+declared separate qualification skip and 32m5.108s timeout margin. The twelve
+slowest groups were emitted by the checked-in profiler; the slowest completed in
+1m33.51s. This supplements the immediately preceding complete `make check`, it
+does not replace it.
+
+DAR-128's current race-enabled application and browser-adapter regression tests
+also passed. They retain the completed parent transcript when newer delegated
+tasks share the chat, preserve paired delegate calls/results, paginate sparse
+source revisions without gaps, return an identical first page on retry, and
+keep malformed or noncanonical browser reads fail-closed. The prior live restart
+and Firefox evidence remains recorded above. DAR-127 and DAR-128 are therefore
+acceptance-ready for Linear reconciliation, but moving them requires explicit
+external mutation authority.
+
+DAR-129 remains genuinely incomplete rather than merely stale. Its code and
+policy-denial fixtures exist, but the issue explicitly requires an operator to
+approve `/Users/aj_lobster/Desktop` as the narrow read root, enable both read
+toggles, restart the daemon, and run the supervised Sol-to-local-worker count.
+No filesystem authority or daemon configuration was changed during this audit.
+DAR-47 also remains open: final candidate identity cannot be frozen while source
+development continues, and target/collateral approval is an operator gate.
