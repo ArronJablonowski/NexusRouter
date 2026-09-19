@@ -29,6 +29,11 @@ func TestDaemonLearningAdvancesAndResumesAcrossProcesses(t *testing.T) {
 	}
 	var calls atomic.Int32
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"models":[]}`))
+			return
+		}
 		calls.Add(1)
 		http.Error(w, "unexpected inference with no workflows", http.StatusServiceUnavailable)
 	}))

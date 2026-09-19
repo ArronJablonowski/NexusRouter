@@ -672,7 +672,7 @@ live-provider, hardware or crash scenarios.
   See [reader/writer execution](reader-writer-execution.md) for availability and
   crashed-holder limits.
 
-The current durable store uses SQLite schema 52. Schema 30 added the immutable
+The current durable store uses SQLite schema 53. Schema 30 added the immutable
 [usage and cost ledger](usage-accounting.md) without reconstructing earlier
 usage; schema 31 adds the routing-key index used by adaptive observation reads,
 schema 32 adds immutable submission-wide stream cursors with per-event body
@@ -733,7 +733,11 @@ Schema 52 adds an immutable normalized companion for delegation evidence bound
 to a context-compaction activation. It records the exact parent, work and child
 tasks, worker, scope, policy and engine digests, completed boundary events,
 child-context digest, and accepted result digest without inventing evidence for
-older activations.
+older activations. Schema 53 adds bounded durable provider/model health observations
+written only by the daemon-owned sequential sampler. The records contain
+validated safe IDs and status/code enums, exclude provider text and request
+content, and are deleted as complete reports when the configured count bound is
+exceeded.
 Browser sessions
 remain process-local and are revoked on restart
 even though durable workspace authority and operation records survive migration,

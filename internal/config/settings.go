@@ -179,10 +179,11 @@ type Security struct {
 	RedactEnv  []string `yaml:"redact_env,omitempty" json:"redact_env,omitempty"`
 }
 type Telemetry struct {
-	Database      string         `yaml:"database" json:"database"`
-	OTEL          bool           `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
-	MetricsExport *MetricsExport `yaml:"metrics_export,omitempty" json:"metrics_export,omitempty"`
-	TraceExport   *TraceExport   `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
+	Database              string                `yaml:"database" json:"database"`
+	OTEL                  bool                  `yaml:"opentelemetry_enabled" json:"opentelemetry_enabled"`
+	ProviderHealthHistory ProviderHealthHistory `yaml:"provider_health_history" json:"provider_health_history"`
+	MetricsExport         *MetricsExport        `yaml:"metrics_export,omitempty" json:"metrics_export,omitempty"`
+	TraceExport           *TraceExport          `yaml:"trace_export,omitempty" json:"trace_export,omitempty"`
 }
 type Tools struct {
 	CreateEnabled         bool   `yaml:"create_enabled" json:"create_enabled,omitempty"`
@@ -210,7 +211,8 @@ func Defaults() Settings {
 			OutcomeRollbackSupervisor: OutcomeRollbackSupervisor{Version: 1, Interval: "5m", Domain: "unknown", Profile: "default", Source: "user_feedback", Privacy: "local_only", MinSamples: 20, MinDrop: .1, TasksPerVersion: 20},
 			Enabled:                   true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8}, Telemetry: Telemetry{Database: "darwin.db"}}
+		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8},
+		Telemetry: Telemetry{Database: "darwin.db", ProviderHealthHistory: ProviderHealthHistory{Enabled: true, Interval: "30s", Retain: 2880}}}
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -430,6 +432,9 @@ func (s Settings) Validate() error {
 	}
 	if s.Telemetry.Database == "" {
 		return errors.New("database path required")
+	}
+	if err := s.Telemetry.ProviderHealthHistory.validate(); err != nil {
+		return err
 	}
 	if err := s.Telemetry.MetricsExport.validate(s.Mode, s.Telemetry.OTEL); err != nil {
 		return err

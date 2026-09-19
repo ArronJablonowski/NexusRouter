@@ -157,6 +157,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var outcomeSupervisor *app.ConfiguredOutcomeSupervision
 	var exporter *app.MetricsExporter
 	var traceExporter *app.TraceExporter
+	var providerHealthRecorder *app.ProviderHealthRecorder
 	var workboardScheduler *app.WorkboardScheduleSupervisor
 	var browserHandler *webuiapp.Handler
 	healthReport := func(ctx context.Context) (health.Report, error) {
@@ -482,6 +483,19 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return 1
 		}
 		defer workboardScheduler.Close()
+	}
+	if s.Telemetry.ProviderHealthHistory.Enabled {
+		healthInterval, intervalErr := s.Telemetry.ProviderHealthHistory.IntervalDuration()
+		if intervalErr != nil {
+			fmt.Fprintln(stderr, "cannot configure provider health history")
+			return 1
+		}
+		providerHealthRecorder, err = app.StartProviderHealthRecorder(ctx, db, healthReport, healthInterval, s.Telemetry.ProviderHealthHistory.Retain)
+		if err != nil {
+			fmt.Fprintln(stderr, "cannot start provider health history")
+			return 1
+		}
+		defer providerHealthRecorder.Close()
 	}
 	rootHandler := composeServeHandler(handler, browserHandler, s.WebUI.PathPrefix)
 	serveErr := serveHTTP(ctx, listener, rootHandler, stdout)

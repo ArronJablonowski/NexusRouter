@@ -38,6 +38,14 @@ separate-gate boundary makes profiling fail.
 This report is timing evidence, not a substitute for `make check`; the full
 repository command remains the required verification gate.
 
+`make check` and `make test` run race-enabled packages with `-p=1`. The package
+timeout is a per-package safety boundary, so concurrently running the three
+SQLite/crash-heavy suites can consume that boundary through host contention even
+when each suite has adequate isolated margin. Serial package scheduling keeps
+the declared 45-minute limit meaningful; it does not skip, shard, cache-bypass,
+or increase any test timeout. Independent package timing remains visible in the
+ordinary `go test` output.
+
 ## Current evidence
 
 On 2026-09-19, source commit `3507623cb19ba1b295abc551bd96e6d65466fbab`

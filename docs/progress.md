@@ -8774,3 +8774,46 @@ toggles, restart the daemon, and run the supervised Sol-to-local-worker count.
 No filesystem authority or daemon configuration was changed during this audit.
 DAR-47 also remains open: final candidate identity cannot be frozen while source
 development continues, and target/collateral approval is an operator gate.
+
+## 2026-09-19 — Durable provider-health history
+
+Implemented the PRD's previously missing durable provider-health entity as
+SQLite schema 53. A daemon-owned sequential sampler now records canonical,
+validated health reports on a configurable 5-second-to-1-hour cadence and
+retains a bounded number of complete reports. Exact retries are idempotent;
+retention removes each old report and its normalized provider/model checks in
+one transaction. Inspection-only health requests remain read-only.
+
+Stored history is deliberately content-free: only safe configured provider and
+model IDs, timestamps, readiness, and closed health status/code enums are
+retained. Endpoints, credentials, provider error text, prompts, responses, and
+tool content are excluded. Reads revalidate the report SHA-256, canonical JSON,
+health semantics, normalized check bindings, schema shape/rules, and foreign-key
+integrity before returning data. Migration rejects partial, forged, or retained
+future schema objects while safely rebuilding a complete empty future schema
+left by a downgraded test fixture.
+
+Focused race tests passed for configuration, migration, record/retry/retention,
+corruption rejection, provider-free no-op behavior, and recorder lifecycle. The
+complete CLI package also passed after its learning-process fixture was corrected
+to distinguish Ollama model discovery from inference. Release documentation and
+install/rollback schema contracts now track schema 53. An authenticated
+operator-facing history view remains a subsequent sprint; the durable reader is
+already available without creating or migrating storage.
+
+The first repository-wide race run also caught and corrected the hosted native
+workflow's stale schema-52 assertion. A subsequent concurrent run proved the
+application suite in 2,653.138s and releasepack in 820.922s, but telemetry hit
+the 45-minute boundary while competing for the host. After removing a redundant
+fresh-migration validation pass, the exact telemetry suite passed alone in
+2,315.729s with 384.271s margin. The standard `make check` and `make test`
+targets now serialize packages with `-p=1` so package timeouts measure test work
+rather than cross-package CPU/SQLite contention; no timeout was raised and no
+test was skipped or narrowed.
+
+A subsequent review corrected two fail-closed boundary gaps before accepting
+this work. History reads now compare the duplicated report version, timestamp,
+status, and readiness columns with the canonical report body, preventing
+metadata corruption from silently changing query order. The daemon recorder
+also rejects typed-nil storage writers and supports concurrent, repeated
+shutdown without blocking. Race-enabled regression tests cover both fixes.

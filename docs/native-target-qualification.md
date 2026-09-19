@@ -77,7 +77,7 @@ go run ./cmd/verify-native-release-evidence \
   --artifact DarwinRouter_1.0.1_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 \
-  --current-schema 52 \
+  --current-schema 53 \
   --backup-sha256 sha256:EXPECTED_BACKUP \
   > /ABSOLUTE/EXTERNAL/EVIDENCE/native-TARGET-verification.json
 ```

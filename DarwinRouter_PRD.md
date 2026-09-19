@@ -762,6 +762,10 @@ security:
 telemetry:
   database: "${DARWIN_DATA_DIR}/darwin.db"
   opentelemetry_enabled: false
+  provider_health_history:
+    enabled: true
+    interval: 30s
+    retain: 2880
 ```
 
 Durations, percentages, weights, paths, provider references, capability names, and mode-specific contradictions must be validated before the daemon becomes ready.
@@ -1350,6 +1354,11 @@ Read-only legacy schemas remain supported at their feature-specific minimums;
 older writers must stop before migration. See [index migration](docs/event-kind-index.md)
 and [bounded performance evidence](docs/benchmarks.md). Large-history migration
 cost, concurrent workloads and the complete latency SLAs remain to be qualified.
+
+Schema53 adds bounded durable provider/model health history. A daemon-owned,
+sequential sampler persists only validated safe IDs and health enums; browser,
+SDK, and HTTP inspection remain read-only and cannot trigger health-history
+writes. Retention is count-bounded and deletes complete reports transactionally.
 
 Core stored entities include configurations, policy snapshots, tasks, sessions, events, attempts, routes, provider health, model fitness, evaluation evidence, work leases, memory, skill versions, approvals, and audit records.
 

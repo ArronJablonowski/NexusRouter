@@ -177,6 +177,14 @@ same-provider digest aliases, and explicitly become partial when a provider is
 unavailable or an installed model has unknown size. Shared layers can make
 physical disk use smaller than this logical total.
 
+The daemon also records a bounded local history of validated provider and model
+health checks. `telemetry.provider_health_history` defaults to a 30-second
+non-overlapping sample interval and retains the newest 2,880 reports. Records
+contain only safe configured IDs plus health status/code enums—never endpoints,
+credentials, prompts, output, or provider error text. Inspection requests remain
+read-only; the daemon-owned sampler is the only writer. See
+[provider health history](docs/provider-health-history.md).
+
 The browser/workboard boundary is now specified in
 [ADR 0001](docs/adr/0001-web-ui-workboard-boundary.md), and the accessibility
 target, automated gates, manual checklist, and explicit browser matrix are in
@@ -2034,8 +2042,9 @@ observability qualification remain unfinished.
    the final candidate only after development stops, then obtain hosted/native
    target evidence, production signing trust, independent verification,
    publication approval, and post-publication receipts.
-4. Continue post-MVP observability qualification for provider-health history,
-   lease-renewal timing, durable trace delivery, retention, and production-scale
+4. Expose the new bounded provider-health history through authenticated
+   operator-facing inspection, then continue post-MVP observability work for
+   lease-renewal timing, durable trace delivery, and production-scale
    cardinality/latency behavior without exposing identities or content.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.

@@ -153,6 +153,16 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version > stateschema.Current {
 		return errors.New("unsupported database version")
 	}
+	if version < 53 {
+		if err = discardEmptyFutureProviderHealthHistory(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version == 53 {
+		if err = validateProviderHealthHistorySchema(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if version < 52 {
 		if err = discardEmptyFutureContextCompactionDelegations(ctx, conn); err != nil {
 			return err
@@ -625,6 +635,11 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if version < 52 {
 		if err = migrateContextCompactionDelegations(ctx, conn); err != nil {
+			return err
+		}
+	}
+	if version < 53 {
+		if err = migrateProviderHealthHistory(ctx, conn); err != nil {
 			return err
 		}
 	}
