@@ -451,6 +451,10 @@ operator records.
   effect class, without tool identity, result content or retry claims.
   Running task roots end at snapshot observation time and contain only durably
   paired child operations, without claiming process health or completion.
+  Model-generated draft outcomes and committed skill activation/rollback
+  transitions are independent content-free roots at their durable timestamps;
+  no skill, version, model, validator, evidence, source or operation identity is
+  exported.
   Delivery remains ephemeral and broader lifecycle spans are open. See
   [trace export](traces-export.md).
 

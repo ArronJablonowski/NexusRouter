@@ -1982,6 +1982,9 @@ result content. It uses
 fresh non-durable wire IDs and no session content or durable identities.
 Running roots end at the coherent observation time and include only durably
 paired child operations; they do not assert process health or completion.
+Model-generated skill drafts and committed catalog activation/rollback changes
+are exported as independent content-free roots at their durable timestamps,
+without skill, version, model, validator, evidence, source, or operation IDs.
 Fixed route-constraint observations expose only mode/privacy/health/policy/
 credential/capacity/context/budget/capability reason classes, never candidates.
 `telemetry.trace_export` enables an

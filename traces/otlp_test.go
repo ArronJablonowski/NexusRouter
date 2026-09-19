@@ -45,7 +45,7 @@ func TestMarshalOTLPContentFreeShapeAndFreshIDs(t *testing.T) {
 	if json.Unmarshal(first, &body) != nil || len(body.ResourceSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans[0].Spans) != 4 {
 		t.Fatal(string(first))
 	}
-	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "7" {
+	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "8" {
 		t.Fatal("wrong schema version", body.ResourceSpans[0].ScopeSpans[0].Scope.Version)
 	}
 	spans := body.ResourceSpans[0].ScopeSpans[0].Spans
@@ -89,6 +89,33 @@ func TestSnapshotAcceptsRunningRootEndingAtObservation(t *testing.T) {
 	snapshot.Traces[0].Spans[0].EndedAt = base
 	if snapshot.Validate() == nil {
 		t.Fatal("running root not bound to observation time")
+	}
+}
+
+func TestSnapshotAcceptsClosedSkillLifecycleRoots(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0).UTC()
+	for name, outcomes := range map[string][]string{
+		"skill_generation": {"drafted", "failed"},
+		"skill_activation": {"activated"},
+		"skill_rollback":   {"rolled_back"},
+	} {
+		for _, outcome := range outcomes {
+			snapshot := Snapshot{Version: SnapshotVersion, ObservedAt: base.Add(time.Second), Traces: []Trace{{Spans: []Span{{
+				Name: name, Outcome: outcome, Parent: -1, StartedAt: base, EndedAt: base,
+			}}}}}
+			if snapshot.Validate() != nil {
+				t.Fatal(name, outcome)
+			}
+			snapshot.Traces[0].Spans[0].Outcome = "private"
+			if snapshot.Validate() == nil {
+				t.Fatal("open root outcome", name)
+			}
+			snapshot.Traces[0].Spans[0].Outcome = outcome
+			snapshot.Traces[0].Spans = append(snapshot.Traces[0].Spans, Span{Name: "provider", Outcome: "completed", Parent: 0, StartedAt: base, EndedAt: base})
+			if snapshot.Validate() == nil {
+				t.Fatal("skill operation accepted child span", name)
+			}
+		}
 	}
 }
 

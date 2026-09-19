@@ -141,6 +141,53 @@ func TestTraceSnapshotRejectsTerminalEventBehindRunningProjection(t *testing.T) 
 	}
 }
 
+func TestTraceSnapshotExportsSkillGenerationAsIndependentContentFreeOperation(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	attempt := generationAttemptFixture("private-generation-attempt")
+	attempt.StartedAt = time.Now().UTC().Add(-time.Second)
+	if db.BeginSkillGeneration(ctx, attempt) != nil {
+		t.Fatal("begin generation fixture")
+	}
+	done := draftedGeneration(attempt)
+	if db.FinishSkillGeneration(ctx, done) != nil {
+		t.Fatal("finish generation fixture")
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 1 {
+		t.Fatal(snapshot, err)
+	}
+	root := snapshot.Traces[0].Spans[0]
+	if root.Name != "skill_generation" || root.Outcome != "drafted" || root.Parent != -1 || !root.StartedAt.Equal(attempt.StartedAt) || !root.EndedAt.Equal(done.FinishedAt) {
+		t.Fatal(root)
+	}
+	encoded, marshalErr := json.Marshal(snapshot)
+	for _, private := range []string{"private-generation", "generator", "session-a", "check-a", "Run shared checks"} {
+		if strings.Contains(string(encoded), private) {
+			t.Fatal("private generation data escaped", private)
+		}
+	}
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+}
+
+func TestTraceSnapshotRejectsCorruptSkillGeneration(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	attempt := generationAttemptFixture("generation-corrupt")
+	attempt.StartedAt = time.Now().UTC().Add(-time.Second)
+	if db.BeginSkillGeneration(ctx, attempt) != nil || db.FinishSkillGeneration(ctx, draftedGeneration(attempt)) != nil {
+		t.Fatal("generation fixture")
+	}
+	if _, err := db.db.ExecContext(ctx, `UPDATE skill_generation_attempts SET body=X'00' WHERE id=?`, attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("corrupt generation escaped", snapshot, err)
+	}
+}
+
 func TestTraceSnapshotExportsResourcePressureWithoutMeasurements(t *testing.T) {
 	db, _ := submissionStore(t)
 	ctx := context.Background()

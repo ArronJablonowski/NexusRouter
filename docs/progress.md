@@ -8610,3 +8610,30 @@ cover running roots, completed and pending child operations, private identity
 exclusion, and contradictory-state rejection. Automatic skill lifecycle,
 provider-health, lease-heartbeat timing, model-delta, and durable-delivery
 traces remain unfinished; no Linear issue state is changed.
+
+## 2026-09-18 — content-free skill lifecycle trace operations
+
+Trace snapshot schema 8 no longer falsifies multi-source learning operations as
+children of an earlier task. Terminal SQLite generation attempts are independent
+`skill_generation/drafted` or `skill_generation/failed` roots using their
+durable start and finish times. The same bounded read transaction decodes and
+validates each selected attempt, then discards model/provider identity,
+generated workflow content, usage/cost, source sessions/evidence, and durable
+attempt/skill identifiers.
+
+The application also opens an explicitly configured file catalog read-only and
+merges its newest validated activation history into the snapshot as
+instantaneous `skill_activation/activated` and `skill_rollback/rolled_back`
+roots. This reports actual committed transitions—including automatic learning
+and rollback—without exposing skill/version, operation, validator, evidence,
+reason, or trigger-surface identity. The complete bounded catalog is validated
+without loading version bodies. A transition later than the SQLite observation
+instant rejects the combined snapshot rather than presenting cross-store state
+as coherent.
+
+Focused race-enabled skills, traces, telemetry, and application tests cover
+newest-first catalog projection, bounds, generation-body corruption, actual
+operation timing, task-independent roots, cross-store merging, closed root
+vocabulary, and private-field absence. Provider health, model deltas, worker or
+lease heartbeat timing, queue arrival/service rates, and durable trace delivery
+remain unfinished; no Linear issue state is changed.

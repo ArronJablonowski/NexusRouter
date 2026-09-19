@@ -7,17 +7,19 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/DarwinRouter/skills"
 	"github.com/ArronJablonowski/DarwinRouter/traces"
 )
 
 var ErrTraces = errors.New("traces unavailable")
 
-// TraceSnapshot reconstructs recent task lifecycles without creating or
-// migrating storage and without exposing their durable identities/content.
+// TraceSnapshot reconstructs recent task and skill lifecycles without creating
+// or migrating storage and without exposing durable identities or content.
 func (s *Service) TraceSnapshot(ctx context.Context, limit int) (traces.Snapshot, error) {
 	if s == nil || ctx == nil || limit < 1 || limit > traces.MaxTraces {
 		return traces.Snapshot{}, ErrTraces
@@ -33,7 +35,54 @@ func (s *Service) TraceSnapshot(ctx context.Context, limit int) (traces.Snapshot
 	if err != nil || snapshot.Validate() != nil {
 		return traces.Snapshot{}, ErrTraces
 	}
+	if err = s.appendSkillCatalogTraces(ctx, &snapshot, limit); err != nil || snapshot.Validate() != nil {
+		return traces.Snapshot{}, ErrTraces
+	}
 	return snapshot, nil
+}
+
+func (s *Service) appendSkillCatalogTraces(ctx context.Context, snapshot *traces.Snapshot, limit int) error {
+	if s.settings.Skills.Root == "" || s.settings.Skills.Scope == "" || s.skillStore != nil {
+		return nil
+	}
+	store, err := skills.OpenReadOnly(s.settings.Skills.Root, []string{s.settings.Skills.Scope})
+	if errors.Is(err, skills.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	observations, err := store.LifecycleObservations(ctx, limit)
+	if err != nil {
+		return err
+	}
+	for _, observation := range observations {
+		if observation.At.After(snapshot.ObservedAt) {
+			return traces.ErrInvalid
+		}
+		name := "skill_activation"
+		if observation.Kind == "rolled_back" {
+			name = "skill_rollback"
+		} else if observation.Kind != "activated" {
+			return traces.ErrInvalid
+		}
+		snapshot.Traces = append(snapshot.Traces, traces.Trace{Spans: []traces.Span{{
+			Name: name, Outcome: observation.Kind, Parent: -1,
+			StartedAt: observation.At, EndedAt: observation.At,
+		}}})
+	}
+	sort.SliceStable(snapshot.Traces, func(i, j int) bool {
+		left, right := snapshot.Traces[i].Spans[0], snapshot.Traces[j].Spans[0]
+		if left.EndedAt.Equal(right.EndedAt) {
+			return left.Name < right.Name
+		}
+		return left.EndedAt.After(right.EndedAt)
+	})
+	if len(snapshot.Traces) > limit {
+		snapshot.Traces = snapshot.Traces[:limit]
+	}
+	return nil
 }
 
 // ExportTraces explicitly sends one bounded recent-task trace snapshot. It

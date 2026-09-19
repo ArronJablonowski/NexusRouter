@@ -25,11 +25,11 @@ type traceStart struct {
 	toolName string
 }
 
-// Traces reconstructs a bounded recent-task view inside one SQLite read
-// snapshot. Running roots end at ObservedAt and include only durably completed
-// child operations. Only pairing fields and a bounded top-level submission
-// time are selected; event bodies, durable IDs, model/provider/tool names and
-// session content never enter the returned value.
+// Traces reconstructs bounded recent task and skill-generation operations
+// inside one SQLite read snapshot. Running task roots end at ObservedAt and
+// include only durably completed child operations. Only pairing fields and a
+// bounded top-level submission time are selected; event bodies, durable IDs,
+// model/provider/tool/skill names and session content never enter the result.
 func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) {
 	if limit < 1 || limit > traces.MaxTraces {
 		return traces.Snapshot{}, errTraces
@@ -58,14 +58,27 @@ func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) 
 		return traces.Snapshot{}, errTraces
 	}
 	out := traces.Snapshot{Version: traces.SnapshotVersion, ObservedAt: time.Now().UTC(), Traces: make([]traces.Trace, 0, len(tasks))}
-	spanCount := 0
 	for _, task := range tasks {
 		trace, readErr := readTaskTrace(ctx, tx, task, out.ObservedAt)
-		if readErr != nil || len(trace.Spans) > traces.MaxSpans-spanCount {
+		if readErr != nil {
 			return traces.Snapshot{}, errTraces
 		}
-		spanCount += len(trace.Spans)
 		out.Traces = append(out.Traces, trace)
+	}
+	generation, err := readSkillGenerationTraces(ctx, tx, limit, out.ObservedAt)
+	if err != nil {
+		return traces.Snapshot{}, errTraces
+	}
+	out.Traces = append(out.Traces, generation...)
+	sort.SliceStable(out.Traces, func(i, j int) bool {
+		left, right := out.Traces[i].Spans[0], out.Traces[j].Spans[0]
+		if left.EndedAt.Equal(right.EndedAt) {
+			return left.Name < right.Name
+		}
+		return left.EndedAt.After(right.EndedAt)
+	})
+	if len(out.Traces) > limit {
+		out.Traces = out.Traces[:limit]
 	}
 	if out.Validate() != nil || tx.Commit() != nil {
 		return traces.Snapshot{}, errTraces

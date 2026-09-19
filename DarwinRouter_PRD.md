@@ -1364,7 +1364,11 @@ base/revised fitness-mutation observations without exporting routing keys,
 scores, samples, evidence, or evaluator identities. Schema 7 includes running
 roots ending at the coherent observation instant, with only durably completed
 child operations; it does not infer process health or fabricate completion for
-in-flight operations. A linked top-level submission also emits one fixed
+in-flight operations. Schema 8 adds independent content-free roots for
+terminal model-generated drafts and committed catalog activation/rollback
+transitions at their actual durable timestamps. These roots reveal no skill,
+version, model/provider, validator, evidence, source, or operation identity and
+are not falsely attached to source tasks. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
 exact arrival time; retries and delegated children are excluded. Paired tool
 completions expose only their authoritative none/confirmed/uncertain effect

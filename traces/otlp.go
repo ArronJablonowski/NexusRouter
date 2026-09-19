@@ -11,7 +11,8 @@ import (
 // MarshalOTLP creates an OTLP/HTTP JSON ExportTraceServiceRequest. Fresh
 // random wire IDs prevent durable task identities or stable pseudonyms from
 // leaving the process. The input contains no prompt, output, tool, model,
-// provider, session, task, turn, attempt, call or worker identity.
+// provider, skill, version, validator, evidence, session, task, turn, attempt,
+// call or worker identity.
 func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 	if snapshot.Validate() != nil {
 		return nil, ErrInvalid
