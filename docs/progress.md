@@ -8661,3 +8661,26 @@ and LOC enforcement, vet, every race-enabled package, and the production build;
 application took 2301.627s, telemetry 2367.690s, release packaging 807.051s,
 SDK 268.847s, tool-gate 108.016s, metrics 1.965s, and workers 47.845s. No
 Linear issue state is changed.
+
+## 2026-09-19 — bounded worker-heartbeat trace observations
+
+Trace snapshot schema 9 adds an instantaneous `worker_heartbeat/observed`
+child at the latest durable heartbeat for each worker lifecycle. SQLite reduces
+heartbeat history to the latest event per private worker identity before the
+existing per-task row bound is applied. The reader then requires that heartbeat
+to follow a retained `worker.started`; a heartbeat before start or after
+`worker.completed` fails the snapshot. Earlier heartbeats remain durable but do
+not amplify public span cardinality.
+
+Public JSON and OTLP expose neither worker identity nor heartbeat count. The
+marker proves only that a heartbeat event was committed at that historical
+instant; it does not assert current liveness, progress, provider health, lease
+ownership, renewal, expiry, or reassignment safety. Focused race-enabled trace
+and telemetry tests cover closed vocabulary, wire schema versioning, latest-
+only projection, identity exclusion, and out-of-lifecycle rejection. Provider
+health, model deltas, lease renewal timing, and durable trace delivery remain
+unfinished. Final `make check` passed formatting and LOC enforcement, vet,
+every race-enabled package, and the production build; application took
+2317.700s, telemetry 2360.904s, release packaging 808.353s, SDK 272.853s,
+tool-gate 108.574s, traces 2.607s, and workers 47.621s. No Linear issue state is
+changed.

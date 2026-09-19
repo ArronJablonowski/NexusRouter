@@ -1368,7 +1368,10 @@ in-flight operations. Schema 8 adds independent content-free roots for
 terminal model-generated drafts and committed catalog activation/rollback
 transitions at their actual durable timestamps. These roots reveal no skill,
 version, model/provider, validator, evidence, source, or operation identity and
-are not falsely attached to source tasks. A linked top-level submission also emits one fixed
+are not falsely attached to source tasks. Schema 9 adds one content-free latest
+durable heartbeat marker per worker lifecycle. It exports neither worker
+identity nor heartbeat count and does not claim present liveness or lease
+renewal. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
 exact arrival time; retries and delegated children are excluded. Paired tool
 completions expose only their authoritative none/confirmed/uncertain effect

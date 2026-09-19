@@ -1983,7 +1983,9 @@ now aliases configured periodic metrics export. A separate explicit CLI/SDK
 [OTLP trace export](docs/traces-export.md) sends up to 32 recent task
 roots with paired provider/tool/worker children and fixed route, evaluation,
 fallback, compaction, skill-context, steering, error and top-level submission
-queue-residency observations. Queue waits use seven fixed buckets and expose no
+queue-residency observations. Trace schema9 also includes at most one latest
+durable heartbeat marker per worker lifecycle, without worker identity or
+heartbeat count and without claiming current liveness. Queue waits use seven fixed buckets and expose no
 submission identity or exact arrival time. Every paired tool completion also
 emits its fixed none/confirmed/uncertain effect class without tool identity or
 result content. It uses

@@ -45,7 +45,7 @@ func TestMarshalOTLPContentFreeShapeAndFreshIDs(t *testing.T) {
 	if json.Unmarshal(first, &body) != nil || len(body.ResourceSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans) != 1 || len(body.ResourceSpans[0].ScopeSpans[0].Spans) != 4 {
 		t.Fatal(string(first))
 	}
-	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "8" {
+	if body.ResourceSpans[0].ScopeSpans[0].Scope.Version != "9" {
 		t.Fatal("wrong schema version", body.ResourceSpans[0].ScopeSpans[0].Scope.Version)
 	}
 	spans := body.ResourceSpans[0].ScopeSpans[0].Spans
@@ -135,8 +135,9 @@ func TestExportOptions(t *testing.T) {
 func TestSpanVocabulary(t *testing.T) {
 	valid := map[string][]string{
 		"provider": {"completed"}, "tool": {"completed"}, "worker": {"completed"},
-		"tool_effect": {"none", "confirmed", "uncertain"},
-		"route":       {"selected", "explored"}, "evaluation": {"accepted", "rejected"},
+		"worker_heartbeat": {"observed"},
+		"tool_effect":      {"none", "confirmed", "uncertain"},
+		"route":            {"selected", "explored"}, "evaluation": {"accepted", "rejected"},
 		"fallback": {"selected"}, "compaction": {"applied"}, "skill_context": {"loaded"},
 		"steering": {"applied"}, "error": {"recorded"},
 		"resource_pressure": {"thermal", "swap"},

@@ -28,7 +28,7 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	kinds := []runtime.Kind{runtime.TaskStarted, runtime.RouteSelected, runtime.TurnStarted, runtime.TurnCompleted, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerCompleted, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.TaskCompleted}
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.RouteSelected, runtime.TurnStarted, runtime.TurnCompleted, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.TaskCompleted}
 	for i, kind := range kinds {
 		e := event("private-event-"+string(rune('a'+i)), int64(i+1), kind)
 		e.TaskID, e.SessionID, e.CorrelationID = "private-task", "private-session", "private-correlation"
@@ -48,7 +48,7 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		if kind == runtime.ToolStarted || kind == runtime.ToolCompleted {
 			e.Data.ToolCallID, e.Data.ToolName, e.Data.Effect = "private-call", "private-tool", runtime.NoEffect
 		}
-		if kind == runtime.WorkerStarted || kind == runtime.WorkerCompleted {
+		if kind == runtime.WorkerStarted || kind == runtime.WorkerHeartbeat || kind == runtime.WorkerCompleted {
 			e.WorkerID = "private-worker"
 		}
 		if kind == runtime.EvaluationRecorded {
@@ -63,14 +63,14 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		}
 	}
 	snapshot, err := db.Traces(ctx, 1)
-	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 20 {
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 21 {
 		t.Fatal(snapshot, err)
 	}
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || snapshot.Traces[0].Spans[0].Outcome != "completed" {
 		t.Fatal(string(body))
 	}
-	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "tool_effect/none": true, "worker/completed": true, "evaluation/accepted": true, "error/recorded": true}
+	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "tool_effect/none": true, "worker/completed": true, "worker_heartbeat/observed": true, "evaluation/accepted": true, "error/recorded": true}
 	for _, reason := range []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
 		want["route_constraint/"+reason] = true
 	}
@@ -121,6 +121,90 @@ func TestTraceSnapshotIncludesRunningTaskWithoutInventingPendingCompletion(t *te
 	body, marshalErr := json.Marshal(snapshot)
 	if marshalErr != nil || strings.Contains(string(body), "private") || strings.Contains(string(body), "tool") {
 		t.Fatal(string(body), marshalErr)
+	}
+}
+
+func TestTraceSnapshotExportsOnlyLatestBoundedWorkerHeartbeat(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.TaskCompleted}
+	events := make([]runtime.Event, 0, len(kinds))
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("heartbeat-event-%d", i), int64(i+1), kind)
+		e.TaskID, e.SessionID, e.CorrelationID = "private-heartbeat-task", "private-heartbeat-session", "private-heartbeat-task"
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.WorkerStarted || kind == runtime.WorkerHeartbeat || kind == runtime.WorkerCompleted {
+			e.WorkerID = "private-heartbeat-worker"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, e)
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 3 {
+		t.Fatal(snapshot, err)
+	}
+	var heartbeatCount int
+	for _, span := range snapshot.Traces[0].Spans[1:] {
+		if span.Name != "worker_heartbeat" {
+			continue
+		}
+		heartbeatCount++
+		if span.Outcome != "observed" || !span.StartedAt.Equal(events[3].Time) || !span.EndedAt.Equal(events[3].Time) {
+			t.Fatal("wrong latest heartbeat", span)
+		}
+	}
+	if heartbeatCount != 1 {
+		t.Fatal("heartbeat cardinality was not bounded", snapshot)
+	}
+	body, marshalErr := json.Marshal(snapshot)
+	if marshalErr != nil || strings.Contains(string(body), "private-heartbeat") {
+		t.Fatal(string(body), marshalErr)
+	}
+}
+
+func TestTraceSnapshotRejectsHeartbeatOutsideWorkerLifecycle(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.WorkerStarted, runtime.WorkerCompleted, runtime.WorkerHeartbeat, runtime.TaskCompleted}
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("late-heartbeat-%d", i), int64(i+1), kind)
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.WorkerStarted || kind == runtime.WorkerHeartbeat || kind == runtime.WorkerCompleted {
+			e.WorkerID = "late-worker"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("out-of-lifecycle heartbeat escaped", snapshot, err)
+	}
+}
+
+func TestTraceSnapshotRejectsMalformedHeartbeatIdentity(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.TaskCompleted}
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("malformed-heartbeat-%d", i), int64(i+1), kind)
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.WorkerStarted || kind == runtime.WorkerHeartbeat || kind == runtime.WorkerCompleted {
+			e.WorkerID = "malformed-worker"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.db.ExecContext(ctx, `UPDATE events SET body=json_remove(body,'$.worker_id') WHERE id='malformed-heartbeat-2'`); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("malformed heartbeat identity escaped", snapshot, err)
 	}
 }
 

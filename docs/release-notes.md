@@ -451,6 +451,9 @@ operator records.
   effect class, without tool identity, result content or retry claims.
   Running task roots end at snapshot observation time and contain only durably
   paired child operations, without claiming process health or completion.
+  Trace schema 9 adds at most one latest durable heartbeat marker per worker
+  lifecycle. It exports no worker identity or heartbeat count and does not
+  claim current liveness, lease ownership, or safe reassignment.
   Model-generated draft outcomes and committed skill activation/rollback
   transitions are independent content-free roots at their durable timestamps;
   no skill, version, model, validator, evidence, source or operation identity is

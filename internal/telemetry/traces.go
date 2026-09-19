@@ -132,9 +132,16 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	  WHEN json_type(body,'$.data.resources.swap_pressure')='false' THEN 0
 	  ELSE -2
 	 END
-	 FROM events INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
+	 FROM events AS e INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
 	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
-	  'worker.started','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied','context.compacted')
+	  'worker.started','worker.heartbeat','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied','context.compacted')
+	 AND (json_extract(body,'$.kind')<>'worker.heartbeat'
+	  OR json_type(body,'$.worker_id') IS NULL OR json_type(body,'$.worker_id')<>'text'
+	  OR length(CAST(json_extract(body,'$.worker_id') AS BLOB)) NOT BETWEEN 1 AND 256
+	  OR sequence=(
+	  SELECT max(h.sequence) FROM events AS h INDEXED BY events_task_kind
+	  WHERE h.task_id=e.task_id AND json_extract(h.body,'$.kind')='worker.heartbeat'
+	   AND json_extract(h.body,'$.worker_id')=json_extract(e.body,'$.worker_id')))
 	 ORDER BY sequence LIMIT 514`, task.id)
 	if err != nil {
 		return traces.Trace{}, errTraces
@@ -229,9 +236,9 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				}
 				children = append(children, traceInstant("tool_effect", toolEffect, at))
 			}
-		case "worker.started", "worker.completed":
+		case "worker.started", "worker.heartbeat", "worker.completed":
 			if worker == "" {
-				continue
+				return traces.Trace{}, errTraces
 			}
 			key := tracePairKey{kind: "worker", call: worker}
 			if kind == "worker.started" {
@@ -242,6 +249,13 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 				continue
 			}
 			started, exists := pending[key]
+			if kind == "worker.heartbeat" {
+				if !exists || at.Before(started.at) {
+					return traces.Trace{}, errTraces
+				}
+				children = append(children, traceInstant("worker_heartbeat", "observed", at))
+				continue
+			}
 			if !exists {
 				continue
 			}
