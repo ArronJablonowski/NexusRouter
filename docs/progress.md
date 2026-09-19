@@ -8635,5 +8635,29 @@ Focused race-enabled skills, traces, telemetry, and application tests cover
 newest-first catalog projection, bounds, generation-body corruption, actual
 operation timing, task-independent roots, cross-store merging, closed root
 vocabulary, and private-field absence. Provider health, model deltas, worker or
-lease heartbeat timing, queue arrival/service rates, and durable trace delivery
+lease heartbeat timing, and durable trace delivery
 remain unfinished; no Linear issue state is changed.
+
+## 2026-09-19 — durable queue activity totals
+
+Metrics snapshot schema 11 adds the closed `queue_activity` states `arrived`,
+`service_started`, and `service_terminal`. Arrivals come from retained durable
+submission rows. A service start requires a canonical linked `task.started`
+event and counts a submission once across fallback/retry tasks; terminal
+service also requires succeeded, failed, or canceled submission state. Thus a
+pre-start cancellation remains an arrival without being mislabeled as service.
+
+The metrics read derives all three totals in the same SQLite snapshot as the
+existing submission population and rejects snapshots unless terminal service
+is no greater than starts, starts are no greater than arrivals, and arrivals
+exactly equal all submission-state counts. Public JSON and OTLP retain only the
+three fixed labels and counts. They expose no submission, task, session, model,
+provider, content, or exact time. Collectors may derive rates from successive
+snapshots for one database; DarwinRouter does not fabricate a sampled
+per-second estimate. Focused metrics and telemetry tests cover durable service
+evidence, running and terminal service, pre-start cancellation, reconciliation,
+legacy availability, and identity absence. Final `make check` passed formatting
+and LOC enforcement, vet, every race-enabled package, and the production build;
+application took 2301.627s, telemetry 2367.690s, release packaging 807.051s,
+SDK 268.847s, tool-gate 108.016s, metrics 1.965s, and workers 47.845s. No
+Linear issue state is changed.

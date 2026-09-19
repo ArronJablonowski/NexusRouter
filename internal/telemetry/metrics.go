@@ -66,6 +66,18 @@ func (s *Store) Metrics(ctx context.Context) (metrics.Snapshot, error) {
 				return metrics.Snapshot{}, errMetrics
 			}
 			continue
+		case "queue_activity":
+			// These are retained cumulative facts, not sampled rates. A service
+			// start requires a durable task.started binding; terminal service
+			// excludes submissions canceled or rejected before any task began.
+			query = `WITH started(id,state) AS (
+			 SELECT DISTINCT s.id,s.state FROM events e JOIN submissions s
+			 ON json_extract(e.body,'$.data.submission_id')=s.id
+			 WHERE json_extract(e.body,'$.kind')='task.started' AND json_type(e.body,'$.data.submission_id')='text'
+			)
+			SELECT 0,count(*) FROM submissions
+			UNION ALL SELECT 1,count(*) FROM started
+			UNION ALL SELECT 2,count(*) FROM started WHERE state IN ('succeeded','failed','canceled')`
 		case "reviews":
 			query = `SELECT CASE status WHEN 'started' THEN 0 WHEN 'completed' THEN 1 WHEN 'failed' THEN 2 ELSE -1 END,count(*) FROM review_attempts GROUP BY 1`
 		case "evaluations":

@@ -1379,7 +1379,7 @@ Each serialization uses fresh random OTLP trace/span IDs. An independently
 configured daemon/SDK trace supervisor now
 sends fresh bounded snapshots sequentially, fences configuration rotation and
 reports supplemental health; scheduling and delivery are non-durable. Broader
-span families, queue arrival/service rates, stable correlation and the complete instrumentation list above
+span families, stable correlation and the complete instrumentation list above
 remain unfinished. See [trace export](docs/traces-export.md). The exported
 closed-vocabulary gauges now also
 count every canonical durable runtime-event kind, providing content-free task,
@@ -1403,8 +1403,11 @@ values are limited to fixed CPU-thread, RAM, swap, aggregate VRAM,
 thermal-pressure and unified-memory gauges; device inventory, profiler
 provenance and host identity remain private. Cloud-only, disabled or failed
 profilers report unavailable rather than fabricated zero, while storage-only
-inspection omits the live block. Queue arrival/service rates, operation-specific
-cardinality, per-device capacity, model
+inspection omits the live block. Snapshot schema 11 now exports reconciled,
+identifier-free retained totals for arrivals, service starts, and terminal
+service. Collectors derive rates from successive snapshots instead of trusting
+sample-window estimates; pre-start cancellation is not misclassified as
+service. Operation-specific cardinality, per-device capacity, model
 residency and reservation telemetry remain separate work.
 
 Schema29 now records task start-to-terminal event wall time transactionally,

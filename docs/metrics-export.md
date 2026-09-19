@@ -93,7 +93,9 @@ collector error text, endpoint or credential enters health metadata.
 
 ## Data and protocol
 
-Snapshot schema version 8 adds fixed, identifier-free usage-accounting gauges
+Snapshot schema version 11 adds fixed, identifier-free queue-activity totals.
+Version 10 tightened live resource-budget observations, version 9 added the
+canonical context-compaction event, and version 8 added usage-accounting gauges
 to version 7's advisory audit outcomes, version 6's provider-turn and tool-call
 duration histograms, version 5's queue-age gauge, version 4's live host
 observation, and version 3's runtime activity. Audit outcomes are validated reviewer verdicts,
@@ -139,6 +141,22 @@ negative age. Classification reads at most the configured 128-item durable
 queue and fails closed if a corrupt store exceeds that bound. The gauges expose
 neither submission identity nor exact arrival time.
 
+Version 11 adds the fixed `queue_activity` states `arrived`,
+`service_started`, and `service_terminal` for schema-12-and-newer databases.
+`arrived` is the retained durable submission population. `service_started`
+requires at least one canonical `task.started` event linked to that submission;
+retries and fallback tasks therefore count once. `service_terminal` additionally
+requires the submission to be succeeded, failed, or canceled. A cancellation or
+admission failure before any task starts is an arrival, but not service. The
+three totals are read in the same SQLite snapshot and must reconcile with the
+submission-state population as `service_terminal <= service_started <= arrived`.
+They contain no submission, task, session, model, provider, prompt, result, or
+exact timestamp. These are retained cumulative totals represented by the
+existing bounded gauge envelope, not precomputed per-second estimates. A
+collector may derive arrival, start, and terminal rates from successive
+snapshots for one database; replacing or restoring that database resets that
+derived series.
+
 The application,
 daemon, HTTP API and SDK attach fixed CPU-thread, RAM, swap, aggregate VRAM,
 thermal-pressure and unified-memory measurements. Each value has an explicit
@@ -166,12 +184,14 @@ The `runtime_operations` group counts fallback-linked task starts, compacted
 continuations, skill-context uses, explored routes, and capacity, budget,
 privacy, or health exclusions. Exclusion counts are per excluded candidate;
 they are not inferred hardware samples. The submission and queue-age groups are
-current durable population gauges, not arrival/service rates or wait-time
-histories.
+current durable population gauges; queue activity supplies the separate
+retained totals from which a collector can derive arrival/service rates. None
+is a wait-time history.
 Each available group is a gauge named
 `darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
-current durable state, not cumulative activity counters or quality judgments.
+current durable state except for the explicitly retained cumulative
+`queue_activity` totals; none are quality judgments.
 Counts and nanosecond timestamps use decimal strings without
 floating-point precision loss. Schema29 additionally supplies a cumulative
 [task-duration histogram](task-duration-metrics.md) and unavailable timing gauges;
@@ -222,6 +242,6 @@ no storage mutation, cancellation, response bounds, partial rejection and redire
 denial. Periodic tests additionally exercise sequential scheduling, cancellation,
 failure recovery, disabled defaults and actual daemon lifecycle wiring. They do
 not qualify a production collector deployment, fleet cardinality, durable
-export delivery, physical thermal-sensor accuracy, queue arrival/service rates,
-operation-specific cardinality, traces, full
+export delivery, physical thermal-sensor accuracy, collector-side rate
+calculation, operation-specific cardinality, traces, full
 histogram coverage or the full PRD telemetry scope.

@@ -163,3 +163,38 @@ func TestMarshalOTLPAccountingUsesClosedIdentifierFreeBuckets(t *testing.T) {
 		t.Fatal("missing accounting metrics", wantNames)
 	}
 }
+
+func TestMarshalOTLPQueueActivityUsesClosedReconciledStates(t *testing.T) {
+	s := NewSnapshot(12, time.Unix(100, 0).UTC())
+	s.Groups[3].Counts[1].Value = 1
+	s.Groups[3].Counts[3].Value = 1
+	s.Groups[3].Counts[4].Value = 1
+	s.Groups[5].Counts[0].Value = 3
+	s.Groups[5].Counts[1].Value = 2
+	s.Groups[5].Counts[2].Value = 1
+	body, err := MarshalOTLP(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request otlpRequest
+	if json.Unmarshal(body, &request) != nil {
+		t.Fatal(string(body))
+	}
+	for _, item := range request.ResourceMetrics[0].ScopeMetrics[0].Metrics {
+		if item.Name != "darwinrouter.queue_activity" {
+			continue
+		}
+		wantStates := []string{"arrived", "service_started", "service_terminal"}
+		wantValues := []string{"3", "2", "1"}
+		if item.Gauge == nil || len(item.Gauge.DataPoints) != len(wantStates) {
+			t.Fatal(item)
+		}
+		for i, point := range item.Gauge.DataPoints {
+			if point.AsInt != wantValues[i] || len(point.Attributes) != 1 || point.Attributes[0].Key != "state" || point.Attributes[0].Value.StringValue != wantStates[i] {
+				t.Fatal(point)
+			}
+		}
+		return
+	}
+	t.Fatal("queue activity metric missing")
+}

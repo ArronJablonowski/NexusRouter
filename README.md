@@ -1907,8 +1907,8 @@ from existing storage. The daemon exposes the same snapshot through authenticate
 body, query parameters or browser origin are rejected. Missing or unreadable
 storage returns an error, not a fabricated empty population.
 
-Metrics snapshot version 8 contains fixed groups for tasks, submissions, review attempts,
-evaluation records, audit records, submission recovery records and all sixteen
+Metrics snapshot version 11 contains fixed groups for tasks, submissions, review attempts,
+evaluation records, audit records, submission recovery records and all seventeen
 canonical durable runtime-event kinds. Tasks,
 submissions and reviews are grouped by stored lifecycle state; the other groups
 count stored records. A separate fixed audit-outcome group counts accept,
@@ -1932,6 +1932,14 @@ seven fixed age buckets from less than one second through at least one hour, or
 distinguishes a fresh queue from sustained wait pressure without exposing exact
 arrival times or submission identity; it is not an arrival rate, service rate,
 historical wait distribution or execution-duration measurement.
+
+The separate `queue_activity` group reports retained totals for `arrived`,
+`service_started`, and `service_terminal`. Starts require a durable linked task
+start and terminals require both a start and terminal submission state, so a
+pre-start cancellation is not mislabeled as service and fallback tasks do not
+double count a submission. The totals reconcile with submission state and
+contain no identity or exact timestamp. Derive rates from successive snapshots
+for the same database; DarwinRouter does not guess a sampled per-second rate.
 
 Schema-28-and-newer stores also expose cumulative provider-turn and tool-call
 duration histograms derived from paired durable events. Missing starts, missing
@@ -1993,8 +2001,11 @@ health is supplemental and delivery remains best effort. The legacy
 `opentelemetry_enabled` alias remains metrics-only.
 Schema29 supplies [task-duration histograms](docs/task-duration-metrics.md) and
 explicit unavailable timing counts, including recovery terminals. Schema30 adds
-the separate [immutable usage ledger](docs/usage-accounting.md). Traces,
-outside this bounded lifecycle slice, queue arrival/service rates,
+the separate [immutable usage ledger](docs/usage-accounting.md). Metrics
+snapshot schema11 adds reconciled retained arrival, service-start, and
+terminal-service totals; collectors can derive queue rates from successive
+snapshots without receiving submission identity or exact timestamps. Traces,
+outside this bounded lifecycle slice,
 per-device pressure, cost histograms, retention and production-scale
 observability qualification remain unfinished.
 

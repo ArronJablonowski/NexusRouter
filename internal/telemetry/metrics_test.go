@@ -84,6 +84,15 @@ func TestMetricsCountsAndPayloadIsolation(t *testing.T) {
 			}
 			continue
 		}
+		if group.Name == "queue_activity" {
+			want := []int64{5, 0, 0}
+			for i, count := range group.Counts {
+				if count.Value != want[i] {
+					t.Fatalf("%s %s %d", group.Name, count.State, count.Value)
+				}
+			}
+			continue
+		}
 		for _, count := range group.Counts {
 			expected := int64(1)
 			if group.Name == "runtime_events" || group.Name == "runtime_operations" {
@@ -179,6 +188,59 @@ func TestMetricsQueueAgeRejectsPopulationBeyondAdmissionBound(t *testing.T) {
 	if _, err := db.Metrics(context.Background()); err == nil {
 		t.Fatal("overbound queue accepted")
 	}
+}
+
+func TestMetricsQueueActivityUsesDurableServiceEvidence(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+
+	prestart := queuedSubmission(t, db, "queue-activity-canceled")
+	if status, err := db.CancelSubmission(ctx, prestart.ID); err != nil || status.State != "canceled" {
+		t.Fatal("pre-start cancellation failed", status, err)
+	}
+
+	queuedSubmission(t, db, "queue-activity-running")
+	running := claimSubmission(t, db)
+	runningStart := submittedEvent("queue-running-start", "queue-running-task", "queue-running-session", 1, runtime.TaskStarted, running.Status.ID)
+	if err := db.AppendSubmission(ctx, 0, runningStart, running.Status.ID, running.Token); err != nil {
+		t.Fatal(err)
+	}
+
+	queuedSubmission(t, db, "queue-activity-terminal")
+	terminal := claimSubmission(t, db)
+	terminalStart := submittedEvent("queue-terminal-start", "queue-terminal-task", "queue-terminal-session", 1, runtime.TaskStarted, terminal.Status.ID)
+	terminalEnd := submittedEvent("queue-terminal-end", "queue-terminal-task", "queue-terminal-session", 2, runtime.TaskFailed, "")
+	if err := db.AppendSubmission(ctx, 0, terminalStart, terminal.Status.ID, terminal.Token); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AppendSubmission(ctx, 1, terminalEnd, terminal.Status.ID, terminal.Token); err != nil {
+		t.Fatal(err)
+	}
+	if status, err := db.FinishSubmission(ctx, terminal.Status.ID, terminal.Token, "failed", "task_failed", nil); err != nil || status.State != "failed" {
+		t.Fatal("terminal service failed", status, err)
+	}
+
+	snapshot, err := db.Metrics(ctx)
+	if err != nil || snapshot.Validate() != nil {
+		t.Fatal(snapshot, err)
+	}
+	for _, group := range snapshot.Groups {
+		if group.Name != "queue_activity" {
+			continue
+		}
+		want := []int64{3, 2, 1}
+		for i, count := range group.Counts {
+			if count.Value != want[i] {
+				t.Fatalf("%s=%d want %d", count.State, count.Value, want[i])
+			}
+		}
+		body, _ := json.Marshal(group)
+		if strings.Contains(string(body), "queue-activity") || strings.Contains(string(body), "queue-running") || strings.Contains(string(body), "queue-terminal") {
+			t.Fatal("queue identity leaked", string(body))
+		}
+		return
+	}
+	t.Fatal("queue activity group missing")
 }
 
 func TestMetricsCountsAdvisoryAuditOutcomesWithoutIdentity(t *testing.T) {
@@ -334,7 +396,7 @@ func TestMetricsLegacyAvailabilityAndCancellation(t *testing.T) {
 		if err != nil || snapshot.StorageSchema != schema {
 			t.Fatal(snapshot, err)
 		}
-		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "queue_age": 12, "reviews": 7, "evaluations": 2, "audits": 5, "audit_outcomes": 5, "recoveries": 13}
+		since := map[string]int{"tasks": 1, "runtime_events": 1, "runtime_operations": 1, "submissions": 12, "queue_age": 12, "queue_activity": 12, "reviews": 7, "evaluations": 2, "audits": 5, "audit_outcomes": 5, "recoveries": 13}
 		for _, group := range snapshot.Groups {
 			if group.Available != (schema >= since[group.Name]) {
 				t.Fatal(group)

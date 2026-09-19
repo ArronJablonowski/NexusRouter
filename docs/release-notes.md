@@ -599,8 +599,12 @@ operator records.
   HTTP endpoint, Go SDK and interactive CLI chat, with a combined lifecycle/text
   SDK interface and stateful terminal filtering in chat.
 - Fixed advisory audit-outcome and durable queue-age population gauges,
-  privacy-safe live host-resource availability, and paired provider/tool
-  lifecycle histograms in metrics snapshot v7. Audit verdicts remain advisory
+  privacy-safe live host-resource availability, paired provider/tool lifecycle
+  histograms, and metrics snapshot v11 retained totals for queue arrivals,
+  service starts, and terminal service. The totals reconcile with durable
+  submission state, exclude pre-start cancellation from service, and reveal no
+  submission/task identity or exact timestamp; collectors derive rates from
+  successive snapshots. Audit verdicts remain advisory
   and do not replace objective evidence or user feedback.
 
 - Coordinator same-model output audits now run as separate bounded invocations.
