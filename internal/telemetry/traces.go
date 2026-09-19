@@ -278,6 +278,11 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		return traces.Trace{}, errTraces
 	}
 	children = append(children, leaseObservations...)
+	fitnessObservations, err := readTaskFitnessTrace(ctx, tx, task.id, rootEnd, observedAt)
+	if err != nil {
+		return traces.Trace{}, errTraces
+	}
+	children = append(children, fitnessObservations...)
 	sort.SliceStable(children, func(i, j int) bool { return children[i].StartedAt.Before(children[j].StartedAt) })
 	spans := make([]traces.Span, 1, len(children)+1)
 	spans[0] = traces.Span{Name: "task", Outcome: task.state, Parent: -1, StartedAt: rootStart, EndedAt: rootEnd}

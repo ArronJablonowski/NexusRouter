@@ -1359,7 +1359,9 @@ and error observations. Schema 4 additionally emits fixed thermal/swap pressure
 observations from the canonical task-start resource snapshot without exporting
 host measurements or source strings. Schema 5 adds terminal, content-free
 reader/writer lease-state observations without exporting counts, capabilities,
-owners, scopes, expiry instants, or process references. A linked top-level submission also emits one fixed
+owners, scopes, expiry instants, or process references. Schema 6 adds validated
+base/revised fitness-mutation observations without exporting routing keys,
+scores, samples, evidence, or evaluator identities. A linked top-level submission also emits one fixed
 queue-residency bucket at task start without exposing submission identity or
 exact arrival time; retries and delegated children are excluded. Paired tool
 completions expose only their authoritative none/confirmed/uncertain effect

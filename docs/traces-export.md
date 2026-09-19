@@ -4,7 +4,8 @@ DarwinRouter can explicitly export a bounded, content-free view of recent
 terminal task lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
 fixed queue-residency observation, version 3 added fixed tool-effect evidence,
 version 4 added content-free resource-pressure observations, and version 5
-adds bounded resource-lease state observations:
+added bounded resource-lease state observations. Version 6 adds validated,
+content-free fitness-mutation observations:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -79,6 +80,19 @@ health, death, cleanup safety, or retry authority. Lease counts, capabilities,
 owners, scopes, expiry instants, and process references remain private. More
 than 1,000 task leases or malformed retained lease data fails the snapshot.
 
+When a terminal task has a bounded canonical evaluation history whose aggregate
+fitness projection still agrees, it receives a `fitness_update/recorded`
+observation at task termination. A validated nonempty subjective revision chain
+also adds `fitness_update/revised`. These markers describe durable mutations,
+not ordinary runtime validation events and not current model quality. They
+export no model/provider/domain/profile identity, score, sample count, evidence,
+evaluator, revision, task, or attempt identity. At most 100 base evaluations and
+100 revisions per base are accepted; bodies are length-bounded before decoding,
+the revision chain and current head are revalidated, and missing or malformed
+aggregate fitness fails the snapshot. Mutation timestamps can occur after task
+termination; task-end placement is an instantaneous content-free observation,
+not a fabricated mutation time.
+
 OTLP trace and span IDs are freshly generated for every serialization. They are
 not hashes or stable pseudonyms for durable DarwinRouter records. Consequently,
 separate exports cannot be joined by their wire IDs. Operators requiring
@@ -94,7 +108,7 @@ legacy/interrupted child operations are omitted; the separate metrics snapshot
 retains explicit missing-start and missing-end counts.
 
 This trace slice does not include running tasks, model deltas, worker
-heartbeats, lease heartbeat/renewal timing, provider health, fitness mutations,
+heartbeats, lease heartbeat/renewal timing, provider health,
 automatic skill draft/activation/rollback operations or queue arrival/service
 rates. Queue residency is historical only for a successfully linked top-level
 task start; current queue pressure remains available through aggregate metrics.

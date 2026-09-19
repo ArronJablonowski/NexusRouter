@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -204,6 +205,104 @@ func TestTraceSnapshotRejectsCorruptResourceLease(t *testing.T) {
 	}
 	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
 		t.Fatal("corrupt lease escaped", snapshot, err)
+	}
+}
+
+func TestTraceSnapshotExportsFitnessMutationsWithoutEvidenceOrIdentity(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	events := []runtime.Event{
+		event("private-fitness-start", 1, runtime.TaskStarted),
+		event("private-fitness-turn-start", 2, runtime.TurnStarted),
+		event("private-fitness-turn-done", 3, runtime.TurnCompleted),
+		event("private-fitness-done", 4, runtime.TaskCompleted),
+	}
+	for i := range events {
+		events[i].TaskID, events[i].SessionID, events[i].CorrelationID = "private-fitness-task", "private-fitness-session", "private-fitness-task"
+		events[i].Time = base.Add(time.Duration(i) * time.Millisecond)
+		if events[i].Kind == runtime.TurnStarted || events[i].Kind == runtime.TurnCompleted {
+			events[i].TurnID, events[i].AttemptID = "private-fitness-turn", "private-fitness-attempt"
+			events[i].Data.ModelID, events[i].Data.ProviderID = "private-fitness-model", "private-fitness-provider"
+		}
+		if err := db.Append(ctx, int64(i), events[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	record := evaluation.Record{
+		Version: 1, ID: "private-fitness-base", TaskID: events[0].TaskID, AttemptID: events[1].AttemptID,
+		Key:        routing.Key{Model: "private-fitness-model", Provider: "private-fitness-provider", Domain: "private-fitness-domain", Profile: "private-fitness-profile"},
+		Checks:     []evaluation.Check{{Source: evaluation.LLMJudge, Reference: "private-fitness-evidence", Passed: true}},
+		AllowJudge: true, ExecutionSucceeded: true, Latency: time.Second, Cost: .25, Time: base.Add(4 * time.Millisecond),
+	}
+	if err := db.RecordEvaluation(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	revision := record
+	revision.ID, revision.AllowJudge = "private-fitness-revision", false
+	revision.Checks = []evaluation.Check{{Source: evaluation.UserFeedback, Reference: "private-fitness-feedback", Passed: false}}
+	if err := db.SupersedeEvaluation(ctx, record.ID, revision); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 4 {
+		t.Fatal(snapshot, err)
+	}
+	for i, outcome := range []string{"recorded", "revised"} {
+		span := snapshot.Traces[0].Spans[i+2]
+		if span.Name != "fitness_update" || span.Outcome != outcome || !span.StartedAt.Equal(events[3].Time) || !span.EndedAt.Equal(events[3].Time) {
+			t.Fatal(span)
+		}
+	}
+	encoded, marshalErr := json.Marshal(snapshot)
+	otlp, otlpErr := tracewire.MarshalOTLP(snapshot)
+	for _, private := range []string{"private-fitness", "evidence", "feedback"} {
+		if strings.Contains(string(encoded), private) || strings.Contains(string(otlp), private) {
+			t.Fatal("private fitness data escaped", private)
+		}
+	}
+	if marshalErr != nil || otlpErr != nil {
+		t.Fatal(marshalErr, otlpErr)
+	}
+}
+
+func TestTraceSnapshotRejectsCorruptFitnessMutation(t *testing.T) {
+	for _, mode := range []string{"body", "projection"} {
+		t.Run(mode, func(t *testing.T) {
+			db, _ := submissionStore(t)
+			ctx := context.Background()
+			start := event("fitness-start", 1, runtime.TaskStarted)
+			turn := event("fitness-turn", 2, runtime.TurnStarted)
+			turn.TurnID, turn.AttemptID = "turn", "attempt"
+			turn.Data.ModelID, turn.Data.ProviderID = "model", "provider"
+			turnDone := event("fitness-turn-done", 3, runtime.TurnCompleted)
+			turnDone.TurnID, turnDone.AttemptID = turn.TurnID, turn.AttemptID
+			done := event("fitness-done", 4, runtime.TaskCompleted)
+			for i, item := range []*runtime.Event{&start, &turn, &turnDone, &done} {
+				item.Time = time.Now().UTC().Add(time.Duration(i-10) * time.Millisecond)
+				if err := db.Append(ctx, int64(i), *item); err != nil {
+					t.Fatal(err)
+				}
+			}
+			record := evaluation.Record{Version: 1, ID: "evaluation", TaskID: start.TaskID, AttemptID: turn.AttemptID,
+				Key:    routing.Key{Model: "model", Provider: "provider", Domain: "code", Profile: "default"},
+				Checks: []evaluation.Check{{Source: evaluation.Deterministic, Reference: "check", Passed: true}}, Time: time.Now().UTC().Add(-time.Millisecond)}
+			if err := db.RecordEvaluation(ctx, record); err != nil {
+				t.Fatal(err)
+			}
+			var err error
+			if mode == "body" {
+				_, err = db.db.ExecContext(ctx, "UPDATE evaluations SET body=X'00' WHERE id='evaluation'")
+			} else {
+				_, err = db.db.ExecContext(ctx, "DELETE FROM fitness")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+				t.Fatal("corrupt fitness mutation escaped", snapshot, err)
+			}
+		})
 	}
 }
 

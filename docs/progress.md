@@ -8567,3 +8567,25 @@ absent. Focused race-enabled trace and telemetry suites pass. Provider-health,
 fitness-mutation, automatic skill lifecycle, lease-heartbeat timing, running
 task, and durable-delivery traces remain unfinished, and no Linear issue state
 is changed by this checkpoint.
+
+## 2026-09-18 — validated fitness-mutation trace observations
+
+Trace snapshot schema 6 now distinguishes durable fitness mutations from
+ordinary runtime validation. A terminal task receives
+`fitness_update/recorded` only when a bounded canonical base evaluation, its
+revision head, and the corresponding aggregate fitness row agree. A validated
+nonempty subjective revision chain additionally emits
+`fitness_update/revised`. Both are instantaneous task-end observations; they do
+not claim the mutation occurred at task termination or represent current model
+quality.
+
+The reader accepts at most 100 base evaluations and 100 revisions per base,
+length-probes retained bodies before decoding, revalidates chain continuity and
+the current head, rejects future/corrupt evidence time, and checks aggregate
+sample, quality, compliance, reliability, latency, cost, and update bounds.
+Public snapshot and OTLP fixtures prove that routing keys, scores, counts,
+evidence references, evaluator/revision identities, and durable task/session
+identities remain absent. Missing/corrupt aggregate state fails the whole
+snapshot. Focused race-enabled trace and telemetry suites pass. Provider-health,
+automatic skill lifecycle, lease-heartbeat timing, running-task, and durable
+delivery traces remain unfinished; no Linear issue state is changed.

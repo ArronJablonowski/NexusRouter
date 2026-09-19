@@ -9,7 +9,7 @@ import (
 var ErrInvalid = errors.New("invalid trace snapshot")
 var ErrExport = errors.New("trace export unavailable")
 
-const SnapshotVersion = 5
+const SnapshotVersion = 6
 const MaxTraces = 32
 const MaxSpans = 512
 
@@ -76,6 +76,8 @@ func spanVocabulary(name, outcome string) bool {
 		return outcome == "thermal" || outcome == "swap"
 	case "resource_lease":
 		return resourceLease(outcome)
+	case "fitness_update":
+		return outcome == "recorded" || outcome == "revised"
 	case "evaluation":
 		return outcome == "accepted" || outcome == "rejected"
 	case "fallback":
