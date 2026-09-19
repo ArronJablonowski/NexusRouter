@@ -9,7 +9,8 @@ content-free fitness-mutation observations. Version 7 includes coherent
 running-task snapshots without inventing completion for in-flight operations.
 Version 8 adds independent model-generated skill-draft and committed
 activation/rollback operation roots. Version 9 adds one bounded latest-worker-
-heartbeat observation per worker lifecycle:
+heartbeat observation per worker lifecycle. Version 10 adds a bounded model-
+output activity window per turn:
 
 ```sh
 darwin traces export --config config.yaml \
@@ -85,6 +86,17 @@ event was committed at that historical instant; it does not prove present
 liveness, progress, lease ownership, provider health, or safe reassignment.
 Worker identity and heartbeat counts remain private.
 
+For each turn that commits model deltas, the task trace includes one
+`model_output/observed` span from the first retained delta to the last. A single
+delta produces an instantaneous span. SQLite reduces any number of fragments to
+those two boundaries before the public row bound is applied. The selected
+boundaries must occur after their exact `turn.started` and before its
+`turn.completed` when present; out-of-lifecycle or malformed turn attribution
+fails the snapshot. The span reports durable output activity, not semantic
+quality, token count, completion, provider latency, or the content of any
+fragment. Text, model/provider identity, turn/attempt identity, fragment count,
+and usage remain private.
+
 Terminal tasks with durable resource leases receive at most one instantaneous
 `resource_lease` observation for each state class present:
 `reader_live`, `reader_expired`, `reader_released`, `writer_live`,
@@ -137,7 +149,7 @@ read snapshot; the validated catalog then contributes at most the same bounded
 number of newest transitions before one final merge and truncation. At most 512
 selected lifecycle events are accepted per task and 512 spans total; worker
 heartbeat history is reduced to the latest row per worker before that bound is
-applied. The SQLite
+applied, and model-delta history is reduced to its first/last row per turn. The SQLite
 deadline is three seconds, the application deadline is four seconds and
 delivery is bounded by ten seconds. A running root ends at the snapshot
 `observed_at` instant and
@@ -149,9 +161,10 @@ mismatched tool pairs or any exceeded bound fail the export. Unpaired
 in-flight, legacy or interrupted child operations are omitted; the separate
 metrics snapshot retains explicit missing-start and missing-end counts.
 
-This trace slice does not include model deltas, lease heartbeat/renewal timing,
-provider health or queue arrival/service rates. The worker-heartbeat marker is
-historical durable-event timing, not lease renewal telemetry.
+This trace slice does not export individual model deltas, lease heartbeat/
+renewal timing, provider health or queue arrival/service rates. The model-output
+span exposes only first/last activity boundaries, and the worker-heartbeat
+marker is historical durable-event timing rather than lease renewal telemetry.
 Queue residency is historical only for a successfully linked top-level
 task start; current queue pressure remains available through aggregate metrics.
 Fallback observations come from canonical safe-retry lineage; they do not

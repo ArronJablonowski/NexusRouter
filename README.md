@@ -1985,7 +1985,9 @@ roots with paired provider/tool/worker children and fixed route, evaluation,
 fallback, compaction, skill-context, steering, error and top-level submission
 queue-residency observations. Trace schema9 also includes at most one latest
 durable heartbeat marker per worker lifecycle, without worker identity or
-heartbeat count and without claiming current liveness. Queue waits use seven fixed buckets and expose no
+heartbeat count and without claiming current liveness. Trace schema10 collapses
+each turn's model deltas into one content-free first-to-last output-activity
+span without output text, fragment count, or a quality/completion claim. Queue waits use seven fixed buckets and expose no
 submission identity or exact arrival time. Every paired tool completion also
 emits its fixed none/confirmed/uncertain effect class without tool identity or
 result content. It uses

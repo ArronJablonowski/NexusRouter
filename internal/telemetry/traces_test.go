@@ -28,7 +28,7 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	kinds := []runtime.Kind{runtime.TaskStarted, runtime.RouteSelected, runtime.TurnStarted, runtime.TurnCompleted, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.TaskCompleted}
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.RouteSelected, runtime.TurnStarted, runtime.ModelDelta, runtime.ModelDelta, runtime.TurnCompleted, runtime.ToolStarted, runtime.ToolCompleted, runtime.WorkerStarted, runtime.WorkerHeartbeat, runtime.WorkerCompleted, runtime.EvaluationRecorded, runtime.ErrorRecorded, runtime.TaskCompleted}
 	for i, kind := range kinds {
 		e := event("private-event-"+string(rune('a'+i)), int64(i+1), kind)
 		e.TaskID, e.SessionID, e.CorrelationID = "private-task", "private-session", "private-correlation"
@@ -42,8 +42,11 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 			e.RouteID, e.Data.ModelID, e.Data.ProviderID = "private-route", "private-model", "private-provider"
 			e.Data.Route = &routing.Selection{Explored: true, Excluded: []routing.Exclusion{{Model: "private-excluded-model", Provider: "private-excluded-provider", Reasons: []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability", "capacity"}}, {Model: "private-second-model", Provider: "private-second-provider", Reasons: []string{"capacity"}}}}
 		}
-		if kind == runtime.TurnStarted || kind == runtime.TurnCompleted || kind == runtime.ToolStarted || kind == runtime.ToolCompleted {
+		if kind == runtime.TurnStarted || kind == runtime.TurnCompleted || kind == runtime.ModelDelta || kind == runtime.ToolStarted || kind == runtime.ToolCompleted {
 			e.TurnID, e.AttemptID = "private-turn", "private-attempt"
+		}
+		if kind == runtime.ModelDelta {
+			e.Data.Text = "private-model-output"
 		}
 		if kind == runtime.ToolStarted || kind == runtime.ToolCompleted {
 			e.Data.ToolCallID, e.Data.ToolName, e.Data.Effect = "private-call", "private-tool", runtime.NoEffect
@@ -63,14 +66,14 @@ func TestTraceSnapshotPairsOperationsWithoutIdentities(t *testing.T) {
 		}
 	}
 	snapshot, err := db.Traces(ctx, 1)
-	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 21 {
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 22 {
 		t.Fatal(snapshot, err)
 	}
 	body, _ := json.Marshal(snapshot)
 	if strings.Contains(string(body), "private") || snapshot.Traces[0].Spans[0].Outcome != "completed" {
 		t.Fatal(string(body))
 	}
-	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "tool/completed": true, "tool_effect/none": true, "worker/completed": true, "worker_heartbeat/observed": true, "evaluation/accepted": true, "error/recorded": true}
+	want := map[string]bool{"fallback/selected": true, "compaction/applied": true, "skill_context/loaded": true, "route/explored": true, "provider/completed": true, "model_output/observed": true, "tool/completed": true, "tool_effect/none": true, "worker/completed": true, "worker_heartbeat/observed": true, "evaluation/accepted": true, "error/recorded": true}
 	for _, reason := range []string{"mode", "privacy", "health", "policy", "credential", "capacity", "context", "budget", "capability"} {
 		want["route_constraint/"+reason] = true
 	}
@@ -120,6 +123,43 @@ func TestTraceSnapshotIncludesRunningTaskWithoutInventingPendingCompletion(t *te
 	}
 	body, marshalErr := json.Marshal(snapshot)
 	if marshalErr != nil || strings.Contains(string(body), "private") || strings.Contains(string(body), "tool") {
+		t.Fatal(string(body), marshalErr)
+	}
+}
+
+func TestTraceSnapshotIncludesRunningModelOutputWithoutInventingTurnCompletion(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	events := []runtime.Event{
+		event("private-streaming-start", 1, runtime.TaskStarted),
+		event("private-streaming-turn", 2, runtime.TurnStarted),
+		event("private-streaming-output", 3, runtime.ModelDelta),
+	}
+	for i := range events {
+		events[i].TaskID, events[i].SessionID, events[i].CorrelationID = "private-streaming-task", "private-streaming-session", "private-streaming-task"
+		events[i].Time = base.Add(time.Duration(i) * time.Millisecond)
+		if events[i].Kind == runtime.TurnStarted || events[i].Kind == runtime.ModelDelta {
+			events[i].TurnID, events[i].AttemptID = "private-streaming-turn", "private-streaming-attempt"
+		}
+		if events[i].Kind == runtime.ModelDelta {
+			events[i].Data.Text = "private-streaming-content"
+		}
+		if err := db.Append(ctx, int64(i), events[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 2 {
+		t.Fatal(snapshot, err)
+	}
+	root, output := snapshot.Traces[0].Spans[0], snapshot.Traces[0].Spans[1]
+	if root.Name != "task" || root.Outcome != "running" || !root.EndedAt.Equal(snapshot.ObservedAt) ||
+		output.Name != "model_output" || output.Outcome != "observed" || !output.StartedAt.Equal(events[2].Time) || !output.EndedAt.Equal(events[2].Time) {
+		t.Fatal(root, output)
+	}
+	body, marshalErr := json.Marshal(snapshot)
+	if marshalErr != nil || strings.Contains(string(body), "private") || strings.Contains(string(body), "provider") {
 		t.Fatal(string(body), marshalErr)
 	}
 }
@@ -205,6 +245,146 @@ func TestTraceSnapshotRejectsMalformedHeartbeatIdentity(t *testing.T) {
 	}
 	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
 		t.Fatal("malformed heartbeat identity escaped", snapshot, err)
+	}
+}
+
+func TestTraceSnapshotCollapsesModelDeltasToOutputWindow(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.TurnStarted, runtime.ModelDelta, runtime.ModelDelta, runtime.ModelDelta, runtime.TurnCompleted, runtime.TaskCompleted}
+	events := make([]runtime.Event, 0, len(kinds))
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("model-output-%d", i), int64(i+1), kind)
+		e.TaskID, e.SessionID, e.CorrelationID = "private-output-task", "private-output-session", "private-output-task"
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.TurnStarted || kind == runtime.ModelDelta || kind == runtime.TurnCompleted {
+			e.TurnID, e.AttemptID = "private-output-turn", "private-output-attempt"
+		}
+		if kind == runtime.ModelDelta {
+			e.Data.Text = "private-output-fragment"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, e)
+	}
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 3 {
+		t.Fatal(snapshot, err)
+	}
+	var outputCount int
+	for _, span := range snapshot.Traces[0].Spans[1:] {
+		if span.Name != "model_output" {
+			continue
+		}
+		outputCount++
+		if span.Outcome != "observed" || !span.StartedAt.Equal(events[2].Time) || !span.EndedAt.Equal(events[4].Time) {
+			t.Fatal("wrong output window", span)
+		}
+	}
+	if outputCount != 1 {
+		t.Fatal("model deltas were not collapsed", snapshot)
+	}
+	body, marshalErr := json.Marshal(snapshot)
+	if marshalErr != nil || strings.Contains(string(body), "private-output") || strings.Contains(string(body), "fragment") {
+		t.Fatal(string(body), marshalErr)
+	}
+}
+
+func TestTraceSnapshotBoundsHighVolumeModelOutputBeforeRowLimit(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	sequence := int64(1)
+	appendEvent := func(kind runtime.Kind) runtime.Event {
+		e := event(fmt.Sprintf("bounded-output-%d", sequence), sequence, kind)
+		e.TaskID, e.SessionID, e.CorrelationID = "private-bounded-task", "private-bounded-session", "private-bounded-task"
+		e.Time = base.Add(time.Duration(sequence-1) * time.Millisecond)
+		if kind == runtime.TurnStarted || kind == runtime.ModelDelta || kind == runtime.TurnCompleted {
+			e.TurnID, e.AttemptID = "private-bounded-turn", "private-bounded-attempt"
+		}
+		if kind == runtime.ModelDelta {
+			e.Data.Text = "private-bounded-content"
+		}
+		if err := db.Append(ctx, sequence-1, e); err != nil {
+			t.Fatal(err)
+		}
+		sequence++
+		return e
+	}
+	appendEvent(runtime.TaskStarted)
+	appendEvent(runtime.TurnStarted)
+	first := appendEvent(runtime.ModelDelta)
+	for range 512 {
+		appendEvent(runtime.ModelDelta)
+	}
+	last := appendEvent(runtime.ModelDelta)
+	appendEvent(runtime.TurnCompleted)
+	appendEvent(runtime.TaskCompleted)
+
+	snapshot, err := db.Traces(ctx, 1)
+	if err != nil || snapshot.Validate() != nil || len(snapshot.Traces) != 1 || len(snapshot.Traces[0].Spans) != 3 {
+		t.Fatal(snapshot, err)
+	}
+	var output tracewire.Span
+	for _, span := range snapshot.Traces[0].Spans[1:] {
+		if span.Name == "model_output" {
+			output = span
+			break
+		}
+	}
+	if output.Name != "model_output" || output.Outcome != "observed" || !output.StartedAt.Equal(first.Time) || !output.EndedAt.Equal(last.Time) {
+		t.Fatal("high-volume output was not reduced before the row bound", output)
+	}
+}
+
+func TestTraceSnapshotRejectsModelDeltaOutsideTurnLifecycle(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.ModelDelta, runtime.TaskCompleted}
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("late-model-output-%d", i), int64(i+1), kind)
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.TurnStarted || kind == runtime.ModelDelta || kind == runtime.TurnCompleted {
+			e.TurnID = "late-output-turn"
+		}
+		if kind == runtime.ModelDelta {
+			e.Data.Text = "late output"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("out-of-lifecycle model delta escaped", snapshot, err)
+	}
+}
+
+func TestTraceSnapshotRejectsMalformedModelDeltaIdentity(t *testing.T) {
+	db, _ := submissionStore(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-time.Second)
+	kinds := []runtime.Kind{runtime.TaskStarted, runtime.TurnStarted, runtime.ModelDelta, runtime.TurnCompleted, runtime.TaskCompleted}
+	for i, kind := range kinds {
+		e := event(fmt.Sprintf("malformed-model-output-%d", i), int64(i+1), kind)
+		e.Time = base.Add(time.Duration(i) * time.Millisecond)
+		if kind == runtime.TurnStarted || kind == runtime.ModelDelta || kind == runtime.TurnCompleted {
+			e.TurnID = "malformed-output-turn"
+		}
+		if kind == runtime.ModelDelta {
+			e.Data.Text = "malformed output"
+		}
+		if err := db.Append(ctx, int64(i), e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.db.ExecContext(ctx, `UPDATE events SET body=json_remove(body,'$.turn_id') WHERE id='malformed-model-output-2'`); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot, err := db.Traces(ctx, 1); err == nil || len(snapshot.Traces) != 0 {
+		t.Fatal("malformed model delta identity escaped", snapshot, err)
 	}
 }
 

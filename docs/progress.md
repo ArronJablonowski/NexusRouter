@@ -8684,3 +8684,30 @@ every race-enabled package, and the production build; application took
 2317.700s, telemetry 2360.904s, release packaging 808.353s, SDK 272.853s,
 tool-gate 108.574s, traces 2.607s, and workers 47.621s. No Linear issue state is
 changed.
+
+## 2026-09-19 — content-free model-output activity traces
+
+Trace snapshot schema 10 collapses every turn's durable `model.delta` history
+into one `model_output/observed` span from its first retained fragment to its
+last; a single fragment becomes an instantaneous observation. One indexed task
+scan computes first/last boundaries with SQLite window projections before the
+existing public row bound, avoiding per-fragment index rescans and preventing
+long streams from amplifying exported span cardinality.
+
+The reader requires each selected boundary to follow its exact
+`turn.started` and precede `turn.completed` when present. Missing, malformed, or
+out-of-lifecycle attribution fails closed. Public JSON and OTLP expose no text,
+fragment/token count, usage, model/provider, turn/attempt, task/session, or
+event identity. The span proves durable output activity only; it is not quality
+evidence, semantic completion, or provider-reported latency. Race-enabled tests
+cover multi-fragment collapse, reduction of a 514-fragment stream before the
+public row bound, in-flight output without fabricated provider completion, a
+closed wire vocabulary, identity/content exclusion, malformed attribution, and
+late delta rejection.
+
+The complete `make check` gate passed source formatting and the 1,000-line
+limit, vetting, every race-enabled package, release packaging, and the
+production build. Application took 2291.038s, telemetry 2335.931s, release
+packaging 806.776s, SDK 273.877s, tool-gate 109.034s, traces 2.659s, and workers
+47.657s. Provider health, lease renewal timing, and durable trace delivery
+remain unfinished; no Linear issue state is changed.

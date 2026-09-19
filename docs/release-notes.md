@@ -454,6 +454,9 @@ operator records.
   Trace schema 9 adds at most one latest durable heartbeat marker per worker
   lifecycle. It exports no worker identity or heartbeat count and does not
   claim current liveness, lease ownership, or safe reassignment.
+  Trace schema 10 reduces each turn's model deltas to one content-free
+  first-to-last output-activity span. It exposes no text, fragment/token count,
+  model/provider identity, or quality/completion claim.
   Model-generated draft outcomes and committed skill activation/rollback
   transitions are independent content-free roots at their durable timestamps;
   no skill, version, model, validator, evidence, source or operation identity is

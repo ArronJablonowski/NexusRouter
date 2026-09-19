@@ -87,7 +87,20 @@ func (s *Store) Traces(ctx context.Context, limit int) (traces.Snapshot, error) 
 }
 
 func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt time.Time) (traces.Trace, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT sequence,json_extract(body,'$.kind'),
+	rows, err := tx.QueryContext(ctx, `WITH trace_events AS (
+	 SELECT e.*,
+	  max(sequence) FILTER (WHERE json_extract(body,'$.kind')='worker.heartbeat') OVER (
+	   PARTITION BY json_extract(body,'$.worker_id')) AS worker_heartbeat_max,
+	  min(sequence) FILTER (WHERE json_extract(body,'$.kind')='model.delta') OVER (
+	   PARTITION BY json_extract(body,'$.turn_id'),COALESCE(json_extract(body,'$.attempt_id'),'')) AS model_delta_first,
+	  max(sequence) FILTER (WHERE json_extract(body,'$.kind')='model.delta') OVER (
+	   PARTITION BY json_extract(body,'$.turn_id'),COALESCE(json_extract(body,'$.attempt_id'),'')) AS model_delta_last
+	 FROM events AS e INDEXED BY events_task_kind
+	 WHERE task_id=? AND json_extract(body,'$.kind') IN
+	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','model.delta','tool.started','tool.completed',
+	  'worker.started','worker.heartbeat','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied','context.compacted')
+	)
+	SELECT sequence,json_extract(body,'$.kind'),
 	 CASE WHEN json_type(body,'$.turn_id')='text' AND length(CAST(json_extract(body,'$.turn_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.turn_id') ELSE '' END,
 	 CASE WHEN json_type(body,'$.attempt_id') IS NULL THEN '' WHEN json_type(body,'$.attempt_id')='text' AND length(CAST(json_extract(body,'$.attempt_id') AS BLOB))<=256 THEN json_extract(body,'$.attempt_id') ELSE '' END,
 	 CASE WHEN json_type(body,'$.data.tool_call_id') IS NULL THEN '' WHEN json_type(body,'$.data.tool_call_id')='text' AND length(CAST(json_extract(body,'$.data.tool_call_id') AS BLOB)) BETWEEN 1 AND 256 THEN json_extract(body,'$.data.tool_call_id') ELSE '' END,
@@ -131,23 +144,31 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 	  WHEN json_type(body,'$.data.resources.swap_pressure')='true' THEN 1
 	  WHEN json_type(body,'$.data.resources.swap_pressure')='false' THEN 0
 	  ELSE -2
+	 END,
+	 CASE
+	  WHEN json_extract(body,'$.kind')<>'model.delta' THEN 0
+	  WHEN json_type(body,'$.turn_id')<>'text' OR length(CAST(json_extract(body,'$.turn_id') AS BLOB)) NOT BETWEEN 1 AND 256
+	   OR (json_type(body,'$.attempt_id') IS NOT NULL AND (json_type(body,'$.attempt_id')<>'text' OR length(CAST(json_extract(body,'$.attempt_id') AS BLOB))>256)) THEN -1
+	  ELSE CASE WHEN sequence=model_delta_first THEN 1 ELSE 0 END
+	   + CASE WHEN sequence=model_delta_last THEN 2 ELSE 0 END
 	 END
-	 FROM events AS e INDEXED BY events_task_kind WHERE task_id=? AND json_extract(body,'$.kind') IN
-	 ('task.started','task.completed','task.failed','task.canceled','turn.started','turn.completed','tool.started','tool.completed',
-	  'worker.started','worker.heartbeat','worker.completed','route.selected','evaluation.recorded','error.recorded','steering.applied','context.compacted')
-	 AND (json_extract(body,'$.kind')<>'worker.heartbeat'
+	 FROM trace_events AS e WHERE
+	 (json_extract(body,'$.kind')<>'worker.heartbeat'
 	  OR json_type(body,'$.worker_id') IS NULL OR json_type(body,'$.worker_id')<>'text'
 	  OR length(CAST(json_extract(body,'$.worker_id') AS BLOB)) NOT BETWEEN 1 AND 256
-	  OR sequence=(
-	  SELECT max(h.sequence) FROM events AS h INDEXED BY events_task_kind
-	  WHERE h.task_id=e.task_id AND json_extract(h.body,'$.kind')='worker.heartbeat'
-	   AND json_extract(h.body,'$.worker_id')=json_extract(e.body,'$.worker_id')))
+	  OR sequence=worker_heartbeat_max)
+	 AND (json_extract(body,'$.kind')<>'model.delta'
+	  OR json_type(body,'$.turn_id') IS NULL OR json_type(body,'$.turn_id')<>'text'
+	  OR length(CAST(json_extract(body,'$.turn_id') AS BLOB)) NOT BETWEEN 1 AND 256
+	  OR (json_type(body,'$.attempt_id') IS NOT NULL AND (json_type(body,'$.attempt_id')<>'text' OR length(CAST(json_extract(body,'$.attempt_id') AS BLOB))>256))
+	  OR sequence=model_delta_first OR sequence=model_delta_last)
 	 ORDER BY sequence LIMIT 514`, task.id)
 	if err != nil {
 		return traces.Trace{}, errTraces
 	}
 	defer rows.Close()
 	pending := map[tracePairKey]traceStart{}
+	modelStarts := map[tracePairKey]time.Time{}
 	children := make([]traces.Span, 0)
 	var rootStart, rootEnd time.Time
 	terminalSeen := false
@@ -159,8 +180,8 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		}
 		var sequence int64
 		var kind, turn, attempt, call, toolName, worker, encodedTime, queuedAt, toolEffect string
-		var retry, compaction, skillContext, explored, accepted, routeConstraints, thermalPressure, swapPressure int
-		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt, &toolEffect, &thermalPressure, &swapPressure) != nil || sequence < 1 {
+		var retry, compaction, skillContext, explored, accepted, routeConstraints, thermalPressure, swapPressure, modelEdge int
+		if rows.Scan(&sequence, &kind, &turn, &attempt, &call, &toolName, &worker, &encodedTime, &retry, &compaction, &skillContext, &explored, &accepted, &routeConstraints, &queuedAt, &toolEffect, &thermalPressure, &swapPressure, &modelEdge) != nil || sequence < 1 {
 			return traces.Trace{}, errTraces
 		}
 		at, valid := operationMetricTime(encodedTime, observedAt)
@@ -201,6 +222,28 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 			}
 			terminalSeen = true
 			rootEnd = at
+		case "model.delta":
+			key := tracePairKey{kind: "provider", turn: turn, attempt: attempt}
+			started, active := pending[key]
+			if !active || turn == "" || at.Before(started.at) || modelEdge < 1 || modelEdge > 3 {
+				return traces.Trace{}, errTraces
+			}
+			switch modelEdge {
+			case 1:
+				if _, exists := modelStarts[key]; exists {
+					return traces.Trace{}, errTraces
+				}
+				modelStarts[key] = at
+			case 2:
+				first, exists := modelStarts[key]
+				if !exists || at.Before(first) {
+					return traces.Trace{}, errTraces
+				}
+				delete(modelStarts, key)
+				children = append(children, traces.Span{Name: "model_output", Outcome: "observed", Parent: 0, StartedAt: first, EndedAt: at})
+			case 3:
+				children = append(children, traceInstant("model_output", "observed", at))
+			}
 		case "turn.started", "turn.completed", "tool.started", "tool.completed":
 			group := "provider"
 			start := kind == "turn.started" || kind == "tool.started"
@@ -303,7 +346,7 @@ func readTaskTrace(ctx context.Context, tx *sql.Tx, task traceTask, observedAt t
 		}
 		rootEnd = observedAt
 	}
-	if rows.Err() != nil || count > 512 || rootStart.IsZero() || rootEnd.IsZero() || rootEnd.Before(rootStart) {
+	if rows.Err() != nil || count > 512 || len(modelStarts) != 0 || rootStart.IsZero() || rootEnd.IsZero() || rootEnd.Before(rootStart) {
 		return traces.Trace{}, errTraces
 	}
 	if rows.Close() != nil {
