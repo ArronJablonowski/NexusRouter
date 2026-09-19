@@ -28,9 +28,10 @@ telemetry, then removes the workspace. Freeze and verification each perform
 dependency reconstruction in a separate fresh cache, so the job cannot succeed
 from a populated setup-go or runner cache. Each job also records the requested version, verified commit,
 actual Go host OS/architecture, Go version and other gate outcomes in its job
-summary. The native wrapper itself runs `make check`, `make qualify-mvp`,
-`make qualify-context-recovery`, and `make qualify-release-test` as
-independently bounded commands. It rechecks the source after every command
+summary. The native wrapper itself gives package-serialized `make check` a
+120-minute ceiling and runs `make qualify-mvp`, `make qualify-context-recovery`,
+and `make qualify-release-test` with independent 60-minute ceilings. It rechecks
+the source after every command
 before creating its record; the public `make qualify-release` target preserves
 the same sequential ordering for operators.
 

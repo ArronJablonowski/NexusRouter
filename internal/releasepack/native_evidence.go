@@ -460,10 +460,11 @@ func validateNativeGo(observed nativeGoEnvironment) error {
 }
 
 func nativeGateCommand(ctx context.Context, source string, env []string, target string, log io.Writer) error {
-	// The release qualification test itself has a 45-minute ceiling. Preserve
-	// that meaningful gate instead of inheriting the short metadata-command
-	// timeout, while still bounding hung build processes and captured output.
-	gateCtx, cancel := context.WithTimeout(ctx, nativeGateTimeout)
+	// The package-serialized repository check can legitimately run two of its
+	// 45-minute package ceilings in sequence. The focused qualification gates
+	// each retain their separate one-hour ceiling. Both paths still bound hung
+	// process trees and captured output.
+	gateCtx, cancel := context.WithTimeout(ctx, nativeGateTimeoutFor(target))
 	defer cancel()
 	cmd := exec.CommandContext(gateCtx, "make", target)
 	configureNativeProcessTree(cmd)
@@ -494,7 +495,17 @@ func nativeGateCommand(ctx context.Context, source string, env []string, target 
 	return nil
 }
 
-const nativeGateTimeout = 60 * time.Minute
+const (
+	nativeCheckGateTimeout = 120 * time.Minute
+	nativeGateTimeout      = 60 * time.Minute
+)
+
+func nativeGateTimeoutFor(target string) time.Duration {
+	if target == "check" {
+		return nativeCheckGateTimeout
+	}
+	return nativeGateTimeout
+}
 
 type boundedNativeGateLog struct {
 	destination io.Writer

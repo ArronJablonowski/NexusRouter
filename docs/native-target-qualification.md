@@ -32,8 +32,9 @@ checks the source again, runs `make qualify-mvp`, checks the source again, runs
 the version- and commit-bound `make qualify-release-test`, and performs a final
 clean-source check before exclusively creating the record.
 
-The wrapper runs `check`, `qualify-mvp`, and the private
-`qualify-release-test` target as three separately bounded native commands. The
+The wrapper gives the package-serialized `check` command a 120-minute ceiling
+and runs `qualify-mvp`, `qualify-context-recovery`, and the private
+`qualify-release-test` target with separate 60-minute ceilings. The
 public `make qualify-release` target preserves the same operator-facing order
 with explicit sequential recursive invocations of `qualify-mvp` and then
 `qualify-release-test`, including when the outer make enables parallel work;
@@ -41,10 +42,10 @@ splitting the
 wrapper invocations prevents the MVP phase from consuming the release test's
 45-minute ceiling.
 
-The hosted matrix gives those three native commands 60 minutes each and keeps
-a separate 120-minute allowance for checkout and toolchain setup, candidate
+The hosted matrix keeps a separate 60-minute allowance beyond those four gate
+ceilings for checkout and toolchain setup, candidate
 derivation, two fresh license-evidence reconstructions, verification, artifact
-upload, and failure-aware reporting. That five-hour job limit is an execution
+upload, and failure-aware reporting. That six-hour job limit is an execution
 ceiling, not evidence that a timed-out or skipped gate passed.
 
 Standard output is the complete gate transcript and standard error contains

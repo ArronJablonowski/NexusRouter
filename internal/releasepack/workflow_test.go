@@ -86,7 +86,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		{"linux/amd64", "ubuntu-24.04", "linux", "amd64"},
 		{"linux/arm64", "ubuntu-24.04-arm", "linux", "arm64"},
 	}
-	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 300 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
+	if !ok || job.Name != "Qualify ${{ matrix.target }}" || job.Timeout != 360 || job.Strategy.FailFast || job.RunsOn != "${{ matrix.runner }}" ||
 		len(job.Strategy.Matrix.Include) != len(expectedMatrix) || len(job.Steps) != 9 {
 		t.Fatal("unexpected job structure")
 	}
@@ -133,11 +133,16 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		strings.Count(string(makefile), "qualify-release:\n\t$(MAKE) qualify-mvp\n\t$(MAKE) qualify-context-recovery\n\t$(MAKE) qualify-release-test") != 1 ||
 		strings.Count(string(makefile), "\nqualify-context-recovery:\n") != 1 ||
 		strings.Count(string(makefile), "\nqualify-release-test:\n") != 1 ||
+		nativeCheckGateTimeout != 120*time.Minute ||
 		nativeGateTimeout != 60*time.Minute ||
+		nativeGateTimeoutFor("check") != nativeCheckGateTimeout ||
+		nativeGateTimeoutFor("qualify-mvp") != nativeGateTimeout ||
+		nativeGateTimeoutFor("qualify-context-recovery") != nativeGateTimeout ||
+		nativeGateTimeoutFor("qualify-release-test") != nativeGateTimeout ||
 		nativeGateTimeout < 35*time.Minute+20*time.Minute ||
 		nativeGateTimeout < 45*time.Minute+15*time.Minute ||
-		time.Duration(job.Timeout)*time.Minute <= 4*nativeGateTimeout+30*time.Minute ||
-		time.Duration(job.Timeout)*time.Minute-4*nativeGateTimeout != 60*time.Minute {
+		time.Duration(job.Timeout)*time.Minute <= nativeCheckGateTimeout+3*nativeGateTimeout+30*time.Minute ||
+		time.Duration(job.Timeout)*time.Minute-nativeCheckGateTimeout-3*nativeGateTimeout != 60*time.Minute {
 		t.Fatal("release timeout hierarchy has insufficient headroom")
 	}
 	for i, expected := range expectedMatrix {

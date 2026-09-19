@@ -8817,3 +8817,22 @@ status, and readiness columns with the canonical report body, preventing
 metadata corruption from silently changing query order. The daemon recorder
 also rejects typed-nil storage writers and supports concurrent, repeated
 shutdown without blocking. Race-enabled regression tests cover both fixes.
+
+## 2026-09-19 — Native qualification timeout correction
+
+A fresh DAR-51 Darwin/arm64 evidence run against clean commit `bd84b147` failed
+closed without creating either canonical record. Its retained transcript proves
+the serialized `make check` gate passed `internal/app` in 2,239.222s and
+`internal/releasepack` in 739.744s, then reached `internal/telemetry` before the
+wrapper's single 60-minute check deadline expired. This was a release-control
+budget defect rather than qualification evidence; the failed directory is not
+eligible for reuse.
+
+The native wrapper now gives the complete package-serialized repository check a
+120-minute ceiling while retaining separate 60-minute ceilings for MVP,
+DAR-126 context recovery, and release-test qualification. The hosted job limit
+is six hours, leaving a separate hour beyond those four gate ceilings for
+checkout, toolchain setup, two clean license reconstructions, verification,
+evidence upload, and failure reporting. Process-tree cancellation, transcript
+bounds, source rechecks, and every existing test remain unchanged. A fresh
+candidate and native campaign are required after this corrective commit.
