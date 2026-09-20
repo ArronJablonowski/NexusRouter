@@ -2864,6 +2864,7 @@
         "id": {"$ref": "#/$defs/model_id"},
         "provider": {"$ref": "#/$defs/model_id"},
         "model": {"type": "string", "minLength": 1, "maxLength": 512, "x-maxBytes": 512},
+        "reasoning_effort": {"enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]},
         "locality": {"enum": ["local", "cloud"]},
         "configured": {"type": "boolean"},
         "enabled": {"type": "boolean"},
@@ -2908,11 +2909,20 @@
     "model_inspection_page": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "availability", "local_unknown_size_count", "refresh_interval_ms", "local_providers", "models"],
+      "required": ["version", "availability", "managed_residency", "specialists_allow_cloud", "local_unknown_size_count", "refresh_interval_ms", "local_providers", "models"],
       "properties": {
         "version": {"const": 1},
         "availability": {"$ref": "#/$defs/availability"},
         "config_id": {"type": "string", "pattern": "^[0-9a-f]{64}$", "minLength": 64, "maxLength": 64, "x-maxBytes": 64},
+        "commander_id": {"$ref": "#/$defs/model_id"},
+        "commander_source": {"enum": ["configured", "inferred"]},
+        "commander_fallback_id": {"$ref": "#/$defs/model_id"},
+        "local_concurrency": {"type": "string", "pattern": "^(auto|[1-9]|[1-5][0-9]|6[0-4])$"},
+        "local_pressure_policy": {"enum": ["reject", "wait"]},
+        "local_ram_limit_pct": {"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+        "local_vram_limit_pct": {"type": "number", "exclusiveMinimum": 0, "maximum": 100},
+        "managed_residency": {"type": "boolean"},
+        "specialists_allow_cloud": {"type": "boolean"},
         "refreshed_at": {"type": "string", "format": "date-time"},
         "local_total_bytes": {"type": "integer", "minimum": 0},
         "local_total_kind": {"const": "logical_deduplicated"},
@@ -2923,7 +2933,10 @@
         "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}}
       },
       "allOf": [
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}}}}
+        {"if": {"required": ["commander_id"]}, "then": {"required": ["commander_source"]}},
+        {"if": {"required": ["commander_source"]}, "then": {"required": ["commander_id"]}},
+        {"if": {"required": ["commander_fallback_id"]}, "then": {"required": ["commander_id"]}},
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}}}}
       ]
     },
     "usage_total_inspection": {

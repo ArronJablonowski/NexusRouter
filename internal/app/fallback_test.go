@@ -96,6 +96,38 @@ func TestAutomaticSafeFallbackPreservesFailedHistory(t *testing.T) {
 	}
 }
 
+func TestConfiguredCommanderFallsBackAfterRetryableFailure(t *testing.T) {
+	svc, _ := autoFixture(t)
+	svc.settings.WebUI.DefaultModel = "a"
+	svc.settings.WebUI.CommanderFallbackModel = "z"
+	calls := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"z"}]}`)
+			return
+		}
+		var request struct {
+			Model string `json:"model"`
+		}
+		if json.NewDecoder(r.Body).Decode(&request) != nil {
+			t.Fatal("invalid provider request")
+		}
+		calls = append(calls, request.Model)
+		if request.Model == "a" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		fmt.Fprintln(w, `{"message":{"content":"local commander fallback"},"done":true,"done_reason":"stop"}`)
+	}))
+	defer server.Close()
+	svc.settings.Providers[0].Endpoint = server.URL
+
+	out, err := svc.Run(context.Background(), Request{ModelID: "a", Prompt: "hello"})
+	if err != nil || out.Text != "local commander fallback" || fmt.Sprint(calls) != "[a z]" || len(out.PreviousTaskIDs) != 1 {
+		t.Fatalf("configured commander fallback failed: %+v %v calls=%v", out, err, calls)
+	}
+}
+
 func TestHybridFallbackMayCrossLocalityOnlyWhenPolicyAllows(t *testing.T) {
 	for _, localRequired := range []bool{false, true} {
 		t.Run(fmt.Sprint("local-required-", localRequired), func(t *testing.T) {

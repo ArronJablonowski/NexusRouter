@@ -287,7 +287,7 @@ func openOwnedCodexProvider(ctx context.Context, s config.Settings, provider con
 			adapter, closeProvider = nil, nil
 		}
 	}()
-	p, err = launch(ctx, codexbridge.LaunchSpec{Executable: provider.Executable, CWD: dir, Model: model.Model, Mode: s.Mode, Privacy: privacy, Env: env})
+	p, err = launch(ctx, codexbridge.LaunchSpec{Executable: provider.Executable, CWD: dir, Model: model.Model, ReasoningEffort: model.ReasoningEffort, Mode: s.Mode, Privacy: privacy, Env: env})
 	if p == nil || (reflect.ValueOf(p).Kind() == reflect.Pointer && reflect.ValueOf(p).IsNil()) {
 		return nil, nil, ErrAdmission
 	}

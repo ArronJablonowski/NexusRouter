@@ -143,9 +143,13 @@ func TestCodexAuditProviderLifecycle(t *testing.T) {
 func TestCodexOwnedProviderCleanupIdempotent(t *testing.T) {
 	fixture := &auditLifecycleProvider{}
 	p := auditLifecycleAdapter(nil)
+	p.model.ReasoningEffort = "medium"
 	var cwd string
 	adapter, closeProvider, err := openOwnedCodexProvider(context.Background(), p.settings, p.provider, p.model, p.privacy, func(_ context.Context, spec codexbridge.LaunchSpec) (taskProvider, error) {
 		cwd = spec.CWD
+		if spec.ReasoningEffort != "medium" {
+			t.Fatal("configured reasoning effort was not forwarded to the Codex launch")
+		}
 		return fixture, nil
 	})
 	owned, ok := adapter.(*ownedCodexProvider)

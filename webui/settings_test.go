@@ -5,7 +5,7 @@ import "testing"
 func TestSettingsContract(t *testing.T) {
 	digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	off := ToolAccessSettings{}
-	on := ToolAccessSettings{ToolsEnabled: true, DelegateReadTools: true, ReadRoot: "/workspace"}
+	on := ToolAccessSettings{ToolsEnabled: true, DelegateReadTools: true, ReadRoot: "/workspace", SpecialistsAllowCloud: true}
 	for _, value := range []interface{ Validate() error }{
 		off, on,
 		SettingsInspection{Version: 1, Digest: digest, Active: off, Saved: on, RestartRequired: true},

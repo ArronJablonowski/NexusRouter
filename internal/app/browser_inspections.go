@@ -55,8 +55,14 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	total := uint64(0)
 	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
-		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models))}
+		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models)), LocalConcurrency: s.settings.Hardware.Concurrent,
+		LocalPressurePolicy: s.settings.Hardware.LocalPressurePolicy, LocalRAMLimitPct: s.settings.Hardware.MaxRAM, LocalVRAMLimitPct: s.settings.Hardware.MaxVRAM}
 	out.CommanderID, out.CommanderSource = browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
+	out.CommanderFallbackID = s.settings.WebUI.CommanderFallbackModel
+	out.SpecialistsAllowCloud = s.settings.WebUI.SpecialistsAllowCloud
+	for _, provider := range s.settings.Providers {
+		out.ManagedResidency = out.ManagedResidency || provider.ManageResidency
+	}
 	configured := map[string]int{}
 	for i, model := range catalog.Models {
 		fact, observed := modelHealth[model.ID]
@@ -179,7 +185,7 @@ func browserModel(model routing.ConfiguredModel, modelHealth string) contract.Mo
 		value := model.VRAMBytes
 		vram = &value
 	}
-	return contract.ModelInspection{ID: model.ID, Provider: model.Provider, Model: model.Model, Locality: model.Locality,
+	return contract.ModelInspection{ID: model.ID, Provider: model.Provider, Model: model.Model, ReasoningEffort: model.ReasoningEffort, Locality: model.Locality,
 		Capabilities: append([]string(nil), model.Capabilities...), ContextTokens: contextTokens, EstimatedCost: cloneFloat(model.EstimatedCost),
 		RAMBytes: ram, VRAMBytes: vram, FailureDomain: model.FailureDomain, Health: modelHealth}
 }

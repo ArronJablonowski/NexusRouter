@@ -148,7 +148,8 @@ func TestInspectionExpandedBoundsMatchSchema(t *testing.T) {
 	now, total := time.Now().UTC(), uint64(0)
 	models := ModelInspectionPage{Version: 1, Availability: Available, ConfigID: strings.Repeat("a", 64), RefreshedAt: &now,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: 10000,
-		LocalProviders: []LocalProviderInspection{}, Models: []ModelInspection{}}
+		LocalProviders: []LocalProviderInspection{}, Models: []ModelInspection{}, LocalConcurrency: "1", LocalPressurePolicy: "reject",
+		LocalRAMLimitPct: 75, LocalVRAMLimitPct: 75}
 	for index := 0; index < 101; index++ {
 		models.Models = append(models.Models, ModelInspection{ID: "model_" + strconv.Itoa(index), Provider: "provider", Model: "model", Locality: "local", Capabilities: []string{}, Health: "unknown"})
 	}
@@ -156,6 +157,12 @@ func TestInspectionExpandedBoundsMatchSchema(t *testing.T) {
 		t.Fatal("101-model Go contract rejected")
 	}
 	validateSchemaValue(t, compiler, location+"#/$defs/model_inspection_page", marshalInspection(t, models), true)
+	models.LocalConcurrency = "01"
+	if !errors.Is(models.Validate(), ErrContract) {
+		t.Fatal("noncanonical local concurrency accepted")
+	}
+	validateSchemaValue(t, compiler, location+"#/$defs/model_inspection_page", marshalInspection(t, models), false)
+	models.LocalConcurrency = "1"
 	for len(models.Models) <= MaxInspectionModels {
 		index := len(models.Models)
 		models.Models = append(models.Models, ModelInspection{ID: "model_" + strconv.Itoa(index), Provider: "provider", Model: "model", Locality: "local", Capabilities: []string{}, Health: "unknown"})

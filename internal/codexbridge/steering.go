@@ -78,6 +78,9 @@ func (s *Session) continueCompleted(ctx context.Context, req providers.Request) 
 		return err
 	}
 	params := map[string]any{"threadId": s.thread, "model": req.Model, "environments": []any{}, "input": input}
+	if s.options.ReasoningEffort != "" {
+		params["effort"] = s.options.ReasoningEffort
+	}
 	if req.JSONSchema != nil {
 		params["outputSchema"] = req.JSONSchema
 	}

@@ -16,9 +16,9 @@ import (
 // must be a host-owned empty directory; the launcher never removes that directory.
 // Env is an explicit allowlist retaining existing login locations, not copied auth.
 type LaunchSpec struct {
-	Executable, CWD, Model string
-	Mode, Privacy          string
-	Env                    []string
+	Executable, CWD, Model, ReasoningEffort string
+	Mode, Privacy                           string
+	Env                                     []string
 }
 
 // LaunchChecked owns discovery and returns a task-owned checked connection.
@@ -37,7 +37,7 @@ type launchReadMetadata func(context.Context, codexrpc.ProcessSpec, ...string) (
 
 func launchChecked(ctx context.Context, spec LaunchSpec, start launchStart, metadata launchReadMetadata) (_ *Session, err error) {
 	if ctx == nil || ctx.Err() != nil || (spec.Mode != "hybrid" && spec.Mode != "cloud_only") || spec.Privacy != "cloud_allowed" || spec.Model != "gpt-5.6-sol" ||
-		!filepath.IsAbs(spec.Executable) || !filepath.IsAbs(spec.CWD) || !launchEnvValid(spec.Env) {
+		!filepath.IsAbs(spec.Executable) || !filepath.IsAbs(spec.CWD) || !launchEnvValid(spec.Env) || !validReasoningEffort(spec.ReasoningEffort) {
 		return nil, ErrLaunchObservation
 	}
 	dir, readErr := os.Open(spec.CWD)
@@ -93,7 +93,7 @@ func launchChecked(ctx context.Context, spec LaunchSpec, start launchStart, meta
 	if err != nil {
 		return nil, ErrLaunchObservation
 	}
-	s, err := NewCheckedSession(ctx, w, Options{Model: spec.Model, CWD: spec.CWD}, features)
+	s, err := NewCheckedSession(ctx, w, Options{Model: spec.Model, CWD: spec.CWD, ReasoningEffort: spec.ReasoningEffort}, features)
 	if err != nil {
 		_ = w.Close()
 		return nil, ErrLaunchObservation

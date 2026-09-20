@@ -48,6 +48,8 @@ type WebUI struct {
 	BrowserSessionTTL             string   `yaml:"browser_session_ttl" json:"browser_session_ttl"`
 	ModelInventoryRefreshInterval string   `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
 	DefaultModel                  string   `yaml:"default_model,omitempty" json:"default_model,omitempty"`
+	CommanderFallbackModel        string   `yaml:"commander_fallback_model,omitempty" json:"commander_fallback_model,omitempty"`
+	SpecialistsAllowCloud         bool     `yaml:"specialists_allow_cloud" json:"specialists_allow_cloud"`
 }
 type Workboard struct {
 	Enabled       bool                   `yaml:"enabled" json:"enabled"`
@@ -104,17 +106,18 @@ type Provider struct {
 	Executable      string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
 type Model struct {
-	ContextTokens int      `yaml:"context_tokens" json:"context_tokens"`
-	EstimatedCost *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
-	RAMBytes      uint64   `yaml:"ram_bytes" json:"ram_bytes"`
-	VRAMBytes     uint64   `yaml:"vram_bytes" json:"vram_bytes"`
-	GPUDevice     string   `yaml:"gpu_device" json:"gpu_device,omitempty"`
-	FailureDomain string   `yaml:"failure_domain" json:"failure_domain"`
-	ID            string   `yaml:"id" json:"id"`
-	Provider      string   `yaml:"provider" json:"provider"`
-	Model         string   `yaml:"model" json:"model"`
-	Locality      string   `yaml:"locality" json:"locality"`
-	Capabilities  []string `yaml:"capabilities" json:"capabilities"`
+	ContextTokens   int      `yaml:"context_tokens" json:"context_tokens"`
+	EstimatedCost   *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
+	RAMBytes        uint64   `yaml:"ram_bytes" json:"ram_bytes"`
+	VRAMBytes       uint64   `yaml:"vram_bytes" json:"vram_bytes"`
+	GPUDevice       string   `yaml:"gpu_device" json:"gpu_device,omitempty"`
+	FailureDomain   string   `yaml:"failure_domain" json:"failure_domain"`
+	ID              string   `yaml:"id" json:"id"`
+	Provider        string   `yaml:"provider" json:"provider"`
+	Model           string   `yaml:"model" json:"model"`
+	ReasoningEffort string   `yaml:"reasoning_effort,omitempty" json:"reasoning_effort,omitempty"`
+	Locality        string   `yaml:"locality" json:"locality"`
+	Capabilities    []string `yaml:"capabilities" json:"capabilities"`
 }
 type Routing struct {
 	Exploration    float64            `yaml:"exploration_rate" json:"exploration_rate"`
@@ -504,6 +507,7 @@ func (s Settings) Validate() error {
 		providers[p.ID] = p
 	}
 	models := map[string]bool{}
+	modelSettings := map[string]Model{}
 	routes := map[[2]string]bool{}
 	if len(s.Models) > 256 {
 		return errors.New("too many configured models")
@@ -521,14 +525,18 @@ func (s Settings) Validate() error {
 			return errors.New("invalid or duplicate model identity")
 		}
 		models[m.ID] = true
+		modelSettings[m.ID] = m
 		if _, ok := providers[m.Provider]; !ok {
 			return errors.New("model references unknown provider")
 		}
 		if m.Locality != "local" && m.Locality != "cloud" {
 			return errors.New("invalid model locality")
 		}
-		if providers[m.Provider].Kind == "codex_app_server" && (m.Locality != "cloud" || m.Model != "gpt-5.6-sol" || m.ContextTokens < 1) {
+		if providers[m.Provider].Kind == "codex_app_server" && (m.Locality != "cloud" || m.Model != "gpt-5.6-sol" || m.ContextTokens < 1 || !validReasoningEffort(m.ReasoningEffort)) {
 			return errors.New("invalid Codex coordinator model settings")
+		}
+		if providers[m.Provider].Kind != "codex_app_server" && m.ReasoningEffort != "" {
+			return errors.New("reasoning effort requires Codex coordinator provider")
 		}
 		if m.GPUDevice != "" && (m.Locality != "local" || m.VRAMBytes == 0 || !resources.ValidGPUDeviceID(m.GPUDevice)) {
 			return errors.New("invalid model GPU binding")
@@ -547,9 +555,24 @@ func (s Settings) Validate() error {
 	if s.WebUI.DefaultModel != "" && !models[s.WebUI.DefaultModel] {
 		return errors.New("unknown web UI default model")
 	}
+	if fallback := s.WebUI.CommanderFallbackModel; fallback != "" {
+		model, ok := modelSettings[fallback]
+		if !ok || fallback == s.WebUI.DefaultModel || s.WebUI.DefaultModel == "" || model.Locality != "local" {
+			return errors.New("invalid web UI commander fallback model")
+		}
+	}
 	return nil
 }
 func finite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
+
+func validReasoningEffort(value string) bool {
+	switch value {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra":
+		return true
+	default:
+		return false
+	}
+}
 
 // RedactedJSON deliberately hides provider endpoints and local filesystem paths.
 // Credentials are never resolved into Settings in the first place.

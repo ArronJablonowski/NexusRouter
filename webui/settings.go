@@ -13,9 +13,10 @@ var settingsDigestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 const MaxSettingsRootBytes = 4096
 
 type ToolAccessSettings struct {
-	ToolsEnabled      bool   `json:"tools_enabled"`
-	DelegateReadTools bool   `json:"delegate_read_tools"`
-	ReadRoot          string `json:"read_root"`
+	ToolsEnabled          bool   `json:"tools_enabled"`
+	DelegateReadTools     bool   `json:"delegate_read_tools"`
+	ReadRoot              string `json:"read_root"`
+	SpecialistsAllowCloud bool   `json:"specialists_allow_cloud"`
 }
 
 func (s ToolAccessSettings) Validate() error {

@@ -208,6 +208,25 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 	var err error
 	if r.ModelID != "" && r.ModelID != "auto" {
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
+		fallback := s.settings.WebUI.CommanderFallbackModel
+		if err != nil && result.retryable && result.TaskID != "" && fallback != "" && r.ModelID == s.settings.WebUI.DefaultModel && r.runtimeHostAdmission == nil && r.delegatedParent == "" && ctx.Err() == nil {
+			remaining := r.MaxCost
+			if remaining > 0 {
+				remaining -= result.reservedCost
+			}
+			if remaining >= 0 {
+				nextRequest := r
+				nextRequest.ModelID, nextRequest.retryOfTaskID, nextRequest.MaxCost = fallback, result.TaskID, remaining
+				nextRequest.taskID, nextRequest.sessionID = "", ""
+				next, nextErr := s.runWithPressure(ctx, nextRequest, s.runExplicit)
+				if next.TaskID != "" {
+					next.PreviousTaskIDs = []string{result.TaskID}
+					next.RouteEstimatedCost = sumRouteEstimatedCost(result.RouteEstimatedCost, next.RouteEstimatedCost)
+					next.Usage = sumCompleteRouteUsage(result.Usage, next.Usage)
+					result, err = next, nextErr
+				}
+			}
+		}
 	} else {
 		result, err = s.runWithPressure(ctx, r, s.runAuto)
 		if err != nil && r.runtimeHostAdmission == nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {

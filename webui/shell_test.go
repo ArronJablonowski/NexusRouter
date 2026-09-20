@@ -137,7 +137,7 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "4e03f80fd978ffe7cf684a9a0bafe9994d3d92b77cb2a91e8e5b8b1a998c49ad" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "7ad1ad209e8f727e71382575a0d0254687c28075394086f84d4df67bdbf7beca" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -461,7 +461,7 @@ func TestSettingsShellUsesBoundedToggleControls(t *testing.T) {
 	html, _ := embeddedShellAssets.ReadFile("assets/v1/index.html")
 	script, _ := embeddedShellAssets.ReadFile("assets/v1/settings.js")
 	styles, _ := embeddedShellAssets.ReadFile("assets/v1/app.css")
-	for _, required := range []string{`data-view="settings"`, `id="settings-view"`, `id="tools-enabled" type="checkbox" role="switch"`, `id="delegate-read-tools" type="checkbox" role="switch"`, `id="tools-read-root"`} {
+	for _, required := range []string{`data-view="settings"`, `id="settings-view"`, `id="specialists-allow-cloud" type="checkbox" role="switch"`, `id="tools-enabled" type="checkbox" role="switch"`, `id="delegate-read-tools" type="checkbox" role="switch"`, `id="tools-read-root"`} {
 		if !strings.Contains(string(html), required) {
 			t.Fatal("settings control missing", required)
 		}

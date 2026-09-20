@@ -193,7 +193,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return report, nil
 	}
 	if s.WebUI.Enabled {
-		activeToolSettings := webui.ToolAccessSettings{ToolsEnabled: s.Tools.Enabled, DelegateReadTools: s.Workers.DelegateReadTools, ReadRoot: s.Tools.ReadRoot}
+		activeToolSettings := webui.ToolAccessSettings{ToolsEnabled: s.Tools.Enabled, DelegateReadTools: s.Workers.DelegateReadTools, ReadRoot: s.Tools.ReadRoot, SpecialistsAllowCloud: s.WebUI.SpecialistsAllowCloud}
 		var settingsMu sync.Mutex
 		settingsProjection := func(ctx context.Context) (webui.SettingsInspection, error) {
 			if err := ctx.Err(); err != nil {
@@ -205,7 +205,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if readErr != nil {
 				return webui.SettingsInspection{}, readErr
 			}
-			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot}
+			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
 			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
 		}
 		updateSettings := func(ctx context.Context, request webui.SettingsUpdateRequest) (webui.SettingsInspection, error) {
@@ -214,7 +214,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 			settingsMu.Lock()
 			defer settingsMu.Unlock()
-			next := config.ToolAccess{Enabled: request.Settings.ToolsEnabled, DelegateReadTools: request.Settings.DelegateReadTools, ReadRoot: request.Settings.ReadRoot}
+			next := config.ToolAccess{Enabled: request.Settings.ToolsEnabled, DelegateReadTools: request.Settings.DelegateReadTools, ReadRoot: request.Settings.ReadRoot, SpecialistsAllowCloud: request.Settings.SpecialistsAllowCloud}
 			saved, digest, updateErr := config.UpdateProjectToolAccess(*path, request.ExpectedDigest, next)
 			if errors.Is(updateErr, config.ErrConfigConflict) {
 				return webui.SettingsInspection{}, webuiapp.ErrSettingsConflict
@@ -222,7 +222,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			if updateErr != nil {
 				return webui.SettingsInspection{}, updateErr
 			}
-			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot}
+			savedSettings := webui.ToolAccessSettings{ToolsEnabled: saved.Enabled, DelegateReadTools: saved.DelegateReadTools, ReadRoot: saved.ReadRoot, SpecialistsAllowCloud: saved.SpecialistsAllowCloud}
 			return webui.SettingsInspection{Version: webui.ContractVersion, Digest: digest, Active: activeToolSettings, Saved: savedSettings, RestartRequired: activeToolSettings != savedSettings}, nil
 		}
 		operationStore, operationErr := browserops.Open(ctx, s.Telemetry.Database)

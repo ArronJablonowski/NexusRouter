@@ -82,7 +82,7 @@ func sessionTool() []codexrpc.Envelope {
 func newSessionFixture(t *testing.T, frames []codexrpc.Envelope) (*Session, *scriptedSessionWire, providers.Request) {
 	t.Helper()
 	w := &scriptedSessionWire{frames: frames, closed: make(chan struct{})}
-	s, err := NewSession(context.Background(), w, Options{Model: "gpt-5.6-sol", CWD: t.TempDir()})
+	s, err := NewSession(context.Background(), w, Options{Model: "gpt-5.6-sol", CWD: t.TempDir(), ReasoningEffort: "medium"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,6 +144,12 @@ func TestSessionFinalAnswerAndHandshake(t *testing.T) {
 	}
 	if json.Unmarshal(writes[2].Params, &thread) != nil || thread.Model != req.Model || len(thread.DynamicTools) != 1 || thread.DynamicTools[0].Name != "darwin" || thread.DynamicTools[0].Type != "namespace" || len(thread.DynamicTools[0].Tools) != 1 {
 		t.Fatalf("incorrect thread start: %s", writes[2].Params)
+	}
+	var turn struct {
+		Effort string `json:"effort"`
+	}
+	if json.Unmarshal(writes[3].Params, &turn) != nil || turn.Effort != "medium" {
+		t.Fatal("configured reasoning effort missing from initial turn")
 	}
 	tool := thread.DynamicTools[0].Tools[0]
 	if tool.Type != "function" || tool.Name != "delegate" || tool.Description != req.Tools[0].Description || string(tool.InputSchema) != string(req.Tools[0].Parameters) {

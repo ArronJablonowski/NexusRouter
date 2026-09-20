@@ -8908,3 +8908,66 @@ responsive TRON-style presentation, and the embedded-asset digest. A real
 browser qualification remains follow-up work. A local desktop-browser visual
 preview covered both routes, and the full formatting, vet, race-enabled test,
 and build gate passed at this checkpoint.
+
+## GPT-5.6 Sol commander and branched routing topology
+
+The supervised Codex coordinator profile now explicitly selects `coordinator`
+as the Web UI commander, identifies its model as `gpt-5.6-sol`, and sets
+`reasoning_effort: medium`. The value is validated as owned model metadata,
+carried through the configured-model and browser inspection contracts, and
+sent as the Codex app-server `effort` field on both initial and continued
+turns. Unsupported providers cannot claim a reasoning-effort setting.
+
+The same profile configures the installed `muse-glimmer:30b-mlx` local model as
+the commander's explicit fallback. A retryable commander failure that emitted
+no model output creates one durable, lineage-linked fallback attempt; partial
+output, context overflow, host-bound execution, delegated child work, and
+unrelated explicit models do not cross this boundary. Configuration requires
+the fallback to be local, distinct from the commander, and present in the
+declared model catalog.
+
+The routing grid now presents the commander as the root of a responsive SVG
+command tree. A strong luminous spine descends through the full specialist
+field, with a dedicated branch terminating at each of the eight job cards and
+their current top model choices. The desktop grid uses paired branches on
+either side of the spine; narrow layouts alternate the same endpoints around a
+vertical circuit without horizontal page overflow. A local in-app browser
+check observed one commander with its Muse Glimmer local failover listed inside
+the same command card, eight terminal cards, nine tree paths, GPT-5.6 Sol at
+medium reasoning, and zero document
+overflow; the focused configuration, Codex bridge, application, Web UI, and
+Web UI application packages passed.
+
+Each base tree path now carries a stronger layered cyan halo plus two bounded
+decorative flow traces. White packets animate from the commander toward every
+specialist and magenta packets animate back toward the commander, including
+the shared central spine. The traces are pointer-inert and aria-hidden with the
+diagram, and the reduced-motion media query removes them entirely. Browser
+inspection confirmed one base trunk, eight base branches, nine outbound flows,
+nine inbound flows, both expected animation names, and zero page overflow.
+
+The supervised profile now also makes its local admission policy visible on
+the routing grid. It admits at most one local model at a time, rejects new work
+under measured memory pressure, caps both RAM or unified-memory and discrete
+VRAM use at 75 percent, and enables confirmed idle-model unloading on its
+dedicated Ollama endpoint. These settings feed the existing live RAM, swap,
+unified-memory, VRAM, thermal, and host-wide reservation checks, so a local
+specialist cannot silently overlap an already-resident local commander.
+
+Specialist recommendations are local-only by default. The model inspection
+contract publishes that policy, the command tree excludes cloud models from
+all eight specialist rankings while it is active, and the Settings page exposes
+one restart-gated `Allow cloud specialists` switch. The narrow project-file
+mutation surface persists the choice as `web_ui.specialists_allow_cloud` with
+optimistic digest concurrency and whole-configuration validation; its zero
+value retains local-only behavior. The commander remains independently
+configured as GPT-5.6 Sol and is not filtered by the specialist policy.
+
+True mid-turn suspension remains a runtime gap. The current reservation is
+owned by the active task and managed residency deliberately cannot unload that
+active model. A local commander that lacks capacity for a delegated specialist
+therefore fails closed instead of growing swap, but it cannot yet checkpoint
+its turn, release and unload itself, transfer a durable reservation to the
+specialist, and resume after the child reports completion. That protocol needs
+explicit checkpoint, residency-ownership, and recovery semantics before it can
+be enabled safely.

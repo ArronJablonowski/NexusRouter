@@ -36,6 +36,33 @@ func TestCodexProviderConfiguration(t *testing.T) {
 	}
 }
 
+func TestCodexCoordinatorReasoningEffort(t *testing.T) {
+	s := codexProviderSettings()
+	s.Models[0].ReasoningEffort = "medium"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.Models[0].ReasoningEffort = "extreme"
+	if s.Validate() == nil {
+		t.Fatal("unknown reasoning effort accepted")
+	}
+	s = codexProviderSettings()
+	s.Models[1].ReasoningEffort = "medium"
+	if s.Validate() == nil {
+		t.Fatal("reasoning effort accepted for unsupported provider")
+	}
+}
+
+func TestSolCodexLocalSmokeSelectsMediumSolCommander(t *testing.T) {
+	s, err := Load(Options{ProjectFile: "../../examples/sol-codex-local-smoke.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.WebUI.DefaultModel != "coordinator" || s.WebUI.CommanderFallbackModel != "muse-glimmer" || len(s.Models) != 3 || s.Models[0].Model != "gpt-5.6-sol" || s.Models[0].ReasoningEffort != "medium" || s.Models[2].Model != "muse-glimmer:30b-mlx" || s.Models[2].Locality != "local" {
+		t.Fatal("Sol commander selection changed", s.WebUI.DefaultModel, s.Models)
+	}
+}
+
 func TestCodexProviderConfigurationRejectsInvalid(t *testing.T) {
 	cases := map[string]func(*Settings){
 		"missing executable":      func(s *Settings) { s.Providers[0].Executable = "" },

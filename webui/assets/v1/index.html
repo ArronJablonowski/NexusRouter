@@ -172,8 +172,12 @@
         </header>
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
-            <div class="settings-card-heading"><div><p class="eyebrow">Permissions</p><h2>Tool access</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
-            <p class="settings-intro">Grant local models narrowly scoped, read-only file access. Saved changes take effect after the DarwinRouter daemon restarts.</p>
+            <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
+            <p class="settings-intro">Choose specialist locality and grant narrowly scoped, read-only file access. Saved changes take effect after the DarwinRouter daemon restarts.</p>
+            <label class="setting-toggle" for="specialists-allow-cloud">
+              <span><strong>Allow cloud specialists</strong><small>Off by default. When off, every high-level specialist route uses eligible local models only.</small></span>
+              <span class="switch"><input id="specialists-allow-cloud" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
+            </label>
             <label class="setting-toggle" for="tools-enabled">
               <span><strong>File tools</strong><small>Expose the built-in read-only file tool to eligible local execution.</small></span>
               <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
@@ -192,7 +196,7 @@
             <p class="eyebrow">Running daemon</p><h2 id="active-settings-title">Active policy</h2>
             <p class="settings-intro">These values remain active until the daemon restarts.</p>
             <dl id="active-settings" class="settings-summary"></dl>
-            <div class="settings-advisory"><strong>Safety boundary</strong><p>This page cannot enable shell commands, write access, or expand access beyond the configured directory.</p></div>
+            <div class="settings-advisory"><strong>Safety boundary</strong><p>Cloud specialists remain disabled by default. This page cannot enable shell commands, write access, or expand access beyond the configured directory.</p></div>
           </aside>
         </div>
       </section>
@@ -202,12 +206,18 @@
           <button id="refresh-routing" class="tron-button" type="button">Rescan grid</button>
         </header>
         <output id="routing-live-status" class="tron-status" role="status" aria-live="polite">Synchronizing model routes…</output>
-        <section class="commander-core" aria-labelledby="commander-title">
-          <div class="core-rings" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div><p class="eyebrow">Primary intelligence</p><h2 id="commander-title">Commander / brain</h2><strong id="commander-model">Resolving…</strong><p id="commander-detail"></p></div>
+        <section id="routing-network" class="routing-network" aria-label="Commander to specialist routing network">
+          <section class="commander-core" aria-labelledby="commander-title">
+            <div class="core-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="commander-copy"><p class="eyebrow">Primary intelligence</p><h2 id="commander-title">Commander / brain</h2><strong id="commander-model">Resolving…</strong><p id="commander-detail"></p><aside id="commander-fallback" class="commander-fallback" aria-label="Commander fallback model" hidden><span>Local failover</span><strong id="commander-fallback-model"></strong><small id="commander-fallback-detail"></small></aside></div>
+          </section>
+          <aside id="resource-guard" class="resource-guard" aria-label="Local model resource guard"><span>Residency guard</span><strong id="resource-guard-title">Resolving local limits…</strong><small id="resource-guard-detail"></small></aside>
+          <svg id="routing-branches" class="routing-branches" aria-hidden="true"></svg>
+          <section class="specialist-terminal-section" aria-labelledby="specialists-title">
+            <div class="tron-section-heading"><div><p class="eyebrow">Instruction fan-out</p><h2 id="specialists-title">High-level specialist routes</h2></div><span id="specialist-policy">Local endpoints only</span></div>
+            <div id="specialist-grid" class="specialist-grid"></div>
+          </section>
         </section>
-        <div class="routing-beam" aria-hidden="true"></div>
-        <section aria-labelledby="specialists-title"><div class="tron-section-heading"><div><p class="eyebrow">Instruction fan-out</p><h2 id="specialists-title">High-level specialist routes</h2></div><span>Top 3 per job</span></div><div id="specialist-grid" class="specialist-grid"></div></section>
         <section id="creative-consultation" class="creative-console" aria-labelledby="creative-title">
           <p class="eyebrow">Human preference loop</p><h2 id="creative-title">Creative tasks require consultation</h2>
           <p id="creative-question">The commander asks: “Which model’s output do you prefer?”</p>

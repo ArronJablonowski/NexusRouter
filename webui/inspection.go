@@ -3,6 +3,7 @@ package webui
 import (
 	"encoding/hex"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ type ModelInspection struct {
 	ID              string     `json:"id"`
 	Provider        string     `json:"provider"`
 	Model           string     `json:"model"`
+	ReasoningEffort string     `json:"reasoning_effort,omitempty"`
 	Locality        string     `json:"locality"`
 	Configured      bool       `json:"configured"`
 	Enabled         bool       `json:"enabled"`
@@ -57,7 +59,7 @@ type ModelInspection struct {
 
 func (m ModelInspection) Validate() error {
 	if !optionalModelID(m.ID) || m.ID == "" || !optionalModelID(m.Provider) || m.Provider == "" ||
-		!boundedPrintable(m.Model, 1, 512) || (m.Locality != "local" && m.Locality != "cloud") ||
+		!boundedPrintable(m.Model, 1, 512) || !validInspectionReasoningEffort(m.ReasoningEffort) || (m.Locality != "local" && m.Locality != "cloud") ||
 		m.Capabilities == nil || len(m.Capabilities) > 128 || !boundedPrintable(m.FailureDomain, 0, 128) ||
 		!boundedPrintable(m.Digest, 0, 64) || !boundedPrintable(m.Family, 0, 128) || !boundedPrintable(m.ParameterSize, 0, 128) ||
 		!boundedPrintable(m.Quantization, 0, 128) || !boundedPrintable(m.StatusCode, 0, 128) ||
@@ -85,6 +87,15 @@ func (m ModelInspection) Validate() error {
 	return nil
 }
 
+func validInspectionReasoningEffort(value string) bool {
+	switch value {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra":
+		return true
+	default:
+		return false
+	}
+}
+
 type LocalProviderInspection struct {
 	Provider   string    `json:"provider"`
 	Status     string    `json:"status"`
@@ -108,6 +119,13 @@ type ModelInspectionPage struct {
 	ConfigID              string                    `json:"config_id,omitempty"`
 	CommanderID           string                    `json:"commander_id,omitempty"`
 	CommanderSource       string                    `json:"commander_source,omitempty"`
+	CommanderFallbackID   string                    `json:"commander_fallback_id,omitempty"`
+	LocalConcurrency      string                    `json:"local_concurrency,omitempty"`
+	LocalPressurePolicy   string                    `json:"local_pressure_policy,omitempty"`
+	LocalRAMLimitPct      float64                   `json:"local_ram_limit_pct,omitempty"`
+	LocalVRAMLimitPct     float64                   `json:"local_vram_limit_pct,omitempty"`
+	ManagedResidency      bool                      `json:"managed_residency"`
+	SpecialistsAllowCloud bool                      `json:"specialists_allow_cloud"`
 	RefreshedAt           *time.Time                `json:"refreshed_at,omitempty"`
 	LocalTotalBytes       *uint64                   `json:"local_total_bytes,omitempty"`
 	LocalTotalKind        string                    `json:"local_total_kind,omitempty"`
@@ -124,11 +142,13 @@ func (p ModelInspectionPage) Validate() error {
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
 		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated" ||
 			(p.LocalTotalCoverage != "complete" && p.LocalTotalCoverage != "partial") || p.RefreshIntervalMS < 5000 || p.RefreshIntervalMS > 300000 || p.LocalProviders == nil || len(p.LocalProviders) > MaxInspectionProviders) ||
-		(p.CommanderID != "" && !modelIDPattern.MatchString(p.CommanderID)) || (p.CommanderSource != "" && p.CommanderSource != "configured" && p.CommanderSource != "inferred") ||
-		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "") {
+		(p.CommanderID != "" && !modelIDPattern.MatchString(p.CommanderID)) || (p.CommanderFallbackID != "" && !modelIDPattern.MatchString(p.CommanderFallbackID)) || (p.CommanderSource != "" && p.CommanderSource != "configured" && p.CommanderSource != "inferred") ||
+		p.Availability == Available && (!validLocalConcurrency(p.LocalConcurrency) || p.LocalPressurePolicy != "reject" && p.LocalPressurePolicy != "wait" || !finiteNonnegative(p.LocalRAMLimitPct) || p.LocalRAMLimitPct <= 0 || p.LocalRAMLimitPct > 100 || !finiteNonnegative(p.LocalVRAMLimitPct) || p.LocalVRAMLimitPct <= 0 || p.LocalVRAMLimitPct > 100) ||
+		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "" || p.CommanderFallbackID != "" || p.LocalConcurrency != "" || p.LocalPressurePolicy != "" || p.LocalRAMLimitPct != 0 || p.LocalVRAMLimitPct != 0 || p.ManagedResidency || p.SpecialistsAllowCloud) {
 		return ErrContract
 	}
 	commanderFound := p.CommanderID == ""
+	fallbackFound := p.CommanderFallbackID == ""
 	partial := p.LocalUnknownSizeCount > 0
 	providerSeen := map[string]bool{}
 	for _, provider := range p.LocalProviders {
@@ -149,12 +169,23 @@ func (p ModelInspectionPage) Validate() error {
 		if model.ID == p.CommanderID {
 			commanderFound = true
 		}
+		if model.ID == p.CommanderFallbackID {
+			fallbackFound = model.Locality == "local" && model.ID != p.CommanderID
+		}
 		seen[model.ID] = true
 	}
-	if !commanderFound || (p.CommanderID == "") != (p.CommanderSource == "") {
+	if !commanderFound || !fallbackFound || (p.CommanderID == "") != (p.CommanderSource == "") || p.CommanderFallbackID != "" && p.CommanderID == "" {
 		return ErrContract
 	}
 	return encodedWithin(p, 256<<10)
+}
+
+func validLocalConcurrency(value string) bool {
+	if value == "auto" {
+		return true
+	}
+	n, err := strconv.Atoi(value)
+	return err == nil && n >= 1 && n <= 64 && strconv.Itoa(n) == value
 }
 
 type RouteCandidateInspection struct {

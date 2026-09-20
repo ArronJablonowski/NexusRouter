@@ -4,7 +4,7 @@
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
 	if (!window.DarwinRoutes || !window.DarwinRoutes.settings(relative)) return;
 	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), models = document.querySelector("#models-view");
-	const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools");
+	const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools"), specialistsAllowCloud = document.querySelector("#specialists-allow-cloud");
 	const root = document.querySelector("#tools-read-root"), validation = document.querySelector("#settings-validation"), status = document.querySelector("#settings-status");
 	const save = document.querySelector("#save-settings"), reset = document.querySelector("#reset-settings"), refresh = document.querySelector("#refresh-settings");
 	const badge = document.querySelector("#settings-restart-badge"), activeSummary = document.querySelector("#active-settings");
@@ -13,13 +13,13 @@
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
 	}
 	function setStatus(message, failed) { status.textContent = message; status.classList.toggle("error", Boolean(failed)); }
-	function setBusy(value) { loading = value; save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; root.disabled = value; syncDependency(); }
+	function setBusy(value) { loading = value; save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
 	function syncDependency() {
 		if (!tools.checked) delegated.checked = false;
 		delegated.disabled = loading || !tools.checked;
@@ -31,10 +31,11 @@
 	}
 	function render(value) {
 		projection = value;
-		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; root.value = value.saved.read_root;
+		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
 		addSummary("File tools", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
+		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Read root", value.active.read_root || "Not configured");
 		syncDependency(); validation.hidden = true;
 		setStatus(value.restart_required ? "Settings are saved. Restart DarwinRouter to activate them." : "Saved settings match the running daemon.", false);
@@ -48,7 +49,7 @@
 			projection = null; setStatus("Settings could not be loaded.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim()}; }
+	function formValue() { return {tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
 		if (value.tools_enabled && !value.read_root) message = "An absolute read root is required when file tools are enabled.";

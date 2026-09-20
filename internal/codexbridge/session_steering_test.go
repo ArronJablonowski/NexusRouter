@@ -55,7 +55,7 @@ func TestSessionSteeringCompletedTurnAndUsage(t *testing.T) {
 	writes := w.sent()
 	last := writes[len(writes)-1]
 	var params map[string]any
-	if last.Method != "turn/start" || string(last.ID) != "1001" || json.Unmarshal(last.Params, &params) != nil || params["threadId"] != "thread-1" || len(params["input"].([]any)) != 32 || params["tools"] != nil {
+	if last.Method != "turn/start" || string(last.ID) != "1001" || json.Unmarshal(last.Params, &params) != nil || params["threadId"] != "thread-1" || params["effort"] != "medium" || len(params["input"].([]any)) != 32 || params["tools"] != nil {
 		t.Fatal("wrong continuation control")
 	}
 	if err := s.Stream(context.Background(), steeringCompletedRequest(next, 1), collectSession(&out)); err == nil || len(w.sent()) != len(writes) {

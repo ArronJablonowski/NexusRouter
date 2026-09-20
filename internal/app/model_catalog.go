@@ -33,7 +33,7 @@ func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCata
 		}
 		catalog.Models[i] = routing.ConfiguredModel{
 			Version: 1, ID: configured.ID, Provider: configured.Provider,
-			Model: configured.Model, Locality: configured.Locality,
+			Model: configured.Model, ReasoningEffort: configured.ReasoningEffort, Locality: configured.Locality,
 			Capabilities:  append([]string(nil), configured.Capabilities...),
 			ContextTokens: configured.ContextTokens, EstimatedCost: cost,
 			RAMBytes: configured.RAMBytes, VRAMBytes: configured.VRAMBytes,

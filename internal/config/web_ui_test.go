@@ -50,6 +50,10 @@ func TestWebUIDisabledDefaultsRemainValid(t *testing.T) {
 	if err := s.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	s.WebUI.SpecialistsAllowCloud = true
+	if s.Validate() == nil {
+		t.Fatal("disabled web UI retained cloud specialist routing")
+	}
 }
 
 func TestWebUIDefaultModelMustReferenceConfiguredModel(t *testing.T) {
@@ -70,6 +74,20 @@ func TestWebUIDefaultModelMustReferenceConfiguredModel(t *testing.T) {
 		t.Fatal("invalid web UI default model accepted")
 	}
 	s.WebUI.DefaultModel = "chat"
+	s.WebUI.CommanderFallbackModel = "chat"
+	if s.Validate() == nil {
+		t.Fatal("commander accepted itself as fallback")
+	}
+	s.Models = append(s.Models, Model{ID: "backup", Provider: "local", Model: "backup-fixture", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 1024, EstimatedCost: &zero})
+	s.WebUI.CommanderFallbackModel = "backup"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.CommanderFallbackModel = "missing"
+	if s.Validate() == nil {
+		t.Fatal("unknown commander fallback accepted")
+	}
+	s.WebUI.CommanderFallbackModel = ""
 	s.WebUI.Enabled = false
 	if s.Validate() == nil {
 		t.Fatal("disabled web UI retained an active default model")

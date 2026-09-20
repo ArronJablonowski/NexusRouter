@@ -18,11 +18,13 @@ var (
 )
 
 // ToolAccess is the deliberately small project-file surface exposed to the
-// local operator UI. It is not a general-purpose configuration editor.
+// local operator UI. It includes the adjacent specialist-locality policy but
+// is not a general-purpose configuration editor.
 type ToolAccess struct {
-	Enabled           bool
-	DelegateReadTools bool
-	ReadRoot          string
+	Enabled               bool
+	DelegateReadTools     bool
+	ReadRoot              string
+	SpecialistsAllowCloud bool
 }
 
 func ReadProjectToolAccess(path string) (ToolAccess, string, error) {
@@ -55,6 +57,7 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	setConfigScalar(root, []string{"tools", "enabled"}, "!!bool", boolText(next.Enabled))
 	setConfigScalar(root, []string{"tools", "read_root"}, "!!str", next.ReadRoot)
 	setConfigScalar(root, []string{"workers", "delegate_read_tools"}, "!!bool", boolText(next.DelegateReadTools))
+	setConfigScalar(root, []string{"web_ui", "specialists_allow_cloud"}, "!!bool", boolText(next.SpecialistsAllowCloud))
 	var encoded bytes.Buffer
 	encoder := yaml.NewEncoder(&encoded)
 	encoder.SetIndent(2)
@@ -133,7 +136,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot}
+	return ToolAccess{Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {

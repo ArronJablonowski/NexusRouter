@@ -23,7 +23,7 @@ type Wire interface {
 	Close() error
 }
 
-type Options struct{ Model, CWD string }
+type Options struct{ Model, CWD, ReasoningEffort string }
 
 // Session adapts one Codex turn into Darwin model/tool segments. A verified
 // item/tool/call is a paused segment boundary, NOT successful task completion.
@@ -61,7 +61,7 @@ type Session struct {
 
 func NewSession(ctx context.Context, w Wire, options Options) (*Session, error) {
 	if ctx == nil || ctx.Err() != nil || w == nil || (reflect.ValueOf(w).Kind() == reflect.Pointer && reflect.ValueOf(w).IsNil()) || options.Model == "" || len(options.Model) > 128 ||
-		!utf8.ValidString(options.Model) || !filepath.IsAbs(options.CWD) || !utf8.ValidString(options.CWD) {
+		!utf8.ValidString(options.Model) || !filepath.IsAbs(options.CWD) || !utf8.ValidString(options.CWD) || !validReasoningEffort(options.ReasoningEffort) {
 		return nil, failure(false)
 	}
 	s := &Session{w: w, options: options, items: make(map[string]*itemState), closeDone: make(chan struct{})}
@@ -224,6 +224,9 @@ func (s *Session) begin(req providers.Request) error {
 		}
 	}
 	params := map[string]any{"threadId": s.thread, "model": req.Model, "environments": []any{}, "input": []map[string]any{{"type": "text", "text": prompt, "text_elements": []any{}}}}
+	if s.options.ReasoningEffort != "" {
+		params["effort"] = s.options.ReasoningEffort
+	}
 	if req.JSONSchema != nil {
 		if !json.Valid(req.JSONSchema) {
 			return failure(false)
@@ -249,6 +252,15 @@ func (s *Session) begin(req providers.Request) error {
 }
 
 func validOpaque(v string) bool { return v != "" && len(v) <= 256 && utf8.ValidString(v) }
+
+func validReasoningEffort(value string) bool {
+	switch value {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra":
+		return true
+	default:
+		return false
+	}
+}
 
 func (s *Session) receive() (codexrpc.Envelope, error) {
 	e, err := s.w.Read()

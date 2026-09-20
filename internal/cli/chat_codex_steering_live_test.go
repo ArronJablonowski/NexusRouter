@@ -155,7 +155,7 @@ func codexChatSteeringAuthority(cfg config.Settings) bool {
 	if cfg.Evaluation.AutoReviewModel != "" || cfg.Evaluation.AutoReviewMaxCost != 0 {
 		return false
 	}
-	if cfg.Validate() != nil || cfg.Mode != "hybrid" || cfg.Tools.Enabled || cfg.Tools.CreateEnabled || cfg.Tools.ReplaceEnabled || cfg.Skills.Enabled || cfg.Skills.AutoDraft || cfg.Skills.AutoActivate || cfg.Skills.Learning.Enabled || cfg.Memory.Enabled || cfg.Evaluation.Judge || cfg.Telemetry.OTEL || cfg.Telemetry.MetricsExport != nil && cfg.Telemetry.MetricsExport.Enabled || cfg.Workers.DelegateMaxCalls != 1 || cfg.Workers.DelegateMaxCost != 0 || cfg.Workers.DelegateReadTools || cfg.Workers.DelegateModel != "local-worker" || cfg.Runtime.MaxTurns != 3 || len(cfg.Providers) != 2 || len(cfg.Models) != 2 {
+	if cfg.Validate() != nil || cfg.Mode != "hybrid" || cfg.Tools.Enabled || cfg.Tools.CreateEnabled || cfg.Tools.ReplaceEnabled || cfg.Skills.Enabled || cfg.Skills.AutoDraft || cfg.Skills.AutoActivate || cfg.Skills.Learning.Enabled || cfg.Memory.Enabled || cfg.Evaluation.Judge || cfg.Telemetry.OTEL || cfg.Telemetry.MetricsExport != nil && cfg.Telemetry.MetricsExport.Enabled || cfg.Workers.DelegateMaxCalls != 1 || cfg.Workers.DelegateMaxCost != 0 || cfg.Workers.DelegateReadTools || cfg.Workers.DelegateModel != "local-worker" || cfg.Runtime.MaxTurns != 3 || cfg.WebUI.DefaultModel != "coordinator" || cfg.WebUI.CommanderFallbackModel != "muse-glimmer" || cfg.WebUI.SpecialistsAllowCloud || cfg.Hardware.MaxRAM != 75 || cfg.Hardware.MaxVRAM != 75 || cfg.Hardware.Concurrent != "1" || len(cfg.Providers) != 2 || len(cfg.Models) != 3 {
 		return false
 	}
 	providers := map[string]config.Provider{}
@@ -166,19 +166,19 @@ func codexChatSteeringAuthority(cfg config.Settings) bool {
 		providers[p.ID] = p
 	}
 	cloud, local := providers["codex-coordinator"], providers["ollama-worker"]
-	if len(providers) != 2 || cloud.Kind != "codex_app_server" || !filepath.IsAbs(cloud.Executable) || cloud.Endpoint != "" || local.Kind != "ollama" || local.Endpoint != "http://127.0.0.1:11434" {
+	if len(providers) != 2 || cloud.Kind != "codex_app_server" || !filepath.IsAbs(cloud.Executable) || cloud.Endpoint != "" || local.Kind != "ollama" || local.Endpoint != "http://127.0.0.1:11434" || !local.ManageResidency {
 		return false
 	}
 	models := map[string]config.Model{}
 	for _, m := range cfg.Models {
 		models[m.ID] = m
 	}
-	c, l := models["coordinator"], models["local-worker"]
-	return len(models) == 2 && c.Model == "gpt-5.6-sol" && c.Provider == cloud.ID && c.Locality == "cloud" && c.ContextTokens == 16384 && c.EstimatedCost != nil && *c.EstimatedCost == .1 && l.Model == "gemma4:12b-it-q4_K_M" && l.Provider == local.ID && l.Locality == "local" && l.ContextTokens == 4096 && l.EstimatedCost != nil && *l.EstimatedCost == 0
+	c, l, fallback := models["coordinator"], models["local-worker"], models["muse-glimmer"]
+	return len(models) == 3 && c.Model == "gpt-5.6-sol" && c.ReasoningEffort == "medium" && c.Provider == cloud.ID && c.Locality == "cloud" && c.ContextTokens == 16384 && c.EstimatedCost != nil && *c.EstimatedCost == .1 && l.Model == "gemma4:12b-it-q4_K_M" && l.Provider == local.ID && l.Locality == "local" && l.ContextTokens == 4096 && l.EstimatedCost != nil && *l.EstimatedCost == 0 && fallback.Model == "muse-glimmer:30b-mlx" && fallback.Provider == local.ID && fallback.Locality == "local" && fallback.EstimatedCost != nil && *fallback.EstimatedCost == 0
 }
 
 func TestCodexChatSteeringAuthority(t *testing.T) {
-	for _, mutate := range []func(*config.Settings){nil, func(c *config.Settings) { c.Models[0].Model = "other" }, func(c *config.Settings) { c.Providers[1].Endpoint = "https://remote.invalid" }, func(c *config.Settings) { c.Providers[0].APIKeyEnv = "TOKEN" }, func(c *config.Settings) { c.Evaluation.Judge = true }, func(c *config.Settings) { c.Workers.DelegateReadTools = true }, func(c *config.Settings) { c.Runtime.MaxTurns = 8 }, func(c *config.Settings) { c.Tools.CreateEnabled = true }} {
+	for _, mutate := range []func(*config.Settings){nil, func(c *config.Settings) { c.Models[0].Model = "other" }, func(c *config.Settings) { c.Providers[1].Endpoint = "https://remote.invalid" }, func(c *config.Settings) { c.Providers[0].APIKeyEnv = "TOKEN" }, func(c *config.Settings) { c.Evaluation.Judge = true }, func(c *config.Settings) { c.Workers.DelegateReadTools = true }, func(c *config.Settings) { c.WebUI.SpecialistsAllowCloud = true }, func(c *config.Settings) { c.Runtime.MaxTurns = 8 }, func(c *config.Settings) { c.Tools.CreateEnabled = true }} {
 		cfg, err := config.Load(config.Options{ProjectFile: "../../examples/sol-codex-local-smoke.yaml"})
 		if err != nil {
 			t.Fatal("sample unavailable")

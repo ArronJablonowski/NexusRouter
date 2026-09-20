@@ -2,11 +2,16 @@
 # Task text and local-worker output reach the signed-in cloud coordinator.
 version: 1
 mode: hybrid
+web_ui:
+  default_model: coordinator
+  commander_fallback_model: muse-glimmer
+  specialists_allow_cloud: false
 runtime:
   max_turns: 3
 hardware:
   auto_profile: true
-  max_ram_usage_pct: 80
+  max_ram_usage_pct: 75
+  max_vram_usage_pct: 75
   max_concurrent_local_models: "1"
   local_pressure_policy: reject
 workers:
@@ -23,10 +28,12 @@ providers:
   - id: ollama-worker
     kind: ollama
     endpoint: http://127.0.0.1:11434
+    manage_residency: true # Dedicated local endpoint; confirms idle-model unloads before low-memory switches.
 models:
   - id: coordinator
     provider: codex-coordinator
     model: gpt-5.6-sol
+    reasoning_effort: medium
     locality: cloud
     capabilities: [chat, code, orchestration]
     context_tokens: 16384
@@ -38,6 +45,14 @@ models:
     capabilities: [chat, code]
     context_tokens: 4096
     ram_bytes: 12884901888 # Initial estimate; not a measured peak guarantee.
+    estimated_cost: 0
+  - id: muse-glimmer
+    provider: ollama-worker
+    model: muse-glimmer:30b-mlx
+    locality: local
+    capabilities: [chat, reasoning, writing, creative]
+    context_tokens: 32768
+    ram_bytes: 25769803776 # Conservative admission estimate for the installed 21-GB MLX artifact.
     estimated_cost: 0
 tools:
   enabled: false
