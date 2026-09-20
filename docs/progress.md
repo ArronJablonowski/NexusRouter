@@ -8884,3 +8884,27 @@ supply DAR-47 candidate approval, DAR-48 human legal/notices approval, DAR-53
 production signing authority, physical-hardware attestation, a historical
 previous-release binary rehearsal, tagging, upload, or publication. No Linear
 issue state was changed while retaining this evidence.
+
+## Dynamic commander grid and elimination tribunal
+
+The authenticated embedded Web UI now includes `/app/routing-map` and
+`/app/model-elimination`. The routing page refreshes from the live bounded model
+inventory, identifies the explicitly configured Web UI default model as the
+commander when present, otherwise labels a capability/name-derived commander as
+inferred, and renders up to three deterministic eligible choices for coding,
+OCR, CLI, general, image generation, video generation, writing, and creative
+work. Creative work carries a visible per-brief user consultation control; its
+preference is deliberately kept only in the current page and is not promoted to
+durable routing evidence.
+
+The elimination page uses a new authenticated same-origin GET projection over
+the existing read-only model-deprecation service. Its query is bounded and
+strictly validated, reports use the existing evaluated-attempt policy and
+evidence digest, and missing or insufficient evidence produces no elimination
+recommendation. The page cannot disable, unload, uninstall, or reconfigure a
+model. Unit coverage checks authentication-before-query parsing, strict query
+admission, report validation, live inventory use, safe DOM construction,
+responsive TRON-style presentation, and the embedded-asset digest. A real
+browser qualification remains follow-up work. A local desktop-browser visual
+preview covered both routes, and the full formatting, vet, race-enabled test,
+and build gate passed at this checkpoint.

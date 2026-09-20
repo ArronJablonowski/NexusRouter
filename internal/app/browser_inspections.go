@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/accounting"
@@ -55,6 +56,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
 		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models))}
+	out.CommanderID, out.CommanderSource = browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
 	configured := map[string]int{}
 	for i, model := range catalog.Models {
 		fact, observed := modelHealth[model.ID]
@@ -140,6 +142,26 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		return zero, ErrInspection
 	}
 	return out, nil
+}
+
+func browserCommander(configured string, models []routing.ConfiguredModel) (string, string) {
+	if configured != "" {
+		return configured, "configured"
+	}
+	for _, model := range models {
+		for _, capability := range model.Capabilities {
+			if capability == "orchestration" {
+				return model.ID, "inferred"
+			}
+		}
+	}
+	for _, model := range models {
+		id := strings.ToLower(model.ID)
+		if strings.Contains(id, "coordinator") || strings.Contains(id, "commander") || strings.Contains(id, "brain") {
+			return model.ID, "inferred"
+		}
+	}
+	return "", ""
 }
 
 func browserModel(model routing.ConfiguredModel, modelHealth string) contract.ModelInspection {

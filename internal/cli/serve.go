@@ -293,7 +293,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			Resources: func(ctx context.Context) (webui.ResourceInspection, error) {
 				return service.BrowserResources(ctx), nil
 			},
-			Settings: settingsProjection,
+			Settings:    settingsProjection,
+			Deprecation: service.ModelDeprecation,
 		}, Workboards: webuiapp.WorkboardServices{
 			List: workboards.BrowserList, Read: workboards.BrowserRead, Events: workboards.BrowserEvents,
 			AttemptHistory: workboards.BrowserAttemptHistory, AttemptDetail: workboards.BrowserAttemptDetail,

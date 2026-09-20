@@ -39,6 +39,9 @@ var (
 	operationPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
 )
 
+// ValidModelID exposes the browser contract's bounded model-alias grammar.
+func ValidModelID(value string) bool { return modelIDPattern.MatchString(value) }
+
 type ChatAction string
 
 const (

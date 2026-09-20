@@ -56,7 +56,15 @@ and host resources. It explicitly distinguishes unavailable projections from
 unknown measurements and separates routed execution usage from auxiliary
 classifier, summarizer, audit, and optional-judge usage. Inspection is bounded
 and GET-only: it does not change models, routing policy, approvals, or runtime
-state. DAR-81 provides the schema-35 durable workboard foundation. DAR-82 now
+state. The same authenticated shell includes a live command grid and an
+evidence tribunal. The command grid identifies the configured Web UI default
+model, or a clearly labelled inferred orchestration model, as the commander and
+shows up to three current specialist choices for coding, OCR, CLI, general,
+image, video, writing, and creative work. Creative selection includes an
+explicit per-brief user preference question. The tribunal reads bounded
+model-deprecation reports for a selected domain and never turns a recommendation
+into disable or uninstall authority. DAR-81 provides the schema-35 durable
+workboard foundation. DAR-82 now
 adds board domain/service contracts; transactional board
 create, revise, list, read, archive, and redacted event reads; rich SQL-backed
 card mutations; and durable claim, heartbeat, recovery,

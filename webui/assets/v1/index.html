@@ -18,6 +18,8 @@
       <a href="__DARWIN_BASE_PATH__/chats" data-view="chats" aria-current="page">Chats</a>
       <a href="__DARWIN_BASE_PATH__/workboards" data-view="workboards">Workboards</a>
       <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
+      <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
+      <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
@@ -193,6 +195,36 @@
             <div class="settings-advisory"><strong>Safety boundary</strong><p>This page cannot enable shell commands, write access, or expand access beyond the configured directory.</p></div>
           </aside>
         </div>
+      </section>
+      <section id="routing-view" class="tron-view" aria-labelledby="routing-grid-title" hidden>
+        <header class="tron-heading">
+          <div><p class="eyebrow">Command network</p><h1 id="routing-grid-title">Darwin routing grid</h1></div>
+          <button id="refresh-routing" class="tron-button" type="button">Rescan grid</button>
+        </header>
+        <output id="routing-live-status" class="tron-status" role="status" aria-live="polite">Synchronizing model routes…</output>
+        <section class="commander-core" aria-labelledby="commander-title">
+          <div class="core-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div><p class="eyebrow">Primary intelligence</p><h2 id="commander-title">Commander / brain</h2><strong id="commander-model">Resolving…</strong><p id="commander-detail"></p></div>
+        </section>
+        <div class="routing-beam" aria-hidden="true"></div>
+        <section aria-labelledby="specialists-title"><div class="tron-section-heading"><div><p class="eyebrow">Instruction fan-out</p><h2 id="specialists-title">High-level specialist routes</h2></div><span>Top 3 per job</span></div><div id="specialist-grid" class="specialist-grid"></div></section>
+        <section id="creative-consultation" class="creative-console" aria-labelledby="creative-title">
+          <p class="eyebrow">Human preference loop</p><h2 id="creative-title">Creative tasks require consultation</h2>
+          <p id="creative-question">The commander asks: “Which model’s output do you prefer?”</p>
+          <div id="creative-choices" class="creative-choices" role="group" aria-label="Preferred creative model"></div>
+          <output id="creative-preference" class="tron-status" aria-live="polite"></output>
+        </section>
+      </section>
+      <section id="elimination-view" class="tron-view elimination-view" aria-labelledby="elimination-title" hidden>
+        <header class="tron-heading"><div><p class="eyebrow">Evidence tribunal</p><h1 id="elimination-title">Model elimination matrix</h1></div><button id="refresh-elimination" class="tron-button" type="button">Recalculate</button></header>
+        <p class="tron-intro">DarwinRouter recommends review only when persisted evaluated attempts cross the selected failure threshold. Recommendations never disable or uninstall a model.</p>
+        <form id="elimination-controls" class="elimination-controls">
+          <label for="elimination-job">Performance domain</label><select id="elimination-job"></select>
+          <label for="elimination-threshold">Failure threshold</label><select id="elimination-threshold"><option value="0.25">25%</option><option value="0.35" selected>35%</option><option value="0.5">50%</option></select>
+          <button type="submit" class="tron-button">Scan evidence</button>
+        </form>
+        <output id="elimination-live-status" class="tron-status" role="status" aria-live="polite">Awaiting evidence scan…</output>
+        <div class="elimination-layout"><section class="tribunal-panel danger-panel" aria-labelledby="candidate-title"><p class="eyebrow">Review recommended</p><h2 id="candidate-title">Elimination candidates</h2><div id="elimination-candidates" class="elimination-list"></div></section><section class="tribunal-panel" aria-labelledby="retained-title"><p class="eyebrow">Retained / insufficient evidence</p><h2 id="retained-title">Protected models</h2><div id="elimination-retained" class="elimination-list"></div></section></div>
       </section>
       <section id="workboard-view" class="workboard-view" aria-labelledby="workboard-title" hidden>
         <header class="workboard-heading">
@@ -426,6 +458,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/routing-map.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>

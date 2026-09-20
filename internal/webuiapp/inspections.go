@@ -8,27 +8,31 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
 
 type InspectionServices struct {
-	Models    func(context.Context) (contract.ModelInspectionPage, error)
-	Route     func(context.Context, string) (contract.RouteInspection, error)
-	Usage     func(context.Context, string) (contract.TaskUsageInspection, error)
-	Tools     func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
-	Audits    func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
-	Health    func(context.Context) (contract.HealthInspection, error)
-	Resources func(context.Context) (contract.ResourceInspection, error)
-	Settings  func(context.Context) (contract.SettingsInspection, error)
+	Models      func(context.Context) (contract.ModelInspectionPage, error)
+	Route       func(context.Context, string) (contract.RouteInspection, error)
+	Usage       func(context.Context, string) (contract.TaskUsageInspection, error)
+	Tools       func(context.Context, string, string, int) (contract.ToolInspectionPage, error)
+	Audits      func(context.Context, string, string, int) (contract.AuditInspectionPage, error)
+	Health      func(context.Context) (contract.HealthInspection, error)
+	Resources   func(context.Context) (contract.ResourceInspection, error)
+	Settings    func(context.Context) (contract.SettingsInspection, error)
+	Deprecation func(context.Context, string, string, string, evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error)
 }
 
 func inspectionQueryPath(base, path string) bool {
-	return taskActionID(base, path, "tools") != "" || taskActionID(base, path, "audits") != ""
+	return taskActionID(base, path, "tools") != "" || taskActionID(base, path, "audits") != "" || path == base+"/api/v1/models/deprecation"
 }
 
 func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.Request) bool {
 	base, path := h.basePath+"/api/v1", request.URL.Path
 	switch {
+	case path == base+"/models/deprecation":
+		h.serveDeprecationInspection(writer, request)
 	case path == base+"/models":
 		serveInspection(h, writer, request, "models_unavailable", func(ctx context.Context) (contract.ModelInspectionPage, error) {
 			if h.inspections.Models == nil {
@@ -109,6 +113,47 @@ func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.R
 		return false
 	}
 	return true
+}
+
+func (h *Handler) serveDeprecationInspection(writer http.ResponseWriter, request *http.Request) {
+	if !h.prevalidateInspectionGET(writer, request) {
+		return
+	}
+	values, err := url.ParseQuery(request.URL.RawQuery)
+	if err != nil || len(values) != 6 || h.inspections.Deprecation == nil {
+		h.writeError(writer, request, http.StatusBadRequest, "invalid_inspection_query")
+		return
+	}
+	one := func(name string) (string, bool) { items := values[name]; return first(items), len(items) == 1 }
+	model, modelOK := one("model")
+	domain, domainOK := one("domain")
+	profile, profileOK := one("profile")
+	windowText, windowOK := one("window")
+	minText, minOK := one("min_samples")
+	thresholdText, thresholdOK := one("failure_threshold")
+	window, windowErr := strconv.Atoi(windowText)
+	minimum, minErr := strconv.Atoi(minText)
+	threshold, thresholdErr := strconv.ParseFloat(thresholdText, 64)
+	policy := evaluation.DeprecationPolicy{Window: window, MinSamples: minimum, FailureThreshold: threshold}
+	if !modelOK || !domainOK || !profileOK || !windowOK || !minOK || !thresholdOK || !contract.ValidModelID(model) || !contract.ValidID(domain) || !contract.ValidID(profile) || windowErr != nil || minErr != nil || thresholdErr != nil || policy.Validate() != nil {
+		h.writeError(writer, request, http.StatusBadRequest, "invalid_inspection_query")
+		return
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
+	defer cancel()
+	report, reportErr := h.inspections.Deprecation(ctx, model, domain, profile, policy)
+	if reportErr != nil || report.Validate() != nil {
+		h.writeError(writer, request, http.StatusServiceUnavailable, "deprecation_unavailable")
+		return
+	}
+	h.writeJSON(writer, http.StatusOK, report)
+}
+
+func first(values []string) string {
+	if len(values) != 1 {
+		return ""
+	}
+	return values[0]
 }
 
 func canonicalToolCursor(value string) bool {

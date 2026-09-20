@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 	contract "github.com/ArronJablonowski/DarwinRouter/webui"
 )
 
@@ -58,6 +60,36 @@ func inspectionHandlerFixture(t *testing.T) (*Handler, *atomic.Int32) {
 		},
 	}
 	return handler, calls
+}
+
+func TestBrowserDeprecationInspectionIsAuthenticatedAndReadOnly(t *testing.T) {
+	handler, calls := inspectionHandlerFixture(t)
+	handler.inspections.Deprecation = func(_ context.Context, model, domain, profile string, policy evaluation.DeprecationPolicy) (evaluation.DeprecationReport, error) {
+		calls.Add(1)
+		if model != "coder" || domain != "coding" || profile != "default" || policy.Window != 100 || policy.MinSamples != 20 || policy.FailureThreshold != .35 {
+			t.Fatalf("unexpected deprecation request: %q %q %q %+v", model, domain, profile, policy)
+		}
+		return evaluation.DeprecationReport{Population: "evaluated_attempts", Version: 1, Key: routing.Key{Model: "implementation", Provider: "provider", Domain: domain, Profile: profile}, Policy: policy, ConfiguredModelID: model, Sampled: 20, EligibleSamples: 20, ExecutionFailures: 8, Failures: 8, FailureRate: .4, Candidate: true, Reason: "failure_threshold", ApprovalRequired: true, EvidenceDigest: strings.Repeat("a", 64)}, nil
+	}
+	target := "/app/api/v1/models/deprecation?model=coder&domain=coding&profile=default&window=100&min_samples=20&failure_threshold=0.35"
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, browserGET(target, nil))
+	if response.Code != http.StatusUnauthorized || calls.Load() != 0 {
+		t.Fatal("unauthenticated deprecation inspection dispatched", response.Code, calls.Load())
+	}
+	cookie, _ := authenticateBrowser(t, handler)
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, browserGET(target, cookie))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"candidate":true`) || calls.Load() != 1 {
+		t.Fatal("deprecation inspection failed", response.Code, response.Body.String(), calls.Load())
+	}
+	for _, invalid := range []string{target + "&extra=x", strings.Replace(target, "min_samples=20", "min_samples=0", 1), strings.Replace(target, "model=coder", "model=bad%20id", 1)} {
+		response = httptest.NewRecorder()
+		handler.ServeHTTP(response, browserGET(invalid, cookie))
+		if response.Code != http.StatusBadRequest {
+			t.Fatal("invalid deprecation query accepted", invalid, response.Code)
+		}
+	}
 }
 
 func TestInspectionRoutesRequireAuthenticationAndStrictGET(t *testing.T) {

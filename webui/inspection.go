@@ -106,6 +106,8 @@ type ModelInspectionPage struct {
 	Version               int                       `json:"version"`
 	Availability          Availability              `json:"availability"`
 	ConfigID              string                    `json:"config_id,omitempty"`
+	CommanderID           string                    `json:"commander_id,omitempty"`
+	CommanderSource       string                    `json:"commander_source,omitempty"`
 	RefreshedAt           *time.Time                `json:"refreshed_at,omitempty"`
 	LocalTotalBytes       *uint64                   `json:"local_total_bytes,omitempty"`
 	LocalTotalKind        string                    `json:"local_total_kind,omitempty"`
@@ -122,9 +124,11 @@ func (p ModelInspectionPage) Validate() error {
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
 		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated" ||
 			(p.LocalTotalCoverage != "complete" && p.LocalTotalCoverage != "partial") || p.RefreshIntervalMS < 5000 || p.RefreshIntervalMS > 300000 || p.LocalProviders == nil || len(p.LocalProviders) > MaxInspectionProviders) ||
-		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0) {
+		(p.CommanderID != "" && !modelIDPattern.MatchString(p.CommanderID)) || (p.CommanderSource != "" && p.CommanderSource != "configured" && p.CommanderSource != "inferred") ||
+		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "") {
 		return ErrContract
 	}
+	commanderFound := p.CommanderID == ""
 	partial := p.LocalUnknownSizeCount > 0
 	providerSeen := map[string]bool{}
 	for _, provider := range p.LocalProviders {
@@ -142,7 +146,13 @@ func (p ModelInspectionPage) Validate() error {
 		if model.Validate() != nil || seen[model.ID] {
 			return ErrContract
 		}
+		if model.ID == p.CommanderID {
+			commanderFound = true
+		}
 		seen[model.ID] = true
+	}
+	if !commanderFound || (p.CommanderID == "") != (p.CommanderSource == "") {
+		return ErrContract
 	}
 	return encodedWithin(p, 256<<10)
 }
