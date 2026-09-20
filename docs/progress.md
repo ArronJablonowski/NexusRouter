@@ -8836,3 +8836,51 @@ checkout, toolchain setup, two clean license reconstructions, verification,
 evidence upload, and failure reporting. Process-tree cancellation, transcript
 bounds, source rechecks, and every existing test remain unchanged. A fresh
 candidate and native campaign are required after this corrective commit.
+
+## 2026-09-19 — DAR-51/DAR-52 retained Darwin/arm64 native evidence
+
+A fresh native-evidence campaign completed successfully against exact clean
+pushed commit `dee852a15e214feae7b943a97c73a7863024676e` for release `1.0.1` on an
+observed `darwin/arm64` Go host using `go1.27.1`. The wrapper exited zero after
+its independently bounded `make check`, `make qualify-mvp`, DAR-126 context-
+recovery, and `make qualify-release-test` gates all passed. The complete check
+ran beyond the former one-hour aggregate deadline and validated the corrective
+120-minute check budget: application passed in 2,295.952s, release packaging in
+745.925s, telemetry in 2,234.805s, CLI in 165.872s, tool-gate in 97.058s, SDK in
+241.673s, and the production build completed before qualification continued.
+
+The canonical schema-2 native record is
+`sha256:e5b5da5c498e5072733890552beddbf333af9f1f180cb006a4bbc5982fd32eba`;
+the canonical install/migration rehearsal record is
+`sha256:512ae4c8f053b3df6a360bd067413273585a59037e6596aa894e87c32efcd85e`.
+The bounded gate transcript is
+`sha256:441c923d5aff954c1c4e5a394b533177f5d32261cae943e8572f8cffa2b5c905`
+and its stderr transcript is the empty-file digest
+`sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The exact native archive is
+`DarwinRouter_1.0.1_darwin_arm64.tar.gz` at
+`sha256:c12285a98bd8db7189fda1da69ae965cc195d3495d1507ac019be2ac564917ec`.
+The rehearsal installed and validated version `1.0.1`, migrated an owned
+schema-29 fixture to schema 53 without fabricating legacy usage, retained the
+immutable backup at
+`sha256:13b6016b07ea732ea58508065031840ce586f1ef89b18a99dc5a19d24620aba0`,
+and passed schema-29 rollback-copy smoke verification.
+
+Both offline verification CLIs independently accepted the exact record bytes,
+supplied digests, public identities, and cross-record bindings. The standalone
+install verification result is
+`sha256:d64ece6ef81466f8b6ddb59c4d186edc989610b2d85e00ddde5b69f891c5998a`;
+the combined native/install result is
+`sha256:8110649e44d6205d4f48fa4f72e5ed296feb569bb1337bcff68534f7aa74752e`.
+A mode-0600 manifest-checked external evidence bundle was retained at ZIP digest
+`sha256:691931dd9033a06e4169f15a7b54fdcb719e463c6576949fa4277c2691d3c0fa`.
+
+This completes the local mechanical Darwin/arm64 evidence requested by DAR-51
+and the same-target synthetic install/migration/backup/rollback evidence used by
+DAR-52. It does not approve a supported-platform matrix or qualify
+`darwin/amd64`, `linux/amd64`, or `linux/arm64`; those targets still require
+matching native hosts or an authenticated hosted matrix. It also does not
+supply DAR-47 candidate approval, DAR-48 human legal/notices approval, DAR-53
+production signing authority, physical-hardware attestation, a historical
+previous-release binary rehearsal, tagging, upload, or publication. No Linear
+issue state was changed while retaining this evidence.
