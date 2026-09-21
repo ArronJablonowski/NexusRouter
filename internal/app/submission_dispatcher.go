@@ -142,8 +142,11 @@ func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 			continue
 		}
 		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
+			// A bounded claim query can fail transiently under SQLite contention or
+			// deadline pressure. Record degraded health, but retain the worker so one
+			// failed claim cannot strand every later durable submission until a daemon
+			// restart. The next iteration reopens a fresh five-second query context.
 			d.recordError()
-			return
 		}
 		select {
 		case <-ctx.Done():
