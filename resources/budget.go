@@ -32,6 +32,7 @@ type Budget struct {
 	adaptive     bool
 	deviceVRAM   map[string]uint64
 	deviceActive map[string]int
+	swapBaseline *uint64
 }
 
 // NewAdaptiveBudget uses MaxConcurrent as an upper ceiling, deriving each new
@@ -72,6 +73,18 @@ func NewBudget(l Limits) (*Budget, error) {
 	}
 	return &Budget{limits: l, deviceVRAM: map[string]uint64{}, deviceActive: map[string]int{}}, nil
 }
+
+func (b *Budget) swapGrowthExceeded(s Snapshot) bool {
+	if s.SwapUsed == nil {
+		return false
+	}
+	if b.swapBaseline == nil {
+		baseline := *s.SwapUsed
+		b.swapBaseline = &baseline
+		return false
+	}
+	return *s.SwapUsed > *b.swapBaseline && *s.SwapUsed-*b.swapBaseline > 5<<30
+}
 func percent(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v > 0 && v <= 100 }
 
 // Reserve returns an idempotent release function. Snapshot usage plus all live
@@ -107,7 +120,7 @@ func (b *Budget) Reserve(s Snapshot, n Need, now time.Time) (func(), error) {
 	if n.VRAM > 0 && ((n.Device != "" && b.used.VRAM > 0) || (n.Device == "" && len(b.deviceVRAM) > 0)) {
 		return nil, ErrCapacity
 	}
-	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) || (s.SwapPressure != nil && *s.SwapPressure) {
+	if b.active >= b.limits.MaxConcurrent || (s.ThermalPressure != nil && *s.ThermalPressure) || (s.SwapPressure != nil && *s.SwapPressure) || b.swapGrowthExceeded(s) {
 		return nil, ErrCapacity
 	}
 	ramRoom, ok := headroom(s.TotalRAM, s.AvailableRAM, b.used.RAM, b.limits.RAMPercent)

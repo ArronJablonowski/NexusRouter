@@ -104,6 +104,7 @@ func validProviderInventory(models []providers.InstalledModel) bool {
 	for _, model := range models {
 		identity, err := providers.OllamaModelIdentity(model.Name)
 		if err != nil || identity != model.Name || seen[identity] || len(model.Digest) != 0 && len(model.Digest) != 64 ||
+			model.ContextTokens < 0 || model.ContextTokens > providers.MaxOutputTokens ||
 			!inventoryMetadata(model.Family) || !inventoryMetadata(model.ParameterSize) || !inventoryMetadata(model.Quantization) ||
 			!model.ModifiedAt.IsZero() && (model.ModifiedAt.Location() != time.UTC || model.ModifiedAt.Year() < 1970 || model.ModifiedAt.Year() > 2260) {
 			return false

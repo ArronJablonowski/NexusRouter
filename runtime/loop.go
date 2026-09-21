@@ -291,7 +291,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		cost := *r.RouteEstimatedCost
 		routeEstimatedCost = &cost
 	}
-	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, IntentClassification: intentClassification, SubmissionID: r.SubmissionID, Compaction: compaction, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile, Capabilities: capabilities}); err != nil {
+	if err := persist(ctx, TaskStarted, Data{SkillContext: skillContext, IntentClassification: intentClassification, SubmissionID: r.SubmissionID, Compaction: compaction, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.RetryOfTaskID, ConfigID: r.ConfigID, RouteEstimatedCost: routeEstimatedCost, Messages: inference.Messages, ModelID: inference.Model, ProviderID: r.ProviderID, ParentTaskID: r.ParentTaskID, Privacy: r.Privacy, Domain: r.Domain, Profile: r.Profile, Capabilities: capabilities, ContextTokens: int(inference.ContextTokens)}); err != nil {
 		return Result{}, err
 	}
 	result := Result{}

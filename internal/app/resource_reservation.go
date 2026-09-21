@@ -120,7 +120,7 @@ func (s *Service) reservePrimary(ctx, admission context.Context, model config.Mo
 	}
 	contextTokens := request.ContextTokens
 	if contextTokens == 0 {
-		contextTokens = model.ContextTokens
+		contextTokens = model.WorkingContextTokens()
 	}
 	taskID, sessionID := request.taskID, request.sessionID
 	if request.runtimeHostAdmission != nil {
@@ -158,7 +158,7 @@ func (s *Service) reserveAuxiliaryExecution(ctx context.Context, model config.Mo
 		return ctx, func() error { release(); return nil }, nil
 	}
 	id := rand.Text()
-	contextTokens := model.ContextTokens
+	contextTokens := model.WorkingContextTokens()
 	if contextTokens < 1 {
 		return ctx, nil, ErrAdmission
 	}

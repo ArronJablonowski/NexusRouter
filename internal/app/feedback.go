@@ -33,6 +33,7 @@ func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost 
 	}
 	key := routing.Key{Domain: "general", Profile: "default"}
 	var start, end runtime.Event
+	contextTokens := 0
 	var sequence int64
 	for pages := 0; pages < 1000; pages++ {
 		events, err := ro.Read(ctx, task, sequence, 256)
@@ -46,6 +47,7 @@ func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost 
 			sequence = e.Sequence
 			switch e.Kind {
 			case runtime.TaskStarted:
+				contextTokens = e.Data.ContextTokens
 				if e.Data.Domain != "" {
 					key.Domain = e.Data.Domain
 				}
@@ -78,7 +80,7 @@ func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost 
 	}
 	hash := sha256.Sum256([]byte("user-feedback:" + task + ":" + start.AttemptID))
 	id := hex.EncodeToString(hash[:])
-	record := evaluation.Record{Version: 1, ID: id, TaskID: task, AttemptID: start.AttemptID, Key: key, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: id, Passed: accepted}}, ExecutionSucceeded: true, Latency: latency, Cost: cost, Time: end.Time.UTC()}
+	record := evaluation.Record{Version: 1, ID: id, TaskID: task, AttemptID: start.AttemptID, Key: key, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: id, Passed: accepted}}, ExecutionSucceeded: true, Latency: latency, ContextTokens: contextTokens, Cost: cost, Time: end.Time.UTC()}
 	if record.Time.IsZero() {
 		return ErrAdmission
 	}

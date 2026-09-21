@@ -31,6 +31,9 @@ type Request struct {
 	// MaxOutputTokens is a provider-enforced generation ceiling. Zero leaves
 	// the provider default in effect.
 	MaxOutputTokens int64
+	// ContextTokens is the model-advertised context window selected by the
+	// application. Zero leaves the provider default in effect.
+	ContextTokens int64
 }
 
 // MaxOutputTokens is the largest generation ceiling accepted by the provider

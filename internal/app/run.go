@@ -494,7 +494,11 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		executionProvider = newContextRolloverTaskProvider(deferredProvider)
 	}
 	loop := runtime.Loop{ContextEstimator: r.contextEstimator, Provider: executionProvider, Journal: j, Steering: db, ValidationText: func(text string) string { return redact(text, secrets) }}
-	inference := providers.Request{Model: model.Model, Messages: messages}
+	contextTokens := model.WorkingContextTokens()
+	if r.ContextTokens > 0 {
+		contextTokens = r.ContextTokens
+	}
+	inference := providers.Request{Model: model.Model, Messages: messages, ContextTokens: int64(contextTokens)}
 	maxTurns := s.Runtime.MaxTurns
 	if registry != nil {
 		inference.Tools = registry.Catalog()

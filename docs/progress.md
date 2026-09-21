@@ -8971,3 +8971,29 @@ its turn, release and unload itself, transfer a durable reservation to the
 specialist, and resume after the child reports completion. That protocol needs
 explicit checkpoint, residency-ownership, and recovery semantics before it can
 be enabled safely.
+
+## Adaptive context tiers and local-model admission
+
+Model configuration now separates the advertised context ceiling from the
+working allocation. Muse Glimmer and Qwen3-Coder retain their advertised
+131K/262K capabilities while ordinary requests begin at the proven 32K tier.
+Automatic routing estimates each task before admission, selects from 32K, 64K,
+128K, and the advertised ceiling, and uses the same frozen tier for host
+reservation and provider dispatch. Exploration requires the configured minimum
+number of samples at the current tier; recorded timeout, provider-error, or
+swap-growth faults force selection back to the proven tier. The policy prefers
+the smallest tier within one percentage point of the best observed quality.
+
+Task-start events now durably attribute the allocated context tier. Evaluation
+records can carry quality, latency, timeout, provider error, peak memory, and
+swap-growth measurements, and telemetry aggregates current evaluation heads by
+model/provider/context tier for future routing decisions. Operator feedback
+automatically records the task's tier. Benchmark adapters still need to supply
+their measured peak-memory, swap-growth, timeout, and provider-error values in
+the evaluation record; DarwinRouter does not infer missing measurements.
+
+Local admission now treats model inventory context as a capability ceiling,
+sends the selected working tier to Ollama as `num_ctx`, and rejects new local
+work after swap usage has grown by more than 5 GiB from the observed baseline.
+The full formatting, vet, race-enabled test, and build gate passed for this
+checkpoint.

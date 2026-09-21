@@ -83,6 +83,33 @@ func TestConcurrentReservations(t *testing.T) {
 		t.Fatal("reservation count", n)
 	}
 }
+
+func TestSwapGrowthGuardRejectsMoreThanFiveGiB(t *testing.T) {
+	now := time.Now()
+	baseline := uint64(3 << 30)
+	b, err := NewBudget(Limits{MaxConcurrent: 1, RAMPercent: 100, VRAMPercent: 100, MaxAge: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := Snapshot{Time: now, TotalRAM: 16 << 30, AvailableRAM: 16 << 30, SwapUsed: &baseline}
+	release, err := b.Reserve(snapshot, Need{RAM: 1}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	atBoundary := baseline + 5<<30
+	snapshot.SwapUsed = &atBoundary
+	release, err = b.Reserve(snapshot, Need{RAM: 1}, now)
+	if err != nil {
+		t.Fatal("5 GiB boundary rejected", err)
+	}
+	release()
+	over := atBoundary + 1
+	snapshot.SwapUsed = &over
+	if _, err = b.Reserve(snapshot, Need{RAM: 1}, now); err == nil {
+		t.Fatal("swap growth over 5 GiB admitted")
+	}
+}
 func TestDarwinParsing(t *testing.T) {
 	input := "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 2.\nPages inactive: 3.\nPages speculative: 1.\n"
 	n, err := darwinAvailable(input)

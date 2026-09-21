@@ -33,7 +33,7 @@
 		projection = value;
 		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
-		addSummary("File tools", value.active.tools_enabled ? "Enabled" : "Disabled");
+		addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Read root", value.active.read_root || "Not configured");

@@ -88,6 +88,12 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 		}
 	}
 	var err error
+	if r.ContextTokens == 0 {
+		// Explicit execution keeps the configured proven tier. Its trusted custom
+		// estimator runs only after TaskStarted is durable; invoking it during
+		// admission would violate the estimator side-effect boundary.
+		r.ContextTokens = model.WorkingContextTokens()
+	}
 	r, err = s.prepareExplicitApprovedCompaction(ctx, r, model)
 	if err != nil {
 		return Result{}, ErrAdmission

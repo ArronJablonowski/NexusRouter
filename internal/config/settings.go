@@ -106,19 +106,28 @@ type Provider struct {
 	Executable      string `yaml:"executable,omitempty" json:"executable,omitempty"`
 }
 type Model struct {
-	ContextTokens   int      `yaml:"context_tokens" json:"context_tokens"`
-	EstimatedCost   *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
-	RAMBytes        uint64   `yaml:"ram_bytes" json:"ram_bytes"`
-	VRAMBytes       uint64   `yaml:"vram_bytes" json:"vram_bytes"`
-	GPUDevice       string   `yaml:"gpu_device" json:"gpu_device,omitempty"`
-	FailureDomain   string   `yaml:"failure_domain" json:"failure_domain"`
-	ID              string   `yaml:"id" json:"id"`
-	Provider        string   `yaml:"provider" json:"provider"`
-	Model           string   `yaml:"model" json:"model"`
-	ReasoningEffort string   `yaml:"reasoning_effort,omitempty" json:"reasoning_effort,omitempty"`
-	Locality        string   `yaml:"locality" json:"locality"`
-	Capabilities    []string `yaml:"capabilities" json:"capabilities"`
+	ContextTokens        int      `yaml:"context_tokens" json:"context_tokens"`
+	DefaultContextTokens int      `yaml:"default_context_tokens,omitempty" json:"default_context_tokens,omitempty"`
+	EstimatedCost        *float64 `yaml:"estimated_cost" json:"estimated_cost,omitempty"`
+	RAMBytes             uint64   `yaml:"ram_bytes" json:"ram_bytes"`
+	VRAMBytes            uint64   `yaml:"vram_bytes" json:"vram_bytes"`
+	GPUDevice            string   `yaml:"gpu_device" json:"gpu_device,omitempty"`
+	FailureDomain        string   `yaml:"failure_domain" json:"failure_domain"`
+	ID                   string   `yaml:"id" json:"id"`
+	Provider             string   `yaml:"provider" json:"provider"`
+	Model                string   `yaml:"model" json:"model"`
+	ReasoningEffort      string   `yaml:"reasoning_effort,omitempty" json:"reasoning_effort,omitempty"`
+	Locality             string   `yaml:"locality" json:"locality"`
+	Capabilities         []string `yaml:"capabilities" json:"capabilities"`
 }
+
+func (m Model) WorkingContextTokens() int {
+	if m.DefaultContextTokens > 0 {
+		return m.DefaultContextTokens
+	}
+	return m.ContextTokens
+}
+
 type Routing struct {
 	Exploration    float64            `yaml:"exploration_rate" json:"exploration_rate"`
 	MinSamples     int                `yaml:"minimum_samples" json:"minimum_samples"`
@@ -518,7 +527,7 @@ func (s Settings) Validate() error {
 			return errors.New("duplicate provider model route")
 		}
 		routes[route] = true
-		if m.ContextTokens < 0 || (m.EstimatedCost != nil && (!finite(*m.EstimatedCost) || *m.EstimatedCost < 0)) || (m.FailureDomain != "" && !identifier.MatchString(m.FailureDomain)) {
+		if m.ContextTokens < 0 || m.DefaultContextTokens < 0 || m.DefaultContextTokens > m.ContextTokens || (m.EstimatedCost != nil && (!finite(*m.EstimatedCost) || *m.EstimatedCost < 0)) || (m.FailureDomain != "" && !identifier.MatchString(m.FailureDomain)) {
 			return errors.New("invalid model routing metadata")
 		}
 		if !identifier.MatchString(m.ID) || models[m.ID] || m.Model == "" || len(m.Model) > 512 || !utf8.ValidString(m.Model) || strings.TrimSpace(m.Model) != m.Model || strings.ContainsFunc(m.Model, unicode.IsControl) {

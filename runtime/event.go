@@ -102,9 +102,13 @@ type Data struct {
 	ToolCalls             []providers.ToolCall           `json:"tool_calls,omitempty"`
 	Usage                 *providers.Usage               `json:"usage,omitempty"`
 	FinishReason          string                         `json:"finish_reason,omitempty"`
+	ContextTokens         int                            `json:"context_tokens,omitempty"`
 }
 
 func (e Event) Validate() error {
+	if e.Data.ContextTokens != 0 && (e.Kind != TaskStarted || e.Data.ContextTokens < 1) {
+		return errors.New("invalid context tokens placement")
+	}
 	if e.Data.DelegationCompaction != nil {
 		authority := e.Data.DelegationCompaction
 		if authority.Validate() != nil || e.Kind != TaskStarted || e.WorkerID == "" ||

@@ -145,6 +145,25 @@ func TestOutputTokenCeilingWireFormat(t *testing.T) {
 	}
 }
 
+func TestOllamaContextWindowWireFormat(t *testing.T) {
+	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Options struct {
+				NumContext int64 `json:"num_ctx"`
+			} `json:"options"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Options.NumContext != 131072 {
+			t.Fatalf("Ollama context window missing: %+v, %v", body, err)
+		}
+		fmt.Fprintln(w, `{"message":{"content":""},"done":true,"done_reason":"stop"}`)
+	})
+	r := request()
+	r.ContextTokens = 131072
+	if err := p.Stream(context.Background(), r, func(Chunk) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInvalidOutputTokenCeilingNeverSent(t *testing.T) {
 	for _, kind := range []string{"openai_compatible", "ollama"} {
 		t.Run(kind, func(t *testing.T) {

@@ -83,12 +83,17 @@ type Record struct {
 	SchemaPassed          *bool
 	ExecutionSucceeded    bool
 	Latency               time.Duration
+	ContextTokens         int
+	TimedOut              bool
+	ProviderError         bool
+	PeakMemoryBytes       uint64
+	SwapGrowthBytes       uint64
 	Cost                  float64
 	Time                  time.Time
 }
 
 func (r Record) Validate() error {
-	if r.Version != 1 || r.ID == "" || r.TaskID == "" || r.AttemptID == "" || r.Key.Model == "" || r.Key.Provider == "" || r.Key.Domain == "" || r.Key.Profile == "" || r.Latency < 0 || math.IsNaN(r.Cost) || math.IsInf(r.Cost, 0) || r.Cost < 0 || r.Time.IsZero() || len(r.Checks) > 100 {
+	if r.Version != 1 || r.ID == "" || r.TaskID == "" || r.AttemptID == "" || r.Key.Model == "" || r.Key.Provider == "" || r.Key.Domain == "" || r.Key.Profile == "" || r.Latency < 0 || r.ContextTokens < 0 || math.IsNaN(r.Cost) || math.IsInf(r.Cost, 0) || r.Cost < 0 || r.Time.IsZero() || len(r.Checks) > 100 {
 		return ErrEvidence
 	}
 	_, err := Resolve(r.Checks, r.AllowJudge)

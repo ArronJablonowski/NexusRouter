@@ -138,6 +138,10 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 				out.LocalTotalCoverage = "partial"
 			}
 			item.Digest, item.Family, item.ParameterSize, item.Quantization = installed.Digest, installed.Family, installed.ParameterSize, installed.Quantization
+			if installed.ContextTokens > 0 {
+				value := installed.ContextTokens
+				item.ContextTokens = &value
+			}
 			if !installed.ModifiedAt.IsZero() {
 				modified := installed.ModifiedAt.UTC()
 				item.ModifiedAt = &modified

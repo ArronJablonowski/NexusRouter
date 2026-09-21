@@ -21,6 +21,7 @@ type InstalledModel struct {
 	Family        string
 	ParameterSize string
 	Quantization  string
+	ContextTokens int64
 }
 
 // ModelInventoryProvider is an optional provider capability. Cloud adapters
@@ -82,9 +83,44 @@ func (p *HTTP) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
 			model.ParameterSize = item.Details.ParameterSize
 			model.Quantization = item.Details.QuantizationLevel
 		}
+		contextTokens, showErr := p.ollamaContextWindow(ctx, identity)
+		if showErr != nil {
+			return nil, showErr
+		}
+		model.ContextTokens = contextTokens
 		out = append(out, model)
 	}
 	return out, nil
+}
+
+func (p *HTTP) ollamaContextWindow(ctx context.Context, model string) (int64, error) {
+	resp, err := p.send(ctx, "POST", "/api/show", map[string]string{"model": model})
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, installedInventoryLimit+1))
+	if err != nil || len(body) > installedInventoryLimit {
+		return 0, &Failure{Code: "invalid_response"}
+	}
+	var envelope struct {
+		ModelInfo map[string]json.RawMessage `json:"model_info"`
+	}
+	if json.Unmarshal(body, &envelope) != nil || envelope.ModelInfo == nil {
+		return 0, &Failure{Code: "invalid_response"}
+	}
+	var found int64
+	for key, raw := range envelope.ModelInfo {
+		if !strings.HasSuffix(key, ".context_length") {
+			continue
+		}
+		var value int64
+		if json.Unmarshal(raw, &value) != nil || value < 1 || value > MaxOutputTokens || found != 0 && found != value {
+			return 0, &Failure{Code: "invalid_response"}
+		}
+		found = value
+	}
+	return found, nil
 }
 
 func validInventoryDigest(value string) bool {

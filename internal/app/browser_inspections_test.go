@@ -131,7 +131,11 @@ func TestBrowserModelsResourcesAndUsagePreserveAvailability(t *testing.T) {
 
 func TestBrowserModelsKeepsHealthyProviderWhenAnotherInventoryFails(t *testing.T) {
 	digest := strings.Repeat("c", 64)
-	healthy := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	healthy := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/show" {
+			_, _ = fmt.Fprint(writer, `{"model_info":{"fixture.context_length":32768}}`)
+			return
+		}
 		_, _ = fmt.Fprintf(writer, `{"models":[{"name":"healthy:latest","modified_at":"2026-09-17T12:00:00Z","size":2048,"digest":%q}]}`, digest)
 	}))
 	defer healthy.Close()
@@ -178,6 +182,10 @@ func TestBrowserModelsKeepsHealthyProviderWhenAnotherInventoryFails(t *testing.T
 func TestBrowserModelsDiscoversInstalledLocalModelsAndDeduplicatesAliases(t *testing.T) {
 	digest := strings.Repeat("b", 64)
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/show" {
+			_, _ = fmt.Fprint(writer, `{"model_info":{"fixture.context_length":32768}}`)
+			return
+		}
 		if request.URL.Path != "/api/tags" {
 			t.Errorf("unexpected path %s", request.URL.Path)
 		}

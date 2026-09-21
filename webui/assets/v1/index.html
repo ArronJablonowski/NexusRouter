@@ -173,13 +173,13 @@
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
-            <p class="settings-intro">Choose specialist locality and grant narrowly scoped, read-only file access. Saved changes take effect after the DarwinRouter daemon restarts.</p>
+            <p class="settings-intro">Choose specialist locality and whether eligible models may use DarwinRouter's narrowly scoped tools. Saved changes take effect after the DarwinRouter daemon restarts.</p>
             <label class="setting-toggle" for="specialists-allow-cloud">
               <span><strong>Allow cloud specialists</strong><small>Off by default. When off, every high-level specialist route uses eligible local models only.</small></span>
               <span class="switch"><input id="specialists-allow-cloud" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="tools-enabled">
-              <span><strong>File tools</strong><small>Expose the built-in read-only file tool to eligible local execution.</small></span>
+              <span><strong>Allow model tool use</strong><small>Off by default. Enable DarwinRouter's built-in read-only workspace tool for eligible local models; benchmark hosts may attach their own separately scoped tools.</small></span>
               <span class="switch"><input id="tools-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>
             <label class="setting-toggle" for="delegate-read-tools">
@@ -196,7 +196,7 @@
             <p class="eyebrow">Running daemon</p><h2 id="active-settings-title">Active policy</h2>
             <p class="settings-intro">These values remain active until the daemon restarts.</p>
             <dl id="active-settings" class="settings-summary"></dl>
-            <div class="settings-advisory"><strong>Safety boundary</strong><p>Cloud specialists remain disabled by default. This page cannot enable shell commands, write access, or expand access beyond the configured directory.</p></div>
+            <div class="settings-advisory"><strong>Safety boundary</strong><p>Tool use and cloud specialists remain disabled by default. This setting cannot enable unrestricted shell commands, write access, or access beyond the configured directory. Benchmark tools retain their host-defined schemas and scopes.</p></div>
           </aside>
         </div>
       </section>

@@ -17,7 +17,7 @@ func (b *Budget) LowMemory(s Snapshot, n Need, now time.Time) (bool, error) {
 	if n.RAM == 0 || s.Time.IsZero() || s.Time.After(now) || now.Sub(s.Time) > b.limits.MaxAge || s.TotalRAM == 0 || s.AvailableRAM > s.TotalRAM || (s.UnifiedMemory && n.VRAM != 0) || (n.Device != "" && n.VRAM == 0) {
 		return false, ErrResourceData
 	}
-	if s.ThermalPressure != nil && *s.ThermalPressure {
+	if s.ThermalPressure != nil && *s.ThermalPressure || b.swapGrowthExceeded(s) {
 		return false, ErrCapacity
 	}
 	// Exhausted headroom is low, even when unloading may later recover some.

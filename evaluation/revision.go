@@ -5,7 +5,7 @@ package evaluation
 // identity and execution measurements are fixed: only subjective judgment may
 // change, without creating another performance sample.
 func ValidateRevision(prior, next Record) error {
-	if prior.Validate() != nil || next.Validate() != nil || prior.ID == next.ID || prior.TaskID != next.TaskID || prior.AttemptID != next.AttemptID || prior.Key != next.Key || prior.ExecutionSucceeded != next.ExecutionSucceeded || prior.Latency != next.Latency || prior.Cost != next.Cost || !prior.Time.Equal(next.Time) || !sameSchema(prior.SchemaPassed, next.SchemaPassed) {
+	if prior.Validate() != nil || next.Validate() != nil || prior.ID == next.ID || prior.TaskID != next.TaskID || prior.AttemptID != next.AttemptID || prior.Key != next.Key || prior.ExecutionSucceeded != next.ExecutionSucceeded || prior.Latency != next.Latency || prior.ContextTokens != next.ContextTokens || prior.TimedOut != next.TimedOut || prior.ProviderError != next.ProviderError || prior.PeakMemoryBytes != next.PeakMemoryBytes || prior.SwapGrowthBytes != next.SwapGrowthBytes || prior.Cost != next.Cost || !prior.Time.Equal(next.Time) || !sameSchema(prior.SchemaPassed, next.SchemaPassed) {
 		return ErrEvidence
 	}
 	old, err := Resolve(prior.Checks, prior.AllowJudge)

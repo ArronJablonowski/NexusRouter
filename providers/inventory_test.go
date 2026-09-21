@@ -11,14 +11,32 @@ import (
 func TestOllamaInstalledModelsIncludesBoundedStorageMetadata(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/show" && r.Method == http.MethodPost {
+			_, _ = fmt.Fprint(w, `{"model_info":{"qwen.context_length":32768}}`)
+			return
+		}
 		if r.URL.Path != "/api/tags" || r.Method != http.MethodGet {
 			t.Errorf("unexpected inventory request %s %s", r.Method, r.URL.Path)
 		}
 		fmt.Fprintf(w, `{"models":[{"name":"qwen:latest","modified_at":"2026-09-17T12:00:00Z","size":4294967296,"digest":%q,"details":{"family":"qwen","parameter_size":"7B","quantization_level":"Q4_K_M"}}]}`, digest)
 	})
 	models, err := p.InstalledModels(context.Background())
-	if err != nil || len(models) != 1 || models[0].Name != "qwen:latest" || models[0].SizeBytes != 4294967296 || models[0].Digest != digest || models[0].Quantization != "Q4_K_M" {
+	if err != nil || len(models) != 1 || models[0].Name != "qwen:latest" || models[0].SizeBytes != 4294967296 || models[0].Digest != digest || models[0].Quantization != "Q4_K_M" || models[0].ContextTokens != 32768 {
 		t.Fatalf("unexpected inventory: %+v, %v", models, err)
+	}
+}
+
+func TestOllamaInstalledModelsAllowsNonTextModelWithoutContext(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/show" {
+			_, _ = fmt.Fprint(w, `{"model_info":{}}`)
+			return
+		}
+		fmt.Fprintf(w, `{"models":[{"name":"qwen:latest","size":1,"digest":%q}]}`, digest)
+	})
+	if models, err := p.InstalledModels(context.Background()); err != nil || len(models) != 1 || models[0].ContextTokens != 0 {
+		t.Fatalf("non-text model inventory rejected: %+v, %v", models, err)
 	}
 }
 

@@ -587,6 +587,19 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		}
 		candidateRequest := r
 		candidateRequest.ModelID = model.ID
+		contextEvidence, evidenceErr := db.ContextEvidence(ctx, model.Model, model.Provider)
+		if evidenceErr != nil {
+			return Result{}, ErrAdmission
+		}
+		candidateRequest.ContextTokens, err = chooseContextTier(ctx, model, candidateRequest, contextTokens, contextEvidence, draw < cfg.Routing.Exploration, cfg.Routing.MinSamples)
+		if err != nil {
+			for i := range candidates {
+				if candidates[i].Model == model.Model && candidates[i].Provider == model.Provider {
+					candidates[i].CapacityAvailable = false
+				}
+			}
+			continue
+		}
 		if candidateRequest.continuation != nil {
 			candidateRequest.sessionID = candidateRequest.continuation.SessionID
 		}
