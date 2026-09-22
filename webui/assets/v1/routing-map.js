@@ -17,6 +17,7 @@
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	let snapshot = null, routingTimer = 0;
 	let creativePreference = "";
+	const expandedModels = new Set(new URLSearchParams(window.location.search).getAll("expanded").filter(value => { const parts=value.split("|"); return parts.length===2 && jobs.some(job => job.key===parts[0]) && idPattern.test(parts[1]); }));
 	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.DarwinRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
 
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
@@ -41,8 +42,10 @@
 	function contextLabel(model) { if (!Number.isSafeInteger(model.context_tokens) || model.context_tokens < 1) return "context unknown"; if (model.context_tokens % 1024 === 0) return (model.context_tokens / 1024) + "K context ceiling"; return model.context_tokens.toLocaleString() + " context ceiling"; }
 	function byteLabel(value) { if (!Number.isSafeInteger(value) || value < 1) return "Unknown"; const units=["B","KiB","MiB","GiB","TiB"]; let amount=value,index=0; while (amount>=1024 && index<units.length-1) { amount/=1024; index++; } return (amount>=10 || index===0 ? Math.round(amount) : Math.round(amount*10)/10) + " " + units[index]; }
 	function fact(label, value) { const row=element("div","route-model-fact"); row.append(element("span","",label),element("strong","",value)); return row; }
+	function persistExpandedModels() { const url=new URL(window.location.href); url.searchParams.delete("expanded"); for (const key of [...expandedModels].sort()) url.searchParams.append("expanded",key); window.history.replaceState(null,"",url); }
 	function modelChip(model, index, job) {
 		const node=element("article","route-model"), evidence=learned(model,job), disclosure=element("details","route-model-details"), summary=element("summary","route-model-summary");
+		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); disclosure.addEventListener("toggle",()=>{ if (disclosure.open) expandedModels.add(expansionKey); else expandedModels.delete(expansionKey); persistExpandedModels(); });
 		const synopsis=evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback";
 		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
 		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Context",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
