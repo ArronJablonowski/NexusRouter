@@ -71,7 +71,7 @@ func (s *Store) ReconcileSummaryAttemptsPage(ctx context.Context, after string, 
 		WHERE a.rowid>? AND json_extract(a.body,'$.Status')='started'
 		ORDER BY a.rowid LIMIT ?`, cursor, limit)
 	if err != nil {
-		return after, 0, fmt.Errorf("%w: list attempts: %v", ErrSummaryRecovery, err)
+		return after, 0, fmt.Errorf("%w: list attempts: %w", ErrSummaryRecovery, err)
 	}
 	candidates := []summaryRecoveryCandidate{}
 	for rows.Next() {

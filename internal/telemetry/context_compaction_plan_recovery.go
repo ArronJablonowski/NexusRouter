@@ -62,7 +62,7 @@ func (s *Store) ReconcileContextCompactionPlansPage(ctx context.Context, after s
 			='started' AND json_extract(attempt.body,'$.Status') IN('started','interrupted')
 		ORDER BY operation.rowid LIMIT ?`, cursor, limit)
 	if err != nil {
-		return after, 0, fmt.Errorf("%w: list: %v", ErrContextCompactionRecovery, err)
+		return after, 0, fmt.Errorf("%w: list: %w", ErrContextCompactionRecovery, err)
 	}
 	candidates := []contextCompactionRecoveryCandidate{}
 	for rows.Next() {
