@@ -118,6 +118,10 @@ func (d *Dispatcher) Close() error {
 
 func (d *Dispatcher) recordError() { d.mu.Lock(); d.err = ErrSubmission; d.mu.Unlock() }
 
+func transientSupervisorError(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+}
+
 func transientClaimError(err error) bool {
 	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }
@@ -270,7 +274,9 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	defer stop()
 	status, statusErr := d.db.Submission(finish, claim.Status.ID)
 	if statusErr != nil {
-		d.recordError()
+		if !transientSupervisorError(statusErr) {
+			d.recordError()
+		}
 		return
 	}
 	linked := make(map[string]bool, len(status.TaskIDs))
@@ -313,7 +319,7 @@ func (d *Dispatcher) executeWorker(ctx context.Context, s *Service, claim submis
 	}
 	// Another supervisor may have fenced this undispatched owner. Its terminal
 	// write is expected to be denied; it must not poison unrelated active work.
-	if finishErr != nil && !errors.Is(finishErr, submissions.ErrLeaseLost) {
+	if finishErr != nil && !errors.Is(finishErr, submissions.ErrLeaseLost) && !transientSupervisorError(finishErr) {
 		d.recordError()
 	}
 }

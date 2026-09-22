@@ -27,7 +27,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		cancel()
 		compactionAfter = nextCompaction
 		d.supervisorHeartbeat(-1)
-		if compactionErr != nil && ctx.Err() == nil {
+		if compactionErr != nil && !transientSupervisorError(compactionErr) && ctx.Err() == nil {
 			d.recordError()
 		}
 		if ctx.Err() != nil {
@@ -38,7 +38,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		cancel()
 		summaryAfter = nextSummary
 		d.supervisorHeartbeat(-1)
-		if summaryErr != nil && ctx.Err() == nil {
+		if summaryErr != nil && !transientSupervisorError(summaryErr) && ctx.Err() == nil {
 			d.recordError()
 		}
 		if ctx.Err() != nil {
@@ -49,7 +49,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		cancel()
 		workerAfter = nextWorker
 		d.supervisorHeartbeat(-1)
-		if workerErr != nil && ctx.Err() == nil {
+		if workerErr != nil && !transientSupervisorError(workerErr) && ctx.Err() == nil {
 			d.recordError()
 		}
 		if ctx.Err() != nil {
@@ -62,7 +62,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		if nextConfig != "" {
 			configAfter = nextConfig
 		}
-		if configErr != nil {
+		if configErr != nil && !transientSupervisorError(configErr) {
 			if ctx.Err() == nil {
 				d.recordError()
 			}
@@ -74,7 +74,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 		next, err := d.recoverPage(query, configDigest, after)
 		cancel()
 		d.supervisorHeartbeat(-1)
-		if err != nil {
+		if err != nil && !transientSupervisorError(err) {
 			if ctx.Err() == nil {
 				d.recordError()
 			}
@@ -89,7 +89,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			// corrupt candidate; one bad record must not pin later pages.
 			readerAfter = nextReader
 			d.supervisorHeartbeat(-1)
-			if readerErr != nil && ctx.Err() == nil {
+			if readerErr != nil && !transientSupervisorError(readerErr) && ctx.Err() == nil {
 				d.recordError()
 			}
 		}
@@ -98,7 +98,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			nextWorkboard, _, workboardErr := d.workboardRecovery.RecoverAttentionPage(query, workboardAfter)
 			cancel()
 			d.supervisorHeartbeat(-1)
-			if workboardErr != nil {
+			if workboardErr != nil && !transientSupervisorError(workboardErr) {
 				if ctx.Err() == nil {
 					d.recordError()
 				}
@@ -115,7 +115,7 @@ func (d *Dispatcher) reconcile(ctx context.Context, configDigest string) {
 			// advances only past attempted candidates on partial failure.
 			attentionAfter = nextAttention
 			d.supervisorHeartbeat(-1)
-			if attentionErr != nil {
+			if attentionErr != nil && !transientSupervisorError(attentionErr) {
 				if ctx.Err() == nil {
 					d.recordError()
 				}

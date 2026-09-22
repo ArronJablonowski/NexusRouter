@@ -20,6 +20,14 @@ func TestTransientClaimErrorsDoNotRequireSupervisorInspection(t *testing.T) {
 	if transientClaimError(errors.New("storage failure")) {
 		t.Fatal("storage failure classified as transient")
 	}
+	for _, err := range []error{context.DeadlineExceeded, context.Canceled} {
+		if !transientSupervisorError(err) {
+			t.Fatalf("expected transient supervisor error: %v", err)
+		}
+	}
+	if transientSupervisorError(errors.New("storage failure")) {
+		t.Fatal("storage failure classified as transient supervisor error")
+	}
 }
 
 func TestDispatcherHealthLifecycleAndStalls(t *testing.T) {
