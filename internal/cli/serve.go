@@ -426,7 +426,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		},
 		HealthReport: healthReport,
 		Feedback: func(ctx context.Context, task string, accepted bool, cost float64) error {
-			return app.RecordFeedback(ctx, s.Telemetry.Database, task, accepted, cost)
+			return app.RecordFeedbackStore(ctx, db, task, accepted, cost)
 		},
 		ApproveBrowserChallenge: func(ctx context.Context, id, code string) error {
 			if browserHandler == nil || ctx == nil || ctx.Err() != nil {

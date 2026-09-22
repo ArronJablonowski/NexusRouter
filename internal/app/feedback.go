@@ -19,15 +19,34 @@ import (
 // The immutable final-attempt record gives repeated identical feedback no extra
 // weight; conflicting feedback requires a future supersession workflow.
 func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost float64) error {
-	if task == "" || len(task) > 128 || math.IsNaN(cost) || math.IsInf(cost, 0) || cost < 0 {
-		return ErrAdmission
-	}
+	// Keep the standalone command from creating a database when the configured
+	// path is absent. The daemon path below receives its already-open store.
 	ro, err := telemetry.OpenReadOnly(ctx, path)
 	if err != nil {
 		return errors.New("feedback database unavailable")
 	}
-	defer ro.Close()
-	snapshot, err := sessions.Replay(ctx, ro, task)
+	if err = ro.Close(); err != nil {
+		return errors.New("feedback database unavailable")
+	}
+	db, err := telemetry.Open(ctx, path)
+	if err != nil {
+		return errors.New("feedback database unavailable")
+	}
+	defer db.Close()
+	return RecordFeedbackStore(ctx, db, task, accepted, cost)
+}
+
+// RecordFeedbackStore records feedback through the daemon's existing store.
+// Opening a second writable Store inside the HTTP handler can contend with the
+// dispatcher long enough to expire claim queries and degrade its supervisor.
+func RecordFeedbackStore(ctx context.Context, db *telemetry.Store, task string, accepted bool, cost float64) error {
+	if task == "" || len(task) > 128 || math.IsNaN(cost) || math.IsInf(cost, 0) || cost < 0 {
+		return ErrAdmission
+	}
+	if db == nil {
+		return errors.New("feedback database unavailable")
+	}
+	snapshot, err := sessions.Replay(ctx, db, task)
 	if err != nil || snapshot.State != "completed" || snapshot.UncertainEffects || snapshot.InterruptedTurn || len(snapshot.Pending) > 0 {
 		return ErrAdmission
 	}
@@ -36,7 +55,7 @@ func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost 
 	contextTokens := 0
 	var sequence int64
 	for pages := 0; pages < 1000; pages++ {
-		events, err := ro.Read(ctx, task, sequence, 256)
+		events, err := db.Read(ctx, task, sequence, 256)
 		if err != nil {
 			return errors.New("feedback history unavailable")
 		}
@@ -87,10 +106,5 @@ func RecordFeedback(ctx context.Context, path, task string, accepted bool, cost 
 	if err := record.Validate(); err != nil {
 		return ErrAdmission
 	}
-	db, err := telemetry.Open(ctx, path)
-	if err != nil {
-		return errors.New("feedback database unavailable")
-	}
-	defer db.Close()
 	return db.RecordEvaluation(ctx, record)
 }
