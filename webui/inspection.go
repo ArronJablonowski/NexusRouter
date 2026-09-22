@@ -31,30 +31,31 @@ const (
 func validAvailability(value Availability) bool { return value == Available || value == Unavailable }
 
 type ModelInspection struct {
-	ID              string     `json:"id"`
-	Provider        string     `json:"provider"`
-	Model           string     `json:"model"`
-	ReasoningEffort string     `json:"reasoning_effort,omitempty"`
-	Locality        string     `json:"locality"`
-	Configured      bool       `json:"configured"`
-	Enabled         bool       `json:"enabled"`
-	Installed       bool       `json:"installed"`
-	Usable          bool       `json:"usable"`
-	Capabilities    []string   `json:"capabilities"`
-	ContextTokens   *int64     `json:"context_tokens,omitempty"`
-	EstimatedCost   *float64   `json:"estimated_cost,omitempty"`
-	RAMBytes        *uint64    `json:"ram_bytes,omitempty"`
-	VRAMBytes       *uint64    `json:"vram_bytes,omitempty"`
-	SizeBytes       *uint64    `json:"size_bytes,omitempty"`
-	Digest          string     `json:"digest,omitempty"`
-	Family          string     `json:"family,omitempty"`
-	ParameterSize   string     `json:"parameter_size,omitempty"`
-	Quantization    string     `json:"quantization,omitempty"`
-	ModifiedAt      *time.Time `json:"modified_at,omitempty"`
-	HealthCheckedAt *time.Time `json:"health_checked_at,omitempty"`
-	FailureDomain   string     `json:"failure_domain,omitempty"`
-	Health          string     `json:"health"`
-	StatusCode      string     `json:"status_code,omitempty"`
+	ID                    string     `json:"id"`
+	Provider              string     `json:"provider"`
+	Model                 string     `json:"model"`
+	ReasoningEffort       string     `json:"reasoning_effort,omitempty"`
+	Locality              string     `json:"locality"`
+	Configured            bool       `json:"configured"`
+	Enabled               bool       `json:"enabled"`
+	Installed             bool       `json:"installed"`
+	Usable                bool       `json:"usable"`
+	Capabilities          []string   `json:"capabilities"`
+	ContextTokens         *int64     `json:"context_tokens,omitempty"`
+	SelectedContextTokens *int64     `json:"selected_context_tokens,omitempty"`
+	EstimatedCost         *float64   `json:"estimated_cost,omitempty"`
+	RAMBytes              *uint64    `json:"ram_bytes,omitempty"`
+	VRAMBytes             *uint64    `json:"vram_bytes,omitempty"`
+	SizeBytes             *uint64    `json:"size_bytes,omitempty"`
+	Digest                string     `json:"digest,omitempty"`
+	Family                string     `json:"family,omitempty"`
+	ParameterSize         string     `json:"parameter_size,omitempty"`
+	Quantization          string     `json:"quantization,omitempty"`
+	ModifiedAt            *time.Time `json:"modified_at,omitempty"`
+	HealthCheckedAt       *time.Time `json:"health_checked_at,omitempty"`
+	FailureDomain         string     `json:"failure_domain,omitempty"`
+	Health                string     `json:"health"`
+	StatusCode            string     `json:"status_code,omitempty"`
 }
 
 func (m ModelInspection) Validate() error {
@@ -70,6 +71,9 @@ func (m ModelInspection) Validate() error {
 		return ErrContract
 	}
 	if m.ContextTokens != nil && *m.ContextTokens < 0 || m.EstimatedCost != nil && !finiteNonnegative(*m.EstimatedCost) {
+		return ErrContract
+	}
+	if m.SelectedContextTokens != nil && (*m.SelectedContextTokens < 1 || m.ContextTokens == nil || *m.SelectedContextTokens > *m.ContextTokens) {
 		return ErrContract
 	}
 	switch m.Health {

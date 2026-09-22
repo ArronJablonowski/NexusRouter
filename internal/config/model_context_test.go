@@ -8,7 +8,11 @@ func TestModelWorkingContextPreservesAdvertisedMaximum(t *testing.T) {
 		t.Fatal(model)
 	}
 	model.DefaultContextTokens = 0
-	if model.WorkingContextTokens() != 262144 {
+	if model.WorkingContextTokens() != 32768 || model.ContextTokens != 262144 {
+		t.Fatal(model)
+	}
+	model.ContextTokens = 16384
+	if model.WorkingContextTokens() != 16384 {
 		t.Fatal(model)
 	}
 }

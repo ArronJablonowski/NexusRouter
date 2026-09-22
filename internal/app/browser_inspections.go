@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math"
 	"strconv"
@@ -13,8 +14,10 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/accounting"
 	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -65,6 +68,10 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		out.ManagedResidency = out.ManagedResidency || provider.ManageResidency
 	}
 	configured := map[string]int{}
+	configuredSettings := map[string]config.Model{}
+	for _, model := range s.settings.Models {
+		configuredSettings[model.ID] = model
+	}
 	for i, model := range catalog.Models {
 		fact, observed := modelHealth[model.ID]
 		if fact.status != "healthy" && fact.status != "degraded" && fact.status != "unavailable" && fact.status != "disabled" {
@@ -72,6 +79,10 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		}
 		enabled := (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
 		out.Models[i] = browserModel(model, fact.status)
+		if configuredModel, ok := configuredSettings[model.ID]; ok && configuredModel.WorkingContextTokens() > 0 {
+			selected := int64(configuredModel.WorkingContextTokens())
+			out.Models[i].SelectedContextTokens = &selected
+		}
 		if observed {
 			checked := report.CheckedAt
 			out.Models[i].HealthCheckedAt = &checked
@@ -155,8 +166,83 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		// initialized; learned ranking starts empty and appears on a later poll.
 		out.Fitness = []contract.ModelFitnessInspection{}
 	}
+	if selected, selectErr := browserSelectedContexts(ctx, s.settings.Telemetry.Database, s.settings.Models, s.settings.Routing.MinSamples); selectErr == nil {
+		for index := range out.Models {
+			if value := selected[out.Models[index].ID]; value > 0 {
+				chosen := int64(value)
+				out.Models[index].SelectedContextTokens = &chosen
+			}
+		}
+	}
 	if out.Validate() != nil || !selectionValueClean(out, memorySecrets(s.settings, s.secret)) {
 		return zero, ErrInspection
+	}
+	return out, nil
+}
+
+func browserSelectedContexts(ctx context.Context, path string, models []config.Model, minimumSamples int) (map[string]int, error) {
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	rows, err := db.QueryContext(ctx, `SELECT e.model,e.provider,CASE WHEN h.current_id=e.id THEN e.body ELSE r.body END FROM evaluations e JOIN evaluation_heads h ON h.base_id=e.id LEFT JOIN evaluation_revisions r ON r.id=h.current_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type tierKey struct {
+		model, provider string
+		tokens          int
+	}
+	tiers := map[tierKey]*contextpolicy.Evidence{}
+	for rows.Next() {
+		var model, provider string
+		var body []byte
+		if err = rows.Scan(&model, &provider, &body); err != nil {
+			return nil, err
+		}
+		var record evaluation.Record
+		if json.Unmarshal(body, &record) != nil || record.Validate() != nil || record.ContextTokens < 1 {
+			continue
+		}
+		outcome, resolveErr := evaluation.Resolve(record.Checks, record.AllowJudge)
+		if resolveErr != nil {
+			continue
+		}
+		key := tierKey{model, provider, record.ContextTokens}
+		item := tiers[key]
+		if item == nil {
+			item = &contextpolicy.Evidence{ContextTokens: record.ContextTokens}
+			tiers[key] = item
+		}
+		item.Samples++
+		if outcome.Accepted {
+			item.Quality++
+		}
+		item.LatencyMillis += float64(record.Latency.Milliseconds())
+		if record.TimedOut {
+			item.Timeouts++
+		}
+		if record.ProviderError {
+			item.ProviderErrors++
+		}
+		item.PeakMemory = max(item.PeakMemory, record.PeakMemoryBytes)
+		item.MaxSwapGrowth = max(item.MaxSwapGrowth, record.SwapGrowthBytes)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	byRoute := map[[2]string][]contextpolicy.Evidence{}
+	for key, item := range tiers {
+		item.Quality /= float64(item.Samples)
+		item.LatencyMillis /= float64(item.Samples)
+		route := [2]string{key.model, key.provider}
+		byRoute[route] = append(byRoute[route], *item)
+	}
+	out := map[string]int{}
+	for _, model := range models {
+		out[model.ID] = contextpolicy.Select(contextpolicy.Request{AdvertisedMaximum: model.ContextTokens, WorkingTier: model.WorkingContextTokens(), EstimatedTokens: 1, Evidence: byRoute[[2]string{model.Model, model.Provider}], MinimumSamples: minimumSamples})
 	}
 	return out, nil
 }

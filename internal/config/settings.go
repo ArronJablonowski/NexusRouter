@@ -125,7 +125,10 @@ func (m Model) WorkingContextTokens() int {
 	if m.DefaultContextTokens > 0 {
 		return m.DefaultContextTokens
 	}
-	return m.ContextTokens
+	// The advertised window is a capability ceiling. Models without an
+	// explicit proven tier begin at 32K and adaptive context evidence may move
+	// them up or down from there.
+	return min(m.ContextTokens, 32*1024)
 }
 
 type Routing struct {

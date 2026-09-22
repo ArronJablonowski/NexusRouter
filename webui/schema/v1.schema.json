@@ -2872,6 +2872,7 @@
         "usable": {"type": "boolean"},
         "capabilities": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128}},
         "context_tokens": {"type": "integer", "minimum": 0},
+        "selected_context_tokens": {"type": "integer", "minimum": 1},
         "estimated_cost": {"type": "number", "minimum": 0},
         "ram_bytes": {"type": "integer", "minimum": 0},
         "vram_bytes": {"type": "integer", "minimum": 0},
