@@ -78,8 +78,12 @@ func (s *Store) ReconcileContextCompactionPlansPage(ctx context.Context, after s
 		}
 		candidates = append(candidates, candidate)
 	}
-	if rows.Err() != nil || rows.Close() != nil {
-		return after, 0, ErrContextCompactionRecovery
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return after, 0, fmt.Errorf("%w: scan candidates: %w", ErrContextCompactionRecovery, err)
+	}
+	if err = rows.Close(); err != nil {
+		return after, 0, fmt.Errorf("%w: close candidates: %w", ErrContextCompactionRecovery, err)
 	}
 	next = after
 	for _, candidate := range candidates {

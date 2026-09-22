@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -45,7 +46,7 @@ func (s *Store) recoverReadersPage(ctx context.Context, after string, limit int,
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT l.rowid,CASE WHEN typeof(l.token)='text' AND length(CAST(l.token AS BLOB)) BETWEEN 1 AND 512 THEN l.token END FROM resource_leases l JOIN task_heads h ON h.task_id=l.task_id WHERE l.rowid>? AND l.writer=0 AND l.released=0 AND l.process_id IS NOT NULL AND `+predicate+` ORDER BY l.rowid LIMIT ?`, cursor, limit)
 	if err != nil {
-		return after, 0, ErrLeaseRecovery
+		return after, 0, fmt.Errorf("%w: list candidates: %w", ErrLeaseRecovery, err)
 	}
 	type entry struct {
 		id    int64
@@ -60,8 +61,12 @@ func (s *Store) recoverReadersPage(ctx context.Context, after string, limit int,
 		}
 		tokens = append(tokens, token)
 	}
-	if rows.Err() != nil || rows.Close() != nil {
-		return after, 0, ErrLeaseRecovery
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return after, 0, fmt.Errorf("%w: scan candidates: %w", ErrLeaseRecovery, err)
+	}
+	if err = rows.Close(); err != nil {
+		return after, 0, fmt.Errorf("%w: close candidates: %w", ErrLeaseRecovery, err)
 	}
 	for _, token := range tokens {
 		next = strconv.FormatInt(token.id, 10)

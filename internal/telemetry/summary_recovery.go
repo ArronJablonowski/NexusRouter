@@ -89,8 +89,12 @@ func (s *Store) ReconcileSummaryAttemptsPage(ctx context.Context, after string, 
 		candidate.Attempt, candidate.SourceSequence = attempt, attempt.SourceSequence
 		candidates = append(candidates, candidate)
 	}
-	if rows.Err() != nil || rows.Close() != nil {
-		return after, 0, fmt.Errorf("%w: close candidate rows", ErrSummaryRecovery)
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return after, 0, fmt.Errorf("%w: scan candidate rows: %w", ErrSummaryRecovery, err)
+	}
+	if err = rows.Close(); err != nil {
+		return after, 0, fmt.Errorf("%w: close candidate rows: %w", ErrSummaryRecovery, err)
 	}
 	next = after
 	for _, candidate := range candidates {
