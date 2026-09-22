@@ -14,7 +14,7 @@ func TestRoutingAndEliminationPagesUseLiveBoundedEvidence(t *testing.T) {
 			t.Fatalf("routing page markup missing %q", required)
 		}
 	}
-	for _, required := range []string{`fetch(base + "/api/v1/models"`, `fetch(base + "/api/v1/models/deprecation?"`, `slice(0,3)`, `snapshot.specialists_allow_cloud || model.locality === "local"`, `snapshot.fitness.filter`, `learned(model,job)`, `learned score`, `context ceiling`, `routing-flow routing-flow-`, `window.setTimeout(loadRouting`, `document.addEventListener("visibilitychange"`, `No model crosses the evidence threshold`, `No recommendation was manufactured`, `credentials:"same-origin"`, `cache:"no-store"`} {
+	for _, required := range []string{`fetch(base + "/api/v1/models"`, `fetch(base + "/api/v1/models/deprecation?"`, `slice(0,3)`, `snapshot.specialists_allow_cloud || model.locality === "local"`, `snapshot.fitness.filter`, `learned(model,job)`, `learned score`, `context ceiling`, `element("details","route-model-details")`, `DarwinRouter ID`, `Estimated RAM`, `routing-flow routing-flow-`, `window.setTimeout(loadRouting`, `document.addEventListener("visibilitychange"`, `No model crosses the evidence threshold`, `No recommendation was manufactured`, `credentials:"same-origin"`, `cache:"no-store"`} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("routing client lost required behavior %q", required)
 		}
@@ -29,7 +29,7 @@ func TestRoutingAndEliminationPagesUseLiveBoundedEvidence(t *testing.T) {
 			t.Fatalf("routing client contains unsafe primitive %q", forbidden)
 		}
 	}
-	for _, required := range []string{`.tron-view {`, `.commander-core {`, `.routing-branches {`, `.routing-trunk { stroke:#dcffff; stroke-width:5;`, `.routing-flow-out {`, `.routing-flow-in {`, `@keyframes routing-data-out`, `@keyframes routing-data-in`, `.routing-flow { display:none; animation:none; }`, `.specialist-grid {`, `grid-template-columns:repeat(2`, `.elimination-layout{`, `@media (prefers-reduced-motion: reduce)`} {
+	for _, required := range []string{`.tron-view {`, `.commander-core {`, `.routing-branches {`, `.routing-trunk { stroke:#dcffff; stroke-width:5;`, `.routing-flow-out {`, `.routing-flow-in {`, `@keyframes routing-data-out`, `@keyframes routing-data-in`, `.routing-flow { display:none; animation:none; }`, `.specialist-grid {`, `grid-template-columns:repeat(2`, `.route-model-details{`, `.route-model-facts{`, `.elimination-layout{`, `@media (prefers-reduced-motion: reduce)`} {
 		if !strings.Contains(styles, required) {
 			t.Fatalf("TRON presentation missing %q", required)
 		}

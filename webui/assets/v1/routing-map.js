@@ -39,7 +39,16 @@
 		return snapshot.models.find(model => model.capabilities.includes("orchestration")) || snapshot.models.find(model => /commander|coordinator|brain/i.test(model.id)) || null;
 	}
 	function contextLabel(model) { if (!Number.isSafeInteger(model.context_tokens) || model.context_tokens < 1) return "context unknown"; if (model.context_tokens % 1024 === 0) return (model.context_tokens / 1024) + "K context ceiling"; return model.context_tokens.toLocaleString() + " context ceiling"; }
-	function modelChip(model, index, job) { const node = element("article", "route-model"), evidence = learned(model,job); const detail = evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + evidence.profile + " · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback"; node.append(element("span","route-rank",String(index+1).padStart(2,"0")), element("strong","",model.model), element("small","",detail)); return node; }
+	function byteLabel(value) { if (!Number.isSafeInteger(value) || value < 1) return "Unknown"; const units=["B","KiB","MiB","GiB","TiB"]; let amount=value,index=0; while (amount>=1024 && index<units.length-1) { amount/=1024; index++; } return (amount>=10 || index===0 ? Math.round(amount) : Math.round(amount*10)/10) + " " + units[index]; }
+	function fact(label, value) { const row=element("div","route-model-fact"); row.append(element("span","",label),element("strong","",value)); return row; }
+	function modelChip(model, index, job) {
+		const node=element("article","route-model"), evidence=learned(model,job), disclosure=element("details","route-model-details"), summary=element("summary","route-model-summary");
+		const synopsis=evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback";
+		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
+		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Context",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
+		if (evidence) facts.append(fact("Task domain",evidence.domain),fact("Evaluation profile",evidence.profile),fact("Learned score",Math.round(evidence.score*1000)/10+"%"),fact("Quality",Math.round(evidence.quality*1000)/10+"%"),fact("Reliability",Math.round(evidence.reliability*1000)/10+"%"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
+		disclosure.append(facts); node.append(element("span","route-rank",String(index+1).padStart(2,"0")),disclosure); return node;
+	}
 	function circuitPath(svg, d, className) {
 		const path = document.createElementNS(svg.namespaceURI, "path"); path.setAttribute("d", d); path.setAttribute("class", className); svg.append(path);
 		for (const direction of ["out", "in"]) { const flow = document.createElementNS(svg.namespaceURI, "path"); flow.setAttribute("d", d); flow.setAttribute("class", "routing-flow routing-flow-" + direction); svg.append(flow); }
