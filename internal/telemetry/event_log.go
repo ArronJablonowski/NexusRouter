@@ -191,8 +191,10 @@ func readTaskEventLogByPosition(ctx context.Context, tx *sql.Tx, position int64,
 	var taskPredecessor, taskMinimum int64
 	err = tx.QueryRowContext(ctx, `SELECT
 		EXISTS(SELECT 1 FROM event_log WHERE position=?),
-		COALESCE((SELECT position FROM event_log WHERE task_id=? AND task_sequence=?),0),
-		COALESCE((SELECT min(position) FROM event_log WHERE task_id=?),0)`, position-1, entry.taskID, entry.taskSequence-1, entry.taskID).
+		COALESCE((SELECT l.position FROM events e JOIN event_log l ON l.event_id=e.id
+			WHERE e.task_id=? AND e.sequence=?),0),
+		COALESCE((SELECT l.position FROM events e JOIN event_log l ON l.event_id=e.id
+			WHERE e.task_id=? AND e.sequence=1),0)`, position-1, entry.taskID, entry.taskSequence-1, entry.taskID).
 		Scan(&hasGlobalPredecessor, &taskPredecessor, &taskMinimum)
 	if err != nil {
 		return eventLogEntry{}, nil, err
