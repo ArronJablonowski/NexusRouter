@@ -2,12 +2,25 @@ package app
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
+
+func TestTransientClaimErrorsDoNotRequireSupervisorInspection(t *testing.T) {
+	for _, err := range []error{sql.ErrNoRows, context.DeadlineExceeded, context.Canceled} {
+		if !transientClaimError(err) {
+			t.Fatalf("expected transient claim error: %v", err)
+		}
+	}
+	if transientClaimError(errors.New("storage failure")) {
+		t.Fatal("storage failure classified as transient")
+	}
+}
 
 func TestDispatcherHealthLifecycleAndStalls(t *testing.T) {
 	now := time.Now()

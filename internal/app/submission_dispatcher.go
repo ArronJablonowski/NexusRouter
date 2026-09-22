@@ -118,6 +118,10 @@ func (d *Dispatcher) Close() error {
 
 func (d *Dispatcher) recordError() { d.mu.Lock(); d.err = ErrSubmission; d.mu.Unlock() }
 
+func transientClaimError(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+}
+
 func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
@@ -141,11 +145,11 @@ func (d *Dispatcher) worker(ctx context.Context, s *Service, id int) {
 			}
 			continue
 		}
-		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
+		if !transientClaimError(err) && ctx.Err() == nil {
 			// A bounded claim query can fail transiently under SQLite contention or
-			// deadline pressure. Record degraded health, but retain the worker so one
-			// failed claim cannot strand every later durable submission until a daemon
-			// restart. The next iteration reopens a fresh five-second query context.
+			// deadline pressure while another request owns the single store connection.
+			// Deadline and cancellation are expected backpressure; other failures remain
+			// visible as degraded health. The next iteration always opens a fresh query.
 			d.recordError()
 		}
 		select {
