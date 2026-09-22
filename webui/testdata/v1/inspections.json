@@ -19,6 +19,9 @@
     "models": [
       {"id":"local-fast","provider":"ollama","model":"qwen:latest","locality":"local","configured":true,"enabled":true,"installed":true,"usable":true,"capabilities":["chat","code"],"context_tokens":8192,"ram_bytes":4294967296,"vram_bytes":2147483648,"size_bytes":4294967296,"digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","family":"qwen","parameter_size":"7B","quantization":"Q4_K_M","failure_domain":"host-local","health":"healthy","status_code":"available","health_checked_at":"2026-09-09T12:00:00Z"},
       {"id":"cloud-deep","provider":"openai","model":"gpt-5.6-sol","locality":"cloud","configured":true,"enabled":true,"installed":false,"usable":false,"capabilities":["chat","reasoning"],"estimated_cost":0.01,"failure_domain":"cloud-a","health":"unknown","health_checked_at":"2026-09-09T12:00:00Z"}
+    ],
+    "fitness": [
+      {"model_id":"local-fast","domain":"coding","profile":"benchmark","samples":9,"quality":0.7777777778,"reliability":1,"compliance":1,"score":0.6625,"confidence":0.45,"updated_at":"2026-09-09T12:00:00Z"}
     ]
   },
   "route": {

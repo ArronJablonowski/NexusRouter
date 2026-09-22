@@ -103,6 +103,31 @@ type LocalProviderInspection struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
+// ModelFitnessInspection is the bounded, read-only projection of DarwinRouter's
+// persisted evaluation aggregate for one model/task profile.
+type ModelFitnessInspection struct {
+	ModelID     string    `json:"model_id"`
+	Domain      string    `json:"domain"`
+	Profile     string    `json:"profile"`
+	Samples     int64     `json:"samples"`
+	Quality     float64   `json:"quality"`
+	Reliability float64   `json:"reliability"`
+	Compliance  float64   `json:"compliance"`
+	Score       float64   `json:"score"`
+	Confidence  float64   `json:"confidence"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (f ModelFitnessInspection) Validate() error {
+	if !optionalModelID(f.ModelID) || f.ModelID == "" || !boundedPrintable(f.Domain, 1, 128) ||
+		!boundedPrintable(f.Profile, 1, 128) || f.Samples < 1 || !finiteNonnegative(f.Quality) || f.Quality > 1 ||
+		!finiteNonnegative(f.Reliability) || f.Reliability > 1 || !finiteNonnegative(f.Compliance) || f.Compliance > 1 ||
+		!finiteNonnegative(f.Score) || f.Score > 1 || !finiteNonnegative(f.Confidence) || f.Confidence > 1 || !validBrowserTime(f.UpdatedAt) {
+		return ErrContract
+	}
+	return nil
+}
+
 func (p LocalProviderInspection) Validate() error {
 	if !optionalModelID(p.Provider) || p.Provider == "" || !validBrowserTime(p.CheckedAt) {
 		return ErrContract
@@ -134,17 +159,18 @@ type ModelInspectionPage struct {
 	RefreshIntervalMS     int64                     `json:"refresh_interval_ms"`
 	LocalProviders        []LocalProviderInspection `json:"local_providers"`
 	Models                []ModelInspection         `json:"models"`
+	Fitness               []ModelFitnessInspection  `json:"fitness"`
 }
 
 func (p ModelInspectionPage) Validate() error {
-	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || len(p.Models) > MaxInspectionModels ||
+	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || p.Fitness == nil || len(p.Models) > MaxInspectionModels || len(p.Fitness) > 4096 ||
 		(p.Availability == Available) != (p.ConfigID != "") || !validInspectionDigest(p.ConfigID, p.Availability == Available) ||
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
 		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated" ||
 			(p.LocalTotalCoverage != "complete" && p.LocalTotalCoverage != "partial") || p.RefreshIntervalMS < 5000 || p.RefreshIntervalMS > 300000 || p.LocalProviders == nil || len(p.LocalProviders) > MaxInspectionProviders) ||
 		(p.CommanderID != "" && !modelIDPattern.MatchString(p.CommanderID)) || (p.CommanderFallbackID != "" && !modelIDPattern.MatchString(p.CommanderFallbackID)) || (p.CommanderSource != "" && p.CommanderSource != "configured" && p.CommanderSource != "inferred") ||
 		p.Availability == Available && (!validLocalConcurrency(p.LocalConcurrency) || p.LocalPressurePolicy != "reject" && p.LocalPressurePolicy != "wait" || !finiteNonnegative(p.LocalRAMLimitPct) || p.LocalRAMLimitPct <= 0 || p.LocalRAMLimitPct > 100 || !finiteNonnegative(p.LocalVRAMLimitPct) || p.LocalVRAMLimitPct <= 0 || p.LocalVRAMLimitPct > 100) ||
-		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "" || p.CommanderFallbackID != "" || p.LocalConcurrency != "" || p.LocalPressurePolicy != "" || p.LocalRAMLimitPct != 0 || p.LocalVRAMLimitPct != 0 || p.ManagedResidency || p.SpecialistsAllowCloud) {
+		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || len(p.Fitness) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "" || p.CommanderFallbackID != "" || p.LocalConcurrency != "" || p.LocalPressurePolicy != "" || p.LocalRAMLimitPct != 0 || p.LocalVRAMLimitPct != 0 || p.ManagedResidency || p.SpecialistsAllowCloud) {
 		return ErrContract
 	}
 	commanderFound := p.CommanderID == ""
@@ -173,6 +199,14 @@ func (p ModelInspectionPage) Validate() error {
 			fallbackFound = model.Locality == "local" && model.ID != p.CommanderID
 		}
 		seen[model.ID] = true
+	}
+	fitnessSeen := map[string]bool{}
+	for _, fitness := range p.Fitness {
+		key := fitness.ModelID + "\x00" + fitness.Domain + "\x00" + fitness.Profile
+		if fitness.Validate() != nil || !seen[fitness.ModelID] || fitnessSeen[key] {
+			return ErrContract
+		}
+		fitnessSeen[key] = true
 	}
 	if !commanderFound || !fallbackFound || (p.CommanderID == "") != (p.CommanderSource == "") || p.CommanderFallbackID != "" && p.CommanderID == "" {
 		return ErrContract

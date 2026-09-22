@@ -2909,7 +2909,7 @@
     "model_inspection_page": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "availability", "managed_residency", "specialists_allow_cloud", "local_unknown_size_count", "refresh_interval_ms", "local_providers", "models"],
+      "required": ["version", "availability", "managed_residency", "specialists_allow_cloud", "local_unknown_size_count", "refresh_interval_ms", "local_providers", "models", "fitness"],
       "properties": {
         "version": {"const": 1},
         "availability": {"$ref": "#/$defs/availability"},
@@ -2930,14 +2930,32 @@
         "local_unknown_size_count": {"type": "integer", "minimum": 0, "maximum": 256},
         "refresh_interval_ms": {"type": "integer", "minimum": 5000, "maximum": 300000},
         "local_providers": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/local_provider_inspection"}},
-        "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}}
+        "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}},
+        "fitness": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/model_fitness_inspection"}}
       },
       "allOf": [
         {"if": {"required": ["commander_id"]}, "then": {"required": ["commander_source"]}},
         {"if": {"required": ["commander_source"]}, "then": {"required": ["commander_id"]}},
         {"if": {"required": ["commander_fallback_id"]}, "then": {"required": ["commander_id"]}},
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}}}}
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}, "fitness": {"maxItems": 0}}}}
       ]
+    },
+    "model_fitness_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "domain", "profile", "samples", "quality", "reliability", "compliance", "score", "confidence", "updated_at"],
+      "properties": {
+        "model_id": {"$ref": "#/$defs/model_id"},
+        "domain": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "profile": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "samples": {"type": "integer", "minimum": 1},
+        "quality": {"type": "number", "minimum": 0, "maximum": 1},
+        "reliability": {"type": "number", "minimum": 0, "maximum": 1},
+        "compliance": {"type": "number", "minimum": 0, "maximum": 1},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
     },
     "usage_total_inspection": {
       "type": "object",

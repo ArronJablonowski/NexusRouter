@@ -5,14 +5,14 @@
 	if (!window.DarwinRoutes || (!window.DarwinRoutes.routing(relative) && !window.DarwinRoutes.elimination(relative))) return;
 	const allViews = ["#chat-view", "#workboard-view", "#models-view", "#settings-view", "#routing-view", "#elimination-view"];
 	const jobs = [
-		{key:"coding", label:"Coding", capabilities:["code","coding","reasoning"]},
-		{key:"ocr", label:"OCR / document vision", capabilities:["ocr","vision","image"]},
-		{key:"cli", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"]},
-		{key:"general", label:"General use", capabilities:["chat","reasoning"]},
+		{key:"coding", label:"Coding", capabilities:["code","coding","reasoning"], domains:["coding","code","code_generation","complex_code","smoke_coding"]},
+		{key:"ocr", label:"OCR / document vision", capabilities:["ocr","vision","image"], domains:["ocr","document_vision","vision"]},
+		{key:"cli", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"], domains:["cli","terminal","tool_use","command_line"]},
+		{key:"general", label:"General use", capabilities:["chat","reasoning"], domains:["general","instruction_following","knowledge","commonsense","science_reasoning","math_reasoning","truthfulness"]},
 		{key:"image_generation", label:"Image generation", capabilities:["image_generation","image","vision"]},
 		{key:"video_generation", label:"Video generation", capabilities:["video_generation","video","vision"]},
-		{key:"writing", label:"General writing", capabilities:["writing","chat","summarize"]},
-		{key:"creative", label:"Creative work", capabilities:["creative","writing","chat"]}
+		{key:"writing", label:"General writing", capabilities:["writing","chat","summarize"], domains:["writing","summarize","general_writing"]},
+		{key:"creative", label:"Creative work", capabilities:["creative","writing","chat"], domains:["creative","creative_writing"]}
 	];
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 	let snapshot = null, routingTimer = 0;
@@ -21,21 +21,25 @@
 
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
 	function validModel(item) { return item && idPattern.test(item.id) && typeof item.model === "string" && item.model.length <= 512 && (item.reasoning_effort === undefined || ["none","minimal","low","medium","high","xhigh","max","ultra"].includes(item.reasoning_effort)) && ["local","cloud"].includes(item.locality) && Array.isArray(item.capabilities) && item.capabilities.every(value => idPattern.test(value)) && typeof item.usable === "boolean"; }
-	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
+	function validFitness(item) { return item && idPattern.test(item.model_id) && typeof item.domain === "string" && item.domain.length > 0 && item.domain.length <= 128 && typeof item.profile === "string" && item.profile.length > 0 && item.profile.length <= 128 && Number.isSafeInteger(item.samples) && item.samples > 0 && [item.quality,item.reliability,item.compliance,item.score,item.confidence].every(value => Number.isFinite(value) && value >= 0 && value <= 1); }
+	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && Array.isArray(value.fitness) && value.fitness.length <= 4096 && value.fitness.every(validFitness) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
 	async function inventory() { const response = await fetch(base + "/api/v1/models", {credentials:"same-origin", cache:"no-store", headers:{Accept:"application/json"}}); if (!response.ok) throw new Error("inventory unavailable"); const value = await response.json(); if (!validSnapshot(value)) throw new Error("invalid inventory"); return value; }
+	function learned(model, job) { const domains = job.domains || [job.key]; return snapshot.fitness.filter(item => item.model_id === model.id && domains.includes(item.domain)).sort((a,b) => b.score-a.score || b.samples-a.samples)[0] || null; }
 	function score(model, job) {
+		const evidence = learned(model, job); if (evidence) return 1000 + evidence.score * 100 + Math.min(10, evidence.samples / 10);
 		let value = model.usable ? 100 : model.enabled ? 20 : 0;
 		for (let index = 0; index < job.capabilities.length; index++) if (model.capabilities.includes(job.capabilities[index])) value += 30 - index * 6;
 		if (model.locality === "local") value += 2;
 		if (typeof model.estimated_cost === "number") value += Math.max(0, 5 - Math.min(5, model.estimated_cost));
 		return value;
 	}
-	function ranked(job) { return snapshot.models.filter(model => model.usable && (snapshot.specialists_allow_cloud || model.locality === "local") && job.capabilities.some(capability => model.capabilities.includes(capability))).sort((a,b) => score(b,job)-score(a,job) || a.id.localeCompare(b.id)).slice(0,3); }
+	function ranked(job) { return snapshot.models.filter(model => model.usable && (snapshot.specialists_allow_cloud || model.locality === "local") && (learned(model,job) || job.capabilities.some(capability => model.capabilities.includes(capability)))).sort((a,b) => score(b,job)-score(a,job) || a.id.localeCompare(b.id)).slice(0,3); }
 	function commander() {
 		if (snapshot.commander_id) return snapshot.models.find(model => model.id === snapshot.commander_id) || null;
 		return snapshot.models.find(model => model.capabilities.includes("orchestration")) || snapshot.models.find(model => /commander|coordinator|brain/i.test(model.id)) || null;
 	}
-	function modelChip(model, index) { const node = element("article", "route-model"); node.append(element("span","route-rank",String(index+1).padStart(2,"0")), element("strong","",model.id), element("small","",model.model + " · " + model.locality)); return node; }
+	function contextLabel(model) { if (!Number.isSafeInteger(model.context_tokens) || model.context_tokens < 1) return "context unknown"; if (model.context_tokens % 1024 === 0) return (model.context_tokens / 1024) + "K context ceiling"; return model.context_tokens.toLocaleString() + " context ceiling"; }
+	function modelChip(model, index, job) { const node = element("article", "route-model"), evidence = learned(model,job); const detail = evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + evidence.profile + " · " + contextLabel(model) : model.model + " · " + model.locality + " · " + contextLabel(model) + " · capability fallback"; node.append(element("span","route-rank",String(index+1).padStart(2,"0")), element("strong","",model.id), element("small","",detail)); return node; }
 	function circuitPath(svg, d, className) {
 		const path = document.createElementNS(svg.namespaceURI, "path"); path.setAttribute("d", d); path.setAttribute("class", className); svg.append(path);
 		for (const direction of ["out", "in"]) { const flow = document.createElementNS(svg.namespaceURI, "path"); flow.setAttribute("d", d); flow.setAttribute("class", "routing-flow routing-flow-" + direction); svg.append(flow); }
@@ -74,12 +78,12 @@
 			document.querySelector("#resource-guard-detail").textContent = "RAM / unified memory " + snapshot.local_ram_limit_pct + "% · VRAM " + snapshot.local_vram_limit_pct + "% · pressure " + snapshot.local_pressure_policy + (snapshot.managed_residency ? " · managed unload enabled" : "");
 			document.querySelector("#specialist-policy").textContent = snapshot.specialists_allow_cloud ? "Top 3 per job · local + cloud" : "Top 3 per job · local endpoints only";
 			const grid = document.querySelector("#specialist-grid"); grid.replaceChildren();
-			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty","No eligible capability match")); else models.forEach((model,index) => routes.append(modelChip(model,index))); card.append(routes); grid.append(card); }
+			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty","No eligible capability or learned match")); else models.forEach((model,index) => routes.append(modelChip(model,index,job))); card.append(routes); grid.append(card); }
 			drawBranches();
 			const creative = ranked(jobs[jobs.length-1]), choices = document.querySelector("#creative-choices"), preference = document.querySelector("#creative-preference"); choices.replaceChildren();
 			creative.forEach(model => { const button = element("button","tron-choice",model.id); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.id + "."; }); choices.append(button); });
 			preference.textContent = creativePreference ? "Current consultation preference: " + creativePreference + ". The commander should ask again when the creative brief materially changes." : "No preference recorded. The commander must ask before choosing between subjective outputs.";
-			status.textContent = "Grid synchronized · " + snapshot.models.length + " models · updates automatically from daemon inventory.";
+			status.textContent = "Grid synchronized · " + snapshot.models.length + " models · " + snapshot.fitness.length + " learned task rankings · updates automatically.";
 		} catch (_) { status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
 		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, snapshot && snapshot.refresh_interval_ms || 10000);
 	}

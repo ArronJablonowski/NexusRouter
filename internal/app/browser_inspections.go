@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ const browserInspectionTimeout = 5 * time.Second
 // Invalid health input does not make configuration disappear; it leaves each
 // model explicitly unknown.
 func (s *Service) BrowserModels(ctx context.Context, report health.Report) (contract.ModelInspectionPage, error) {
-	zero := contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}}
+	zero := contract.ModelInspectionPage{Version: 1, Availability: contract.Unavailable, LocalProviders: []contract.LocalProviderInspection{}, Models: []contract.ModelInspection{}, Fitness: []contract.ModelFitnessInspection{}}
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return zero, ErrAdmission
 	}
@@ -55,7 +56,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	total := uint64(0)
 	out := contract.ModelInspectionPage{Version: 1, Availability: contract.Available, ConfigID: catalog.ConfigID, RefreshedAt: &refreshed,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: refreshInterval.Milliseconds(),
-		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models)), LocalConcurrency: s.settings.Hardware.Concurrent,
+		LocalProviders: []contract.LocalProviderInspection{}, Models: make([]contract.ModelInspection, len(catalog.Models)), Fitness: []contract.ModelFitnessInspection{}, LocalConcurrency: s.settings.Hardware.Concurrent,
 		LocalPressurePolicy: s.settings.Hardware.LocalPressurePolicy, LocalRAMLimitPct: s.settings.Hardware.MaxRAM, LocalVRAMLimitPct: s.settings.Hardware.MaxVRAM}
 	out.CommanderID, out.CommanderSource = browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
 	out.CommanderFallbackID = s.settings.WebUI.CommanderFallbackModel
@@ -148,10 +149,57 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 			}
 		}
 	}
+	out.Fitness, err = browserModelFitness(ctx, s.settings.Telemetry.Database, catalog.Models)
+	if err != nil {
+		// Model inventory remains useful before the telemetry database is
+		// initialized; learned ranking starts empty and appears on a later poll.
+		out.Fitness = []contract.ModelFitnessInspection{}
+	}
 	if out.Validate() != nil || !selectionValueClean(out, memorySecrets(s.settings, s.secret)) {
 		return zero, ErrInspection
 	}
 	return out, nil
+}
+
+func browserModelFitness(ctx context.Context, path string, models []routing.ConfiguredModel) ([]contract.ModelFitnessInspection, error) {
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	rows, err := db.QueryContext(ctx, `SELECT model,provider,domain,profile,samples,quality,compliance,schema_samples,reliability,updated FROM fitness ORDER BY domain,profile,model,provider`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	configured := map[string]string{}
+	for _, model := range models {
+		configured[model.Provider+"\x00"+model.Model] = model.ID
+	}
+	out := []contract.ModelFitnessInspection{}
+	for rows.Next() {
+		var model, provider, domain, profile string
+		var samples, quality, compliance, schemaSamples, reliability, updated int64
+		if err = rows.Scan(&model, &provider, &domain, &profile, &samples, &quality, &compliance, &schemaSamples, &reliability, &updated); err != nil {
+			return nil, err
+		}
+		id, ok := configured[provider+"\x00"+model]
+		if !ok || samples < 1 {
+			continue
+		}
+		q, r, c := float64(quality)/float64(samples), float64(reliability)/float64(samples), .5
+		if schemaSamples > 0 {
+			c = float64(compliance) / float64(schemaSamples)
+		}
+		confidence := math.Min(1, float64(samples)/20)
+		raw := .55*q + .30*r + .15*c
+		score := .5 + confidence*(raw-.5)
+		out = append(out, contract.ModelFitnessInspection{ModelID: id, Domain: domain, Profile: profile, Samples: samples, Quality: q, Reliability: r, Compliance: c, Score: score, Confidence: confidence, UpdatedAt: time.Unix(0, updated).UTC()})
+		if len(out) > 4096 {
+			return nil, errors.New("fitness projection exceeds bound")
+		}
+	}
+	return out, rows.Err()
 }
 
 func browserCommander(configured string, models []routing.ConfiguredModel) (string, string) {

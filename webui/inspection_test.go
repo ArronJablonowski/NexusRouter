@@ -149,7 +149,7 @@ func TestInspectionExpandedBoundsMatchSchema(t *testing.T) {
 	models := ModelInspectionPage{Version: 1, Availability: Available, ConfigID: strings.Repeat("a", 64), RefreshedAt: &now,
 		LocalTotalBytes: &total, LocalTotalKind: "logical_deduplicated", LocalTotalCoverage: "complete", RefreshIntervalMS: 10000,
 		LocalProviders: []LocalProviderInspection{}, Models: []ModelInspection{}, LocalConcurrency: "1", LocalPressurePolicy: "reject",
-		LocalRAMLimitPct: 75, LocalVRAMLimitPct: 75}
+		LocalRAMLimitPct: 75, LocalVRAMLimitPct: 75, Fitness: []ModelFitnessInspection{}}
 	for index := 0; index < 101; index++ {
 		models.Models = append(models.Models, ModelInspection{ID: "model_" + strconv.Itoa(index), Provider: "provider", Model: "model", Locality: "local", Capabilities: []string{}, Health: "unknown"})
 	}
