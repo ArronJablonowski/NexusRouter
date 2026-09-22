@@ -45,7 +45,7 @@
 	function persistExpandedModels() { const url=new URL(window.location.href); url.searchParams.delete("expanded"); for (const key of [...expandedModels].sort()) url.searchParams.append("expanded",key); window.history.replaceState(null,"",url); }
 	function modelChip(model, index, job) {
 		const node=element("article","route-model"), evidence=learned(model,job), disclosure=element("details","route-model-details"), summary=element("summary","route-model-summary");
-		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); disclosure.addEventListener("toggle",()=>{ if (disclosure.open) expandedModels.add(expansionKey); else expandedModels.delete(expansionKey); persistExpandedModels(); });
+		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); summary.addEventListener("click",()=>{ if (disclosure.open) expandedModels.delete(expansionKey); else expandedModels.add(expansionKey); persistExpandedModels(); });
 		const synopsis=evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback";
 		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
 		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Context",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
