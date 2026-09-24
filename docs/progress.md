@@ -9138,3 +9138,38 @@ at 32K context. The benchmark suite preserves the initial JSONL and records the
 feedback repair separately. A Qwen3 Coder retest was not admitted because its
 35.4 GB reservation exceeded the host's 32.7 GB available memory at that time;
 no quality feedback was assigned to that capacity failure.
+
+### September 24: benchmark evidence transfer and context selection
+
+The harness review and staged capability plan are in
+[benchmark-learning-plan.md](benchmark-learning-plan.md). Implemented explicit,
+confidence-capped routing evidence fallbacks with stored source attribution;
+domain/profile-scoped context accuracy; healthy lower-tier retention after a
+larger-tier fault; minimum samples before quality promotion; memory checks and
+conservative reservation scaling for expansion; whole-task feedback latency with
+immutable retry compatibility; and bounded configurable standalone feedback
+command timeouts. Default mappings are empty. The live test configuration opts
+into 13 mappings and accuracy-priority weights.
+
+Focused ordinary and race tests cover source precedence/isolation, route
+explanation replay, memory admission/overflow, sparse context evidence, and
+new/legacy feedback idempotence. Complete routing/contextpolicy/config package
+tests pass. A live local automatic math task used a math_reasoning/benchmark
+prior, selected qwen3.8:27b-mlx at 32K, returned the correct answer and persisted
+one accepted evaluation. This is integration evidence, not a benchmark win.
+
+The full make check was launched; its final result is recorded in the follow-up
+entry. Historical resource measurements remain missing, larger contexts remain
+unqualified, and public-contract completion checks and independent procedural
+learning are still planned. See the plan for explicit validation gates.
+
+Standalone replay of the prior rejected coding task took 12.67 seconds and kept
+one evaluation, directly exercising the former 10-second cold-open deadline.
+Focused vet/build and final targeted race tests passed after the memory admission
+follow-up. The benchmark adapter timeout change is maintained separately in its
+own repository.
+
+Checkpoint verification limitation: make check passed source checks and vet and
+entered the complete race suite, but the broad internal/app package was still
+running at the development checkpoint. No complete-suite pass is claimed. The
+focused race checks above completed separately against the final implementation.

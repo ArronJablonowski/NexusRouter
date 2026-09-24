@@ -6,11 +6,25 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/DarwinRouter/routing"
 )
 
 // ContextEvidence returns outcome summaries by allocated context tier. Records
 // created before context attribution was introduced are intentionally omitted.
 func (s *Store) ContextEvidence(ctx context.Context, model, provider string) ([]contextpolicy.Evidence, error) {
+	return s.contextEvidence(ctx, model, provider, nil)
+}
+
+// ContextEvidenceFor keeps accuracy/latency task-specific while sharing hard
+// resource faults across task categories for the same model/provider.
+func (s *Store) ContextEvidenceFor(ctx context.Context, key routing.Key) ([]contextpolicy.Evidence, error) {
+	if !validObservationKey(key) {
+		return nil, routing.ErrInvalid
+	}
+	return s.contextEvidence(ctx, key.Model, key.Provider, &key)
+}
+
+func (s *Store) contextEvidence(ctx context.Context, model, provider string, key *routing.Key) ([]contextpolicy.Evidence, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT CASE WHEN h.current_id=e.id THEN e.body ELSE r.body END
 		FROM evaluations e JOIN evaluation_heads h ON h.base_id=e.id
 		LEFT JOIN evaluation_revisions r ON r.id=h.current_id
@@ -41,11 +55,13 @@ func (s *Store) ContextEvidence(ctx context.Context, model, provider string) ([]
 		if resolveErr != nil {
 			return nil, resolveErr
 		}
-		item.Samples++
-		if outcome.Accepted {
-			item.Quality++
+		if key == nil || (record.Key.Domain == key.Domain && record.Key.Profile == key.Profile) {
+			item.Samples++
+			if outcome.Accepted {
+				item.Quality++
+			}
+			item.LatencyMillis += float64(record.Latency.Milliseconds())
 		}
-		item.LatencyMillis += float64(record.Latency.Milliseconds())
 		if record.TimedOut {
 			item.Timeouts++
 		}
@@ -60,8 +76,10 @@ func (s *Store) ContextEvidence(ctx context.Context, model, provider string) ([]
 	}
 	out := make([]contextpolicy.Evidence, 0, len(tiers))
 	for _, item := range tiers {
-		item.Quality /= float64(item.Samples)
-		item.LatencyMillis /= float64(item.Samples)
+		if item.Samples > 0 {
+			item.Quality /= float64(item.Samples)
+			item.LatencyMillis /= float64(item.Samples)
+		}
 		out = append(out, *item)
 	}
 	return out, nil

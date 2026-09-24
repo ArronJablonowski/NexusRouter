@@ -106,6 +106,11 @@ func (s *Service) coordinatedResources() (resources.Coordinator, resources.Reser
 }
 
 func (s *Service) reservePrimary(ctx, admission context.Context, model config.Model, request Request) (context.Context, func() error, error) {
+	sized, sizeErr := contextReservationModel(model, request.ContextTokens)
+	if sizeErr != nil {
+		return ctx, nil, sizeErr
+	}
+	model = sized
 	coordinator, owner := s.coordinatedResources()
 	if coordinator == nil {
 		release, err := s.reserveExplicitLocal(admission, model)

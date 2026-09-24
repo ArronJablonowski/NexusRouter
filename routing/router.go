@@ -36,6 +36,7 @@ type Validity struct {
 	DecayApplied      bool      `json:",omitempty"`
 }
 type Evidence struct {
+	SourceDomain, SourceProfile      string `json:",omitempty"`
 	Validity                         Validity
 	Advisory                         Advisory
 	Samples                          int
@@ -75,6 +76,7 @@ type Policy struct {
 	Exploration  float64
 }
 type Ranked struct {
+	SourceDomain, SourceProfile       string `json:",omitempty"`
 	ValiditySamples, ValidityFailures int
 	ValidityPenalty                   float64
 	AdvisorySamples                   int
@@ -208,6 +210,14 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 			fresh = math.Exp2(-float64(now.Sub(e.Updated)) / float64(p.HalfLife))
 			confidence = math.Min(1, float64(e.Samples)/float64(p.MinSamples)) * fresh
 		}
+		if (e.SourceDomain == "") != (e.SourceProfile == "") ||
+			(e.SourceDomain != "" && (!safeExplanationLabel(e.SourceDomain, 128) || !safeExplanationLabel(e.SourceProfile, 128))) {
+			return out, ErrInvalid
+		}
+		if e.SourceDomain != "" {
+			// Cross-profile/category evidence is a prior, not direct proof.
+			confidence = math.Min(confidence, .25)
+		}
 		// Shrink stale or sparse outcome estimates toward neutral priors. Cost
 		// and latency use fixed scales, so adding a candidate cannot change a
 		// different candidate's score through pool-relative normalization.
@@ -279,7 +289,7 @@ func Select(r Request, p Policy, candidates []Candidate, evidence map[Key]Eviden
 		latency := 1 / (1 + float64(e.Latency)/float64(p.LatencyScale))
 		cost := 1 / (1 + e.Cost/p.CostScale)
 		score := w.Quality*quality + w.Compliance*shrink(e.Compliance) + w.Reliability*shrink(e.Reliability) + w.Latency*shrink(latency) + w.Cost*shrink(cost) + w.Recency*fresh + w.Uncertainty*confidence
-		out.Ranked = append(out.Ranked, Ranked{Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, EffectiveSamples: e.EffectiveSamples, DecayContribution: e.DecayContribution, WindowStart: e.WindowStart, WindowEnd: e.WindowEnd, DecayApplied: e.DecayApplied, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, AdvisoryEffectiveSamples: a.EffectiveSamples, AdvisoryDecayContribution: a.DecayContribution, AdvisoryWindowStart: a.WindowStart, AdvisoryWindowEnd: a.WindowEnd, AdvisoryDecayApplied: a.DecayApplied, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty, ValidityEffectiveSamples: v.EffectiveSamples, ValidityEffectiveFailures: v.EffectiveFailures, ValidityDecayContribution: v.DecayContribution, ValidityWindowStart: v.WindowStart, ValidityWindowEnd: v.WindowEnd, ValidityDecayApplied: v.DecayApplied})
+		out.Ranked = append(out.Ranked, Ranked{SourceDomain: e.SourceDomain, SourceProfile: e.SourceProfile, Model: c.Model, Provider: c.Provider, FailureDomain: c.FailureDomain, Score: score, Confidence: confidence, Recency: fresh, Uncertainty: 1 - confidence, Samples: e.Samples, EffectiveSamples: e.EffectiveSamples, DecayContribution: e.DecayContribution, WindowStart: e.WindowStart, WindowEnd: e.WindowEnd, DecayApplied: e.DecayApplied, AdvisorySamples: a.Samples, AdvisoryInfluence: advisoryInfluence, AdvisoryEffectiveSamples: a.EffectiveSamples, AdvisoryDecayContribution: a.DecayContribution, AdvisoryWindowStart: a.WindowStart, AdvisoryWindowEnd: a.WindowEnd, AdvisoryDecayApplied: a.DecayApplied, ValiditySamples: v.Samples, ValidityFailures: v.Failures, ValidityPenalty: validityPenalty, ValidityEffectiveSamples: v.EffectiveSamples, ValidityEffectiveFailures: v.EffectiveFailures, ValidityDecayContribution: v.DecayContribution, ValidityWindowStart: v.WindowStart, ValidityWindowEnd: v.WindowEnd, ValidityDecayApplied: v.DecayApplied})
 	}
 	sort.Slice(out.Excluded, func(i, j int) bool {
 		a, b := out.Excluded[i], out.Excluded[j]

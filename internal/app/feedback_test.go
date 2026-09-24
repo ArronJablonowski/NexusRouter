@@ -2,18 +2,76 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/routing"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
+
+func TestFeedbackUsesWholeTaskLatencyAndPreservesLegacyRetries(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		ctx := context.Background()
+		db, err := telemetry.Open(ctx, filepath.Join(t.TempDir(), "latency.db"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+		base := time.Unix(100, 0).UTC()
+		kinds := []runtime.Kind{runtime.TaskStarted, runtime.TurnStarted, runtime.TurnCompleted, runtime.TurnStarted, runtime.TurnCompleted, runtime.TaskCompleted}
+		seconds := []int{0, 1, 50, 51, 60, 60}
+		for i, kind := range kinds {
+			e := runtime.Event{Version: 1, ID: string(rune('a' + i)), TaskID: "task", SessionID: "session", CorrelationID: "task", Sequence: int64(i + 1), Time: base.Add(time.Duration(seconds[i]) * time.Second), Kind: kind}
+			if i == 0 {
+				e.Data.Messages = []providers.Message{{Role: "user", Content: "work"}}
+				e.Data.ContextTokens = 32768
+			}
+			if i == 1 || i == 2 {
+				e.TurnID = "one"
+				e.AttemptID = "first"
+			}
+			if i == 3 || i == 4 {
+				e.TurnID = "two"
+				e.AttemptID = "last"
+			}
+			if kind == runtime.TurnStarted {
+				e.Data.ModelID = "m"
+				e.Data.ProviderID = "p"
+			}
+			if err = db.Append(ctx, int64(i), e); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want := time.Minute
+		if legacy {
+			hash := sha256.Sum256([]byte("user-feedback:task:last"))
+			id := hex.EncodeToString(hash[:])
+			want = 9 * time.Second
+			r := evaluation.Record{Version: 1, ID: id, TaskID: "task", AttemptID: "last", Key: routing.Key{Model: "m", Provider: "p", Domain: "general", Profile: "default"}, Checks: []evaluation.Check{{Source: evaluation.UserFeedback, Reference: id, Passed: false}}, ExecutionSucceeded: true, Latency: want, ContextTokens: 32768, Time: base.Add(time.Minute)}
+			if err = db.RecordEvaluation(ctx, r); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := 0; i < 2; i++ {
+			if err = RecordFeedbackStore(ctx, db, "task", false, 0); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := db.EvaluationHistory(ctx, "task", "last")
+		if err != nil || len(got) != 1 || got[0].Latency != want {
+			t.Fatalf("legacy=%v: %+v %v", legacy, got, err)
+		}
+	}
+}
 
 func TestFeedbackUpdatesRoutingExactlyOnce(t *testing.T) {
 	svc, cfg := autoFixture(t)

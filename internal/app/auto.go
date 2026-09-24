@@ -441,6 +441,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	candidates := []routing.Candidate{}
 	evidence := map[routing.Key]routing.Evidence{}
 	observationSets := map[routing.Key]routing.ObservationSet{}
+	observationKeys := map[routing.Key]routing.Key{}
 	validitySets := map[routing.Key]routing.Validity{}
 	// Custom estimates are model-specific. Bound the whole measurement batch
 	// separately from provider health checks, and deny only unmeasurable models.
@@ -524,6 +525,18 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if observationErr != nil {
 			return Result{}, errors.New("cannot read routing observations")
 		}
+		observationKeys[key] = key
+		if len(observations.Fitness) == 0 && len(observations.Advisory) == 0 {
+			if domain, profile, ok := cfg.Routing.EvidenceSource(key.Domain, key.Profile); ok {
+				source := routing.Key{Model: key.Model, Provider: key.Provider, Domain: domain, Profile: profile}
+				// Transfer only direct, durable verdicts, never judge opinions.
+				observations, observationErr = db.ObservationSet(ctx, source, false)
+				if observationErr != nil {
+					return Result{}, errors.New("cannot read routing prior")
+				}
+				observationKeys[key] = source
+			}
+		}
 		observationSets[key] = observations
 		validity, verr := db.OutputValidity(ctx, key, r.Validation)
 		if verr != nil {
@@ -540,10 +553,13 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		var e routing.Evidence
 		if len(observations.Fitness) > 0 || len(observations.Advisory) > 0 {
 			var observationErr error
-			e, observationErr = routing.AggregateEvidence(key, observations, routingNow, p, decayResolver)
+			e, observationErr = routing.AggregateEvidence(observationKeys[key], observations, routingNow, p, decayResolver)
 			if observationErr != nil {
 				return Result{}, errors.New("cannot aggregate routing observations")
 			}
+		}
+		if source := observationKeys[key]; source != key && e.Samples > 0 {
+			e.SourceDomain, e.SourceProfile = source.Domain, source.Profile
 		}
 		validity := validitySets[key]
 		if validity.Samples > 0 {
@@ -590,11 +606,11 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		}
 		candidateRequest := r
 		candidateRequest.ModelID = model.ID
-		contextEvidence, evidenceErr := db.ContextEvidence(ctx, model.Model, model.Provider)
+		contextEvidence, evidenceErr := db.ContextEvidenceFor(ctx, routing.Key{Model: model.Model, Provider: model.Provider, Domain: r.Domain, Profile: r.Profile})
 		if evidenceErr != nil {
 			return Result{}, ErrAdmission
 		}
-		candidateRequest.ContextTokens, err = chooseContextTier(ctx, model, candidateRequest, contextTokens, contextEvidence, draw < cfg.Routing.Exploration, cfg.Routing.MinSamples)
+		candidateRequest.ContextTokens, err = chooseContextTier(ctx, model, candidateRequest, contextTokens, contextEvidence, draw < cfg.Routing.Exploration, cfg.Routing.MinSamples, s.contextFitsMemory(ctx, model))
 		if err != nil {
 			for i := range candidates {
 				if candidates[i].Model == model.Model && candidates[i].Provider == model.Provider {

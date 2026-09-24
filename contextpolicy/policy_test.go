@@ -46,3 +46,30 @@ func TestSelectHonorsMemoryAvailability(t *testing.T) {
 		t.Fatalf("selected %d", got)
 	}
 }
+
+func TestFaultDoesNotPoisonHealthyLowerTier(t *testing.T) {
+	r := Request{AdvertisedMaximum: 262144, WorkingTier: 32768, EstimatedTokens: 40000, Evidence: []Evidence{{ContextTokens: 131072, Timeouts: 1}}}
+	if got := Select(r); got != 65536 {
+		t.Fatalf("healthy 64K lost: %d", got)
+	}
+	r.Evidence = []Evidence{{ContextTokens: 32768, ProviderErrors: 1}}
+	if got := Select(r); got != 0 {
+		t.Fatalf("unsafe tier returned: %d", got)
+	}
+}
+
+func TestSparseLargerTierCannotDisplaceProvenTier(t *testing.T) {
+	r := Request{AdvertisedMaximum: 131072, WorkingTier: 32768, MinimumSamples: 5, Evidence: []Evidence{{ContextTokens: 32768, Samples: 10, Quality: .8}, {ContextTokens: 65536, Samples: 1, Quality: 1}}}
+	if got := Select(r); got != 32768 {
+		t.Fatalf("single lucky sample promoted tier: %d", got)
+	}
+	r.Explore = true
+	r.FitsMemory = func(tier int) bool { return tier <= 32768 }
+	if got := Select(r); got != 32768 {
+		t.Fatalf("explored without memory: %d", got)
+	}
+	r.FitsMemory = func(int) bool { return false }
+	if got := Select(r); got != 0 {
+		t.Fatalf("returned inadmissible fallback: %d", got)
+	}
+}

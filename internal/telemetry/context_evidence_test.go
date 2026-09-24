@@ -51,4 +51,12 @@ func TestContextEvidenceAggregatesTierOutcomes(t *testing.T) {
 	if err != nil || len(got) != 1 || got[0].Samples != 2 || got[0].Quality != .5 || got[0].LatencyMillis != 1500 || got[0].PeakMemory != 200 || got[0].MaxSwapGrowth != 10 {
 		t.Fatalf("evidence=%+v err=%v", got, err)
 	}
+	scoped, err := s.ContextEvidenceFor(ctx, routing.Key{Model: "model", Provider: "provider", Domain: "math", Profile: "default"})
+	if err != nil || len(scoped) != 1 || scoped[0].Samples != 0 || scoped[0].Quality != 0 || scoped[0].MaxSwapGrowth != 10 {
+		t.Fatalf("unrelated accuracy leaked or safety lost: %+v %v", scoped, err)
+	}
+	scoped, err = s.ContextEvidenceFor(ctx, routing.Key{Model: "model", Provider: "provider", Domain: "code", Profile: "default"})
+	if err != nil || len(scoped) != 1 || scoped[0].Samples != 2 || scoped[0].Quality != .5 {
+		t.Fatalf("matching evidence lost: %+v %v", scoped, err)
+	}
 }

@@ -238,6 +238,9 @@ func browserSelectedContexts(ctx context.Context, path string, models []config.M
 		item.Quality /= float64(item.Samples)
 		item.LatencyMillis /= float64(item.Samples)
 		route := [2]string{key.model, key.provider}
+		// Inventory has no task domain. Report the safe baseline, not an
+		// accuracy optimum pooled from unrelated tasks.
+		item.Samples, item.Quality = 0, 0
 		byRoute[route] = append(byRoute[route], *item)
 	}
 	out := map[string]int{}

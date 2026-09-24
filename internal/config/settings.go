@@ -133,12 +133,13 @@ func (m Model) WorkingContextTokens() int {
 }
 
 type Routing struct {
-	Exploration    float64            `yaml:"exploration_rate" json:"exploration_rate"`
-	MinSamples     int                `yaml:"minimum_samples" json:"minimum_samples"`
-	HalfLife       string             `yaml:"decay_half_life" json:"decay_half_life"`
-	DecayOverrides []DecayOverride    `yaml:"decay_overrides,omitempty" json:"decay_overrides,omitempty"`
-	Weights        map[string]float64 `yaml:"weights" json:"weights"`
-	Classifier     RoutingClassifier  `yaml:"classifier" json:"classifier"`
+	EvidenceFallbacks []EvidenceFallback `yaml:"evidence_fallbacks,omitempty" json:"evidence_fallbacks,omitempty"`
+	Exploration       float64            `yaml:"exploration_rate" json:"exploration_rate"`
+	MinSamples        int                `yaml:"minimum_samples" json:"minimum_samples"`
+	HalfLife          string             `yaml:"decay_half_life" json:"decay_half_life"`
+	DecayOverrides    []DecayOverride    `yaml:"decay_overrides,omitempty" json:"decay_overrides,omitempty"`
+	Weights           map[string]float64 `yaml:"weights" json:"weights"`
+	Classifier        RoutingClassifier  `yaml:"classifier" json:"classifier"`
 }
 
 // RoutingClassifier configures one policy-bounded auxiliary call that may
@@ -362,6 +363,9 @@ func (s Settings) Validate() error {
 			return errors.New("invalid routing decay override duration")
 		}
 		decaySelectors[selector] = true
+	}
+	if err := s.Routing.validateEvidenceFallbacks(); err != nil {
+		return err
 	}
 	known := Defaults().Routing.Weights
 	total := 0.0

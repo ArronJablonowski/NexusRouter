@@ -1,7 +1,10 @@
 // Package contextpolicy selects bounded model context windows from learned tiers.
 package contextpolicy
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 const (
 	ProvenTier       = 32 * 1024
@@ -26,6 +29,7 @@ type Request struct {
 	AdvertisedMaximum int
 	WorkingTier       int
 	EstimatedTokens   int
+	FitsMemory        func(int) bool
 	MemoryAvailable   uint64
 	EstimatedMemory   func(contextTokens int) uint64
 	Evidence          []Evidence
@@ -69,24 +73,37 @@ func Select(r Request) int {
 	for _, item := range r.Evidence {
 		evidence[item.ContextTokens] = item
 	}
+	// A fault bounds this and larger allocations; it must not poison smaller
+	// healthy tiers. With no safe allocation, return zero rather than the very
+	// tier whose memory or error evidence caused admission to fail.
+	ceiling := r.AdvertisedMaximum
 	for _, item := range r.Evidence {
-		if item.ContextTokens >= working && (item.Timeouts > 0 || item.ProviderErrors > 0 || item.MaxSwapGrowth > MaxSwapGrowth) {
-			return min(working, r.AdvertisedMaximum)
+		if item.Timeouts > 0 || item.ProviderErrors > 0 || item.MaxSwapGrowth > MaxSwapGrowth {
+			ceiling = min(ceiling, item.ContextTokens-1)
 		}
 	}
+	working = min(working, r.AdvertisedMaximum)
+	if working > 0 {
+		tiers = append(tiers, working)
+		sort.Ints(tiers)
+		tiers = compactTiers(tiers)
+	}
 	safe := func(tier int) bool {
+		if tier > ceiling || (r.FitsMemory != nil && !r.FitsMemory(tier)) {
+			return false
+		}
 		item := evidence[tier]
 		if item.Timeouts > 0 || item.ProviderErrors > 0 || item.MaxSwapGrowth > MaxSwapGrowth {
 			return false
 		}
-		if r.EstimatedMemory != nil && r.MemoryAvailable > 0 && r.EstimatedMemory(tier) > r.MemoryAvailable {
+		if r.EstimatedMemory != nil && r.EstimatedMemory(tier) > r.MemoryAvailable {
 			return false
 		}
 		return true
 	}
 	selected := 0
 	for _, tier := range tiers {
-		if tier >= required && safe(tier) {
+		if tier >= max(required, working) && safe(tier) {
 			selected = tier
 			break
 		}
@@ -99,27 +116,27 @@ func Select(r Request) int {
 				return tiers[i]
 			}
 		}
-		return min(working, r.AdvertisedMaximum)
+		return 0
 	}
 
 	// Once multiple tiers have evidence, retain the smallest tier whose quality
 	// preserves the best observed accuracy within one percentage point.
+	minimumSamples := max(r.MinimumSamples, 1)
 	bestQuality := -1.0
 	for _, item := range r.Evidence {
-		if item.Samples > 0 && item.Timeouts == 0 && item.ProviderErrors == 0 && item.MaxSwapGrowth <= MaxSwapGrowth && item.Quality > bestQuality {
+		if item.Samples >= minimumSamples && safe(item.ContextTokens) && item.ContextTokens >= required && item.Quality >= 0 && item.Quality <= 1 && !math.IsNaN(item.Quality) && item.Quality > bestQuality {
 			bestQuality = item.Quality
 		}
 	}
 	if bestQuality >= 0 {
 		for _, tier := range tiers {
 			item := evidence[tier]
-			if tier >= required && safe(tier) && item.Samples > 0 && item.Quality+qualityTolerance >= bestQuality {
+			if tier >= required && safe(tier) && item.Samples >= minimumSamples && item.Quality+qualityTolerance >= bestQuality {
 				selected = tier
 				break
 			}
 		}
 	}
-	minimumSamples := max(r.MinimumSamples, 1)
 	if r.Explore && evidence[selected].Samples >= minimumSamples {
 		for _, tier := range tiers {
 			if tier > selected && safe(tier) {
@@ -128,4 +145,14 @@ func Select(r Request) int {
 		}
 	}
 	return selected
+}
+
+func compactTiers(in []int) []int {
+	out := in[:0]
+	for _, n := range in {
+		if len(out) == 0 || out[len(out)-1] != n {
+			out = append(out, n)
+		}
+	}
+	return out
 }

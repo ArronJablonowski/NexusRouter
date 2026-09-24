@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"math"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
@@ -52,6 +54,7 @@ func RecordFeedbackStore(ctx context.Context, db *telemetry.Store, task string, 
 	}
 	key := routing.Key{Domain: "general", Profile: "default"}
 	var start, end runtime.Event
+	var taskStart time.Time
 	contextTokens := 0
 	var sequence int64
 	for pages := 0; pages < 1000; pages++ {
@@ -66,6 +69,7 @@ func RecordFeedbackStore(ctx context.Context, db *telemetry.Store, task string, 
 			sequence = e.Sequence
 			switch e.Kind {
 			case runtime.TaskStarted:
+				taskStart = e.Time
 				contextTokens = e.Data.ContextTokens
 				if e.Data.Domain != "" {
 					key.Domain = e.Data.Domain
@@ -93,7 +97,12 @@ func RecordFeedbackStore(ctx context.Context, db *telemetry.Store, task string, 
 	if start.AttemptID == "" || end.AttemptID != start.AttemptID {
 		return ErrAdmission
 	}
-	latency := end.Time.Sub(start.Time)
+	// Feedback judges the completed task, including tools and earlier turns.
+	// Measuring only its final answer systematically rewards long agent loops.
+	if taskStart.IsZero() || taskStart.After(start.Time) {
+		return ErrAdmission
+	}
+	latency := end.Time.Sub(taskStart)
 	if latency < 0 {
 		return ErrAdmission
 	}
@@ -105,6 +114,19 @@ func RecordFeedbackStore(ctx context.Context, db *telemetry.Store, task string, 
 	}
 	if err := record.Validate(); err != nil {
 		return ErrAdmission
+	}
+	// Preserve immutable historical measurements on identical retries across
+	// this correction. New tasks receive whole-task latency; old records are
+	// not silently rewritten or turned into duplicate samples.
+	history, historyErr := db.EvaluationHistory(ctx, task, start.AttemptID)
+	if historyErr != nil && !errors.Is(historyErr, sql.ErrNoRows) {
+		return historyErr
+	}
+	for _, prior := range history {
+		if prior.ID == record.ID {
+			record.Latency = prior.Latency
+			break
+		}
 	}
 	return db.RecordEvaluation(ctx, record)
 }

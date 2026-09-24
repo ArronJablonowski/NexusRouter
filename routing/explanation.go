@@ -137,7 +137,7 @@ func validExplanationCandidate(c Candidate) bool {
 }
 
 func validExplanationRanked(r Ranked) bool {
-	return safeExplanationLabel(r.Model, 512) && safeExplanationLabel(r.Provider, 128) && safeOptionalExplanationLabel(r.FailureDomain, 128) && r.Samples >= 0 && r.AdvisorySamples >= 0 && r.ValiditySamples >= 0 && r.ValidityFailures >= 0 && r.ValidityFailures <= r.ValiditySamples && unit(r.Score) && unit(r.Confidence) && unit(r.Recency) && unit(r.Uncertainty) && unit(r.AdvisoryInfluence) && unit(r.ValidityPenalty) && math.Abs(r.Confidence+r.Uncertainty-1) <= 1e-9 && validExplanationDecay(r.DecayApplied, r.Samples, r.EffectiveSamples, r.DecayContribution, r.WindowStart, r.WindowEnd) && validExplanationDecay(r.AdvisoryDecayApplied, r.AdvisorySamples, r.AdvisoryEffectiveSamples, r.AdvisoryDecayContribution, r.AdvisoryWindowStart, r.AdvisoryWindowEnd) && validExplanationDecay(r.ValidityDecayApplied, r.ValiditySamples, r.ValidityEffectiveSamples, r.ValidityDecayContribution, r.ValidityWindowStart, r.ValidityWindowEnd) && (!r.ValidityDecayApplied && r.ValidityEffectiveFailures == 0 || r.ValidityDecayApplied && nonnegative(r.ValidityEffectiveFailures) && r.ValidityEffectiveFailures <= r.ValidityEffectiveSamples)
+	return ((r.SourceDomain == "" && r.SourceProfile == "") || (safeExplanationLabel(r.SourceDomain, 128) && safeExplanationLabel(r.SourceProfile, 128))) && safeExplanationLabel(r.Model, 512) && safeExplanationLabel(r.Provider, 128) && safeOptionalExplanationLabel(r.FailureDomain, 128) && r.Samples >= 0 && r.AdvisorySamples >= 0 && r.ValiditySamples >= 0 && r.ValidityFailures >= 0 && r.ValidityFailures <= r.ValiditySamples && unit(r.Score) && unit(r.Confidence) && unit(r.Recency) && unit(r.Uncertainty) && unit(r.AdvisoryInfluence) && unit(r.ValidityPenalty) && math.Abs(r.Confidence+r.Uncertainty-1) <= 1e-9 && validExplanationDecay(r.DecayApplied, r.Samples, r.EffectiveSamples, r.DecayContribution, r.WindowStart, r.WindowEnd) && validExplanationDecay(r.AdvisoryDecayApplied, r.AdvisorySamples, r.AdvisoryEffectiveSamples, r.AdvisoryDecayContribution, r.AdvisoryWindowStart, r.AdvisoryWindowEnd) && validExplanationDecay(r.ValidityDecayApplied, r.ValiditySamples, r.ValidityEffectiveSamples, r.ValidityDecayContribution, r.ValidityWindowStart, r.ValidityWindowEnd) && (!r.ValidityDecayApplied && r.ValidityEffectiveFailures == 0 || r.ValidityDecayApplied && nonnegative(r.ValidityEffectiveFailures) && r.ValidityEffectiveFailures <= r.ValidityEffectiveSamples)
 }
 
 func validExplanationDecay(applied bool, samples int, effective, contribution float64, start, end time.Time) bool {
@@ -156,6 +156,9 @@ func validExplanationDecay(applied bool, samples int, effective, contribution fl
 func validExplanationPolicyProjection(r Ranked, p Policy) bool {
 	if r.DecayApplied {
 		confidence := math.Min(1, r.EffectiveSamples/float64(p.MinSamples))
+		if r.SourceDomain != "" {
+			confidence = math.Min(confidence, .25)
+		}
 		if math.Abs(r.Confidence-confidence) > 1e-12 || math.Abs(r.Recency-r.DecayContribution) > 1e-12 {
 			return false
 		}
