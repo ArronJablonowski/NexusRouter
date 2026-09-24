@@ -209,6 +209,7 @@ func uniqueValidity(in []ValidityObservation, key Key, now time.Time) ([]Validit
 func aggregateFitness(in []FitnessObservation, now time.Time, halfLife time.Duration) Evidence {
 	e := Evidence{Samples: len(in), DecayApplied: true}
 	var weight, quality, reliability, latency, cost, schemaWeight, compliance float64
+	maxCost := 0.0
 	for i, o := range in {
 		w := decayWeight(now, o.Time, halfLife)
 		weight += w
@@ -218,6 +219,7 @@ func aggregateFitness(in []FitnessObservation, now time.Time, halfLife time.Dura
 		}
 		latency += w * float64(o.Latency)
 		cost += w * o.Cost
+		maxCost = math.Max(maxCost, o.Cost)
 		if o.Compliance != nil {
 			schemaWeight += w
 			if *o.Compliance {
@@ -238,7 +240,22 @@ func aggregateFitness(in []FitnessObservation, now time.Time, halfLife time.Dura
 		return e
 	}
 	e.Quality, e.Reliability = quality/weight, reliability/weight
-	e.Latency, e.Cost = time.Duration(latency/weight), cost/weight
+	meanLatency := latency / weight
+	if meanLatency >= float64(math.MaxInt64) {
+		e.Latency = time.Duration(math.MaxInt64)
+	} else {
+		e.Latency = time.Duration(meanLatency)
+	}
+	e.Cost = cost / weight
+	if math.IsInf(e.Cost, 0) {
+		// Individually finite costs can overflow their weighted sum. Recover
+		// using normalized values while keeping ordinary aggregates unchanged.
+		scaled := 0.0
+		for _, o := range in {
+			scaled += decayWeight(now, o.Time, halfLife) * (o.Cost / maxCost)
+		}
+		e.Cost = math.Min(1, scaled/weight) * maxCost
+	}
 	if schemaWeight == 0 {
 		e.Compliance = .5
 	} else {

@@ -65,6 +65,21 @@ func (s *Service) reserveManagedResidency(ctx context.Context, provider config.P
 		}
 		return nil, ErrAdmission
 	}
+	need := modelResources(model)
+	plan, err := s.budget.Plan(ctx, resources.CapacityRequest{Version: resources.CapacityContractVersion, Snapshot: snapshot, Need: need, Now: time.Now()})
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	if plan.Action == resources.CapacityWait {
+		// Context expansion can exceed available memory even above the fixed
+		// 16 GiB low-memory tier. Only a measured RAM/VRAM shortfall permits
+		// reclaiming idle residency; pressure and concurrency denials do not.
+		shortfall := need.RAM > plan.Headroom.RAMBytes || need.VRAM > 0 && need.VRAM > plan.Headroom.VRAMBytes
+		if plan.Reason != resources.CapacityExhausted || !shortfall {
+			return bad()
+		}
+		low = true
+	}
 	identity, err := providers.OllamaModelIdentity(model.Model)
 	if err != nil {
 		return nil, ErrAdmission

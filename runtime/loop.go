@@ -142,6 +142,16 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr error) {
+	if r.MaxContextTokens < 0 || r.Inference.ContextTokens < 0 || r.Inference.ContextTokens > providers.MaxOutputTokens ||
+		(r.MaxContextTokens > 0 && r.Inference.ContextTokens > int64(r.MaxContextTokens)) {
+		return Result{}, ErrInvalidRun
+	}
+	// The advertised capability may exceed the allocation admitted for this
+	// attempt. Bound both dispatch and compaction by that smaller allocation;
+	// growing the window requires a new host reservation, never a silent bump.
+	if r.Inference.ContextTokens > 0 && (r.MaxContextTokens == 0 || r.Inference.ContextTokens < int64(r.MaxContextTokens)) {
+		r.MaxContextTokens = int(r.Inference.ContextTokens)
+	}
 	if r.WorkerID != "" && !validRunWorkerID(r.WorkerID) {
 		return Result{}, ErrInvalidRun
 	}
@@ -642,7 +652,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 					}
 				}
 				if c.Usage != nil {
-					if c.Usage.InputTokens < 0 || c.Usage.OutputTokens < 0 {
+					if usage != nil || c.Usage.InputTokens < 0 || c.Usage.OutputTokens < 0 {
 						return ErrProtocol
 					}
 					copy := *c.Usage

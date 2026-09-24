@@ -237,7 +237,7 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		MaxCost                                  float64
 		Executable                               string `json:",omitempty"`
 		StructuredOutput                         bool   `json:",omitempty"`
-	}{1, key, sources, model, provider.ID, provider.Kind, provider.ResolvedEndpoint(), s.settings.Mode, localRequired, model.ContextTokens, 30 * time.Second, maxCost, provider.Executable, provider.Kind == "codex_app_server"})
+	}{1, key, sources, model, provider.ID, provider.Kind, provider.ResolvedEndpoint(), s.settings.Mode, localRequired, model.WorkingContextTokens(), 30 * time.Second, maxCost, provider.Executable, provider.Kind == "codex_app_server"})
 	if err != nil || len(body) > 512<<10 {
 		return bad()
 	}
@@ -283,7 +283,7 @@ func (s *Service) generateSkillDraft(ctx context.Context, attemptID, modelID str
 		}
 		return finish(a, errors.New("skill generation failed"))
 	}
-	g := skills.ModelGenerator{Provider: adapter, ContextEstimator: s.contextEstimator, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: 30 * time.Second, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+	g := skills.ModelGenerator{Provider: adapter, ContextEstimator: s.contextEstimator, Model: model.Model, ContextTokens: model.WorkingContextTokens(), Timeout: 30 * time.Second, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 	g.StructuredOutput = provider.Kind == "codex_app_server"
 	result, err := g.GenerateDetailed(ctx, key, examples)
 	if cleanupErr := cleanup(); cleanupErr != nil {

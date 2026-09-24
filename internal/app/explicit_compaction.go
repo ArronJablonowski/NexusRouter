@@ -48,8 +48,12 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if err != nil {
 		return full, err
 	}
-	pendingEligible := fullEstimate <= model.ContextTokens && midTaskCompactionProvider(s.settings, model)
-	if fullEstimate <= model.ContextTokens && !pendingEligible {
+	contextLimit := model.WorkingContextTokens()
+	if r.ContextTokens > 0 {
+		contextLimit = min(model.ContextTokens, r.ContextTokens)
+	}
+	pendingEligible := fullEstimate <= contextLimit && midTaskCompactionProvider(s.settings, model)
+	if fullEstimate <= contextLimit && !pendingEligible {
 		return full, nil
 	}
 	attempt, review, err := db.LatestApprovedSummary(ctx, r.ContinueTaskID)
@@ -71,10 +75,10 @@ func (s *Service) prepareExplicitApprovedCompaction(ctx context.Context, r Reque
 	if err != nil {
 		return r, err
 	}
-	if compactEstimate > model.ContextTokens {
+	if compactEstimate > contextLimit {
 		return full, nil
 	}
-	if fullEstimate > model.ContextTokens {
+	if fullEstimate > contextLimit {
 		return compact, nil
 	}
 	if compactEstimate >= fullEstimate || !exactMessagePrefix(inference.Messages, full.continuation.Messages) ||

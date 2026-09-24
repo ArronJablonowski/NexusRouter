@@ -84,7 +84,7 @@ func (g ModelGenerator) GenerateDetailed(ctx context.Context, key Key, examples 
 	if err != nil {
 		return ModelDraftResult{}, ErrInvalid
 	}
-	request := providers.Request{Model: g.Model, Messages: []providers.Message{
+	request := providers.Request{Model: g.Model, ContextTokens: int64(g.ContextTokens), Messages: []providers.Message{
 		{Role: "system", Content: modelDraftInstructions},
 		{Role: "user", Content: string(input)},
 	}}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"strconv"
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
@@ -21,6 +22,18 @@ func FeedbackHistory(ctx context.Context, path, task string) ([]evaluation.Recor
 		return nil, err
 	}
 	defer db.Close()
+	return FeedbackHistoryStore(ctx, db, task)
+}
+
+// FeedbackHistoryStore reuses an already-validated daemon store rather than
+// revalidating the entire database on every feedback inspection.
+func FeedbackHistoryStore(ctx context.Context, db *telemetry.Store, task string) ([]evaluation.Record, error) {
+	if task == "" || len(task) > 128 {
+		return nil, ErrAdmission
+	}
+	if db == nil {
+		return nil, errors.New("feedback database unavailable")
+	}
 	snapshot, err := sessions.Replay(ctx, db, task)
 	if err != nil || snapshot.State != "completed" || snapshot.UncertainEffects || snapshot.InterruptedTurn {
 		return nil, ErrAdmission
@@ -61,6 +74,36 @@ func ReviseFeedback(ctx context.Context, path, task, expectedID string, accepted
 	if err != nil {
 		return err
 	}
+	next, err := feedbackRevision(history, task, expectedID, accepted)
+	if err != nil {
+		return err
+	}
+	db, err := telemetry.Open(ctx, path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return db.SupersedeEvaluation(ctx, expectedID, next)
+}
+
+// ReviseFeedbackStore keeps daemon revisions on the same store as execution
+// and initial feedback; a second writable open can delay dispatcher leases.
+func ReviseFeedbackStore(ctx context.Context, db *telemetry.Store, task, expectedID string, accepted bool) error {
+	if expectedID == "" || len(expectedID) > 128 {
+		return ErrAdmission
+	}
+	history, err := FeedbackHistoryStore(ctx, db, task)
+	if err != nil {
+		return err
+	}
+	next, err := feedbackRevision(history, task, expectedID, accepted)
+	if err != nil {
+		return err
+	}
+	return db.SupersedeEvaluation(ctx, expectedID, next)
+}
+
+func feedbackRevision(history []evaluation.Record, task, expectedID string, accepted bool) (evaluation.Record, error) {
 	var prior evaluation.Record
 	found := false
 	for _, record := range history {
@@ -71,7 +114,7 @@ func ReviseFeedback(ctx context.Context, path, task, expectedID string, accepted
 		}
 	}
 	if !found {
-		return ErrAdmission
+		return evaluation.Record{}, ErrAdmission
 	}
 	next := prior
 	hash := sha256.Sum256([]byte("feedback-revision:" + task + ":" + expectedID + ":" + strconv.FormatBool(accepted)))
@@ -79,12 +122,7 @@ func ReviseFeedback(ctx context.Context, path, task, expectedID string, accepted
 	next.AllowJudge = false
 	next.Checks = []evaluation.Check{{Source: evaluation.UserFeedback, Reference: next.ID, Passed: accepted}}
 	if evaluation.ValidateRevision(prior, next) != nil {
-		return ErrAdmission
+		return evaluation.Record{}, ErrAdmission
 	}
-	db, err := telemetry.Open(ctx, path)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return db.SupersedeEvaluation(ctx, expectedID, next)
+	return next, nil
 }

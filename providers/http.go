@@ -73,6 +73,9 @@ func (p *HTTP) send(ctx context.Context, method, path string, body any) (*http.R
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4097))
 		resp.Body.Close()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		code := "http_error"
 		retry := false
 		switch {

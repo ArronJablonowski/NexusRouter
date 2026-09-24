@@ -306,3 +306,38 @@ func TestInvalidRequestNeverSent(t *testing.T) {
 		t.Fatal("implicit transport accepted")
 	}
 }
+
+func TestErrorBodyCancellationPreservesContextError(t *testing.T) {
+	for _, method := range []string{"stream", "models"} {
+		t.Run(method, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p, err := NewHTTP("http://fixture.invalid", "ollama", "", errorBodyCancelTransport{cancel: cancel})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if method == "models" {
+				_, err = p.Models(ctx)
+			} else {
+				err = p.Stream(ctx, request(), func(Chunk) error { t.Fatal("error response emitted output"); return nil })
+			}
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("cancellation became retryable provider failure: %v", err)
+			}
+		})
+	}
+}
+
+type errorBodyCancelTransport struct{ cancel context.CancelFunc }
+
+func (t errorBodyCancelTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: errorBodyCanceler{cancel: t.cancel}}, nil
+}
+
+type errorBodyCanceler struct{ cancel context.CancelFunc }
+
+func (b errorBodyCanceler) Read([]byte) (int, error) {
+	b.cancel()
+	return 0, context.Canceled
+}
+func (b errorBodyCanceler) Close() error { return nil }

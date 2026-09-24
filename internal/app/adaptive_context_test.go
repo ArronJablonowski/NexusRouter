@@ -2,13 +2,47 @@ package app
 
 import (
 	"context"
+	"errors"
 	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
 	"github.com/ArronJablonowski/DarwinRouter/internal/config"
 	"github.com/ArronJablonowski/DarwinRouter/resources"
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestRequiredContextGrowthPreservesResidencyAdmission(t *testing.T) {
+	svc, fixture := managedResidencyFixture(t)
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 131072
+	}
+	result, err := svc.Run(context.Background(), Request{Prompt: strings.Repeat("x", 40000)})
+	if err != nil || result.Text != "answer" {
+		t.Fatal("required larger tier skipped residency recovery", result, err)
+	}
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if fixture.unloads != 1 || fixture.streams != 1 {
+		t.Fatal(fixture.unloads, fixture.streams)
+	}
+}
+
+func TestRequiredContextGrowthRetainsCapacityClassification(t *testing.T) {
+	svc, _ := autoFixture(t)
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].ContextTokens = 131072
+	}
+	release, err := svc.reserveExplicit(context.Background(), svc.settings.Models[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	result, err := svc.runAuto(context.Background(), Request{Prompt: strings.Repeat("x", 40000)})
+	if result.TaskID != "" || !errors.Is(err, resources.ErrCapacity) {
+		t.Fatal("pressure cannot be retried", result, err)
+	}
+}
 
 func TestContextReservationScalesMemoryWithoutDiscountOrOverflow(t *testing.T) {
 	m := config.Model{Locality: "local", ContextTokens: 131072, RAMBytes: 100, VRAMBytes: 40}

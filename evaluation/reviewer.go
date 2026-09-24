@@ -91,7 +91,7 @@ func (v Reviewer) Review(ctx context.Context, input ReviewRequest) (ReviewResult
 	if err != nil || len(body) > 1<<20 {
 		return ReviewResult{}, ErrAudit
 	}
-	request := providers.Request{Model: v.Model, Messages: []providers.Message{{Role: "system", Content: reviewInstructions}, {Role: "user", Content: string(body)}}, MaxOutputTokens: v.MaxOutputTokens}
+	request := providers.Request{Model: v.Model, ContextTokens: int64(v.ContextTokens), Messages: []providers.Message{{Role: "system", Content: reviewInstructions}, {Role: "user", Content: string(body)}}, MaxOutputTokens: v.MaxOutputTokens}
 	if v.StructuredOutput {
 		request.JSONSchema = reviewOutputSchema(trusted)
 	}

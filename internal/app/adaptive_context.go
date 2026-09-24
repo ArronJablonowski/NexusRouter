@@ -12,8 +12,8 @@ import (
 )
 
 // chooseContextTier freezes the context allocation before host admission. The
-// advertised window remains the runtime compaction ceiling; the selected tier
-// is the provider allocation for this attempt.
+// advertised window remains the capability ceiling; the selected tier bounds
+// provider allocation and runtime dispatch/compaction for this attempt.
 func chooseContextTier(ctx context.Context, model config.Model, request Request, estimated int, evidence []contextpolicy.Evidence, explore bool, minimumSamples int, fitsMemory func(int) bool) (int, error) {
 	if request.ContextTokens > 0 {
 		if request.ContextTokens > model.ContextTokens {
@@ -32,7 +32,7 @@ func chooseContextTier(ctx context.Context, model config.Model, request Request,
 			return 0, ErrAdmission
 		}
 	}
-	tier := contextpolicy.Select(contextpolicy.Request{
+	policy := contextpolicy.Request{
 		AdvertisedMaximum: model.ContextTokens,
 		WorkingTier:       model.WorkingContextTokens(),
 		EstimatedTokens:   estimated,
@@ -40,7 +40,25 @@ func chooseContextTier(ctx context.Context, model config.Model, request Request,
 		Explore:           explore,
 		MinimumSamples:    minimumSamples,
 		FitsMemory:        fitsMemory,
-	})
+	}
+	if fitsMemory != nil {
+		// Optional accuracy/exploration growth needs headroom now. The minimum
+		// safe allocation required by the input must instead reach reservation:
+		// that path can reclaim managed residency or queue on transient pressure.
+		// Preserve hard-fault evidence when deriving this minimum, but exclude
+		// quality promotion and exploration, which must still pass FitsMemory.
+		minimum := policy
+		minimum.FitsMemory, minimum.Explore = nil, false
+		minimum.Evidence = append([]contextpolicy.Evidence(nil), evidence...)
+		for i := range minimum.Evidence {
+			minimum.Evidence[i].Samples = 0
+		}
+		requiredTier := contextpolicy.Select(minimum)
+		policy.FitsMemory = func(tier int) bool {
+			return tier == requiredTier && tier >= estimated || fitsMemory(tier)
+		}
+	}
+	tier := contextpolicy.Select(policy)
 	if tier < estimated || tier < 1 {
 		return 0, ErrAdmission
 	}

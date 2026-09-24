@@ -1,6 +1,9 @@
 package contextpolicy
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestTiersPreserveAdvertisedCeiling(t *testing.T) {
 	got := Tiers(96 * 1024)
@@ -71,5 +74,31 @@ func TestSparseLargerTierCannotDisplaceProvenTier(t *testing.T) {
 	r.FitsMemory = func(int) bool { return false }
 	if got := Select(r); got != 0 {
 		t.Fatalf("returned inadmissible fallback: %d", got)
+	}
+}
+
+func TestSelectUsesLearnedNoncanonicalTier(t *testing.T) {
+	r := Request{AdvertisedMaximum: 131072, WorkingTier: 32768, MinimumSamples: 2, Evidence: []Evidence{
+		{ContextTokens: 32768, Samples: 4, Quality: .5},
+		{ContextTokens: 49152, Samples: 4, Quality: 1},
+	}}
+	if got := Select(r); got != 49152 {
+		t.Fatalf("discarded accurate measured tier: %d", got)
+	}
+}
+
+func TestSelectIgnoresInvalidAccuracyButRetainsSafetyEvidence(t *testing.T) {
+	for _, quality := range []float64{math.Inf(1), math.NaN(), 1.1, -1} {
+		r := Request{AdvertisedMaximum: 131072, WorkingTier: 32768, MinimumSamples: 2, Evidence: []Evidence{
+			{ContextTokens: 16384, Samples: 4, Quality: quality},
+			{ContextTokens: 32768, Samples: 4, Quality: .8},
+		}}
+		if got := Select(r); got != 32768 {
+			t.Fatalf("invalid accuracy %v selected tier %d", quality, got)
+		}
+		r.Evidence[0].Timeouts = 1
+		if got := Select(r); got != 0 {
+			t.Fatalf("invalid accuracy hid a real allocation fault: %d", got)
+		}
 	}
 }

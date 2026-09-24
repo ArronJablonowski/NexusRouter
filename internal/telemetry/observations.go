@@ -56,6 +56,21 @@ func (s *Store) ObservationSet(ctx context.Context, key routing.Key, includeAdvi
 		return routing.ObservationSet{}, routing.ErrInvalid
 	}
 	withAdvisory := len(includeAdvisory) == 0 || includeAdvisory[0]
+	return s.observationSet(ctx, key, withAdvisory, false)
+}
+
+// DirectObservationSet supplies transferable priors without judge-only verdicts
+// or advisory reviews. Each correction family is validated before filtering;
+// its current verdict determines eligibility so a user correction of an earlier
+// judge verdict can contribute exactly once while retaining its original time.
+func (s *Store) DirectObservationSet(ctx context.Context, key routing.Key) (routing.ObservationSet, error) {
+	if ctx == nil || !validObservationKey(key) {
+		return routing.ObservationSet{}, routing.ErrInvalid
+	}
+	return s.observationSet(ctx, key, false, true)
+}
+
+func (s *Store) observationSet(ctx context.Context, key routing.Key, withAdvisory, directOnly bool) (routing.ObservationSet, error) {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return routing.ObservationSet{}, err
@@ -63,7 +78,7 @@ func (s *Store) ObservationSet(ctx context.Context, key routing.Key, includeAdvi
 	defer tx.Rollback()
 
 	out := routing.ObservationSet{Fitness: []routing.FitnessObservation{}, Advisory: []routing.AdvisoryObservation{}, Validity: []routing.ValidityObservation{}}
-	if err = appendFitnessObservations(ctx, tx, key, &out); err != nil {
+	if err = appendFitnessObservations(ctx, tx, key, &out, directOnly); err != nil {
 		return routing.ObservationSet{}, err
 	}
 	if withAdvisory {
@@ -90,7 +105,7 @@ func validObservationKey(key routing.Key) bool {
 	return true
 }
 
-func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key, out *routing.ObservationSet) error {
+func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key, out *routing.ObservationSet, directOnly bool) error {
 	// One bounded union reads every base and revision for this key. Resolving
 	// heads in memory avoids an evaluationHistory query per attempt.
 	rows, err := tx.QueryContext(ctx, fitnessObservationQuery, key.Model, key.Provider, key.Domain, key.Profile, key.Model, key.Provider, key.Domain, key.Profile, maxRoutingObservations+1)
@@ -172,6 +187,7 @@ func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key,
 		}
 		current := base
 		visited := 0
+		familyStart := len(out.Fitness)
 		for {
 			record := current.record
 			outcome, resolveErr := evaluation.Resolve(record.Checks, record.AllowJudge)
@@ -194,6 +210,9 @@ func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key,
 			if !ok {
 				if record.ID != base.head || visited != len(versions) {
 					return evaluation.ErrEvidence
+				}
+				if directOnly && outcome.Source == evaluation.LLMJudge {
+					out.Fitness = out.Fitness[:familyStart]
 				}
 				break
 			}

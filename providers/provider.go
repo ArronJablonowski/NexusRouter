@@ -31,8 +31,9 @@ type Request struct {
 	// MaxOutputTokens is a provider-enforced generation ceiling. Zero leaves
 	// the provider default in effect.
 	MaxOutputTokens int64
-	// ContextTokens is the model-advertised context window selected by the
-	// application. Zero leaves the provider default in effect.
+	// ContextTokens is the context allocation selected by the application for
+	// this attempt, at or below the model's advertised capability ceiling.
+	// Zero leaves the provider default in effect.
 	ContextTokens int64
 }
 
@@ -58,6 +59,8 @@ type Chunk struct {
 
 // Stream invokes emit sequentially with backpressure. Returning nil requires a
 // verified completion marker; an interrupted stream returns a typed failure.
+// Usage, when known, is emitted once as the total for this invocation. Adapters
+// must consolidate incremental provider measurements before emitting Usage.
 // Tool calls are proposals, never executed by a provider adapter.
 type Provider interface {
 	Stream(context.Context, Request, func(Chunk) error) error

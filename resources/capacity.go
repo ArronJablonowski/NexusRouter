@@ -100,7 +100,7 @@ func (b *Budget) Plan(ctx context.Context, request CapacityRequest) (CapacityRes
 		return CapacityResult{}, ErrResourceData
 	}
 	b.mu.Lock()
-	clone := &Budget{limits: b.limits, used: b.used, active: b.active, adaptive: b.adaptive, deviceVRAM: cloneCapacityMap(b.deviceVRAM), deviceActive: cloneCapacityMap(b.deviceActive)}
+	clone := &Budget{limits: b.limits, used: b.used, active: b.active, adaptive: b.adaptive, deviceVRAM: cloneCapacityMap(b.deviceVRAM), deviceActive: cloneCapacityMap(b.deviceActive), swapBaseline: cloneCapacityUint(b.swapBaseline)}
 	b.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return CapacityResult{}, errors.Join(ErrResourceData, err)
@@ -114,7 +114,7 @@ func (b *Budget) Plan(ctx context.Context, request CapacityRequest) (CapacityRes
 		base.Action, base.Reason = CapacityWait, CapacityThermal
 		return checkedCapacity(base)
 	}
-	if snapshot.SwapPressure != nil && *snapshot.SwapPressure {
+	if snapshot.SwapPressure != nil && *snapshot.SwapPressure || clone.swapGrowthExceeded(snapshot) {
 		base.Action, base.Reason = CapacityWait, CapacitySwap
 		return checkedCapacity(base)
 	}

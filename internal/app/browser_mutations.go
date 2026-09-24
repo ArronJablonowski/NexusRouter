@@ -628,9 +628,15 @@ func (b *BrowserMutations) FeedbackContext(ctx context.Context, task string) (co
 	clean := snapshot.State == "completed" && !snapshot.UncertainEffects && !snapshot.InterruptedTurn && len(snapshot.Pending) == 0
 	if !clean {
 		out.DenialCode = "task_ineligible"
-	} else {
-		out.FeedbackAllowed = true
+		// FeedbackHistory admits completed tasks only. Preserve the explicit
+		// denial for running, failed, or canceled tasks instead of turning it
+		// into an unavailable feedback panel.
+		if out.Validate() != nil {
+			return contract.FeedbackContext{}, ErrBrowserMutation
+		}
+		return out, nil
 	}
+	out.FeedbackAllowed = true
 	history, historyErr := FeedbackHistory(ctx, b.service.settings.Telemetry.Database, task)
 	if historyErr != nil && !errors.Is(historyErr, sql.ErrNoRows) {
 		return contract.FeedbackContext{}, ErrBrowserMutation

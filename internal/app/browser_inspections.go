@@ -64,14 +64,13 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 	out.CommanderID, out.CommanderSource = browserCommander(s.settings.WebUI.DefaultModel, catalog.Models)
 	out.CommanderFallbackID = s.settings.WebUI.CommanderFallbackModel
 	out.SpecialistsAllowCloud = s.settings.WebUI.SpecialistsAllowCloud
+	for _, fallback := range s.settings.Routing.EvidenceFallbacks {
+		out.EvidenceFallbacks = append(out.EvidenceFallbacks, contract.RoutingEvidenceFallbackInspection{Domain: fallback.Domain, Profile: fallback.Profile, SourceDomain: fallback.SourceDomain, SourceProfile: fallback.SourceProfile})
+	}
 	for _, provider := range s.settings.Providers {
 		out.ManagedResidency = out.ManagedResidency || provider.ManageResidency
 	}
 	configured := map[string]int{}
-	configuredSettings := map[string]config.Model{}
-	for _, model := range s.settings.Models {
-		configuredSettings[model.ID] = model
-	}
 	for i, model := range catalog.Models {
 		fact, observed := modelHealth[model.ID]
 		if fact.status != "healthy" && fact.status != "degraded" && fact.status != "unavailable" && fact.status != "disabled" {
@@ -79,10 +78,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		}
 		enabled := (s.settings.Mode != "local_only" || model.Locality == "local") && (s.settings.Mode != "cloud_only" || model.Locality == "cloud")
 		out.Models[i] = browserModel(model, fact.status)
-		if configuredModel, ok := configuredSettings[model.ID]; ok && configuredModel.WorkingContextTokens() > 0 {
-			selected := int64(configuredModel.WorkingContextTokens())
-			out.Models[i].SelectedContextTokens = &selected
-		}
+		out.Models[i].ContextSelectionStatus = "unavailable"
 		if observed {
 			checked := report.CheckedAt
 			out.Models[i].HealthCheckedAt = &checked
@@ -166,11 +162,19 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		// initialized; learned ranking starts empty and appears on a later poll.
 		out.Fitness = []contract.ModelFitnessInspection{}
 	}
+	s.markBrowserFallbackFitness(ctx, out.Fitness, catalog.Models)
 	if selected, selectErr := browserSelectedContexts(ctx, s.settings.Telemetry.Database, s.settings.Models, s.settings.Routing.MinSamples); selectErr == nil {
 		for index := range out.Models {
-			if value := selected[out.Models[index].ID]; value > 0 {
-				chosen := int64(value)
-				out.Models[index].SelectedContextTokens = &chosen
+			if value, known := selected[out.Models[index].ID]; known {
+				// A zero selection means safety evidence ruled out every tier.
+				// Do not retain the configured baseline as an alleged decision.
+				out.Models[index].SelectedContextTokens = nil
+				out.Models[index].ContextSelectionStatus = "blocked"
+				if value > 0 {
+					chosen := int64(value)
+					out.Models[index].SelectedContextTokens = &chosen
+					out.Models[index].ContextSelectionStatus = "selected"
+				}
 			}
 		}
 	}
@@ -178,6 +182,47 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		return zero, ErrInspection
 	}
 	return out, nil
+}
+
+// A pooled lifetime score can transfer only if every contributing current
+// verdict is direct evidence. Mixed/judge-only scores stay unavailable as priors
+// rather than borrowing their inflated quality. Runtime uses the direct subset.
+func (s *Service) markBrowserFallbackFitness(ctx context.Context, fitness []contract.ModelFitnessInspection, models []routing.ConfiguredModel) {
+	sources := map[[2]string]bool{}
+	for _, rule := range s.settings.Routing.EvidenceFallbacks {
+		sources[[2]string{rule.SourceDomain, rule.SourceProfile}] = true
+	}
+	if len(sources) == 0 || len(fitness) == 0 {
+		return
+	}
+	db, release, err := s.openTaskReadStore(ctx)
+	if err != nil {
+		return
+	}
+	defer release()
+	configured := map[string]routing.ConfiguredModel{}
+	for _, model := range models {
+		configured[model.ID] = model
+	}
+	for index := range fitness {
+		row := &fitness[index]
+		if !sources[[2]string{row.Domain, row.Profile}] {
+			continue
+		}
+		model, ok := configured[row.ModelID]
+		if !ok {
+			continue
+		}
+		observations, err := db.DirectObservationSet(ctx, routing.Key{Model: model.Model, Provider: model.Provider, Domain: row.Domain, Profile: row.Profile})
+		if err != nil {
+			continue
+		}
+		bases := map[string]bool{}
+		for _, observation := range observations.Fitness {
+			bases[observation.BaseID] = true
+		}
+		row.FallbackEligible = row.Samples > 0 && int64(len(bases)) == row.Samples
+	}
 }
 
 func browserSelectedContexts(ctx context.Context, path string, models []config.Model, minimumSamples int) (map[string]int, error) {
@@ -203,7 +248,10 @@ func browserSelectedContexts(ctx context.Context, path string, models []config.M
 			return nil, err
 		}
 		var record evaluation.Record
-		if json.Unmarshal(body, &record) != nil || record.Validate() != nil || record.ContextTokens < 1 {
+		if json.Unmarshal(body, &record) != nil || record.Validate() != nil {
+			return nil, evaluation.ErrEvidence
+		}
+		if record.ContextTokens < 1 {
 			continue
 		}
 		outcome, resolveErr := evaluation.Resolve(record.Checks, record.AllowJudge)

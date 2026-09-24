@@ -147,6 +147,9 @@ func TestMidTaskCompactionActivationBudgetTerminalizesWithRealStore(t *testing.T
 	const contextLimit = 2 << 20
 	svc.settings.Runtime.AutoApprovedCompaction = true
 	svc.settings.Models[0].ContextTokens = contextLimit
+	// This journal-exhaustion fixture intentionally uses a large allocation;
+	// otherwise the normal 32K working tier correctly rejects its initial input.
+	svc.settings.Models[0].DefaultContextTokens = contextLimit
 	svc.contextEstimator = auxiliaryContextEstimator(func(_ context.Context, request providers.Request) (int, error) {
 		hasTool, hasSource := false, false
 		for _, message := range request.Messages {

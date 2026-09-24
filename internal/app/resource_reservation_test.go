@@ -152,7 +152,8 @@ func TestHostReservationBindsPrimaryExecutionAndReleases(t *testing.T) {
 	service, _ := autoFixture(t)
 	fixture := newReservationCoordinatorFixture()
 	owner := installReservationFixture(t, service, fixture)
-	result, err := service.Run(context.Background(), Request{ModelID: "a", Prompt: "hello", Profile: "code", ContextTokens: 1024})
+	// Include room for both the prompt and the estimator's 1024-token reserve.
+	result, err := service.Run(context.Background(), Request{ModelID: "a", Prompt: "hello", Profile: "code", ContextTokens: 2048})
 	if err != nil || result.TaskID == "" || result.Text != "a" {
 		t.Fatal(result, err)
 	}
@@ -165,7 +166,7 @@ func TestHostReservationBindsPrimaryExecutionAndReleases(t *testing.T) {
 	configID, _ := settingsConfigID(service.settings)
 	if request.Owner != owner || request.TaskID != result.TaskID || request.SessionID != result.TaskID ||
 		request.ProviderID != "local" || request.ModelID != "a" || request.Profile != "code" ||
-		request.RAMBytes != 100 || request.ContextTokens != 1024 || request.ConfigDigest != configID {
+		request.RAMBytes != 100 || request.ContextTokens != 2048 || request.ConfigDigest != configID {
 		t.Fatal("wrong durable binding", request)
 	}
 }

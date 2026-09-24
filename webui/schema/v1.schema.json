@@ -2873,6 +2873,7 @@
         "capabilities": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128}},
         "context_tokens": {"type": "integer", "minimum": 0},
         "selected_context_tokens": {"type": "integer", "minimum": 1},
+        "context_selection_status": {"enum": ["selected", "blocked", "unavailable"]},
         "estimated_cost": {"type": "number", "minimum": 0},
         "ram_bytes": {"type": "integer", "minimum": 0},
         "vram_bytes": {"type": "integer", "minimum": 0},
@@ -2889,6 +2890,8 @@
       },
       "allOf": [
         {"if": {"properties": {"usable": {"const": true}}}, "then": {"properties": {"configured": {"const": true}, "enabled": {"const": true}, "health": {"const": "healthy"}}}},
+        {"if": {"required": ["context_selection_status"], "properties": {"context_selection_status": {"const": "selected"}}}, "then": {"required": ["selected_context_tokens", "context_tokens"]}},
+        {"if": {"required": ["context_selection_status"], "properties": {"context_selection_status": {"enum": ["blocked", "unavailable"]}}}, "then": {"properties": {"selected_context_tokens": false}}},
         {"if": {"properties": {"enabled": {"const": true}}}, "then": {"properties": {"configured": {"const": true}}}},
         {"if": {"properties": {"locality": {"const": "cloud"}}}, "then": {"properties": {"installed": {"const": false}, "size_bytes": false, "digest": false, "modified_at": false}}}
       ]
@@ -2932,14 +2935,26 @@
         "refresh_interval_ms": {"type": "integer", "minimum": 5000, "maximum": 300000},
         "local_providers": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/local_provider_inspection"}},
         "models": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/model_inspection"}},
-        "fitness": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/model_fitness_inspection"}}
+        "fitness": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/model_fitness_inspection"}},
+        "evidence_fallbacks": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/routing_evidence_fallback_inspection"}}
       },
       "allOf": [
         {"if": {"required": ["commander_id"]}, "then": {"required": ["commander_source"]}},
         {"if": {"required": ["commander_source"]}, "then": {"required": ["commander_id"]}},
         {"if": {"required": ["commander_fallback_id"]}, "then": {"required": ["commander_id"]}},
-        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}, "fitness": {"maxItems": 0}}}}
+        {"if": {"properties": {"availability": {"const": "available"}}}, "then": {"required": ["config_id", "local_concurrency", "local_pressure_policy", "local_ram_limit_pct", "local_vram_limit_pct", "refreshed_at", "local_total_bytes", "local_total_kind", "local_total_coverage", "refresh_interval_ms", "local_providers"]}, "else": {"properties": {"config_id": false, "commander_id": false, "commander_source": false, "commander_fallback_id": false, "local_concurrency": false, "local_pressure_policy": false, "local_ram_limit_pct": false, "local_vram_limit_pct": false, "managed_residency": {"const": false}, "specialists_allow_cloud": {"const": false}, "refreshed_at": false, "local_total_bytes": false, "local_total_kind": false, "local_total_coverage": false, "local_unknown_size_count": {"const": 0}, "refresh_interval_ms": {"const": 0}, "local_providers": {"maxItems": 0}, "models": {"maxItems": 0}, "fitness": {"maxItems": 0}, "evidence_fallbacks": {"maxItems": 0}}}}
       ]
+    },
+    "routing_evidence_fallback_inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "profile", "source_domain", "source_profile"],
+      "properties": {
+        "domain": {"$ref": "#/$defs/model_id"},
+        "profile": {"$ref": "#/$defs/model_id"},
+        "source_domain": {"$ref": "#/$defs/model_id"},
+        "source_profile": {"$ref": "#/$defs/model_id"}
+      }
     },
     "model_fitness_inspection": {
       "type": "object",
@@ -2949,6 +2964,7 @@
         "model_id": {"$ref": "#/$defs/model_id"},
         "domain": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
         "profile": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
+        "fallback_eligible": {"type": "boolean"},
         "samples": {"type": "integer", "minimum": 1},
         "quality": {"type": "number", "minimum": 0, "maximum": 1},
         "reliability": {"type": "number", "minimum": 0, "maximum": 1},

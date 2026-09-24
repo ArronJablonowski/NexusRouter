@@ -80,3 +80,23 @@ func TestValidateExploredExplanation(t *testing.T) {
 		t.Fatal(selection, err)
 	}
 }
+
+func TestValidateExplanationRejectsOverconfidentLegacyPrior(t *testing.T) {
+	candidates, policy, _ := explanationFixture(t)
+	now := time.Unix(1000, 0)
+	request := Request{Mode: "hybrid", Domain: "code", Profile: "default", Capabilities: []string{"chat"}, ContextTokens: 10, MaxCost: 1}
+	evidence := map[Key]Evidence{{Model: "a", Provider: "local", Domain: "code", Profile: "default"}: {
+		SourceDomain: "coding", SourceProfile: "benchmark", Samples: 100,
+		Quality: 1, Reliability: 1, Updated: now,
+	}}
+	selection, err := Select(request, policy, candidates, evidence, now, .5)
+	if err != nil || ValidateExplanation(candidates, &policy, &selection) != nil {
+		t.Fatal(selection, err)
+	}
+	selection.Ranked[0].Confidence = .8
+	selection.Ranked[0].Uncertainty = .2
+	selection.Primary = selection.Ranked[0]
+	if ValidateExplanation(candidates, &policy, &selection) == nil {
+		t.Fatal("transferred evidence exceeded prior confidence cap")
+	}
+}

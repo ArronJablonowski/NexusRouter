@@ -19,16 +19,19 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: darwin web approve --config path CHALLENGE_ID.DISPLAY_CODE")
 		return 2
 	}
-	if len(args) < 1 || args[0] != "approve" {
+	if len(args) < 2 || args[0] != "approve" {
 		return invalid()
 	}
 	fs := flag.NewFlagSet("web approve", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := fs.String("config", "", "configuration")
-	if fs.Parse(args[1:]) != nil || *path == "" || fs.NArg() != 1 {
+	// Challenge IDs are URL-safe base64 and may begin with '-'. Parse the
+	// required trailing credential separately so flag parsing cannot mistake
+	// a valid one-time code for an option.
+	if fs.Parse(args[1:len(args)-1]) != nil || *path == "" || fs.NArg() != 0 {
 		return invalid()
 	}
-	id, code, ok := strings.Cut(fs.Arg(0), ".")
+	id, code, ok := strings.Cut(args[len(args)-1], ".")
 	request := contract.BrowserChallengeApprovalRequest{Version: 1, DisplayCode: code}
 	if !ok || strings.Contains(code, ".") || (contract.BrowserSessionRequest{Version: 1, ChallengeID: id}).Validate() != nil || request.Validate() != nil {
 		return invalid()

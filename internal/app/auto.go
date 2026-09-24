@@ -445,7 +445,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	validitySets := map[routing.Key]routing.Validity{}
 	// Custom estimates are model-specific. Bound the whole measurement batch
 	// separately from provider health checks, and deny only unmeasurable models.
-	contextFits := map[string]bool{}
+	contextEstimates := map[string]int{}
 	if r.contextEstimator != nil {
 		measureCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		for _, m := range cfg.Models {
@@ -456,7 +456,9 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 			candidateInput := inference
 			candidateInput.Model = m.Model
 			estimate, err := providers.EstimateWith(measureCtx, r.contextEstimator, candidateInput)
-			contextFits[m.ID] = err == nil && estimate <= m.ContextTokens
+			if err == nil {
+				contextEstimates[m.ID] = estimate
+			}
 		}
 		cancel()
 	}
@@ -468,7 +470,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 			c.ContextTokens = 1
 		}
 		c.PolicyAllowed = m.ContextTokens > 0 && m.EstimatedCost != nil
-		if r.contextEstimator != nil && !contextFits[m.ID] {
+		if r.contextEstimator != nil && (contextEstimates[m.ID] < 1 || contextEstimates[m.ID] > m.ContextTokens) {
 			c.PolicyAllowed = false
 		}
 		if r.onlyModelID != "" && m.ID != r.onlyModelID {
@@ -530,7 +532,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 			if domain, profile, ok := cfg.Routing.EvidenceSource(key.Domain, key.Profile); ok {
 				source := routing.Key{Model: key.Model, Provider: key.Provider, Domain: domain, Profile: profile}
 				// Transfer only direct, durable verdicts, never judge opinions.
-				observations, observationErr = db.ObservationSet(ctx, source, false)
+				observations, observationErr = db.DirectObservationSet(ctx, source)
 				if observationErr != nil {
 					return Result{}, errors.New("cannot read routing prior")
 				}
@@ -610,7 +612,8 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		if evidenceErr != nil {
 			return Result{}, ErrAdmission
 		}
-		candidateRequest.ContextTokens, err = chooseContextTier(ctx, model, candidateRequest, contextTokens, contextEvidence, draw < cfg.Routing.Exploration, cfg.Routing.MinSamples, s.contextFitsMemory(ctx, model))
+		requiredContext := max(contextTokens, contextEstimates[model.ID])
+		candidateRequest.ContextTokens, err = chooseContextTier(ctx, model, candidateRequest, requiredContext, contextEvidence, draw < cfg.Routing.Exploration, cfg.Routing.MinSamples, s.contextFitsMemory(ctx, model))
 		if err != nil {
 			for i := range candidates {
 				if candidates[i].Model == model.Model && candidates[i].Provider == model.Provider {

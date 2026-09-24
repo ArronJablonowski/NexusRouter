@@ -85,3 +85,39 @@ func TestOutputTokenBudgetRejectsInvalidBoundsBeforeDispatch(t *testing.T) {
 		}
 	}
 }
+
+func TestOutputTokenBudgetRejectsDuplicateUsageBeforeToolEffect(t *testing.T) {
+	journal := &compactionJournal{}
+	executed, calls := false, 0
+	loop := runtime.Loop{Journal: journal, Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+		calls++
+		if calls > 1 {
+			return emit(providers.Chunk{Text: "unexpected second turn", Usage: &providers.Usage{OutputTokens: 1}, Done: true, FinishReason: "stop"})
+		}
+		if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "call", Name: "lookup", Arguments: []byte(`{}`)}}); err != nil {
+			return err
+		}
+		if err := emit(providers.Chunk{Usage: &providers.Usage{OutputTokens: 100}}); err != nil {
+			return err
+		}
+		// Even if an adapter ignores the callback error, the runtime must not
+		// execute the proposed tool using this smaller replacement measurement.
+		_ = emit(providers.Chunk{Usage: &providers.Usage{OutputTokens: 1}})
+		_ = emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+		return nil
+	}), Tools: executor(func(context.Context, providers.ToolCall) (runtime.ToolResult, error) {
+		executed = true
+		return runtime.ToolResult{Content: "unsafe", Effect: runtime.ConfirmedEffect}, nil
+	})}
+	request := runRequest()
+	request.Inference.MaxOutputTokens = 5
+	result, err := loop.Run(context.Background(), request)
+	if !errors.Is(err, runtime.ErrProtocol) || executed || calls != 1 || result.Retryable || result.Usage != nil {
+		t.Fatal(result, err, executed, calls)
+	}
+	for _, event := range journal.events {
+		if event.Kind == runtime.ToolStarted || event.Kind == runtime.TurnCompleted {
+			t.Fatal("ambiguous usage committed", event)
+		}
+	}
+}

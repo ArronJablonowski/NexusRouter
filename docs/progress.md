@@ -9173,3 +9173,48 @@ Checkpoint verification limitation: make check passed source checks and vet and
 entered the complete race suite, but the broad internal/app package was still
 running at the development checkpoint. No complete-suite pass is claimed. The
 focused race checks above completed separately against the final implementation.
+
+### September 24: extensive code QA
+
+The follow-up review corrected allocation enforcement across initial prompts,
+continuations, compaction, summary, audit, and skill generation. Provider calls
+and estimators use the admitted working tier; automatic routing retains the
+model-specific estimate. Required safe growth reaches ordinary capacity admission
+and authorized idle-model reclamation, while optional growth still requires
+headroom. Capacity plans preserve the swap baseline and maintenance respects
+thermal, swap, and concurrency blockers. Two test fixtures now explicitly request
+enough context for their original journal-limit and reservation assertions.
+
+Context evidence rejects damaged attribution and excludes execution errors from
+accuracy samples while retaining safety faults. Observed noncanonical tiers are
+selectable. Routing priors exclude judge-only current verdicts, numeric aggregation
+avoids overflow, and explanations enforce the prior confidence cap. Duplicate
+provider usage cannot lower the output-budget total; cancellation while reading an
+HTTP error body remains cancellation.
+
+Daemon feedback revision/history reuse the validated store. Ineligible browser
+feedback has its intended response, and browser approval accepts URL-safe challenge
+IDs beginning with a hyphen. The routing map ignores stale refreshes, preserves
+expanded cards, distinguishes unavailable context evidence from blocked tiers,
+and uses exact task/profile evidence before explicitly configured direct priors.
+The displayed learned evidence score remains a lifetime overview, not a prediction
+of the runtime's decayed, constrained routing decision.
+
+The benchmark repository separately fixes grade eligibility, acknowledgment-loss
+recovery after feedback CLI timeouts, and JSONL Unicode-line-separator handling
+(commit f65f76f). Four new feedback tests and eight existing coding tests pass.
+Its remote backup is blocked by SSH public-key authentication; the local commit is
+preserved. No historical benchmark evidence or feedback was rewritten.
+
+Focused race regressions and independent second-pass reviews pass. The combined
+tree passed source checks and vet and is running the full ordinary and race suites.
+Final broad-suite and runtime verification results will follow. These fixes do not
+establish model-quality improvements or qualify larger context windows.
+
+The idle live-test daemon was rebuilt and restarted with a rollback binary kept
+outside Git. An automatic local math smoke selected gemma4:26b-mlx at 32K using a
+math_reasoning/benchmark prior, answered correctly, and stored exactly one accepted
+evaluation (7.788 seconds including feedback). Browser approval, model inspection,
+and logout passed: 17 models, 211 fitness rows, 13 configured mappings, 162 verified
+transferable prior rows, and selected tiers of 16K/32K. The reviewed UI asset digest
+pin was updated; security assertions and the asset contract version remain intact.

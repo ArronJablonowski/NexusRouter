@@ -147,7 +147,7 @@ func (s *Service) SummarizeTask(ctx context.Context, task, modelID string, keep 
 			return nil
 		}
 	}
-	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost, StructuredOutput: provider.Kind == "codex_app_server"}
+	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, ContextTokens: model.WorkingContextTokens(), Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost, StructuredOutput: provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, input, keep)
 	if cleanupErr := cleanup(); cleanupErr != nil {
 		err = errors.Join(err, cleanupErr)

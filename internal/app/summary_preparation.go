@@ -246,7 +246,7 @@ func (s *Service) prepareSummaryAdmission(ctx context.Context, key string, reque
 	snapshot.Hardware.LocalQueueTimeout = s.settings.Hardware.LocalQueueTimeout
 	snapshot.Model.ID, snapshot.Model.Provider, snapshot.Model.Model = model.ID, model.Provider, model.Model
 	snapshot.Model.Locality, snapshot.Model.GPUDevice = model.Locality, model.GPUDevice
-	snapshot.Model.ContextTokens, snapshot.Model.EstimatedCost = model.ContextTokens, *model.EstimatedCost
+	snapshot.Model.ContextTokens, snapshot.Model.EstimatedCost = model.WorkingContextTokens(), *model.EstimatedCost
 	snapshot.Model.RAMBytes, snapshot.Model.VRAMBytes = model.RAMBytes, model.VRAMBytes
 	snapshot.Provider.ID, snapshot.Provider.Kind = provider.ID, provider.Kind
 	snapshot.Provider.RequestTimeout, snapshot.Provider.APIKeyEnv = provider.RequestTimeout, provider.APIKeyEnv
@@ -367,7 +367,7 @@ func (s *Service) executePreparedSummary(ctx context.Context, write *telemetry.S
 		}
 	}
 	summarizer := sessions.Summarizer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: admission.model.Model,
-		ContextTokens: admission.model.ContextTokens, Timeout: time.Minute, EstimatedCost: *admission.model.EstimatedCost,
+		ContextTokens: admission.model.WorkingContextTokens(), Timeout: time.Minute, EstimatedCost: *admission.model.EstimatedCost,
 		MaxCost: admission.maxCost, StructuredOutput: admission.provider.Kind == "codex_app_server"}
 	draft, err := summarizer.Draft(ctx, admission.input, admission.selection.Keep)
 	if cleanupErr := cleanup(); cleanupErr != nil {

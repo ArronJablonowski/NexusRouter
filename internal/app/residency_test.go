@@ -250,3 +250,91 @@ func TestManagedResidencyMissingSourceAndCredentialsDoNotUnload(t *testing.T) {
 		})
 	}
 }
+
+func expandedResidencyFixture(t *testing.T) (*Service, *residencyFixture) {
+	t.Helper()
+	svc, fixture := managedResidencyFixture(t)
+	for i := range svc.settings.Models {
+		svc.settings.Models[i].RAMBytes = 12 << 30
+		svc.settings.Models[i].ContextTokens = 131072
+	}
+	svc.profile = func(context.Context) (resources.Snapshot, error) {
+		fixture.mu.Lock()
+		defer fixture.mu.Unlock()
+		fixture.profiles++
+		// The 80% RAM budget leaves 20 GiB before an idle model is
+		// unloaded, more than the fixed 16 GiB low-memory tier.
+		available := uint64(40 << 30)
+		if fixture.resident == "" && !fixture.noRecovery {
+			available = 64 << 30
+		}
+		return resources.Snapshot{Time: time.Now(), TotalRAM: 100 << 30, AvailableRAM: available, CPUs: 4}, nil
+	}
+	return svc, fixture
+}
+
+func TestManagedResidencyReclaimsForExpandedContextAboveLowMemoryTier(t *testing.T) {
+	for _, coordinated := range []bool{false, true} {
+		t.Run(fmt.Sprint(coordinated), func(t *testing.T) {
+			svc, fixture := expandedResidencyFixture(t)
+			if coordinated {
+				installReservationFixture(t, svc, newReservationCoordinatorFixture())
+			}
+			result, err := svc.Run(context.Background(), Request{ModelID: "a", ContextTokens: 65536, Prompt: "hello"})
+			fixture.mu.Lock()
+			defer fixture.mu.Unlock()
+			if coordinated {
+				if !errors.Is(err, resources.ErrCapacity) || fixture.unloads != 0 || fixture.streams != 0 {
+					t.Fatalf("coordinated path gained peer-unaware unload authority: %+v %v, unloads=%d streams=%d", result, err, fixture.unloads, fixture.streams)
+				}
+			} else if err != nil || result.Text != "answer" || fixture.unloads != 1 || fixture.streams != 1 || fixture.profiles < 2 {
+				t.Fatalf("24 GiB context allocation did not reclaim idle memory: %+v %v, unloads=%d streams=%d", result, err, fixture.unloads, fixture.streams)
+			}
+		})
+	}
+}
+
+func TestManagedResidencyDoesNotUnloadForNonMemoryBlockers(t *testing.T) {
+	for _, mode := range []string{"thermal", "swap", "concurrency", "invalid", "unrecovered"} {
+		t.Run(mode, func(t *testing.T) {
+			svc, fixture := expandedResidencyFixture(t)
+			profile := svc.profile
+			svc.profile = func(ctx context.Context) (resources.Snapshot, error) {
+				snapshot, err := profile(ctx)
+				pressure := true
+				switch mode {
+				case "thermal":
+					snapshot.ThermalPressure = &pressure
+				case "swap":
+					snapshot.SwapPressure = &pressure
+				case "invalid":
+					snapshot.CPUs = -1
+				}
+				return snapshot, err
+			}
+			if mode == "concurrency" {
+				for range 2 {
+					now := time.Now()
+					release, err := svc.budget.Reserve(resources.Snapshot{Time: now, TotalRAM: 100 << 30, AvailableRAM: 100 << 30, CPUs: 4}, resources.Need{RAM: 1 << 30}, now)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer release()
+				}
+			}
+			if mode == "unrecovered" {
+				fixture.noRecovery = true
+			}
+			_, err := svc.Run(context.Background(), Request{ModelID: "a", ContextTokens: 65536, Prompt: "hello"})
+			fixture.mu.Lock()
+			defer fixture.mu.Unlock()
+			wantUnloads := 0
+			if mode == "unrecovered" {
+				wantUnloads = 1
+			}
+			if err == nil || fixture.unloads != wantUnloads || fixture.streams != 0 {
+				t.Fatalf("denied route mutated residency or dispatched: %v, unloads=%d streams=%d", err, fixture.unloads, fixture.streams)
+			}
+		})
+	}
+}

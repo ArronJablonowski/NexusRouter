@@ -51,6 +51,23 @@ func TestCapacityPlanAccountsForLiveReservationsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestCapacityPlanPreservesSwapGrowthBaseline(t *testing.T) {
+	budget, request := capacityFixture(t)
+	release, err := budget.Reserve(request.Snapshot, request.Need, request.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	*request.Snapshot.SwapUsed = (5 << 30) + 1
+	plan, err := budget.Plan(context.Background(), request)
+	if err != nil || plan.Action != CapacityWait || plan.Reason != CapacitySwap || plan.MaxAdditional != 0 {
+		t.Fatalf("planner forgot admitted swap baseline: %+v %v", plan, err)
+	}
+	if release, err := budget.Reserve(request.Snapshot, request.Need, request.Now); !errors.Is(err, ErrCapacity) || release != nil {
+		t.Fatalf("plan changed the actual swap baseline: %v", err)
+	}
+}
+
 func TestCapacityPlanPressureWaitsWithoutClaimingCapacity(t *testing.T) {
 	for _, mode := range []string{"thermal", "swap", "full"} {
 		t.Run(mode, func(t *testing.T) {

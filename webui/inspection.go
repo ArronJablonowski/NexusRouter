@@ -31,31 +31,32 @@ const (
 func validAvailability(value Availability) bool { return value == Available || value == Unavailable }
 
 type ModelInspection struct {
-	ID                    string     `json:"id"`
-	Provider              string     `json:"provider"`
-	Model                 string     `json:"model"`
-	ReasoningEffort       string     `json:"reasoning_effort,omitempty"`
-	Locality              string     `json:"locality"`
-	Configured            bool       `json:"configured"`
-	Enabled               bool       `json:"enabled"`
-	Installed             bool       `json:"installed"`
-	Usable                bool       `json:"usable"`
-	Capabilities          []string   `json:"capabilities"`
-	ContextTokens         *int64     `json:"context_tokens,omitempty"`
-	SelectedContextTokens *int64     `json:"selected_context_tokens,omitempty"`
-	EstimatedCost         *float64   `json:"estimated_cost,omitempty"`
-	RAMBytes              *uint64    `json:"ram_bytes,omitempty"`
-	VRAMBytes             *uint64    `json:"vram_bytes,omitempty"`
-	SizeBytes             *uint64    `json:"size_bytes,omitempty"`
-	Digest                string     `json:"digest,omitempty"`
-	Family                string     `json:"family,omitempty"`
-	ParameterSize         string     `json:"parameter_size,omitempty"`
-	Quantization          string     `json:"quantization,omitempty"`
-	ModifiedAt            *time.Time `json:"modified_at,omitempty"`
-	HealthCheckedAt       *time.Time `json:"health_checked_at,omitempty"`
-	FailureDomain         string     `json:"failure_domain,omitempty"`
-	Health                string     `json:"health"`
-	StatusCode            string     `json:"status_code,omitempty"`
+	ID                     string     `json:"id"`
+	Provider               string     `json:"provider"`
+	Model                  string     `json:"model"`
+	ReasoningEffort        string     `json:"reasoning_effort,omitempty"`
+	Locality               string     `json:"locality"`
+	Configured             bool       `json:"configured"`
+	Enabled                bool       `json:"enabled"`
+	Installed              bool       `json:"installed"`
+	Usable                 bool       `json:"usable"`
+	Capabilities           []string   `json:"capabilities"`
+	ContextTokens          *int64     `json:"context_tokens,omitempty"`
+	SelectedContextTokens  *int64     `json:"selected_context_tokens,omitempty"`
+	ContextSelectionStatus string     `json:"context_selection_status,omitempty"`
+	EstimatedCost          *float64   `json:"estimated_cost,omitempty"`
+	RAMBytes               *uint64    `json:"ram_bytes,omitempty"`
+	VRAMBytes              *uint64    `json:"vram_bytes,omitempty"`
+	SizeBytes              *uint64    `json:"size_bytes,omitempty"`
+	Digest                 string     `json:"digest,omitempty"`
+	Family                 string     `json:"family,omitempty"`
+	ParameterSize          string     `json:"parameter_size,omitempty"`
+	Quantization           string     `json:"quantization,omitempty"`
+	ModifiedAt             *time.Time `json:"modified_at,omitempty"`
+	HealthCheckedAt        *time.Time `json:"health_checked_at,omitempty"`
+	FailureDomain          string     `json:"failure_domain,omitempty"`
+	Health                 string     `json:"health"`
+	StatusCode             string     `json:"status_code,omitempty"`
 }
 
 func (m ModelInspection) Validate() error {
@@ -74,6 +75,19 @@ func (m ModelInspection) Validate() error {
 		return ErrContract
 	}
 	if m.SelectedContextTokens != nil && (*m.SelectedContextTokens < 1 || m.ContextTokens == nil || *m.SelectedContextTokens > *m.ContextTokens) {
+		return ErrContract
+	}
+	switch m.ContextSelectionStatus {
+	case "": // Older bounded snapshots did not expose selection availability.
+	case "selected":
+		if m.SelectedContextTokens == nil {
+			return ErrContract
+		}
+	case "blocked", "unavailable":
+		if m.SelectedContextTokens != nil {
+			return ErrContract
+		}
+	default:
 		return ErrContract
 	}
 	switch m.Health {
@@ -110,16 +124,17 @@ type LocalProviderInspection struct {
 // ModelFitnessInspection is the bounded, read-only projection of DarwinRouter's
 // persisted evaluation aggregate for one model/task profile.
 type ModelFitnessInspection struct {
-	ModelID     string    `json:"model_id"`
-	Domain      string    `json:"domain"`
-	Profile     string    `json:"profile"`
-	Samples     int64     `json:"samples"`
-	Quality     float64   `json:"quality"`
-	Reliability float64   `json:"reliability"`
-	Compliance  float64   `json:"compliance"`
-	Score       float64   `json:"score"`
-	Confidence  float64   `json:"confidence"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ModelID          string    `json:"model_id"`
+	Domain           string    `json:"domain"`
+	Profile          string    `json:"profile"`
+	Samples          int64     `json:"samples"`
+	Quality          float64   `json:"quality"`
+	Reliability      float64   `json:"reliability"`
+	Compliance       float64   `json:"compliance"`
+	Score            float64   `json:"score"`
+	Confidence       float64   `json:"confidence"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	FallbackEligible bool      `json:"fallback_eligible,omitempty"`
 }
 
 func (f ModelFitnessInspection) Validate() error {
@@ -142,32 +157,53 @@ func (p LocalProviderInspection) Validate() error {
 	return ErrContract
 }
 
+// RoutingEvidenceFallbackInspection exposes only exact nonsecret task selectors.
+type RoutingEvidenceFallbackInspection struct {
+	Domain        string `json:"domain"`
+	Profile       string `json:"profile"`
+	SourceDomain  string `json:"source_domain"`
+	SourceProfile string `json:"source_profile"`
+}
+
+func (f RoutingEvidenceFallbackInspection) Validate() error {
+	for _, value := range []string{f.Domain, f.Profile, f.SourceDomain, f.SourceProfile} {
+		if value == "" || !optionalModelID(value) {
+			return ErrContract
+		}
+	}
+	if f.Domain == f.SourceDomain && f.Profile == f.SourceProfile {
+		return ErrContract
+	}
+	return nil
+}
+
 type ModelInspectionPage struct {
-	Version               int                       `json:"version"`
-	Availability          Availability              `json:"availability"`
-	ConfigID              string                    `json:"config_id,omitempty"`
-	CommanderID           string                    `json:"commander_id,omitempty"`
-	CommanderSource       string                    `json:"commander_source,omitempty"`
-	CommanderFallbackID   string                    `json:"commander_fallback_id,omitempty"`
-	LocalConcurrency      string                    `json:"local_concurrency,omitempty"`
-	LocalPressurePolicy   string                    `json:"local_pressure_policy,omitempty"`
-	LocalRAMLimitPct      float64                   `json:"local_ram_limit_pct,omitempty"`
-	LocalVRAMLimitPct     float64                   `json:"local_vram_limit_pct,omitempty"`
-	ManagedResidency      bool                      `json:"managed_residency"`
-	SpecialistsAllowCloud bool                      `json:"specialists_allow_cloud"`
-	RefreshedAt           *time.Time                `json:"refreshed_at,omitempty"`
-	LocalTotalBytes       *uint64                   `json:"local_total_bytes,omitempty"`
-	LocalTotalKind        string                    `json:"local_total_kind,omitempty"`
-	LocalTotalCoverage    string                    `json:"local_total_coverage,omitempty"`
-	LocalUnknownSizeCount int                       `json:"local_unknown_size_count"`
-	RefreshIntervalMS     int64                     `json:"refresh_interval_ms"`
-	LocalProviders        []LocalProviderInspection `json:"local_providers"`
-	Models                []ModelInspection         `json:"models"`
-	Fitness               []ModelFitnessInspection  `json:"fitness"`
+	Version               int                                 `json:"version"`
+	Availability          Availability                        `json:"availability"`
+	ConfigID              string                              `json:"config_id,omitempty"`
+	CommanderID           string                              `json:"commander_id,omitempty"`
+	CommanderSource       string                              `json:"commander_source,omitempty"`
+	CommanderFallbackID   string                              `json:"commander_fallback_id,omitempty"`
+	LocalConcurrency      string                              `json:"local_concurrency,omitempty"`
+	LocalPressurePolicy   string                              `json:"local_pressure_policy,omitempty"`
+	LocalRAMLimitPct      float64                             `json:"local_ram_limit_pct,omitempty"`
+	LocalVRAMLimitPct     float64                             `json:"local_vram_limit_pct,omitempty"`
+	ManagedResidency      bool                                `json:"managed_residency"`
+	SpecialistsAllowCloud bool                                `json:"specialists_allow_cloud"`
+	RefreshedAt           *time.Time                          `json:"refreshed_at,omitempty"`
+	LocalTotalBytes       *uint64                             `json:"local_total_bytes,omitempty"`
+	LocalTotalKind        string                              `json:"local_total_kind,omitempty"`
+	LocalTotalCoverage    string                              `json:"local_total_coverage,omitempty"`
+	LocalUnknownSizeCount int                                 `json:"local_unknown_size_count"`
+	RefreshIntervalMS     int64                               `json:"refresh_interval_ms"`
+	LocalProviders        []LocalProviderInspection           `json:"local_providers"`
+	Models                []ModelInspection                   `json:"models"`
+	Fitness               []ModelFitnessInspection            `json:"fitness"`
+	EvidenceFallbacks     []RoutingEvidenceFallbackInspection `json:"evidence_fallbacks,omitempty"`
 }
 
 func (p ModelInspectionPage) Validate() error {
-	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || p.Fitness == nil || len(p.Models) > MaxInspectionModels || len(p.Fitness) > 4096 ||
+	if p.Version != ContractVersion || !validAvailability(p.Availability) || p.Models == nil || p.LocalProviders == nil || p.Fitness == nil || len(p.Models) > MaxInspectionModels || len(p.Fitness) > 4096 || len(p.EvidenceFallbacks) > 128 || p.Availability == Unavailable && len(p.EvidenceFallbacks) > 0 ||
 		(p.Availability == Available) != (p.ConfigID != "") || !validInspectionDigest(p.ConfigID, p.Availability == Available) ||
 		p.LocalUnknownSizeCount < 0 || p.LocalUnknownSizeCount > MaxInspectionModels ||
 		p.Availability == Available && (p.RefreshedAt == nil || !validBrowserTime(*p.RefreshedAt) || p.LocalTotalBytes == nil || p.LocalTotalKind != "logical_deduplicated" ||
@@ -203,6 +239,14 @@ func (p ModelInspectionPage) Validate() error {
 			fallbackFound = model.Locality == "local" && model.ID != p.CommanderID
 		}
 		seen[model.ID] = true
+	}
+	fallbackSeen := map[[2]string]bool{}
+	for _, fallback := range p.EvidenceFallbacks {
+		key := [2]string{fallback.Domain, fallback.Profile}
+		if fallback.Validate() != nil || fallbackSeen[key] {
+			return ErrContract
+		}
+		fallbackSeen[key] = true
 	}
 	fitnessSeen := map[string]bool{}
 	for _, fitness := range p.Fitness {

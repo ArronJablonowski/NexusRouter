@@ -5,27 +5,34 @@
 	if (!window.DarwinRoutes || (!window.DarwinRoutes.routing(relative) && !window.DarwinRoutes.elimination(relative))) return;
 	const allViews = ["#chat-view", "#workboard-view", "#models-view", "#settings-view", "#routing-view", "#elimination-view"];
 	const jobs = [
-		{key:"coding", label:"Coding", capabilities:["code","coding","reasoning"], domains:["coding","code","code_generation","complex_code","smoke_coding"]},
-		{key:"ocr", label:"OCR / document vision", capabilities:["ocr","vision","image"], domains:["ocr","document_vision","vision"]},
-		{key:"cli", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"], domains:["cli","terminal","tool_use","command_line"]},
-		{key:"general", label:"General use", capabilities:["chat","reasoning"], domains:["general","instruction_following","knowledge","commonsense","science_reasoning","math_reasoning","truthfulness"]},
+		{key:"coding", domain:"code", label:"Coding", capabilities:["code","coding","reasoning"]},
+		{key:"ocr", label:"OCR / document vision", capabilities:["ocr","vision","image"]},
+		{key:"cli", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"]},
+		{key:"general", label:"General use", capabilities:["chat","reasoning"]},
 		{key:"image_generation", label:"Image generation", capabilities:["image_generation","image","vision"]},
 		{key:"video_generation", label:"Video generation", capabilities:["video_generation","video","vision"]},
-		{key:"writing", label:"General writing", capabilities:["writing","chat","summarize"], domains:["writing","summarize","general_writing"]},
-		{key:"creative", label:"Creative work", capabilities:["creative","writing","chat"], domains:["creative","creative_writing"]}
+		{key:"writing", label:"General writing", capabilities:["writing","chat","summarize"]},
+		{key:"creative", label:"Creative work", capabilities:["creative","writing","chat"]}
 	];
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
-	let snapshot = null, routingTimer = 0;
+	let snapshot = null, routingTimer = 0, routingGeneration = 0;
 	let creativePreference = "";
 	const expandedModels = new Set(new URLSearchParams(window.location.search).getAll("expanded").filter(value => { const parts=value.split("|"); return parts.length===2 && jobs.some(job => job.key===parts[0]) && idPattern.test(parts[1]); }));
 	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.DarwinRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
 
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
-	function validModel(item) { return item && idPattern.test(item.id) && typeof item.model === "string" && item.model.length <= 512 && (item.reasoning_effort === undefined || ["none","minimal","low","medium","high","xhigh","max","ultra"].includes(item.reasoning_effort)) && ["local","cloud"].includes(item.locality) && Array.isArray(item.capabilities) && item.capabilities.every(value => idPattern.test(value)) && (item.selected_context_tokens === undefined || Number.isSafeInteger(item.selected_context_tokens) && item.selected_context_tokens > 0 && Number.isSafeInteger(item.context_tokens) && item.selected_context_tokens <= item.context_tokens) && typeof item.usable === "boolean"; }
-	function validFitness(item) { return item && idPattern.test(item.model_id) && typeof item.domain === "string" && item.domain.length > 0 && item.domain.length <= 128 && typeof item.profile === "string" && item.profile.length > 0 && item.profile.length <= 128 && Number.isSafeInteger(item.samples) && item.samples > 0 && [item.quality,item.reliability,item.compliance,item.score,item.confidence].every(value => Number.isFinite(value) && value >= 0 && value <= 1); }
-	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && Array.isArray(value.fitness) && value.fitness.length <= 4096 && value.fitness.every(validFitness) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
+	function validModel(item) { return item && idPattern.test(item.id) && typeof item.model === "string" && item.model.length <= 512 && (item.reasoning_effort === undefined || ["none","minimal","low","medium","high","xhigh","max","ultra"].includes(item.reasoning_effort)) && ["local","cloud"].includes(item.locality) && Array.isArray(item.capabilities) && item.capabilities.every(value => idPattern.test(value)) && (item.selected_context_tokens === undefined || Number.isSafeInteger(item.selected_context_tokens) && item.selected_context_tokens > 0 && Number.isSafeInteger(item.context_tokens) && item.selected_context_tokens <= item.context_tokens) && (item.context_selection_status === undefined || ["selected","blocked","unavailable"].includes(item.context_selection_status) && (item.context_selection_status === "selected" ? item.selected_context_tokens !== undefined : item.selected_context_tokens === undefined)) && typeof item.usable === "boolean"; }
+	function validFitness(item) { return item && idPattern.test(item.model_id) && typeof item.domain === "string" && item.domain.length > 0 && item.domain.length <= 128 && typeof item.profile === "string" && item.profile.length > 0 && item.profile.length <= 128 && Number.isSafeInteger(item.samples) && item.samples > 0 && (item.fallback_eligible === undefined || typeof item.fallback_eligible === "boolean") && [item.quality,item.reliability,item.compliance,item.score,item.confidence].every(value => Number.isFinite(value) && value >= 0 && value <= 1); }
+	function validFallbacks(value) { return value === undefined || Array.isArray(value) && value.length <= 128 && value.every(item => item && [item.domain,item.profile,item.source_domain,item.source_profile].every(part => typeof part === "string" && idPattern.test(part)) && (item.domain !== item.source_domain || item.profile !== item.source_profile)) && new Set(value.map(item => item.domain+"|"+item.profile)).size === value.length; }
+	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && Array.isArray(value.fitness) && value.fitness.length <= 4096 && value.fitness.every(validFitness) && validFallbacks(value.evidence_fallbacks) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
 	async function inventory() { const response = await fetch(base + "/api/v1/models", {credentials:"same-origin", cache:"no-store", headers:{Accept:"application/json"}}); if (!response.ok) throw new Error("inventory unavailable"); const value = await response.json(); if (!validSnapshot(value)) throw new Error("invalid inventory"); return value; }
-	function learned(model, job) { const domains = job.domains || [job.key]; return snapshot.fitness.filter(item => item.model_id === model.id && domains.includes(item.domain)).sort((a,b) => b.score-a.score || b.samples-a.samples)[0] || null; }
+	function learned(model, job) {
+		const domain = job.domain || job.key, profile = "default";
+		const direct = snapshot.fitness.find(item => item.model_id === model.id && item.domain === domain && item.profile === profile);
+		if (direct) return direct;
+		const fallback = (snapshot.evidence_fallbacks || []).find(item => item.domain === domain && item.profile === profile);
+		return fallback ? snapshot.fitness.find(item => item.model_id === model.id && item.domain === fallback.source_domain && item.profile === fallback.source_profile && item.fallback_eligible === true) || null : null;
+	}
 	function score(model, job) {
 		const evidence = learned(model, job); if (evidence) return 1000 + evidence.score * 100 + Math.min(10, evidence.samples / 10);
 		let value = model.usable ? 100 : model.enabled ? 20 : 0;
@@ -34,23 +41,23 @@
 		if (typeof model.estimated_cost === "number") value += Math.max(0, 5 - Math.min(5, model.estimated_cost));
 		return value;
 	}
-	function ranked(job) { return snapshot.models.filter(model => model.usable && (snapshot.specialists_allow_cloud || model.locality === "local") && (learned(model,job) || job.capabilities.some(capability => model.capabilities.includes(capability)))).sort((a,b) => score(b,job)-score(a,job) || a.id.localeCompare(b.id)).slice(0,3); }
+	function ranked(job) { return snapshot.models.filter(model => model.usable && model.context_selection_status !== "blocked" && (snapshot.specialists_allow_cloud || model.locality === "local") && (learned(model,job) || job.capabilities.some(capability => model.capabilities.includes(capability)))).sort((a,b) => score(b,job)-score(a,job) || a.id.localeCompare(b.id)).slice(0,3); }
 	function commander() {
 		if (snapshot.commander_id) return snapshot.models.find(model => model.id === snapshot.commander_id) || null;
 		return snapshot.models.find(model => model.capabilities.includes("orchestration")) || snapshot.models.find(model => /commander|coordinator|brain/i.test(model.id)) || null;
 	}
 	function contextLabel(model) { if (!Number.isSafeInteger(model.context_tokens) || model.context_tokens < 1) return "context unknown"; if (model.context_tokens % 1024 === 0) return (model.context_tokens / 1024) + "K context ceiling"; return model.context_tokens.toLocaleString() + " context ceiling"; }
-	function selectedContextLabel(model) { if (!Number.isSafeInteger(model.selected_context_tokens) || model.selected_context_tokens < 1) return "Not yet selected"; if (model.selected_context_tokens % 1024 === 0) return (model.selected_context_tokens / 1024) + "K"; return model.selected_context_tokens.toLocaleString(); }
+	function selectedContextLabel(model) { if (model.context_selection_status === "blocked") return "No safe context tier"; if (model.context_selection_status === "unavailable") return "Unavailable"; if (!Number.isSafeInteger(model.selected_context_tokens) || model.selected_context_tokens < 1) return "Not yet selected"; if (model.selected_context_tokens % 1024 === 0) return (model.selected_context_tokens / 1024) + "K"; return model.selected_context_tokens.toLocaleString(); }
 	function byteLabel(value) { if (!Number.isSafeInteger(value) || value < 1) return "Unknown"; const units=["B","KiB","MiB","GiB","TiB"]; let amount=value,index=0; while (amount>=1024 && index<units.length-1) { amount/=1024; index++; } return (amount>=10 || index===0 ? Math.round(amount) : Math.round(amount*10)/10) + " " + units[index]; }
 	function fact(label, value) { const row=element("div","route-model-fact"); row.append(element("span","",label),element("strong","",value)); return row; }
 	function persistExpandedModels() { const url=new URL(window.location.href); url.searchParams.delete("expanded"); for (const key of [...expandedModels].sort()) url.searchParams.append("expanded",key); window.history.replaceState(null,"",url); }
 	function modelChip(model, index, job) {
 		const node=element("article","route-model"), evidence=learned(model,job), disclosure=element("details","route-model-details"), summary=element("summary","route-model-summary");
 		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); summary.addEventListener("click",()=>{ if (disclosure.open) expandedModels.delete(expansionKey); else expandedModels.add(expansionKey); persistExpandedModels(); });
-		const synopsis=evidence ? Math.round(evidence.score*100) + "% learned score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback";
+		const synopsis=evidence ? Math.round(evidence.score*100) + "% learned evidence score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · capability fallback";
 		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
 		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Selected context",selectedContextLabel(model)),fact("Advertised maximum",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
-		if (evidence) facts.append(fact("Task domain",evidence.domain),fact("Evaluation profile",evidence.profile),fact("Learned score",Math.round(evidence.score*1000)/10+"%"),fact("Quality",Math.round(evidence.quality*1000)/10+"%"),fact("Reliability",Math.round(evidence.reliability*1000)/10+"%"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
+		if (evidence) facts.append(fact("Evidence domain",evidence.domain),fact("Evaluation profile",evidence.profile),fact("Target task",(job.domain || job.key)+" / default"),fact("Learned evidence score",Math.round(evidence.score*1000)/10+"%"),fact("Quality",Math.round(evidence.quality*1000)/10+"%"),fact("Reliability",Math.round(evidence.reliability*1000)/10+"%"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
 		disclosure.append(facts); node.append(element("span","route-rank",String(index+1).padStart(2,"0")),disclosure); return node;
 	}
 	function circuitPath(svg, d, className) {
@@ -80,24 +87,28 @@
 	}
 
 	async function loadRouting() {
+		const generation = ++routingGeneration;
+		window.clearTimeout(routingTimer);
 		const status = document.querySelector("#routing-live-status"); status.textContent = "Synchronizing live model inventory…";
 		try {
-			snapshot = await inventory(); const brain = commander();
+			const next = await inventory();
+			if (generation !== routingGeneration) return;
+			snapshot = next; const brain = commander();
 			document.querySelector("#commander-model").textContent = brain ? brain.model : "Automatic router";
 			document.querySelector("#commander-detail").textContent = brain ? (brain.reasoning_effort ? brain.reasoning_effort + " reasoning · " : "") + (snapshot.commander_source || "derived") + " command authority · " + contextLabel(brain) : "No explicit commander is configured; DarwinRouter chooses from eligible routes.";
 			const fallback = snapshot.commander_fallback_id ? snapshot.models.find(model => model.id === snapshot.commander_fallback_id) : null, fallbackNode = document.querySelector("#commander-fallback"); fallbackNode.hidden = !fallback;
 			if (fallback) { document.querySelector("#commander-fallback-model").textContent = fallback.model; document.querySelector("#commander-fallback-detail").textContent = contextLabel(fallback) + " · activates after retryable cloud failure"; }
 			document.querySelector("#resource-guard-title").textContent = (snapshot.local_concurrency === "1" ? "One local model at a time" : "Up to " + snapshot.local_concurrency + " local models");
 			document.querySelector("#resource-guard-detail").textContent = "RAM / unified memory " + snapshot.local_ram_limit_pct + "% · VRAM " + snapshot.local_vram_limit_pct + "% · pressure " + snapshot.local_pressure_policy + (snapshot.managed_residency ? " · managed unload enabled" : "");
-			document.querySelector("#specialist-policy").textContent = snapshot.specialists_allow_cloud ? "Top 3 per job · local + cloud" : "Top 3 per job · local endpoints only";
+			document.querySelector("#specialist-policy").textContent = snapshot.specialists_allow_cloud ? "Top 3 by learned evidence · local + cloud" : "Top 3 by learned evidence · local endpoints only";
 			const grid = document.querySelector("#specialist-grid"); grid.replaceChildren();
 			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty","No eligible capability or learned match")); else models.forEach((model,index) => routes.append(modelChip(model,index,job))); card.append(routes); grid.append(card); }
 			drawBranches();
 			const creative = ranked(jobs[jobs.length-1]), choices = document.querySelector("#creative-choices"), preference = document.querySelector("#creative-preference"); choices.replaceChildren();
 			creative.forEach(model => { const button = element("button","tron-choice",model.model); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.model + "."; }); choices.append(button); });
 			preference.textContent = creativePreference ? "Current consultation preference: " + creativePreference + ". The commander should ask again when the creative brief materially changes." : "No preference recorded. The commander must ask before choosing between subjective outputs.";
-			status.textContent = "Grid synchronized · " + snapshot.models.length + " models · " + snapshot.fitness.length + " learned task rankings · updates automatically.";
-		} catch (_) { status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
+			status.textContent = "Grid synchronized · " + snapshot.models.length + " models · learned evidence updates automatically. Actual routing also considers request constraints and decayed evidence.";
+		} catch (_) { if (generation !== routingGeneration) return; status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
 		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, snapshot && snapshot.refresh_interval_ms || 10000);
 	}
 

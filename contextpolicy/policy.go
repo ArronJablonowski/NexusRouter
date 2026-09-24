@@ -71,14 +71,23 @@ func Select(r Request) int {
 	required := max(r.EstimatedTokens, 1)
 	evidence := make(map[int]Evidence, len(r.Evidence))
 	for _, item := range r.Evidence {
+		if item.ContextTokens < 1 {
+			continue
+		}
 		evidence[item.ContextTokens] = item
+		// Explicit allocations and custom working tiers can produce useful
+		// evidence between canonical exploration tiers. Keep those allocations
+		// selectable so their quality cannot become an unreachable target.
+		if item.ContextTokens <= r.AdvertisedMaximum {
+			tiers = append(tiers, item.ContextTokens)
+		}
 	}
 	// A fault bounds this and larger allocations; it must not poison smaller
 	// healthy tiers. With no safe allocation, return zero rather than the very
 	// tier whose memory or error evidence caused admission to fail.
 	ceiling := r.AdvertisedMaximum
 	for _, item := range r.Evidence {
-		if item.Timeouts > 0 || item.ProviderErrors > 0 || item.MaxSwapGrowth > MaxSwapGrowth {
+		if item.ContextTokens > 0 && (item.Timeouts > 0 || item.ProviderErrors > 0 || item.MaxSwapGrowth > MaxSwapGrowth) {
 			ceiling = min(ceiling, item.ContextTokens-1)
 		}
 	}
@@ -89,7 +98,7 @@ func Select(r Request) int {
 		tiers = compactTiers(tiers)
 	}
 	safe := func(tier int) bool {
-		if tier > ceiling || (r.FitsMemory != nil && !r.FitsMemory(tier)) {
+		if tier < 1 || tier > ceiling || (r.FitsMemory != nil && !r.FitsMemory(tier)) {
 			return false
 		}
 		item := evidence[tier]
@@ -122,16 +131,19 @@ func Select(r Request) int {
 	// Once multiple tiers have evidence, retain the smallest tier whose quality
 	// preserves the best observed accuracy within one percentage point.
 	minimumSamples := max(r.MinimumSamples, 1)
+	validQuality := func(item Evidence) bool {
+		return item.Samples >= minimumSamples && item.Quality >= 0 && item.Quality <= 1 && !math.IsNaN(item.Quality)
+	}
 	bestQuality := -1.0
-	for _, item := range r.Evidence {
-		if item.Samples >= minimumSamples && safe(item.ContextTokens) && item.ContextTokens >= required && item.Quality >= 0 && item.Quality <= 1 && !math.IsNaN(item.Quality) && item.Quality > bestQuality {
+	for _, item := range evidence {
+		if validQuality(item) && safe(item.ContextTokens) && item.ContextTokens >= required && item.Quality > bestQuality {
 			bestQuality = item.Quality
 		}
 	}
 	if bestQuality >= 0 {
 		for _, tier := range tiers {
 			item := evidence[tier]
-			if tier >= required && safe(tier) && item.Samples >= minimumSamples && item.Quality+qualityTolerance >= bestQuality {
+			if tier >= required && safe(tier) && validQuality(item) && item.Quality+qualityTolerance >= bestQuality {
 				selected = tier
 				break
 			}

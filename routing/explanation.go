@@ -154,6 +154,9 @@ func validExplanationDecay(applied bool, samples int, effective, contribution fl
 }
 
 func validExplanationPolicyProjection(r Ranked, p Policy) bool {
+	if r.SourceDomain != "" && r.Confidence > .25 {
+		return false
+	}
 	if r.DecayApplied {
 		confidence := math.Min(1, r.EffectiveSamples/float64(p.MinSamples))
 		if r.SourceDomain != "" {

@@ -336,7 +336,7 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 			return failAdmitted(ErrAdmission)
 		}
 		cleanupAuxiliary = auxiliaryCleanup(closeProvider, release)
-		reviewer := evaluation.Reviewer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.ContextTokens, Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
+		reviewer := evaluation.Reviewer{ContextEstimator: s.contextEstimator, Provider: adapter, Model: model.Model, EvaluatorID: model.ID, ContextTokens: model.WorkingContextTokens(), Timeout: time.Minute, EstimatedCost: *model.EstimatedCost, MaxCost: maxCost}
 		reviewer.StructuredOutput = provider.Kind == "codex_app_server"
 		if operation == nil {
 			// Preserve the legacy lifecycle: provider/resource preparation predates

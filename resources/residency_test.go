@@ -91,3 +91,35 @@ func TestLowMemoryUsesSelectedDeviceReservations(t *testing.T) {
 		t.Fatal("aggregate observation bypassed device reservations", err)
 	}
 }
+
+func TestLowMemoryRejectsUnavailableExecutionSlots(t *testing.T) {
+	for _, device := range []bool{false, true} {
+		limits := Limits{MaxConcurrent: 1, RAMPercent: 100, VRAMPercent: 100, MaxAge: time.Minute}
+		now := time.Now()
+		s := deviceSnapshot(now)
+		s.TotalRAM, s.AvailableRAM, s.CPUs = 128<<30, 128<<30, 8
+		need := Need{RAM: 1}
+		budget, _ := NewBudget(limits)
+		count := 1
+		if device {
+			limits.MaxConcurrent = 4
+			budget, _ = NewAdaptiveBudget(limits)
+			count = 2
+			need.VRAM, need.Device = 1, "nvidia:GPU-abcdef01"
+			for i := range s.GPUs.Sources[0].Devices {
+				s.GPUs.Sources[0].Devices[i].TotalBytes = 64 << 30
+				s.GPUs.Sources[0].Devices[i].AvailableBytes = 64 << 30
+			}
+		}
+		for range count {
+			release, err := budget.Reserve(s, need, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer release()
+		}
+		if _, err := budget.LowMemory(s, need, now); !errors.Is(err, ErrCapacity) {
+			t.Fatalf("device=%v: exhausted execution slot invited residency maintenance: %v", device, err)
+		}
+	}
+}

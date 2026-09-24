@@ -11,12 +11,17 @@ import (
 )
 
 func TestWebApprovalCLI(t *testing.T) {
+	for _, prefix := range []string{"a", "-", "_"} {
+		t.Run(prefix, func(t *testing.T) { testWebApprovalCLI(t, prefix+strings.Repeat("a", 23)) })
+	}
+}
+
+func testWebApprovalCLI(t *testing.T, id string) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	id := strings.Repeat("a", 24)
 	token := strings.Repeat("t", 32)
 	called := make(chan bool, 1)
 	server := &http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

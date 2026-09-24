@@ -84,7 +84,7 @@ func (s Summarizer) Draft(ctx context.Context, source Snapshot, keep int) (Summa
 	if err != nil || len(input) > 1<<20 {
 		return SummaryDraft{}, ErrHistory
 	}
-	request := providers.Request{Model: s.Model, Messages: []providers.Message{
+	request := providers.Request{Model: s.Model, ContextTokens: int64(s.ContextTokens), Messages: []providers.Message{
 		{Role: "system", Content: summaryInstructions},
 		{Role: "user", Content: string(input)},
 	}}
