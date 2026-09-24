@@ -9218,3 +9218,11 @@ evaluation (7.788 seconds including feedback). Browser approval, model inspectio
 and logout passed: 17 models, 211 fitness rows, 13 configured mappings, 162 verified
 transferable prior rows, and selected tiers of 16K/32K. The reviewed UI asset digest
 pin was updated; security assertions and the asset contract version remain intact.
+
+Final ordinary regression passed across all 61 tested packages (five additional
+packages have no tests), including application, telemetry, SDK, CLI, browser, and
+release packaging. Full browser tests also pass with the race detector. Source
+checks, repository-wide vet/build, focused race regressions, and the live smoke
+passed. The separately launched complete `make check` race sweep remains active at
+this checkpoint; do not interpret the ordinary-suite pass as complete race or
+platform/release qualification. DarwinRouter fixes are backed up in f874927.
