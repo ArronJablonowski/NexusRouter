@@ -229,6 +229,15 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	}
 	// Direct file tools are local-only. A cloud coordinator may hold only the
 	// delegate tool while an independently scoped local worker borrows read_file.
+	// Allowing read tools is optional capability, not a requirement to use them.
+	// Models without a known context bound and ordinary cloud models receive no
+	// file tools. Explicit writing/delegated-read authority must still fail closed.
+	if s.Tools.Enabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s, r, model)) {
+		if s.Tools.CreateEnabled || s.Tools.ReplaceEnabled || s.Workers.DelegateReadTools {
+			return result, ErrAdmission
+		}
+		s.Tools.Enabled = false
+	}
 	toolingEnabled := s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
 	if toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s, r, model)) {
 		return result, ErrAdmission

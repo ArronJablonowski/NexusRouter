@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,7 +10,11 @@ import (
 
 func TestToolsDefaults(t *testing.T) {
 	s := Defaults()
-	if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || s.Tools.WorkboardWriteEnabled || s.Tools.ReadRoot != "" || s.Tools.MaxTurns != 8 {
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.Tools.Enabled || s.Tools.WorkboardReadEnabled || s.Tools.WorkboardWriteEnabled || s.Tools.ReadRoot != root || s.Tools.MaxTurns != 8 {
 		t.Fatalf("tools defaults = %#v", s.Tools)
 	}
 	if err := s.Validate(); err != nil {

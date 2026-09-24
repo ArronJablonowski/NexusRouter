@@ -1079,7 +1079,15 @@ It receives only the explicit prompt, with no ambient history, memory or skills.
 It cannot delegate recursively. A local-only parent cannot send its child to
 the cloud, even in hybrid mode.
 
-To permit workspace inspection, explicitly enable `workers.delegate_read_tools`
+Model tool use (`tools.enabled`) is enabled by default. Built-in read-only file
+access defaults to the directory where DarwinRouter is launched; set an absolute
+`tools.read_root` to choose another workspace. An explicit `tools.enabled: false`
+still disables it. Optional read tools are supplied only to eligible models;
+ordinary cloud models and models without a known context bound can still answer
+without receiving file access. File creation, replacement, and delegated access retain their
+separate configuration and approval requirements.
+
+To permit delegated workspace inspection, explicitly enable `workers.delegate_read_tools`
 alongside the parent's `tools.enabled` and `tools.read_root`. The worker must be
 local. For a local parent, it receives the ordinary `read_file` schema,
 borrowing the parent's already-open root; it cannot reopen a changed path,

@@ -232,16 +232,30 @@ func TestApplicationReadToolCycleIsDurable(t *testing.T) {
 	}
 }
 
-func TestFileToolsDenyCloudBeforeStorage(t *testing.T) {
-	_, cfg := autoFixture(t)
-	cfg.Mode = "hybrid"
-	cfg.Models[0].Locality = "cloud"
-	cfg.Tools.Enabled = true
-	cfg.Tools.ReadRoot = t.TempDir()
-	if _, err := RunExplicit(context.Background(), cfg, Request{ModelID: "a", Prompt: "read"}, nil); err != ErrAdmission {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(cfg.Telemetry.Database); !os.IsNotExist(err) {
-		t.Fatalf("denied request touched database: %v", err)
+func TestOptionalReadToolsDoNotBlockIneligibleModels(t *testing.T) {
+	for _, locality := range []string{"cloud", "local"} {
+		t.Run(locality, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var request struct {
+					Tools []json.RawMessage `json:"tools"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil || len(request.Tools) != 0 {
+					t.Errorf("ineligible model received file tools: %+v, %v", request, err)
+				}
+				fmt.Fprintln(w, `{"message":{"content":"answer"},"done":true,"done_reason":"stop"}`)
+			}))
+			defer server.Close()
+			cfg := config.Defaults()
+			cfg.Telemetry.Database = filepath.Join(t.TempDir(), "task.db")
+			cfg.Providers = []config.Provider{{ID: "fixture", Kind: "ollama", Endpoint: server.URL}}
+			cfg.Models = []config.Model{{ID: "m", Provider: "fixture", Model: "m", Locality: locality, RAMBytes: 1, Capabilities: []string{"chat"}}}
+			if locality == "cloud" {
+				cfg.Models[0].ContextTokens = 8192
+			}
+			out, err := RunExplicit(context.Background(), cfg, Request{ModelID: "m", Prompt: "Answer normally"}, nil)
+			if err != nil || out.Text != "answer" {
+				t.Fatal(out, err)
+			}
+		})
 	}
 }

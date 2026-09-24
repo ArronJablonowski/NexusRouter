@@ -12,7 +12,7 @@ func TestProjectToolAccessAtomicUpdate(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "workspace")
 	path := file(t, "version: 1\nmode: hybrid\nworkers:\n  delegate_model: local-worker\n  delegate_read_tools: false\nmodels:\n  - id: local-worker\n    provider: local\n    model: fixture\n    locality: local\n    capabilities: [chat]\n    context_tokens: 4096\n    estimated_cost: 0\nproviders:\n  - id: local\n    kind: ollama\ntools:\n  enabled: false\n  max_turns: 8\n")
 	before, digest, err := ReadProjectToolAccess(path)
-	if err != nil || before.Enabled || before.DelegateReadTools || before.ReadRoot != "" || before.SpecialistsAllowCloud || len(digest) != 64 {
+	if err != nil || before.Enabled || before.DelegateReadTools || before.ReadRoot != Defaults().Tools.ReadRoot || before.SpecialistsAllowCloud || len(digest) != 64 {
 		t.Fatal(before, digest, err)
 	}
 	next := ToolAccess{Enabled: true, DelegateReadTools: true, ReadRoot: root, SpecialistsAllowCloud: true}

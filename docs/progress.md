@@ -8997,3 +8997,63 @@ sends the selected working tier to Ollama as `num_ctx`, and rejects new local
 work after swap usage has grown by more than 5 GiB from the observed baseline.
 The full formatting, vet, race-enabled test, and build gate passed for this
 checkpoint.
+
+
+## September 24, 2026: benchmark reliability and tools by default
+
+The all-local standard campaign had 144 passes, 49 incorrect completed answers,
+and 96 execution errors (90 interruptions). Current-schema telemetry opens had
+held a SQLite writer reservation during history validation, contending with
+submission lease renewal. Validation now runs in a read snapshot for a current
+schema; migrations still acquire BEGIN IMMEDIATE and reread the version. A
+regression test holds an existing writer while opening a current database.
+
+Trusted pre-handler argument rejection now returns a recoverable tool result
+only when no effect occurred. This lets a model correct its arguments within
+normal turn limits. Denials, confirmed effects, uncertain effects, and cancelled
+contexts retain terminal behavior. Delegate descriptions distinguish Go-source
+validation from ordinary text/Python output. Model tool use defaults on with a
+read-only root at the launch directory; explicit disabled settings are honored.
+Optional reads do not force local routing or block ordinary cloud/text-only
+models: ineligible models receive no file tools. File creation, replacement,
+delegated access, host extensions, and workboard tools retain separate controls.
+
+The matching benchmark-suite change bounds correction of textual tool markup,
+allows coding feedback to share the daemon database, preserves the actual
+attempt identity instead of synthesizing acknowledgement tasks, and separates
+allocated context tier from cumulative token usage. Those changes belong to the
+benchmark repository, not this repository.
+
+A fresh fixed Qwen3 Coder standard pass using the storage fix and tools enabled
+scored 13/17, versus 5/17 originally, with no terminal execution errors and
+feedback on all 17 outputs. One task needed an adapter retry. Summed request time
+was 581.985 seconds. This pass preceded deployment of argument repair and cannot
+validate that repair's live effect. Historical Pi and COH passes scored 10/17 and
+11/17 respectively, but differing dates/configurations limit timing comparisons.
+Schema/history validation remains a significant request-latency cost. Further
+model and coding validation is in progress; no universal superiority is claimed.
+
+Focused configuration/UI and runtime/tool tests passed, including race-enabled
+runtime/tool/config checks. The full make check gate is being rerun; the earlier
+attempt encountered host-admission failures while large-model inference was
+active and was stopped. Live coding and remaining full-suite validation are not
+yet claimed complete.
+
+
+Follow-up evidence: Gemma 4 31B completed 17/17 without execution errors (12
+passes under the original grader). Inspection identified missing AttributeError
+in the benchmark Python builtin allowlist. Corrected behavioral-v1.1 grading of
+saved responses yields 14/17, matching the corrected historical Pi and COH
+scores. Qwen3 Coder remains 13/17 versus Pi 10/17 and COH 11/17. All 34 completed
+answers recorded feedback. Three false-negative feedback records across the old
+and new campaigns were superseded through the supported revision API; immutable
+history and original benchmark evidence were preserved.
+
+Three automatic-routing smoke tasks passed at 32K context, selecting Gemma 4
+12B, Qwen3.8, and GPT-OSS 20B. This is not a full automatic-routing qualification.
+Three Qwen3 Coder coding attempts were blocked before inference by host capacity
+(about 30 GiB available versus a 33 GiB reservation). They contributed no model
+quality feedback, and no live coding improvement is claimed. The coding host's
+bounded repair/accounting tests and all 68 benchmark platform-support tests pass.
+The broader API tests also pass after making default reads optional for
+ineligible cloud/text-only models while retaining required tool restrictions.

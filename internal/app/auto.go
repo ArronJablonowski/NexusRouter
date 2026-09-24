@@ -355,7 +355,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 		return Result{}, ErrAdmission
 	}
 	cfg := s.settings
-	if cfg.Tools.WorkboardReadEnabled || cfg.Tools.Enabled && !delegatedReadsConfigured(cfg) || len(r.toolExtension.Names()) > 0 {
+	if cfg.Tools.WorkboardReadEnabled || cfg.Tools.CreateEnabled || cfg.Tools.ReplaceEnabled || len(r.toolExtension.Names()) > 0 {
 		r.LocalRequired = true
 	}
 	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)

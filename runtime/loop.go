@@ -132,8 +132,11 @@ var (
 	ErrEmptyOutput     = errors.New("required final text is empty")
 	ErrInvalidOutput   = errors.New("final output failed requested validation")
 	ErrTool            = errors.New("tool execution failed or denied")
-	ErrJournalLimit    = errors.New("durable task journal budget exhausted")
-	ErrPersistence     = errors.New("runtime persistence failed; inspect durable state before retry")
+	// ErrToolArguments means a trusted executor rejected arguments before any
+	// handler or approval ran. Only a NoEffect result may be repaired in-loop.
+	ErrToolArguments = errors.New("invalid tool arguments")
+	ErrJournalLimit  = errors.New("durable task journal budget exhausted")
+	ErrPersistence   = errors.New("runtime persistence failed; inspect durable state before retry")
 )
 
 // Run starts a new durable task. It does not resume or silently retry existing
@@ -789,6 +792,13 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			toolErr := ctx.Err()
 			if toolErr == nil {
 				out, toolErr = invokeTool(ctx, l.Tools, ToolExecution{TaskID: r.TaskID, SessionID: r.SessionID, TurnID: turn, AttemptID: attempt, Call: call})
+			}
+			if errors.Is(toolErr, ErrToolArguments) && out.Effect == NoEffect && ctx.Err() == nil {
+				// The rejected proposal has not executed. Let the model correct it
+				// under the normal turn budget; never retry a tool effect ourselves.
+				out = ToolResult{Effect: NoEffect, Failed: true, Recoverable: true,
+					Content: `{"error":"invalid_tool_arguments","message":"No tool ran. Correct the arguments using the provided tool schema; do not repeat the same invalid call."}`}
+				toolErr = nil
 			}
 			if out.Effect != NoEffect && out.Effect != ConfirmedEffect && out.Effect != UncertainEffect {
 				out.Effect = UncertainEffect

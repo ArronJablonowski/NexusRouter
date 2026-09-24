@@ -17,7 +17,7 @@ import (
 )
 
 var ErrDenied = errors.New("tool denied")
-var ErrArguments = errors.New("invalid tool arguments")
+var ErrArguments = runtime.ErrToolArguments
 var ErrDefinition = errors.New("invalid tool definition")
 var ErrExecution = errors.New("tool execution failed")
 

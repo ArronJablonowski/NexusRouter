@@ -136,18 +136,14 @@ func (s *Store) initialize(ctx context.Context) error {
 	if integrity != "ok" {
 		return errors.New("database integrity check failed")
 	}
-	// BEGIN IMMEDIATE serializes migration discovery and application across processes.
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	if _, err = conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
-		return err
-	}
 	defer conn.ExecContext(context.Background(), "ROLLBACK")
-	var version int
-	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
+	version, err := beginSchemaTransaction(ctx, conn)
+	if err != nil {
 		return err
 	}
 	if version > stateschema.Current {

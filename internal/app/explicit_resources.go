@@ -73,7 +73,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 			return Result{}, ErrAdmission
 		}
 	}
-	toolingEnabled := s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
+	toolingEnabled := s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Workers.DelegateReadTools || s.settings.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
 	if r.delegatedParent == "" && toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s.settings, r, model)) {
 		return Result{}, ErrAdmission
 	}
