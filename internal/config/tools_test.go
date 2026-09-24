@@ -31,7 +31,7 @@ func TestToolsValidation(t *testing.T) {
 	}{
 		{"enabled absolute nonexistent root", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 8}, true},
 		{"enabled minimum turns", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 2}, true},
-		{"enabled maximum turns", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 32}, true},
+		{"enabled maximum turns", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 96}, true},
 		{"enabled empty root", Tools{Enabled: true, ReadRoot: "", MaxTurns: 8}, false},
 		{"enabled relative root", Tools{Enabled: true, ReadRoot: "relative", MaxTurns: 8}, false},
 		{"enabled tilde root", Tools{Enabled: true, ReadRoot: "~/project", MaxTurns: 8}, false},
@@ -40,9 +40,9 @@ func TestToolsValidation(t *testing.T) {
 		{"disabled zero turns", Tools{Enabled: false, ReadRoot: "", MaxTurns: 0}, false},
 		{"disabled negative turns", Tools{Enabled: false, ReadRoot: "", MaxTurns: -1}, false},
 		{"disabled one turn", Tools{Enabled: false, ReadRoot: "", MaxTurns: 1}, false},
-		{"disabled excessive turns", Tools{Enabled: false, ReadRoot: "", MaxTurns: 33}, false},
+		{"disabled excessive turns", Tools{Enabled: false, ReadRoot: "", MaxTurns: 97}, false},
 		{"enabled one turn", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 1}, false},
-		{"enabled excessive turns", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 33}, false},
+		{"enabled excessive turns", Tools{Enabled: true, ReadRoot: missingRoot, MaxTurns: 97}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := Defaults()

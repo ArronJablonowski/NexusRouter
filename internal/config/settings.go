@@ -396,11 +396,11 @@ func (s Settings) Validate() error {
 		}
 		redactEnv[name] = true
 	}
-	if s.Tools.MaxTurns < 2 || s.Tools.MaxTurns > 32 {
-		return errors.New("tool max turns must be between 2 and 32")
+	if s.Tools.MaxTurns < 2 || s.Tools.MaxTurns > 96 {
+		return errors.New("tool max turns must be between 2 and 96")
 	}
-	if s.Runtime.MaxTurns < 1 || s.Runtime.MaxTurns > 32 {
-		return errors.New("runtime max turns must be between 1 and 32")
+	if s.Runtime.MaxTurns < 1 || s.Runtime.MaxTurns > 96 {
+		return errors.New("runtime max turns must be between 1 and 96")
 	}
 	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
 		return errors.New("enabled tools require an absolute read root")

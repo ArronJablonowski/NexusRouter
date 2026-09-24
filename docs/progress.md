@@ -9113,3 +9113,17 @@ application, API, and SDK package tests pass without the race detector. The
 repository-wide `make check` is running; final status will be recorded separately.
 The complete telemetry package also passes without the race detector (88.755s),
 covering fresh-open migration and historical integrity validation paths.
+
+### Coding retest turn budget and verification, September 24
+
+An isolated Muse Glimmer coding retest reached four of six objective checks but
+exhausted the explicit 32-turn host budget. Configuration now permits an explicit
+maximum of 96 runtime/tool turns for long coding tasks; both defaults remain 8.
+The benchmark host sets 96 for its retests. This only removes a premature stop:
+quality and efficiency still require a fresh graded coding run.
+
+The earlier repository-wide `make check` did not pass: under the race detector,
+`TestBrowserListsLiveBlockedProposalAfterToolStarted` returned
+`browser mutation unavailable` after a denied receipt. This failure is outside
+the turn-budget change; a focused repeat is running. The updated configuration
+package passes its focused tests. Do not treat the full suite as verified yet.
