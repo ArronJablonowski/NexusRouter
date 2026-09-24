@@ -9125,10 +9125,10 @@ quality and efficiency still require a fresh graded coding run.
 The earlier repository-wide `make check` did not pass: under the race detector,
 `TestBrowserListsLiveBlockedProposalAfterToolStarted` returned
 `browser mutation unavailable` after a denied receipt. This failure is outside
-the turn-budget change; a focused repeat is running. The updated configuration
-package passes its focused tests. Do not treat the full suite as verified yet.
+the turn-budget change; a focused repeat passed under the race detector. The
+updated configuration package passes its focused tests. Do not treat the full
+suite as verified yet.
 
-The focused repeat of that browser-mutation test passed under the race detector.
 The completed Muse Glimmer coding retest used 74 turns and 770.763 seconds and
 passed four of six external checks, equal to the previous interrupted partial
 result. It produced a completed task with 22 changed files, but the larger turn
