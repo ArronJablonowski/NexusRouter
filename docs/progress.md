@@ -9127,3 +9127,14 @@ The earlier repository-wide `make check` did not pass: under the race detector,
 `browser mutation unavailable` after a denied receipt. This failure is outside
 the turn-budget change; a focused repeat is running. The updated configuration
 package passes its focused tests. Do not treat the full suite as verified yet.
+
+The focused repeat of that browser-mutation test passed under the race detector.
+The completed Muse Glimmer coding retest used 74 turns and 770.763 seconds and
+passed four of six external checks, equal to the previous interrupted partial
+result. It produced a completed task with 22 changed files, but the larger turn
+budget did not improve its objective score. Its initial standalone feedback CLI
+call failed; a later retry recorded the rejected outcome for the final attempt
+at 32K context. The benchmark suite preserves the initial JSONL and records the
+feedback repair separately. A Qwen3 Coder retest was not admitted because its
+35.4 GB reservation exceeded the host's 32.7 GB available memory at that time;
+no quality feedback was assigned to that capacity failure.
