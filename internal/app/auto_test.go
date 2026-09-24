@@ -38,6 +38,8 @@ func autoFixture(t *testing.T) (*Service, config.Settings) {
 	}))
 	t.Cleanup(server.Close)
 	cfg := config.Defaults()
+	// These routing fixtures explicitly isolate their own tool catalogs.
+	cfg.Tools.Enabled = false
 	cfg.Mode = "local_only"
 	cfg.Routing.Exploration = 0
 	cfg.Telemetry.Database = filepath.Join(t.TempDir(), "auto.db")

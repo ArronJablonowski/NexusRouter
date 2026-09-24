@@ -9057,3 +9057,36 @@ quality feedback, and no live coding improvement is claimed. The coding host's
 bounded repair/accounting tests and all 68 benchmark platform-support tests pass.
 The broader API tests also pass after making default reads optional for
 ineligible cloud/text-only models while retaining required tool restrictions.
+
+### 2026-09-24 tool defaults and benchmark reliability follow-up
+
+- Tool availability now defaults on; explicit opt-outs remain supported. Optional
+  workspace reads do not make otherwise valid cloud or unknown-context text
+  requests inadmissible. The live configuration was explicitly enabled and its
+  daemon restarted after the SDK coding trial finished.
+- Updated narrow catalog fixtures to opt out explicitly. The complete application
+  package passes without the race detector (165.579s). Formatting/source limits
+  and vet pass. The full `make check` was run: its first application pass exposed
+  those old-default fixtures and its native resource test exposed concurrent WAL
+  initialization returning SQLITE_BUSY. The already-failed broad run was stopped;
+  a clean end-to-end race gate is not claimed.
+- Concurrent WAL initialization now retries only that idempotent pragma, bounded
+  and cancellation-aware, before any admission transaction. The complete resource
+  package passed three consecutive race-detector runs (22.002s). Native helper
+  failures now retain their stdout diagnostic.
+- Corrected Standard validation scores are Qwen3 Coder 13/17 and Gemma 4 31B
+  14/17, with zero terminal execution errors and feedback on all 34 outputs.
+  Qwen used ten delegate calls and two delegate batches with Gemma 4 12B workers;
+  its score is a multi-model harness result, not an isolated single-model result.
+- Benchmark-suite fixes preserve real task feedback attribution, isolate coding
+  command access, repair bounded textual tool-protocol mistakes, and supply an
+  explicit coding-agent system role. The fresh Muse trial implemented six files
+  and passed four of six checks but exhausted its 32-turn budget (593.366s).
+  It remains an execution error, receives no model-quality feedback, and is not
+  evidence of a successful coding benchmark. Qwen coding was capacity-blocked.
+- These small tasks only observed 32K contexts; larger windows are not qualified
+  by this pass. Historical timings and harness configurations are not controlled
+  same-seed comparisons. Benchmark-suite commits remain local because available
+  credentials do not grant that repository write access.
+- The entire set of application tests that failed under the old default also
+  passes with the race detector after the fixture changes (261.441s).

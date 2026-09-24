@@ -127,7 +127,7 @@ func (c *Coordinator) Close() error {
 }
 func (c *Coordinator) initialize(ctx context.Context) error {
 	for _, q := range []string{"PRAGMA busy_timeout=5000", "PRAGMA journal_mode=WAL", "PRAGMA synchronous=FULL", "PRAGMA foreign_keys=ON"} {
-		if _, err := c.db.ExecContext(ctx, q); err != nil {
+		if err := initializePragma(ctx, c.db, q); err != nil {
 			return err
 		}
 	}

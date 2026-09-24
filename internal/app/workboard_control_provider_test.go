@@ -196,6 +196,8 @@ func TestProviderNeutralWorkboardPauseAcknowledgementAndResume(t *testing.T) {
 	provider := &workboardPauseResumeProvider{store: store, boardID: boardID, cardID: cardID, pauseRevision: card.Revision,
 		reachBoundary: reachBoundary, workerDone: workerDone}
 	cfg := config.Defaults()
+	// Keep this provider contract scoped to the workboard catalog.
+	cfg.Tools.Enabled = false
 	cfg.Mode = "local_only"
 	cfg.Telemetry.Database = database
 	cfg.Tools.WorkboardReadEnabled = true

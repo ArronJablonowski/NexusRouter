@@ -342,6 +342,8 @@ type nativeProcess struct {
 	input   io.WriteCloser
 	output  *json.Decoder
 	stderr  *bytes.Buffer
+	stdout  *bytes.Buffer
+	reader  io.Reader
 }
 
 func startNativeProcess(t *testing.T, database, owners, mode, id, staleOwner string) nativeProcess {
@@ -367,7 +369,8 @@ func startNativeProcess(t *testing.T, database, owners, mode, id, staleOwner str
 	if err = command.Start(); err != nil {
 		t.Fatal(err)
 	}
-	return nativeProcess{command: command, input: input, output: json.NewDecoder(output), stderr: stderr}
+	stdout := &bytes.Buffer{}
+	return nativeProcess{command: command, input: input, output: json.NewDecoder(io.TeeReader(output, stdout)), stderr: stderr, stdout: stdout, reader: output}
 }
 
 func finishNativeProcess(t *testing.T, process nativeProcess) nativeProcessResult {
@@ -375,8 +378,9 @@ func finishNativeProcess(t *testing.T, process nativeProcess) nativeProcessResul
 	var result nativeProcessResult
 	if err := process.output.Decode(&result); err != nil {
 		_ = process.command.Process.Kill()
+		_, _ = io.Copy(process.stdout, process.reader)
 		_ = process.command.Wait()
-		t.Fatalf("decode helper: %v %s", err, process.stderr.String())
+		t.Fatalf("decode helper: %v stdout=%s stderr=%s", err, process.stdout.String(), process.stderr.String())
 	}
 	if err := process.command.Wait(); err != nil {
 		t.Fatalf("wait helper: %v %s", err, process.stderr.String())
