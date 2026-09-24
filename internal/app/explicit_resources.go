@@ -32,6 +32,7 @@ func RunExplicit(ctx context.Context, cfg config.Settings, r Request, secret fun
 }
 
 func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, runErr error) {
+	r.openTaskStore = s.openTaskStore
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
 	if classifyErr != nil {

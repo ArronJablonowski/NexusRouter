@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -24,97 +23,14 @@ var ErrConflict = errors.New("event sequence or identity conflict")
 const currentStorageSchema = stateschema.Current
 
 type Store struct {
-	db *sql.DB
+	db            *sql.DB
+	path          string
+	fileInfo      os.FileInfo
+	schemaVersion int
 
 	workboardCursorOnce sync.Once
 	workboardCursorKey  [32]byte
 	workboardCursorErr  error
-}
-
-type storeOpenLock struct {
-	token chan struct{}
-	users int
-}
-
-var storeOpenLocks = struct {
-	sync.Mutex
-	paths map[string]*storeOpenLock
-}{paths: map[string]*storeOpenLock{}}
-
-// Open creates a private on-disk database. Callers must use a dedicated data
-// directory; application configuration must never point into shared scratch.
-func Open(ctx context.Context, path string) (*Store, error) {
-	if path == "" || path == ":memory:" {
-		return nil, errors.New("on-disk database path required")
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return nil, err
-	}
-	if err = os.MkdirAll(filepath.Dir(abs), 0700); err != nil {
-		return nil, err
-	}
-	f, err := os.OpenFile(abs, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		return nil, err
-	}
-	if err = f.Close(); err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("sqlite", abs)
-	if err != nil {
-		return nil, err
-	}
-	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
-	lockPath, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	release, err := lockStoreOpenPath(ctx, lockPath)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	defer release()
-	if err = s.initialize(ctx); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return s, nil
-}
-
-func lockStoreOpenPath(ctx context.Context, path string) (func(), error) {
-	storeOpenLocks.Lock()
-	entry := storeOpenLocks.paths[path]
-	if entry == nil {
-		entry = &storeOpenLock{token: make(chan struct{}, 1)}
-		entry.token <- struct{}{}
-		storeOpenLocks.paths[path] = entry
-	}
-	entry.users++
-	storeOpenLocks.Unlock()
-	select {
-	case <-ctx.Done():
-		storeOpenLocks.Lock()
-		entry.users--
-		if entry.users == 0 {
-			delete(storeOpenLocks.paths, path)
-		}
-		storeOpenLocks.Unlock()
-		return nil, ctx.Err()
-	case <-entry.token:
-	}
-	return func() {
-		entry.token <- struct{}{}
-		storeOpenLocks.Lock()
-		entry.users--
-		if entry.users == 0 {
-			delete(storeOpenLocks.paths, path)
-		}
-		storeOpenLocks.Unlock()
-	}, nil
 }
 
 func (s *Store) initialize(ctx context.Context) error {
@@ -641,6 +557,9 @@ func (s *Store) initialize(ctx context.Context) error {
 	}
 	if err = conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil || version != stateschema.Current {
 		return errors.New("migration did not reach current database version")
+	}
+	if err = conn.QueryRowContext(ctx, "PRAGMA schema_version").Scan(&s.schemaVersion); err != nil {
+		return err
 	}
 	_, err = conn.ExecContext(ctx, "COMMIT")
 	return err

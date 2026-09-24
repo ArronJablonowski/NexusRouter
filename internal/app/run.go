@@ -26,6 +26,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	openTaskStore                   func(context.Context) (*telemetry.Store, func(), error)
 	toolExtension                   *tools.Extension
 	toolReviewer                    tools.ApprovalReviewer
 	toolPresenter                   tools.ApprovalPresenter
@@ -345,11 +346,21 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	} else {
-		db, err = telemetry.Open(ctx, s.Telemetry.Database)
+		var release func()
+		if r.openTaskStore != nil {
+			db, release, err = r.openTaskStore(ctx)
+		} else {
+			db, err = telemetry.Open(ctx, s.Telemetry.Database)
+			release = func() {
+				if db != nil {
+					_ = db.Close()
+				}
+			}
+		}
 		if err != nil {
 			return result, errors.New("cannot open task storage")
 		}
-		defer db.Close()
+		defer release()
 	}
 	if s.Tools.WorkboardReadEnabled {
 		if registry == nil {

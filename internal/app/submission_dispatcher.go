@@ -20,6 +20,7 @@ type Dispatcher struct {
 	cancel                  context.CancelFunc
 	done                    chan struct{}
 	db                      *telemetry.Store
+	service                 *Service
 	eventSink               runtime.EventSink
 	eventSinkSequencer      *configuredSinkSequencer
 	lifecycle               context.Context
@@ -52,7 +53,7 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 		return nil, ErrSubmission
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	d := &Dispatcher{cancel: cancel, done: make(chan struct{}), db: db, eventSink: s.eventSink, eventSinkSequencer: s.eventSinkSequencer, lifecycle: ctx, recoverySecrets: func() []string { return memorySecrets(s.settings, s.secret) }, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
+	d := &Dispatcher{service: s, cancel: cancel, done: make(chan struct{}), db: db, eventSink: s.eventSink, eventSinkSequencer: s.eventSinkSequencer, lifecycle: ctx, recoverySecrets: func() []string { return memorySecrets(s.settings, s.secret) }, configuredWorkers: s.settings.Workers.Max, workerAlive: map[int]bool{}, workerBeats: map[int]time.Time{}}
 	d.workboardRecovery, err = NewWorkboardRecoveryCoordinator(db, time.Now)
 	if err != nil {
 		db.Close()
@@ -76,6 +77,9 @@ func StartDispatcher(ctx context.Context, s *Service) (*Dispatcher, error) {
 		cancel()
 		return nil, ErrSubmission
 	}
+	s.taskStoreMu.Lock()
+	s.taskStore = db
+	s.taskStoreMu.Unlock()
 	var workers sync.WaitGroup
 	workers.Add(1)
 	go func() {
@@ -106,6 +110,13 @@ func (d *Dispatcher) Close() error {
 		<-d.done
 		if d.db.Close() != nil {
 			d.recordError()
+		}
+		if d.service != nil {
+			d.service.taskStoreMu.Lock()
+			if d.service.taskStore == d.db {
+				d.service.taskStore = nil
+			}
+			d.service.taskStoreMu.Unlock()
 		}
 		d.mu.Lock()
 		d.closed = true

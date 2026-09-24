@@ -9090,3 +9090,26 @@ ineligible cloud/text-only models while retaining required tool restrictions.
   credentials do not grant that repository write access.
 - The entire set of application tests that failed under the old default also
   passes with the race detector after the fixture changes (261.441s).
+
+### 2026-09-24 SQLite request lifecycle optimization
+
+The dispatcher-owned validated store is now reused for submission, status polling,
+routing, and root/delegated execution. Fresh opens still perform full validation;
+reuse checks file identity, schema cookie/version, and WAL mode. Shutdown removes
+the binding; unexpected closure or drift never silently falls back to another
+store. Connection-local durability and foreign-key settings now survive SQL pool
+connection replacement. Detailed invariants and measurements are documented in
+`docs/sqlite-lifecycle.md`.
+
+On a consistent roughly 570k-event / 598 MB benchmark snapshot, deterministic
+provider task execution decreased from median 11.836 seconds with full opens to
+2.446 milliseconds with daemon reuse (three trials each). Actual local-model
+HTTP probes decreased from 23–28 seconds before deployment to 0.95–1.48 seconds
+warm afterward. The first post-restart probe still took 30.22 seconds including
+startup wait; no LLM throughput improvement is claimed.
+
+Focused identity/connection tests and dispatcher race tests pass; the complete
+application, API, and SDK package tests pass without the race detector. The
+repository-wide `make check` is running; final status will be recorded separately.
+The complete telemetry package also passes without the race detector (88.755s),
+covering fresh-open migration and historical integrity validation paths.

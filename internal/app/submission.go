@@ -126,11 +126,11 @@ func (s *Service) SubmitResume(ctx context.Context, key string, source sessions.
 	if _, _, _, err := s.submissionPayload(key, r); err != nil {
 		return submissions.Status{}, err
 	}
-	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskStore(ctx)
 	if err != nil {
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	fence, err := db.ResumeSource(ctx, source.TaskID)
 	if err != nil {
 		return submissions.Status{}, submissionError(err)
@@ -165,11 +165,11 @@ func (s *Service) SubmitBranch(ctx context.Context, key string, source sessions.
 	if _, _, _, err := s.submissionPayload(key, r); err != nil {
 		return submissions.Status{}, err
 	}
-	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskStore(ctx)
 	if err != nil {
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	fence, err := db.BranchSource(ctx, source.TaskID)
 	if err != nil {
 		return submissions.Status{}, submissionError(err)
@@ -195,11 +195,11 @@ func (s *Service) Submit(ctx context.Context, key string, r Request) (submission
 	if err != nil {
 		return submissions.Status{}, err
 	}
-	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskStore(ctx)
 	if err != nil {
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	status, err := db.CreateSubmission(ctx, keyDigest, requestDigest, s.submissionConfigDigest(), body)
 	return status, submissionError(err)
 }
@@ -211,14 +211,14 @@ func (s *Service) ResumeSubmission(ctx context.Context, key string, r Request) (
 	if err != nil {
 		return submissions.Status{}, err
 	}
-	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return submissions.Status{}, sql.ErrNoRows
 		}
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	status, err := db.SubmissionByKey(ctx, keyDigest, requestDigest, s.submissionConfigDigest())
 	return status, submissionError(err)
 }
@@ -232,14 +232,14 @@ func (s *Service) ExistingFollowUpSubmission(ctx context.Context, key string, so
 		return submissions.Status{}, ErrAdmission
 	}
 	r.ContinueTaskID = source.TaskID
-	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return submissions.Status{}, sql.ErrNoRows
 		}
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	var envelope submissionEnvelope
 	if recovered {
 		fence, readErr := db.ResumeSource(ctx, source.TaskID)
@@ -287,11 +287,11 @@ func (s *Service) RunSubmission(ctx context.Context, key string, r Request) (sub
 	if err != nil || status.State != "queued" && status.State != "running" {
 		return status, err
 	}
-	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		return status, submissionError(err)
 	}
-	defer db.Close()
+	defer release()
 	ticker := time.NewTicker(25 * time.Millisecond)
 	defer ticker.Stop()
 	return waitForSubmission(ctx, status, ticker.C, db.Submission)
@@ -327,14 +327,14 @@ func (s *Service) SubmissionStatus(ctx context.Context, id string) (submissions.
 	if !sessions.ValidEventPageID(id) {
 		return submissions.Status{}, ErrAdmission
 	}
-	db, err := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskReadStore(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return submissions.Status{}, sql.ErrNoRows
 		}
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	status, err := db.Submission(ctx, id)
 	return status, submissionError(err)
 }
@@ -343,11 +343,11 @@ func (s *Service) CancelSubmission(ctx context.Context, id string) (submissions.
 	if _, err := s.SubmissionStatus(ctx, id); err != nil {
 		return submissions.Status{}, err
 	}
-	db, err := telemetry.Open(ctx, s.settings.Telemetry.Database)
+	db, release, err := s.openTaskStore(ctx)
 	if err != nil {
 		return submissions.Status{}, ErrSubmission
 	}
-	defer db.Close()
+	defer release()
 	status, err := db.CancelSubmission(ctx, id)
 	return status, submissionError(err)
 }

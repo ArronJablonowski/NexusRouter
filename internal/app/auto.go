@@ -33,6 +33,8 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	taskStoreMu                sync.Mutex
+	taskStore                  *telemetry.Store
 	toolExtension              *tools.Extension
 	toolReviewer               tools.ApprovalReviewer
 	toolPresenter              tools.ApprovalPresenter
@@ -338,6 +340,7 @@ func validateInput(r Request) error {
 }
 
 func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr error) {
+	r.openTaskStore = s.openTaskStore
 	var classifyErr error
 	r, classifyErr = classifyRequestIntent(r)
 	if classifyErr != nil {
@@ -358,11 +361,11 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	if cfg.Tools.WorkboardReadEnabled || cfg.Tools.CreateEnabled || cfg.Tools.ReplaceEnabled || len(r.toolExtension.Names()) > 0 {
 		r.LocalRequired = true
 	}
-	db, err := telemetry.Open(ctx, cfg.Telemetry.Database)
+	db, releaseStorage, err := s.openTaskStore(ctx)
 	if err != nil {
 		return Result{}, errors.New("cannot open routing storage")
 	}
-	defer db.Close()
+	defer releaseStorage()
 	messages := []providers.Message{}
 	if r.ContinueTaskID != "" {
 		if r.continuation == nil {
