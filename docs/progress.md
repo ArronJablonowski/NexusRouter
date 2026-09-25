@@ -9318,3 +9318,8 @@ separately; deployment receipts remain outside Git.
 
 
 September 25 transport follow-up: a coding turn failed exactly at the policy transport 60s header limit despite a configured 5m provider request budget. Execution transports now use the validated provider timeout for headers; unrelated transports retain60s. Focused cancellation/bounds tests and full validation pending; no deployment or benchmark recovery claimed.
+
+
+## 2026-09-25 exact context counter opt-in (not deployed)
+
+An explicit trusted BoundTokenCounter may replace the byte floor only for its bound model; unsupported requests retain fallback and measurement errors fail closed. Existing estimators retain their maximum-of-byte-floor contract. Focused provider race tests pass. No tokenizer adapter is enabled yet; renderer/tokenizer binding, SDK/runtime integration tests, full check and fresh coding replay remain outstanding. Local Muse offline reconstruction matches all 12 observed turns exactly with all seven configured tools; prospective rejected input counts 7517 tokens at 32768 allocation. This evidence is not a completed coding quality grade.

@@ -21,8 +21,9 @@ var ErrContextEstimate = errors.New("context estimation failed")
 
 const maxEstimateRequestBytes = 4 << 20
 
-// EstimateWith never reduces the built-in serialized-byte estimate and framing
-// reserve. Nil retains EstimateContext behavior. Custom estimators receive an
+// EstimateWith preserves the built-in serialized-byte estimate and framing
+// reserve except for an explicitly constructed BoundTokenCounter. Nil retains
+// EstimateContext behavior. Custom estimators receive an
 // isolated request, limited to 4 MiB serialized JSON, and a cooperative maximum
 // three-second deadline. No goroutine is abandoned for a noncooperative callback;
 // the host must ensure its estimator returns when its context is canceled.
@@ -72,6 +73,9 @@ func EstimateWith(ctx context.Context, estimator ContextEstimator, request Reque
 	custom, callbackErr := estimator.Estimate(bounded, snapshot)
 	if callbackErr != nil || bounded.Err() != nil || custom < 0 {
 		return 0, ErrContextEstimate
+	}
+	if _, exact := estimator.(*BoundTokenCounter); exact {
+		return custom, nil
 	}
 	return max(baseline, custom), nil
 }

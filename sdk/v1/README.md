@@ -422,6 +422,14 @@ auxiliary attempt without changing the completed source task or accepting a draf
 Configured estimators require a known,
 positive model context window.
 
+Ordinary estimators retain the conservative floor described below. An explicit
+`providers.NewBoundTokenCounter` can instead count fully rendered input for one
+host-verified model/tokenizer/renderer combination, adding the existing 1024-token
+reserve. The host must verify artifact hashes and rendering parity; the constructor
+does not certify a provider. Unsupported models/features fall back to byte counting,
+while callback errors, panics, cancellation and invalid counts fail closed. This
+opt-in is not enabled by configuration defaults and does not alter memory admission.
+
 The effective estimate is the larger of the custom value and the existing
 serialized-byte estimate plus framing/output reserve. This extension cannot
 lower that conservative floor, rewrite context or change permissions. Nil
