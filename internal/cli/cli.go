@@ -39,6 +39,10 @@ Usage:
   darwin metrics --db path  Read metadata-only lifecycle counts as JSON
   darwin metrics export --config path --endpoint URL [--api-key-env ENV_NAME]
   darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]
+  darwin logs --config path [--task id --after position --limit 100 --follow --include-content]
+    Read structured durable activity; --include-content adds private redacted I/O
+    --follow starts at current activity unless --task or --after is given
+    Without --follow, read one bounded page from --after (default: 0)
   darwin task show --db path --task id  Inspect durable conversation state
   darwin task list --db path [--state state --after cursor --limit 25]
   darwin session tasks --db path --session id [--after cursor --limit 25]
@@ -128,6 +132,9 @@ func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, vers
 	}
 	if len(args) > 0 && args[0] == "traces" {
 		return runTraces(args[1:], stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "logs" {
+		return runLogs(args[1:], stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "submit" {
 		return runSubmit(args[1:], stdin, stdout, stderr)

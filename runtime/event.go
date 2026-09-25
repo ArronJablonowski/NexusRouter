@@ -31,6 +31,7 @@ const (
 	WorkerCompleted    Kind = "worker.completed"
 	RouteSelected      Kind = "route.selected"
 	EvaluationRecorded Kind = "evaluation.recorded"
+	ResponseRevision   Kind = "response.revision"
 	ErrorRecorded      Kind = "error.recorded"
 	SteeringApplied    Kind = "steering.applied"
 	ContextCompacted   Kind = "context.compacted"
@@ -187,6 +188,10 @@ func (e Event) Validate() error {
 		return errors.New("invalid replaced message count")
 	}
 	switch e.Kind {
+	case ResponseRevision:
+		if e.Data.Code != "response_contract.v1" || e.Data.Text == "" || len(e.Data.Text) > 4096 || e.TurnID != "" || e.AttemptID != "" || e.Data.Accepted != nil || len(e.Data.ToolCalls) != 0 || len(e.Data.Messages) != 0 {
+			return errors.New("invalid response revision event")
+		}
 	case ContextCompacted:
 		if e.Data.Compaction == nil || e.Data.Compaction.SummaryAttemptID == "" || e.Data.Compaction.SummaryReviewID == "" || e.Data.ParentTaskID == "" || e.Data.ReplacedMessages < 1 || len(e.Data.Messages) == 0 || providers.ValidateMessages(e.Data.Messages) != nil || e.TurnID != "" || e.AttemptID != "" {
 			return errors.New("invalid context compaction event")

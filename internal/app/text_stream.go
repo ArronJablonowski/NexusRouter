@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
@@ -44,13 +45,31 @@ func (s *Service) RunTextStream(ctx context.Context, r Request, emit func(string
 // discarded on failure. Matching spans assistant turns because clients combine
 // their text; a secret split across two turns must not leak after concatenation.
 type textDelivery struct {
-	secrets  []string
-	emit     func(string, bool)
-	redactor *textRedactor
-	utf8Tail string
+	// Structured responses cannot concatenate rejected drafts with the final
+	// document. Buffer only the current turn; release it after durable completion.
+	finalOnly bool
+	candidate strings.Builder
+	secrets   []string
+	emit      func(string, bool)
+	redactor  *textRedactor
+	utf8Tail  string
 }
 
 func (d *textDelivery) accept(kind runtime.Kind, text string) {
+	if d.finalOnly {
+		switch kind {
+		case runtime.TurnStarted, runtime.ResponseRevision, runtime.TaskFailed, runtime.TaskCanceled:
+			d.candidate.Reset()
+		case runtime.ModelDelta:
+			d.candidate.WriteString(text)
+		case runtime.TaskCompleted:
+			r := newTextRedactor(d.secrets)
+			clean := r.Write(d.candidate.String()) + r.Flush()
+			d.candidate.Reset()
+			d.deliver(clean, true)
+		}
+		return
+	}
 	switch kind {
 	case runtime.TurnStarted:
 		if d.redactor == nil {

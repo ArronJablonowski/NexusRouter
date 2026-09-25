@@ -474,8 +474,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	}
 	j := redactingJournal{db: db, secrets: secrets, eventSink: r.eventSink, eventDelivery: r.eventDelivery, deliverPerCall: r.deliverPerCall, submissionID: r.submissionID, submissionToken: r.submissionToken, runtimeHostAdmission: r.runtimeHostAdmission, cancellationBoundary: cancellationBoundary}
 	if r.textSink != nil || r.presentationTextSink != nil {
-		j.textDelivery = &textDelivery{secrets: secrets, emit: func(text string, final bool) {
-			if !final {
+		finalOnly := responseContract(r).Active()
+		j.textDelivery = &textDelivery{secrets: secrets, finalOnly: finalOnly, emit: func(text string, final bool) {
+			if !final || finalOnly {
 				deliverPresentationText(r.presentationTextSink, result.TaskID, sessionID, text)
 			}
 			if r.textSink != nil {
@@ -554,7 +555,7 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		compaction = r.continuation.Compaction
 		contextLineage = r.continuation.ContextLineage
 	}
-	out, err := loop.Run(ctx, runtime.RunRequest{SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, RequireContextRollover: requireContextRollover, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
+	out, err := loop.Run(ctx, runtime.RunRequest{ResponseInstructions: responseInstructions(r), SkillContext: freshSkillContextUse(r.skillContext), IntentClassification: r.intentClassificationUse, SubmissionID: r.submissionID, WorkerID: workerID, Compaction: compaction, ApprovedCompaction: r.approvedCompaction, CompactionPlan: r.compactionPlan, RequireContextRollover: requireContextRollover, ContextLineage: contextLineage, Validation: r.Validation, RetryOfTaskID: r.retryOfTaskID, ConfigID: configID, RouteEstimatedCost: result.RouteEstimatedCost, RequireText: true, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, Route: r.route, TaskID: result.TaskID, SessionID: sessionID, ProviderID: provider.ID, ParentTaskID: parentID, Privacy: privacy, Inference: inference, MaxTurns: maxTurns, MaxContextTokens: model.ContextTokens, MaxOutputBytes: maxOutput})
 	watchErr := stopWatcher()
 	watcherStopped = true
 	if watchErr != nil {

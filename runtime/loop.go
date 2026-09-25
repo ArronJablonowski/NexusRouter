@@ -12,6 +12,7 @@ import (
 
 	"github.com/ArronJablonowski/DarwinRouter/evaluation"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/DarwinRouter/responsecontract"
 )
 
 // Journal must commit before returning nil. Implemented by the SQLite store.
@@ -63,6 +64,10 @@ type ToolResult struct {
 	Recoverable bool
 }
 type RunRequest struct {
+	// ResponseInstructions contains the current user's instructions, selected
+	// by the host before context assembly. Empty disables format repair. It is
+	// never derived from tool results, memories, or model output.
+	ResponseInstructions string
 	SkillContext         *SkillContextUse
 	IntentClassification *IntentClassificationUse
 	SubmissionID         string
@@ -142,6 +147,11 @@ var (
 // Run starts a new durable task. It does not resume or silently retry existing
 // task IDs. Completion means the loop ended, not that output passed evaluation.
 func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr error) {
+	if len(r.ResponseInstructions) > 1<<20 {
+		return Result{}, ErrInvalidRun
+	}
+	contract := responsecontract.Infer(r.ResponseInstructions)
+	revisions := 0
 	if r.MaxContextTokens < 0 || r.Inference.ContextTokens < 0 || r.Inference.ContextTokens > providers.MaxOutputTokens ||
 		(r.MaxContextTokens > 0 && r.Inference.ContextTokens > int64(r.MaxContextTokens)) {
 		return Result{}, ErrInvalidRun
@@ -228,6 +238,8 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if json.Unmarshal(b, &inference) != nil {
 		return Result{}, ErrInvalidRun
 	}
+	originalTools := append([]providers.Tool(nil), inference.Tools...)
+	repairingResponse := false
 	if compaction != nil && (compaction.Version >= 2 || contextLineage != nil) {
 		contextLineage, err = ExtendContextLineage(contextLineage, r.TaskID, 1, compaction, inference.Messages)
 		if err != nil {
@@ -267,7 +279,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if k == RouteSelected {
 			e.RouteID = rand.Text()
 		}
-		if k == SteeringApplied || k == ContextCompacted {
+		if k == SteeringApplied || k == ContextCompacted || k == ResponseRevision {
 			e.TurnID, e.AttemptID = "", ""
 		}
 		var err error
@@ -544,6 +556,13 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if persistErr := persist(ctx, SteeringApplied, Data{SteeringID: message.ID, Text: message.Text}); persistErr != nil {
 				return applied, persistErr
 			}
+			// Any accepted steering can replace the original requirements,
+			// including guidance applied before the first provider call.
+			contract = responsecontract.Infer("")
+			if repairingResponse {
+				candidate.Tools = originalTools
+				repairingResponse = false
+			}
 			inference = candidate
 			appliedSteering++
 			applied = true
@@ -693,6 +712,11 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if reason == "tool_calls" && len(calls) == 0 {
 			return fail(ErrProtocol)
 		}
+		if repairingResponse && len(calls) > 0 {
+			// Output-format correction has no authority to repeat effects or
+			// start new work. Real user steering can restore the original tools.
+			return fail(ErrTool)
+		}
 		if ctx.Err() != nil {
 			return fail(ctx.Err())
 		}
@@ -730,6 +754,41 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			}
 			if ctx.Err() != nil {
 				return fail(ctx.Err())
+			}
+			if contract.Active() {
+				violations := contract.Validate(validationText)
+				guidance := contract.Guidance(violations)
+				canRevise := len(violations) > 0 && revisions < 2 && n+1 < r.MaxTurns && used < r.MaxOutputBytes &&
+					(outputTokenBudget == 0 || usageComplete && totalUsage.OutputTokens < outputTokenBudget)
+				if canRevise {
+					prospective := inference
+					prospective.Messages = append(append([]providers.Message(nil), inference.Messages...), providers.Message{Role: "user", Content: guidance})
+					encoded, encodeErr := json.Marshal(prospective.Messages)
+					canRevise = encodeErr == nil && len(encoded) <= 4<<20
+					if canRevise && r.MaxContextTokens > 0 {
+						estimate, estimateErr := providers.EstimateWith(ctx, l.ContextEstimator, prospective)
+						canRevise = estimateErr == nil && estimate <= r.MaxContextTokens
+					}
+				}
+				if canRevise {
+					// Corrections share the original task's model, transcript,
+					// token, context, time, and turn budgets. No tool is replayed.
+					if err := persist(ctx, ResponseRevision, Data{Code: "response_contract.v1", Text: guidance}); err != nil {
+						return terminalizeJournalLimit(err)
+					}
+					inference.Messages = append(inference.Messages, providers.Message{Role: "user", Content: guidance})
+					inference.Tools = nil
+					repairingResponse = true
+					revisions++
+					continue
+				}
+				// A completed attempt is not a claim of semantic correctness.
+				// Preserve an unrepaired candidate for external grading and
+				// rejection; never turn format success into quality feedback.
+				accepted := len(violations) == 0
+				if err := persist(ctx, EvaluationRecorded, Data{Accepted: &accepted, Code: "deterministic.response_contract.v1", ModelID: inference.Model, ProviderID: r.ProviderID, Domain: r.Domain, Profile: r.Profile}); err != nil {
+					return terminalizeJournalLimit(err)
+				}
 			}
 			if r.RequireText {
 				accepted := strings.TrimSpace(validationText) != ""

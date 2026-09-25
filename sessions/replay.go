@@ -53,6 +53,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 	steeringIDs := map[string]bool{}
 	initialMessages := 0
 	completedTurn := false
+	responseRevisions := 0
 	for {
 		events, err := r.Read(ctx, task, s.Sequence, 100)
 		if err != nil {
@@ -112,6 +113,13 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 				attempt = e.AttemptID
 				turnIDs[turn] = true
 				attemptIDs[attempt] = true
+			case runtime.ResponseRevision:
+				if turn != "" || attempt != "" || len(s.Pending) > 0 || s.UncertainEffects || !completedTurn || responseRevisions >= 2 || len(s.Messages) == 0 || s.Messages[len(s.Messages)-1].Role != "assistant" || len(s.Messages[len(s.Messages)-1].ToolCalls) != 0 {
+					return s, ErrHistory
+				}
+				responseRevisions++
+				s.Messages = append(s.Messages, providers.Message{Role: "user", Content: e.Data.Text})
+				s.MessageSequences = append(s.MessageSequences, e.Sequence)
 			case runtime.SteeringApplied:
 				if turn != "" || attempt != "" || len(s.Pending) > 0 || s.UncertainEffects || e.TurnID != "" || e.AttemptID != "" || steeringIDs[e.Data.SteeringID] || len(steeringIDs) >= 32 {
 					return s, ErrHistory

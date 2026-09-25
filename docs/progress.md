@@ -9226,3 +9226,44 @@ checks, repository-wide vet/build, focused race regressions, and the live smoke
 passed. The separately launched complete `make check` race sweep remains active at
 this checkpoint; do not interpret the ordinary-suite pass as complete race or
 platform/release qualification. DarwinRouter fixes are backed up in f874927.
+
+### September 25: benchmark failure analysis and diagnostic logging
+
+The matched-gap audit separated formatting violations, model behavioral errors,
+and a grader defect. The independent grader now permits safe IPv4Address.packed
+solutions; its corrected fixed baseline is 28/47 and automatic baseline 15/16.
+The corresponding old feedback was revised through the supported API with its
+rejection history preserved. This one-point correction is not a harness gain.
+
+Explicit current-user response constraints now receive conservative static
+validation and at most two bounded correction turns. Corrections reuse original
+token, context, time and turn budgets, disable tool dispatch, survive durable
+replay, and stop applying stale constraints after steering. Contract-constrained
+streams publish the final answer only while preserving intermediate turns in the
+journal. Semantic correctness remains the independent grader's responsibility.
+Context exploration skips already-qualified inferior tiers to reach the next safe
+underqualified tier; no larger window is claimed qualified by these unit tests.
+
+Diagnostic JSONL exposes committed routing, context, timing, model turns, tools,
+revisions, evaluations, and errors with stable identities. Private input/output
+is available through --include-content with configured-secret redaction. Bounded
+read-only cursor scans authenticate selected records and fail closed on damage.
+The daemon adds content-free request metadata for failures before task admission.
+Unavailable resource/token measurements remain null. See diagnostic-logging.md
+and response-completion.md for behavior and limits.
+
+The benchmark repository separately fixes sandbox command working directories
+and zero-test discovery reporting, and strengthens generic public-interface
+guidance. Historical outputs and scores are preserved. A fresh 63-observation
+Standard comparison and focused coding follow-up are prepared but not yet run.
+Focused ordinary/race regressions and independent QA pass; full make check and
+live deployment verification are pending at this checkpoint.
+
+The idle daemon is now running the verified build (SHA-256
+f88196c8003d850891f98963665600e4844a842dd334319b49c994fdb86ebef8).
+The pre-change database snapshot and rollback binary are retained outside Git.
+Live journal export returned complete redacted I/O and timing for an existing
+benchmark task. HTTP health returned 200, and a deliberate unauthorized request
+returned 401 with a sanitized route and no header/path/query marker in the log.
+The full make check race sweep remains active; source checks and vet passed, as
+did the complete API race package. Do not treat this as a full-suite pass yet.

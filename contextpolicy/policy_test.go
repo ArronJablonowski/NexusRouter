@@ -25,8 +25,54 @@ func TestSelectSmallestAccurateTierAndExplore(t *testing.T) {
 		t.Fatalf("selected %d", got)
 	}
 	r.Explore = true
-	if got := Select(r); got != 64*1024 {
+	if got := Select(r); got != 128*1024 {
 		t.Fatalf("exploration selected %d", got)
+	}
+}
+
+func TestExplorationQualifiesHigherTierAfterMeasuredTierLoses(t *testing.T) {
+	r := Request{AdvertisedMaximum: 128 * 1024, WorkingTier: 32 * 1024, EstimatedTokens: 20 * 1024, MinimumSamples: 3, Explore: true, Evidence: []Evidence{
+		{ContextTokens: 32 * 1024, Samples: 6, Quality: .9},
+		{ContextTokens: 64 * 1024, Samples: 3, Quality: .5},
+	}}
+	if got := Select(r); got != 128*1024 {
+		t.Fatalf("repeated an already qualified, inferior allocation: %d", got)
+	}
+	r.Evidence = append(r.Evidence, Evidence{ContextTokens: 128 * 1024, Samples: 3, Quality: .6})
+	if got := Select(r); got != 32*1024 {
+		t.Fatalf("explored after the ladder was qualified: %d", got)
+	}
+}
+
+func TestExplorationFinishesSparseTierBeforeMovingHigher(t *testing.T) {
+	r := Request{AdvertisedMaximum: 128 * 1024, WorkingTier: 32 * 1024, MinimumSamples: 3, Explore: true, Evidence: []Evidence{
+		{ContextTokens: 32 * 1024, Samples: 6, Quality: .9},
+		{ContextTokens: 64 * 1024, Samples: 2, Quality: .5},
+	}}
+	if got := Select(r); got != 64*1024 {
+		t.Fatalf("skipped an incompletely measured allocation: %d", got)
+	}
+}
+
+func TestExplorationBeyondQualifiedTierStillHonorsResourceLimits(t *testing.T) {
+	for _, limit := range []string{"memory", "timeout", "swap"} {
+		t.Run(limit, func(t *testing.T) {
+			r := Request{AdvertisedMaximum: 128 * 1024, WorkingTier: 32 * 1024, MinimumSamples: 3, Explore: true, Evidence: []Evidence{
+				{ContextTokens: 32 * 1024, Samples: 6, Quality: .9},
+				{ContextTokens: 64 * 1024, Samples: 3, Quality: .5},
+			}}
+			switch limit {
+			case "memory":
+				r.FitsMemory = func(tier int) bool { return tier < 128*1024 }
+			case "timeout":
+				r.Evidence = append(r.Evidence, Evidence{ContextTokens: 128 * 1024, Timeouts: 1})
+			case "swap":
+				r.Evidence = append(r.Evidence, Evidence{ContextTokens: 128 * 1024, MaxSwapGrowth: MaxSwapGrowth + 1})
+			}
+			if got := Select(r); got != 32*1024 {
+				t.Fatalf("resource limit allowed exploration at %d", got)
+			}
+		})
 	}
 }
 

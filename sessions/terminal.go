@@ -122,7 +122,7 @@ func ProjectTerminalSubmission(events []runtime.Event) (TerminalOutcome, error) 
 	}
 	nonempty, syntax := int64(0), int64(0)
 	for _, e := range events {
-		if e.Kind == runtime.SteeringApplied && e.Sequence > turnEnd.Sequence {
+		if (e.Kind == runtime.SteeringApplied || e.Kind == runtime.ResponseRevision) && e.Sequence > turnEnd.Sequence {
 			return bad()
 		}
 		if e.Kind != runtime.EvaluationRecorded {

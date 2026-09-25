@@ -499,6 +499,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		defer providerHealthRecorder.Close()
 	}
 	rootHandler := composeServeHandler(handler, browserHandler, s.WebUI.PathPrefix)
+	rootHandler = api.WithRequestLog(rootHandler, api.JSONRequestLog(stderr))
 	serveErr := serveHTTP(ctx, listener, rootHandler, stdout)
 	var workboardCloseErr error
 	if workboardScheduler != nil {

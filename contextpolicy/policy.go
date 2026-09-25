@@ -57,8 +57,8 @@ func Tiers(advertised int) []int {
 	return out
 }
 
-// Select chooses the smallest safe tier that fits the task. A larger tier is
-// explored only when requested and the next tier has no recorded hard fault.
+// Select chooses the smallest safe tier that fits the task. Exploration collects
+// enough evidence at each larger safe tier before moving up the ladder.
 func Select(r Request) int {
 	tiers := Tiers(r.AdvertisedMaximum)
 	if len(tiers) == 0 {
@@ -149,9 +149,13 @@ func Select(r Request) int {
 			}
 		}
 	}
-	if r.Explore && evidence[selected].Samples >= minimumSamples {
+	if r.Explore && validQuality(evidence[selected]) {
 		for _, tier := range tiers {
-			if tier > selected && safe(tier) {
+			// A measured larger tier can be less accurate than the selected
+			// tier. Repeatedly exploring that same tier would starve every
+			// higher allocation of evidence. Qualify the next unmeasured tier,
+			// then retain the best proven allocation once the ladder is covered.
+			if tier > selected && safe(tier) && !validQuality(evidence[tier]) {
 				return tier
 			}
 		}

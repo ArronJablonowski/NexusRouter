@@ -77,7 +77,7 @@ func planInterruptedModel(histories [][]runtime.Event, now time.Time, canceled, 
 			return bad()
 		}
 		switch event.Kind {
-		case runtime.TaskStarted, runtime.ModelDelta, runtime.RouteSelected, runtime.SteeringApplied:
+		case runtime.TaskStarted, runtime.ModelDelta, runtime.RouteSelected, runtime.SteeringApplied, runtime.ResponseRevision:
 		case runtime.ContextCompacted:
 			active = event
 		case runtime.TurnStarted:
