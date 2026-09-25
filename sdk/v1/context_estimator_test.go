@@ -257,3 +257,71 @@ func TestSDKContextEstimatorRejectsUnknownExplicitWindow(t *testing.T) {
 		t.Fatal("unknown window admitted", err, turns.Load())
 	}
 }
+
+// A trusted counter must reach both SDK admission and subsequent tool dispatch.
+// Large tool history exercises the byte-floor override without dropping history.
+func TestSDKBoundCounterToolHistory(t *testing.T) {
+	for _, mode := range []string{"exact", "unsupported", "overflow"} {
+		t.Run(mode, func(t *testing.T) {
+			options, _ := sdkToolOptions(t)
+			var handlers, turns, estimates atomic.Int32
+			options.Tools = []sdk.Tool{sdkReadTool(&handlers)}
+			options.ToolPolicy = &tools.Policy{Default: tools.Allow}
+			counter, err := providers.NewBoundTokenCounter("fixture", strings.Repeat("a", 64), strings.Repeat("b", 64), func(ctx context.Context, r providers.Request) (int, bool, error) {
+				estimates.Add(1)
+				if len(r.Tools) != 1 || r.Tools[0].Name != "lookup_fact" {
+					t.Error("missing catalog")
+				}
+				if turns.Load() > 0 {
+					last := r.Messages[len(r.Messages)-1]
+					if last.Role != "tool" || last.Content != "forty-two" {
+						t.Error("missing live tool history")
+					}
+					if mode == "overflow" {
+						return 16384, true, nil
+					}
+				}
+				return 100, mode != "unsupported", nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			options.ContextEstimator = counter
+			options.ProviderFactory = sdkProviderFactory(func(context.Context, providers.Connection) (providers.Provider, error) {
+				return sdkProviderStream(func(_ context.Context, r providers.Request, emit func(providers.Chunk) error) error {
+					if turns.Add(1) == 1 {
+						if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "lookup", Name: "lookup_fact", Arguments: json.RawMessage(`{"key":"answer"}`)}}); err != nil {
+							return err
+						}
+						return emit(providers.Chunk{Done: true, FinishReason: "tool_calls"})
+					}
+					return emit(providers.Chunk{Text: "done", Done: true, FinishReason: "stop"})
+				}), nil
+			})
+			client, err := sdk.New(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			out, err := client.Run(ctx, sdk.Request{Version: 1, ModelID: "chat", Prompt: strings.Repeat("word ", 4000)})
+			switch mode {
+			case "exact":
+				if err != nil || out.Text != "done" || turns.Load() != 2 || handlers.Load() != 1 {
+					t.Fatal(out, err, turns.Load(), handlers.Load())
+				}
+			case "unsupported":
+				if err == nil || turns.Load() != 0 {
+					t.Fatal("unsupported request bypassed byte floor", err, turns.Load())
+				}
+			case "overflow":
+				if err == nil || turns.Load() != 1 || handlers.Load() != 1 {
+					t.Fatal("oversized next turn dispatched", err, turns.Load())
+				}
+			}
+			if estimates.Load() == 0 {
+				t.Fatal("counter never invoked")
+			}
+		})
+	}
+}
