@@ -26,6 +26,16 @@ type Transport struct {
 }
 
 func NewTransport(localOnly bool, endpoints []string) (*Transport, error) {
+	return NewTransportWithHeaderTimeout(localOnly, endpoints, time.Minute)
+}
+
+// NewTransportWithHeaderTimeout lets bounded provider requests wait for slow
+// local prefill without an unrelated shorter transport deadline. Caller
+// cancellation and HTTP client total deadlines still take precedence.
+func NewTransportWithHeaderTimeout(localOnly bool, endpoints []string, timeout time.Duration) (*Transport, error) {
+	if timeout < 100*time.Millisecond || timeout > 5*time.Minute {
+		return nil, errors.New("invalid response header timeout")
+	}
 	if len(endpoints) == 0 {
 		return nil, ErrEgress
 	}
@@ -48,7 +58,7 @@ func NewTransport(localOnly bool, endpoints []string) (*Transport, error) {
 	}
 	t := &Transport{origins: origins, localOnly: localOnly}
 	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
-	t.inner = &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 60 * time.Second, IdleConnTimeout: 90 * time.Second, MaxIdleConns: 20, MaxConnsPerHost: 8, MaxResponseHeaderBytes: 1 << 20}
+	t.inner = &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: timeout, IdleConnTimeout: 90 * time.Second, MaxIdleConns: 20, MaxConnsPerHost: 8, MaxResponseHeaderBytes: 1 << 20}
 	t.inner.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		if network != "tcp" && network != "tcp4" && network != "tcp6" {
 			return nil, ErrEgress

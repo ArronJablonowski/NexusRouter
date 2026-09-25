@@ -9315,3 +9315,6 @@ CLI diagnostics, telemetry contention/diagnostics, application receipt/submissio
 behavior, response contracts and runtime correction. Independent review found no
 blocking defect. A fresh full check of the integrated source is tracked
 separately; deployment receipts remain outside Git.
+
+
+September 25 transport follow-up: a coding turn failed exactly at the policy transport 60s header limit despite a configured 5m provider request budget. Execution transports now use the validated provider timeout for headers; unrelated transports retain60s. Focused cancellation/bounds tests and full validation pending; no deployment or benchmark recovery claimed.

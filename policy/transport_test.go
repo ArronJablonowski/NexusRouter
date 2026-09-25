@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/providers"
 )
@@ -88,5 +89,29 @@ func TestProviderCannotFollowRedirect(t *testing.T) {
 	}
 	if _, err := p.Models(context.Background()); err == nil || targetCalls != 0 {
 		t.Fatal("redirect followed")
+	}
+}
+
+func TestProviderHeaderBudgetAndCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	defer server.Close()
+	tr, err := NewTransportWithHeaderTimeout(true, []string{server.URL}, 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.CloseIdleConnections()
+	if tr.inner.ResponseHeaderTimeout != 5*time.Minute {
+		t.Fatal("provider header budget shortened")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
+	if _, err := (&http.Client{Transport: tr}).Do(req); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("caller cancellation lost: %v", err)
+	}
+	for _, timeout := range []time.Duration{0, 99 * time.Millisecond, 5*time.Minute + 1} {
+		if _, err := NewTransportWithHeaderTimeout(true, []string{server.URL}, timeout); err == nil {
+			t.Fatal("invalid budget accepted", timeout)
+		}
 	}
 }
