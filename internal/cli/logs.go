@@ -64,7 +64,14 @@ func runLogs(args []string, stdout, stderr io.Writer) int {
 
 func runLogsContext(ctx context.Context, path string, options diagnostics.Options, follow, startLatest bool, stdout, stderr io.Writer) int {
 	fail := func() int { fmt.Fprintln(stderr, "diagnostic log unavailable"); return 1 }
-	if ctx == nil || ctx.Err() != nil || options.Validate() != nil {
+	if ctx == nil || options.Validate() != nil {
+		return fail()
+	}
+	canceled := func() bool { return follow && ctx.Err() != nil }
+	if ctx.Err() != nil {
+		if canceled() {
+			return 0
+		}
 		return fail()
 	}
 	cfg, err := config.Load(config.Options{ProjectFile: path, Env: config.Environment(os.Environ())})
@@ -73,12 +80,18 @@ func runLogsContext(ctx context.Context, path string, options diagnostics.Option
 	}
 	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
 	if err != nil {
+		if canceled() {
+			return 0
+		}
 		return fail()
 	}
 	defer db.Close()
 	if startLatest {
 		options.After, err = db.DiagnosticHead(ctx)
 		if err != nil {
+			if canceled() {
+				return 0
+			}
 			return fail()
 		}
 	}

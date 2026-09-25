@@ -71,10 +71,36 @@ func TestLogsCLIInvalidArgumentsAndMissingDatabaseDoNotLeak(t *testing.T) {
 
 func TestLogsFollowStopsOnCancellation(t *testing.T) {
 	path := logsFixture(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	var stdout, stderr bytes.Buffer
-	if code := runLogsContext(ctx, path, diagnostics.Options{Limit: 100}, true, true, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "diagnostic.checkpoint") || strings.Contains(stdout.String(), "log-event") {
+	stdout := cancelCheckpointWriter{cancel: cancel}
+	var stderr bytes.Buffer
+	if code := runLogsContext(ctx, path, diagnostics.Options{Limit: 100}, true, true, &stdout, &stderr); code != 0 || ctx.Err() != context.Canceled || !strings.Contains(stdout.String(), "diagnostic.checkpoint") || strings.Contains(stdout.String(), "log-event") {
 		t.Fatal(code, stdout.String(), stderr.String())
 	}
+}
+
+func TestLogsCancellationBeforeStartup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, follow := range []bool{false, true} {
+		var stdout, stderr bytes.Buffer
+		code := runLogsContext(ctx, "unused", diagnostics.Options{Limit: 100}, follow, follow, &stdout, &stderr)
+		if follow && (code != 0 || stderr.Len() != 0) || !follow && code != 1 || stdout.Len() != 0 {
+			t.Fatal(follow, code, stdout.String(), stderr.String())
+		}
+	}
+}
+
+type cancelCheckpointWriter struct {
+	bytes.Buffer
+	cancel context.CancelFunc
+}
+
+func (w *cancelCheckpointWriter) Write(p []byte) (int, error) {
+	n, err := w.Buffer.Write(p)
+	if bytes.Contains(p, []byte(`"kind":"diagnostic.checkpoint"`)) {
+		w.cancel()
+	}
+	return n, err
 }

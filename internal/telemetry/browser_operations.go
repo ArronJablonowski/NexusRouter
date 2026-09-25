@@ -56,6 +56,9 @@ func (s *Store) BeginBrowserOperation(ctx context.Context, subject, key, kind st
 		return BrowserOperation{}, err
 	}
 	defer tx.Rollback()
+	if err = reserveBrowserOperationWrite(ctx, tx); err != nil {
+		return BrowserOperation{}, err
+	}
 	if record, readErr := readBrowserOperation(ctx, tx, operationID); readErr == nil {
 		if record.Subject != subject || record.Kind != kind || record.RequestDigest != requestDigest {
 			return BrowserOperation{}, ErrBrowserOperationConflict
@@ -170,6 +173,9 @@ func (s *Store) RecoverBrowserOperation(ctx context.Context, recoverySubject str
 		return BrowserOperation{}, err
 	}
 	defer tx.Rollback()
+	if err = reserveBrowserOperationWrite(ctx, tx); err != nil {
+		return BrowserOperation{}, err
+	}
 	current, err := readBrowserOperation(ctx, tx, record.OperationID)
 	if err != nil || current.Subject != record.Subject || current.Kind != record.Kind || current.RequestDigest != record.RequestDigest {
 		return BrowserOperation{}, ErrBrowserOperationConflict
@@ -236,6 +242,9 @@ func (s *Store) finishBrowserOperation(ctx context.Context, subject, operationID
 		return BrowserOperation{}, err
 	}
 	defer tx.Rollback()
+	if err = reserveBrowserOperationWrite(ctx, tx); err != nil {
+		return BrowserOperation{}, err
+	}
 	record, err := readBrowserOperation(ctx, tx, operationID)
 	if err != nil || record.Subject != subject || record.RequestDigest != requestDigest {
 		return BrowserOperation{}, ErrBrowserOperationConflict
@@ -351,4 +360,13 @@ func validBrowserDigest(v string) bool {
 }
 func validBrowserOperationID(v string) bool {
 	return strings.HasPrefix(v, "op_") && validBrowserDigest(strings.TrimPrefix(v, "op_"))
+}
+
+// reserveBrowserOperationWrite acquires SQLite's writer reservation before a
+// receipt lookup establishes a WAL snapshot. An unrelated runtime write between
+// SELECT and UPDATE would otherwise cause SQLITE_BUSY_SNAPSHOT, which the busy
+// timeout cannot repair. This no-op changes no operation or approval state.
+func reserveBrowserOperationWrite(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `UPDATE browser_operations SET state=state WHERE 0`)
+	return err
 }

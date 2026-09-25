@@ -124,7 +124,8 @@ type Loop struct {
 	Tools            ToolExecutor
 	// ValidationText supplies the host's persisted/delivered view (for example
 	// secret redaction). It must match the journal and output adapter exactly.
-	// It is trusted host code, never a model-supplied transformation.
+	// It is called for current-user instructions and completed answers, and must
+	// be deterministic trusted host code, never a model-supplied transformation.
 	ValidationText func(string) string
 }
 
@@ -150,7 +151,17 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	if len(r.ResponseInstructions) > 1<<20 {
 		return Result{}, ErrInvalidRun
 	}
-	contract := responsecontract.Infer(r.ResponseInstructions)
+	instructions, validationErr := validationView(l.ValidationText, r.ResponseInstructions, 1<<20)
+	if validationErr != nil {
+		return Result{}, ErrInvalidRun
+	}
+	// A literal containing a configured secret cannot be matched against a
+	// redacted response. Abstain when the host changes instruction text rather
+	// than asking a correction to restore information that the host removed.
+	if instructions != r.ResponseInstructions {
+		instructions = ""
+	}
+	contract := responsecontract.Infer(instructions)
 	revisions := 0
 	if r.MaxContextTokens < 0 || r.Inference.ContextTokens < 0 || r.Inference.ContextTokens > providers.MaxOutputTokens ||
 		(r.MaxContextTokens > 0 && r.Inference.ContextTokens > int64(r.MaxContextTokens)) {
@@ -748,9 +759,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			} else if applied {
 				continue
 			}
-			validationText := text.String()
-			if l.ValidationText != nil {
-				validationText = l.ValidationText(validationText)
+			validationText, validationErr := validationView(l.ValidationText, text.String(), 16<<20)
+			if validationErr != nil {
+				return fail(ErrInvalidOutput)
 			}
 			if ctx.Err() != nil {
 				return fail(ctx.Err())
@@ -906,6 +917,25 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 	}
 	return fail(ErrLimit)
+}
+
+// validationView bounds the trusted host projection used for contract inference
+// and final checks. Host failures must not expose their raw panic/error text or
+// make an unbounded transformed value part of a correction transcript.
+func validationView(transform func(string) string, text string, limit int) (value string, err error) {
+	defer func() {
+		if recover() != nil {
+			value, err = "", ErrInvalidOutput
+		}
+	}()
+	value = text
+	if transform != nil {
+		value = transform(text)
+	}
+	if len(value) > limit {
+		return "", ErrInvalidOutput
+	}
+	return value, nil
 }
 
 func validRunWorkerID(value string) bool {

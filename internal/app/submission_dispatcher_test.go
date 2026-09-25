@@ -57,6 +57,7 @@ func TestDispatcherQueuedRestartExecutesIdempotentSubmissionOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.profile = healthProfile
 	d, err := StartDispatcher(ctx, s)
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +79,7 @@ func TestDispatcherQueuedRestartExecutesIdempotentSubmissionOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	restarted.profile = healthProfile
 	d, err = StartDispatcher(ctx, restarted)
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +214,7 @@ func TestDispatcherCancellationStopsBlockedProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.profile = healthProfile
 	a, err := s.Submit(ctx, "0123456789abcdef", Request{ModelID: "chat", Prompt: "hello"})
 	if err != nil {
 		t.Fatal(err)

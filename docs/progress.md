@@ -9267,3 +9267,51 @@ benchmark task. HTTP health returned 200, and a deliberate unauthorized request
 returned 401 with a sanitized route and no header/path/query marker in the log.
 The full make check race sweep remains active; source checks and vet passed, as
 did the complete API race package. Do not treat this as a full-suite pass yet.
+
+### September 25: diagnostic cancellation and concurrent browser receipts
+
+The deployed diagnostic command passed live redacted task export, metadata-only
+follow, unauthorized-request metadata logging, and canceled-task inspection.
+The `908ad65` full race sweep subsequently exposed a startup-cancellation edge:
+follow mode reported an unavailable log if interrupted while opening or reading
+the initial journal head. Follow now exits cleanly for that cancellation too.
+Its regression cancels after the first checkpoint rather than assuming SQLite
+startup finishes within 100 milliseconds. One-shot canceled exports remain
+errors. The documented scan bound now distinguishes processed matching entries
+from unrelated SQLite rows a task-filtered query may visit.
+
+The same sweep reproduced a browser-operation persistence defect: deferred
+transactions read before reserving the writer, permitting an unrelated WAL
+writer to invalidate the snapshot before the receipt update. Begin, finish and
+recovery now reserve the writer with a zero-row update before reading. Focused
+tests reproduce the prior SQLITE_BUSY_SNAPSHOT ordering, exercise contention on
+all three paths, and verify durable denial retry, exact replay and conflicting
+command rejection. Sustained lock starvation can still fail with an error; this
+does not bypass the existing timeout or retry ambiguous effects. Three unrelated
+submission fixtures now use deterministic host profiles instead of sampling the
+machine while live inference runs.
+
+The frozen 63-observation Standard comparison completed with 61 passes, one literal-format
+mismatch and one transport timeout under the common behavioral-v1.3 grader,
+versus 43 prior passes. All 62 valid grades have matching durable quality feedback;
+the timeout has none. Original evidence remains immutable. Two `_` discard-name
+grader false negatives were revised through the supported feedback API with
+their old rejections retained. The benchmark grader fix is in its own repository.
+
+A conservative explicit-literal response contract addresses the remaining
+wrapped-reply mismatch. It accepts bounded top-level current-user bare-literal
+directives, abstains on ambiguity/quoted material, and does not expose the
+literal in corrective diagnostics. Instruction redaction causes abstention so
+correction cannot demand restoration of configured credentials. Offline review
+flagged none of 262 passing saved answers; this is detection evidence, not a live
+recovery claim. Targeted live literal, idle-host timeout and coding follow-ups
+remain separately tracked by the 10-minute monitor.
+
+These follow-ups are integrated in an isolated checkout while the original
+`908ad65` sweep continues unchanged. That original sweep has five known failures
+(four application tests and the CLI cancellation test); full repository success
+is not claimed. Combined source checks, vet, and focused race tests passed for
+CLI diagnostics, telemetry contention/diagnostics, application receipt/submission
+behavior, response contracts and runtime correction. Independent review found no
+blocking defect. A fresh full check of the integrated source is tracked
+separately; deployment receipts remain outside Git.

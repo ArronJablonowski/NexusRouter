@@ -48,6 +48,7 @@ func TestSubmittedBranchUsesExactCompletedSourceWithoutMutation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.profile = healthProfile
 	source, err := s.Run(ctx, Request{ModelID: "chat", Prompt: "root question"})
 	if err != nil {
 		t.Fatal(err)

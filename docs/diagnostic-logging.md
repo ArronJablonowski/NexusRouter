@@ -21,7 +21,9 @@ reads one page from `--after` (default 0). Its final `diagnostic.checkpoint` rec
 contains the next position and whether more records remain. `--follow` starts at
 the current head unless `--task` or `--after` is supplied; it catches up through
 available pages, then polls once per second until interrupted. Each poll scans
-at most 1,000 journal entries, with an eight MiB output page ceiling. Model delta
+at most 1,000 matching journal entries, with an eight MiB output page ceiling.
+Task-filtered SQLite queries may inspect additional unrelated rows, with a
+five-second query timeout. Model delta
 and worker heartbeat records are authenticated but suppressed; complete model
 output appears on `turn.completed`.
 

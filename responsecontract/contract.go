@@ -22,6 +22,7 @@ type Contract struct {
 	noFences bool
 	marker   string
 	maxLines int
+	literal  string
 }
 
 // Violation is a stable diagnostic code; it contains no candidate or prompt text.
@@ -35,6 +36,7 @@ const (
 	LineLimit        Violation = "line_limit"
 	ReasoningMarkup  Violation = "reasoning_markup"
 	ResponseTooLarge Violation = "response_too_large"
+	LiteralMismatch  Violation = "literal_mismatch"
 )
 
 var (
@@ -54,6 +56,10 @@ var (
 func Infer(instructions string) Contract {
 	var c Contract
 	if len(instructions) > maxInstructionsBytes {
+		return c
+	}
+	literal, ambiguous := inferLiteral(instructions)
+	if ambiguous {
 		return c
 	}
 	for _, sentence := range instructionSentences(instructions) {
@@ -87,11 +93,17 @@ func Infer(instructions string) Contract {
 	if c.jsonOnly && (c.codeOnly || c.marker != "") || c.codeOnly && c.marker != "" {
 		return Contract{}
 	}
+	if literal != "" {
+		if c.Active() {
+			return Contract{}
+		}
+		c.literal = literal
+	}
 	return c
 }
 
 func (c Contract) Active() bool {
-	return c.jsonOnly || c.codeOnly || c.marker != "" || c.maxLines > 0
+	return c.jsonOnly || c.codeOnly || c.marker != "" || c.maxLines > 0 || c.literal != ""
 }
 
 // Validate checks presentation only. For code it recognizes obvious wrappers;
@@ -102,6 +114,12 @@ func (c Contract) Validate(text string) []Violation {
 	}
 	if len(text) > maxResponseBytes {
 		return []Violation{ResponseTooLarge}
+	}
+	if c.literal != "" {
+		if strings.TrimSpace(text) != c.literal {
+			return []Violation{LiteralMismatch}
+		}
+		return nil
 	}
 	var violations []Violation
 	trimmed := strings.TrimSpace(text)
@@ -211,6 +229,9 @@ func (c Contract) Instructions() string {
 		return ""
 	}
 	parts := []string{"Check the requested final-answer format before responding."}
+	if c.literal != "" {
+		parts = append(parts, "Return exactly the single-line literal explicitly requested in the user's instruction, preserving its spelling, case, punctuation, and interior spaces. Add no headings, wrappers, or explanation.")
+	}
 	if c.jsonOnly {
 		parts = append(parts, "Return exactly one valid JSON value with no Markdown or surrounding prose.")
 		if c.compact {
@@ -266,6 +287,8 @@ func (c Contract) Guidance(violations []Violation) string {
 			parts = append(parts, "The answer exposed internal reasoning markup.")
 		case ResponseTooLarge:
 			parts = append(parts, "The response exceeded the validation size limit.")
+		case LiteralMismatch:
+			parts = append(parts, "The answer did not match the literal response explicitly requested by the user.")
 		}
 	}
 	return strings.Join(parts, " ") + " " + c.Instructions()
