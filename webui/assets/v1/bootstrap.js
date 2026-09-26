@@ -28,7 +28,7 @@
     const challenge = await response.json();
 		const expiresAt = Date.parse(challenge.expires_at);
     code.textContent = challenge.approval_code;
-    commandCode.textContent = "darwin web approve --config PATH " + challenge.approval_code;
+    commandCode.textContent = "darwin web approve " + challenge.approval_code;
     command.hidden = false;
     status.textContent = "Waiting for terminal approval.";
     while (!stopped) {

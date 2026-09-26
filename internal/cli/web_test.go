@@ -50,3 +50,22 @@ func TestWebApprovalCLIRejectsMalformedInputWithoutNetwork(t *testing.T) {
 		}
 	}
 }
+
+func TestWebLaunchTokenFailsClosed(t *testing.T) {
+	token := strings.Repeat("s", 32)
+	for _, tc := range []struct{ raw, want string }{
+		{" environment = {\n DARWIN_API_TOKEN => " + token + "\n }", token},
+		{"DARWIN_API_TOKEN => short", ""},
+		{"OTHER_TOKEN => " + token, ""},
+		{"exec /usr/bin/env DARWIN_API_TOKEN=" + token + " darwin serve", token},
+		{"DARWIN_API_TOKEN => " + token + "\nDARWIN_API_TOKEN => " + token, ""},
+	} {
+		if got := webLaunchToken(tc.raw); got != tc.want {
+			t.Fatal("unexpected credential resolution")
+		}
+	}
+	var out, err bytes.Buffer
+	if runWeb([]string{"approve", "--config", "PATH", strings.Repeat("a", 24) + ".12345678"}, &out, &err) != 1 || !strings.Contains(err.String(), "placeholder") {
+		t.Fatal("missing placeholder guidance")
+	}
+}

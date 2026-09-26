@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +21,7 @@ import (
 
 func runWeb(args []string, stdout, stderr io.Writer) int {
 	invalid := func() int {
-		fmt.Fprintln(stderr, "usage: darwin web approve --config path CHALLENGE_ID.DISPLAY_CODE")
+		fmt.Fprintln(stderr, "usage: darwin web approve [--config path] CHALLENGE_ID.DISPLAY_CODE")
 		return 2
 	}
 	if len(args) < 2 || args[0] != "approve" {
@@ -28,7 +33,7 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 	// Challenge IDs are URL-safe base64 and may begin with '-'. Parse the
 	// required trailing credential separately so flag parsing cannot mistake
 	// a valid one-time code for an option.
-	if fs.Parse(args[1:len(args)-1]) != nil || *path == "" || fs.NArg() != 0 {
+	if fs.Parse(args[1:len(args)-1]) != nil || fs.NArg() != 0 {
 		return invalid()
 	}
 	id, code, ok := strings.Cut(args[len(args)-1], ".")
@@ -36,12 +41,31 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 	if !ok || strings.Contains(code, ".") || (contract.BrowserSessionRequest{Version: 1, ChallengeID: id}).Validate() != nil || request.Validate() != nil {
 		return invalid()
 	}
-	cfg, err := config.Load(config.Options{ProjectFile: *path, Env: config.Environment(os.Environ())})
+	token := os.Getenv("DARWIN_API_TOKEN")
+	home, _ := os.UserHomeDir()
+	installedPath := filepath.Join(home, "Library/Application Support/DarwinRouter/live-test/config.yaml")
+	if *path == "PATH" {
+		fmt.Fprintln(stderr, "PATH is a placeholder. Use darwin web approve CODE for the installed local service, or supply its actual --config filename.")
+		return 1
+	}
+	if *path == "" {
+		*path = installedPath
+	}
+	if token == "" && runtime.GOOS == "darwin" && filepath.Clean(*path) == installedPath {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		raw, probeErr := exec.CommandContext(ctx, "/bin/launchctl", "print", "gui/"+strconv.Itoa(os.Getuid())+"/com.darwinrouter.live-test").Output()
+		cancel()
+		if probeErr == nil {
+			token = webLaunchToken(string(raw))
+		}
+	}
+	env := config.Environment(os.Environ())
+	cfg, err := config.Load(config.Options{ProjectFile: *path, Env: env})
 	if err != nil || !cfg.WebUI.Enabled {
 		fmt.Fprintln(stderr, "Web UI configuration unavailable")
 		return 1
 	}
-	client, err := daemonClient(cfg, os.Getenv("DARWIN_API_TOKEN"))
+	client, err := daemonClient(cfg, token)
 	if err != nil {
 		fmt.Fprintln(stderr, "browser approval unavailable")
 		return 1
@@ -60,4 +84,14 @@ func runWeb(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// Only reads the current user's explicitly named installed service. Never logs
+// launchctl output or exports its credential to the parent shell.
+func webLaunchToken(output string) string {
+	matches := regexp.MustCompile(`(?:^|\s)DARWIN_API_TOKEN\s*(?:=>|=)\s*([^\s]+)`).FindAllStringSubmatch(output, -1)
+	if len(matches) != 1 || len(matches[0][1]) < 32 {
+		return ""
+	}
+	return matches[0][1]
 }

@@ -9359,3 +9359,5 @@ corrections, isolation, stale revisions, session/CSRF/confirmation and shell
 assets. Build passed. Full validation and live UI verification pending.
 
 Stats readability update: full exact counts use grouped thousands and responsive typography through signed 64-bit totals (including trillions). Removed fixed digit cells and leading zero padding; cloud/local tint retained. Focused shell/API tests pass; full Stats validation remains queued behind cloud validation.
+
+Browser approval CLI now resolves the current user installed live-test service config and launchd credential when omitted. Explicit other configs still require their own credential. Placeholder PATH receives actionable guidance; bootstrap shows the runnable default command. Focused race tests and live approval without DARWIN_API_TOKEN passed. Full validation pending.
