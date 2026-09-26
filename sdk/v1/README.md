@@ -1134,3 +1134,6 @@ compaction, broader extension hooks,
 a signed release, and full PRD SDK contract coverage remain unfinished. Existing
 low-level packages are not a
 substitute for those future application-level extension contracts.
+
+
+`ConfigOptions.ContextEstimatorFactory` receives copied `ContextModelBinding` values from the validated configuration before service construction. Each binding contains model ID/name and provider ID/kind/endpoint, excluding credential fields. Use this trusted synchronous constructor to bind a counter to the same configuration used for dispatch. It must return promptly and is mutually exclusive with `ContextEstimator` and `ContextEngine`. Errors, panics and nil estimators reject construction with `ErrAdmission`. This does not attest a live provider binary or tokenizer; those checks remain the adapter host’s responsibility.

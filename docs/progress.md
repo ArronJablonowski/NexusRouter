@@ -9323,3 +9323,6 @@ September 25 transport follow-up: a coding turn failed exactly at the policy tra
 ## 2026-09-25 exact context counter opt-in (not deployed)
 
 An explicit trusted BoundTokenCounter may replace the byte floor only for its bound model; unsupported requests retain fallback and measurement errors fail closed. Existing estimators retain their maximum-of-byte-floor contract. Focused provider race tests pass. No tokenizer adapter is enabled yet; renderer/tokenizer binding, SDK/runtime integration tests, full check and fresh coding replay remain outstanding. Local Muse offline reconstruction matches all 12 observed turns exactly with all seven configured tools; prospective rejected input counts 7517 tokens at 32768 allocation. This evidence is not a completed coding quality grade.
+
+
+SDK context binding follow-up: ContextEstimatorFactory now receives copied effective model/provider IDs, model names, kinds and endpoints before service construction. Focused race tests verify binding isolation and sanitized rejection of nil, typed-nil, error and panic results. SDK constructor default-mapping, conflicting-option and invalid-config regressions also pass. Adapter wiring and full make check remain pending; not deployed.

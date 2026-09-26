@@ -80,7 +80,10 @@ type ConfigOptions struct {
 	// Auxiliary audits and summaries measure their assembled, redacted prompts.
 	// Trusted code must honor cancellation and privacy; this is not a sandbox.
 	ContextEstimator ContextEstimator
-	ContextEngine    ContextEngine
+	// ContextEstimatorFactory binds accounting to effective provider configuration.
+	// It is mutually exclusive with ContextEstimator and ContextEngine.
+	ContextEstimatorFactory ContextEstimatorFactory
+	ContextEngine           ContextEngine
 	// Evaluator replaces provider-backed advisory review execution while keeping
 	// configured reviewer identity, privacy admission, durable lifecycle, and
 	// evidence precedence under DarwinRouter control. It is trusted in-process
@@ -151,6 +154,15 @@ func New(options ConfigOptions) (*Client, error) {
 	cfg, err := config.Load(config.Options{UserFile: options.UserFile, ProjectFile: options.ProjectFile, Env: clone(options.Environment), Flags: clone(options.Overrides)})
 	if err != nil {
 		return nil, ErrAdmission
+	}
+	if options.ContextEstimatorFactory != nil {
+		if options.ContextEstimator != nil || options.ContextEngine != nil {
+			return nil, ErrAdmission
+		}
+		options.ContextEstimator, err = configuredContextEstimator(cfg, options.ContextEstimatorFactory)
+		if err != nil {
+			return nil, ErrAdmission
+		}
 	}
 	constructor := tools.NewExtension
 	if options.ApprovalReviewer != nil || options.ApprovalPresenter != nil {
