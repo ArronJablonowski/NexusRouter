@@ -83,17 +83,17 @@ func (s *Service) ChatHistory(ctx context.Context, chat string, options contract
 		}
 		offset = cursor.Offset
 	}
-	clean, err := redactCodexHistoryMessages(transcript.Messages, secrets)
-	if err != nil {
-		return contract.HistoryPage{}, ErrInspection
-	}
-	messages := make([]contract.HistoryMessage, 0, len(clean))
-	for index, message := range clean {
+	// The browser presents only user/assistant text. Do not parse hidden tool
+	// output as structured history: files and command output may legitimately
+	// begin with JSON delimiters without being JSON. Keep original indices for
+	// source revisions, and redact every text field that crosses this boundary.
+	messages := make([]contract.HistoryMessage, 0, len(transcript.Messages))
+	for index, message := range transcript.Messages {
 		if (message.Role != "user" && message.Role != "assistant") || message.Content == "" {
 			continue
 		}
 		digest := sha256.Sum256([]byte(head.TaskID + "\x00" + strconv.Itoa(index) + "\x00" + strconv.FormatInt(snapshot.MessageSequences[index], 10)))
-		messages = append(messages, contract.HistoryMessage{ID: "msg_" + hex.EncodeToString(digest[:12]), Role: message.Role, Text: message.Content, Revision: int64(len(messages) + 1), SourceRevision: snapshot.MessageSequences[index]})
+		messages = append(messages, contract.HistoryMessage{ID: "msg_" + hex.EncodeToString(digest[:12]), Role: message.Role, Text: redact(message.Content, secrets), Revision: int64(len(messages) + 1), SourceRevision: snapshot.MessageSequences[index]})
 	}
 	if offset > len(messages) {
 		return contract.HistoryPage{}, ErrAdmission

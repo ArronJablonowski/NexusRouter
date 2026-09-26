@@ -9326,3 +9326,7 @@ An explicit trusted BoundTokenCounter may replace the byte floor only for its bo
 
 
 SDK context binding follow-up: ContextEstimatorFactory now receives copied effective model/provider IDs, model names, kinds and endpoints before service construction. Focused race tests verify binding isolation and sanitized rejection of nil, typed-nil, error and panic results. SDK constructor default-mapping, conflicting-option and invalid-config regressions also pass. Adapter wiring and full make check remain pending; not deployed.
+
+### Browser transcript projection repair (2026-09-26)
+
+ChatHistory now selects only user/assistant presentation text before redaction, retaining original source sequence indices. Hidden tool output is never rendered or parsed by this browser projection. Regression cases reproduce failures with TOML-style bracket prefixes, JSON followed by command text, and truncated bracket output while retaining secret-redaction and pagination assertions. The strict structured-history sanitizer used by other consumers is unchanged. Focused ChatHistory race tests passed (10.298s), including reproduced failures before the fix. Full make check and deployment verification pending.

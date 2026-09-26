@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,12 @@ import (
 )
 
 func TestChatHistoryRedactsAndOmitsSystemAndToolContent(t *testing.T) {
+	for _, output := range []string{`{"value":"private tool browser-private-credential"}`, "[project]\nname = 'private tool browser-private-credential'", "{\"ok\":true}\ncommand completed", "[truncated output"} {
+		t.Run(strconv.Itoa(len(output)), func(t *testing.T) { checkChatHistoryHiddenToolOutput(t, output) })
+	}
+}
+
+func checkChatHistoryHiddenToolOutput(t *testing.T, toolOutput string) {
 	service := submissionService(t)
 	const secret = "browser-private-credential"
 	service.secret = func(string) string { return secret }
@@ -30,7 +37,7 @@ func TestChatHistoryRedactsAndOmitsSystemAndToolContent(t *testing.T) {
 		{Version: 1, ID: "turn", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 2, Time: now, Kind: runtime.TurnStarted, TurnID: "turn", AttemptID: "attempt"},
 		{Version: 1, ID: "answer", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 3, Time: now, Kind: runtime.TurnCompleted, TurnID: "turn", AttemptID: "attempt", Data: runtime.Data{ToolCalls: []providers.ToolCall{{ID: "call", Name: "read", Arguments: json.RawMessage(`{"token":"` + secret + `"}`)}}}},
 		{Version: 1, ID: "tool-start", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 4, Time: now, Kind: runtime.ToolStarted, TurnID: "turn", AttemptID: "attempt", Data: runtime.Data{ToolCallID: "call", ToolName: "read", Effect: runtime.NoEffect}},
-		{Version: 1, ID: "tool-end", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 5, Time: now, Kind: runtime.ToolCompleted, TurnID: "turn", AttemptID: "attempt", Data: runtime.Data{ToolCallID: "call", ToolName: "read", Effect: runtime.NoEffect, Text: `{"value":"private tool ` + secret + `"}`}},
+		{Version: 1, ID: "tool-end", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 5, Time: now, Kind: runtime.ToolCompleted, TurnID: "turn", AttemptID: "attempt", Data: runtime.Data{ToolCallID: "call", ToolName: "read", Effect: runtime.NoEffect, Text: toolOutput}},
 		{Version: 1, ID: "turn-2", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 6, Time: now, Kind: runtime.TurnStarted, TurnID: "turn-2", AttemptID: "attempt-2"},
 		{Version: 1, ID: "answer-2", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 7, Time: now, Kind: runtime.TurnCompleted, TurnID: "turn-2", AttemptID: "attempt-2", Data: runtime.Data{Text: "safe answer " + secret}},
 		{Version: 1, ID: "done", TaskID: "task", SessionID: "chat", CorrelationID: "task", Sequence: 8, Time: now, Kind: runtime.TaskCompleted},
