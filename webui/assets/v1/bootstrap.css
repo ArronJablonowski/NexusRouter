@@ -8,3 +8,8 @@ output { display: block; margin: 1.5rem 0; padding: 1rem; border-radius: .6rem; 
 code { color: #73e6b1; }
 button { padding: .7rem 1rem; border: 0; border-radius: .5rem; background: #73e6b1; color: #08130f; font: inherit; font-weight: 700; }
 :focus-visible { outline: 3px solid #73e6b1; outline-offset: 3px; }
+
+#command code {display:block;overflow-wrap:anywhere;padding:1rem;background:#070b15;border:1px solid #34415d;border-radius:.6rem;line-height:1.6;user-select:all}
+#copy-command {margin-top:.8rem;cursor:pointer}
+#copy-command:disabled {opacity:.5;cursor:default}
+#copy-status {font-size:.9rem;color:#b8c7dc;min-height:1.4em}

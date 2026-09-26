@@ -9369,3 +9369,5 @@ Skills browser page: read-only configured-scope catalog with every stored draft/
 Cloud fullcheck found reproducible rollover fixture contamination by real CODEX_HOME model recommendations. Isolated synthetic tiny-context fixture in private empty CODEX_HOME; focused race regression passed5.335s. Original failed fullcheck retained; final cumulative fullcheck must pass before training.
 
 Settings now exposes skill usage, draft creation, store root and scope through authenticated CSRF/CAS atomic config saves. Saved/active comparison reports restart requirement; no automatic activation or learning job is enabled. Round-trip tests verify enable/disable and no store mutation; targeted race tests pass. Full cumulative check pending.
+
+Connect-browser page now has Copy command using the browser clipboard API with success status and selected-text fallback. Expired/failed challenge commands are hidden and cannot be copied. JavaScript syntax and focused shell tests pass; full cumulative validation queued.

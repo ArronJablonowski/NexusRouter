@@ -14,7 +14,7 @@
       <h1 id="connect-title">Connect this browser</h1>
       <p>Approve the one-time code in a trusted terminal. No API token is sent to this page.</p>
       <output id="approval-code" aria-live="polite">Creating a one-time code…</output>
-      <p id="command" hidden>Run <code></code></p>
+      <div id="command" hidden><p>Run this command in your terminal:</p><code></code><button id="copy-command" type="button" disabled>Copy command</button><p id="copy-status" role="status" aria-live="polite"></p></div>
       <p id="status" role="status">Waiting for a secure challenge.</p>
       <button id="retry" type="button" hidden>Try again</button>
     </section>
