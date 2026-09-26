@@ -184,7 +184,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 func browserShellNavigation(base, requestPath string) bool {
-	if requestPath == base || requestPath == base+"/" || requestPath == base+"/chats" || requestPath == base+"/workboards" || requestPath == base+"/models" || requestPath == base+"/routing-map" || requestPath == base+"/model-elimination" || requestPath == base+"/settings" {
+	if requestPath == base || requestPath == base+"/" || requestPath == base+"/chats" || requestPath == base+"/workboards" || requestPath == base+"/models" || requestPath == base+"/routing-map" || requestPath == base+"/model-elimination" || requestPath == base+"/settings" || requestPath == base+"/stats" {
 		return true
 	}
 	for _, prefix := range []string{base + "/chats/", base + "/workboards/"} {

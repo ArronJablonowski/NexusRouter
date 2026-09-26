@@ -343,3 +343,17 @@ input, select { padding: .55rem .7rem; }
   *, *::before, *::after { scroll-behavior: auto !important; }
   .routing-flow { display:none; animation:none; }
 }
+
+.stats-view {width:100%;padding:clamp(20px,3vw,48px);max-width:1600px;margin:0 auto}
+.stats-heading,.stats-trip-heading {display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}
+.stats-heading h1 {font-size:clamp(28px,3vw,44px);margin:8px 0}
+.stats-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.stats-card {padding:clamp(18px,2vw,32px);border:1px solid #33465e;border-radius:20px;background:linear-gradient(145deg,#152239,#0b1423);box-shadow:0 15px 40px #0002;min-width:0}
+.stats-cloud {border-top:3px solid #88b5ff}.stats-local {border-top:3px solid #70dfb1}
+.stats-card h2 {font-size:24px;margin:10px 0 24px}.stats-counter-pair {display:grid;gap:22px}
+.odometer {display:flex;gap:3px;width:100%;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+.odometer-digit {flex:1;min-width:0;max-width:44px;text-align:center;padding:12px 0;font-size:clamp(14px,2.1vw,32px);line-height:1.1;color:#edf6ff;border:1px solid #34465e;border-radius:5px;background:linear-gradient(#26354a 49%,#070c14 50%,#19283a 53%);box-shadow:inset 0 2px 5px #0008;text-shadow:0 1px 2px #000}
+.stats-trip {border-top:1px solid #33465e;margin-top:28px;padding-top:24px}.stats-trip-heading h3 {margin:0}.stats-since,.stats-note {color:#a8bbd2;font-size:13px;line-height:1.6}.stats-confirm {display:flex;align-items:flex-start;gap:12px;margin:24px 0}.stats-confirm input {width:auto;margin-top:4px}
+#stats-reset-dialog {max-width:480px;border:1px solid #476080;border-radius:16px;background:#111d30;color:#ecf3ff;padding:28px}#stats-reset-dialog::backdrop {background:#030912b8}
+@media(max-width:1000px){.stats-grid{grid-template-columns:1fr}.odometer-digit{font-size:24px}.stats-heading{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.odometer-digit{transition:none}}

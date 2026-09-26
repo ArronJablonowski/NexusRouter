@@ -9343,3 +9343,17 @@ local/cloud isolation, invalid metadata, provider ceilings and explicit budgets.
 Other cloud transports lack a standardized discovery implementation and retain
 configured limits; this limitation remains explicit. Full repository validation
 for this change is pending behind the already-running transcript check.
+
+### Token Stats page — September 26
+
+Added a browser Stats page with separate cloud/local lifetime input/output
+odometers and persistent independent trip meters. Confirmed, CSRF-protected
+resets advance a sidecar SQLite watermark and revision; usage and correction
+history are read-only. A stale reset returns conflict. Usage corrections update
+lifetime totals without bringing pre-reset records into the trip. Unknown usage
+and unclassified model records are shown separately; locality follows the current
+configured provider/model catalog. Decimal strings retain full integer precision
+in the browser. Counts update when accounting records are committed, not per
+streamed token. Targeted race tests passed for accounting/reset persistence,
+corrections, isolation, stale revisions, session/CSRF/confirmation and shell
+assets. Build passed. Full validation and live UI verification pending.

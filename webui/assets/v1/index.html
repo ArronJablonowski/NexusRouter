@@ -20,6 +20,7 @@
       <a href="__DARWIN_BASE_PATH__/models" data-view="models">Models</a>
       <a href="__DARWIN_BASE_PATH__/routing-map" data-view="routing">Command grid</a>
       <a href="__DARWIN_BASE_PATH__/model-elimination" data-view="elimination">Elimination</a>
+      <a href="__DARWIN_BASE_PATH__/stats" data-view="stats">Stats</a>
       <a href="__DARWIN_BASE_PATH__/settings" data-view="settings">Settings</a>
     </nav>
     <main id="main" tabindex="-1">
@@ -164,6 +165,13 @@
             <ul id="cloud-model-list" class="model-cards" aria-label="Configured cloud models"></ul>
           </section>
         </div>
+      </section>
+      <section id="stats-view" class="stats-view" aria-labelledby="stats-title" hidden>
+        <header class="stats-heading"><div><p class="eyebrow">Usage dashboard</p><h1 id="stats-title">Token odometers</h1><p>Lifetime usage and independent trips for cloud and local models.</p></div><button id="stats-refresh" class="secondary" type="button">Refresh</button></header>
+        <div id="stats-meters" class="stats-grid"></div>
+        <p id="stats-status" role="status" aria-live="polite">Loading recorded usage…</p>
+        <p class="stats-note">Includes recorded input and output tokens across tasks and auxiliary model calls. Updates every 15 seconds. Usage appears when recorded; missing measurements are reported separately. Lifetime totals follow accounting corrections. Model locality uses the current configured catalog.</p>
+        <dialog id="stats-reset-dialog" aria-labelledby="stats-reset-title"><form method="dialog"><h2 id="stats-reset-title">Reset trip?</h2><p id="stats-reset-description"></p><label class="stats-confirm"><input type="checkbox" id="stats-reset-check"> I understand that only this trip’s input and output counters will reset.</label><div class="button-row"><button value="cancel" class="secondary">Cancel</button><button id="stats-reset-confirm" type="button" disabled>Reset trip</button></div></form></dialog>
       </section>
       <section id="settings-view" class="settings-view" aria-labelledby="settings-title" hidden>
         <header class="settings-heading">
@@ -469,6 +477,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/routing-map.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/stats.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/app.js" defer></script>
 </body>
 </html>
