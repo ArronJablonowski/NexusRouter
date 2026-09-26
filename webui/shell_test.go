@@ -137,10 +137,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "5284c64bc77e663fbe9a22e419ed997a9cfa05fda8edb6b8f406491da68ca4e9" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "9a22d435c8dc8a2470a72aa91c786e2a7c1858b76f89cbc75f64afa585464b2a" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		file, err := embeddedShellAssets.Open(name)
 		if err != nil {
 			t.Fatal(err)
@@ -449,7 +449,7 @@ func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
 	guard := strings.Index(body, `const workboardRoute = window.DarwinRoutes.workboards(relativePath)`)
 	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals()`)
 	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
-	if guard < 0 || !strings.Contains(body[guard:chat], `if (!workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute)`) || chat < guard || csrf < chat {
+	if guard < 0 || !strings.Contains(body[guard:chat], `if (!skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute)`) || chat < guard || csrf < chat {
 		t.Fatal("workboard route does not guard unrelated startup requests")
 	}
 	if !strings.Contains(body, `for (const link of document.querySelectorAll("[data-view]"))`) || !strings.Contains(body, `link.setAttribute("aria-current", "page")`) {

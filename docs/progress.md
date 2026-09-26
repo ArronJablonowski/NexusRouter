@@ -9379,3 +9379,7 @@ The HTTP endpoint policy check incorrectly rejected executable-backed Codex app-
 ### 2026-09-26 — Isolate browser inventory availability test
 
 Full cumulative 4c2c4d8 validation exposed TestBrowserModelsResourcesAndUsagePreserveAvailability using Ollama's default live endpoint. Successful installed-model discovery now makes that fixture's one-model assertion fail. Bound it to an isolated httptest tags server; all TestBrowserModels race tests pass (4.790s). Production code unchanged. Original full run preserved; corrected full validation queued before training/push.
+
+### 2026-09-26 — Review expanded UI shell assets
+
+Completed 4c2c4d8 validation also exposed stale shell digest/route expectations and app.js at1001 lines. Reviewed Stats/Skills integration, added their scripts to external/inline-resource checks, updated the digest and route guard assertion, and compacted declarations below1000 lines without behavior changes. Full webui race suite passed9.272s. Current isolated fullcheck remains untouched; final cumulative verification queued after it.

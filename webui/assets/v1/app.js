@@ -971,10 +971,8 @@
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	const skillsRoute = window.DarwinRoutes.skills(relativePath);
- const statsRoute = window.DarwinRoutes.stats(relativePath);
-	const workboardRoute = window.DarwinRoutes.workboards(relativePath), settingsRoute = window.DarwinRoutes.settings(relativePath), modelsRoute = window.DarwinRoutes.models(relativePath), routingRoute = window.DarwinRoutes.routing(relativePath), eliminationRoute = window.DarwinRoutes.elimination(relativePath);
-	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
+	const skillsRoute = window.DarwinRoutes.skills(relativePath), statsRoute = window.DarwinRoutes.stats(relativePath);
+	const workboardRoute = window.DarwinRoutes.workboards(relativePath), settingsRoute = window.DarwinRoutes.settings(relativePath), modelsRoute = window.DarwinRoutes.models(relativePath), routingRoute = window.DarwinRoutes.routing(relativePath), eliminationRoute = window.DarwinRoutes.elimination(relativePath);	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
