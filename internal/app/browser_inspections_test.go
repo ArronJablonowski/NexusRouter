@@ -98,8 +98,15 @@ func TestBrowserToolInspectionFailsClosedOnOrphanCompletion(t *testing.T) {
 }
 
 func TestBrowserModelsResourcesAndUsagePreserveAvailability(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/tags" {
+			t.Errorf("unexpected inventory request %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = fmt.Fprint(w, `{"models":[]}`)
+	}))
+	defer server.Close()
 	service := submissionService(t)
-	service.settings.Providers = []config.Provider{{ID: "provider", Kind: "ollama"}}
+	service.settings.Providers = []config.Provider{{ID: "provider", Kind: "ollama", Endpoint: server.URL}}
 	service.settings.Models = []config.Model{{ID: "model", Provider: "provider", Model: "fixture", Locality: "local", Capabilities: []string{"chat"}, ContextTokens: 4096, RAMBytes: 10}}
 	report := health.Report{Version: 1, CheckedAt: time.Now().UTC(), Status: "healthy", Ready: true, Checks: []health.Check{
 		{Component: "daemon", Status: "healthy", Code: "serving"}, {Component: "database", Status: "healthy", Code: "available"},

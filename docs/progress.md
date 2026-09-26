@@ -9375,3 +9375,7 @@ Connect-browser page now has Copy command using the browser clipboard API with s
 ### 2026-09-26 — Codex inventory health discovery
 
 The HTTP endpoint policy check incorrectly rejected executable-backed Codex app-server providers, reporting their cloud models unavailable. Health now uses bounded, owned stdio discovery with the existing pinned launch profile, a read-only account check (no login refresh), and paginated model listing. No thread, turn, prompt, or inference is sent; local-only mode still blocks cloud discovery. Missing credentials and discovery failures remain unavailable. Focused health/bridge race tests and live discovery of gpt-5.6-sol passed. Full cumulative validation remains queued before push; this does not change specialist cloud authorization or attest successful inference.
+
+### 2026-09-26 — Isolate browser inventory availability test
+
+Full cumulative 4c2c4d8 validation exposed TestBrowserModelsResourcesAndUsagePreserveAvailability using Ollama's default live endpoint. Successful installed-model discovery now makes that fixture's one-model assertion fail. Bound it to an isolated httptest tags server; all TestBrowserModels race tests pass (4.790s). Production code unchanged. Original full run preserved; corrected full validation queued before training/push.
