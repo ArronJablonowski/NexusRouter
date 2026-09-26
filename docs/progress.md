@@ -9357,3 +9357,5 @@ in the browser. Counts update when accounting records are committed, not per
 streamed token. Targeted race tests passed for accounting/reset persistence,
 corrections, isolation, stale revisions, session/CSRF/confirmation and shell
 assets. Build passed. Full validation and live UI verification pending.
+
+Stats readability update: full exact counts use grouped thousands and responsive typography through signed 64-bit totals (including trillions). Removed fixed digit cells and leading zero padding; cloud/local tint retained. Focused shell/API tests pass; full Stats validation remains queued behind cloud validation.

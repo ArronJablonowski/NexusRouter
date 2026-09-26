@@ -9,7 +9,14 @@
  function counter(label,value){
   if(typeof value!=="string" || !/^[0-9]{1,19}$/.test(value))throw new Error("Invalid usage count");
   const box=node("div","stats-counter"),caption=node("p","eyebrow",label),display=node("output","odometer");display.setAttribute("aria-label",label+": "+BigInt(value).toLocaleString()+" tokens");
-  for(const digit of value.padStart(9,"0")){const cell=node("span","odometer-digit",digit);cell.setAttribute("aria-hidden","true");display.append(cell);}
+  const digits=BigInt(value).toString();
+  display.dataset.digits=String(digits.length);
+  const groups=digits.replace(/\B(?=(\d{3})+(?!\d))/g,",").split(",");
+  groups.forEach((group,index)=>{
+   if(index){const separator=node("span","odometer-separator",",");separator.setAttribute("aria-hidden","true");display.append(separator);}
+   const cell=node("span","odometer-group",group);cell.setAttribute("aria-hidden","true");display.append(cell);
+  });
+  if(digits.length>=13)display.classList.add("odometer-large");
   box.append(caption,display);return box;
  }
  function render(data){
