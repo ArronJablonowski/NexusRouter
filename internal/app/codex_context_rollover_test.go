@@ -72,6 +72,9 @@ func (p *appCodexRolloverGeneration) Close() (err error) {
 }
 
 func TestCodexContextRolloverActivatesBeforeOwnedReplacement(t *testing.T) {
+	// This fixture deliberately sets a tiny context to force rollover.
+	// A real user catalog must not replace that synthetic limit.
+	t.Setenv("CODEX_HOME", t.TempDir())
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	svc, attempt, _ := prepareCodexPlanEvidence(t, nil)

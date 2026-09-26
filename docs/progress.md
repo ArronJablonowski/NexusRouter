@@ -9365,3 +9365,5 @@ Browser approval CLI now resolves the current user installed live-test service c
 Local inventory recovery: normalize provider timestamps to UTC and retain validated size/digest metadata when optional context discovery fails. Partial unavailable totals no longer display 0 B. Provider regression race tests pass; live verification and full validation pending. Totals remain provider-reported logical sizes, digest-deduplicated, not filesystem block allocation.
 
 Skills browser page: read-only configured-scope catalog with every stored draft/version, active/validated/draft status, descriptions/tags/version IDs and explicit empty/disabled state. Workflow bodies and session provenance are not returned. Scoped inventory regression tests and shell tests passed; full validation and live verification pending.
+
+Cloud fullcheck found reproducible rollover fixture contamination by real CODEX_HOME model recommendations. Isolated synthetic tiny-context fixture in private empty CODEX_HOME; focused race regression passed5.335s. Original failed fullcheck retained; final cumulative fullcheck must pass before training.
