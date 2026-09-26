@@ -9,17 +9,18 @@
 	const save = document.querySelector("#save-settings"), reset = document.querySelector("#reset-settings"), refresh = document.querySelector("#refresh-settings");
 	const badge = document.querySelector("#settings-restart-badge"), activeSummary = document.querySelector("#active-settings");
 	const connection = document.querySelector("#connection-state");
-	const digestPattern = /^[0-9a-f]{64}$/;
+	const skillsEnabled=document.querySelector("#skills-enabled"), skillsDraft=document.querySelector("#skills-auto-draft"), skillsRoot=document.querySelector("#skills-root"), skillsScope=document.querySelector("#skills-scope");
+ const digestPattern = /^[0-9a-f]{64}$/;
 	let csrf = "", projection = null, loading = false;
 	chat.hidden = true; workboards.hidden = true; models.hidden = true; view.hidden = false;
 	function validAccess(value) {
-		return value && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
+		return value && typeof value.skills_enabled === "boolean" && typeof value.skills_auto_draft === "boolean" && typeof value.skills_root === "string" && typeof value.skills_scope === "string" && (!value.skills_enabled || (value.skills_root.startsWith("/") && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.skills_scope))) && typeof value.tools_enabled === "boolean" && typeof value.delegate_read_tools === "boolean" && typeof value.specialists_allow_cloud === "boolean" && typeof value.read_root === "string" && value.read_root.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value.read_root) && (!value.delegate_read_tools || value.tools_enabled) && (!value.tools_enabled || /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(value.read_root));
 	}
 	function validProjection(value) {
 		return value && value.version === 1 && digestPattern.test(value.digest) && validAccess(value.active) && validAccess(value.saved) && typeof value.restart_required === "boolean" && value.restart_required === (JSON.stringify(value.active) !== JSON.stringify(value.saved));
 	}
 	function setStatus(message, failed) { status.textContent = message; status.classList.toggle("error", Boolean(failed)); }
-	function setBusy(value) { loading = value; save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
+	function setBusy(value) { loading = value; [skillsEnabled,skillsDraft,skillsRoot,skillsScope].forEach(n=>n.disabled=value); save.disabled = value || !csrf || !projection; reset.disabled = value || !projection; refresh.disabled = value; tools.disabled = value; specialistsAllowCloud.disabled = value; root.disabled = value; syncDependency(); }
 	function syncDependency() {
 		if (!tools.checked) delegated.checked = false;
 		delegated.disabled = loading || !tools.checked;
@@ -31,9 +32,11 @@
 	}
 	function render(value) {
 		projection = value;
+ skillsEnabled.checked=value.saved.skills_enabled;skillsDraft.checked=value.saved.skills_auto_draft;skillsRoot.value=value.saved.skills_root;skillsScope.value=value.saved.skills_scope;
 		tools.checked = value.saved.tools_enabled; delegated.checked = value.saved.delegate_read_tools; specialistsAllowCloud.checked = value.saved.specialists_allow_cloud; root.value = value.saved.read_root;
 		badge.hidden = !value.restart_required; activeSummary.replaceChildren();
-		addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
+		addSummary("Skill usage",value.active.skills_enabled?"Enabled":"Disabled");addSummary("Skill creation",value.active.skills_enabled&&value.active.skills_auto_draft?"Allowed":"Disabled");
+ addSummary("Model tool use", value.active.tools_enabled ? "Enabled" : "Disabled");
 		addSummary("Delegated reads", value.active.delegate_read_tools ? "Enabled" : "Disabled");
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Read root", value.active.read_root || "Not configured");
@@ -49,7 +52,7 @@
 			projection = null; setStatus("Settings could not be loaded.", true);
 		}).finally(() => setBusy(false));
 	}
-	function formValue() { return {tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
+	function formValue() { return {skills_enabled:skillsEnabled.checked,skills_auto_draft:skillsDraft.checked,skills_root:skillsRoot.value.trim(),skills_scope:skillsScope.value.trim(),tools_enabled: tools.checked, delegate_read_tools: delegated.checked, read_root: root.value.trim(), specialists_allow_cloud: specialistsAllowCloud.checked}; }
 	function validate(value) {
 		let message = "";
 		if (value.tools_enabled && !value.read_root) message = "An absolute read root is required when file tools are enabled.";

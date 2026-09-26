@@ -184,7 +184,13 @@
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
             <p class="settings-intro">Choose specialist locality and whether eligible models may use DarwinRouter's narrowly scoped tools. Saved changes take effect after the DarwinRouter daemon restarts.</p>
-            <label class="setting-toggle" for="specialists-allow-cloud">
+            <h3>Skills</h3>
+<label class="setting-toggle"><span><strong>Use skills</strong><small>Enable the skill system and use eligible active skills from the configured store.</small></span><input id="skills-enabled" type="checkbox"></label>
+<label class="setting-toggle"><span><strong>Allow skill creation</strong><small>Permit draft creation when skills are enabled. This does not activate drafts or start a background learning job.</small></span><input id="skills-auto-draft" type="checkbox"></label>
+<label for="skills-root">Skill store directory</label><input id="skills-root" type="text" placeholder="/absolute/path/to/skills" autocomplete="off">
+<label for="skills-scope">Skill scope</label><input id="skills-scope" type="text" placeholder="project" autocomplete="off">
+<p class="settings-intro">Set a private store directory and scope before enabling skills. Changes require a daemon restart. Existing drafts and skills are retained when disabled.</p>
+<label class="setting-toggle" for="specialists-allow-cloud">
               <span><strong>Allow cloud specialists</strong><small>Off by default. When off, every high-level specialist route uses eligible local models only.</small></span>
               <span class="switch"><input id="specialists-allow-cloud" type="checkbox" role="switch"><span aria-hidden="true"></span></span>
             </label>

@@ -21,6 +21,10 @@ var (
 // local operator UI. It includes the adjacent specialist-locality policy but
 // is not a general-purpose configuration editor.
 type ToolAccess struct {
+	SkillsEnabled         bool
+	SkillsAutoDraft       bool
+	SkillsRoot            string
+	SkillsScope           string
 	Enabled               bool
 	DelegateReadTools     bool
 	ReadRoot              string
@@ -43,6 +47,9 @@ func ReadProjectToolAccess(path string) (ToolAccess, string, error) {
 // resulting configuration, and atomically replaces the project file. Runtime
 // services remain unchanged until their owning process restarts.
 func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (ToolAccess, string, error) {
+	if next.SkillsEnabled && (next.SkillsRoot == "" || next.SkillsScope == "") {
+		return ToolAccess{}, "", ErrConfigWrite
+	}
 	data, mode, err := readWritableProject(path)
 	if err != nil {
 		return ToolAccess{}, "", err
@@ -58,6 +65,10 @@ func UpdateProjectToolAccess(path, expectedDigest string, next ToolAccess) (Tool
 	setConfigScalar(root, []string{"tools", "read_root"}, "!!str", next.ReadRoot)
 	setConfigScalar(root, []string{"workers", "delegate_read_tools"}, "!!bool", boolText(next.DelegateReadTools))
 	setConfigScalar(root, []string{"web_ui", "specialists_allow_cloud"}, "!!bool", boolText(next.SpecialistsAllowCloud))
+	setConfigScalar(root, []string{"skills", "enabled"}, "!!bool", boolText(next.SkillsEnabled))
+	setConfigScalar(root, []string{"skills", "auto_draft"}, "!!bool", boolText(next.SkillsAutoDraft))
+	setConfigScalar(root, []string{"skills", "root"}, "!!str", next.SkillsRoot)
+	setConfigScalar(root, []string{"skills", "scope"}, "!!str", next.SkillsScope)
 	var encoded bytes.Buffer
 	encoder := yaml.NewEncoder(&encoded)
 	encoder.SetIndent(2)
@@ -136,7 +147,7 @@ func setConfigScalar(node *yaml.Node, path []string, tag, value string) {
 }
 
 func toolAccess(settings Settings) ToolAccess {
-	return ToolAccess{Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
+	return ToolAccess{SkillsEnabled: settings.Skills.Enabled, SkillsAutoDraft: settings.Skills.AutoDraft, SkillsRoot: settings.Skills.Root, SkillsScope: settings.Skills.Scope, Enabled: settings.Tools.Enabled, DelegateReadTools: settings.Workers.DelegateReadTools, ReadRoot: settings.Tools.ReadRoot, SpecialistsAllowCloud: settings.WebUI.SpecialistsAllowCloud}
 }
 
 func boolText(value bool) string {

@@ -9367,3 +9367,5 @@ Local inventory recovery: normalize provider timestamps to UTC and retain valida
 Skills browser page: read-only configured-scope catalog with every stored draft/version, active/validated/draft status, descriptions/tags/version IDs and explicit empty/disabled state. Workflow bodies and session provenance are not returned. Scoped inventory regression tests and shell tests passed; full validation and live verification pending.
 
 Cloud fullcheck found reproducible rollover fixture contamination by real CODEX_HOME model recommendations. Isolated synthetic tiny-context fixture in private empty CODEX_HOME; focused race regression passed5.335s. Original failed fullcheck retained; final cumulative fullcheck must pass before training.
+
+Settings now exposes skill usage, draft creation, store root and scope through authenticated CSRF/CAS atomic config saves. Saved/active comparison reports restart requirement; no automatic activation or learning job is enabled. Round-trip tests verify enable/disable and no store mutation; targeted race tests pass. Full cumulative check pending.

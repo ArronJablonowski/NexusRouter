@@ -50,3 +50,32 @@ func TestProjectToolAccessRejectsInvalidAndSymlink(t *testing.T) {
 		t.Fatal("symlink accepted", err)
 	}
 }
+
+func TestProjectSkillControlsRoundTrip(t *testing.T) {
+	path := file(t, "version: 1\n")
+	next, digest, err := ReadProjectToolAccess(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next.SkillsEnabled = true
+	next.SkillsAutoDraft = true
+	next.SkillsRoot = filepath.Join(t.TempDir(), "skills")
+	next.SkillsScope = "project"
+	saved, digest, err := UpdateProjectToolAccess(path, digest, next)
+	if err != nil || saved != next {
+		t.Fatal(saved, err)
+	}
+	loaded, err := Load(Options{ProjectFile: path})
+	if err != nil || !loaded.Skills.Enabled || !loaded.Skills.AutoDraft || loaded.Skills.Root != next.SkillsRoot {
+		t.Fatal(err)
+	}
+	next.SkillsEnabled = false
+	next.SkillsAutoDraft = false
+	saved, _, err = UpdateProjectToolAccess(path, digest, next)
+	if err != nil || saved != next {
+		t.Fatal(saved, err)
+	}
+	if _, err = os.Stat(next.SkillsRoot); !os.IsNotExist(err) {
+		t.Fatal("settings save created or changed store")
+	}
+}
