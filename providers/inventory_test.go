@@ -19,7 +19,7 @@ func TestOllamaInstalledModelsIncludesBoundedStorageMetadata(t *testing.T) {
 		if r.URL.Path != "/api/tags" || r.Method != http.MethodGet {
 			t.Errorf("unexpected inventory request %s %s", r.Method, r.URL.Path)
 		}
-		fmt.Fprintf(w, `{"models":[{"name":"qwen:latest","modified_at":"2026-09-17T12:00:00Z","size":4294967296,"digest":%q,"details":{"family":"qwen","parameter_size":"7B","quantization_level":"Q4_K_M"}}]}`, digest)
+		fmt.Fprintf(w, `{"models":[{"name":"qwen:latest","modified_at":"2026-09-17T12:00:00Z","size":4294967296,"digest":%q,"details":{"family":"qwen","parameter_size":"7B","quantization_level":"Q4_K_M","context_length":32768}}]}`, digest)
 	})
 	models, err := p.InstalledModels(context.Background())
 	if err != nil || len(models) != 1 || models[0].Name != "qwen:latest" || models[0].SizeBytes != 4294967296 || models[0].Digest != digest || models[0].Quantization != "Q4_K_M" || models[0].ContextTokens != 32768 {
@@ -59,6 +59,7 @@ func TestOllamaInstalledModelsRejectsUnverifiableSizeAndDigest(t *testing.T) {
 func TestOllamaInventoryStorageSurvivesOptionalContextFailure(t *testing.T) {
 	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/show" {
+			t.Error("storage discovery must not fetch optional context metadata")
 			http.Error(w, "unsupported", 500)
 			return
 		}

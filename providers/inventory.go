@@ -58,6 +58,7 @@ func (p *HTTP) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
 				Family            string `json:"family"`
 				ParameterSize     string `json:"parameter_size"`
 				QuantizationLevel string `json:"quantization_level"`
+				ContextLength     int64  `json:"context_length"`
 			} `json:"details"`
 		} `json:"models"`
 	}
@@ -83,13 +84,11 @@ func (p *HTTP) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
 			model.ParameterSize = item.Details.ParameterSize
 			model.Quantization = item.Details.QuantizationLevel
 		}
-		contextTokens, showErr := p.ollamaContextWindow(ctx, identity)
-		if showErr != nil {
-			// Storage metadata from /api/tags remains authoritative even when
-			// optional context discovery is unavailable for a model.
-			contextTokens = 0
+		// Storage inventory is one bounded tags request. Optional per-model
+		// show calls must not exhaust its deadline and hide every model's size.
+		if item.Details != nil && item.Details.ContextLength > 0 && item.Details.ContextLength <= MaxOutputTokens {
+			model.ContextTokens = item.Details.ContextLength
 		}
-		model.ContextTokens = contextTokens
 		out = append(out, model)
 	}
 	return out, nil
@@ -141,6 +140,7 @@ func inventoryText(details *struct {
 	Family            string `json:"family"`
 	ParameterSize     string `json:"parameter_size"`
 	QuantizationLevel string `json:"quantization_level"`
+	ContextLength     int64  `json:"context_length"`
 }, modified time.Time) bool {
 	if !modified.IsZero() && (modified.Year() < 1970 || modified.Year() > 2260) {
 		return false
