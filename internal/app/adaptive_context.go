@@ -32,6 +32,12 @@ func chooseContextTier(ctx context.Context, model config.Model, request Request,
 			return 0, ErrAdmission
 		}
 	}
+	if model.Locality == "cloud" {
+		if estimated > model.ContextTokens || model.ContextTokens < 1 {
+			return 0, ErrAdmission
+		}
+		return model.ContextTokens, nil
+	}
 	policy := contextpolicy.Request{
 		AdvertisedMaximum: model.ContextTokens,
 		WorkingTier:       model.WorkingContextTokens(),

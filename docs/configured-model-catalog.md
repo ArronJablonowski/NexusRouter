@@ -44,3 +44,25 @@ and tool-policy checks run later when a task is admitted.
 `GET /v1/models` remains the separate OpenAI-compatible minimal catalog. It
 contains only configured Darwin model IDs and compatibility fields; its response
 shape has not changed.
+
+### Cloud context recommendations
+
+Cloud models use their configured/provider-recommended context window by default;
+the local 32K starting tier, RAM/VRAM fit checks and learned local context tiers
+do not reduce cloud allocations. Explicit request context budgets remain bounded
+by the provider window.
+
+For `codex_app_server`, new explicit/automatic admissions and catalog inspections
+read `models_cache.json` from `CODEX_HOME` (or `~/.codex`). A catalog fetched within
+24 hours supplies the exact model's `context_window`, replacing stale configured
+ceilings and starting tiers in an owned snapshot. `max_context_window` is not the
+recommended default and is deliberately not used. Changes are picked up without
+a daemon restart; running attempts keep their admitted snapshot. This reads
+metadata only and does not dispatch inference or consume credentials.
+
+Missing, stale, malformed, duplicate, or oversized catalogs leave the configured
+limit intact. Other cloud providers currently retain their configured limits:
+OpenAI-compatible `/models` does not standardize a recommended context field.
+This is not a claim of universal discovery. Provider recommendations unavailable
+from a supported metadata source must not be guessed from local capacity or a
+different API product's advertised maximum.

@@ -123,6 +123,9 @@ type Model struct {
 }
 
 func (m Model) WorkingContextTokens() int {
+	if m.Locality == "cloud" {
+		return m.ContextTokens
+	}
 	if m.DefaultContextTokens > 0 {
 		return m.DefaultContextTokens
 	}

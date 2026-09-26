@@ -41,19 +41,20 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	if s == nil || s.settings.Validate() != nil || validateInput(r) != nil || ctx.Err() != nil || validateRuntimeHostStore(ctx, s.settings, r) != nil {
 		return Result{}, ErrAdmission
 	}
+	cfg := config.WithCloudContextRecommendations(s.settings)
 	r.providerFactory = s.providerFactory
 	r.codexLauncher = s.codexLauncher
 	r.contextEstimator = s.contextEstimator
 	r.contextEngine = s.contextEngine
 	r = s.bindToolExtension(r)
 	var model config.Model
-	for _, m := range s.settings.Models {
+	for _, m := range cfg.Models {
 		if m.ID == r.ModelID {
 			model = m
 			break
 		}
 	}
-	if model.ID == "" || (r.LocalRequired && model.Locality != "local") || (s.settings.Mode == "local_only" && model.Locality != "local") || (s.settings.Mode == "cloud_only" && model.Locality != "cloud") {
+	if model.ID == "" || (r.LocalRequired && model.Locality != "local") || (cfg.Mode == "local_only" && model.Locality != "local") || (cfg.Mode == "cloud_only" && model.Locality != "cloud") {
 		return Result{}, ErrAdmission
 	}
 	if r.ContextTokens > 0 && model.ContextTokens < r.ContextTokens {
@@ -74,15 +75,15 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 			return Result{}, ErrAdmission
 		}
 	}
-	toolingEnabled := s.settings.Tools.CreateEnabled || s.settings.Tools.ReplaceEnabled || s.settings.Workers.DelegateReadTools || s.settings.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
-	if r.delegatedParent == "" && toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(s.settings, r, model)) {
+	toolingEnabled := cfg.Tools.CreateEnabled || cfg.Tools.ReplaceEnabled || cfg.Workers.DelegateReadTools || cfg.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0
+	if r.delegatedParent == "" && toolingEnabled && (model.ContextTokens == 0 || model.Locality != "local" && !cloudDelegatedReads(cfg, r, model)) {
 		return Result{}, ErrAdmission
 	}
-	if r.delegatedParent == "" && s.settings.Workers.DelegateModel != "" && model.ContextTokens == 0 {
+	if r.delegatedParent == "" && cfg.Workers.DelegateModel != "" && model.ContextTokens == 0 {
 		return Result{}, ErrAdmission
 	}
 	if r.runtimeHostAdmission != nil {
-		for _, provider := range s.settings.Providers {
+		for _, provider := range cfg.Providers {
 			if provider.ID == model.Provider && provider.ManageResidency {
 				return Result{}, ErrAdmission
 			}
@@ -101,7 +102,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	}
 	// Managed residency is an admission-time maintenance action. Reject known
 	// credential/source failures before any such provider mutation.
-	for _, provider := range s.settings.Providers {
+	for _, provider := range cfg.Providers {
 		if provider.ID == model.Provider && provider.ManageResidency {
 			if provider.APIKeyEnv != "" && (s.secret == nil || s.secret(provider.APIKeyEnv) == "") {
 				return Result{}, ErrAdmission
@@ -112,11 +113,11 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	// eventual TaskStarted event will use. Resolve continuation lineage before
 	// capacity admission instead of discovering it after a claim is held.
 	if model.Locality == "local" && r.ContinueTaskID != "" && r.continuation == nil {
-		db, openErr := telemetry.OpenReadOnly(ctx, s.settings.Telemetry.Database)
+		db, openErr := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
 		if openErr != nil {
 			return Result{}, ErrAdmission
 		}
-		r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(s.settings, s.secret))
+		r.continuation, err = loadContinuation(ctx, db, r, memorySecrets(cfg, s.secret))
 		closeErr := db.Close()
 		if err != nil || closeErr != nil {
 			return Result{}, ErrAdmission
@@ -157,7 +158,7 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 		r.delegate = s.bindDelegate(r)
 		r.delegateAudit = s.bindDelegationAudit()
 	}
-	return runExplicitAdmitted(ctx, s.settings, r, s.secret)
+	return runExplicitAdmitted(ctx, cfg, r, s.secret)
 }
 
 func (s *Service) reserveExplicit(ctx context.Context, model config.Model) (release func(), err error) {

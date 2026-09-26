@@ -10,7 +10,8 @@ import (
 )
 
 // ConfiguredModelCatalog returns owned declared routing metadata. It performs
-// no provider discovery, inference, health check, reservation, or storage read.
+// no inference, health check, reservation, or task storage read. Cloud context
+// recommendations are refreshed from the provider-owned local catalog.
 func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCatalog, error) {
 	zero := routing.ModelCatalog{}
 	if ctx == nil {
@@ -19,13 +20,14 @@ func (s *Service) ConfiguredModelCatalog(ctx context.Context) (routing.ModelCata
 	if err := ctx.Err(); err != nil {
 		return zero, err
 	}
-	secrets := memorySecrets(s.settings, s.secret)
-	configID, err := settingsConfigID(s.settings)
+	settings := config.WithCloudContextRecommendations(s.settings)
+	secrets := memorySecrets(settings, s.secret)
+	configID, err := settingsConfigID(settings)
 	if err != nil {
 		return zero, ErrAdmission
 	}
-	catalog := routing.ModelCatalog{Version: 1, ConfigID: configID, Models: make([]routing.ConfiguredModel, len(s.settings.Models))}
-	for i, configured := range s.settings.Models {
+	catalog := routing.ModelCatalog{Version: 1, ConfigID: configID, Models: make([]routing.ConfiguredModel, len(settings.Models))}
+	for i, configured := range settings.Models {
 		var cost *float64
 		if configured.EstimatedCost != nil {
 			value := *configured.EstimatedCost

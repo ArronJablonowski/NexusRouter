@@ -163,7 +163,11 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 		out.Fitness = []contract.ModelFitnessInspection{}
 	}
 	s.markBrowserFallbackFitness(ctx, out.Fitness, catalog.Models)
-	if selected, selectErr := browserSelectedContexts(ctx, s.settings.Telemetry.Database, s.settings.Models, s.settings.Routing.MinSamples); selectErr == nil {
+	contextModels := append([]config.Model(nil), s.settings.Models...)
+	for i := range contextModels {
+		contextModels[i].ContextTokens = catalog.Models[i].ContextTokens
+	}
+	if selected, selectErr := browserSelectedContexts(ctx, s.settings.Telemetry.Database, contextModels, s.settings.Routing.MinSamples); selectErr == nil {
 		for index := range out.Models {
 			if value, known := selected[out.Models[index].ID]; known {
 				// A zero selection means safety evidence ruled out every tier.
@@ -293,6 +297,10 @@ func browserSelectedContexts(ctx context.Context, path string, models []config.M
 	}
 	out := map[string]int{}
 	for _, model := range models {
+		if model.Locality == "cloud" {
+			out[model.ID] = model.ContextTokens
+			continue
+		}
 		out[model.ID] = contextpolicy.Select(contextpolicy.Request{AdvertisedMaximum: model.ContextTokens, WorkingTier: model.WorkingContextTokens(), EstimatedTokens: 1, Evidence: byRoute[[2]string{model.Model, model.Provider}], MinimumSamples: minimumSamples})
 	}
 	return out, nil

@@ -9330,3 +9330,16 @@ SDK context binding follow-up: ContextEstimatorFactory now receives copied effec
 ### Browser transcript projection repair (2026-09-26)
 
 ChatHistory now selects only user/assistant presentation text before redaction, retaining original source sequence indices. Hidden tool output is never rendered or parsed by this browser projection. Regression cases reproduce failures with TOML-style bracket prefixes, JSON followed by command text, and truncated bracket output while retaining secret-redaction and pagination assertions. The strict structured-history sanitizer used by other consumers is unchanged. Focused ChatHistory race tests passed (10.298s), including reproduced failures before the fix. Full make check and deployment verification pending.
+
+### Cloud context recommendation correction — September 26
+
+Removed the local 32K starting-tier rule from cloud models, and bypassed local
+context evidence/capacity tier selection for cloud defaults. Codex provider
+recommendations now refresh from its bounded, fresh account model catalog for
+new explicit/automatic admissions and browser/catalog reads, without mutating
+shared settings. The default context_window is used rather than the opt-in max.
+Focused race checks passed (config 1.301s, app 4.707s), including refresh,
+local/cloud isolation, invalid metadata, provider ceilings and explicit budgets.
+Other cloud transports lack a standardized discovery implementation and retain
+configured limits; this limitation remains explicit. Full repository validation
+for this change is pending behind the already-running transcript check.
