@@ -77,7 +77,7 @@ func (p *HTTP) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
 			return nil, &Failure{Code: "invalid_response"}
 		}
 		seen[identity] = true
-		model := InstalledModel{Name: identity, Digest: item.Digest, SizeBytes: *item.Size, ModifiedAt: item.ModifiedAt}
+		model := InstalledModel{Name: identity, Digest: item.Digest, SizeBytes: *item.Size, ModifiedAt: item.ModifiedAt.UTC()}
 		if item.Details != nil {
 			model.Family = item.Details.Family
 			model.ParameterSize = item.Details.ParameterSize
@@ -85,7 +85,9 @@ func (p *HTTP) InstalledModels(ctx context.Context) ([]InstalledModel, error) {
 		}
 		contextTokens, showErr := p.ollamaContextWindow(ctx, identity)
 		if showErr != nil {
-			return nil, showErr
+			// Storage metadata from /api/tags remains authoritative even when
+			// optional context discovery is unavailable for a model.
+			contextTokens = 0
 		}
 		model.ContextTokens = contextTokens
 		out = append(out, model)

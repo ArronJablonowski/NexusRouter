@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestOllamaInstalledModelsIncludesBoundedStorageMetadata(t *testing.T) {
@@ -52,5 +53,19 @@ func TestOllamaInstalledModelsRejectsUnverifiableSizeAndDigest(t *testing.T) {
 				t.Fatalf("unverifiable inventory accepted: %+v", models)
 			}
 		})
+	}
+}
+
+func TestOllamaInventoryStorageSurvivesOptionalContextFailure(t *testing.T) {
+	p := fixtureProvider(t, "ollama", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/show" {
+			http.Error(w, "unsupported", 500)
+			return
+		}
+		fmt.Fprintf(w, `{"models":[{"name":"muse:latest","modified_at":"2026-09-17T12:00:00-06:00","size":123456789,"digest":%q}]}`, strings.Repeat("a", 64))
+	})
+	models, err := p.InstalledModels(context.Background())
+	if err != nil || len(models) != 1 || models[0].SizeBytes != 123456789 || models[0].ModifiedAt.Location() != time.UTC || models[0].ModifiedAt.Hour() != 18 {
+		t.Fatalf("storage lost: %+v %v", models, err)
 	}
 }

@@ -92,7 +92,7 @@
 		localState.hidden = locals.length > 0; cloudState.hidden = clouds.length > 0;
 		if (!locals.length) notice(localState, "No local models were discovered or configured.", false);
 		if (!clouds.length) notice(cloudState, "No cloud models are configured.", false);
-		total.textContent = bytes(page.local_total_bytes);
+		total.textContent = page.local_total_coverage === "partial" && page.local_total_bytes === 0 ? "Unavailable" : bytes(page.local_total_bytes);
 		total.title = page.local_total_bytes.toLocaleString() + " bytes";
 		const unknown = page.local_unknown_size_count ? " " + page.local_unknown_size_count + " model size" + (page.local_unknown_size_count === 1 ? " is" : "s are") + " unknown." : "";
 		const unavailable = page.local_providers.filter(item => item.status === "unavailable").map(item => item.provider);
