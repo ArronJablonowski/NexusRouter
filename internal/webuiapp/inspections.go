@@ -3,6 +3,7 @@ package webuiapp
 import (
 	"context"
 	"errors"
+	"github.com/ArronJablonowski/DarwinRouter/internal/app"
 	"github.com/ArronJablonowski/DarwinRouter/internal/usagestats"
 	"net/http"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 )
 
 type InspectionServices struct {
+	Skills      func(context.Context) (app.BrowserSkillPage, error)
 	Stats       func(context.Context, *usagestats.Reset) (usagestats.Snapshot, error)
 	Models      func(context.Context) (contract.ModelInspectionPage, error)
 	Route       func(context.Context, string) (contract.RouteInspection, error)
@@ -33,6 +35,8 @@ func inspectionQueryPath(base, path string) bool {
 func (h *Handler) serveInspectionAPI(writer http.ResponseWriter, request *http.Request) bool {
 	base, path := h.basePath+"/api/v1", request.URL.Path
 	switch {
+	case path == base+"/skills":
+		h.serveSkills(writer, request)
 	case path == base+"/stats":
 		h.serveStats(writer, request)
 	case path == base+"/models/deprecation":

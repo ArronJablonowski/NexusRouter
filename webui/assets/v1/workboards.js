@@ -5,7 +5,7 @@
 	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({
 		workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path),
 		models: path => path === "/models", routing: path => path === "/routing-map",
-		elimination: path => path === "/model-elimination", settings: path => path === "/settings", stats: path => path === "/stats"
+		elimination: path => path === "/model-elimination", settings: path => path === "/settings", skills: path => path === "/skills", stats: path => path === "/stats"
 	});
 	const route = window.DarwinRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
 	if (!route) return;
