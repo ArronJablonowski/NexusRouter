@@ -15,6 +15,10 @@ type BrowserSkillPage struct {
 
 func (s *Service) BrowserSkills(ctx context.Context) (BrowserSkillPage, error) {
 	p := BrowserSkillPage{1, s.settings.Skills.Enabled, s.settings.Skills.Scope, []skills.InventoryItem{}}
+	if s.settings.Skills.Root == "" || s.settings.Skills.Scope == "" {
+		p.Scope = "Not configured"
+		return p, nil
+	}
 	st, err := skills.OpenReadOnly(s.settings.Skills.Root, []string{s.settings.Skills.Scope})
 	if errors.Is(err, skills.ErrNotFound) {
 		return p, nil
