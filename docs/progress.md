@@ -9371,3 +9371,7 @@ Cloud fullcheck found reproducible rollover fixture contamination by real CODEX_
 Settings now exposes skill usage, draft creation, store root and scope through authenticated CSRF/CAS atomic config saves. Saved/active comparison reports restart requirement; no automatic activation or learning job is enabled. Round-trip tests verify enable/disable and no store mutation; targeted race tests pass. Full cumulative check pending.
 
 Connect-browser page now has Copy command using the browser clipboard API with success status and selected-text fallback. Expired/failed challenge commands are hidden and cannot be copied. JavaScript syntax and focused shell tests pass; full cumulative validation queued.
+
+### 2026-09-26 — Codex inventory health discovery
+
+The HTTP endpoint policy check incorrectly rejected executable-backed Codex app-server providers, reporting their cloud models unavailable. Health now uses bounded, owned stdio discovery with the existing pinned launch profile, a read-only account check (no login refresh), and paginated model listing. No thread, turn, prompt, or inference is sent; local-only mode still blocks cloud discovery. Missing credentials and discovery failures remain unavailable. Focused health/bridge race tests and live discovery of gpt-5.6-sol passed. Full cumulative validation remains queued before push; this does not change specialist cloud authorization or attest successful inference.

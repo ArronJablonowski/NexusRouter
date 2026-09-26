@@ -280,3 +280,49 @@ func TestHealthReportProbeTimeoutIsTypedFailure(t *testing.T) {
 		t.Fatal("catalog request not canceled")
 	}
 }
+
+func TestHealthReportCodexDiscovery(t *testing.T) {
+	for _, tc := range []struct {
+		mode   string
+		fail   bool
+		status string
+	}{
+		{"hybrid", false, "healthy"}, {"cloud_only", false, "healthy"}, {"local_only", false, "disabled"}, {"hybrid", true, "unavailable"},
+	} {
+		t.Run(fmt.Sprint(tc), func(t *testing.T) {
+			s := submissionService(t)
+			s.settings.Mode = tc.mode
+			s.settings.Providers = []config.Provider{{ID: "codex", Kind: "codex_app_server", Executable: "/fixture/codex"}}
+			s.settings.Models = []config.Model{{ID: "cloud", Provider: "codex", Model: "gpt-5.6-sol", Locality: "cloud"}}
+			s.profile = healthProfile
+			calls := 0
+			s.codexHealthModels = func(ctx context.Context, executable string) ([]string, error) {
+				calls++
+				if executable != "/fixture/codex" {
+					t.Error(executable)
+				}
+				if _, ok := ctx.Deadline(); !ok {
+					t.Error("unbounded discovery")
+				}
+				if tc.fail {
+					return nil, errors.New("private failure")
+				}
+				return []string{"gpt-5.6-sol"}, nil
+			}
+			report, err := s.HealthReport(context.Background(), healthySupervisor())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, check := range report.Checks {
+				if check.Component == "model" || check.Component == "provider" {
+					if check.Status != tc.status {
+						t.Fatal(check)
+					}
+				}
+			}
+			if (calls == 0) != (tc.mode == "local_only") {
+				t.Fatal(calls)
+			}
+		})
+	}
+}

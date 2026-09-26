@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
 	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
 	"github.com/ArronJablonowski/DarwinRouter/policy"
 	"github.com/ArronJablonowski/DarwinRouter/providers"
@@ -140,6 +141,10 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 		if enabled[i] {
 			for _, p := range s.settings.Providers {
 				if p.ID == m.Provider {
+					if p.Kind == "codex_app_server" {
+						policyBlocked[i] = m.Locality != "cloud"
+						break
+					}
 					transport, policyErr := policy.NewTransport(m.Locality == "local" || s.settings.Mode == "local_only", []string{p.ResolvedEndpoint()})
 					if policyErr != nil {
 						policyBlocked[i] = true
@@ -195,6 +200,18 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 			for i := range jobs {
 				p := s.settings.Providers[i]
 				query, stop := context.WithTimeout(ctx, 2*time.Second)
+				if p.Kind == "codex_app_server" {
+					discover := s.codexHealthModels
+					if discover == nil {
+						discover = codexbridge.HealthModels
+					}
+					probes[i].names, probes[i].err = discover(query, p.Executable)
+					if errors.Is(probes[i].err, codexbridge.ErrCredentialsMissing) {
+						probes[i].code = "credentials_missing"
+					}
+					stop()
+					continue
+				}
 				endpoint := p.ResolvedEndpoint()
 				transport, err := policy.NewTransport(s.settings.Mode == "local_only" || probes[i].local, []string{endpoint})
 				if err == nil {

@@ -40,6 +40,7 @@ type Service struct {
 	toolPresenter              tools.ApprovalPresenter
 	providerFactory            providers.Factory
 	codexLauncher              codexLaunch
+	codexHealthModels          func(context.Context, string) ([]string, error)
 	contextEstimator           providers.ContextEstimator
 	contextEngine              contextengine.Engine
 	evaluator                  evaluation.Evaluator
