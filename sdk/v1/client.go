@@ -22,6 +22,10 @@ import (
 var ErrAdmission = app.ErrAdmission
 var ErrEventDelivery = app.ErrEventDelivery
 
+// ErrRecoveryExhausted reports that automatic routing exhausted its eligible
+// candidates or configured attempt budget; inspect the returned task lineage.
+var ErrRecoveryExhausted = app.ErrRecoveryExhausted
+
 // ResourceProfiler is the versioned measurement-engine contract. Resource
 // reservation and route eligibility remain owned by the runtime.
 type ResourceProfiler = resources.Profiler

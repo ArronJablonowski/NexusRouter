@@ -56,7 +56,7 @@ func TestAutomaticSafeFallbackPreservesFailedHistory(t *testing.T) {
 				request.ModelID = "a"
 			}
 			out, err := svc.Run(context.Background(), request)
-			if mode != "retryable" {
+			if mode != "retryable" && mode != "partial" {
 				if err == nil || len(calls) != 1 || len(out.PreviousTaskIDs) != 0 {
 					t.Fatalf("unsafe retry: %+v %v calls=%v", out, err, calls)
 				}
@@ -228,7 +228,7 @@ func TestAutomaticTraversesBoundedFallbackChain(t *testing.T) {
 	}
 }
 
-func TestAutomaticFallbackChainStopsAfterIntermediatePartialOutput(t *testing.T) {
+func TestAutomaticFallbackChainRecoversAfterIntermediatePartialText(t *testing.T) {
 	svc, _ := autoFixture(t)
 	middle := svc.settings.Models[0]
 	middle.ID, middle.Model, middle.FailureDomain = "m", "m", "middle-domain"
@@ -252,14 +252,13 @@ func TestAutomaticFallbackChainStopsAfterIntermediatePartialOutput(t *testing.T)
 			fmt.Fprintln(w, `{"message":{"content":"partial private output"},"done":false}`)
 			return
 		}
-		t.Error("unsafe third route dispatched")
-		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(w, `{"message":{"content":"third route answer"},"done":true,"done_reason":"stop"}`)
 	}))
 	defer server.Close()
 	svc.settings.Providers[0].Endpoint = server.URL
 
 	out, err := svc.Run(context.Background(), Request{Prompt: "hello"})
-	if err == nil || out.retryable || fmt.Sprint(calls) != "[a m]" || len(out.PreviousTaskIDs) != 1 || out.TaskID == "" {
+	if err != nil || out.Text != "third route answer" || fmt.Sprint(calls) != "[a m z]" || len(out.PreviousTaskIDs) != 2 || out.TaskID == "" {
 		t.Fatalf("unsafe chain result: %+v %v calls=%v", out, err, calls)
 	}
 }
@@ -326,7 +325,7 @@ func TestAutomaticFallbackChainHasHardAttemptBound(t *testing.T) {
 	svc.settings.Providers[0].Endpoint = server.URL
 
 	out, err := svc.Run(context.Background(), Request{Prompt: "hello"})
-	if err == nil || calls != sessions.MaxTerminalRouteAttempts || len(out.PreviousTaskIDs) != sessions.MaxTerminalRouteAttempts-1 {
+	if err == nil || calls != svc.settings.Runtime.FallbackMaxAttempts || len(out.PreviousTaskIDs) != svc.settings.Runtime.FallbackMaxAttempts-1 {
 		t.Fatalf("unbounded chain: calls=%d previous=%d err=%v", calls, len(out.PreviousTaskIDs), err)
 	}
 }

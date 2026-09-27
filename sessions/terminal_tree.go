@@ -139,7 +139,7 @@ func ProjectTerminalTree(histories [][]runtime.Event) (TerminalOutcome, error) {
 			continue
 		}
 		last := n.history[len(n.history)-1]
-		if last.Kind != runtime.TaskFailed || last.Data.Code != "provider_retryable_no_output" || len(n.children) != 0 {
+		if last.Kind != runtime.TaskFailed || (last.Data.Code != "provider_retryable_no_output" && last.Data.Code != "provider_failed_before_tools") || len(n.children) != 0 {
 			return bad()
 		}
 		turns := 0
@@ -147,7 +147,7 @@ func ProjectTerminalTree(histories [][]runtime.Event) (TerminalOutcome, error) {
 			if event.Kind == runtime.TurnStarted {
 				turns++
 			}
-			if event.Kind == runtime.TurnCompleted || event.Kind == runtime.ToolStarted || event.Kind == runtime.ToolCompleted || len(event.Data.ToolCalls) > 0 || (event.Kind == runtime.ModelDelta && event.Data.Text != "") {
+			if event.Kind == runtime.SteeringApplied || event.Kind == runtime.TurnCompleted || event.Kind == runtime.ToolStarted || event.Kind == runtime.ToolCompleted || len(event.Data.ToolCalls) > 0 || (event.Kind == runtime.ModelDelta && event.Data.Text != "" && last.Data.Code != "provider_failed_before_tools") {
 				return bad()
 			}
 		}

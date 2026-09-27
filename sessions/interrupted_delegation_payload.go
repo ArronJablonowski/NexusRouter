@@ -118,7 +118,7 @@ func recoveryWorkResult(work, execution []runtime.Event) (json.RawMessage, error
 			return recoveryFailureEvidence{}, ErrHistory
 		}
 		switch e.Data.Code {
-		case "worker_failed", "worker_owner_interrupted", "interrupted_model", "interrupted_read_only_model", "interrupted_read_only_tool", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "execution_lease_lost":
+		case "worker_failed", "worker_owner_interrupted", "interrupted_model", "interrupted_read_only_model", "interrupted_read_only_tool", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "provider_failed_before_tools", "execution_lease_lost":
 		default:
 			return recoveryFailureEvidence{}, ErrHistory
 		}

@@ -831,19 +831,31 @@ Fitness is maintained by model, provider, domain, and relevant execution profile
 ### 8.4 Fallbacks
 
 The router preselects an ordered fallback chain, preferring a different failure
-domain before repeating one. Automatic execution may traverse at most 32 route
-attempts. Every candidate is freshly checked for policy, health, resources and
-remaining budget before dispatch; a candidate that becomes ineligible without
-starting work may be skipped. Every executed predecessor must be a durably
-failed, provider-declared retryable first turn with no output, steering or tool
-proposal, and each successor records immediate retry lineage. Partial output,
-validation failure, cancellation, persistence ambiguity, or any confirmed or
-uncertain external side effect stops the chain. Explicit-model requests never
-auto-fallback. Cross-provider conformance must exercise the production adapter
-protocols, not merely relabel one provider fixture: a retryable Ollama failure
-must be durably closed before an OpenAI-compatible fallback begins, and a
-local-required request must make no discovery or inference request to that
-cloud fallback.
+domain before repeating one. Automatic execution defaults to three total route
+attempts (`runtime.fallback_max_attempts`, configurable 1–8) and a ten-minute
+window after the first failed attempt (`runtime.fallback_timeout`, configurable
+100ms–30m). Existing provider request limits and shorter caller deadlines still
+apply. A setting of one disables fallback. Each candidate is freshly checked
+for policy, health, capabilities, resources, context and remaining cost budget.
+
+Recovery requires a durably failed first turn before any tool proposal,
+completed turn or steering. In addition to provider-declared retryable failures
+without output, known invalid/incomplete streams and provider-owned request
+timeouts may recover after incomplete text. This new boundary is recorded as
+`provider_failed_before_tools`; the original request/conversation is passed to
+the next model without injecting the failed partial answer. Existing partial
+stream content retention/redaction policy is unchanged. Every successor has an
+immediate retry lineage; quality feedback belongs only to the completed result.
+Validation failure, cancellation, persistence ambiguity, any tool proposal,
+and confirmed or uncertain tool effects stop recovery. No tool is replayed.
+
+Pinned requests remain pinned unless the operator explicitly configured the
+existing commander-default fallback. Runtime-host admissions never fallback.
+Exhaustion returns a terminal error and the last attempt's durable identity.
+Historical replay still accepts the older 32-attempt envelope. Cross-provider
+qualification exercises production adapters and local-required requests make
+no discovery or inference request to a cloud fallback. See
+[bounded provider recovery](docs/provider-recovery.md).
 
 Each task start records the selected route's operator-configured cost estimate.
 Public native results expose the sum across admitted top-level fallback

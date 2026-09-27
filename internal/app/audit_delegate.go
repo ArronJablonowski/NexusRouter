@@ -121,7 +121,7 @@ func auditDelegatedEvidence(ctx context.Context, db *telemetry.Store, delegation
 			terminal := h.events[len(h.events)-1]
 			if terminal.Kind == runtime.TaskFailed || terminal.Kind == runtime.TaskCanceled {
 				switch terminal.Data.Code {
-				case "worker_failed", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "execution_lease_lost":
+				case "worker_failed", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "provider_failed_before_tools", "execution_lease_lost":
 				default:
 					return nil, ErrAdmission
 				}

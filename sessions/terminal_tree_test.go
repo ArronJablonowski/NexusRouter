@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	"github.com/ArronJablonowski/DarwinRouter/runtime"
 )
 
@@ -242,5 +243,50 @@ func TestProjectTerminalTreeRouteLimitAllowsFinalDelegation(t *testing.T) {
 	out, err := ProjectTerminalTree(histories)
 	if err != nil || out.State != "succeeded" || out.Result == nil || out.Result.TaskID != "task" || len(out.Result.PreviousTaskIDs) != MaxTerminalRouteAttempts-1 {
 		t.Fatal(out, err)
+	}
+}
+
+func TestProjectTerminalTreeStreamFailureBoundary(t *testing.T) {
+	for _, mode := range []string{"text-only", "legacy-code", "tool-proposal", "steering", "second-turn", "completed-turn"} {
+		t.Run(mode, func(t *testing.T) {
+			failed := retryableRootFixture(t, "prior", "")
+			failed[len(failed)-1].Data.Code = "provider_failed_before_tools"
+			delta := failed[1]
+			delta.ID = "partial"
+			delta.Kind = runtime.ModelDelta
+			delta.Data = runtime.Data{Text: "partial evidence"}
+			if mode == "legacy-code" {
+				failed[len(failed)-1].Data.Code = "provider_retryable_no_output"
+			}
+			switch mode {
+			case "tool-proposal":
+				delta.Data.ToolCalls = []providers.ToolCall{{ID: "tool", Name: "read", Arguments: []byte(`{}`)}}
+			case "steering":
+				delta.Kind = runtime.SteeringApplied
+				delta.Data.SteeringID = "steering"
+				delta.TurnID = ""
+				delta.AttemptID = ""
+			case "second-turn":
+				delta.Kind = runtime.TurnStarted
+				delta.Data = failed[1].Data
+				delta.TurnID = "second"
+				delta.AttemptID = "second"
+			case "completed-turn":
+				delta.Kind = runtime.TurnCompleted
+				delta.Data.FinishReason = "stop"
+			}
+			failed = append(failed[:2], append([]runtime.Event{delta}, failed[2:]...)...)
+			treeLimitRenumber(failed)
+			final := terminalHistory(t, "success")
+			final[0].Data.RetryOfTaskID = "prior"
+			out, err := ProjectTerminalTree([][]runtime.Event{failed, final})
+			if mode == "text-only" {
+				if err != nil || out.Result == nil || len(out.Result.PreviousTaskIDs) != 1 {
+					t.Fatal(out, err)
+				}
+			} else if err == nil {
+				t.Fatal("unsafe boundary accepted", mode, out)
+			}
+		})
 	}
 }

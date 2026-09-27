@@ -160,7 +160,7 @@ func (s *Store) SteeringStatus(ctx context.Context, task, id string) (runtime.St
 }
 
 func steeringAppendGate(ctx context.Context, tx *sql.Tx, e runtime.Event) error {
-	if e.Kind == runtime.TaskCompleted || (e.Kind == runtime.TaskFailed && e.Data.Code == "provider_retryable_no_output") {
+	if e.Kind == runtime.TaskCompleted || (e.Kind == runtime.TaskFailed && (e.Data.Code == "provider_retryable_no_output" || e.Data.Code == "provider_failed_before_tools")) {
 		_, pending, err := steeringCounts(ctx, tx, e.TaskID)
 		if err != nil {
 			return err

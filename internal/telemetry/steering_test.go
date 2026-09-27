@@ -39,6 +39,10 @@ func TestSteeringAtomicApplyAndIdempotence(t *testing.T) {
 	if err = db.Append(ctx, 1, failed); !errors.Is(err, runtime.ErrSteeringPending) {
 		t.Fatal(err)
 	}
+	failed.Data.Code = "provider_failed_before_tools"
+	if err = db.Append(ctx, 1, failed); !errors.Is(err, runtime.ErrSteeringPending) {
+		t.Fatal(err)
+	}
 	applied := event("applied", 2, runtime.SteeringApplied)
 	applied.Data.SteeringID = message.ID
 	applied.Data.Text = "wrong"

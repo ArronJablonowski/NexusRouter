@@ -59,3 +59,49 @@ func TestContextOverflowIsDurableAndNeverRetryable(t *testing.T) {
 		t.Fatalf("context overflow not durable: %v %v", events, readErr)
 	}
 }
+
+func TestStreamRecoveryRequiresFirstTurnWithoutToolsAndDurableFailure(t *testing.T) {
+	for _, mode := range []string{"text", "tool", "persist", "canceled", "unknown", "non-stop-finish"} {
+		t.Run(mode, func(t *testing.T) {
+			s, _ := store(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			calls := 0
+			l := runtime.Loop{Journal: s, Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+				calls++
+				if mode == "non-stop-finish" && calls == 1 {
+					return emit(providers.Chunk{Text: "continue", Done: true, FinishReason: "length"})
+				}
+				if mode == "tool" {
+					if err := emit(providers.Chunk{ToolCall: &providers.ToolCall{ID: "call", Name: "tool", Arguments: []byte(`{}`)}}); err != nil {
+						return err
+					}
+				} else {
+					if err := emit(providers.Chunk{Text: "incomplete"}); err != nil {
+						return err
+					}
+				}
+				if mode == "canceled" {
+					cancel()
+				}
+				code := "invalid_stream"
+				if mode == "unknown" {
+					code = "adapter_failure"
+				}
+				return &providers.Failure{Code: code, Partial: true}
+			})}
+			if mode == "persist" {
+				l.Journal = journal(func(_ context.Context, _ int64, e runtime.Event) error {
+					if e.Kind == runtime.TaskFailed {
+						return errors.New("unknown commit")
+					}
+					return nil
+				})
+			}
+			out, err := l.Run(ctx, runRequest())
+			if err == nil || out.Retryable != (mode == "text") {
+				t.Fatal(mode, out, err)
+			}
+		})
+	}
+}

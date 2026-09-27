@@ -206,13 +206,27 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	return result, runErr
 }
 
+// ErrRecoveryExhausted leaves the final failed attempt and its lineage available.
+var ErrRecoveryExhausted = errors.New("automatic recovery exhausted eligible candidates or attempt budget")
+
 func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) {
 	var result Result
 	var err error
+	maxAttempts := s.settings.Runtime.FallbackMaxAttempts
+	if maxAttempts == 0 {
+		maxAttempts = 3
+	}
+	fallbackTimeout := 10 * time.Minute
+	if s.settings.Runtime.FallbackTimeout != "" {
+		fallbackTimeout, _ = config.Duration(s.settings.Runtime.FallbackTimeout)
+	}
 	if r.ModelID != "" && r.ModelID != "auto" {
 		result, err = s.runWithPressure(ctx, r, s.runExplicit)
 		fallback := s.settings.WebUI.CommanderFallbackModel
-		if err != nil && result.retryable && result.TaskID != "" && fallback != "" && r.ModelID == s.settings.WebUI.DefaultModel && r.runtimeHostAdmission == nil && r.delegatedParent == "" && ctx.Err() == nil {
+		if maxAttempts > 1 && err != nil && result.retryable && result.TaskID != "" && fallback != "" && r.ModelID == s.settings.WebUI.DefaultModel && r.runtimeHostAdmission == nil && r.delegatedParent == "" && ctx.Err() == nil {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, fallbackTimeout)
+			defer cancel()
 			remaining := r.MaxCost
 			if remaining > 0 {
 				remaining -= result.reservedCost
@@ -232,10 +246,13 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 		}
 	} else {
 		result, err = s.runWithPressure(ctx, r, s.runAuto)
-		if err != nil && r.runtimeHostAdmission == nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {
+		if maxAttempts > 1 && err != nil && r.runtimeHostAdmission == nil && result.retryable && result.TaskID != "" && len(result.fallbackModelIDs) > 0 && ctx.Err() == nil {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, fallbackTimeout)
+			defer cancel()
 			fallbacks := append([]string(nil), result.fallbackModelIDs...)
-			if len(fallbacks) >= sessions.MaxTerminalRouteAttempts {
-				fallbacks = fallbacks[:sessions.MaxTerminalRouteAttempts-1]
+			if len(fallbacks) >= maxAttempts {
+				fallbacks = fallbacks[:maxAttempts-1]
 			}
 			previous := []string{result.TaskID}
 			remaining := r.MaxCost - result.reservedCost
@@ -271,6 +288,14 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 				}
 			}
 		}
+		if err != nil && result.retryable && ctx.Err() == nil {
+			err = errors.Join(err, ErrRecoveryExhausted)
+			result.retryable = false
+		}
+	}
+	if err != nil && ctx.Err() != nil {
+		result.retryable = false
+		err = errors.Join(err, ctx.Err())
 	}
 	return result, err
 }

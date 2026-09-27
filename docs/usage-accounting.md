@@ -49,12 +49,15 @@ new task receives its own `fallback` record and session attribution. Multiple
 completed provider turns within one task are summed only when all pairings and
 reported measurements are valid.
 
-Fallback attribution is not inferred from a predecessor ID alone. The complete
-lineage is bounded to 32 route attempts and each predecessor must be the exact
-durable first-turn lifecycle for `provider_retryable_no_output`, with no output,
-steering, tool proposal, or effect. Completed, canceled, context-overflow,
-partial-output, unsafe-effect, cyclic, and overlong lineages remain unaccounted
-rather than being mislabeled as safe fallback spend.
+Fallback attribution is not inferred from a predecessor ID alone. Historical
+lineage is bounded to 32 attempts (new execution defaults to three, configurable
+up to eight). Each predecessor must have one failed first turn: either
+`provider_retryable_no_output` without output or
+`provider_failed_before_tools` with only incomplete model deltas. Both reject
+steering, completed turns, tool proposals and effects. Completed, canceled,
+context-overflow, unsafe-effect, cyclic and overlong lineages remain unaccounted
+rather than being mislabeled as safe fallback spend. Failed streams retain
+unknown token usage when no trustworthy completed-turn measurement exists.
 
 ## Known, unknown, estimated, and reconciled values
 

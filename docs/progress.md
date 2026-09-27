@@ -9402,3 +9402,30 @@ Full cumulative 4c2c4d8 validation exposed TestBrowserModelsResourcesAndUsagePre
 ### 2026-09-26 — Review expanded UI shell assets
 
 Completed 4c2c4d8 validation also exposed stale shell digest/route expectations and app.js at1001 lines. Reviewed Stats/Skills integration, added their scripts to external/inline-resource checks, updated the digest and route guard assertion, and compacted declarations below1000 lines without behavior changes. Full webui race suite passed9.272s. Current isolated fullcheck remains untouched; final cumulative verification queued after it.
+
+### 2026-09-27 — Post-benchmark bounded provider recovery
+
+The CLI benchmark campaign and routing feedback are fully reconciled: all 340
+cases terminal, 313 valid (209 accepted / 104 rejected), 12 reviewed
+infrastructure exclusions and 15 user-directed GLM model-run skips. Automatic
+routing completed 19/20 passes; GLM remains failed, never declared recovered.
+Benchmark grader correction 9aa60d0 passed 43 regression tests and preserved all
+canonical records. Core recovery work began only after that final audit.
+
+Automatic routing now admits known invalid/incomplete first streams and
+provider-owned request timeouts at a durable boundary before tools or steering,
+including incomplete text. It defaults to three total candidates and a ten-minute
+fallback window, with fresh normal admission and unchanged provider safeguards.
+Pinned/host semantics, pending steering, storage ambiguity, tool proposals and
+confirmed/uncertain effects remain fenced. Failure lineage, submission recovery,
+usage classification and successful-model feedback attribution cover the new
+boundary. See docs/provider-recovery.md for configuration and exact limits.
+
+The deterministic repetition-abort-shaped regression failed before the change
+and then reached a different eligible model with correct durable submission,
+feedback and usage attribution. Targeted race validation passed across runtime, providers, sessions, telemetry,
+configuration, application and SDK tool-safety cases (work/recovery-focused-race-final.log).
+Full make check, safe remote backup and any live deployment remain pending.
+The source-root format gate encountered only preserved untracked historical
+work/ diagnostics; full validation uses the existing clean isolated checkout.
+No live GLM inference was used and the existing deployed binary/config are unchanged.

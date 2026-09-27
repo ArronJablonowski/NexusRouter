@@ -331,6 +331,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		return Result{}, err
 	}
 	result := Result{}
+	recoveryBeforeTools := false
 	compactionActivated := false
 	lastProviderFinishReason := ""
 	appliedSteering := 0
@@ -358,6 +359,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		code := "execution_failed"
 		if result.Retryable && errors.Is(cause, ErrProvider) {
 			code = "provider_retryable_no_output"
+			if recoveryBeforeTools {
+				code = "provider_failed_before_tools"
+			}
 		}
 		var providerFailure *providers.Failure
 		if errors.As(cause, &providerFailure) && providerFailure != nil && providerFailure.Code == "context_overflow" {
@@ -391,7 +395,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if err := persist(terminal, kind, Data{Code: code}); err != nil {
-			if errors.Is(err, ErrSteeringPending) && kind == TaskFailed && code == "provider_retryable_no_output" {
+			if errors.Is(err, ErrSteeringPending) && kind == TaskFailed && (code == "provider_retryable_no_output" || code == "provider_failed_before_tools") {
 				result.Retryable = false
 				if rewriteErr := persist(terminal, TaskFailed, Data{Code: "execution_failed"}); rewriteErr != nil {
 					return result, rewriteErr
@@ -708,7 +712,18 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		}
 		if err != nil {
 			var providerFailure *providers.Failure
-			safe := n == 0 && appliedSteering == 0 && text.Len() == 0 && len(calls) == 0 && ctx.Err() == nil && errors.As(err, &providerFailure) && providerFailure.Retryable && !providerFailure.Partial
+			firstTurn := n == 0 && appliedSteering == 0 && len(calls) == 0 && ctx.Err() == nil
+			hasFailure := errors.As(err, &providerFailure) && providerFailure != nil
+			safe := firstTurn && text.Len() == 0 && hasFailure && providerFailure.Retryable && !providerFailure.Partial
+			// Incomplete provider text is evidence, not a completed assistant turn.
+			// Restart only the original request, before ANY tool proposal or steering.
+			// Do not make provider/parser errors generally retryable or replay effects.
+			if firstTurn && hasFailure {
+				switch providerFailure.Code {
+				case "invalid_stream", "incomplete_stream", "incomplete_or_invalid_stream", "request_timeout":
+					safe, recoveryBeforeTools = true, true
+				}
+			}
 			result.Retryable = safe
 			out, failErr := fail(errors.Join(ErrProvider, err))
 			out.Retryable = out.Retryable && safe && errors.Is(failErr, ErrProvider)

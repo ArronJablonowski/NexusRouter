@@ -42,7 +42,7 @@ func (s *steeringFixture) Append(_ context.Context, seq int64, e runtime.Event) 
 		s.queue("late guidance")
 		return runtime.ErrSteeringPending
 	}
-	if e.Kind == runtime.TaskFailed && e.Data.Code == "provider_retryable_no_output" && s.gateFailure {
+	if e.Kind == runtime.TaskFailed && (e.Data.Code == "provider_retryable_no_output" || e.Data.Code == "provider_failed_before_tools") && s.gateFailure {
 		s.gateFailure = false
 		s.queue("late failure guidance")
 		return runtime.ErrSteeringPending
@@ -197,5 +197,24 @@ func TestSteeringDisablesRetryableFallback(t *testing.T) {
 				t.Fatal(out, err, journal.events)
 			}
 		})
+	}
+}
+
+func TestSteeringDisablesStreamRecovery(t *testing.T) {
+	for _, late := range []bool{false, true} {
+		journal := &steeringFixture{gateFailure: late}
+		if !late {
+			journal.queue("guidance")
+		}
+		loop := runtime.Loop{Journal: journal, Steering: journal, Provider: model(func(_ context.Context, _ providers.Request, emit func(providers.Chunk) error) error {
+			if err := emit(providers.Chunk{Text: "partial"}); err != nil {
+				return err
+			}
+			return &providers.Failure{Code: "invalid_stream", Partial: true}
+		})}
+		out, err := loop.Run(context.Background(), runRequest())
+		if err == nil || out.Retryable || journal.events[len(journal.events)-1].Data.Code != "execution_failed" {
+			t.Fatal(out, err, journal.events)
+		}
 	}
 }

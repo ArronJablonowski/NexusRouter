@@ -71,7 +71,7 @@ func delegateRejection(ctx context.Context, db *telemetry.Store, parent, session
 		}
 		code := e.Data.Code
 		switch code {
-		case "worker_failed", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "execution_lease_lost":
+		case "worker_failed", "canceled", "invalid_output", "empty_output", "execution_failed", "budget_exhausted", "provider_retryable_no_output", "provider_failed_before_tools", "execution_lease_lost":
 		default:
 			return delegateFailureEvidence{}, false
 		}

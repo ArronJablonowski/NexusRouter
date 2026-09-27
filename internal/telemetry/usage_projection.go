@@ -124,14 +124,14 @@ func validateRetryChainBefore(ctx context.Context, tx *sql.Tx, task, predecessor
 
 // safeRetryPredecessor accepts only the exact durable lifecycle emitted when
 // the runtime authorizes automatic fallback: one model attempt failed with
-// explicit provider retryability before producing output or attempting a tool.
+// explicit retryability without output, or a known stream failure before tools.
 // A terminal state alone is insufficient evidence because completed, canceled,
-// context-overflow, partial-output, and side-effecting tasks must never confer
+// context-overflow, completed turns, steering and side-effecting tasks never confer
 // fallback attribution.
 func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string, error) {
 	var session, state string
 	var head int64
-	if err := tx.QueryRowContext(ctx, `SELECT session_id,sequence,state FROM task_heads WHERE task_id=?`, task).Scan(&session, &head, &state); err != nil || state != "failed" || head < 3 || head > 4 {
+	if err := tx.QueryRowContext(ctx, `SELECT session_id,sequence,state FROM task_heads WHERE task_id=?`, task).Scan(&session, &head, &state); err != nil || state != "failed" || head < 3 || head > sessions.MaxTaskEvents {
 		return "", accounting.ErrUsage
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT id,sequence,body FROM events WHERE task_id=? ORDER BY sequence`, task)
@@ -140,6 +140,7 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 	}
 	defer rows.Close()
 	events := make([]runtime.Event, 0, head)
+	bytesRead := 0
 	for rows.Next() {
 		var storedID string
 		var storedSequence int64
@@ -148,14 +149,17 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 		if rows.Scan(&storedID, &storedSequence, &raw) != nil || json.Unmarshal(raw, &event) != nil || event.Validate() != nil || event.ID != storedID || event.TaskID != task || event.SessionID != session || event.CorrelationID != task || event.Sequence != storedSequence || event.Sequence != int64(len(events)+1) {
 			return "", accounting.ErrUsage
 		}
+		if len(raw) > sessions.MaxEventPageBytes-bytesRead {
+			return "", accounting.ErrUsage
+		}
+		bytesRead += len(raw)
 		canonical, encodeErr := event.Encode()
 		if encodeErr != nil || !bytes.Equal(canonical, raw) {
 			return "", accounting.ErrUsage
 		}
-		// These fields would be evidence of emitted output, a proposed tool, a
-		// dispatched tool, or an effect. None is compatible with the runtime's
-		// provider_retryable_no_output authority.
-		if event.Data.Text != "" || len(event.Data.ToolCalls) != 0 || event.Data.ToolCallID != "" || event.Data.ToolName != "" || event.Data.Effect != "" {
+		// Only incomplete model text can precede the new recovery boundary.
+		// A tool proposal, dispatch, effect or other output always fails closed.
+		if (event.Data.Text != "" && event.Kind != runtime.ModelDelta) || len(event.Data.ToolCalls) != 0 || event.Data.ToolCallID != "" || event.Data.ToolName != "" || event.Data.Effect != "" {
 			return "", accounting.ErrUsage
 		}
 		events = append(events, event)
@@ -174,12 +178,17 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 		}
 		i++
 	}
-	if start.Data.ProviderID == "" || start.Data.ModelID == "" || i+1 != len(events)-1 || events[i].Kind != runtime.TurnStarted || events[i].Data.ProviderID != start.Data.ProviderID || events[i].Data.ModelID != start.Data.ModelID {
+	if start.Data.ProviderID == "" || start.Data.ModelID == "" || i >= len(events)-1 || events[i].Kind != runtime.TurnStarted || events[i].Data.ProviderID != start.Data.ProviderID || events[i].Data.ModelID != start.Data.ModelID {
 		return "", accounting.ErrUsage
 	}
-	terminal := events[i+1]
-	if terminal.Kind != runtime.TaskFailed || terminal.Data.Code != "provider_retryable_no_output" || terminal.TurnID != events[i].TurnID || terminal.AttemptID != events[i].AttemptID {
+	terminal := events[len(events)-1]
+	if terminal.Kind != runtime.TaskFailed || (terminal.Data.Code != "provider_retryable_no_output" && terminal.Data.Code != "provider_failed_before_tools") || terminal.TurnID != events[i].TurnID || terminal.AttemptID != events[i].AttemptID {
 		return "", accounting.ErrUsage
+	}
+	for _, delta := range events[i+1 : len(events)-1] {
+		if terminal.Data.Code != "provider_failed_before_tools" || delta.Kind != runtime.ModelDelta || delta.TurnID != events[i].TurnID || delta.AttemptID != events[i].AttemptID {
+			return "", accounting.ErrUsage
+		}
 	}
 	return start.Data.RetryOfTaskID, nil
 }
@@ -229,7 +238,7 @@ func routedUsage(ctx context.Context, tx *sql.Tx, task, provider, model string) 
 }
 
 func terminalRetryClass(code string) accounting.RetryClass {
-	if code == "provider_retryable_no_output" {
+	if code == "provider_retryable_no_output" || code == "provider_failed_before_tools" {
 		return accounting.Retryable
 	}
 	switch code {

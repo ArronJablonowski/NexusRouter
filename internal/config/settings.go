@@ -218,8 +218,10 @@ type Tools struct {
 }
 
 type Runtime struct {
-	MaxTurns               int  `yaml:"max_turns" json:"max_turns"`
-	AutoApprovedCompaction bool `yaml:"auto_use_approved_summary" json:"auto_use_approved_summary"`
+	FallbackMaxAttempts    int    `yaml:"fallback_max_attempts,omitempty" json:"fallback_max_attempts,omitempty"`
+	FallbackTimeout        string `yaml:"fallback_timeout,omitempty" json:"fallback_timeout,omitempty"`
+	MaxTurns               int    `yaml:"max_turns" json:"max_turns"`
+	AutoApprovedCompaction bool   `yaml:"auto_use_approved_summary" json:"auto_use_approved_summary"`
 }
 
 func Defaults() Settings {
@@ -234,7 +236,7 @@ func Defaults() Settings {
 			OutcomeRollbackSupervisor: OutcomeRollbackSupervisor{Version: 1, Interval: "5m", Domain: "unknown", Profile: "default", Source: "user_feedback", Privacy: "local_only", MinSamples: 20, MinDrop: .1, TasksPerVersion: 20},
 			Enabled:                   true, AutoDraft: true, AutoActivate: true, Rollback: true, LocalOnly: true, MaxSkills: 3, MaxBytes: 16384}, Memory: Memory{Enabled: true, LocalOnly: true, MaxFacts: 8, MaxBytes: 16384},
 		Evaluation: Evaluation{Judge: true, Precedence: []string{"deterministic", "tool_result", "user_feedback", "llm_judge"}},
-		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{Enabled: true, ReadRoot: readRoot, MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8},
+		Security:   Security{Egress: "deny", ToolPolicy: "ask"}, Tools: Tools{Enabled: true, ReadRoot: readRoot, MaxTurns: 8}, Runtime: Runtime{MaxTurns: 8, FallbackMaxAttempts: 3, FallbackTimeout: "10m"},
 		Telemetry: Telemetry{Database: "darwin.db", ProviderHealthHistory: ProviderHealthHistory{Enabled: true, Interval: "30s", Retain: 2880}}}
 }
 
@@ -408,6 +410,15 @@ func (s Settings) Validate() error {
 	}
 	if s.Runtime.MaxTurns < 1 || s.Runtime.MaxTurns > 96 {
 		return errors.New("runtime max turns must be between 1 and 96")
+	}
+	if s.Runtime.FallbackMaxAttempts < 0 || s.Runtime.FallbackMaxAttempts > 8 {
+		return errors.New("fallback max attempts must be between 1 and 8, or 0 for default")
+	}
+	if s.Runtime.FallbackTimeout != "" {
+		d, err := Duration(s.Runtime.FallbackTimeout)
+		if err != nil || d < 100*time.Millisecond || d > 30*time.Minute {
+			return errors.New("fallback timeout must be between 100ms and 30m")
+		}
 	}
 	if s.Tools.Enabled && !filepath.IsAbs(s.Tools.ReadRoot) {
 		return errors.New("enabled tools require an absolute read root")
