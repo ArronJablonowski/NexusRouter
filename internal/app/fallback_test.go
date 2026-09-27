@@ -264,39 +264,44 @@ func TestAutomaticFallbackChainRecoversAfterIntermediatePartialText(t *testing.T
 }
 
 func TestAutomaticFallbackChainSkipsCandidateThatBecomesIneligible(t *testing.T) {
-	svc, _ := autoFixture(t)
-	middle := svc.settings.Models[0]
-	middle.ID, middle.Model, middle.FailureDomain = "m", "m", "middle-domain"
-	svc.settings.Models = append(svc.settings.Models, middle)
-	calls := []string{}
-	tagCalls := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/tags" {
-			tagCalls++
-			if tagCalls == 1 {
-				fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"m"},{"name":"z"}]}`)
-			} else {
-				fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"z"}]}`)
-			}
-			return
-		}
-		var request struct {
-			Model string `json:"model"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&request)
-		calls = append(calls, request.Model)
-		if request.Model == "a" {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		fmt.Fprintln(w, `{"message":{"content":"eligible fallback"},"done":true,"done_reason":"stop"}`)
-	}))
-	defer server.Close()
-	svc.settings.Providers[0].Endpoint = server.URL
+	for _, maxAttempts := range []int{2, 3} {
+		t.Run(fmt.Sprint("attempts-", maxAttempts), func(t *testing.T) {
+			svc, _ := autoFixture(t)
+			svc.settings.Runtime.FallbackMaxAttempts = maxAttempts
+			middle := svc.settings.Models[0]
+			middle.ID, middle.Model, middle.FailureDomain = "m", "m", "middle-domain"
+			svc.settings.Models = append(svc.settings.Models, middle)
+			calls := []string{}
+			tagCalls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/tags" {
+					tagCalls++
+					if tagCalls == 1 {
+						fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"m"},{"name":"z"}]}`)
+					} else {
+						fmt.Fprintln(w, `{"models":[{"name":"a"},{"name":"z"}]}`)
+					}
+					return
+				}
+				var request struct {
+					Model string `json:"model"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&request)
+				calls = append(calls, request.Model)
+				if request.Model == "a" {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+				fmt.Fprintln(w, `{"message":{"content":"eligible fallback"},"done":true,"done_reason":"stop"}`)
+			}))
+			defer server.Close()
+			svc.settings.Providers[0].Endpoint = server.URL
 
-	out, err := svc.Run(context.Background(), Request{Prompt: "hello"})
-	if err != nil || out.Text != "eligible fallback" || fmt.Sprint(calls) != "[a z]" || len(out.PreviousTaskIDs) != 1 || tagCalls < 2 {
-		t.Fatalf("%+v %v calls=%v tags=%d", out, err, calls, tagCalls)
+			out, err := svc.Run(context.Background(), Request{Prompt: "hello"})
+			if err != nil || out.Text != "eligible fallback" || fmt.Sprint(calls) != "[a z]" || len(out.PreviousTaskIDs) != 1 || tagCalls < 2 {
+				t.Fatalf("%+v %v calls=%v tags=%d", out, err, calls, tagCalls)
+			}
+		})
 	}
 }
 

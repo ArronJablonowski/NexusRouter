@@ -30,6 +30,9 @@ provider also retains its configured request timeout. Custom provider callbacks
 must honor cancellation; arbitrary uncooperative in-process code cannot safely
 be killed or overlapped with a successor. Exhausted candidates/attempt budget
 return an explicit recovery-exhausted error and the last failed task identity.
+Candidates rejected by fresh admission do not consume an execution attempt;
+the router may continue through the bounded candidate list within that same
+deadline to find another eligible model.
 
 Candidates remain subject to fresh privacy/locality, capability, health, resource,
 context and cost checks. No failed model is attempted twice in the selected

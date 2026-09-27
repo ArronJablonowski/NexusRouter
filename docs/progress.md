@@ -9414,7 +9414,7 @@ canonical records. Core recovery work began only after that final audit.
 
 Automatic routing now admits known invalid/incomplete first streams and
 provider-owned request timeouts at a durable boundary before tools or steering,
-including incomplete text. It defaults to three total candidates and a ten-minute
+including incomplete text. It defaults to three total attempts and a ten-minute
 fallback window, with fresh normal admission and unchanged provider safeguards.
 Pinned/host semantics, pending steering, storage ambiguity, tool proposals and
 confirmed/uncertain effects remain fenced. Failure lineage, submission recovery,
@@ -9429,3 +9429,15 @@ Full make check, safe remote backup and any live deployment remain pending.
 The source-root format gate encountered only preserved untracked historical
 work/ diagnostics; full validation uses the existing clean isolated checkout.
 No live GLM inference was used and the existing deployed binary/config are unchanged.
+
+Recovery admission-budget correction: a deterministic test with two allowed
+attempts reproduced premature exhaustion when the first fallback disappeared
+from fresh provider discovery. The router now counts dispatched attempts,
+allowing a later healthy model to use the remaining slot. Admission skips retain
+the existing overall deadline and bounded candidate list; actual failed attempts
+still consume the configured budget. The regression covers limits of two and
+three alongside the existing hard-cap, pinning, cancellation and lineage tests.
+Those focused application race tests passed in 47.002 seconds; the two-attempt
+regression failed before the correction and passed afterward.
+Full validation of this follow-up must run after the already active 2b1ac34
+check finishes; that active isolated checkout remains untouched.

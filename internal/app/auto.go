@@ -251,13 +251,12 @@ func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) 
 			ctx, cancel = context.WithTimeout(ctx, fallbackTimeout)
 			defer cancel()
 			fallbacks := append([]string(nil), result.fallbackModelIDs...)
-			if len(fallbacks) >= maxAttempts {
-				fallbacks = fallbacks[:maxAttempts-1]
-			}
 			previous := []string{result.TaskID}
 			remaining := r.MaxCost - result.reservedCost
 			for _, modelID := range fallbacks {
-				if !result.retryable || ctx.Err() != nil || remaining < 0 {
+				// Admission skips create no attempt. Preserve the execution
+				// budget for later eligible models in the bounded candidate list.
+				if len(previous) >= maxAttempts || !result.retryable || ctx.Err() != nil || remaining < 0 {
 					break
 				}
 				r.onlyModelID = modelID
