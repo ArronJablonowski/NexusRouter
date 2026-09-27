@@ -102,6 +102,9 @@ func runChatFeedback(ctx context.Context, command, argument, task string, hooks 
 			if outcome.Accepted {
 				label = "accepted"
 			}
+			if outcome.Source == evaluation.Withdrawn {
+				label = "withdrawn"
+			}
 			output.WriteString(record.ID + " " + label + " source=" + string(outcome.Source) + "\n")
 		}
 		return output.String()

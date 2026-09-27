@@ -27,6 +27,9 @@ func (s *Store) RecordEvaluation(ctx context.Context, r evaluation.Record) error
 	if err != nil {
 		return err
 	}
+	if out.Source == evaluation.Withdrawn {
+		return evaluation.ErrEvidence // withdrawal requires an existing subjective head
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -112,6 +115,9 @@ func (s *Store) Fitness(ctx context.Context, key routing.Key) (routing.Evidence,
 		return e, err
 	}
 	n := float64(e.Samples)
+	if n == 0 {
+		return routing.Evidence{}, sql.ErrNoRows
+	}
 	e.Quality /= n
 	e.Reliability /= n
 	e.Cost /= n

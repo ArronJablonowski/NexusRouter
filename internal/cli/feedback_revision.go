@@ -18,9 +18,9 @@ func runFeedbackRevision(args []string, stdout, stderr io.Writer) int {
 	task := fs.String("task", "", "completed task")
 	timeout := fs.Duration("timeout", 2*time.Minute, "database validation and feedback deadline (up to 10m)")
 	expected := fs.String("expected", "", "prior evaluation ID")
-	outcome := fs.String("outcome", "", "accepted or rejected")
-	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *timeout <= 0 || *timeout > 10*time.Minute || *path == "" || *task == "" || (args[0] == "revise" && (*expected == "" || (*outcome != "accepted" && *outcome != "rejected"))) || (args[0] == "show" && (*expected != "" || *outcome != "")) {
-		fmt.Fprintln(stderr, "usage: darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]")
+	outcome := fs.String("outcome", "", "accepted, rejected, or withdrawn")
+	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *timeout <= 0 || *timeout > 10*time.Minute || *path == "" || *task == "" || (args[0] == "revise" && (*expected == "" || (*outcome != "accepted" && *outcome != "rejected" && *outcome != "withdrawn"))) || (args[0] == "show" && (*expected != "" || *outcome != "")) {
+		fmt.Fprintln(stderr, "usage: darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected|withdrawn]")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
@@ -36,7 +36,13 @@ func runFeedbackRevision(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	if app.ReviseFeedback(ctx, *path, *task, *expected, *outcome == "accepted") != nil {
+	var err error
+	if *outcome == "withdrawn" {
+		err = app.WithdrawFeedback(ctx, *path, *task, *expected)
+	} else {
+		err = app.ReviseFeedback(ctx, *path, *task, *expected, *outcome == "accepted")
+	}
+	if err != nil {
 		fmt.Fprintln(stderr, "feedback revision rejected; inspect current history and evidence")
 		return 1
 	}

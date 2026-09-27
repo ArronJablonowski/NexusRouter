@@ -73,7 +73,7 @@ Usage:
   darwin skill-generations publish --config path --id attempt-id
     Generate saves a proposal; publish creates an inactive version, never activates it
   darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount
-  darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected]
+  darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected|withdrawn]
   darwin audits list|show|attempts --db path [--task id] [--id audit-id]
   darwin audit --config path --task id --reviewer model-id [--max-cost amount]
   darwin summary --config path --task id --model id --keep n [--max-cost amount] [--idempotency-key key]

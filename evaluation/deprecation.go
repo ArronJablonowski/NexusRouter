@@ -40,6 +40,7 @@ type DeprecationReport struct {
 	Sampled            int               `json:"sampled"`
 	EligibleSamples    int               `json:"eligible_samples"`
 	ExcludedJudgeOnly  int               `json:"excluded_judge_only"`
+	ExcludedWithdrawn  int               `json:"excluded_withdrawn,omitempty"`
 	ExecutionFailures  int               `json:"execution_failures"`
 	QualityFailures    int               `json:"quality_failures"`
 	SchemaFailures     int               `json:"schema_failures"`
@@ -80,7 +81,9 @@ func SummarizeDeprecation(records []Record, p DeprecationPolicy) (DeprecationRep
 		outcome, err := Resolve(record.Checks, false)
 		authoritative := err == nil
 		schemaFailure := record.SchemaPassed != nil && !*record.SchemaPassed
-		if !authoritative && record.ExecutionSucceeded && !schemaFailure {
+		if outcome.Source == Withdrawn {
+			out.ExcludedWithdrawn++
+		} else if !authoritative && record.ExecutionSucceeded && !schemaFailure {
 			out.ExcludedJudgeOnly++
 		} else {
 			out.EligibleSamples++

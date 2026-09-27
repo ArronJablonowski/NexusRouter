@@ -159,7 +159,7 @@ func workflowSource(ctx context.Context, tx *sql.Tx, task string, budget *int) (
 		}
 		return zero, errWorkflowSources
 	}
-	if !outcome.Accepted || !record.ExecutionSucceeded {
+	if outcome.Source == evaluation.Withdrawn || !outcome.Accepted || !record.ExecutionSucceeded {
 		return zero, errWorkflowIneligible
 	}
 	encoded, err := json.Marshal(record)

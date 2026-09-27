@@ -62,7 +62,7 @@ func readTaskFitnessTrace(ctx context.Context, tx *sql.Tx, task string, at, obse
 				return nil, errTraces
 			}
 		}
-		if validateTraceFitnessProjection(ctx, tx, history[0]) != nil {
+		if validateTraceFitnessProjection(ctx, tx, history[len(history)-1]) != nil {
 			return nil, errTraces
 		}
 		revised = revised || revisionCount > 0
@@ -78,6 +78,10 @@ func readTaskFitnessTrace(ctx context.Context, tx *sql.Tx, task string, at, obse
 }
 
 func validateTraceFitnessProjection(ctx context.Context, tx *sql.Tx, record evaluation.Record) error {
+	minimumSamples := int64(1)
+	if outcome, err := evaluation.Resolve(record.Checks, record.AllowJudge); err == nil && outcome.Source == evaluation.Withdrawn {
+		minimumSamples = 0
+	}
 	var samples, schemaSamples sql.NullInt64
 	var quality, compliance, reliability, latency, cost sql.NullFloat64
 	var updated sql.NullInt64
@@ -93,7 +97,7 @@ func validateTraceFitnessProjection(ctx context.Context, tx *sql.Tx, record eval
 	FROM fitness WHERE model=? AND provider=? AND domain=? AND profile=?`, record.Key.Model, record.Key.Provider, record.Key.Domain, record.Key.Profile).
 		Scan(&samples, &quality, &compliance, &schemaSamples, &reliability, &latency, &cost, &updated)
 	if err != nil || !samples.Valid || !schemaSamples.Valid || !quality.Valid || !compliance.Valid || !reliability.Valid || !latency.Valid || !cost.Valid || !updated.Valid ||
-		samples.Int64 < 1 || schemaSamples.Int64 < 0 || schemaSamples.Int64 > samples.Int64 ||
+		samples.Int64 < minimumSamples || schemaSamples.Int64 < 0 || schemaSamples.Int64 > samples.Int64 ||
 		invalidFitnessFloat(quality.Float64, 0, float64(samples.Int64)) ||
 		invalidFitnessFloat(compliance.Float64, 0, float64(schemaSamples.Int64)) ||
 		invalidFitnessFloat(reliability.Float64, 0, float64(samples.Int64)) ||

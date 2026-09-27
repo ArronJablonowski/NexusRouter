@@ -64,11 +64,28 @@ func (s *Store) SupersedeEvaluation(ctx context.Context, expectedID string, r ev
 	oldOutcome, _ := evaluation.Resolve(prior.Checks, prior.AllowJudge)
 	newOutcome, _ := evaluation.Resolve(r.Checks, r.AllowJudge)
 	delta := 0
-	if oldOutcome.Accepted {
+	if oldOutcome.Accepted && oldOutcome.Source != evaluation.Withdrawn {
 		delta--
 	}
-	if newOutcome.Accepted {
+	if newOutcome.Accepted && newOutcome.Source != evaluation.Withdrawn {
 		delta++
+	}
+	sampleDelta := 0
+	if oldOutcome.Source == evaluation.Withdrawn {
+		sampleDelta++
+	}
+	if newOutcome.Source == evaluation.Withdrawn {
+		sampleDelta--
+	}
+	reliability, schemas, compliance := 0, 0, 0
+	if r.ExecutionSucceeded {
+		reliability = sampleDelta
+	}
+	if r.SchemaPassed != nil {
+		schemas = sampleDelta
+		if *r.SchemaPassed {
+			compliance = sampleDelta
+		}
 	}
 	if _, err = tx.ExecContext(ctx, "INSERT INTO evaluation_revisions(id,base_id,supersedes,body) VALUES(?,?,?,?)", r.ID, history[0].ID, expectedID, body); err != nil {
 		return err
@@ -80,7 +97,7 @@ func (s *Store) SupersedeEvaluation(ctx context.Context, expectedID string, r ev
 	if n, err := result.RowsAffected(); err != nil || n != 1 {
 		return ErrConflict
 	}
-	result, err = tx.ExecContext(ctx, "UPDATE fitness SET quality=quality+? WHERE model=? AND provider=? AND domain=? AND profile=?", delta, r.Key.Model, r.Key.Provider, r.Key.Domain, r.Key.Profile)
+	result, err = tx.ExecContext(ctx, "UPDATE fitness SET quality=quality+?,samples=samples+?,reliability=reliability+?,schema_samples=schema_samples+?,compliance=compliance+?,latency=latency+?,cost=cost+? WHERE model=? AND provider=? AND domain=? AND profile=?", delta, sampleDelta, reliability, schemas, compliance, float64(sampleDelta)*float64(r.Latency), float64(sampleDelta)*r.Cost, r.Key.Model, r.Key.Provider, r.Key.Domain, r.Key.Profile)
 	if err != nil {
 		return err
 	}

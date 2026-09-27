@@ -1,5 +1,24 @@
 # Implementation evidence
 
+## 2026-09-27 — Invalid subjective feedback withdrawal
+
+CLI feedback revisions now accept `--outcome withdrawn` with the exact current
+evaluation ID. This appends an immutable withdrawal, removes its routing and
+legacy fitness contribution, excludes it from model deprecation and skill
+quality, and preserves raw history and context safety measurements. An explicit
+later accepted/rejected revision can restore the same single contribution.
+Objective checks cannot be withdrawn through subjective feedback. Older clients
+do not recognize the new evidence source and fail closed; upgrade the daemon and
+embedded SDK hosts before recording a withdrawal.
+
+The trigger was a benchmark fixture whose service status remained Stopped after
+a successful restart, contaminating one completed Gemma grade. That feedback is
+pending withdrawal; the campaign is held. Focused race checks passed across evaluation, telemetry, application and CLI,
+including withdrawal/restore, stale heads, rollback, context safety and skill
+quality exclusion. Root source check encountered unrelated unformatted scratch
+files under work; full make check runs in a clean isolated checkout. Deployment,
+live withdrawal and campaign host rebuild remain gated on full validation.
+
 ## 2026-09-16 — DAR-51 native-evidence fixture hardening
 
 A proposed Darwin/arm64 native-evidence run at clean, pushed commit

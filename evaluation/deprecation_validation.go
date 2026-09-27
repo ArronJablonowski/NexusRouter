@@ -39,7 +39,7 @@ func (r DeprecationReport) Validate() error {
 			return ErrDeprecation
 		}
 	}
-	if r.Sampled < 0 || r.Sampled > r.Policy.Window || r.EligibleSamples < 0 || r.EligibleSamples > r.Sampled || r.ExcludedJudgeOnly < 0 || r.ExcludedJudgeOnly != r.Sampled-r.EligibleSamples {
+	if r.Sampled < 0 || r.Sampled > r.Policy.Window || r.EligibleSamples < 0 || r.EligibleSamples > r.Sampled || r.ExcludedJudgeOnly < 0 || r.ExcludedWithdrawn < 0 || r.ExcludedJudgeOnly+r.ExcludedWithdrawn != r.Sampled-r.EligibleSamples {
 		return ErrDeprecation
 	}
 	if r.Failures < 0 || r.Failures > r.EligibleSamples {

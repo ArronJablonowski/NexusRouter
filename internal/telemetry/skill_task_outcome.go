@@ -150,6 +150,9 @@ func skillTaskQuality(ctx context.Context, tx *sql.Tx, out *skills.TaskOutcome) 
 	if err != nil {
 		return err
 	}
+	if quality.Source == evaluation.Withdrawn {
+		return nil
+	}
 	body, err := json.Marshal(record)
 	if err != nil {
 		return err

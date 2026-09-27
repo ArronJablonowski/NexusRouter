@@ -76,7 +76,7 @@ func (s *Store) contextEvidence(ctx context.Context, model, provider string, key
 		if resolveErr != nil {
 			return nil, resolveErr
 		}
-		if record.ExecutionSucceeded && !record.TimedOut && !record.ProviderError && (key == nil || (record.Key.Domain == key.Domain && record.Key.Profile == key.Profile)) {
+		if outcome.Source != evaluation.Withdrawn && record.ExecutionSucceeded && !record.TimedOut && !record.ProviderError && (key == nil || (record.Key.Domain == key.Domain && record.Key.Profile == key.Profile)) {
 			item.Samples++
 			if outcome.Accepted {
 				item.Quality++

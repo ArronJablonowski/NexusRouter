@@ -262,6 +262,9 @@ func browserSelectedContexts(ctx context.Context, path string, models []config.M
 		if resolveErr != nil {
 			continue
 		}
+		if outcome.Source == evaluation.Withdrawn {
+			continue
+		}
 		key := tierKey{model, provider, record.ContextTokens}
 		item := tiers[key]
 		if item == nil {

@@ -16,6 +16,9 @@ const (
 	ToolResult    Source = "tool_result"
 	UserFeedback  Source = "user_feedback"
 	LLMJudge      Source = "llm_judge"
+	// Withdrawn is an explicit correction of invalid subjective evidence.
+	// It is neither an accepted nor a rejected quality observation.
+	Withdrawn Source = "withdrawn"
 )
 
 // Check must be supplied by an authorized evaluator or feedback adapter. Model
@@ -56,6 +59,11 @@ func Resolve(checks []Check, allowJudge bool) (Outcome, error) {
 				continue
 			}
 			rank = 4
+		case Withdrawn:
+			if len(checks) != 1 || c.Passed || allowJudge {
+				return Outcome{}, ErrEvidence
+			}
+			return Outcome{Source: Withdrawn, References: []string{c.Reference}}, nil
 		default:
 			return Outcome{}, ErrEvidence
 		}

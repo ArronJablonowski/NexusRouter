@@ -103,6 +103,61 @@ func ReviseFeedbackStore(ctx context.Context, db *telemetry.Store, task, expecte
 	return db.SupersedeEvaluation(ctx, expectedID, next)
 }
 
+// WithdrawFeedback removes invalid subjective evidence from quality learning
+// without deleting its original judgment or changing execution measurements.
+func WithdrawFeedback(ctx context.Context, path, task, expectedID string) error {
+	if expectedID == "" || len(expectedID) > 128 {
+		return ErrAdmission
+	}
+	history, err := FeedbackHistory(ctx, path, task)
+	if err != nil {
+		return err
+	}
+	next, err := feedbackWithdrawal(history, task, expectedID)
+	if err != nil {
+		return err
+	}
+	db, err := telemetry.Open(ctx, path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return db.SupersedeEvaluation(ctx, expectedID, next)
+}
+
+func WithdrawFeedbackStore(ctx context.Context, db *telemetry.Store, task, expectedID string) error {
+	if expectedID == "" || len(expectedID) > 128 {
+		return ErrAdmission
+	}
+	history, err := FeedbackHistoryStore(ctx, db, task)
+	if err != nil {
+		return err
+	}
+	next, err := feedbackWithdrawal(history, task, expectedID)
+	if err != nil {
+		return err
+	}
+	return db.SupersedeEvaluation(ctx, expectedID, next)
+}
+
+func feedbackWithdrawal(history []evaluation.Record, task, expectedID string) (evaluation.Record, error) {
+	for _, prior := range history {
+		if prior.ID != expectedID {
+			continue
+		}
+		next := prior
+		hash := sha256.Sum256([]byte("feedback-withdrawal:" + task + ":" + expectedID))
+		next.ID = hex.EncodeToString(hash[:])
+		next.AllowJudge = false
+		next.Checks = []evaluation.Check{{Source: evaluation.Withdrawn, Reference: next.ID}}
+		if evaluation.ValidateRevision(prior, next) != nil {
+			return evaluation.Record{}, ErrAdmission
+		}
+		return next, nil
+	}
+	return evaluation.Record{}, ErrAdmission
+}
+
 func feedbackRevision(history []evaluation.Record, task, expectedID string, accepted bool) (evaluation.Record, error) {
 	var prior evaluation.Record
 	found := false

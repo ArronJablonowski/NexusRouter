@@ -211,7 +211,7 @@ func appendFitnessObservations(ctx context.Context, tx *sql.Tx, key routing.Key,
 				if record.ID != base.head || visited != len(versions) {
 					return evaluation.ErrEvidence
 				}
-				if directOnly && outcome.Source == evaluation.LLMJudge {
+				if outcome.Source == evaluation.Withdrawn || (directOnly && outcome.Source == evaluation.LLMJudge) {
 					out.Fitness = out.Fitness[:familyStart]
 				}
 				break

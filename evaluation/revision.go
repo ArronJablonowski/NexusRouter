@@ -9,14 +9,14 @@ func ValidateRevision(prior, next Record) error {
 		return ErrEvidence
 	}
 	old, err := Resolve(prior.Checks, prior.AllowJudge)
-	if err != nil || (old.Source != LLMJudge && old.Source != UserFeedback) {
+	if err != nil || (old.Source != LLMJudge && old.Source != UserFeedback && old.Source != Withdrawn) {
 		return ErrEvidence
 	}
 	if next.AllowJudge {
 		return ErrEvidence
 	}
 	for _, check := range next.Checks {
-		if check.Source != UserFeedback {
+		if check.Source != UserFeedback && check.Source != Withdrawn {
 			return ErrEvidence
 		}
 	}
