@@ -95,3 +95,29 @@ func TestOutputValidityColdAndUnfinishedStartsDoNotInventSamples(t *testing.T) {
 		t.Fatal(got, err)
 	}
 }
+
+// A model can be hot while the requested card scope is entirely cold. The
+// exact-scope lookup must neither borrow another domain nor invent validity.
+func TestOutputValidityDenseModelMissingCardScope(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, filepath.Join(t.TempDir(), "cold-scope.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for i := 0; i < 250; i++ {
+		appendValidity(t, s, validityEvents(fmt.Sprintf("known-%d", i), true))
+	}
+	key := validityKey()
+	key.Domain = "commandline"
+	key.Profile = "benchmark"
+	v, err := s.OutputValidity(ctx, key)
+	if err != nil || v.Samples != 0 || v.Failures != 0 {
+		t.Fatal(v, err)
+	}
+	key = validityKey()
+	v, err = s.OutputValidity(ctx, key)
+	if err != nil || v.Samples != 100 || v.Failures != 0 {
+		t.Fatal(v, err)
+	}
+}

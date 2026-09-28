@@ -182,6 +182,7 @@ func (s *Service) BrowserModels(ctx context.Context, report health.Report) (cont
 			}
 		}
 	}
+	out.Rankings = s.browserRankings(ctx, out.Models)
 	if out.Validate() != nil || !selectionValueClean(out, memorySecrets(s.settings, s.secret)) {
 		return zero, ErrInspection
 	}

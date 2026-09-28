@@ -453,16 +453,7 @@ func (s *Service) runAuto(ctx context.Context, r Request) (result Result, runErr
 	if r.ContextTokens > contextTokens {
 		contextTokens = r.ContextTokens
 	}
-	p := routing.Defaults()
-	p.MinSamples = cfg.Routing.MinSamples
-	p.Exploration = cfg.Routing.Exploration
-	p.HalfLife, _ = config.Duration(cfg.Routing.HalfLife)
-	decayResolver := routing.DecayResolverFunc(func(key routing.Key) (time.Duration, bool) {
-		halfLife, err := cfg.Routing.DecayHalfLife(key.Domain, key.Profile)
-		return halfLife, err == nil
-	})
-	w := cfg.Routing.Weights
-	p.Weights = routing.Weights{Quality: w["quality"], Compliance: w["schema_compliance"], Reliability: w["reliability"], Latency: w["latency"], Cost: w["cost"], Recency: w["recency"], Uncertainty: w["uncertainty"]}
+	p, decayResolver := configuredRoutingPolicy(cfg)
 	candidates := []routing.Candidate{}
 	evidence := map[routing.Key]routing.Evidence{}
 	observationSets := map[routing.Key]routing.ObservationSet{}

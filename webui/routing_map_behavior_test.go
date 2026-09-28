@@ -27,30 +27,17 @@ func runRoutingMapScript(t *testing.T, script string) {
 	}
 }
 
-func TestRoutingMapUsesExactDirectEvidenceBeforeConfiguredPrior(t *testing.T) {
-	script := `let snapshot={models:[{id:'a',usable:true,locality:'local',capabilities:['code']},{id:'b',usable:true,locality:'local',capabilities:['code']}],fitness:[
-{model_id:'a',domain:'coding',profile:'benchmark',score:.9,samples:20,fallback_eligible:true},
-{model_id:'a',domain:'code',profile:'default',score:.1,samples:20},
-{model_id:'b',domain:'code',profile:'default',score:.8,samples:20}],
-evidence_fallbacks:[{domain:'code',profile:'default',source_domain:'coding',source_profile:'benchmark'}],specialists_allow_cloud:false};
-const job={key:'coding',domain:'code',capabilities:['code']};
-` + routingMapSection(t, "function learned(", "function commander(") + `
-if (learned(snapshot.models[0],job).score !== .1 || ranked(job)[0].id !== 'b') throw Error('benchmark prior overrode direct rejection');
-snapshot.models[1].context_selection_status='blocked';
-if(ranked(job).some(model=>model.id==='b'))throw Error('unsafe context was ranked as eligible');
-delete snapshot.models[1].context_selection_status;
-snapshot.fitness.splice(1,1);
-if (learned(snapshot.models[0],job).score !== .9) throw Error('configured prior was not used');
-snapshot.fitness[0].fallback_eligible=false;
-if (learned(snapshot.models[0],job)!==null) throw Error('mixed or unverified judge evidence transferred');
-snapshot.fitness[0].fallback_eligible=true;
-snapshot.evidence_fallbacks=[];
-if (learned(snapshot.models[0],job) !== null) throw Error('unconfigured alias/profile evidence transferred');
-snapshot.evidence_fallbacks=[{domain:'code',profile:'default',source_domain:'missing',source_profile:'default'},{domain:'missing',profile:'default',source_domain:'coding',source_profile:'benchmark'}];
-if (learned(snapshot.models[0],job) !== null) throw Error('fallback mapping chained');
-snapshot.evidence_fallbacks=[{domain:'code',profile:'benchmark',source_domain:'coding',source_profile:'benchmark'}];
-if (learned(snapshot.models[0],job) !== null) throw Error('target profile ignored');
-`
+func TestRoutingMapUsesBackendOrderAndExplicitBenchmarkScope(t *testing.T) {
+	script := `let snapshot={models:[{id:'a',usable:true,locality:'local'},{id:'b',usable:true,locality:'local'}],fitness:[{model_id:'a',domain:'cli',profile:'default',score:1}],rankings:[{key:'cli',domain:'commandline',profile:'benchmark',models:[{model_id:'b',score:.7},{model_id:'a',score:.9}]}],specialists_allow_cloud:false};
+ const job={key:'cli',domain:'commandline',profile:'benchmark'};
+ ` + routingMapSection(t, "function learned(", "function commander(") + `
+ if(ranked(job).map(m=>m.id).join(',')!=='b,a')throw Error('client reordered backend result');
+ if(learned(snapshot.models[1],job).score!==.7)throw Error('client used lifetime heuristic');
+ if(ranked({key:'cli',domain:'cli',profile:'default'}).length)throw Error('scope leaked');
+ snapshot.models[1].context_selection_status='blocked';
+ if(ranked(job).some(m=>m.id==='b'))throw Error('blocked model shown');
+ snapshot.rankings=[];if(ranked(job).length)throw Error('fabricated fallback ranking');
+ `
 	runRoutingMapScript(t, script)
 }
 

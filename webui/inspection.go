@@ -178,6 +178,7 @@ func (f RoutingEvidenceFallbackInspection) Validate() error {
 }
 
 type ModelInspectionPage struct {
+	Rankings              []SpecialistRankingInspection       `json:"rankings,omitempty"`
 	Version               int                                 `json:"version"`
 	Availability          Availability                        `json:"availability"`
 	ConfigID              string                              `json:"config_id,omitempty"`
@@ -211,6 +212,9 @@ func (p ModelInspectionPage) Validate() error {
 		(p.CommanderID != "" && !modelIDPattern.MatchString(p.CommanderID)) || (p.CommanderFallbackID != "" && !modelIDPattern.MatchString(p.CommanderFallbackID)) || (p.CommanderSource != "" && p.CommanderSource != "configured" && p.CommanderSource != "inferred") ||
 		p.Availability == Available && (!validLocalConcurrency(p.LocalConcurrency) || p.LocalPressurePolicy != "reject" && p.LocalPressurePolicy != "wait" || !finiteNonnegative(p.LocalRAMLimitPct) || p.LocalRAMLimitPct <= 0 || p.LocalRAMLimitPct > 100 || !finiteNonnegative(p.LocalVRAMLimitPct) || p.LocalVRAMLimitPct <= 0 || p.LocalVRAMLimitPct > 100) ||
 		p.Availability == Unavailable && (len(p.Models) != 0 || len(p.LocalProviders) != 0 || len(p.Fitness) != 0 || p.RefreshedAt != nil || p.LocalTotalBytes != nil || p.LocalTotalKind != "" || p.LocalTotalCoverage != "" || p.LocalUnknownSizeCount != 0 || p.RefreshIntervalMS != 0 || p.CommanderID != "" || p.CommanderSource != "" || p.CommanderFallbackID != "" || p.LocalConcurrency != "" || p.LocalPressurePolicy != "" || p.LocalRAMLimitPct != 0 || p.LocalVRAMLimitPct != 0 || p.ManagedResidency || p.SpecialistsAllowCloud) {
+		return ErrContract
+	}
+	if validateSpecialistRankings(p.Rankings, p.Models, p.Availability) != nil {
 		return ErrContract
 	}
 	commanderFound := p.CommanderID == ""

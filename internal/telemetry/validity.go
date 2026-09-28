@@ -40,16 +40,11 @@ func (s *Store) OutputValidity(ctx context.Context, key routing.Key, requested .
 	if modelStarts == 0 {
 		return out, nil
 	}
-	// For a dense model history, reverse event scanning can stop at the recent
-	// window. For a sparse model, let SQLite start at the model index. This only
-	// changes join planning, never filtering, ordering, or the sample limit.
-	// Scope checks to the final turn's sequence window, then validate their
-	// attempt identity below. Filtering only by attempt ID would silently hide
-	// malformed final evidence. Steering after that turn invalidates its answer.
+	// Let SQLite use the model-start index even for dense histories. A reverse
+	// global scan is pathological when a populated model has no observations
+	// in the requested domain/profile (as in a multi-card ranking preview).
+	// The final eligible rowid window and all evidence checks are unchanged.
 	join := "JOIN"
-	if modelStarts > 200 {
-		join = "CROSS JOIN"
-	}
 	rows, err := s.db.QueryContext(ctx, `WITH recent AS MATERIALIZED (
 	 SELECT a.id,a.task_id,a.sequence,a.body,t.body AS start_body
 	 FROM events a `+join+` task_heads h ON h.task_id=a.task_id AND h.state IN ('completed','failed')
