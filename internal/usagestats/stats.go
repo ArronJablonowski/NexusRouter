@@ -13,15 +13,18 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/DarwinRouter/accounting"
+	"github.com/ArronJablonowski/DarwinRouter/providers"
 	_ "modernc.org/sqlite"
 )
 
 var ErrConflict = errors.New("trip changed; refresh before resetting")
 
 type Count struct {
-	Input   string `json:"input"`
-	Output  string `json:"output"`
-	Unknown int64  `json:"unknown"`
+	Input    string `json:"input"`
+	Output   string `json:"output"`
+	Unknown  int64  `json:"unknown"`
+	Measured int64  `json:"measured"`
+	Partial  int64  `json:"partial"`
 }
 type Meter struct {
 	Lifetime Count  `json:"lifetime"`
@@ -124,15 +127,21 @@ func Read(ctx context.Context, path string, locality map[[2]string]string, reset
 		return out, err
 	}
 	defer rows.Close()
-	type totals struct{ in, out, unknown int64 }
+	type totals struct{ in, out, unknown, measured, partial int64 }
 	life := map[string]totals{}
 	trip := map[string]totals{}
-	add := func(t totals, r accounting.Record) (totals, error) {
-		if r.Usage == nil {
+	add := func(t totals, r accounting.Record, partial *providers.Usage) (totals, error) {
+		usage := r.Usage
+		if usage == nil {
 			t.unknown++
-			return t, nil
+			if partial == nil {
+				return t, nil
+			}
+			usage = partial
+			t.partial++
 		}
-		i, o := r.Usage.InputTokens, r.Usage.OutputTokens
+		t.measured++
+		i, o := usage.InputTokens, usage.OutputTokens
 		if i < 0 || o < 0 || t.in > math.MaxInt64-i || t.out > math.MaxInt64-o {
 			return t, errors.New("invalid usage totals")
 		}
@@ -163,12 +172,19 @@ func Read(ctx context.Context, path string, locality map[[2]string]string, reset
 			out.Unclassified++
 			continue
 		}
-		life[kind], err = add(life[kind], record)
+		var partial *providers.Usage
+		if record.Usage == nil && current == base {
+			partial, err = measuredTurns(ctx, read, record)
+			if err != nil {
+				return out, err
+			}
+		}
+		life[kind], err = add(life[kind], record, partial)
 		if err != nil {
 			return out, err
 		}
 		if id > bounds[kind].watermark {
-			trip[kind], err = add(trip[kind], record)
+			trip[kind], err = add(trip[kind], record, partial)
 			if err != nil {
 				return out, err
 			}
@@ -179,7 +195,7 @@ func Read(ctx context.Context, path string, locality map[[2]string]string, reset
 	}
 	rows.Close()
 	count := func(t totals) Count {
-		return Count{strconv.FormatInt(t.in, 10), strconv.FormatInt(t.out, 10), t.unknown}
+		return Count{strconv.FormatInt(t.in, 10), strconv.FormatInt(t.out, 10), t.unknown, t.measured, t.partial}
 	}
 	meter := func(kind string) Meter {
 		m := bounds[kind]

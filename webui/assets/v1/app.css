@@ -361,3 +361,5 @@ input, select { padding: .55rem .7rem; }
 #stats-reset-dialog {max-width:480px;border:1px solid #476080;border-radius:16px;background:#111d30;color:#ecf3ff;padding:28px}#stats-reset-dialog::backdrop {background:#030912b8}
 @media(max-width:1000px){.stats-grid{grid-template-columns:1fr}.stats-heading{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.odometer-digit{transition:none}}
+
+.odometer-unavailable{font-size:clamp(1rem,2vw,1.5rem);letter-spacing:0}
