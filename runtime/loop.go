@@ -51,8 +51,11 @@ type ToolExecution struct {
 }
 
 type ToolResult struct {
-	Content string
-	Effect  Effect
+	// EndToolUse closes tool execution after a successful trusted submission.
+	// A normal provider final response is still required; this is not task success.
+	EndToolUse bool
+	Content    string
+	Effect     Effect
 	// Failed reports an explicit trusted-handler failure independently of side
 	// effects. A failed operation may have no effect or a confirmed effect;
 	// neither is automatically uncertainty. The loop records tool_failed.
@@ -251,6 +254,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 	}
 	originalTools := append([]providers.Tool(nil), inference.Tools...)
 	repairingResponse := false
+	toolUseEnded := false
 	if compaction != nil && (compaction.Version >= 2 || contextLineage != nil) {
 		contextLineage, err = ExtendContextLineage(contextLineage, r.TaskID, 1, compaction, inference.Messages)
 		if err != nil {
@@ -394,7 +398,7 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		// Cancellation still requires a bounded durable terminal transition.
 		terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if err := persist(terminal, kind, Data{Code: code}); err != nil {
+		if err := persist(terminal, kind, providerFailureData(kind, code, cause)); err != nil {
 			if errors.Is(err, ErrSteeringPending) && kind == TaskFailed && (code == "provider_retryable_no_output" || code == "provider_failed_before_tools") {
 				result.Retryable = false
 				if rewriteErr := persist(terminal, TaskFailed, Data{Code: "execution_failed"}); rewriteErr != nil {
@@ -640,6 +644,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			return fail(ctx.Err())
 		}
 		var text strings.Builder
+		if toolUseEnded {
+			inference.Tools = nil
+		}
 		calls := []providers.ToolCall{}
 		var usage *providers.Usage
 		done := false
@@ -738,9 +745,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 		if reason == "tool_calls" && len(calls) == 0 {
 			return fail(ErrProtocol)
 		}
-		if repairingResponse && len(calls) > 0 {
+		if (repairingResponse || toolUseEnded) && len(calls) > 0 {
 			// Output-format correction has no authority to repeat effects or
-			// start new work. Real user steering can restore the original tools.
+			// start new work. Steering can restore format-repair tools, but a
+			// trusted submission keeps tool use closed for the rest of this run.
 			return fail(ErrTool)
 		}
 		if ctx.Err() != nil {
@@ -880,6 +888,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if behaviorErr != nil {
 				return fail(ErrTool)
 			}
+			if toolUseEnded {
+				return fail(ErrTool)
+			}
 			if err := persist(ctx, ToolStarted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: UncertainEffect}); err != nil {
 				return terminalizeJournalLimit(err)
 			}
@@ -916,6 +927,9 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 			if toolErr != nil || out.Failed {
 				code = "tool_failed"
 			}
+			if out.EndToolUse && toolErr == nil && !out.Failed && out.Effect != UncertainEffect {
+				code = "tool_use_ended"
+			}
 			terminal, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			err := persist(terminal, ToolCompleted, Data{ToolCallID: call.ID, ToolName: call.Name, ToolBehavior: behavior, Effect: out.Effect, Text: out.Content, Code: code})
 			cancel()
@@ -929,6 +943,10 @@ func (l Loop) Run(ctx context.Context, r RunRequest) (returned Result, runErr er
 				return fail(ErrTool)
 			}
 			inference.Messages = append(inference.Messages, providers.Message{Role: "tool", ToolCallID: call.ID, Content: out.Content, ToolFailed: out.Failed})
+			if out.EndToolUse && !out.Failed {
+				toolUseEnded = true
+				inference.Tools = nil
+			}
 		}
 	}
 	return fail(ErrLimit)

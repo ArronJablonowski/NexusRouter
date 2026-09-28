@@ -249,9 +249,25 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 				} `json:"tool_calls"`
 			} `json:"message"`
 		}
-		if total > maxStreamBytes || !utf8.Valid(line) || !uniqueAccountingKeys(line, "prompt_eval_count", "eval_count") || json.Unmarshal(line, &c) != nil || c.Error != "" {
-			return &Failure{Code: "invalid_stream", Partial: partial}
+		detail := ""
+		switch {
+		case total > maxStreamBytes:
+			detail = "byte_limit"
+		case !utf8.Valid(line):
+			detail = "invalid_utf8"
+		case !json.Valid(line):
+			detail = "invalid_json"
+		case !uniqueAccountingKeys(line, "prompt_eval_count", "eval_count"):
+			detail = "invalid_accounting_keys"
+		case json.Unmarshal(line, &c) != nil:
+			detail = "invalid_json"
+		case c.Error != "":
+			detail = "upstream_error"
 		}
+		if detail != "" {
+			return &Failure{Code: "invalid_stream", Partial: partial, StreamDetail: detail}
+		}
+
 		if c.Message.Content != "" {
 			partial = true
 			if err := emit(Chunk{Text: c.Message.Content}); err != nil {
@@ -260,7 +276,7 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 		}
 		for _, call := range c.Message.Calls {
 			if len(calls) >= 128 || call.Function.Name == "" || !jsonObject(call.Function.Arguments) {
-				return &Failure{Code: "invalid_tool_call", Partial: partial}
+				return &Failure{Code: "invalid_tool_call", Partial: partial, StreamDetail: "invalid_tool_arguments"}
 			}
 			index++
 			partial = true
@@ -272,7 +288,7 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 				input, inputOK := parseUsageCount(c.Input)
 				output, outputOK := parseUsageCount(c.Output)
 				if !inputOK || !outputOK || input > math.MaxInt64-output {
-					return &Failure{Code: "invalid_usage", Partial: partial}
+					return &Failure{Code: "invalid_usage", Partial: partial, StreamDetail: "invalid_usage_counts"}
 				}
 				usage = &Usage{InputTokens: input, OutputTokens: output}
 			}
@@ -289,7 +305,11 @@ func readOllama(reader io.Reader, emit func(Chunk) error) error {
 			return emit(Chunk{Done: true, FinishReason: c.Reason})
 		}
 	}
-	return &Failure{Code: "incomplete_stream", Partial: partial}
+	detail := "missing_done"
+	if scanner.Err() != nil {
+		detail = "stream_read_error"
+	}
+	return &Failure{Code: "incomplete_stream", Partial: partial, StreamDetail: detail}
 }
 
 func parseUsageCount(raw json.RawMessage) (int64, bool) {

@@ -80,6 +80,10 @@ func TestAutomaticInvalidStreamRecoveryPreservesEvidenceAndFeedback(t *testing.T
 		histories = append(histories, es)
 	}
 	first := histories[0]
+	terminal := first[len(first)-1]
+	if terminal.Data.ProviderStreamDetail != "upstream_error" || terminal.Data.Text != "" {
+		t.Fatal("provider diagnostic must be metadata, not output", terminal.Data)
+	}
 	if first[len(first)-1].Data.Code != "provider_failed_before_tools" {
 		t.Fatal("missing failure boundary", first)
 	}

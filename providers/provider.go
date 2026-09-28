@@ -79,9 +79,24 @@ type ContextRolloverProvider interface {
 	ActivateContextRollover(context.Context, Request) error
 }
 type Failure struct {
-	Code      string
-	Retryable bool
-	Partial   bool
+	// StreamDetail is a bounded parser category, never upstream body text.
+	StreamDetail string
+	Code         string
+	Retryable    bool
+	Partial      bool
 }
 
-func (e *Failure) Error() string { return "provider: " + e.Code }
+func (e *Failure) Error() string {
+	detail := e.SafeStreamDetail()
+	if detail != "" {
+		return "provider: " + e.Code + " (" + detail + ")"
+	}
+	return "provider: " + e.Code
+}
+func (e *Failure) SafeStreamDetail() string {
+	switch e.StreamDetail {
+	case "byte_limit", "invalid_utf8", "invalid_json", "invalid_accounting_keys", "upstream_error", "invalid_tool_arguments", "invalid_usage_counts", "stream_read_error", "missing_done":
+		return e.StreamDetail
+	}
+	return ""
+}

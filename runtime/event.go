@@ -66,6 +66,7 @@ type Event struct {
 }
 
 type Data struct {
+	ProviderStreamDetail  string                         `json:"provider_stream_detail,omitempty"`
 	SkillContext          *SkillContextUse               `json:"skill_context,omitempty"`
 	IntentClassification  *IntentClassificationUse       `json:"intent_classification,omitempty"`
 	DelegationCompaction  *DelegationCompactionAuthority `json:"delegation_compaction_authority,omitempty"`
@@ -107,6 +108,9 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if detail := e.Data.ProviderStreamDetail; detail != "" && (e.Kind != TaskFailed || (&providers.Failure{StreamDetail: detail}).SafeStreamDetail() != detail) {
+		return errors.New("invalid provider stream diagnostic")
+	}
 	if e.Data.ContextTokens != 0 && (e.Kind != TaskStarted || e.Data.ContextTokens < 1) {
 		return errors.New("invalid context tokens placement")
 	}
