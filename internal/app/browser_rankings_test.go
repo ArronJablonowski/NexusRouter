@@ -14,6 +14,12 @@ func TestBrowserRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testing.T
 	for _, scope := range []struct{ key, domain, profile, capability string }{
 		{"cli", "commandline", "benchmark", "tools"},
 		{"ocr", "ocr", "ocr-progressive-v1", "vision"},
+		{"research", "research", "benchmark-v1", "chat"},
+		{"data_analysis", "data_analysis", "benchmark-v1", "code"},
+		{"reasoning", "reasoning", "benchmark-v1", "reasoning"},
+		{"workflow", "workflow", "benchmark-v1", "tools"},
+		{"translation", "translation", "benchmark-v1", "chat"},
+		{"audio", "audio", "benchmark-v1", "audio"},
 	} {
 		t.Run(scope.key, func(t *testing.T) {
 			testBrowserEvidenceRanking(t, scope.key, scope.domain, scope.profile, scope.capability)
@@ -60,7 +66,7 @@ func testBrowserEvidenceRanking(t *testing.T, card, domain, profile, capability 
 			cli = row
 		}
 	}
-	if cli.Domain != domain || cli.Profile != profile || len(cli.Models) != 2 || cli.Models[0].ModelID != "z" {
+	if cli.Domain != domain || cli.Profile != profile || !cli.RequiresEvidence || len(cli.Models) != 2 || cli.Models[0].ModelID != "z" {
 		t.Fatal(cli)
 	}
 	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
@@ -108,6 +114,13 @@ func testBrowserEvidenceRanking(t *testing.T, card, domain, profile, capability 
 		}
 	}
 	models[1].ContextSelectionStatus = ""
+	models[1].Capabilities = nil
+	for _, row := range s.browserRankings(ctx, models) {
+		if row.Key == card && (len(row.Models) != 1 || row.Models[0].ModelID != "a") {
+			t.Fatal("feedback granted missing capability", row)
+		}
+	}
+	models[1].Capabilities = []string{capability}
 	history, err := FeedbackHistory(ctx, cfg.Telemetry.Database, winnerTask)
 	if err != nil || len(history) == 0 {
 		t.Fatal(history, err)
@@ -126,4 +139,57 @@ func testBrowserEvidenceRanking(t *testing.T, card, domain, profile, capability 
 		}
 	}
 
+}
+
+func TestBrowserRankingNewCategoriesWaitForEvidence(t *testing.T) {
+	s, cfg := autoFixture(t)
+	db, err := telemetry.Open(context.Background(), cfg.Telemetry.Database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	cost, ram, tokens := 0.0, uint64(100), int64(32768)
+	models := []contract.ModelInspection{{ID: "a", Model: "a", Provider: "local", Configured: true, Usable: true, ContextTokens: &tokens, EstimatedCost: &cost, RAMBytes: &ram, Capabilities: []string{"chat", "code", "reasoning", "tools"}, Locality: "local"}}
+	rows := s.browserRankings(context.Background(), models)
+	if len(rows) != 14 {
+		t.Fatalf("got %d cards", len(rows))
+	}
+	for _, row := range rows {
+		switch row.Key {
+		case "research", "data_analysis", "reasoning", "workflow", "translation", "audio":
+			if row.Domain != row.Key || row.Profile != "benchmark-v1" || !row.RequiresEvidence || len(row.Models) != 0 {
+				t.Fatal("unmeasured candidate promoted", row)
+			}
+		}
+	}
+}
+
+func TestBrowserGenerationRankingRequiresGenerationCapabilityDespiteFeedback(t *testing.T) {
+	s, cfg := autoFixture(t)
+	ctx := context.Background()
+	for _, domain := range []string{"image_generation", "video_generation"} {
+		result, err := s.Run(ctx, Request{ModelID: "a", Domain: domain, Profile: "default", Prompt: "seed"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := RecordFeedback(ctx, cfg.Telemetry.Database, result.TaskID, true, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cost, ram, tokens := 0.0, uint64(100), int64(32768)
+	models := []contract.ModelInspection{}
+	for _, id := range []string{"a", "z"} {
+		capabilities := []string{"vision", "image", "video"}
+		if id == "z" {
+			capabilities = []string{"image_generation", "video_generation"}
+		}
+		models = append(models, contract.ModelInspection{ID: id, Model: id, Provider: "local", Configured: true, Usable: true, ContextTokens: &tokens, EstimatedCost: &cost, RAMBytes: &ram, Capabilities: capabilities, Locality: "local"})
+	}
+	for _, row := range s.browserRankings(ctx, models) {
+		if row.Key == "image_generation" || row.Key == "video_generation" {
+			if len(row.Models) != 1 || row.Models[0].ModelID != "z" {
+				t.Fatal("image understanding treated as generation", row)
+			}
+		}
+	}
 }

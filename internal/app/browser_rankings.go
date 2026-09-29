@@ -18,8 +18,14 @@ var specialistScopes = []specialistScope{
 	{"ocr", "ocr", "ocr-progressive-v1", []string{"ocr", "vision", "image"}},
 	{"cli", "commandline", "benchmark", []string{"tools"}},
 	{"general", "general", "default", []string{"chat", "reasoning"}},
-	{"image_generation", "image_generation", "default", []string{"image_generation", "image", "vision"}},
-	{"video_generation", "video_generation", "default", []string{"video_generation", "video", "vision"}},
+	{"research", "research", "benchmark-v1", []string{"chat", "reasoning", "summarize"}},
+	{"data_analysis", "data_analysis", "benchmark-v1", []string{"code", "reasoning"}},
+	{"reasoning", "reasoning", "benchmark-v1", []string{"chat", "reasoning"}},
+	{"workflow", "workflow", "benchmark-v1", []string{"tools"}},
+	{"translation", "translation", "benchmark-v1", []string{"chat", "translation", "multilingual"}},
+	{"audio", "audio", "benchmark-v1", []string{"audio", "speech", "transcription", "speech_to_text", "text_to_speech", "audio_generation"}},
+	{"image_generation", "image_generation", "default", []string{"image_generation"}},
+	{"video_generation", "video_generation", "default", []string{"video_generation"}},
 	{"writing", "writing", "default", []string{"writing", "chat", "summarize"}},
 	{"creative", "creative", "default", []string{"creative", "writing", "chat"}},
 }
@@ -49,6 +55,10 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 			for _, capability := range scope.capabilities {
 				matches = matches || slices.Contains(m.Capabilities, capability)
 			}
+			// Evidence cannot grant a missing execution or generation capability.
+			if !matches && (scope.profile != "default" || scope.key == "image_generation" || scope.key == "video_generation") {
+				continue
+			}
 			key := routing.Key{Model: m.Model, Provider: m.Provider, Domain: scope.domain, Profile: scope.profile}
 			set, err := db.ObservationSet(ctx, key, s.settings.Evaluation.Judge)
 			if err != nil {
@@ -64,7 +74,7 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 					}
 				}
 			}
-			if scope.profile != "default" && (len(set.Fitness) == 0 || !matches) {
+			if scope.profile != "default" && len(set.Fitness) == 0 {
 				continue
 			}
 			if !matches && len(set.Fitness) == 0 && len(set.Advisory) == 0 {
@@ -101,7 +111,7 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 			contextTokens = 32768
 		}
 		selection, err := routing.Select(routing.Request{Mode: s.settings.Mode, Domain: scope.domain, Profile: scope.profile, LocalRequired: !s.settings.WebUI.SpecialistsAllowCloud, ContextTokens: contextTokens}, p, candidates, evidence, now, 0)
-		row := contract.SpecialistRankingInspection{Key: scope.key, Domain: scope.domain, Profile: scope.profile, Models: []contract.SpecialistRankInspection{}}
+		row := contract.SpecialistRankingInspection{Key: scope.key, Domain: scope.domain, Profile: scope.profile, RequiresEvidence: scope.profile != "default", Models: []contract.SpecialistRankInspection{}}
 		if err == nil {
 			for _, rank := range selection.Ranked {
 				key := routing.Key{Model: rank.Model, Provider: rank.Provider, Domain: scope.domain, Profile: scope.profile}

@@ -93,3 +93,24 @@ func TestRoutingMapRefreshUsesBackendEvidenceProfileAndNewOrder(t *testing.T) {
  `
 	runRoutingMapScript(t, script)
 }
+
+func TestRoutingMapExpandedCategoriesValidateAndAwaitEvidence(t *testing.T) {
+	script := routingMapSection(t, "const jobs = [", "let snapshot =") + `
+ const models=[{id:'a',usable:true,locality:'local'}];
+ let snapshot={models,specialists_allow_cloud:false,rankings:jobs.map(job=>({key:job.key,domain:job.domain||job.key,profile:'benchmark-v1',requires_evidence:true,models:[]}))};
+ ` + routingMapSection(t, "function validRankings(", "function validSnapshot(") + routingMapSection(t, "function learned(", "function commander(") + `
+ if(jobs.length!==14 || !validRankings(snapshot.rankings,models))throw Error('expanded response rejected');
+ for(const key of ['research','data_analysis','reasoning','workflow','translation','audio']) {
+   const job=jobs.find(job=>job.key===key);if(!job)throw Error('missing category '+key);
+   if(!emptyRankingLabel(job).includes('Insufficient measured evidence')||ranked(job).length)throw Error('invented winner');
+   if(scopeLabel(job)!==key+' / benchmark-v1')throw Error('wrong scope');
+ }
+ const row=snapshot.rankings.find(row=>row.key==='research');
+ row.models=[{model_id:'a',domain:'research',profile:'benchmark-v1',score:.8,confidence:.1,samples:0}];
+ if(validRankings(snapshot.rankings,models))throw Error('zero-sample measured ranking accepted');
+ row.models[0].samples=1;
+ if(!validRankings(snapshot.rankings,models)||ranked({key:'research'})[0].id!=='a')throw Error('new evidence not displayed');
+ if(validRankings([...snapshot.rankings,{key:'overflow',domain:'overflow',profile:'default',models:[]}],models))throw Error('unbounded response accepted');
+ `
+	runRoutingMapScript(t, script)
+}

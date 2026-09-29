@@ -3,10 +3,11 @@ package webui
 // SpecialistRankingInspection is a deterministic, read-only policy preview.
 // It neither reserves capacity nor promises admission for a future request.
 type SpecialistRankingInspection struct {
-	Key     string                     `json:"key"`
-	Domain  string                     `json:"domain"`
-	Profile string                     `json:"profile"`
-	Models  []SpecialistRankInspection `json:"models"`
+	Key              string                     `json:"key"`
+	Domain           string                     `json:"domain"`
+	Profile          string                     `json:"profile"`
+	RequiresEvidence bool                       `json:"requires_evidence,omitempty"`
+	Models           []SpecialistRankInspection `json:"models"`
 }
 type SpecialistRankInspection struct {
 	ModelID    string  `json:"model_id"`
@@ -18,7 +19,7 @@ type SpecialistRankInspection struct {
 }
 
 func validateSpecialistRankings(rows []SpecialistRankingInspection, models []ModelInspection, availability Availability) error {
-	if len(rows) > 8 || availability == Unavailable && len(rows) > 0 {
+	if len(rows) > 14 || availability == Unavailable && len(rows) > 0 {
 		return ErrContract
 	}
 	known := map[string]bool{}
@@ -33,7 +34,7 @@ func validateSpecialistRankings(rows []SpecialistRankingInspection, models []Mod
 		seen[row.Key] = true
 		ids := map[string]bool{}
 		for _, m := range row.Models {
-			if !known[m.ModelID] || ids[m.ModelID] || !modelIDPattern.MatchString(m.Domain) || !modelIDPattern.MatchString(m.Profile) || !finite(m.Score) || m.Score < 0 || m.Score > 1 || !finite(m.Confidence) || m.Confidence < 0 || m.Confidence > 1 || m.Samples < 0 {
+			if !known[m.ModelID] || ids[m.ModelID] || !modelIDPattern.MatchString(m.Domain) || !modelIDPattern.MatchString(m.Profile) || !finite(m.Score) || m.Score < 0 || m.Score > 1 || !finite(m.Confidence) || m.Confidence < 0 || m.Confidence > 1 || m.Samples < 0 || row.RequiresEvidence && m.Samples == 0 {
 				return ErrContract
 			}
 			ids[m.ModelID] = true
