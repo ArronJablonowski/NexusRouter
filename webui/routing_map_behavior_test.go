@@ -80,3 +80,16 @@ if(modelChip(model,0,job).children[1].open)throw Error('collapsed model reopened
 `
 	runRoutingMapScript(t, script)
 }
+
+func TestRoutingMapRefreshUsesBackendEvidenceProfileAndNewOrder(t *testing.T) {
+	script := `let snapshot={models:[{id:'a',usable:true,locality:'local'},{id:'b',usable:true,locality:'local'}],rankings:[{key:'ocr',domain:'ocr',profile:'ocr-progressive-v1',models:[{model_id:'b',score:.8,samples:22},{model_id:'a',score:.4,samples:1}]}],specialists_allow_cloud:false};
+ const job={key:'ocr'};
+ ` + routingMapSection(t, "function learned(", "function commander(") + `
+ if(scopeLabel(job)!=='ocr / ocr-progressive-v1')throw Error('hidden or incorrect evidence profile');
+ if(ranked(job).map(m=>m.id).join(',')!=='b,a')throw Error('benchmark ranking lost');
+ snapshot.rankings[0]={key:'ocr',domain:'ocr',profile:'ocr-progressive-v2',models:[{model_id:'a',score:.9,samples:30},{model_id:'b',score:.3,samples:22}]};
+ if(scopeLabel(job)!=='ocr / ocr-progressive-v2'||ranked(job)[0].id!=='a'||learned(snapshot.models[0],job).samples!==30)throw Error('next refresh pinned old profile or winner');
+ snapshot.rankings=[];if(ranked(job).length||scopeLabel(job)!=='Evidence scope unavailable')throw Error('fabricated missing scope');
+ `
+	runRoutingMapScript(t, script)
+}

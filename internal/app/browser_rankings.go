@@ -15,7 +15,7 @@ type specialistScope struct {
 
 var specialistScopes = []specialistScope{
 	{"coding", "code", "default", []string{"code", "coding", "reasoning"}},
-	{"ocr", "ocr", "default", []string{"ocr", "vision", "image"}},
+	{"ocr", "ocr", "ocr-progressive-v1", []string{"ocr", "vision", "image"}},
 	{"cli", "commandline", "benchmark", []string{"tools"}},
 	{"general", "general", "default", []string{"chat", "reasoning"}},
 	{"image_generation", "image_generation", "default", []string{"image_generation", "image", "vision"}},
@@ -64,7 +64,7 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 					}
 				}
 			}
-			if scope.profile == "benchmark" && (len(set.Fitness) == 0 || !matches) {
+			if scope.profile != "default" && (len(set.Fitness) == 0 || !matches) {
 				continue
 			}
 			if !matches && len(set.Fitness) == 0 && len(set.Advisory) == 0 {
@@ -97,7 +97,7 @@ func (s *Service) browserRankings(ctx context.Context, models []contract.ModelIn
 			evidence[key] = e
 		}
 		contextTokens := 1
-		if scope.profile == "benchmark" {
+		if scope.profile != "default" {
 			contextTokens = 32768
 		}
 		selection, err := routing.Select(routing.Request{Mode: s.settings.Mode, Domain: scope.domain, Profile: scope.profile, LocalRequired: !s.settings.WebUI.SpecialistsAllowCloud, ContextTokens: contextTokens}, p, candidates, evidence, now, 0)

@@ -10,18 +10,29 @@ import (
 	"time"
 )
 
-func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testing.T) {
+func TestBrowserRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testing.T) {
+	for _, scope := range []struct{ key, domain, profile, capability string }{
+		{"cli", "commandline", "benchmark", "tools"},
+		{"ocr", "ocr", "ocr-progressive-v1", "vision"},
+	} {
+		t.Run(scope.key, func(t *testing.T) {
+			testBrowserEvidenceRanking(t, scope.key, scope.domain, scope.profile, scope.capability)
+		})
+	}
+}
+
+func testBrowserEvidenceRanking(t *testing.T, card, domain, profile, capability string) {
 	s, cfg := autoFixture(t)
 	ctx := context.Background()
 	var winnerTask string
 	for i := range s.settings.Models {
 		s.settings.Models[i].ContextTokens = 32768
-		s.settings.Models[i].Capabilities = []string{"tools"}
+		s.settings.Models[i].Capabilities = []string{capability}
 	}
 	for _, seed := range []struct {
 		id, domain, profile string
 		pass                bool
-	}{{"a", "commandline", "benchmark", false}, {"z", "commandline", "benchmark", true}, {"a", "cli", "default", true}} {
+	}{{"a", domain, profile, false}, {"z", domain, profile, true}, {"a", domain, "default", true}} {
 		result, err := s.Run(ctx, Request{ModelID: seed.id, Domain: seed.domain, Profile: seed.profile, Prompt: "seed"})
 		if err != nil {
 			t.Fatal(err)
@@ -40,16 +51,16 @@ func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testin
 	tokens := int64(32768)
 	models := []contract.ModelInspection{}
 	for _, id := range []string{"a", "z"} {
-		models = append(models, contract.ModelInspection{ID: id, Model: id, Provider: "local", Configured: true, Usable: true, ContextTokens: &tokens, EstimatedCost: &cost, RAMBytes: &ram, Capabilities: []string{"tools"}, Locality: "local"})
+		models = append(models, contract.ModelInspection{ID: id, Model: id, Provider: "local", Configured: true, Usable: true, ContextTokens: &tokens, EstimatedCost: &cost, RAMBytes: &ram, Capabilities: []string{capability}, Locality: "local"})
 	}
 	rows := s.browserRankings(ctx, models)
 	var cli contract.SpecialistRankingInspection
 	for _, row := range rows {
-		if row.Key == "cli" {
+		if row.Key == card {
 			cli = row
 		}
 	}
-	if cli.Domain != "commandline" || cli.Profile != "benchmark" || len(cli.Models) != 2 || cli.Models[0].ModelID != "z" {
+	if cli.Domain != domain || cli.Profile != profile || len(cli.Models) != 2 || cli.Models[0].ModelID != "z" {
 		t.Fatal(cli)
 	}
 	db, err := telemetry.OpenReadOnly(ctx, cfg.Telemetry.Database)
@@ -62,7 +73,7 @@ func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testin
 	evidence := map[routing.Key]routing.Evidence{}
 	candidates := []routing.Candidate{}
 	for _, m := range models {
-		key := routing.Key{Model: m.Model, Provider: m.Provider, Domain: "commandline", Profile: "benchmark"}
+		key := routing.Key{Model: m.Model, Provider: m.Provider, Domain: domain, Profile: profile}
 		set, err := db.ObservationSet(ctx, key, s.settings.Evaluation.Judge)
 		if err != nil {
 			t.Fatal(err)
@@ -81,7 +92,7 @@ func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testin
 		evidence[key] = e
 		candidates = append(candidates, routing.Candidate{Model: m.Model, Provider: m.Provider, Local: true, Capabilities: m.Capabilities, ContextTokens: 32768, Healthy: true, PolicyAllowed: true, CapacityAvailable: true})
 	}
-	expected, err := routing.Select(routing.Request{Mode: "local_only", Domain: "commandline", Profile: "benchmark", LocalRequired: true, ContextTokens: 32768}, p, candidates, evidence, now, 0)
+	expected, err := routing.Select(routing.Request{Mode: "local_only", Domain: domain, Profile: profile, LocalRequired: true, ContextTokens: 32768}, p, candidates, evidence, now, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +103,7 @@ func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testin
 	}
 	models[1].ContextSelectionStatus = "blocked"
 	for _, row := range s.browserRankings(ctx, models) {
-		if row.Key == "cli" && (len(row.Models) != 1 || row.Models[0].ModelID != "a") {
+		if row.Key == card && (len(row.Models) != 1 || row.Models[0].ModelID != "a") {
 			t.Fatal("unsafe candidate shown", row)
 		}
 	}
@@ -106,7 +117,7 @@ func TestBrowserCLIRankingUsesDispatchWeightsCurrentHeadsAndExactScope(t *testin
 	}
 	s.now = func() time.Time { return time.Now().UTC() }
 	for _, row := range s.browserRankings(ctx, models) {
-		if row.Key == "cli" {
+		if row.Key == card {
 			for _, rank := range row.Models {
 				if rank.ModelID == "z" {
 					t.Fatal("withdrawn-only evidence ranked as benchmark evidence", row)

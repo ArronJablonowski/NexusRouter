@@ -136,10 +136,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: backend-scoped rankings and partial-token odometers.
+	// Reviewed v1 assets: backend-owned OCR evidence scopes and live ranking labels.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "7461eac9e0006472892f70f32cb6f0b756d14a377c70bd5254a60e020ea072aa" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "e6c5eee19fb27deac387a12d00efa187fea15e2beae813e8ae4d1e8e88845ae5" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {

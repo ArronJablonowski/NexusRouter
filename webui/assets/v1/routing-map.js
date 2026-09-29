@@ -7,7 +7,7 @@
 	const jobs = [
 		{key:"coding", domain:"code", label:"Coding", capabilities:["code","coding","reasoning"]},
 		{key:"ocr", label:"OCR / document vision", capabilities:["ocr","vision","image"]},
-		{key:"cli", domain:"commandline", profile:"benchmark", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"]},
+		{key:"cli", domain:"commandline", label:"CLI and terminal", capabilities:["cli","terminal","tools","code"]},
 		{key:"general", label:"General use", capabilities:["chat","reasoning"]},
 		{key:"image_generation", label:"Image generation", capabilities:["image_generation","image","vision"]},
 		{key:"video_generation", label:"Video generation", capabilities:["video_generation","video","vision"]},
@@ -28,11 +28,15 @@
 	function validSnapshot(value) { const concurrency = value && value.local_concurrency === "auto" ? 1 : Number(value && value.local_concurrency); return value && value.version === 1 && value.availability === "available" && Array.isArray(value.models) && value.models.length <= 256 && value.models.every(validModel) && validRankings(value.rankings,value.models) && Array.isArray(value.fitness) && value.fitness.length <= 4096 && value.fitness.every(validFitness) && validFallbacks(value.evidence_fallbacks) && (value.commander_id === undefined || idPattern.test(value.commander_id)) && (value.commander_fallback_id === undefined || idPattern.test(value.commander_fallback_id)) && (value.local_concurrency === "auto" || Number.isInteger(concurrency) && concurrency >= 1 && concurrency <= 64 && String(concurrency) === value.local_concurrency) && ["reject","wait"].includes(value.local_pressure_policy) && Number.isFinite(value.local_ram_limit_pct) && value.local_ram_limit_pct > 0 && value.local_ram_limit_pct <= 100 && Number.isFinite(value.local_vram_limit_pct) && value.local_vram_limit_pct > 0 && value.local_vram_limit_pct <= 100 && typeof value.managed_residency === "boolean" && typeof value.specialists_allow_cloud === "boolean"; }
 	async function inventory() { const response = await fetch(base + "/api/v1/models", {credentials:"same-origin", cache:"no-store", headers:{Accept:"application/json"}}); if (!response.ok) throw new Error("inventory unavailable"); const value = await response.json(); if (!validSnapshot(value)) throw new Error("invalid inventory"); return value; }
 	function learned(model, job) {
-        const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key) && item.profile === (job.profile || "default"));
+        const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
         return scope ? scope.models.find(item => item.model_id === model.id) || null : null;
     }
+    function scopeLabel(job) {
+        const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
+        return scope ? scope.domain + " / " + scope.profile : "Evidence scope unavailable";
+    }
     function ranked(job) {
-        const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key) && item.profile === (job.profile || "default"));
+        const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
         return scope ? scope.models.map(item => snapshot.models.find(model => model.id === item.model_id)).filter(model => model && model.usable && model.context_selection_status !== "blocked" && (snapshot.specialists_allow_cloud || model.locality === "local")) : [];
     }
 	function commander() {
@@ -47,10 +51,10 @@
 	function modelChip(model, index, job) {
 		const node=element("article","route-model"), evidence=learned(model,job), disclosure=element("details","route-model-details"), summary=element("summary","route-model-summary");
 		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); summary.addEventListener("click",()=>{ if (disclosure.open) expandedModels.delete(expansionKey); else expandedModels.add(expansionKey); persistExpandedModels(); });
-		const synopsis=evidence ? evidence.score.toFixed(3) + " routing score · " + evidence.samples + " samples · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · ranking unavailable";
+		const synopsis=evidence ? evidence.score.toFixed(3) + " routing score · " + (evidence.samples ? evidence.samples + " samples" : "unmeasured policy prior") + " · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · ranking unavailable";
 		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
 		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Selected context",selectedContextLabel(model)),fact("Advertised maximum",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
-        if (evidence) facts.append(fact("Evidence domain",evidence.domain),fact("Evidence profile",evidence.profile),fact("Target scope",(job.domain || job.key)+" / "+(job.profile || "default")),fact("Routing score",evidence.score.toFixed(6)+" (not a pass probability)"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
+        if (evidence) facts.append(fact("Evidence domain",evidence.domain),fact("Evidence profile",evidence.profile),fact("Target scope",scopeLabel(job)),fact("Routing score",evidence.score.toFixed(6)+" (not a pass probability)"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
 
 		disclosure.append(facts); node.append(element("span","route-rank",String(index+1).padStart(2,"0")),disclosure); return node;
 	}
@@ -96,19 +100,21 @@
 			document.querySelector("#resource-guard-detail").textContent = "RAM / unified memory " + snapshot.local_ram_limit_pct + "% · VRAM " + snapshot.local_vram_limit_pct + "% · pressure " + snapshot.local_pressure_policy + (snapshot.managed_residency ? " · managed unload enabled" : "");
 			document.querySelector("#specialist-policy").textContent = snapshot.specialists_allow_cloud ? "Top 3 by backend routing policy · local + cloud" : "Top 3 by backend routing policy · local endpoints only";
 			const grid = document.querySelector("#specialist-grid"); grid.replaceChildren();
-			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading,element("small","route-scope",(job.domain || job.key)+" / "+(job.profile || "default")+" · policy preview")); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty","No eligible backend ranking available")); else models.forEach((model,index) => routes.append(modelChip(model,index,job))); card.append(routes); grid.append(card); }
+			for (const job of jobs) { const card = element("article","specialist-card"), heading = element("div","specialist-heading"); card.dataset.route = job.key; heading.append(element("span","job-glyph",job.label.slice(0,2).toUpperCase()), element("h3","",job.label)); card.append(heading,element("small","route-scope",scopeLabel(job)+" · policy preview")); const routes = element("div","route-stack"), models = ranked(job); if (!models.length) routes.append(element("p","route-empty","No eligible backend ranking available")); else models.forEach((model,index) => routes.append(modelChip(model,index,job))); card.append(routes); grid.append(card); }
 			drawBranches();
 			const creative = ranked(jobs[jobs.length-1]), choices = document.querySelector("#creative-choices"), preference = document.querySelector("#creative-preference"); choices.replaceChildren();
 			creative.forEach(model => { const button = element("button","tron-choice",model.model); button.type="button"; button.setAttribute("aria-pressed",String(creativePreference === model.id)); button.addEventListener("click",() => { creativePreference = model.id; for (const item of choices.querySelectorAll("button")) item.setAttribute("aria-pressed",String(item === button)); preference.textContent = "User preference recorded for this consultation: " + model.model + "."; }); choices.append(button); });
 			preference.textContent = creativePreference ? "Current consultation preference: " + creativePreference + ". The commander should ask again when the creative brief materially changes." : "No preference recorded. The commander must ask before choosing between subjective outputs.";
-			status.textContent = "Grid synchronized · " + snapshot.models.length + " models · learned evidence updates automatically. Scores include configured weights and decay. Dispatch still checks request constraints, exploration and available capacity.";
+			status.textContent = "Grid synchronized at " + new Date().toLocaleTimeString() + " · " + snapshot.models.length + " models · learned evidence updates automatically. Scores include configured weights and decay. Dispatch still checks request constraints, exploration and available capacity.";
 		} catch (_) { if (generation !== routingGeneration) return; status.textContent = "Routing grid unavailable. The last display was cleared."; document.querySelector("#specialist-grid").replaceChildren(); }
 		window.clearTimeout(routingTimer); if (!document.hidden) routingTimer = window.setTimeout(loadRouting, snapshot && snapshot.refresh_interval_ms || 10000);
 	}
 
 	async function report(model, domain, threshold) {
-		const scope = jobs.find(job => job.key === domain) || {key:domain};
-		const query = new URLSearchParams({model:model.id, domain:scope.domain || scope.key, profile:scope.profile || "default", window:"100", min_samples:"20", failure_threshold:String(threshold)});
+		const job = jobs.find(job => job.key === domain) || {key:domain};
+		const scope = (snapshot.rankings || []).find(item => item.key === job.key && item.domain === (job.domain || job.key));
+		if (!scope) throw new Error("evidence scope unavailable");
+		const query = new URLSearchParams({model:model.id, domain:scope.domain, profile:scope.profile, window:"100", min_samples:"20", failure_threshold:String(threshold)});
 		const response = await fetch(base + "/api/v1/models/deprecation?" + query.toString(), {credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}});
 		if (!response.ok) throw new Error("report unavailable"); const value = await response.json();
 		if (!value || value.version !== 1 || value.configured_model_id !== model.id || typeof value.candidate !== "boolean" || !Number.isSafeInteger(value.eligible_samples) || typeof value.failure_rate !== "number" || typeof value.reason !== "string") throw new Error("invalid report");
