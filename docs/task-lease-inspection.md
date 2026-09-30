@@ -4,7 +4,7 @@ Inspect a task's durable resource-lease and recovery counts without executing,
 repairing or reclaiming anything:
 
 ```sh
-darwin task leases --db /path/to/telemetry.db --task TASK_ID
+nexus task leases --db /path/to/telemetry.db --task TASK_ID
 ```
 
 The Go SDK exposes `Client.InspectTaskLeases(ctx, taskID)`. A running daemon

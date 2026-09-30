@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 type summaryArgs struct {
@@ -53,7 +53,7 @@ func parseSummaryArgs(args []string) (summaryArgs, error) {
 func runSummary(args []string, stdout, stderr io.Writer) int {
 	parsed, err := parseSummaryArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin summary --config path --task id --model id --keep n [--max-cost amount] (creates a draft only)")
+		fmt.Fprintln(stderr, "usage: nexus summary --config path --task id --model id --keep n [--max-cost amount] (creates a draft only)")
 		return 2
 	}
 	cfg, err := config.Load(config.Options{ProjectFile: parsed.config, Env: config.Environment(os.Environ())})
@@ -99,7 +99,7 @@ func runSummary(args []string, stdout, stderr io.Writer) int {
 
 func runSummaries(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin summaries list|show|recoveries --db path [--task id --after id --limit n] [--id id]")
+		fmt.Fprintln(stderr, "usage: nexus summaries list|show|recoveries --db path [--task id --after id --limit n] [--id id]")
 		return 2
 	}
 	if len(args) == 0 || (args[0] != "list" && args[0] != "show" && args[0] != "recoveries") {

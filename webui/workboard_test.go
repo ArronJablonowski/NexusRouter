@@ -37,7 +37,7 @@ func TestAcceptanceCriterionAdmitsNamespacedBuiltinValidator(t *testing.T) {
 
 func boardFixture() Board {
 	now := workboardTime()
-	return Board{Version: 1, ID: "board-a", Revision: 1, LayoutRevision: 1, EventSequence: 1, State: "active", Title: "DarwinRouter", Description: "Work", CardCount: 1, ActiveClaims: 1, CreatedAt: now, UpdatedAt: now}
+	return Board{Version: 1, ID: "board-a", Revision: 1, LayoutRevision: 1, EventSequence: 1, State: "active", Title: "NexusRouter", Description: "Work", CardCount: 1, ActiveClaims: 1, CreatedAt: now, UpdatedAt: now}
 }
 
 func columnFixtures(boardID string) []Column {
@@ -393,8 +393,8 @@ func TestSnapshotRejectsDuplicateAndOversizedCards(t *testing.T) {
 func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 	compiler := jsonschema.NewCompiler()
 	for _, item := range []struct{ location, path string }{
-		{"https://darwinrouter.local/schema/webui/v1", "schema/v1.schema.json"},
-		{"https://darwinrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/v1", "schema/v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
 	} {
 		body, err := os.ReadFile(item.path)
 		if err != nil {
@@ -445,7 +445,7 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, body, true)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, body, true)
 	}
 	negative := []struct{ definition, body string }{
 		{"board", `{"version":1,"id":"board-a","revision":1,"layout_revision":1,"event_sequence":1,"state":"archived","title":"Board","description":"","card_count":1,"active_claims":1,"created_at":"2026-09-09T12:00:00Z","updated_at":"2026-09-09T12:00:00Z"}`},
@@ -458,7 +458,7 @@ func TestPublishedWorkboardSchemaAcceptsProjectionFixtures(t *testing.T) {
 		{"attempt", `{"version":1,"id":"attempt-a","board_id":"board-a","card_id":"card-a","ordinal":1,"revision":1,"state":"accepted","worker_id":"worker-a","criteria_revision":1,"criteria_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","policy_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","budget":{},"criteria":[],"task_ids":[],"session_ids":[],"evidence":[],"started_at":"2026-09-09T12:00:00Z"}`},
 	}
 	for _, item := range negative {
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, json.RawMessage(item.body), false)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/workboard-v1#/$defs/"+item.definition, json.RawMessage(item.body), false)
 	}
 }
 

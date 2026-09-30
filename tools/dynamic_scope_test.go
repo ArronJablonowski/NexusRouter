@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 const dynamicMutationSchema = `{"type":"object","properties":{"board_id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"},"idempotency_key":{"type":"string","minLength":16,"maxLength":128}},"required":["board_id","idempotency_key"],"additionalProperties":false}`

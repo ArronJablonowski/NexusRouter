@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	darwinruntime "github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	darwinruntime "github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"modernc.org/sqlite"
 )
 

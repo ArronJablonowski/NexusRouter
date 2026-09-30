@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 func validInstallEvidenceFixture() InstallRehearsalEvidence {
 	version := "1.0.0-rc.11"
-	artifact := "DarwinRouter_" + version + "_darwin_arm64.tar.gz"
+	artifact := "NexusRouter_" + version + "_darwin_arm64.tar.gz"
 	return InstallRehearsalEvidence{
 		SchemaVersion: installEvidenceSchema, Scope: installEvidenceScope,
 		Release:      InstallEvidenceRelease{Version: version, Commit: strings.Repeat("a", 40)},
@@ -112,7 +112,7 @@ func TestVerifyInstallRehearsalEvidenceBindsAllExpectations(t *testing.T) {
 		"commit":          func(e *InstallRehearsalExpectations) { e.Commit = strings.Repeat("b", 40) },
 		"os":              func(e *InstallRehearsalExpectations) { e.TargetOS = "linux" },
 		"arch":            func(e *InstallRehearsalExpectations) { e.TargetArch = "amd64" },
-		"artifact":        func(e *InstallRehearsalExpectations) { e.ArtifactName = "DarwinRouter_1.0.0-rc.11_linux_arm64.tar.gz" },
+		"artifact":        func(e *InstallRehearsalExpectations) { e.ArtifactName = "NexusRouter_1.0.0-rc.11_linux_arm64.tar.gz" },
 		"artifact_digest": func(e *InstallRehearsalExpectations) { e.ArtifactSHA256 = testInstallDigest("4") },
 		"source_schema":   func(e *InstallRehearsalExpectations) { e.SourceSchema = 28 },
 		"current_schema":  func(e *InstallRehearsalExpectations) { e.CurrentSchema = stateschema.Current - 1 },

@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/contextpolicy"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	"math"
 	"strings"
 	"testing"

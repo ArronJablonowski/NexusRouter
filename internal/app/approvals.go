@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // InspectApproval returns validated metadata only, bound to the requested task.

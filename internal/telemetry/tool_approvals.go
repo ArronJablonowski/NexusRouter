@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // Approval transactions acquire the SQLite writer lock before observing state.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Imported tool output can contain JSON-escaped credentials. Decode the

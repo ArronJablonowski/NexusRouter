@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"sort"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 type ComparisonPolicy struct {

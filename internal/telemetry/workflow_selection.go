@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 var ErrWorkflowSelectionUnavailable = errors.New("workflow selection storage unavailable")

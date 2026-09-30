@@ -5,7 +5,7 @@ cross an operator-selected failure threshold. It never disables, uninstalls,
 unloads or deletes a model, changes routing, or creates an approval.
 
 ```sh
-./bin/darwin models deprecation --config config.yaml --model local-coder \
+./bin/nexus models deprecation --config config.yaml --model local-coder \
   --domain code --profile default --window 50 --minimum-samples 20 \
   --failure-threshold 0.35
 ```

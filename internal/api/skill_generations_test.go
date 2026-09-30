@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func TestSkillGenerationHTTPAdmission(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func cliSkillPath(t *testing.T) string {

@@ -3,7 +3,7 @@ package v1
 import (
 	"reflect"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 // ContextModelBinding is copied from the effective configuration used by this

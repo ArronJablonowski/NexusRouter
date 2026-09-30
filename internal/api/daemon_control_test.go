@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
 )
 
 func TestDaemonControlAPI(t *testing.T) {

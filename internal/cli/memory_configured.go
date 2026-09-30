@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 type configuredMemoryOptions struct {

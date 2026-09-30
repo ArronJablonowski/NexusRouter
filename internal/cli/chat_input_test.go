@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestChatLine(t *testing.T) {

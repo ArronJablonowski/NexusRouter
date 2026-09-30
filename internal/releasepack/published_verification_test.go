@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubverify"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubverify"
 )
 
 func TestVerifyPublishedReleaseReverifiesFreshRemoteBytes(t *testing.T) {
@@ -124,7 +124,7 @@ func TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity(t *t
 		"bad_verifier":     func(r *PostPublicationReceipt) { r.VerifierID = "INVALID VERIFIER" },
 		"missing_policy":   func(r *PostPublicationReceipt) { r.VerificationPolicy = "" },
 		"changed_policy": func(r *PostPublicationReceipt) {
-			r.VerificationPolicy = "darwinrouter-github-post-publication-verification/v1"
+			r.VerificationPolicy = "nexusrouter-github-post-publication-verification/v1"
 		},
 		"attestation_version": func(r *PostPublicationReceipt) { r.ReleaseAttestation.VerifierVersion = "gh current" },
 		"attestation_result":  func(r *PostPublicationReceipt) { r.ReleaseAttestation.VerifiedResultSHA256 = "bad" },
@@ -235,7 +235,7 @@ func publishedFixtureFromSigningWithVerifier(t *testing.T, signing ApprovedSigni
 	}
 	record := publicationAuthorizationFixture()
 	record.ReleaseVersion, record.SourceCommit = candidate.ReleaseVersion, candidate.SourceCommit
-	record.Tag, record.ReleaseTitle = "v"+candidate.ReleaseVersion, "DarwinRouter v"+candidate.ReleaseVersion
+	record.Tag, record.ReleaseTitle = "v"+candidate.ReleaseVersion, "NexusRouter v"+candidate.ReleaseVersion
 	record.ReleaseNotesSHA256, record.Assets = publicationDigest(notes), assets
 	record.CandidateRecordSHA256, record.LicenseEvidenceSHA256 = verified.CandidateRecordSHA256, verified.LicenseEvidenceSHA256
 	record.SHA256SUMSSHA256, record.SignatureFileSHA256 = verified.SHA256SUMSSHA256, verified.SignatureFileSHA256

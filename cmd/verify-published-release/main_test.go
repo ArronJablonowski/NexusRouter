@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubverify"
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubverify"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type readerFixture struct{}
@@ -25,7 +25,7 @@ func fullArgs() []string {
 		"--trust-record", "/trust", "--trust-record-sha256", digest, "--key-id", "release-1", "--key-fingerprint", digest,
 		"--signing-authorization", "/signing", "--signing-authorization-sha256", digest,
 		"--publication-authorization", "/publication", "--publication-authorization-sha256", digest,
-		"--repository", "ArronJablonowski/DarwinRouter", "--release-notes", "/notes",
+		"--repository", "ArronJablonowski/NexusRouter", "--release-notes", "/notes",
 		"--verifier-id", "idp:independent-release-verifier",
 		"--download-dir", "/downloads", "--out", "/receipt",
 		"--gh-binary", "/opt/reviewed/bin/gh", "--gh-binary-sha256", digest,
@@ -57,7 +57,7 @@ func TestCLIForwardsAuthorityAndPersistsCanonicalReceipt(t *testing.T) {
 	if code != 0 || diagnostic.Len() != 0 || out.String() != digest+"\n" || got.DownloadDir != "/downloads" ||
 		got.VerifierID != "idp:independent-release-verifier" ||
 		gotGHBinary != "/opt/reviewed/bin/gh" || gotGHBinarySHA256 != "sha256:"+strings.Repeat("1", 64) ||
-		got.Preflight.ExpectedRepository != "ArronJablonowski/DarwinRouter" || got.Preflight.Verification.ExpectedKeyID != "release-1" ||
+		got.Preflight.ExpectedRepository != "ArronJablonowski/NexusRouter" || got.Preflight.Verification.ExpectedKeyID != "release-1" ||
 		len(protected) != 3 || protected[0] != "/source" || protected[1] != "/signed" || protected[2] != "/downloads" {
 		t.Fatalf("authority not preserved: code=%d options=%+v protected=%v out=%q err=%q", code, got, protected, out.String(), diagnostic.String())
 	}

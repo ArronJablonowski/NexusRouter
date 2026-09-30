@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
 )
 
 func TestBoundApprovalFreshClockRetryAfterConsumption(t *testing.T) {

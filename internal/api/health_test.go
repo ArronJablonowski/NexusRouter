@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func healthReportFixture() health.Report {

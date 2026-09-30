@@ -15,7 +15,7 @@ func TestPublishedBrowserAuthenticationSchemaAndFixtures(t *testing.T) {
 	}
 	var document any
 	compiler := jsonschema.NewCompiler()
-	if json.Unmarshal(schemaBody, &document) != nil || compiler.AddResource("https://darwinrouter.local/schema/webui/browser-auth-v1", document) != nil {
+	if json.Unmarshal(schemaBody, &document) != nil || compiler.AddResource("https://nexusrouter.local/schema/webui/browser-auth-v1", document) != nil {
 		t.Fatal("invalid browser authentication schema")
 	}
 	fixtureBody, err := os.ReadFile("testdata/v1/browser-auth.json")
@@ -27,7 +27,7 @@ func TestPublishedBrowserAuthenticationSchemaAndFixtures(t *testing.T) {
 		t.Fatal("invalid browser authentication fixtures")
 	}
 	for definition, fixture := range fixtures {
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/browser-auth-v1#/$defs/"+definition, fixture, true)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/browser-auth-v1#/$defs/"+definition, fixture, true)
 	}
-	validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/browser-auth-v1#/$defs/approval_request", json.RawMessage(`{"version":1,"display_code":"abcdefgh"}`), false)
+	validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/browser-auth-v1#/$defs/approval_request", json.RawMessage(`{"version":1,"display_code":"abcdefgh"}`), false)
 }

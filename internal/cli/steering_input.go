@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 var errSteeringInput = errors.New("steering input unavailable or invalid")

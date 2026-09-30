@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	run "github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	run "github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // This compiles outside the repository's import tree, so internal-package
@@ -74,7 +74,7 @@ func TestExternalModuleConsumer(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer verify.Close()
-	mod := fmt.Sprintf("module example.org/externalconsumer\n\ngo %s\n\nrequire github.com/ArronJablonowski/DarwinRouter v0.0.0\nreplace github.com/ArronJablonowski/DarwinRouter => %q\n", goVersion, root)
+	mod := fmt.Sprintf("module example.org/externalconsumer\n\ngo %s\n\nrequire github.com/ArronJablonowski/NexusRouter v0.0.0\nreplace github.com/ArronJablonowski/NexusRouter => %q\n", goVersion, root)
 	config := fmt.Sprintf(`version: 1
 mode: local_only
 telemetry:
@@ -134,10 +134,10 @@ import (
  "strings"
  "sync/atomic"
  "time"
- sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
- "github.com/ArronJablonowski/DarwinRouter/runtime"
- "github.com/ArronJablonowski/DarwinRouter/resources"
- "github.com/ArronJablonowski/DarwinRouter/submissions"
+ sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+ "github.com/ArronJablonowski/NexusRouter/runtime"
+ "github.com/ArronJablonowski/NexusRouter/resources"
+ "github.com/ArronJablonowski/NexusRouter/submissions"
 )
 func check(ok bool, label string) { if !ok { panic(label) } }
 type fixtureProfiler struct{}

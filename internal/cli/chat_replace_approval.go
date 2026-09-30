@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 func chatReplaceApprovalPreview(settings config.Settings, secret func(string) string, p tools.ApprovalPrompt) (string, error) {
@@ -34,7 +34,7 @@ func chatReplaceApprovalPreview(settings config.Settings, secret func(string) st
 	}
 	values := []string{args.Path, args.Expected, args.Content, settings.Tools.ReplaceRoot, string(requestBody), p.Description, p.Request.ID, p.Request.TaskID, p.Request.TurnID, p.Request.ToolCallID, p.Request.Scope}
 	if secret != nil {
-		envs := []string{"DARWIN_API_TOKEN"}
+		envs := []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"}
 		for _, provider := range settings.Providers {
 			if provider.APIKeyEnv != "" {
 				envs = append(envs, provider.APIKeyEnv)

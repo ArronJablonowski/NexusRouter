@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func event(id string, sequence int64, kind runtime.Kind) runtime.Event {

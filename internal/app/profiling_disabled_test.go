@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func TestDisabledProfilingDeniesLocalWithoutStorage(t *testing.T) {

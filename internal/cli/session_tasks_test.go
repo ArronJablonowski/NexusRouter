@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func TestSessionTasksCLIIsReadOnlyAndBound(t *testing.T) {

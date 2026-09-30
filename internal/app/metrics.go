@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 var ErrMetrics = errors.New("metrics unavailable")

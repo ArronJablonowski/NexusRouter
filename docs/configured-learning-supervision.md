@@ -7,7 +7,7 @@ Go host must register a concrete validator implementation under a stable identit
 Changing validation semantics requires a new identity; the registry does not
 authenticate code or infer its correctness.
 
-The stock `darwin` binary ships one deliberately narrow validator under the
+The stock `nexus` binary ships one deliberately narrow validator under the
 protected identity `darwin_observed_tools_activation_v1`. It is available only
 when configuration explicitly selects that identity; the default remains
 draft-only. Unknown identities and attempts by a host callback to claim the

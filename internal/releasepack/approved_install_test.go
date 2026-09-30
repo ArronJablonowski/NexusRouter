@@ -18,13 +18,13 @@ func TestVerifyApprovedInstallBindsNativeExecutionAndApproval(t *testing.T) {
 	}
 	if receipt.ReleaseVersion != "1.0.0" || receipt.TargetOS != runtime.GOOS || receipt.TargetArch != runtime.GOARCH ||
 		receipt.SourceCommit == "" || receipt.ManifestSHA256 == "" || receipt.ArtifactSHA256 == "" ||
-		receipt.InstalledBinarySHA256 == "" || receipt.VersionOutput != "darwin 1.0.0" ||
+		receipt.InstalledBinarySHA256 == "" || receipt.VersionOutput != "nexus 1.0.0" ||
 		receipt.ApprovalVerification.CandidateRecordSHA256 != options.Verification.ExpectedCandidateSHA256 ||
 		receipt.VerifierID != options.VerifierID || receipt.HostID != options.HostID ||
 		receipt.PublicKeyChannel != options.PublicKeyChannel || receipt.VerifiedAt != "2026-09-14T12:34:56Z" || receipt.Result != "passed" {
 		t.Fatal("incomplete approved native verification receipt", receipt)
 	}
-	installed := filepath.Join(options.InstallRoot, "bin", "darwin")
+	installed := filepath.Join(options.InstallRoot, "bin", "nexus")
 	info, err := os.Lstat(installed)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0755 {
 		t.Fatal("native binary was not installed privately", info, err)
@@ -52,7 +52,7 @@ func TestVerifyApprovedInstallRejectsTamperingAndUnsafeInputs(t *testing.T) {
 	})
 	t.Run("signed_archive_tampering", func(t *testing.T) {
 		options := approvedInstallFixture(t)
-		archive := filepath.Join(options.Verification.Dir, "DarwinRouter_1.0.0_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz")
+		archive := filepath.Join(options.Verification.Dir, "NexusRouter_1.0.0_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz")
 		appendPublishedFixtureByte(t, archive, 0)
 		if receipt, err := VerifyApprovedInstall(context.Background(), options); err == nil || receipt.SchemaVersion != 0 {
 			t.Fatal("tampered signed archive executed", receipt, err)
@@ -134,7 +134,7 @@ func TestApprovedInstallReceiptRejectsFieldAndEncodingTampering(t *testing.T) {
 		"manifest": func(r *ApprovedInstallVerificationReceipt) { r.ManifestSHA256 = "bad" },
 		"artifact": func(r *ApprovedInstallVerificationReceipt) { r.ArtifactName = "other.tar.gz" },
 		"binary":   func(r *ApprovedInstallVerificationReceipt) { r.InstalledBinarySHA256 = "bad" },
-		"output":   func(r *ApprovedInstallVerificationReceipt) { r.VersionOutput = "darwin 1.0.1" },
+		"output":   func(r *ApprovedInstallVerificationReceipt) { r.VersionOutput = "nexus 1.0.1" },
 		"approval": func(r *ApprovedInstallVerificationReceipt) { r.ApprovalVerification.KeyID = "bad key" },
 		"verifier": func(r *ApprovedInstallVerificationReceipt) { r.VerifierID = "bad verifier" },
 		"host":     func(r *ApprovedInstallVerificationReceipt) { r.HostID = "x" },
@@ -177,7 +177,7 @@ func approvedInstallOptions(t *testing.T, signing ApprovedSigningOptions) Approv
 	return ApprovedInstallVerificationOptions{
 		Verification: verificationOptions(signing), TargetOS: runtime.GOOS, TargetArch: runtime.GOARCH,
 		InstallRoot: filepath.Join(t.TempDir(), "installed"), VerifierID: "idp:independent-verifier",
-		HostID: "host:darwin-verifier-01", PublicKeyChannel: "https://keys.example.invalid/darwinrouter/release-test-01.json",
+		HostID: "host:darwin-verifier-01", PublicKeyChannel: "https://keys.example.invalid/nexusrouter/release-test-01.json",
 		Now: func() time.Time { return time.Date(2026, 9, 14, 12, 34, 56, 0, time.UTC) },
 	}
 }

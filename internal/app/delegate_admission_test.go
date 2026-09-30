@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func TestDelegateAdmissionPreservesLocalPrivacyAndReservations(t *testing.T) {

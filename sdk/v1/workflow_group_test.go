@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 func TestSDKWorkflowGroupActualTools(t *testing.T) {

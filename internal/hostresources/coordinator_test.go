@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	_ "modernc.org/sqlite"
 )
 

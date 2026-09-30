@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func (h *Handler) serveWorkboardDependencies(writer http.ResponseWriter, request *http.Request, boardID, cardID string) {

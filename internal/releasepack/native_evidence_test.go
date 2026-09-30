@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 type cancelOnNativeQualification struct {
@@ -67,7 +67,7 @@ func TestNativeEvidenceSchemaTwoBindsInstallRehearsal(t *testing.T) {
 	record.SchemaVersion = 2
 	record.InstallRehearsal = &NativeInstallEvidenceBinding{
 		RecordSHA256: testInstallDigest("1"),
-		ArtifactName: "DarwinRouter_1.0.0-rc.3_darwin_arm64.tar.gz", ArtifactSHA256: testInstallDigest("2"),
+		ArtifactName: "NexusRouter_1.0.0-rc.3_darwin_arm64.tar.gz", ArtifactSHA256: testInstallDigest("2"),
 		BackupSHA256: testInstallDigest("3"), SourceSchema: 29, CurrentSchema: stateschema.Current,
 	}
 	if validateNativeEvidence(nativeEvidenceBody(t, record)) != nil {
@@ -229,7 +229,7 @@ func TestQualifyNativeReleaseRunsBoundGatesBeforeWritingEvidence(t *testing.T) {
 		t.Fatal("primary evidence omitted install binding", err)
 	}
 	installBody, err := os.ReadFile(installOut)
-	if err != nil || primary.InstallRehearsal.RecordSHA256 != installEvidenceDigest(installBody) || primary.InstallRehearsal.ArtifactName != "DarwinRouter_1.0.0-rc.3_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz" {
+	if err != nil || primary.InstallRehearsal.RecordSHA256 != installEvidenceDigest(installBody) || primary.InstallRehearsal.ArtifactName != "NexusRouter_1.0.0-rc.3_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz" {
 		t.Fatal("primary evidence install binding mismatch", err)
 	}
 	if err = os.WriteFile(filepath.Join(source, "dirty"), []byte("dirty\n"), 0600); err != nil {
@@ -267,7 +267,7 @@ func TestQualifyNativeReleaseRequiresBoundInstallEvidenceBeforePrimary(t *testin
 				} else {
 					r.Target.OS = "darwin"
 				}
-				r.Artifact.Name = "DarwinRouter_1.0.0_" + r.Target.OS + "_" + r.Target.Arch + ".tar.gz"
+				r.Artifact.Name = "NexusRouter_1.0.0_" + r.Target.OS + "_" + r.Target.Arch + ".tar.gz"
 				r.Rollback.TargetOS = r.Target.OS
 			})
 			return "cp \"" + fixture + "\" \"" + out + "\""
@@ -446,7 +446,7 @@ func writeNativeInstallFixture(t *testing.T, path, version, commit, goos, goarch
 	record := validInstallEvidenceFixture()
 	record.Release.Version, record.Release.Commit = version, commit
 	record.Target = NativeEvidenceTarget{OS: goos, Arch: goarch}
-	record.Artifact.Name = "DarwinRouter_" + version + "_" + goos + "_" + goarch + ".tar.gz"
+	record.Artifact.Name = "NexusRouter_" + version + "_" + goos + "_" + goarch + ".tar.gz"
 	record.Installation.BinaryVersion = version
 	record.Rollback.BinaryVersion, record.Rollback.TargetOS, record.Rollback.TargetArch = version, goos, goarch
 	if mutate != nil {

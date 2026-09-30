@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 // serveChatStream emits provisional redacted text, never tool arguments or raw

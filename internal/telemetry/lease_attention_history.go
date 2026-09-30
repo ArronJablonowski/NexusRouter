@@ -9,8 +9,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func decodeAttentionTransition(id string, sequence int64, kind string, body []byte) (workers.LeaseAttentionTransition, error) {

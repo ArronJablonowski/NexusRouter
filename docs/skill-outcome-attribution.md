@@ -1,6 +1,6 @@
 # Skill context attribution and task outcomes
 
-DarwinRouter records which validated skill versions the host freshly admitted
+NexusRouter records which validated skill versions the host freshly admitted
 into a task's initial context. This is the evidence needed to study outcomes
 after a revision, not proof that a model followed the workflow or that the skill
 caused success or failure. Statistical comparison and automatic outcome-driven
@@ -40,7 +40,7 @@ persistence. Historical records and receipts are not backfilled or rewritten.
 ## Inspect one task
 
 ```sh
-darwin task skill-outcome --config config.yaml --task TASK_ID
+nexus task skill-outcome --config config.yaml --task TASK_ID
 ```
 
 The Go SDK exposes `client.SkillTaskOutcome(ctx, taskID)`. The daemon provides

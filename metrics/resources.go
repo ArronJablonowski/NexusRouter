@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 // ResourceMeasurement is one fixed, identifier-free host measurement. An

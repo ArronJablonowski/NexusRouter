@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 // ListSubmissions discovers durable work without loading private request or

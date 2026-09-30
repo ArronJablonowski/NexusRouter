@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func workflowRedactionSteps(t *testing.T, messages []providers.Message) []string {

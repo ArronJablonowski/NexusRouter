@@ -42,7 +42,7 @@ and both observed processes disappeared. See the live cancellation checkpoint
 in the testing guide. This is bounded evidence for that timing window, not
 universal descendant containment or graceful upstream interruption.
 
-The installed Codex CLI can use its existing ChatGPT login. DarwinRouter must
+The installed Codex CLI can use its existing ChatGPT login. NexusRouter must
 not extract tokens from its credential files or silently require direct API
 credentials. A local Codex process still performs **cloud inference**.
 
@@ -56,7 +56,7 @@ inspected on September 5, 2026; these are a version-specific contract, not a
 guarantee that later CLI versions remain compatible.
 
 In that schema, `thread/start.dynamicTools` supports a `type: "namespace"`
-entry with a name, description and nested tool definitions. Darwin tools will
+entry with a name, description and nested tool definitions. NexusRouter tools will
 use the `darwin` namespace. `item/tool/call` identifies `threadId`, `turnId`,
 `callId`, `namespace`, `tool` and `arguments`. The outer RPC request ID is
 distinct from `callId`. A text tool response contains `contentItems` with
@@ -68,7 +68,7 @@ The existing runtime owns the following ordering:
 
 1. Receive a provider tool **proposal**, without executing it.
 2. Persist the assistant turn and tool-start event.
-3. Apply Darwin's tool permissions and run its bounded worker.
+3. Apply NexusRouter's tool permissions and run its bounded worker.
 4. Persist the tool outcome; stop on errors, uncertain effects or nonrecoverable failures.
 5. Supply the successful or explicitly recoverable effect-free failed tool message
    to the next provider invocation, preserving its failure status.
@@ -329,7 +329,7 @@ while no-inference launcher qualification passes. Full live delegation remains o
 Test no-launch privacy denials, exact RPC attribution, unexpected server
 requests, bounded output, cancellation/cleanup, child-process exit and failed
 durable boundaries. Then run the requested supervised live test: Sol proposes
-`darwin.delegate`, Darwin authorizes and executes the installed local Ollama
+`darwin.delegate`, NexusRouter authorizes and executes the installed local Ollama
 worker, Sol receives its untrusted result and produces a final answer. Preserve
 the durable parent/worker/event linkage. The previously successful standalone
 CLI and local-worker checks do not prove this integrated workflow.

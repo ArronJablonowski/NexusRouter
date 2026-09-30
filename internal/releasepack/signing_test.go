@@ -35,7 +35,7 @@ func signingFixture(t *testing.T) (dir, seedFile, publicFile string) {
 	var sums strings.Builder
 	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: strings.Repeat("a", 40), Created: "2026-09-13T18:00:00Z", Toolchain: "go1.27.1"}
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
-		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
+		name := "NexusRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
 		body := signingArchiveFixture(t, target[0], target[1])
 		writeSigningFixture(t, filepath.Join(dir, name), body, 0644)
 		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(body), name)
@@ -266,7 +266,7 @@ func TestSigningManifestContract(t *testing.T) {
 				t.Fatal("invalid contract signed", err)
 			}
 			// Even an authentic signature cannot turn malformed release metadata
-			// into a conforming DarwinRouter package.
+			// into a conforming NexusRouter package.
 			seed, err := signingKeyFile(seedFile, true)
 			if err != nil {
 				t.Fatal(err)
@@ -308,16 +308,16 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 	for _, scenario := range []string{"plain_string", "multiple_entries", "wrong_name", "missing_notice", "missing_sbom", "missing_config", "tampered_license", "tampered_sbom", "wrong_notice_target", "wrong_sbom_target", "wrong_sbom_binary", "wrong_sbom_toolchain", "noncanonical_metadata", "trailing_bytes", "bad_gzip_crc", "compressed_bomb", "wrong_os", "wrong_arch", "header_only_macho", "header_only_elf", "elf_interpreter"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
-			name := "DarwinRouter_1.0.0_darwin_amd64.tar.gz"
+			name := "NexusRouter_1.0.0_darwin_amd64.tar.gz"
 			var body []byte
 			switch scenario {
 			case "plain_string":
 				// This was the former fixture shape: authenticated bytes, but
-				// neither a gzip archive nor a DarwinRouter executable.
+				// neither a gzip archive nor a NexusRouter executable.
 				body = []byte("fixture " + name)
 			case "multiple_entries":
 				var archive bytes.Buffer
-				if err := Archive(&archive, []Entry{{Name: "darwin", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: noticeName, Data: signingNoticeFixture("darwin", "amd64")}, {Name: "extra", Data: []byte("extra")}}); err != nil {
+				if err := Archive(&archive, []Entry{{Name: "nexus", Data: signingBinaryFixture(t, "darwin", "amd64")}, {Name: noticeName, Data: signingNoticeFixture("darwin", "amd64")}, {Name: "extra", Data: []byte("extra")}}); err != nil {
 					t.Fatal(err)
 				}
 				body = archive.Bytes()
@@ -395,7 +395,7 @@ func TestSigningRejectsInvalidArchivePayloads(t *testing.T) {
 
 func archiveSigningBody(t *testing.T, body, notice []byte) []byte {
 	t.Helper()
-	entries := []Entry{{Name: "darwin", Data: body}}
+	entries := []Entry{{Name: "nexus", Data: body}}
 	if notice != nil {
 		var err error
 		sbom := signingSBOMFixture(t, "1.0.0", strings.Repeat("a", 40), "darwin", "amd64", body)
@@ -425,7 +425,7 @@ func customSigningArchive(t *testing.T, body []byte, mode int64, suffix int64) [
 	tw := tar.NewWriter(gz)
 	for _, entry := range entries {
 		entryMode := int64(0644)
-		if entry.Name == "darwin" {
+		if entry.Name == "nexus" {
 			entryMode = mode
 		}
 		header := &tar.Header{Name: entry.Name, Mode: entryMode, Size: int64(len(entry.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
@@ -518,7 +518,7 @@ func authenticateSigningFixture(t *testing.T, dir, seedFile string) {
 }
 
 func TestSigningTampering(t *testing.T) {
-	for _, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig"} {
+	for _, name := range []string{"NexusRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig"} {
 		t.Run(name, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
 			if err := signUncheckedForTest(dir, seed); err != nil {
@@ -543,7 +543,7 @@ func TestSigningRejectsUnsafeFilesAndIncompleteCoverage(t *testing.T) {
 			}
 			switch scenario {
 			case "symlink_archive", "symlink_sums", "symlink_key":
-				path := filepath.Join(dir, "DarwinRouter_1.0.0_darwin_amd64.tar.gz")
+				path := filepath.Join(dir, "NexusRouter_1.0.0_darwin_amd64.tar.gz")
 				if scenario == "symlink_sums" {
 					path = sumsPath
 				} else if scenario == "symlink_key" {
@@ -557,7 +557,7 @@ func TestSigningRejectsUnsafeFilesAndIncompleteCoverage(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "directory_archive":
-				path := filepath.Join(dir, "DarwinRouter_1.0.0_darwin_amd64.tar.gz")
+				path := filepath.Join(dir, "NexusRouter_1.0.0_darwin_amd64.tar.gz")
 				if err := os.Remove(path); err != nil {
 					t.Fatal(err)
 				}
@@ -571,7 +571,7 @@ func TestSigningRejectsUnsafeFilesAndIncompleteCoverage(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "traversal":
-				sums = []byte(strings.ReplaceAll(string(sums), "DarwinRouter_1.0.0_darwin_amd64.tar.gz", "../DarwinRouter_1.0.0_darwin_amd64.tar.gz"))
+				sums = []byte(strings.ReplaceAll(string(sums), "NexusRouter_1.0.0_darwin_amd64.tar.gz", "../NexusRouter_1.0.0_darwin_amd64.tar.gz"))
 			case "duplicate":
 				sums = append(sums, sums...)
 			case "unsorted":
@@ -594,7 +594,7 @@ func TestSigningRejectsUnsafeFilesAndIncompleteCoverage(t *testing.T) {
 }
 
 func TestSigningVerificationSymlinksAndCoverage(t *testing.T) {
-	for _, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig", "public", "extra"} {
+	for _, name := range []string{"NexusRouter_1.0.0_darwin_amd64.tar.gz", "manifest.json", "SHA256SUMS", "SHA256SUMS.sig", "public", "extra"} {
 		t.Run(name, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
 			if err := signUncheckedForTest(dir, seed); err != nil {

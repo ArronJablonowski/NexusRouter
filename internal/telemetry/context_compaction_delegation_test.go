@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 type delegationCompactionProvider struct{}

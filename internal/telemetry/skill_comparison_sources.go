@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // CheckSkillComparisonSources checks only the saved task IDs in one current

@@ -12,15 +12,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ArronJablonowski/DarwinRouter/contextengine"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/contextengine"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 var ErrAdmission = errors.New("task admission failed")
@@ -308,8 +308,10 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 	key := ""
 	secrets := []string{}
 	if secret != nil {
-		if token := secret("DARWIN_API_TOKEN"); token != "" {
-			secrets = append(secrets, token)
+		for _, name := range []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"} {
+			if token := secret(name); token != "" {
+				secrets = append(secrets, token)
+			}
 		}
 	}
 	for _, p := range s.Providers {

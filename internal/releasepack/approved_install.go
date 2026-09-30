@@ -14,7 +14,7 @@ var ErrApprovedInstallVerification = errors.New("approved native install verific
 
 const (
 	approvedInstallVerificationSchema = 1
-	approvedInstallVerificationScope  = "darwinrouter-approved-native-install-verification"
+	approvedInstallVerificationScope  = "nexusrouter-approved-native-install-verification"
 )
 
 // ApprovedInstallVerificationOptions binds a native installation observation
@@ -161,14 +161,14 @@ func pathWithin(relative string) bool {
 // MarshalApprovedInstallVerificationReceipt returns the canonical schema-1
 // encoding: two-space indentation and one final LF.
 func MarshalApprovedInstallVerificationReceipt(receipt ApprovedInstallVerificationReceipt) ([]byte, error) {
-	expectedArtifact := "DarwinRouter_" + receipt.ReleaseVersion + "_" + receipt.TargetOS + "_" + receipt.TargetArch + ".tar.gz"
+	expectedArtifact := "NexusRouter_" + receipt.ReleaseVersion + "_" + receipt.TargetOS + "_" + receipt.TargetArch + ".tar.gz"
 	if receipt.SchemaVersion != approvedInstallVerificationSchema || receipt.Scope != approvedInstallVerificationScope ||
 		validate(Options{Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit, Out: "receipt"}) != nil ||
 		(receipt.TargetOS != "darwin" && receipt.TargetOS != "linux") ||
 		(receipt.TargetArch != "amd64" && receipt.TargetArch != "arm64") || receipt.ArtifactName != expectedArtifact ||
 		!trustFingerprint(receipt.ManifestSHA256) || !trustFingerprint(receipt.ArtifactSHA256) ||
 		!trustFingerprint(receipt.InstalledBinarySHA256) || receipt.InstalledBinaryMode != "0755" ||
-		receipt.VersionOutput != "darwin "+receipt.ReleaseVersion || !validReceiptVerification(receipt.ApprovalVerification) ||
+		receipt.VersionOutput != "nexus "+receipt.ReleaseVersion || !validReceiptVerification(receipt.ApprovalVerification) ||
 		!rollbackIdentity.MatchString(receipt.VerifierID) || !rollbackIdentity.MatchString(receipt.HostID) ||
 		!trustHTTPSURL(receipt.PublicKeyChannel) || !wholeSecondUTC(receipt.VerifiedAt) || receipt.Result != "passed" {
 		return nil, ErrApprovedInstallVerification

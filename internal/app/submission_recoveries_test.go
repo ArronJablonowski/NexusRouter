@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func TestSubmissionRecoveryHistoryNoStorageCreation(t *testing.T) {

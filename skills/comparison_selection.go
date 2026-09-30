@@ -1,8 +1,8 @@
 package skills
 
 import (
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // ComparisonSources identifies the exact observed tasks, not a query to rerun.

@@ -9,8 +9,8 @@ the configured periodic metrics exporter; it does not enable traces, which
 remain unfinished.
 
 ```sh
-darwin metrics export --config config.yaml --endpoint http://127.0.0.1:4318/v1/metrics
-darwin metrics export --config config.yaml --endpoint https://collector.example/v1/metrics --api-key-env OTEL_COLLECTOR_TOKEN
+nexus metrics export --config config.yaml --endpoint http://127.0.0.1:4318/v1/metrics
+nexus metrics export --config config.yaml --endpoint https://collector.example/v1/metrics --api-key-env OTEL_COLLECTOR_TOKEN
 ```
 
 The endpoint is the complete URL, including `/v1/metrics` or the collector's
@@ -28,7 +28,7 @@ err := client.ExportMetrics(ctx, sdk.MetricsExportOptions{
 ```
 
 The collector examples are placeholders, not services contacted by default.
-`darwin metrics --db path` remains an independent, local-only JSON inspection
+`nexus metrics --db path` remains an independent, local-only JSON inspection
 command. No new daemon HTTP endpoint accepts arbitrary export destinations.
 
 ## Periodic daemon and SDK export
@@ -51,7 +51,7 @@ telemetry:
 
 The interval defaults to 60 seconds and must be between one second and 24 hours.
 The normal user/project/environment/flag precedence applies. For example,
-`DARWIN__TELEMETRY__METRICS_EXPORT__ENABLED=false` disables configured delivery.
+`NEXUS__TELEMETRY__METRICS_EXPORT__ENABLED=false` disables configured delivery.
 Configuration is snapshotted at startup: change it and restart the daemon to
 apply it. The collector endpoint is redacted in configuration display; credential
 values stay in the secret resolver and join task/context redaction rules even
@@ -163,12 +163,12 @@ thermal-pressure and unified-memory measurements. Each value has an explicit
 availability bit: an unsupported or failed probe is unavailable, never an
 observed zero. Cloud-only and disabled-profiling services publish the same
 explicit unavailability block without invoking a profiler. Storage-only
-`darwin metrics --db` snapshots omit the block because reading a database is not
+`nexus metrics --db` snapshots omit the block because reading a database is not
 a host observation.
 
 Available resource values export as individual gauges named
-`darwinrouter.resource.<measurement>` with fixed units, plus
-`darwinrouter.resource.available` for every fixed measurement. No device ID,
+`nexusrouter.resource.<measurement>` with fixed units, plus
+`nexusrouter.resource.available` for every fixed measurement. No device ID,
 GPU inventory, profiler source, thermal-state string or host identity is
 released. These are point-in-time host readings, not model residency,
 reservation, queue-depth or provider-load measurements. A profiling failure
@@ -188,7 +188,7 @@ current durable population gauges; queue activity supplies the separate
 retained totals from which a collector can derive arrival/service rates. None
 is a wait-time history.
 Each available group is a gauge named
-`darwinrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
+`nexusrouter.<group>` with a fixed `state` attribute. Unavailable legacy-schema
 groups are omitted, not represented as observed zeros. Counts are gauges of
 current durable state except for the explicitly retained cumulative
 `queue_activity` totals; none are quality judgments.
@@ -197,8 +197,8 @@ floating-point precision loss. Schema29 additionally supplies a cumulative
 [task-duration histogram](task-duration-metrics.md) and unavailable timing gauges;
 its floating-point sum is in seconds. Legacy schemas omit that instrumentation.
 
-The resource is fixed `service.name=DarwinRouter` and the instrumentation scope
-is `darwinrouter.metrics`, version1. No task/session/model identifiers, prompts,
+The resource is fixed `service.name=NexusRouter` and the instrumentation scope
+is `nexusrouter.metrics`, version1. No task/session/model identifiers, prompts,
 tool arguments, outputs, paths, endpoints or credentials enter the payload. Use a
 collector stream per database or configure collector-side resource identity to
 distinguish multiple databases; the exporter does not invent a persistent host or

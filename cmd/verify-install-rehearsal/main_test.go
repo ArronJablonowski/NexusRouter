@@ -13,18 +13,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 func TestRunVerifiesCanonicalRecord(t *testing.T) {
 	version, commit := "1.0.0-rc.11", strings.Repeat("a", 40)
 	digest := func(char string) string { return "sha256:" + strings.Repeat(char, 64) }
 	record := releasepack.InstallRehearsalEvidence{
-		SchemaVersion: 1, Scope: "darwinrouter-native-install-migration-rehearsal",
+		SchemaVersion: 1, Scope: "nexusrouter-native-install-migration-rehearsal",
 		Release:      releasepack.InstallEvidenceRelease{Version: version, Commit: commit},
 		Target:       releasepack.NativeEvidenceTarget{OS: "darwin", Arch: "arm64"},
-		Artifact:     releasepack.InstallEvidenceArtifact{Name: "DarwinRouter_1.0.0-rc.11_darwin_arm64.tar.gz", SHA256: digest("1")},
+		Artifact:     releasepack.InstallEvidenceArtifact{Name: "NexusRouter_1.0.0-rc.11_darwin_arm64.tar.gz", SHA256: digest("1")},
 		Installation: releasepack.InstallEvidenceInstall{BinaryVersion: version, PrivatePermissions: "passed", Configuration: "passed", DaemonStart: "passed", ExactWriterStop: "passed"},
 		Source:       releasepack.InstallEvidenceSource{Schema: 29, QuickCheck: "ok", Quiescence: "passed"},
 		Backup:       releasepack.InstallEvidenceBackup{SHA256: digest("2"), Schema: 29, QuickCheck: "ok"},
@@ -55,14 +55,14 @@ func TestRunRequiresAndForwardsIndependentExpectations(t *testing.T) {
 		"--record", "/evidence/rehearsal.json", "--record-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--version", "1.0.0-rc.11", "--commit", strings.Repeat("a", 40),
 		"--target-os", "darwin", "--target-arch", "arm64",
-		"--artifact", "DarwinRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
+		"--artifact", "NexusRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
 		"--artifact-sha256", "sha256:" + strings.Repeat("2", 64),
 		"--source-schema", "29", "--current-schema", strconv.Itoa(stateschema.Current),
 		"--backup-sha256", "sha256:" + strings.Repeat("3", 64),
 	}
 	want := releasepack.InstallRehearsalExpectations{
 		RecordSHA256: "sha256:" + strings.Repeat("1", 64), Version: "1.0.0-rc.11", Commit: strings.Repeat("a", 40),
-		TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "DarwinRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
+		TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "NexusRouter_1.0.0-rc.11_darwin_arm64.tar.gz",
 		ArtifactSHA256: "sha256:" + strings.Repeat("2", 64), SourceSchema: 29, CurrentSchema: stateschema.Current,
 		BackupSHA256: "sha256:" + strings.Repeat("3", 64),
 	}
@@ -84,7 +84,7 @@ func TestRunExitSemantics(t *testing.T) {
 	valid := []string{
 		"--record", "/evidence/rehearsal.json", "--record-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--version", "1.0.0", "--commit", strings.Repeat("a", 40), "--target-os", "darwin", "--target-arch", "arm64",
-		"--artifact", "DarwinRouter_1.0.0_darwin_arm64.tar.gz", "--artifact-sha256", "sha256:" + strings.Repeat("2", 64),
+		"--artifact", "NexusRouter_1.0.0_darwin_arm64.tar.gz", "--artifact-sha256", "sha256:" + strings.Repeat("2", 64),
 		"--source-schema", "29", "--current-schema", strconv.Itoa(stateschema.Current), "--backup-sha256", "sha256:" + strings.Repeat("3", 64),
 	}
 	verifyOK := func(string, releasepack.InstallRehearsalExpectations) (releasepack.InstallRehearsalVerification, error) {

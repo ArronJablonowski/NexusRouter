@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestSessionDeltasVerifiedWithoutDuplicateText(t *testing.T) {

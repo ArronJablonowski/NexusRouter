@@ -11,10 +11,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
-const skillsUsage = "usage: darwin skills list|show|history|state|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--expected-revision sha256] [--limit 100]\n       darwin skills compare --config path < request.json\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable. Comparison is advisory and cannot activate or roll back skills."
+const skillsUsage = "usage: nexus skills list|show|history|state|draft|rollback --root path --scope id [--name id] [--version id] [--expected-version id] [--expected-revision sha256] [--limit 100]\n       nexus skills compare --config path < request.json\nDraft reads a skills.Draft JSON object from stdin. Activation requires trusted validator integration and is unavailable. Comparison is advisory and cannot activate or roll back skills."
 
 var skillIdentifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
 

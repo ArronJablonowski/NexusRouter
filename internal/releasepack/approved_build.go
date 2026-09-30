@@ -167,7 +167,7 @@ func compareCandidateBuilds(first, second string, candidate CandidateRecord) ([]
 	}
 	names := make([]string, 0, len(candidate.Targets)+2)
 	for _, target := range candidate.Targets {
-		names = append(names, "DarwinRouter_"+candidate.ReleaseVersion+"_"+target.OS+"_"+target.Arch+".tar.gz")
+		names = append(names, "NexusRouter_"+candidate.ReleaseVersion+"_"+target.OS+"_"+target.Arch+".tar.gz")
 	}
 	names = append(names, "manifest.json", "SHA256SUMS")
 	for _, name := range names {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // ConsumeWorkflowScan consumes exactly one durable page. It refreshes objective

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type ReadServices struct {

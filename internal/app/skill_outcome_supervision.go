@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // OutcomeRollbackReadiness is a read-only observation for one activation.

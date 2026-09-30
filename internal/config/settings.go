@@ -16,8 +16,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/memory"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 type Settings struct {

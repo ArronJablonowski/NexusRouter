@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 func TestCreatePreviewChecksBehaviorDeclaration(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 // Explicit forwarding avoids accidentally inheriting the optional finalizer.

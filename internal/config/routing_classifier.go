@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/classification"
+	"github.com/ArronJablonowski/NexusRouter/classification"
 	"go.yaml.in/yaml/v3"
 )
 

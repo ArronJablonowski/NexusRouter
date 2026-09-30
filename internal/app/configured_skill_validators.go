@@ -3,7 +3,7 @@ package app
 import (
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // BuildConfiguredSkillValidatorRegistry merges product-owned validators into

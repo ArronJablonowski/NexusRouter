@@ -41,7 +41,7 @@ request or external process has stopped.
 Check history readiness without exporting conversation content:
 
 ```sh
-darwin task continuation --db ./data/darwin.db --task TASK_ID
+nexus task continuation --db ./data/darwin.db --task TASK_ID
 ```
 
 SDK `InspectTaskContinuation` and authenticated HTTP

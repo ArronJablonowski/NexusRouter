@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 var errUsage = errors.New("invalid rollback-readiness arguments")

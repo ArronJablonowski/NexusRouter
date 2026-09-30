@@ -3,8 +3,8 @@ package app
 import (
 	"errors"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func projectAttemptHistory(source workboard.AttemptHistoryPage) (contract.AttemptHistoryPage, error) {

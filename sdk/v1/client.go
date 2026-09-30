@@ -1,22 +1,22 @@
-// Package v1 exposes the version-one in-process DarwinRouter SDK. Reuse a
+// Package v1 exposes the version-one in-process NexusRouter SDK. Reuse a
 // Client to share admission budgets. It owns no persistent database handle or
 // background supervisor and does not require Close.
 package v1
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/contextengine"
+	"github.com/ArronJablonowski/NexusRouter/contextengine"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 var ErrAdmission = app.ErrAdmission
@@ -90,7 +90,7 @@ type ConfigOptions struct {
 	ContextEngine           ContextEngine
 	// Evaluator replaces provider-backed advisory review execution while keeping
 	// configured reviewer identity, privacy admission, durable lifecycle, and
-	// evidence precedence under DarwinRouter control. It is trusted in-process
+	// evidence precedence under NexusRouter control. It is trusted in-process
 	// code, must honor cancellation, and cannot grant tool authority. Nil keeps
 	// the configured provider-backed reviewer. Typed nils are rejected.
 	Evaluator Evaluator

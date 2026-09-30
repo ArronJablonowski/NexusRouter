@@ -54,7 +54,7 @@ func TestPublicationAuthorizationCanonicalAndIndependentBinding(t *testing.T) {
 		t.Fatal("wrong independent repository accepted")
 	}
 	duplicate := bytes.Replace(body, []byte("  \"schema_version\": 1,"), []byte("  \"schema_version\": 1,\n  \"schema_version\": 1,"), 1)
-	reordered := bytes.Replace(body, []byte("  \"project\": \"DarwinRouter\",\n  \"scope\": \"darwinrouter-github-publication-authorization\","), []byte("  \"scope\": \"darwinrouter-github-publication-authorization\",\n  \"project\": \"DarwinRouter\","), 1)
+	reordered := bytes.Replace(body, []byte("  \"project\": \"NexusRouter\",\n  \"scope\": \"nexusrouter-github-publication-authorization\","), []byte("  \"scope\": \"nexusrouter-github-publication-authorization\",\n  \"project\": \"NexusRouter\","), 1)
 	for _, invalid := range [][]byte{body[:len(body)-1], append(append([]byte(nil), body...), '\n'), append([]byte("{\"unknown\":true,"), body[1:]...), duplicate, reordered} {
 		invalidPath := filepath.Join(t.TempDir(), "invalid.json")
 		if err = os.WriteFile(invalidPath, invalid, 0644); err != nil {
@@ -80,11 +80,11 @@ func publicationAuthorizationFixture() PublicationAuthorization {
 		assets = append(assets, PublicationAsset{Name: name, Size: 100, SHA256: digest})
 	}
 	return PublicationAuthorization{
-		SchemaVersion: publicationAuthorizationSchema, Project: "DarwinRouter", Scope: publicationAuthorizationScope,
-		GitHubHost: "github.com", Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0",
-		SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseTitle: "DarwinRouter v1.0.0",
-		TagMessage: "DarwinRouter release v1.0.0",
-		Tagger:     PublicationTagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
+		SchemaVersion: publicationAuthorizationSchema, Project: "NexusRouter", Scope: publicationAuthorizationScope,
+		GitHubHost: "github.com", Repository: "ArronJablonowski/NexusRouter", ReleaseVersion: "1.0.0",
+		SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseTitle: "NexusRouter v1.0.0",
+		TagMessage: "NexusRouter release v1.0.0",
+		Tagger:     PublicationTagger{Name: "NexusRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
 		Prerelease: false, MakeLatest: true,
 		ReleaseNotesSHA256: digest, CandidateRecordSHA256: digest, LicenseEvidenceSHA256: digest,
 		SHA256SUMSSHA256: digest, SignatureFileSHA256: digest, TrustRecordSHA256: digest,

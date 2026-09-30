@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserauth"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 const (

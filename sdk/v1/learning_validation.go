@@ -3,9 +3,9 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 type LearningActivationIntent = skills.LearningActivationIntent

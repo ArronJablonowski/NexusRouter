@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 func TestDelegationCompactionPolicyDeterministicAndSummaryBound(t *testing.T) {

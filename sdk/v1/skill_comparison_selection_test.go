@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestSDKSkillComparisonSelectionReadOnly(t *testing.T) {

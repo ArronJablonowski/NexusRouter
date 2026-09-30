@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // ListTasks discovers content-free durable task metadata. It neither creates

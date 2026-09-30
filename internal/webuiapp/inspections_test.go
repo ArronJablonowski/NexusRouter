@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/routing"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func inspectionHandlerFixture(t *testing.T) (*Handler, *atomic.Int32) {

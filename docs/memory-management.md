@@ -18,12 +18,12 @@ Use an explicit project configuration to apply the same configured scope,
 credential redaction and existing-store-only controls as the application service:
 
 ```sh
-darwin memory list --config config.yaml --limit 20
-darwin memory list --config config.yaml --after language --include-expired
-darwin memory show --config config.yaml --id language
-darwin memory export --config config.yaml
-darwin memory put --config config.yaml --expected 0 < fact.json
-darwin memory delete --config config.yaml --id language --expected 1
+nexus memory list --config config.yaml --limit 20
+nexus memory list --config config.yaml --after language --include-expired
+nexus memory show --config config.yaml --id language
+nexus memory export --config config.yaml
+nexus memory put --config config.yaml --expected 0 < fact.json
+nexus memory delete --config config.yaml --id language --expected 1
 ```
 
 Use the complete fact shown below for creation. A correction supplies the next
@@ -51,7 +51,7 @@ remains direct storage access without these configured redaction controls.
 
 ### Consistent export
 
-`darwin memory export --config config.yaml` emits one compact JSON object with
+`nexus memory export --config config.yaml` emits one compact JSON object with
 `version: 1`, configured `scope`, `captured_at`, and an ordered `facts` array.
 It includes all current facts in that scope, including private and expired facts;
 it excludes deleted/expired-away facts, retired-ID tombstones and historical
@@ -71,7 +71,7 @@ Exceeding either limit or encountering invalid storage fails the whole export:
 there is no silent truncation or fallback to live pages. CLI adds one newline
 outside that envelope limit and buffers validation before writing stdout. A
 failed output write can still leave a partial external copy and returns nonzero.
-No output file is created by Darwin; secure any redirected copy yourself.
+No output file is created by NexusRouter; secure any redirected copy yourself.
 
 This is a factual-memory export, not a database backup, restore format or secure
 erasure mechanism. Larger snapshot exports remain future work. Exported facts
@@ -201,7 +201,7 @@ rejection instead of identity rewriting, preserving pagination and revision
 semantics. Other personal data is not automatically removed; exports remain
 sensitive. Stronger identifier validation now rejects invalid UTF-8, control
 characters, and surrounding whitespace; old records with such identifiers are
-not silently normalized. The legacy `darwin memory --db ...` commands are
+not silently normalized. The legacy `nexus memory --db ...` commands are
 separate direct-store operations, not this configured redaction boundary.
 
 No write is automatically retried. A timeout, crash or lost response may happen

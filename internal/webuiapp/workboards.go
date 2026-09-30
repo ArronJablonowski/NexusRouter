@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 type WorkboardServices struct {

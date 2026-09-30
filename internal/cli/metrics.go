@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func runMetrics(args []string, stdout, stderr io.Writer) int {
@@ -20,7 +20,7 @@ func runMetrics(args []string, stdout, stderr io.Writer) int {
 	count := 0
 	fs.Func("db", "existing database", func(value string) error { count++; path = value; return nil })
 	if fs.Parse(args) != nil || fs.NArg() != 0 || count != 1 || path == "" {
-		fmt.Fprintln(stderr, "usage: darwin metrics --db path")
+		fmt.Fprintln(stderr, "usage: nexus metrics --db path")
 		return 2
 	}
 	ctx, stop := submissionCLIContext()

@@ -2,14 +2,14 @@
 
 The experimental `codex_app_server` provider can generate session-compaction
 proposals using the configured exact `gpt-5.6-sol` model and signed-in Codex CLI.
-This extends the existing summary command and Darwin-native HTTP summary API;
+This extends the existing summary command and NexusRouter-native HTTP summary API;
 it does not enable automatic compaction, approve model output, or change the
 source journal.
 
 ```sh
-./bin/darwin summary --config path/to/config.yaml --task SOURCE_TASK_ID \
+./bin/nexus summary --config path/to/config.yaml --task SOURCE_TASK_ID \
   --model COORDINATOR_MODEL_ID --keep 6 --max-cost 0.10
-./bin/darwin summaries show --db path/to/darwin.db --id SUMMARY_ATTEMPT_ID
+./bin/nexus summaries show --db path/to/darwin.db --id SUMMARY_ATTEMPT_ID
 ```
 
 Use your configured model ID, known context window and cost estimate. The cost

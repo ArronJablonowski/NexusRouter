@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // contextRolloverTaskProvider owns successive task-scoped provider generations.

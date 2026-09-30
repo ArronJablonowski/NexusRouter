@@ -3,7 +3,7 @@
 The experimental `codex_app_server` provider now accepts an explicit
 `--continue-task` source whose replayed history is eligible for continuation.
 The source may be a completed task or an exact recovered-delegation checkpoint.
-This starts a new Darwin task and a new ephemeral Codex thread; it does not
+This starts a new NexusRouter task and a new ephemeral Codex thread; it does not
 resume a stored Codex thread by ID or automatically restart interrupted work.
 
 Completed sources also support explicit [reviewed compacted continuation](codex-compacted-continuation.md).
@@ -16,7 +16,7 @@ describes `thread/inject_items` for adding model-visible history without startin
 generation. The installed CLI 0.153.4 experimental TypeScript schema was also
 checked for the exact request and ResponseItem forms.
 
-Darwin projects its provider-neutral messages into typed native items:
+NexusRouter projects its provider-neutral messages into typed native items:
 
 | Source | Native history item |
 | --- | --- |
@@ -49,7 +49,7 @@ sent to a cloud coordinator.
 
 Tool output beginning with an object or array delimiter is decoded as bounded,
 strict JSON before redacting string values and keys. This catches credentials
-escaped inside Darwin's structured delegation envelopes. Duplicate keys,
+escaped inside NexusRouter's structured delegation envelopes. Duplicate keys,
 redacted-key collisions, malformed structured content, excessive nesting and
 oversized content are rejected before launch. Plain tool text uses literal
 replacement. This is not universal de-obfuscation: encoded JSON inside a string,
@@ -66,9 +66,9 @@ First inspect history eligibility. Then, for a small non-sensitive source whose
 privacy permits cloud processing:
 
 ```sh
-./bin/darwin task continuation --db ./data/sol-codex-local-smoke.db --task SOURCE_TASK_ID
+./bin/nexus task continuation --db ./data/sol-codex-local-smoke.db --task SOURCE_TASK_ID
 printf '%s\n' 'Review the saved worker result without repeating work.' |
-  ./bin/darwin run --config examples/sol-codex-local-smoke.yaml \
+  ./bin/nexus run --config examples/sol-codex-local-smoke.yaml \
     --model coordinator --continue-task SOURCE_TASK_ID \
     --set workers.delegate_model= --domain smoke
 ```

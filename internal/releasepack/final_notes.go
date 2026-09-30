@@ -13,7 +13,7 @@ import (
 
 const (
 	finalReleaseNotesSchema = 1
-	releaseNotesTemplateH1  = "# DarwinRouter release notes — unreleased\n"
+	releaseNotesTemplateH1  = "# NexusRouter release notes — unreleased\n"
 )
 
 // CandidateFinalReleaseNotes binds the candidate identity to the exact notes
@@ -36,7 +36,7 @@ func renderFinalReleaseNotes(template []byte, version, commit, created string) (
 		return nil, ErrInvalid
 	}
 	var notes bytes.Buffer
-	fmt.Fprintf(&notes, "# DarwinRouter %s release notes\n\n", version)
+	fmt.Fprintf(&notes, "# NexusRouter %s release notes\n\n", version)
 	fmt.Fprintf(&notes, "- Release version: `%s`\n", version)
 	fmt.Fprintf(&notes, "- Source commit: `%s`\n", commit)
 	fmt.Fprintf(&notes, "- Release date (UTC): `%s`\n", created)
@@ -58,7 +58,7 @@ func renderFinalReleaseNotes(template []byte, version, commit, created string) (
 
 func validFinalReleaseNotesBody(body []byte) bool {
 	for _, line := range strings.Split(string(body), "\n") {
-		if (strings.HasPrefix(line, "# DarwinRouter ") && strings.HasSuffix(line, " release notes")) ||
+		if (strings.HasPrefix(line, "# NexusRouter ") && strings.HasSuffix(line, " release notes")) ||
 			strings.HasPrefix(line, "- Release version:") || strings.HasPrefix(line, "- Source commit:") ||
 			strings.HasPrefix(line, "- Release date (UTC):") || line == "- Supported artifact targets:" ||
 			line == "## Release contract and limitations" {

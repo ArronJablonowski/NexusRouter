@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type preflightVerifier func(context.Context, releasepack.PublicationPreflightOptions) (releasepack.PublicationPreflightResult, error)

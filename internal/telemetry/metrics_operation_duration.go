@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 type operationDurationKey struct {

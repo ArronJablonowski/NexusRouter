@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 func runSkillLearning(args []string, stdout, stderr io.Writer) int {
-	usage := func() int { return skillsError(stderr, "usage: darwin skills learning status --config path", 2) }
+	usage := func() int { return skillsError(stderr, "usage: nexus skills learning status --config path", 2) }
 	if len(args) < 2 || args[0] != "status" {
 		return usage()
 	}

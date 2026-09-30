@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func resourcePlanService(t *testing.T, mode, pressure string, profile func(context.Context) (resources.Snapshot, error)) *Service {

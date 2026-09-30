@@ -3,14 +3,14 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 type SkillValidatorRegistry = skills.ValidatorRegistry
 
-// ObservedToolsActivationValidatorID selects DarwinRouter's protected,
+// ObservedToolsActivationValidatorID selects NexusRouter's protected,
 // deterministic observed-tools provenance validator. Setting
 // skills.learning.validator_id to this value is an explicit opt-in; callers do
 // not register a callback for this identity.
@@ -27,7 +27,7 @@ func NewSkillValidatorRegistry(entries map[string]skills.Validator) (*SkillValid
 }
 
 // ConfiguredSkillValidatorRegistry snapshots host validators and adds the
-// protected DarwinRouter validators bound to this client's frozen settings.
+// protected NexusRouter validators bound to this client's frozen settings.
 // It performs no I/O and is safe to call before durable stores exist. Passing
 // a protected identity in entries is rejected.
 func (c *Client) ConfiguredSkillValidatorRegistry(entries map[string]skills.Validator) (*SkillValidatorRegistry, error) {

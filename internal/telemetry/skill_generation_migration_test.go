@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestSkillGenerationMigrationFrom15PreservesExistingData(t *testing.T) {

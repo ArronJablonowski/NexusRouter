@@ -86,7 +86,7 @@ func newReconstructionFixture(t *testing.T) *reconstructionFixture {
 	fixture.server = httptest.NewServer(mux)
 	t.Cleanup(fixture.server.Close)
 	fixture.policy = goReconstructionPolicyOptions{
-		policy:           "darwinrouter-controlled-reconstruction-v1",
+		policy:           "nexusrouter-controlled-reconstruction-v1",
 		moduleProxy:      fixture.server.URL + "/proxy",
 		checksumDatabase: verifier + " " + fixture.server.URL + "/sumdb",
 	}
@@ -197,7 +197,7 @@ func (fixture *reconstructionFixture) serveProxy(writer http.ResponseWriter, req
 func (fixture *reconstructionFixture) sourceRepository() (string, string) {
 	fixture.t.Helper()
 	source := filepath.Join(fixture.t.TempDir(), "source")
-	if err := os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(source, "cmd", "nexus"), 0755); err != nil {
 		fixture.t.Fatal(err)
 	}
 	paths := make([]string, 0, len(fixture.modules))
@@ -218,16 +218,16 @@ func (fixture *reconstructionFixture) sourceRepository() (string, string) {
 	}
 	files := map[string]string{
 		"go.mod": goMod.String(), "go.sum": goSum.String(),
-		"LICENSE": "MIT License\n\nCopyright controlled reconstruction fixture\n",
-		filepath.Join("cmd", "darwin", "main.go"): "package main\n\nimport _ \"example.com/darwin-fixture/common\"\n\nfunc main() {}\n",
+		"LICENSE":                                "MIT License\n\nCopyright controlled reconstruction fixture\n",
+		filepath.Join("cmd", "nexus", "main.go"): "package main\n\nimport _ \"example.com/darwin-fixture/common\"\n\nfunc main() {}\n",
 	}
 	for _, osName := range []string{"darwin", "linux"} {
 		modulePath := "example.com/darwin-fixture/os-" + osName
-		files[filepath.Join("cmd", "darwin", "platform_"+osName+".go")] = "//go:build " + osName + "\n\npackage main\n\nimport _ \"" + modulePath + "\"\n"
+		files[filepath.Join("cmd", "nexus", "platform_"+osName+".go")] = "//go:build " + osName + "\n\npackage main\n\nimport _ \"" + modulePath + "\"\n"
 	}
 	for _, arch := range []string{"amd64", "arm64"} {
 		modulePath := "example.com/darwin-fixture/arch-" + arch
-		files[filepath.Join("cmd", "darwin", "platform_"+arch+".go")] = "//go:build " + arch + "\n\npackage main\n\nimport _ \"" + modulePath + "\"\n"
+		files[filepath.Join("cmd", "nexus", "platform_"+arch+".go")] = "//go:build " + arch + "\n\npackage main\n\nimport _ \"" + modulePath + "\"\n"
 	}
 	for name, body := range files {
 		path := filepath.Join(source, name)
@@ -452,7 +452,7 @@ func TestControlledReconstructionRejectsPolicyAndSourceDrift(t *testing.T) {
 	if fixture.zipRequestCount() != before {
 		t.Fatal("policy drift was not rejected before reconstruction")
 	}
-	mainPath := filepath.Join(source, "cmd", "darwin", "main.go")
+	mainPath := filepath.Join(source, "cmd", "nexus", "main.go")
 	mainBody, err := os.ReadFile(mainPath)
 	if err != nil {
 		t.Fatal(err)

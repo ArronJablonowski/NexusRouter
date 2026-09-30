@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func TestSDKDurableSkillRegressionLifecycleAndGuards(t *testing.T) {

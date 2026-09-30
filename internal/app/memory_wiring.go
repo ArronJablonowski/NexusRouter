@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 // Context leaves storage only after configured credentials are removed. Routing
@@ -11,7 +11,7 @@ func memorySecrets(cfg config.Settings, secret func(string) string) []string {
 	if secret == nil {
 		return nil
 	}
-	secrets := []string{secret("DARWIN_API_TOKEN")}
+	secrets := []string{secret("NEXUS_API_TOKEN"), secret("DARWIN_API_TOKEN")}
 	for _, p := range cfg.Providers {
 		if p.APIKeyEnv != "" {
 			secrets = append(secrets, secret(p.APIKeyEnv))

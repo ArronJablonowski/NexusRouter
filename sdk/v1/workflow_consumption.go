@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // ConsumeSkillWorkflowScan durably groups one saved scan page in the configured

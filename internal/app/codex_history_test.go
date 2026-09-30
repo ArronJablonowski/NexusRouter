@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexbridge"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 // Protocol fixture: no Codex process or cloud inference is started. Only fresh

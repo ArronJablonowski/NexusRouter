@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func TestCLIAdditionalSummaryCategories(t *testing.T) {

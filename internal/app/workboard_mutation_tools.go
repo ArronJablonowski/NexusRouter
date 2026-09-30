@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
-	"github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 
 func workboardMutationSpecs() []providers.Tool {
 	return []providers.Tool{
-		{Name: "workboard_create_board", Description: "Create a local DarwinRouter Kanban board after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536}},"required":["idempotency_key","title"],"additionalProperties":false}`)},
+		{Name: "workboard_create_board", Description: "Create a local NexusRouter Kanban board after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536}},"required":["idempotency_key","title"],"additionalProperties":false}`)},
 		workboardBoardReviseMutationSpec(),
 		workboardBoardArchiveMutationSpec(),
 		{Name: "workboard_create_card", Description: "Create a bounded card with explicit acceptance criteria on one local Kanban board after operator approval.", Parameters: json.RawMessage(`{"type":"object","properties":{"idempotency_key":` + workboardKeySchema + `,"board_id":` + workboardIDSchema + `,"title":{"type":"string","minLength":1,"maxLength":256},"description":{"type":"string","maxLength":65536},"priority":{"enum":["low","normal","high","urgent"]},"parent_id":` + workboardIDSchema + `,"assignee_id":` + workboardIDSchema + `,"labels":` + workboardLabelsSchema + `,"dependencies":` + workboardIDsSchema + `,"budget":` + workboardBudgetSchema + `,"criteria":{"type":"array","minItems":1,"maxItems":32,"items":` + workboardCriterionSchema + `},"expected_board_revision":{"type":"integer","minimum":1},"expected_graph_revision":{"type":"integer","minimum":1}},"required":["idempotency_key","board_id","title","criteria","expected_board_revision","expected_graph_revision"],"additionalProperties":false}`)},

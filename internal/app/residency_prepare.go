@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func (s *Service) prepareResidency(ctx context.Context, state *residencyEndpoint, adapter providers.ResidencyController, provider config.Provider, target string, low bool) error {

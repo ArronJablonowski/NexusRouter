@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func (h *Handler) serveWorkboardDependencies(w http.ResponseWriter, r *http.Request, boardID, cardID string) {

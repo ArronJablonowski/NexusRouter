@@ -2,7 +2,7 @@
 
 The built-in macOS profiler now reads `NSProcessInfo.thermalState` alongside
 its existing RAM, swap and unified-memory observations. The reported state is
-available in `darwin resources` and the host profiler extension. No model
+available in `nexus resources` and the host profiler extension. No model
 inference, stress load, administrator access or power-setting changes are needed.
 
 | OS report | `ThermalPressure` | New local reservation |
@@ -26,7 +26,7 @@ The mapping does not measure degrees, fan speed or per-device GPU temperature.
 
 ## Probe and failure boundary
 
-Darwin executes one fixed Foundation-only JavaScript expression using the
+NexusRouter executes one fixed Foundation-only JavaScript expression using the
 absolute `/usr/bin/osascript` path. Named framework constants are converted to
 fixed labels. No user data is inserted into the script, and it does not automate
 applications or access a repository. The existing process helper supplies a
@@ -43,7 +43,7 @@ otherwise viable work under the existing budget policy.
 
 ## Evidence and remaining work
 
-On the development Mac, the rebuilt `darwin resources` returned `nominal`,
+On the development Mac, the rebuilt `nexus resources` returned `nominal`,
 `ThermalPressure: false`, 16 CPU threads and 48 GiB unified memory. The old
 `pmset -g therm` reported no recorded thermal data and is not used as a cool
 signal. This was a read-only observation, not a physical throttling test.

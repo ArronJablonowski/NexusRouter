@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func sdkRegressionMonitorFixture(t *testing.T) (*sdk.Client, sdk.ConfigOptions, skills.Version, skills.Version, string) {

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestScopeLeaseStatusReadOnly(t *testing.T) {

@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -28,7 +28,7 @@ func TestJSONRunProcessLiveOutputAndBrokenPipe(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "darwin")
 	buildCtx, stopBuild := context.WithTimeout(context.Background(), time.Minute)
 	defer stopBuild()
-	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/darwin")
+	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/nexus")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, out)
 	}

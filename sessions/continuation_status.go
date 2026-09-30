@@ -1,6 +1,6 @@
 package sessions
 
-import "github.com/ArronJablonowski/DarwinRouter/runtime"
+import "github.com/ArronJablonowski/NexusRouter/runtime"
 
 // ContinuationStatus describes durable history eligibility, not provider,
 // privacy, resource, context-budget or permission readiness for a new task.

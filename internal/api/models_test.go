@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestModelCatalogOpenAIShapeAndAdmission(t *testing.T) {
@@ -39,7 +39,7 @@ func TestModelCatalogOpenAIShapeAndAdmission(t *testing.T) {
 	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &body) != nil || body.Object != "list" || calls != 1 || runs != 0 {
 		t.Fatal(w.Code, w.Body.String(), calls, runs)
 	}
-	want := []modelCatalogItem{{ID: "coordinator", Object: "model", Created: 0, OwnedBy: "darwinrouter"}, {ID: "local-worker", Object: "model", Created: 0, OwnedBy: "darwinrouter"}}
+	want := []modelCatalogItem{{ID: "coordinator", Object: "model", Created: 0, OwnedBy: "nexusrouter"}, {ID: "local-worker", Object: "model", Created: 0, OwnedBy: "nexusrouter"}}
 	if !reflect.DeepEqual(body.Data, want) || !strings.Contains(w.Body.String(), `"shutdown_date":null`) || strings.Contains(w.Body.String(), "endpoint") || strings.Contains(w.Body.String(), "credential") {
 		t.Fatal(body, w.Body.String())
 	}

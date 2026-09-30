@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/memory"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Memory use means an admitted dispatch attempt, not proof of provider receipt.

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Explicit supervised opt-in only. Each case owns one checked CLI process and

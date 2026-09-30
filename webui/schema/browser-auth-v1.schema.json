@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://darwinrouter.local/schema/webui/browser-auth-v1",
-  "title": "DarwinRouter browser authentication contract v1",
+  "$id": "https://nexusrouter.local/schema/webui/browser-auth-v1",
+  "title": "NexusRouter browser authentication contract v1",
   "$defs": {
     "challenge_id": {
       "type": "string",

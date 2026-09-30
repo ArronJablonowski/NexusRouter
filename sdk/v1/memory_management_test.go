@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestSDKMemoryManagementExistingScopedStorage(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Exercise the actual provider adapter in hybrid/cloud-capable transport mode.

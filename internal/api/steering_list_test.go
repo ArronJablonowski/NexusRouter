@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestSteeringListMetadataAndValidation(t *testing.T) {

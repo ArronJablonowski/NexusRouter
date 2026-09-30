@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 type delegateAuditRunner func(context.Context, string, string) (*runtime.DelegationAudit, error)

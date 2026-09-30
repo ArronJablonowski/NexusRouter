@@ -1,10 +1,10 @@
-// Command darwin is the DarwinRouter command-line entry point.
+// Command darwin is the deprecated compatibility entry point; use nexus.
 package main
 
 import (
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/cli"
+	"github.com/ArronJablonowski/NexusRouter/internal/cli"
 )
 
 // version can be set by release builds using -ldflags.

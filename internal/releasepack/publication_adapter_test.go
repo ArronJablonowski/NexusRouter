@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubpublish"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubpublish"
 )
 
 type adapterSecretSource struct{ calls int }

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func runSkillComparisonSelection(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -25,7 +25,7 @@ func runSkillComparisonSelection(args []string, stdin io.Reader, stdout, stderr 
 		}
 	}
 	if path == "" {
-		return skillsError(stderr, "usage: darwin skills compare-select --config path < request.json", 2)
+		return skillsError(stderr, "usage: nexus skills compare-select --config path < request.json", 2)
 	}
 	request, err := decodeSkillComparisonSelection(stdin)
 	if err != nil {

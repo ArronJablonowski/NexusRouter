@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 )
 
 func (h *Handler) serveDeprecation(w http.ResponseWriter, r *http.Request) {

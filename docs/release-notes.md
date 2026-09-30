@@ -1,4 +1,4 @@
-# DarwinRouter release notes — unreleased
+# NexusRouter release notes — unreleased
 
 This source template summarizes the candidate functionality and its known
 limitations. Release packaging derives a canonical final body that identifies
@@ -412,7 +412,7 @@ operator records.
   not backfill pre-ledger work and preserves the task-duration epoch. See
   [durable usage and cost accounting](usage-accounting.md).
 
-- Versioned configured routing metadata through `darwin models list`, Go SDK
+- Versioned configured routing metadata through `nexus models list`, Go SDK
   `ConfiguredModelCatalog`, and authenticated `GET /v1/routing/models`. The
   snapshot carries the redacted configuration fingerprint and declared
   model/provider aliases, capabilities, context, optional cost, resource hints
@@ -422,13 +422,13 @@ operator records.
   development builds; `/v1/models` retains its minimal OpenAI-compatible shape.
   See [configured model metadata](configured-model-catalog.md).
 
-- Content-free durable task discovery through `darwin task list`, interactive
+- Content-free durable task discovery through `nexus task list`, interactive
   `/tasks`, Go SDK `ListTasks`, and authenticated `GET /v1/tasks`. Newest-first
   opaque pages freeze their insertion boundary while reporting live state; a
   listed ID still requires an explicit continuation-readiness check before
   `/resume`. See [task discovery](task-discovery.md).
 
-- Metadata-only automatic-route inspection through `darwin task route`, the Go
+- Metadata-only automatic-route inspection through `nexus task route`, the Go
   SDK's `InspectRouteExplanation`, and authenticated
   `GET /v1/tasks/{id}/route`. The reader reconstructs only the fixed initial
   route boundary and validates policy weights, candidates, ranking, exclusions,
@@ -438,11 +438,11 @@ operator records.
   [route explanation inspection](route-explanation.md).
 
 - Authenticated `GET /v1/models` returns an OpenAI-shaped, configuration-only
-  catalog of Darwin model aliases. It is independently capacity-bounded, does
+  catalog of NexusRouter model aliases. It is independently capacity-bounded, does
   no discovery or inference, and omits endpoints, credential references,
   routing cost and host resource metadata. Invalid backend catalogs fail closed.
   The compatibility `created` field is zero because upstream creation time is
-  unknown; `shutdown_date` is null and `owned_by` identifies DarwinRouter's
+  unknown; `shutdown_date` is null and `owned_by` identifies NexusRouter's
   virtual route record rather than ownership of upstream model weights.
 
 - Explicit one-shot OTLP/HTTP trace export through CLI and Go SDK for bounded
@@ -764,7 +764,7 @@ Background learning and managed model residency default off. Do not enable
 either merely to try a newer binary: review scope, budgets, privacy, dedicated
 server ownership and recovery semantics first. Keep credentials outside source
 configuration and logs. Existing Codex login is used without copying credentials
-into DarwinRouter or artifacts.
+into NexusRouter or artifacts.
 
 ## Operator-controlled release evidence
 

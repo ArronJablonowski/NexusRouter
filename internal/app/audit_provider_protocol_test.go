@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexbridge"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 )
 
 type auditProtocolWire struct{ codexHistoryWire }

@@ -33,7 +33,7 @@ and sensitive logs out of this record and the repository.
 
 ## License and notices
 
-- DarwinRouter licensing policy: MIT, selected by the project owner to match
+- NexusRouter licensing policy: MIT, selected by the project owner to match
   Hermes Agent; see the repository-root `LICENSE`.
 - Mechanical dependency inventory:
   [distribution dependency license inventory](dependency-license-inventory.md)
@@ -279,7 +279,7 @@ be omitted.
   network-denied host; the retained transcript and independently delivered
   digest are reviewed, and any incomplete reservation is quarantined.
 - [ ] Exactly one rollback policy is recorded: `first_release` explicitly
-  approves that no previous public DarwinRouter release or pre-upgrade backup is
+  approves that no previous public NexusRouter release or pre-upgrade backup is
   claimed, or `upgrade` binds the authenticated prior binary and its matching
   pre-upgrade backup digest and schema.
 - [ ] The canonical rollback-readiness record is within its approval validity

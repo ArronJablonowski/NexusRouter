@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 // beginSchemaTransaction validates current schemas in a WAL read snapshot so

@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // AppendLeased implements the supervisor journal for non-submitted work. Hosts

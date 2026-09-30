@@ -9,13 +9,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 func runMemory(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin memory list|show|put|delete (--config path | --db path --scope scope) [--id id] [--expected revision]; darwin memory export --config path")
+		fmt.Fprintln(stderr, "usage: nexus memory list|show|put|delete (--config path | --db path --scope scope) [--id id] [--expected revision]; nexus memory export --config path")
 		return 2
 	}
 	if len(args) == 0 {

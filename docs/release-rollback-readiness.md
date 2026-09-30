@@ -30,15 +30,15 @@ Operators must pass exactly one mode; the verifier never infers it:
   mechanically observed installation evidence, it must explicitly approve
   daemon `stop`, binary `uninstall`, and data
   `preserve_current_schema_no_restore`; the verifier never chooses these actions
-  and DarwinRouter does not invent a previous public release.
+  and NexusRouter does not invent a previous public release.
 - `upgrade` records `not_applicable`, the exact prior supported binary identity
   (repository, version, commit, tag, target, artifact and binary digests,
   publication and verification receipt digests, and schema), an actual
   pre-upgrade backup digest/schema, and a passed
   `published_release_upgrade_rollback` rehearsal.
 
-Canonical records use schema `1`, project `DarwinRouter`, and scope
-`darwinrouter-rollback-readiness`. JSON must be the exact two-space-indented
+Canonical records use schema `1`, project `NexusRouter`, and scope
+`nexusrouter-rollback-readiness`. JSON must be the exact two-space-indented
 encoding with one trailing newline. Generate it through the Go type and verify
 its independently communicated SHA-256; hand-edited or reordered JSON is
 rejected. Use `releasepack.MarshalRollbackReadiness` and
@@ -46,7 +46,7 @@ rejected. Use `releasepack.MarshalRollbackReadiness` and
 exclusive creation, mode `0600`, file sync, directory sync, and exact digest.
 
 The rehearsal file is the schema-`1`
-`darwinrouter-published-native-install-rehearsal` record. The verifier derives
+`nexusrouter-published-native-install-rehearsal` record. The verifier derives
 repository, version, commit, tag, immutable release ID, publication receipt and
 authorization digests, install-evidence digest, native target, artifact and
 installed-binary digests, backup digest, source/current/rollback schemas, and
@@ -67,14 +67,14 @@ go run ./cmd/verify-rollback-readiness \
   --publication-receipt-sha256 sha256:RECEIPT \
   --publication-authorization-sha256 sha256:AUTHORIZATION \
   --receipt-verifier-id idp:release-observer \
-  --repository ArronJablonowski/DarwinRouter --version 1.0.1 \
+  --repository ArronJablonowski/NexusRouter --version 1.0.1 \
   --commit FULL40HEXCOMMIT --tag v1.0.1 --release-id 123 --current-schema 53 \
   --mode first_release \
   --rehearsal-evidence published-install.json \
   --rehearsal-sha256 sha256:PUBLISHED_INSTALL_RECORD \
   --rehearsal-verifier-id idp:rehearsal-reviewer \
   --incident-owner team:release-incident \
-  --status-url https://status.example.invalid/darwinrouter \
+  --status-url https://status.example.invalid/nexusrouter \
   --approver-id idp:release-approver \
   --policy-url https://policy.example.invalid/rollback \
   --first-release-daemon-action stop \

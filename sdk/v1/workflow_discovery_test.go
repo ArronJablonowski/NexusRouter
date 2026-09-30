@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func TestSDKWorkflowDiscoveryReadOnlyAndClientGuards(t *testing.T) {

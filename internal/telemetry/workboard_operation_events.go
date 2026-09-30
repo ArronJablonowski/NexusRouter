@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 // verifyWorkboardReceiptEvents binds an exact-replay response back to the

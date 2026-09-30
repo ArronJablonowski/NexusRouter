@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func attentionPageFixture() workers.LeaseAttentionPage {

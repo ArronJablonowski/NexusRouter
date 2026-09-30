@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/classification"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/classification"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 var ErrClassification = errors.New("intent classification failed")
@@ -344,7 +344,7 @@ func classifierSecretSnapshot(settings config.Settings, resolve func(string) str
 	if resolve == nil {
 		return values, nil
 	}
-	names := []string{"DARWIN_API_TOKEN"}
+	names := []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"}
 	for _, provider := range settings.Providers {
 		if provider.APIKeyEnv != "" {
 			names = append(names, provider.APIKeyEnv)

@@ -24,7 +24,7 @@ func trustRecordFixture(t *testing.T, publicFile string) (string, TrustRecord) {
 	digest := sha256.Sum256(key)
 	record := TrustRecord{
 		SchemaVersion:         1,
-		Project:               "DarwinRouter",
+		Project:               "NexusRouter",
 		Scope:                 trustScope,
 		KeyID:                 "release-2026-01",
 		Algorithm:             "Ed25519",
@@ -32,8 +32,8 @@ func trustRecordFixture(t *testing.T, publicFile string) (string, TrustRecord) {
 		PublicKeySHA256:       "sha256:" + hex.EncodeToString(digest[:]),
 		Status:                "active",
 		PublishedAt:           "2026-09-07T12:34:56Z",
-		ReleasePolicyURL:      "https://github.com/ArronJablonowski/DarwinRouter/blob/main/docs/release-policy.md",
-		RotationRevocationURL: "https://github.com/ArronJablonowski/DarwinRouter/security/advisories",
+		ReleasePolicyURL:      "https://github.com/ArronJablonowski/NexusRouter/blob/main/docs/release-policy.md",
+		RotationRevocationURL: "https://github.com/ArronJablonowski/NexusRouter/security/advisories",
 	}
 	encoded, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
@@ -138,7 +138,7 @@ func TestTrustRecordStatusAndSchemaFailClosed(t *testing.T) {
 			case "duplicate":
 				encoded = []byte(strings.Replace(string(encoded), `"schema_version": 1,`, `"schema_version": 1, "schema_version": 1,`, 1))
 			case "reordered":
-				encoded = []byte(strings.Replace(string(encoded), "  \"project\": \"DarwinRouter\",\n  \"scope\": \"darwinrouter-release-signing\",", "  \"scope\": \"darwinrouter-release-signing\",\n  \"project\": \"DarwinRouter\",", 1))
+				encoded = []byte(strings.Replace(string(encoded), "  \"project\": \"NexusRouter\",\n  \"scope\": \"nexusrouter-release-signing\",", "  \"scope\": \"nexusrouter-release-signing\",\n  \"project\": \"NexusRouter\",", 1))
 			case "noncanonical":
 				encoded, err = json.Marshal(record)
 				if err != nil {

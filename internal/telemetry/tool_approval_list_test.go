@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
 )
 
 func insertListApproval(t *testing.T, s *Store, req approvals.Request, id, call string) {

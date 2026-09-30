@@ -25,11 +25,11 @@ func TestMarshalOTLPWireShapePrecisionAndOwnership(t *testing.T) {
 	}
 	resource := wire["resourceMetrics"].([]any)[0].(map[string]any)
 	attr := resource["resource"].(map[string]any)["attributes"].([]any)[0].(map[string]any)
-	if attr["key"] != "service.name" || attr["value"].(map[string]any)["stringValue"] != "DarwinRouter" {
+	if attr["key"] != "service.name" || attr["value"].(map[string]any)["stringValue"] != "NexusRouter" {
 		t.Fatal(attr)
 	}
 	scope := resource["scopeMetrics"].([]any)[0].(map[string]any)
-	if !reflect.DeepEqual(scope["scope"], map[string]any{"name": "darwinrouter.metrics", "version": "1"}) {
+	if !reflect.DeepEqual(scope["scope"], map[string]any{"name": "nexusrouter.metrics", "version": "1"}) {
 		t.Fatal(scope)
 	}
 	metrics := scope["metrics"].([]any)
@@ -38,7 +38,7 @@ func TestMarshalOTLPWireShapePrecisionAndOwnership(t *testing.T) {
 	}
 	for i, item := range metrics[:len(s.Groups)] {
 		metric := item.(map[string]any)
-		if len(metric) != 3 || metric["name"] != "darwinrouter."+s.Groups[i].Name || metric["unit"] != "{record}" {
+		if len(metric) != 3 || metric["name"] != "nexusrouter."+s.Groups[i].Name || metric["unit"] != "{record}" {
 			t.Fatal(metric)
 		}
 		points := metric["gauge"].(map[string]any)["dataPoints"].([]any)
@@ -59,7 +59,7 @@ func TestMarshalOTLPWireShapePrecisionAndOwnership(t *testing.T) {
 	}
 	operation := metrics[len(s.Groups)].(map[string]any)
 	unavailable := metrics[len(s.Groups)+1].(map[string]any)
-	if operation["name"] != "darwinrouter.operation.duration" || unavailable["name"] != "darwinrouter.operation.duration.unavailable" {
+	if operation["name"] != "nexusrouter.operation.duration" || unavailable["name"] != "nexusrouter.operation.duration.unavailable" {
 		t.Fatal(metrics[len(s.Groups):])
 	}
 	after, _ := json.Marshal(s)
@@ -108,7 +108,7 @@ func TestMarshalOTLPLegacyAndClosedLabels(t *testing.T) {
 		t.Fatal(string(body))
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
-	if len(items) != 3 || items[0].Name != "darwinrouter.tasks" || items[1].Name != "darwinrouter.runtime_events" || items[2].Name != "darwinrouter.runtime_operations" {
+	if len(items) != 3 || items[0].Name != "nexusrouter.tasks" || items[1].Name != "nexusrouter.runtime_events" || items[2].Name != "nexusrouter.runtime_operations" {
 		t.Fatal("unavailable fabricated", items)
 	}
 	for _, mutate := range []func(*Snapshot){func(s *Snapshot) { s.Groups[0].Name = "private-task" }, func(s *Snapshot) { s.Groups[0].Counts[0].State = "secret-token" }, func(s *Snapshot) { s.Groups[0].Counts[0].Value = -1 }, func(s *Snapshot) { s.Groups[1].Counts = []Count{{State: "queued", Value: 1}} }, func(s *Snapshot) { s.Version++ }} {
@@ -135,14 +135,14 @@ func TestMarshalOTLPAccountingUsesClosedIdentifierFreeBuckets(t *testing.T) {
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
 	wantNames := map[string]bool{
-		"darwinrouter.accounting.records":               true,
-		"darwinrouter.accounting.usage.known_records":   true,
-		"darwinrouter.accounting.usage.unknown_records": true,
-		"darwinrouter.accounting.input_tokens.known":    true,
-		"darwinrouter.accounting.output_tokens.known":   true,
-		"darwinrouter.accounting.cost.known_records":    true,
-		"darwinrouter.accounting.cost.unknown_records":  true,
-		"darwinrouter.accounting.normalized_cost.known": true,
+		"nexusrouter.accounting.records":               true,
+		"nexusrouter.accounting.usage.known_records":   true,
+		"nexusrouter.accounting.usage.unknown_records": true,
+		"nexusrouter.accounting.input_tokens.known":    true,
+		"nexusrouter.accounting.output_tokens.known":   true,
+		"nexusrouter.accounting.cost.known_records":    true,
+		"nexusrouter.accounting.cost.unknown_records":  true,
+		"nexusrouter.accounting.normalized_cost.known": true,
 	}
 	wantBuckets := []string{"primary_execution", "fallback", "classifier", "summarizer", "orchestrator_audit", "optional_judge", "routed", "auxiliary", "overall"}
 	for _, item := range items {
@@ -181,7 +181,7 @@ func TestMarshalOTLPQueueActivityUsesClosedReconciledStates(t *testing.T) {
 		t.Fatal(string(body))
 	}
 	for _, item := range request.ResourceMetrics[0].ScopeMetrics[0].Metrics {
-		if item.Name != "darwinrouter.queue_activity" {
+		if item.Name != "nexusrouter.queue_activity" {
 			continue
 		}
 		wantStates := []string{"arrived", "service_started", "service_terminal"}

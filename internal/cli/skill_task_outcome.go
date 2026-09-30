@@ -7,15 +7,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func runSkillTaskOutcome(args []string, stdout, stderr io.Writer) int {
 	flags, err := parseSteeringFlags(args, "config", "task")
 	if err != nil || !sessions.ValidEventPageID(flags["task"]) {
-		fmt.Fprintln(stderr, "usage: darwin task skill-outcome --config path --task id")
+		fmt.Fprintln(stderr, "usage: nexus task skill-outcome --config path --task id")
 		return 2
 	}
 	cfg, err := config.Load(config.Options{ProjectFile: flags["config"], Env: config.Environment(os.Environ())})

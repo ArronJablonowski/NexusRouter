@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 // Extract only the intake-specific flag; all execution options are validated
@@ -66,7 +66,7 @@ func parseSubmitArgs(args []string) (config.Options, app.Request, string, error)
 func runSubmit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, key, err := parseSubmitArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin submit --config path --key idempotency-key --model id < prompt.txt")
+		fmt.Fprintln(stderr, "usage: nexus submit --config path --key idempotency-key --model id < prompt.txt")
 		return 2
 	}
 	ctx, cancel := submissionCLIContext()

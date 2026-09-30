@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 // readSkillGenerationTraces projects terminal generation attempts as

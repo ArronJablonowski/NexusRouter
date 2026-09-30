@@ -97,7 +97,7 @@ type sbomSourceFile struct {
 	SHA256 string
 }
 
-// BuildTargetSBOM derives the exact cmd/darwin dependency closure and checked-
+// BuildTargetSBOM derives the exact cmd/nexus dependency closure and checked-
 // in frontend source inventory before rendering canonical SPDX 2.3 JSON.
 func BuildTargetSBOM(ctx context.Context, source string, env []string, options TargetSBOMOptions) ([]byte, error) {
 	if ctx == nil || source == "" || len(env) == 0 {
@@ -131,17 +131,17 @@ func renderTargetSBOM(options TargetSBOMOptions, modules []noticeModule, assets 
 	assets = append([]sbomSourceFile(nil), assets...)
 	sort.Slice(assets, func(i, j int) bool { return assets[i].Name < assets[j].Name })
 
-	rootID := "SPDXRef-Package-DarwinRouter"
+	rootID := "SPDXRef-Package-NexusRouter"
 	document := spdxDocument{
 		SPDXVersion: spdxVersion, DataLicense: spdxDataLicense, SPDXID: "SPDXRef-DOCUMENT",
-		Name:              "DarwinRouter-" + options.Version + "-" + options.TargetOS + "-" + options.TargetArch,
+		Name:              "NexusRouter-" + options.Version + "-" + options.TargetOS + "-" + options.TargetArch,
 		Comment:           spdxScopeComment,
-		DocumentNamespace: fmt.Sprintf("https://github.com/ArronJablonowski/DarwinRouter/releases/%s/%s/%s-%s/sbom", options.Version, options.Commit, options.TargetOS, options.TargetArch),
-		CreationInfo:      spdxCreationInfo{Created: options.Created, Creators: []string{"Tool: DarwinRouter-releasepack"}},
+		DocumentNamespace: fmt.Sprintf("https://github.com/ArronJablonowski/NexusRouter/releases/%s/%s/%s-%s/sbom", options.Version, options.Commit, options.TargetOS, options.TargetArch),
+		CreationInfo:      spdxCreationInfo{Created: options.Created, Creators: []string{"Tool: NexusRouter-releasepack"}},
 		DocumentDescribes: []string{rootID},
 	}
 	document.Packages = append(document.Packages, spdxPackage{
-		Name: "DarwinRouter", SPDXID: rootID, VersionInfo: options.Version,
+		Name: "NexusRouter", SPDXID: rootID, VersionInfo: options.Version,
 		DownloadLocation: spdxNoAssertion, FilesAnalyzed: false, LicenseConcluded: spdxNoAssertion, LicenseDeclared: "MIT",
 		CopyrightText: spdxNoAssertion,
 	})
@@ -166,9 +166,9 @@ func renderTargetSBOM(options TargetSBOMOptions, modules []noticeModule, assets 
 		}
 		document.Relationships = append(document.Relationships, relation)
 	}
-	binaryID := "SPDXRef-File-darwin"
+	binaryID := "SPDXRef-File-nexus"
 	document.Files = append(document.Files, spdxFile{
-		FileName: "./darwin", SPDXID: binaryID, Checksums: []spdxChecksum{{Algorithm: "SHA256", ChecksumValue: options.BinarySHA256}},
+		FileName: "./nexus", SPDXID: binaryID, Checksums: []spdxChecksum{{Algorithm: "SHA256", ChecksumValue: options.BinarySHA256}},
 		FileTypes: []string{"BINARY"}, LicenseConcluded: spdxNoAssertion, CopyrightText: spdxNoAssertion,
 	})
 	seenIDs[binaryID] = true
@@ -227,8 +227,8 @@ func ValidateTargetSBOM(body []byte) error {
 
 func validateTargetSBOMDocument(document spdxDocument) error {
 	if document.SPDXVersion != spdxVersion || document.DataLicense != spdxDataLicense || document.SPDXID != "SPDXRef-DOCUMENT" ||
-		document.Name == "" || len(document.Name) > 256 || document.Comment != spdxScopeComment || len(document.DocumentDescribes) != 1 || document.DocumentDescribes[0] != "SPDXRef-Package-DarwinRouter" ||
-		len(document.CreationInfo.Creators) != 1 || document.CreationInfo.Creators[0] != "Tool: DarwinRouter-releasepack" || !validSPDXCreated(document.CreationInfo.Created) {
+		document.Name == "" || len(document.Name) > 256 || document.Comment != spdxScopeComment || len(document.DocumentDescribes) != 1 || document.DocumentDescribes[0] != "SPDXRef-Package-NexusRouter" ||
+		len(document.CreationInfo.Creators) != 1 || document.CreationInfo.Creators[0] != "Tool: NexusRouter-releasepack" || !validSPDXCreated(document.CreationInfo.Created) {
 		return ErrInvalid
 	}
 	parsed, err := url.Parse(document.DocumentNamespace)
@@ -246,7 +246,7 @@ func validateTargetSBOMDocument(document spdxDocument) error {
 		}
 		ids[item.SPDXID] = true
 		if i == 0 {
-			if item.Name != "DarwinRouter" || item.SPDXID != "SPDXRef-Package-DarwinRouter" || !semver.MatchString(item.VersionInfo) || item.LicenseConcluded != spdxNoAssertion || item.LicenseDeclared != "MIT" || len(item.Checksums) != 0 {
+			if item.Name != "NexusRouter" || item.SPDXID != "SPDXRef-Package-NexusRouter" || !semver.MatchString(item.VersionInfo) || item.LicenseConcluded != spdxNoAssertion || item.LicenseDeclared != "MIT" || len(item.Checksums) != 0 {
 				return ErrInvalid
 			}
 			continue
@@ -278,7 +278,7 @@ func validateTargetSBOMDocument(document spdxDocument) error {
 		}
 		ids[file.SPDXID] = true
 		if i == 0 {
-			if file.FileName != "./darwin" || file.SPDXID != "SPDXRef-File-darwin" || file.FileTypes[0] != "BINARY" || file.LicenseConcluded != spdxNoAssertion {
+			if file.FileName != "./nexus" || file.SPDXID != "SPDXRef-File-nexus" || file.FileTypes[0] != "BINARY" || file.LicenseConcluded != spdxNoAssertion {
 				return ErrInvalid
 			}
 		} else {
@@ -289,7 +289,7 @@ func validateTargetSBOMDocument(document spdxDocument) error {
 		}
 	}
 	nameSuffix := "-" + targetFromNamespace(parsed.Path)
-	if nameSuffix == "-" || !strings.HasSuffix(document.Name, nameSuffix) || strings.TrimSuffix(document.Name, nameSuffix) != "DarwinRouter-"+document.Packages[0].VersionInfo ||
+	if nameSuffix == "-" || !strings.HasSuffix(document.Name, nameSuffix) || strings.TrimSuffix(document.Name, nameSuffix) != "NexusRouter-"+document.Packages[0].VersionInfo ||
 		document.DocumentNamespace != expectedSBOMNamespace(document.Packages[0].VersionInfo, parsed.Path) {
 		return ErrInvalid
 	}
@@ -306,19 +306,19 @@ func validateTargetSBOMDocument(document spdxDocument) error {
 		return ErrInvalid
 	}
 	for _, item := range document.Packages[1:] {
-		key := "SPDXRef-Package-DarwinRouter\x00DEPENDS_ON\x00" + item.SPDXID
+		key := "SPDXRef-Package-NexusRouter\x00DEPENDS_ON\x00" + item.SPDXID
 		if item.Name == goToolchainModulePath {
-			key = item.SPDXID + "\x00BUILD_TOOL_OF\x00SPDXRef-Package-DarwinRouter"
+			key = item.SPDXID + "\x00BUILD_TOOL_OF\x00SPDXRef-Package-NexusRouter"
 		}
 		if !seenRelations[key] {
 			return ErrInvalid
 		}
 	}
-	if !seenRelations["SPDXRef-Package-DarwinRouter\x00GENERATES\x00SPDXRef-File-darwin"] {
+	if !seenRelations["SPDXRef-Package-NexusRouter\x00GENERATES\x00SPDXRef-File-nexus"] {
 		return ErrInvalid
 	}
 	for _, file := range document.Files[1:] {
-		if !seenRelations["SPDXRef-File-darwin\x00GENERATED_FROM\x00"+file.SPDXID] {
+		if !seenRelations["SPDXRef-File-nexus\x00GENERATED_FROM\x00"+file.SPDXID] {
 			return ErrInvalid
 		}
 	}
@@ -327,7 +327,7 @@ func validateTargetSBOMDocument(document spdxDocument) error {
 
 func targetFromNamespace(namespacePath string) string {
 	parts := strings.Split(strings.TrimPrefix(namespacePath, "/"), "/")
-	if len(parts) != 7 || parts[0] != "ArronJablonowski" || parts[1] != "DarwinRouter" || parts[2] != "releases" || parts[6] != "sbom" ||
+	if len(parts) != 7 || parts[0] != "ArronJablonowski" || parts[1] != "NexusRouter" || parts[2] != "releases" || parts[6] != "sbom" ||
 		!semver.MatchString(parts[3]) || !commitPattern.MatchString(parts[4]) {
 		return ""
 	}

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 type reviewContextEstimator func(context.Context, providers.Request) (int, error)

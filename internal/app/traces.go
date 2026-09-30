@@ -10,10 +10,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/policy"
+	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 var ErrTraces = errors.New("traces unavailable")
@@ -87,7 +87,7 @@ func (s *Service) appendSkillCatalogTraces(ctx context.Context, snapshot *traces
 
 // ExportTraces explicitly sends one bounded recent-task trace snapshot. It
 // starts no scheduler, follows no redirect, retries nothing and mutates no
-// DarwinRouter state. Collector acknowledgement can still be lost.
+// NexusRouter state. Collector acknowledgement can still be lost.
 func (s *Service) ExportTraces(ctx context.Context, options traces.ExportOptions) (err error) {
 	return s.exportTraces(ctx, options, nil)
 }

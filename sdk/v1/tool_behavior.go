@@ -1,6 +1,6 @@
 package v1
 
-import "github.com/ArronJablonowski/DarwinRouter/runtime"
+import "github.com/ArronJablonowski/NexusRouter/runtime"
 
 // ToolBehavior declares the handler's operation class, independently of the
 // observed effect of one execution. Idempotence is not approval or retry authority.

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func TestFeedbackWithdrawalStoreAndRestore(t *testing.T) {

@@ -272,7 +272,7 @@ func candidateRecord(version, commit, created, source string) (CandidateRecord, 
 	}
 	entries := make([]CandidateEntry, len(archiveContract))
 	for i, entry := range archiveContract {
-		entries[i] = CandidateEntry{Name: entry.name, Mode: entry.mode, MaxBytes: entry.max, Shared: entry.name != noticeName && entry.name != sbomName && entry.name != "darwin"}
+		entries[i] = CandidateEntry{Name: entry.name, Mode: entry.mode, MaxBytes: entry.max, Shared: entry.name != noticeName && entry.name != sbomName && entry.name != "nexus"}
 	}
 	collateral := []struct {
 		source, entry string
@@ -338,7 +338,7 @@ func validateCandidateRecord(record CandidateRecord) error {
 		}
 	}
 	for i, contract := range archiveContract {
-		want := CandidateEntry{Name: contract.name, Mode: contract.mode, MaxBytes: contract.max, Shared: contract.name != noticeName && contract.name != sbomName && contract.name != "darwin"}
+		want := CandidateEntry{Name: contract.name, Mode: contract.mode, MaxBytes: contract.max, Shared: contract.name != noticeName && contract.name != sbomName && contract.name != "nexus"}
 		if record.ArchiveEntries[i] != want {
 			return ErrInvalid
 		}

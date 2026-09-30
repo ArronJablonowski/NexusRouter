@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/policy"
 )
 
 // MetricsExporter owns sequential, ephemeral scheduling, not durable delivery.

@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
 )
 
 // OpenApprovalControl opens only an existing current-schema WAL database.

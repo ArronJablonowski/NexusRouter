@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func runFeedbackRevision(args []string, stdout, stderr io.Writer) int {
@@ -20,7 +20,7 @@ func runFeedbackRevision(args []string, stdout, stderr io.Writer) int {
 	expected := fs.String("expected", "", "prior evaluation ID")
 	outcome := fs.String("outcome", "", "accepted, rejected, or withdrawn")
 	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *timeout <= 0 || *timeout > 10*time.Minute || *path == "" || *task == "" || (args[0] == "revise" && (*expected == "" || (*outcome != "accepted" && *outcome != "rejected" && *outcome != "withdrawn"))) || (args[0] == "show" && (*expected != "" || *outcome != "")) {
-		fmt.Fprintln(stderr, "usage: darwin feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected|withdrawn]")
+		fmt.Fprintln(stderr, "usage: nexus feedback show|revise --db path --task id [--expected evaluation-id --outcome accepted|rejected|withdrawn]")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)

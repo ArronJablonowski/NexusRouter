@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 func TestRunReservesThenRetainsApprovedInstallReceipt(t *testing.T) {
@@ -36,7 +36,7 @@ func TestRunReservesThenRetainsApprovedInstallReceipt(t *testing.T) {
 		captured.Verification.ExpectedKeyID != "release-test-01" ||
 		captured.TargetOS != "darwin" || captured.TargetArch != "arm64" || captured.InstallRoot == "" ||
 		captured.VerifierID != "idp:install-verifier" || captured.HostID != "host:darwin-arm64" ||
-		captured.PublicKeyChannel != "https://keys.example.invalid/darwinrouter" ||
+		captured.PublicKeyChannel != "https://keys.example.invalid/nexusrouter" ||
 		!captured.Now().Equal(time.Date(2026, 9, 14, 18, 34, 56, 0, time.UTC)) {
 		t.Fatalf("arguments not forwarded: code=%d options=%+v stderr=%q", code, captured, stderr.String())
 	}
@@ -118,7 +118,7 @@ func approvedInstallArgs(t *testing.T) ([]string, string) {
 		"--authorization-record", "/evidence/authorization.json", "--authorization-record-sha256", digest,
 		"--target-os", "darwin", "--target-arch", "arm64", "--install-root", installRoot,
 		"--verifier-id", "idp:install-verifier", "--host-id", "host:darwin-arm64",
-		"--public-key-channel", "https://keys.example.invalid/darwinrouter", "--out", out,
+		"--public-key-channel", "https://keys.example.invalid/nexusrouter", "--out", out,
 	}, out
 }
 
@@ -129,16 +129,16 @@ func successfulApprovedInstallVerifier(context.Context, releasepack.ApprovedInst
 func approvedInstallReceiptFixture() releasepack.ApprovedInstallVerificationReceipt {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	return releasepack.ApprovedInstallVerificationReceipt{
-		SchemaVersion: 1, Scope: "darwinrouter-approved-native-install-verification",
+		SchemaVersion: 1, Scope: "nexusrouter-approved-native-install-verification",
 		ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("b", 40), TargetOS: "darwin", TargetArch: "arm64",
-		ManifestSHA256: digest, ArtifactName: "DarwinRouter_1.0.0_darwin_arm64.tar.gz", ArtifactSHA256: digest,
-		InstalledBinarySHA256: digest, InstalledBinaryMode: "0755", VersionOutput: "darwin 1.0.0",
+		ManifestSHA256: digest, ArtifactName: "NexusRouter_1.0.0_darwin_arm64.tar.gz", ArtifactSHA256: digest,
+		InstalledBinarySHA256: digest, InstalledBinaryMode: "0755", VersionOutput: "nexus 1.0.0",
 		ApprovalVerification: releasepack.ApprovedVerificationResult{
 			CandidateRecordSHA256: digest, LicenseEvidenceSHA256: digest, SHA256SUMSSHA256: digest,
 			TrustRecordSHA256: digest, AuthorizationRecordSHA256: digest, KeyID: "release-test-01",
 			KeyFingerprint: digest, SignatureFileSHA256: digest,
 		},
 		VerifierID: "idp:install-verifier", HostID: "host:darwin-arm64",
-		PublicKeyChannel: "https://keys.example.invalid/darwinrouter", VerifiedAt: "2026-09-14T18:34:56Z", Result: "passed",
+		PublicKeyChannel: "https://keys.example.invalid/nexusrouter", VerifiedAt: "2026-09-14T18:34:56Z", Result: "passed",
 	}
 }

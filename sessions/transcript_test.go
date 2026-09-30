@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestProjectTranscriptPreservesCompleteToolPairs(t *testing.T) {

@@ -1,4 +1,4 @@
-# Product Requirements Document: DarwinRouter
+# Product Requirements Document: NexusRouter
 
 **Version:** 1.0.0
 
@@ -11,11 +11,11 @@
 
 ## 1. Executive Summary
 
-DarwinRouter is a Go-based, local-first agent runtime whose defining capability is adaptive model routing. It evaluates tasks, chooses among heterogeneous local and cloud models, executes provider-neutral agent and tool loops, measures outcomes, and improves future routing from durable evidence.
+NexusRouter is a Go-based, local-first agent runtime whose defining capability is adaptive model routing. It evaluates tasks, chooses among heterogeneous local and cloud models, executes provider-neutral agent and tool loops, measures outcomes, and improves future routing from durable evidence.
 
-The product combines a compact event-driven runtime, persistent sessions and memory, progressively loaded procedural skills, bounded worker delegation, hardware-aware scheduling, auditable policy enforcement, and restart-safe telemetry. It runs as a persistent daemon controlled through a CLI, a versioned Go SDK, an OpenAI-compatible HTTP surface, Darwin-native task-management APIs, and an authenticated Web UI for chat and durable work planning.
+The product combines a compact event-driven runtime, persistent sessions and memory, progressively loaded procedural skills, bounded worker delegation, hardware-aware scheduling, auditable policy enforcement, and restart-safe telemetry. It runs as a persistent daemon controlled through a CLI, a versioned Go SDK, an OpenAI-compatible HTTP surface, NexusRouter-native task-management APIs, and an authenticated Web UI for chat and durable work planning.
 
-DarwinRouter supports fully local, fully cloud, and hybrid operation. Fully local mode is an enforced privacy boundary: unauthorized outbound transports must be denied, not merely left unconfigured. Hybrid mode favors local execution when it satisfies task, privacy, quality, and resource constraints, then uses cloud capacity where policy permits.
+NexusRouter supports fully local, fully cloud, and hybrid operation. Fully local mode is an enforced privacy boundary: unauthorized outbound transports must be denied, not merely left unconfigured. Hybrid mode favors local execution when it satisfies task, privacy, quality, and resource constraints, then uses cloud capacity where policy permits.
 
 ## 2. Product Vision and Success Criteria
 
@@ -25,7 +25,7 @@ Provide one trustworthy control plane for agents and applications that need to u
 
 ### 2.2 MVP Success Criteria
 
-DarwinRouter 1.0 is successful when it can:
+NexusRouter 1.0 is successful when it can:
 
 1. Accept tasks through the CLI, Go SDK, and HTTP API and stream a common typed event sequence.
 2. Execute a provider-neutral model/tool loop against at least one OpenAI-compatible cloud endpoint and one local Ollama/OpenAI-compatible endpoint.
@@ -41,7 +41,7 @@ DarwinRouter 1.0 is successful when it can:
     history, approvals, feedback, route inspection, and runtime status.
 12. Provide an integrated Kanban board whose durable cards, dependencies,
     leases, acceptance evidence, and lifecycle state can be used by both an
-    operator and policy-constrained DarwinRouter workers for long-running work.
+    operator and policy-constrained NexusRouter workers for long-running work.
 
 ### 2.3 Non-Goals for 1.0
 
@@ -55,14 +55,14 @@ DarwinRouter 1.0 is successful when it can:
 
 ### 2.4 Licensing and Attribution
 
-DarwinRouter is distributed under the MIT License, matching Hermes Agent's
-public license family while retaining DarwinRouter's own copyright ownership.
+NexusRouter is distributed under the MIT License, matching Hermes Agent's
+public license family while retaining NexusRouter's own copyright ownership.
 Architectural ideas and independently implemented behavior do not transfer an
-upstream copyright. If DarwinRouter later copies or substantially adapts Hermes
+upstream copyright. If NexusRouter later copies or substantially adapts Hermes
 Agent code or documentation, the applicable Nous Research copyright and MIT
 permission notice must be preserved with those portions.
 
-Every binary distribution must include DarwinRouter's root `LICENSE` and a
+Every binary distribution must include NexusRouter's root `LICENSE` and a
 candidate-bound third-party notice bundle for the exact dependencies, toolchain,
 targets, and build inputs being shipped. Mechanical notice generation and
 verification do not replace human review. Production signing and publication
@@ -71,11 +71,11 @@ and all applicable third-party license, notice, patent, and attribution terms.
 
 ## 3. Research Basis
 
-DarwinRouter adapts proven ideas from three open-source agent systems while retaining routing as its core product identity.
+NexusRouter adapts proven ideas from three open-source agent systems while retaining routing as its core product identity.
 
 ### 3.1 Hermes Agent
 
-Hermes distinguishes durable factual memory from reusable procedural skills, loads skills progressively, separates stable prompt material from volatile session state, and permits auxiliary models for bounded tasks. DarwinRouter adopts those separations, automatic skill drafting, tiered prompt assembly, replaceable context and memory engines, and strict credential hygiene.
+Hermes distinguishes durable factual memory from reusable procedural skills, loads skills progressively, separates stable prompt material from volatile session state, and permits auxiliary models for bounded tasks. NexusRouter adopts those separations, automatic skill drafting, tiered prompt assembly, replaceable context and memory engines, and strict credential hygiene.
 
 Automatic skill changes are allowed only within an explicit scope. Every activated version must retain provenance, validation evidence, its predecessor, and a rollback path. Messaging gateways, voice, and broad assistant features are deferred.
 
@@ -83,7 +83,7 @@ Sources: [Hermes MIT license](https://github.com/NousResearch/hermes-agent/blob/
 
 ### 3.2 Pi Agent
 
-Pi demonstrates a small provider-neutral loop driven by typed streaming events, append-only sessions, resumable branches, safe compaction boundaries, steering, and extension hooks. DarwinRouter adopts a compact core loop, event-first integration, paired tool-call/result preservation, structured compaction records, and cross-provider conformance testing.
+Pi demonstrates a small provider-neutral loop driven by typed streaming events, append-only sessions, resumable branches, safe compaction boundaries, steering, and extension hooks. NexusRouter adopts a compact core loop, event-first integration, paired tool-call/result preservation, structured compaction records, and cross-provider conformance testing.
 
 Presentation remains outside the runtime. CLI, HTTP, and the first-class Web UI
 consume the same application service and typed event stream through adapters.
@@ -92,7 +92,7 @@ Sources: [Pi monorepo](https://github.com/badlogic/pi-mono), [agent loop](https:
 
 ### 3.3 Gas Town
 
-Gas Town separates coordination from implementation work, gives work durable identities and dependencies, re-derives health from observable state, supervises worker lifecycles, and gates completion through validation. DarwinRouter adopts durable work units, leases, heartbeats, orphan recovery, stall detection, idempotent reassignment, acceptance gates, and OpenTelemetry-compatible observability.
+Gas Town separates coordination from implementation work, gives work durable identities and dependencies, re-derives health from observable state, supervises worker lifecycles, and gates completion through validation. NexusRouter adopts durable work units, leases, heartbeats, orphan recovery, stall detection, idempotent reassignment, acceptance gates, and OpenTelemetry-compatible observability.
 
 The MVP adapts these ideas to an in-process runtime: inference and declared read-only work may run concurrently, but side-effecting operations require an exclusive resource lease and applicable approval. Stronger isolation follows after 1.0.
 
@@ -246,12 +246,12 @@ not fulfill automatic compaction or semantic validation requirements.
 
 ### 6.2 HTTP API
 
-DarwinRouter exposes:
+NexusRouter exposes:
 
 - An OpenAI-compatible streaming chat/completion endpoint.
 - An authenticated OpenAI-shaped configured-model catalog that performs no
   provider discovery or inference and exposes no endpoint or credential data.
-- A separate versioned Darwin-native configured-model metadata catalog across
+- A separate versioned NexusRouter-native configured-model metadata catalog across
   CLI, Go SDK and authenticated HTTP. It exposes redacted route declarations,
   not provider health, discovered availability, current capacity or execution authority.
 - Native task submission, cancellation, status, and Server-Sent Events endpoints.
@@ -319,7 +319,7 @@ healthy providers, and a transient refresh failure retains a visibly stale last
 verified snapshot. Inventory is inspection-only and never pulls, removes, or
 loads a model.
 
-The same Web UI includes native DarwinRouter Kanban boards for larger and
+The same Web UI includes native NexusRouter Kanban boards for larger and
 long-running work; they are not proxies for Linear or another external service.
 Multiple boards are supported. At a minimum each board provides backlog, ready,
 in-progress, blocked, review, done, and canceled states; configurable views may
@@ -333,7 +333,7 @@ list views, card detail, dependencies and blockers, activity/checkpoint views,
 accessible keyboard movement, and optimistic updates with server-side compare-
 and-swap conflict handling.
 
-DarwinRouter may discover eligible cards, decompose work within configured
+NexusRouter may discover eligible cards, decompose work within configured
 depth/fan-out budgets, create and link child cards, atomically claim a ready card
 whose dependencies are satisfied, heartbeat leases, append checkpoints and
 progress evidence, request review, and transition accepted work through an
@@ -803,7 +803,7 @@ inspectable without claiming routed execution or fitness evidence.
 
 ### 8.2 Eligibility Filtering
 
-Before ranking, DarwinRouter rejects candidates that violate any hard constraint:
+Before ranking, NexusRouter rejects candidates that violate any hard constraint:
 
 - Deployment mode or privacy policy.
 - Required capability or tool support.
@@ -921,7 +921,7 @@ Apply recency decay independently to every current observation using its immutab
 
 ### 9.3 Pruning
 
-Models crossing configurable failure or value thresholds become deprecation candidates. DarwinRouter explains the evidence and estimated resource savings, but disabling, uninstalling, or deleting a model requires operator approval.
+Models crossing configurable failure or value thresholds become deprecation candidates. NexusRouter explains the evidence and estimated resource savings, but disabling, uninstalling, or deleting a model requires operator approval.
 
 ### 9.4 Skill Learning
 
@@ -1095,7 +1095,7 @@ iteration, output, context, privacy or tool limits, and pending guidance must no
 be discarded by automatic fallback. `runtime.max_turns` bounds all task turns
 (default8, allowed1–32), also capped by tool limits when tools are enabled.
 Failed/canceled tasks may retain inspectable pending guidance. Line-oriented
-`darwin chat` supports `/steer` during work, with committed application evidence.
+`nexus chat` supports `/steer` during work, with committed application evidence.
 The experimental Codex coordinator admits this guidance at completed model/tool
 boundaries through checked native steering or a new turn in the same thread;
 it does not interrupt an active model stream or replay tool execution. See
@@ -1465,7 +1465,7 @@ tool effects.
 
 ## 14. Security and Privacy
 
-- Fully local mode denies unauthorized outbound connections at the DarwinRouter transport boundary.
+- Fully local mode denies unauthorized outbound connections at the NexusRouter transport boundary.
 - Recognized loopback provider destinations, including case-insensitive `localhost`, remain pinned to loopback in every deployment mode; enabling cloud routes must not delegate local endpoint resolution to DNS.
 - Provider credentials are read from environment variables or secret-store adapters and are never serialized into configuration snapshots.
 - Logs, events, errors, traces, and route explanations pass through structured redaction before persistence or export.
@@ -1477,7 +1477,7 @@ tool effects.
 
 ## 15. Reliability and Failure Handling
 
-DarwinRouter must remain recoverable across crashes at every durable boundary: before and after task admission, provider dispatch, stream capture, tool execution, evaluation, fitness update, compaction, skill activation, and response acknowledgement.
+NexusRouter must remain recoverable across crashes at every durable boundary: before and after task admission, provider dispatch, stream capture, tool execution, evaluation, fitness update, compaction, skill activation, and response acknowledgement.
 
 Provider errors use normalized typed classifications. Expected operational failures return events and durable outcomes rather than panicking the daemon. OOM, context overflow, timeout, cancellation, quota exhaustion, invalid schemas, partial streams, and lost acknowledgements have explicit resolution paths.
 
@@ -1561,7 +1561,7 @@ Evaluation ladder, transactional fitness updates, safe compaction, memory, progr
 
 ### Phase 5: Product Surfaces and Hardening
 
-Daemon, CLI, Go SDK, OpenAI-compatible API, Darwin-native API, authenticated Web
+Daemon, CLI, Go SDK, OpenAI-compatible API, NexusRouter-native API, authenticated Web
 UI chat, durable integrated Kanban, agent-facing board operations, local-only
 egress enforcement, redaction, recovery qualification, performance benchmarks,
 and release packaging.

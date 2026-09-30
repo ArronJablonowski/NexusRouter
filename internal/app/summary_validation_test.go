@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func summaryValidationRegistry(t *testing.T, validator sessions.SummaryValidator) *sessions.SummaryValidatorRegistry {

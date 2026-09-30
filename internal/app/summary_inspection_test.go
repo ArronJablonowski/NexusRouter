@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func TestSummaryInspectionReadOnlyPaginationAndReopen(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 func TestPublicationPreflightCLIForwardsAuthority(t *testing.T) {
@@ -18,16 +18,16 @@ func TestPublicationPreflightCLIForwardsAuthority(t *testing.T) {
 		"--trust-record", "/trust", "--trust-record-sha256", digest, "--key-id", "release-1", "--key-fingerprint", digest,
 		"--signing-authorization", "/signing", "--signing-authorization-sha256", digest,
 		"--publication-authorization", "/publication", "--publication-authorization-sha256", digest,
-		"--repository", "ArronJablonowski/DarwinRouter", "--release-notes", "/notes",
+		"--repository", "ArronJablonowski/NexusRouter", "--release-notes", "/notes",
 	}
 	var captured releasepack.PublicationPreflightOptions
 	var out, diagnostic bytes.Buffer
-	result := releasepack.PublicationPreflightResult{PublicationAuthorizationSHA256: digest, Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseNotesSHA256: digest}
+	result := releasepack.PublicationPreflightResult{PublicationAuthorizationSHA256: digest, Repository: "ArronJablonowski/NexusRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseNotesSHA256: digest}
 	code := run(context.Background(), args, &out, &diagnostic, func(_ context.Context, got releasepack.PublicationPreflightOptions) (releasepack.PublicationPreflightResult, error) {
 		captured = got
 		return result, nil
 	})
-	if code != 0 || diagnostic.Len() != 0 || captured.ExpectedRepository != "ArronJablonowski/DarwinRouter" ||
+	if code != 0 || diagnostic.Len() != 0 || captured.ExpectedRepository != "ArronJablonowski/NexusRouter" ||
 		captured.PublicationAuthorizationFile != "/publication" || captured.Verification.AuthorizationRecordFile != "/signing" ||
 		captured.Verification.ExpectedLicenseEvidenceSHA256 != digest || !strings.Contains(out.String(), `"tag":"v1.0.0"`) {
 		t.Fatalf("CLI did not preserve authority inputs: code=%d options=%+v out=%q err=%q", code, captured, out.String(), diagnostic.String())

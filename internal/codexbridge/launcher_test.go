@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 )
 
 func launcherSpec(t *testing.T) LaunchSpec {

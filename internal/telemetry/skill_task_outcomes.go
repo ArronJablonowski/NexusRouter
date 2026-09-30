@@ -7,8 +7,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // SkillTaskOutcomes observes an explicit set in one SQLite snapshot. Input order

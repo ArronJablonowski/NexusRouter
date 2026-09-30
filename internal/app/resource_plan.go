@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 const (

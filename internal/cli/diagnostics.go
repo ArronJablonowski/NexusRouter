@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 var errDiagnosticArguments = errors.New("invalid diagnostic arguments")
@@ -49,13 +50,13 @@ func runModels(args []string, stdout, stderr io.Writer) int {
 
 func runCatalog(kind string, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "list" {
-		fmt.Fprintf(stderr, "usage: darwin %s list --config path\n", kind)
+		fmt.Fprintf(stderr, "usage: nexus %s list --config path\n", kind)
 		return 2
 	}
 	cfg, err := diagnosticConfig(args[1:], kind)
 	if err != nil {
 		if errors.Is(err, errDiagnosticArguments) {
-			fmt.Fprintf(stderr, "usage: darwin %s list --config path\n", kind)
+			fmt.Fprintf(stderr, "usage: nexus %s list --config path\n", kind)
 			return 2
 		}
 		fmt.Fprintln(stderr, "diagnostic configuration unavailable")
@@ -98,13 +99,13 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	cfg, err := diagnosticConfig(args, "doctor")
 	if err != nil {
 		if errors.Is(err, errDiagnosticArguments) {
-			fmt.Fprintln(stderr, "usage: darwin doctor --config path")
+			fmt.Fprintln(stderr, "usage: nexus doctor --config path")
 			return 2
 		}
 		fmt.Fprintln(stderr, "diagnostic configuration unavailable")
 		return 1
 	}
-	client, err := daemonClient(cfg, os.Getenv("DARWIN_API_TOKEN"))
+	client, err := daemonClient(cfg, branding.Getenv("DARWIN_API_TOKEN"))
 	if err != nil {
 		fmt.Fprintln(stderr, "daemon health unavailable")
 		return 1

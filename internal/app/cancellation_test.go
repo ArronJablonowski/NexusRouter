@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 func TestCancellationWatcherFailsClosedAndJoins(t *testing.T) {

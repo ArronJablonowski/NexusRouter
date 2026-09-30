@@ -214,7 +214,7 @@ damage and reference/child/parent drift. Pure planner tests cover lifecycle
 ordering, invalid metadata, independent sessions and non-submitted work.
 
 ```sh
-export DARWIN_PROCESS_OWNER_DIR="$(mktemp -d)"
+export NEXUS_PROCESS_OWNER_DIR="$(mktemp -d)"
 go test -race ./sessions -run PlanInterruptedWorker -count=3
 go test -race ./internal/telemetry -run '^TestOrphan(Worker|Child|ReadOnly)' -count=3
 go test -race ./internal/app -run '^Test(WorkerFinalizationProcessDeathRecoveryBoundary|UnfinishedDelegationAfterSIGKILLRecoversFailure|ReadOnlyWorkerAfterSIGKILLRecoversFailure)$' -count=3

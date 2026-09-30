@@ -35,7 +35,7 @@ func validateSignedManifest(root *os.Root, digests map[string]string) error {
 	var shared [len(sharedIndexes)]archiveEntryMetadata
 	for i, target := range targets {
 		artifact := manifest.Artifacts[i]
-		name := "DarwinRouter_" + manifest.Version + "_" + target[0] + "_" + target[1] + ".tar.gz"
+		name := "NexusRouter_" + manifest.Version + "_" + target[0] + "_" + target[1] + ".tar.gz"
 		if artifact.OS != target[0] || artifact.Arch != target[1] || artifact.File != name || artifact.SHA256 == "" || digests[name] != artifact.SHA256 || len(artifact.Entries) != len(archiveContract) {
 			return ErrSignature
 		}

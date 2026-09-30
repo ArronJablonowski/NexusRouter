@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestLeaseAttentionHistoryConcurrentObservers(t *testing.T) {

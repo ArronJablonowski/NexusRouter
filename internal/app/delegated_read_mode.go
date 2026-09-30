@@ -1,6 +1,6 @@
 package app
 
-import "github.com/ArronJablonowski/DarwinRouter/internal/config"
+import "github.com/ArronJablonowski/NexusRouter/internal/config"
 
 // delegatedReadsConfigured distinguishes an operator-approved local worker
 // capability from direct filesystem authority. The cloud coordinator may see

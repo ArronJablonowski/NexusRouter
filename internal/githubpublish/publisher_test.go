@@ -295,14 +295,14 @@ func TestPlanAndOriginValidationPrecedesRequests(t *testing.T) {
 
 func testPlan() DraftPlan {
 	assets := []Asset{
-		{Name: "DarwinRouter_1.2.3-rc.1_darwin_arm64.tar.gz", ContentType: "application/gzip", Body: []byte("darwin-archive")},
+		{Name: "NexusRouter_1.2.3-rc.1_darwin_arm64.tar.gz", ContentType: "application/gzip", Body: []byte("darwin-archive")},
 		{Name: "SHA256SUMS", ContentType: "text/plain", Body: []byte("signed-checksums\n")},
 	}
 	for i := range assets {
 		assets[i].SHA256 = digest(assets[i].Body)
 	}
 	body := "Exact release notes.\n"
-	return DraftPlan{AuthorizationSHA256: "sha256:" + strings.Repeat("b", 64), ReleaseNotesSHA256: digest([]byte(body)), Owner: "acme", Repository: "darwin", Tag: "v1.2.3-rc.1", Commit: strings.Repeat("a", 40), Name: "DarwinRouter v1.2.3-rc.1", Body: body, Draft: true, Prerelease: true, Assets: assets}
+	return DraftPlan{AuthorizationSHA256: "sha256:" + strings.Repeat("b", 64), ReleaseNotesSHA256: digest([]byte(body)), Owner: "acme", Repository: "darwin", Tag: "v1.2.3-rc.1", Commit: strings.Repeat("a", 40), Name: "NexusRouter v1.2.3-rc.1", Body: body, Draft: true, Prerelease: true, Assets: assets}
 }
 
 func newTestPublisher(t *testing.T, server *httptest.Server) *Publisher {
@@ -343,7 +343,7 @@ func findAsset(t *testing.T, plan DraftPlan, name string) Asset {
 
 func assertHeaders(t *testing.T, request *http.Request) {
 	t.Helper()
-	if request.Header.Get("X-GitHub-Api-Version") != APIVersion || request.Header.Get("Accept") != "application/vnd.github+json" || request.Header.Get("User-Agent") != "DarwinRouter-create-only-publisher/1" {
+	if request.Header.Get("X-GitHub-Api-Version") != APIVersion || request.Header.Get("Accept") != "application/vnd.github+json" || request.Header.Get("User-Agent") != "NexusRouter-create-only-publisher/1" {
 		t.Error("unpinned GitHub request headers")
 	}
 }

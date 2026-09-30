@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // SkillLearningActivationIntent reads a pinned activation intent without

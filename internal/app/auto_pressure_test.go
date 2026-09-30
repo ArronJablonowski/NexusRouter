@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 func TestAutomaticPressureClassification(t *testing.T) {

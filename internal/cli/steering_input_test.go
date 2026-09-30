@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	run "github.com/ArronJablonowski/DarwinRouter/runtime"
+	run "github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestSteeringInputValidation(t *testing.T) {

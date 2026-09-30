@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const auxiliaryReviewOutcomeColumns = `outcome_id,version,admission_id,admission_digest,operation_id,

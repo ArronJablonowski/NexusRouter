@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func (s *Service) skillGenerationBudget() (skills.GenerationBudget, error) {

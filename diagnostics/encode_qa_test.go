@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/diagnostics"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/diagnostics"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestDiagnosticRedactionRejectsCollidingObjectKeys(t *testing.T) {

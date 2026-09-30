@@ -6,7 +6,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 const configuredMemoryBodyLimit = 128 << 10

@@ -1,7 +1,8 @@
 .PHONY: build check test fmt profile-releasepack qualify-linux-cgroup qualify-performance qualify-mvp qualify-context-recovery qualify-webui qualify-delegated-count qualify-release qualify-release-test qualify-license-evidence qualify-codex-repair qualify-codex-rollover
 
 build:
-	go build -trimpath -buildvcs=false -o bin/darwin ./cmd/darwin
+	go build -trimpath -buildvcs=false -o bin/nexus ./cmd/nexus
+	ln -sf nexus bin/darwin
 
 check:
 	go run ./cmd/check
@@ -19,7 +20,7 @@ fmt:
 # supported full-suite command, reject skips, require the historical DAR-127
 # failure point, and print the slowest top-level test groups plus timeout margin.
 profile-releasepack:
-	@go test -race -count=1 -timeout=45m -json ./internal/releasepack | go run ./cmd/test-profile --package github.com/ArronJablonowski/DarwinRouter/internal/releasepack --timeout 45m --top 12 --require TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity --expect-skip TestReleaseQualification
+	@go test -race -count=1 -timeout=45m -json ./internal/releasepack | go run ./cmd/test-profile --package github.com/ArronJablonowski/NexusRouter/internal/releasepack --timeout 45m --top 12 --require TestPostPublicationReceiptRejectsMissingOrTamperedVerificationIdentity --expect-skip TestReleaseQualification
 
 qualify-linux-cgroup:
 	sh scripts/qualify-linux-cgroup.sh

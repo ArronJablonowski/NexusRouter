@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func steeringFinal(turn, item string) []codexrpc.Envelope {

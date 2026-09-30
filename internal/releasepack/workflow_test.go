@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -190,7 +190,7 @@ func TestReleaseQualificationWorkflowAuthority(t *testing.T) {
 		!strings.Contains(native.Run, `--install-rehearsal-record "$install_record"`) ||
 		!strings.Contains(native.Run, `--install-rehearsal-record-sha256 "$install_record_sha256"`) ||
 		!strings.Contains(native.Run, `--go-version "$EXPECTED_GO_VERSION"`) ||
-		!strings.Contains(native.Run, `test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"`) ||
+		!strings.Contains(native.Run, `test "$artifact_name" = "NexusRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"`) ||
 		!strings.Contains(native.Run, `test "${record_value#record_sha256=}" = "$install_record_sha256"`) ||
 		!strings.Contains(native.Run, `test "$source_schema" = 29`) ||
 		!strings.Contains(native.Run, `test "$current_schema" = `+strconv.Itoa(stateschema.Current)) ||

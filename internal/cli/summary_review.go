@@ -13,8 +13,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 type summaryReviewArgs struct{ config, attempt, expected, decision, note string }
@@ -41,7 +41,7 @@ func parseSummaryReviewArgs(args []string) (summaryReviewArgs, error) {
 func runSummaryReview(args []string, stdout, stderr io.Writer) int {
 	parsed, err := parseSummaryReviewArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin summary-review --config path --attempt id [--expected review-id] --decision approved|rejected --note text")
+		fmt.Fprintln(stderr, "usage: nexus summary-review --config path --attempt id [--expected review-id] --decision approved|rejected --note text")
 		return 2
 	}
 	cfg, err := config.Load(config.Options{ProjectFile: parsed.config, Env: config.Environment(os.Environ())})
@@ -73,7 +73,7 @@ func runSummaryReviews(args []string, stdout, stderr io.Writer) int {
 	path := fs.String("db", "", "existing database")
 	attempt := fs.String("attempt", "", "summary attempt ID")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *path == "" || *attempt == "" || !validSummaryReviewLabel(*attempt) {
-		fmt.Fprintln(stderr, "usage: darwin summary-reviews --db path --attempt id")
+		fmt.Fprintln(stderr, "usage: nexus summary-reviews --db path --attempt id")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

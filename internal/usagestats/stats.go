@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/accounting"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/accounting"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	_ "modernc.org/sqlite"
 )
 

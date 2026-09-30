@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func leaseScopeQuery(raw string) (string, error) {

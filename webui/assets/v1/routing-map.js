@@ -2,7 +2,7 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	if (!window.DarwinRoutes || (!window.DarwinRoutes.routing(relative) && !window.DarwinRoutes.elimination(relative))) return;
+	if (!window.NexusRoutes || (!window.NexusRoutes.routing(relative) && !window.NexusRoutes.elimination(relative))) return;
 	const allViews = ["#chat-view", "#workboard-view", "#models-view", "#settings-view", "#routing-view", "#elimination-view"];
 	const jobs = [
 		{key:"coding", domain:"code", label:"Coding", capabilities:["code","coding","reasoning"]},
@@ -24,7 +24,7 @@
 	let snapshot = null, routingTimer = 0, routingGeneration = 0;
 	let creativePreference = "";
 	const expandedModels = new Set(new URLSearchParams(window.location.search).getAll("expanded").filter(value => { const parts=value.split("|"); return parts.length===2 && jobs.some(job => job.key===parts[0]) && idPattern.test(parts[1]); }));
-	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.DarwinRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
+	for (const selector of allViews) document.querySelector(selector).hidden = selector !== (window.NexusRoutes.routing(relative) ? "#routing-view" : "#elimination-view");
 
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
 	function validModel(item) { return item && idPattern.test(item.id) && typeof item.model === "string" && item.model.length <= 512 && (item.reasoning_effort === undefined || ["none","minimal","low","medium","high","xhigh","max","ultra"].includes(item.reasoning_effort)) && ["local","cloud"].includes(item.locality) && Array.isArray(item.capabilities) && item.capabilities.every(value => idPattern.test(value)) && (item.selected_context_tokens === undefined || Number.isSafeInteger(item.selected_context_tokens) && item.selected_context_tokens > 0 && Number.isSafeInteger(item.context_tokens) && item.selected_context_tokens <= item.context_tokens) && (item.context_selection_status === undefined || ["selected","blocked","unavailable"].includes(item.context_selection_status) && (item.context_selection_status === "selected" ? item.selected_context_tokens !== undefined : item.selected_context_tokens === undefined)) && typeof item.usable === "boolean"; }
@@ -63,7 +63,7 @@
 		const expansionKey=job.key+"|"+model.id; disclosure.open=expandedModels.has(expansionKey); summary.addEventListener("click",()=>{ if (disclosure.open) expandedModels.delete(expansionKey); else expandedModels.add(expansionKey); persistExpandedModels(); });
 		const synopsis=evidence ? evidence.score.toFixed(3) + " routing score · " + (evidence.samples ? evidence.samples + " samples" : "unmeasured policy prior") + " · " + contextLabel(model) : model.locality + " · " + contextLabel(model) + " · ranking unavailable";
 		summary.append(element("strong","",model.model),element("small","",synopsis)); disclosure.append(summary);
-		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("DarwinRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Selected context",selectedContextLabel(model)),fact("Advertised maximum",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
+		const facts=element("div","route-model-facts"); facts.append(fact("Provider",model.provider),fact("NexusRouter ID",model.id),fact("Locality",model.locality),fact("Health",model.health),fact("Capabilities",model.capabilities.length ? model.capabilities.join(", ") : "None advertised"),fact("Selected context",selectedContextLabel(model)),fact("Advertised maximum",contextLabel(model)),fact("Estimated RAM",byteLabel(model.ram_bytes)),fact("Estimated VRAM",byteLabel(model.vram_bytes)));
         if (evidence) facts.append(fact("Evidence domain",evidence.domain),fact("Evidence profile",evidence.profile),fact("Target scope",scopeLabel(job)),fact("Routing score",evidence.score.toFixed(6)+" (not a pass probability)"),fact("Confidence",Math.round(evidence.confidence*1000)/10+"%"),fact("Samples",String(evidence.samples)));
 
 		disclosure.append(facts); node.append(element("span","route-rank",String(index+1).padStart(2,"0")),disclosure); return node;
@@ -103,7 +103,7 @@
 			if (generation !== routingGeneration) return;
 			snapshot = next; const brain = commander();
 			document.querySelector("#commander-model").textContent = brain ? brain.model : "Automatic router";
-			document.querySelector("#commander-detail").textContent = brain ? (brain.reasoning_effort ? brain.reasoning_effort + " reasoning · " : "") + (snapshot.commander_source || "derived") + " command authority · " + contextLabel(brain) : "No explicit commander is configured; DarwinRouter chooses from eligible routes.";
+			document.querySelector("#commander-detail").textContent = brain ? (brain.reasoning_effort ? brain.reasoning_effort + " reasoning · " : "") + (snapshot.commander_source || "derived") + " command authority · " + contextLabel(brain) : "No explicit commander is configured; NexusRouter chooses from eligible routes.";
 			const fallback = snapshot.commander_fallback_id ? snapshot.models.find(model => model.id === snapshot.commander_fallback_id) : null, fallbackNode = document.querySelector("#commander-fallback"); fallbackNode.hidden = !fallback;
 			if (fallback) { document.querySelector("#commander-fallback-model").textContent = fallback.model; document.querySelector("#commander-fallback-detail").textContent = contextLabel(fallback) + " · activates after retryable cloud failure"; }
 			document.querySelector("#resource-guard-title").textContent = (snapshot.local_concurrency === "1" ? "One local model at a time" : "Up to " + snapshot.local_concurrency + " local models");
@@ -142,8 +142,8 @@
 		} catch (_) { status.textContent = "Elimination evidence is unavailable. No recommendation was manufactured."; }
 	}
 
-	if (window.DarwinRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); loadRouting(); }
-	if (window.DarwinRoutes.elimination(relative)) {
+	if (window.NexusRoutes.routing(relative)) { document.querySelector("#refresh-routing").addEventListener("click",loadRouting); document.addEventListener("visibilitychange",() => { window.clearTimeout(routingTimer); if (!document.hidden) loadRouting(); }); window.addEventListener("resize",drawBranches); loadRouting(); }
+	if (window.NexusRoutes.elimination(relative)) {
 		const select = document.querySelector("#elimination-job"); for (const job of jobs) { const option = element("option","",job.label); option.value = job.key; select.append(option); }
 		document.querySelector("#refresh-elimination").addEventListener("click",loadElimination); document.querySelector("#elimination-controls").addEventListener("submit",event => { event.preventDefault(); loadElimination(); }); loadElimination();
 	}

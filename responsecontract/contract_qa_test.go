@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/responsecontract"
+	"github.com/ArronJablonowski/NexusRouter/responsecontract"
 )
 
 func TestEndingMarkerDoesNotInventANewLineRequirement(t *testing.T) {

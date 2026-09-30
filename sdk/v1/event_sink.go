@@ -3,7 +3,7 @@ package v1
 import (
 	"reflect"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // Event is the version-one durable runtime event contract.

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 const memoryBodyLimit = 128 << 10

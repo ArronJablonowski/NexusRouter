@@ -22,18 +22,18 @@ func operationFixture() ExpectedDraftState {
 	return ExpectedDraftState{
 		Identity: OperationIdentity{
 			AuthorizationSHA256: "sha256:" + strings.Repeat("a", 64),
-			Repository:          "ArronJablonowski/DarwinRouter",
+			Repository:          "ArronJablonowski/NexusRouter",
 			Tag:                 "v1.0.0-rc.1",
 		},
 		Commit:             strings.Repeat("b", 40),
-		TagMessage:         "DarwinRouter release v1.0.0-rc.1",
-		Tagger:             Tagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
-		ReleaseTitle:       "DarwinRouter v1.0.0-rc.1",
+		TagMessage:         "NexusRouter release v1.0.0-rc.1",
+		Tagger:             Tagger{Name: "NexusRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
+		ReleaseTitle:       "NexusRouter v1.0.0-rc.1",
 		ReleaseNotesSHA256: "sha256:" + strings.Repeat("c", 64),
 		Prerelease:         true,
 		Assets: []ExpectedAsset{
-			{Name: "darwinrouter_checksums.txt", Size: 200, SHA256: "sha256:" + strings.Repeat("d", 64), ContentType: "application/octet-stream"},
-			{Name: "darwinrouter_macos.tar.gz", Size: 400, SHA256: "sha256:" + strings.Repeat("e", 64), ContentType: "application/gzip"},
+			{Name: "nexusrouter_checksums.txt", Size: 200, SHA256: "sha256:" + strings.Repeat("d", 64), ContentType: "application/octet-stream"},
+			{Name: "nexusrouter_macos.tar.gz", Size: 400, SHA256: "sha256:" + strings.Repeat("e", 64), ContentType: "application/gzip"},
 		},
 	}
 }

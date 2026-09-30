@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func runScopeLeases(args []string, stdout, stderr io.Writer) int {
@@ -19,7 +19,7 @@ func runScopeLeases(args []string, stdout, stderr io.Writer) int {
 func runScopeLeasesContext(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags, ok := scopeLeaseFlags(args)
 	if !ok {
-		fmt.Fprintln(stderr, "usage: darwin resources leases --db path --scope scope")
+		fmt.Fprintln(stderr, "usage: nexus resources leases --db path --scope scope")
 		return 2
 	}
 	status, err := app.InspectScopeLeases(ctx, flags["db"], flags["scope"])

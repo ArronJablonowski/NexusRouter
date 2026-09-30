@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 // WorkboardBoardLister supplies stable cursor pages for one bounded active-board

@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func TestNativeWorkboardCancelFinalizeIsProofFreeAndOperatorBound(t *testing.T) {

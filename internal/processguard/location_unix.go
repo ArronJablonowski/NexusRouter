@@ -3,6 +3,7 @@
 package processguard
 
 import (
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,7 @@ import (
 // Resolve only before creating the process singleton. Existing references remain
 // independently probeable wherever their original guard was stored.
 func ownerDirectory() (string, error) {
-	path, explicit := os.LookupEnv("DARWIN_PROCESS_OWNER_DIR")
+	path, explicit := branding.LookupEnv("DARWIN_PROCESS_OWNER_DIR")
 	if !explicit {
 		base, err := os.UserConfigDir()
 		if err != nil {

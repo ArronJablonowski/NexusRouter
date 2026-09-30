@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 func TestMetricsExportPinnedPolicy(t *testing.T) {

@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 type ConfiguredModel = routing.ConfiguredModel

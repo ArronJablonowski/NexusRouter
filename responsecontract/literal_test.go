@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/responsecontract"
+	"github.com/ArronJablonowski/NexusRouter/responsecontract"
 )
 
 func TestExplicitLiteralResponsePreservesTextWithoutWrappers(t *testing.T) {

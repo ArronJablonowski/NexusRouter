@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 )
 
 func TestModelDeprecationUsesCurrentFeedbackWithoutMutation(t *testing.T) {

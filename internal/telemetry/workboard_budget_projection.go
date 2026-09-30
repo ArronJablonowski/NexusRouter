@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 // WorkboardBudgetProjection is a read-only view of card-owned capacity after

@@ -1,6 +1,6 @@
 # Provider health history
 
-DarwinRouter stores a bounded local history of its validated provider and model
+NexusRouter stores a bounded local history of its validated provider and model
 health probes. This supplies restart-safe operational evidence without turning
 health GETs, the Web UI, or SDK inspection into write operations.
 

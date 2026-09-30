@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserauth"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func handlerFixture(t *testing.T) *Handler {
@@ -89,7 +89,7 @@ func TestBrowserBootstrapShellAndLogout(t *testing.T) {
 	shellRequest.AddCookie(cookie)
 	shell := httptest.NewRecorder()
 	handler.ServeHTTP(shell, shellRequest)
-	if shell.Code != http.StatusOK || !strings.Contains(shell.Body.String(), "DarwinRouter") {
+	if shell.Code != http.StatusOK || !strings.Contains(shell.Body.String(), "NexusRouter") {
 		t.Fatal("authenticated shell unavailable", shell.Code)
 	}
 	logoutRequest := browserRequest(http.MethodPost, "/app/api/v1/session/logout", `{"version":1}`)

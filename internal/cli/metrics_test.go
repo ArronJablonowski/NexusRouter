@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestMetricsStrictArgumentsAndMissingDatabase(t *testing.T) {

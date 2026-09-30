@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func TestWorkboardReassignmentReadersExposeExactLineage(t *testing.T) {

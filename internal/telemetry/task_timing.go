@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 var errTaskTiming = errors.New("invalid task timing projection")

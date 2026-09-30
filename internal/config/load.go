@@ -194,17 +194,20 @@ func override(n *yaml.Node, path []string, value string) error {
 	return errors.New("unknown override path")
 }
 
-// Environment selects DARWIN__SECTION__FIELD variables. Values remain literal;
+// Environment selects NEXUS__SECTION__FIELD with legacy DARWIN__ fallback. Values remain literal;
 // secret environment variables are neither read nor expanded into the config.
 func Environment(env []string) map[string]string {
 	out := map[string]string{}
-	for _, entry := range env {
-		key, value, ok := strings.Cut(entry, "=")
-		if !ok || !strings.HasPrefix(key, "DARWIN__") {
-			continue
+	// Apply legacy values first; canonical names win independent of input order.
+	for _, prefix := range []string{"DARWIN__", "NEXUS__"} {
+		for _, entry := range env {
+			key, value, ok := strings.Cut(entry, "=")
+			if !ok || !strings.HasPrefix(key, prefix) {
+				continue
+			}
+			key = strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(key, prefix), "__", "."))
+			out[key] = value
 		}
-		key = strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(key, "DARWIN__"), "__", "."))
-		out[key] = value
 	}
 	return out
 }

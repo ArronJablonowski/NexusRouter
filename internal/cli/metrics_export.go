@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 // Export is an explicit one-shot operation, independent of daemon scheduling.
@@ -32,7 +32,7 @@ func runMetricsExport(args []string, stdout, stderr io.Writer) int {
 	}
 	options := metrics.ExportOptions{Endpoint: values["endpoint"], APIKeyEnv: values["api-key-env"]}
 	if !valid || options.Validate() != nil {
-		fmt.Fprintln(stderr, "usage: darwin metrics export --config path --endpoint URL [--api-key-env ENV_NAME]")
+		fmt.Fprintln(stderr, "usage: nexus metrics export --config path --endpoint URL [--api-key-env ENV_NAME]")
 		return 2
 	}
 	ctx, stop := submissionCLIContext()

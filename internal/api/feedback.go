@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func (h *Handler) serveFeedback(w http.ResponseWriter, r *http.Request) {

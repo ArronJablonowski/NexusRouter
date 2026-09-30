@@ -22,13 +22,13 @@ var ErrTrustRecord = errors.New("release trust record validation failed")
 const (
 	trustRecordSchema = 1
 	trustRecordMax    = 16 << 10
-	trustScope        = "darwinrouter-release-signing"
+	trustScope        = "nexusrouter-release-signing"
 )
 
 var trustKeyID = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$`)
 
 // TrustRecord is the canonical, independently published public description of
-// a DarwinRouter release-signing identity. It does not authenticate itself:
+// a NexusRouter release-signing identity. It does not authenticate itself:
 // operators must obtain it through a separately authenticated channel and bind
 // verification to its exact digest, expected KeyID and public-key fingerprint.
 type TrustRecord struct {
@@ -106,7 +106,7 @@ func trustFingerprint(value string) bool {
 }
 
 func validateTrustRecord(record TrustRecord) error {
-	if record.SchemaVersion != trustRecordSchema || record.Project != "DarwinRouter" ||
+	if record.SchemaVersion != trustRecordSchema || record.Project != "NexusRouter" ||
 		record.Scope != trustScope || !trustKeyID.MatchString(record.KeyID) ||
 		record.Algorithm != "Ed25519" || (record.Status != "active" && record.Status != "revoked") {
 		return ErrTrustRecord

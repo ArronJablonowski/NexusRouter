@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 type BrowserSkillPage struct {

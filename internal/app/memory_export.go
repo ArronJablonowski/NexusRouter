@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 // ExportMemory exports the configured scope without inference or mutation.

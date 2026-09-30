@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 func TestTraceExportHealthIsSupplemental(t *testing.T) {

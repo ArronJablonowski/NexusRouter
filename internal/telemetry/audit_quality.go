@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 // AuditQuality returns the legacy lifetime advisory snapshot. Adaptive routing

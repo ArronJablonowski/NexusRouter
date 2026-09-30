@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 type delegateToolsKey struct{}

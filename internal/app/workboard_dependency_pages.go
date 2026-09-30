@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func (b *WorkboardBridge) NativeDependencies(ctx context.Context, boardID, cardID string, options contract.DependencyOptions) (contract.DependencyPage, error) {

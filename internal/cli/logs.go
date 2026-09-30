@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/diagnostics"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/diagnostics"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
-const logsUsage = "usage: darwin logs --config path [--task id --after position --limit 100 --follow --include-content]"
+const logsUsage = "usage: nexus logs --config path [--task id --after position --limit 100 --follow --include-content]"
 
 func runLogs(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("logs", flag.ContinueOnError)
@@ -149,7 +149,7 @@ func writeLogLine(writer io.Writer, body []byte) (ok bool) {
 }
 
 func logSecrets(cfg config.Settings, secret func(string) string) []string {
-	values := []string{secret("DARWIN_API_TOKEN")}
+	values := []string{secret("NEXUS_API_TOKEN"), secret("DARWIN_API_TOKEN")}
 	for _, provider := range cfg.Providers {
 		if provider.APIKeyEnv != "" {
 			values = append(values, secret(provider.APIKeyEnv))

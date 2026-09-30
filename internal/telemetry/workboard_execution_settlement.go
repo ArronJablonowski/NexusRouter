@@ -9,8 +9,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 type executionTerminalProof struct {

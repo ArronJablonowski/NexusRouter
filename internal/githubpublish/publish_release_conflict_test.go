@@ -20,28 +20,28 @@ func TestCredentialedPublishReleaseStopsOnConflictingRemoteState(t *testing.T) {
 		{
 			name: "existing_annotated_tag_wrong_commit_no_release", tagStatus: http.StatusOK,
 			releaseStatus: http.StatusNotFound,
-			wantPaths:     []string{"/repos/ArronJablonowski/DarwinRouter/immutable-releases", "/repos/ArronJablonowski/DarwinRouter/git/ref/tags/v1.0.0"},
+			wantPaths:     []string{"/repos/ArronJablonowski/NexusRouter/immutable-releases", "/repos/ArronJablonowski/NexusRouter/git/ref/tags/v1.0.0"},
 		},
 		{
 			name: "existing_release", tagStatus: http.StatusNotFound, releaseStatus: http.StatusOK,
-			wantPaths: []string{"/repos/ArronJablonowski/DarwinRouter/immutable-releases", "/repos/ArronJablonowski/DarwinRouter/git/ref/tags/v1.0.0", "/repos/ArronJablonowski/DarwinRouter/releases/tags/v1.0.0"},
+			wantPaths: []string{"/repos/ArronJablonowski/NexusRouter/immutable-releases", "/repos/ArronJablonowski/NexusRouter/git/ref/tags/v1.0.0", "/repos/ArronJablonowski/NexusRouter/releases/tags/v1.0.0"},
 		},
 		{
 			name: "ambiguous_tag_lookup", tagStatus: http.StatusInternalServerError,
 			releaseStatus: http.StatusNotFound,
-			wantPaths:     []string{"/repos/ArronJablonowski/DarwinRouter/immutable-releases", "/repos/ArronJablonowski/DarwinRouter/git/ref/tags/v1.0.0"},
+			wantPaths:     []string{"/repos/ArronJablonowski/NexusRouter/immutable-releases", "/repos/ArronJablonowski/NexusRouter/git/ref/tags/v1.0.0"},
 		},
 		{
 			name: "ambiguous_release_lookup", tagStatus: http.StatusNotFound,
 			releaseStatus: http.StatusInternalServerError,
-			wantPaths:     []string{"/repos/ArronJablonowski/DarwinRouter/immutable-releases", "/repos/ArronJablonowski/DarwinRouter/git/ref/tags/v1.0.0", "/repos/ArronJablonowski/DarwinRouter/releases/tags/v1.0.0"},
+			wantPaths:     []string{"/repos/ArronJablonowski/NexusRouter/immutable-releases", "/repos/ArronJablonowski/NexusRouter/git/ref/tags/v1.0.0", "/repos/ArronJablonowski/NexusRouter/releases/tags/v1.0.0"},
 		},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			plan := publicationPlan(t)
-			plan.Owner, plan.Repository = "ArronJablonowski", "DarwinRouter"
+			plan.Owner, plan.Repository = "ArronJablonowski", "NexusRouter"
 			plan.Tag, plan.Commit = "v1.0.0", "fb8abf91d4e0c3a112f76ebe452acd9a1ac193a2"
-			plan.Name, plan.TagMessage, plan.Prerelease = "DarwinRouter v1.0.0", "DarwinRouter release v1.0.0", false
+			plan.Name, plan.TagMessage, plan.Prerelease = "NexusRouter v1.0.0", "NexusRouter release v1.0.0", false
 			bodySecret := "release-asset-body-must-not-leak"
 			plan.Assets[0].Body = []byte(bodySecret)
 			plan.Assets[0].SHA256 = digest(plan.Assets[0].Body)
@@ -74,15 +74,15 @@ func TestCredentialedPublishReleaseStopsOnConflictingRemoteState(t *testing.T) {
 
 				status, responseBody := http.StatusMethodNotAllowed, `{"message":"unexpected"}`
 				switch request.URL.Path {
-				case "/repos/ArronJablonowski/DarwinRouter/immutable-releases":
+				case "/repos/ArronJablonowski/NexusRouter/immutable-releases":
 					status, responseBody = http.StatusOK, `{"enabled":true}`
-				case "/repos/ArronJablonowski/DarwinRouter/git/ref/tags/" + plan.Tag:
+				case "/repos/ArronJablonowski/NexusRouter/git/ref/tags/" + plan.Tag:
 					status = scenario.tagStatus
 					responseBody = `{"ref":"refs/tags/` + plan.Tag + `","object":{"sha":"` + oldTagObject + `","type":"tag"}}`
-				case "/repos/ArronJablonowski/DarwinRouter/releases/tags/" + plan.Tag:
+				case "/repos/ArronJablonowski/NexusRouter/releases/tags/" + plan.Tag:
 					status = scenario.releaseStatus
 					responseBody = `{"id":41,"tag_name":"` + plan.Tag + `"}`
-				case "/repos/ArronJablonowski/DarwinRouter/git/tags/" + oldTagObject:
+				case "/repos/ArronJablonowski/NexusRouter/git/tags/" + oldTagObject:
 					status = http.StatusOK
 					responseBody = `{"sha":"` + oldTagObject + `","object":{"sha":"` + oldCommit + `","type":"commit"}}`
 				}

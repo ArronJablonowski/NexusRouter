@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 const (
@@ -121,7 +121,7 @@ type LocalProviderInspection struct {
 	CheckedAt  time.Time `json:"checked_at"`
 }
 
-// ModelFitnessInspection is the bounded, read-only projection of DarwinRouter's
+// ModelFitnessInspection is the bounded, read-only projection of NexusRouter's
 // persisted evaluation aggregate for one model/task profile.
 type ModelFitnessInspection struct {
 	ModelID          string    `json:"model_id"`

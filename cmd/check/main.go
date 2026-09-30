@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/quality"
+	"github.com/ArronJablonowski/NexusRouter/internal/quality"
 )
 
 func main() {

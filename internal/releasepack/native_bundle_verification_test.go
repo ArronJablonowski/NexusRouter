@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 func nativeBundleFixture(t *testing.T) (string, string, NativeEvidenceExpectations) {
@@ -20,7 +20,7 @@ func nativeBundleFixture(t *testing.T) (string, string, NativeEvidenceExpectatio
 	install := validInstallEvidenceFixture()
 	install.Release = InstallEvidenceRelease{Version: version, Commit: commit}
 	install.Target = NativeEvidenceTarget{OS: targetOS, Arch: targetArch}
-	install.Artifact.Name = "DarwinRouter_" + version + "_" + targetOS + "_" + targetArch + ".tar.gz"
+	install.Artifact.Name = "NexusRouter_" + version + "_" + targetOS + "_" + targetArch + ".tar.gz"
 	install.Installation.BinaryVersion = version
 	install.Rollback.BinaryVersion = version
 	install.Rollback.TargetOS, install.Rollback.TargetArch = targetOS, targetArch
@@ -88,7 +88,7 @@ func TestVerifyNativeEvidenceAgainstRejectsExpectationDrift(t *testing.T) {
 		"target_os":              func(e *NativeEvidenceExpectations) { e.TargetOS = "darwin" },
 		"target_arch":            func(e *NativeEvidenceExpectations) { e.TargetArch = "arm64" },
 		"go_version":             func(e *NativeEvidenceExpectations) { e.GoVersion = "go1.27.2" },
-		"artifact_name":          func(e *NativeEvidenceExpectations) { e.ArtifactName = "DarwinRouter_1.2.4_linux_amd64.tar.gz" },
+		"artifact_name":          func(e *NativeEvidenceExpectations) { e.ArtifactName = "NexusRouter_1.2.4_linux_amd64.tar.gz" },
 		"artifact_digest":        func(e *NativeEvidenceExpectations) { e.ArtifactSHA256 = testInstallDigest("7") },
 		"install_source_schema":  func(e *NativeEvidenceExpectations) { e.SourceSchema = 28 },
 		"install_current_schema": func(e *NativeEvidenceExpectations) { e.CurrentSchema = stateschema.Current - 1 },

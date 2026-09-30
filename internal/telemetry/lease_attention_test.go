@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func attentionLease(t *testing.T, s *Store, scope string, writer bool, expires time.Time) Lease {

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // CompareSkillOutcomes is a read-only advisory comparison of explicit tasks.

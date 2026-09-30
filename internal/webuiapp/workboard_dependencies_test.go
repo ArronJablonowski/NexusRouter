@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func TestBrowserDependencyRouteBindsSessionAndClosedQuery(t *testing.T) {

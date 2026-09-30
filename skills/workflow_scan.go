@@ -1,6 +1,6 @@
 package skills
 
-import "github.com/ArronJablonowski/DarwinRouter/sessions"
+import "github.com/ArronJablonowski/NexusRouter/sessions"
 
 // WorkflowScan freezes epoch membership with an append-only task sequence fence
 // and lexical upper ID. Evidence stays live; later epochs revisit changed tasks.

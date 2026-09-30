@@ -1,13 +1,13 @@
 # Managed local model residency
 
 Task reservations and model residency are different: releasing a RAM/VRAM
-reservation does not tell an inference server to evict cached weights. Darwin's
+reservation does not tell an inference server to evict cached weights. NexusRouter's
 managed Ollama path adds provider inspection and confirmed unloading before
 low-memory model switches, followed by fresh hardware admission.
 
 ## Explicit ownership
 
-Enable this only for a dedicated Ollama server used by one DarwinRouter Service
+Enable this only for a dedicated Ollama server used by one NexusRouter Service
 or daemon and no other clients:
 
 ```yaml
@@ -23,7 +23,7 @@ it does not delete models from disk, prune routing candidates, pull models, or
 change tool permissions. Existing user configuration is not changed automatically.
 An embedding host must reuse a Service to share process-local coordination.
 Daemon processes additionally use the private per-host resource coordinator,
-so independent DarwinRouter workspaces contend for the same bounded local
+so independent NexusRouter workspaces contend for the same bounded local
 capacity rather than trusting separate in-memory counters.
 
 Managed providers require a loopback root endpoint, local models and distinct
@@ -42,7 +42,7 @@ resident inventory and unloads only unambiguous configured idle models.
 
 An unload uses a non-streaming empty generation request with `keep_alive: 0`.
 Success requires an unload acknowledgement and a subsequent resident-inventory
-observation that no longer contains the target. Darwin does not equate an HTTP
+observation that no longer contains the target. NexusRouter does not equate an HTTP
 200 response or a released logical reservation with confirmed absence.
 These operations follow Ollama's [generate contract](https://docs.ollama.com/api/generate)
 and [running-model inventory](https://docs.ollama.com/api/ps).
@@ -56,7 +56,7 @@ Within an uncoordinated embedding Service, an uncertain unload remains blocked
 until fresh inventory shows both its identity and original digest absent;
 queued retries do not send that unload again. A daemon with host coordination
 does not invoke this process-local unload authority at all. Ollama may load the
-selected model during inference, but DarwinRouter will not unload or steal a
+selected model during inference, but NexusRouter will not unload or steal a
 peer daemon's active or uncertain resident model. Durable provider-lifecycle
 operations remain a separate post-MVP enhancement.
 
@@ -83,7 +83,7 @@ they are never silently evicted.
 
 The optional unload implementation is Ollama-first. Custom provider factories
 and other inference engines do not acquire unload authority implicitly. The
-daemon's durable host reservation coordinates DarwinRouter processes only; it
+daemon's durable host reservation coordinates NexusRouter processes only; it
 does not fence outside clients, prove GPU placement, or claim durable provider
 residency ownership. Provider absence is an observation, not protection against
 another client immediately reloading that model. Physical memory recovery is

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 func TestSubmissionCommandsAcrossProcesses(t *testing.T) {
@@ -20,7 +20,7 @@ func TestSubmissionCommandsAcrossProcesses(t *testing.T) {
 	defer cancel()
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "darwin")
-	build := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/darwin")
+	build := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/nexus")
 	if body, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, body)
 	}

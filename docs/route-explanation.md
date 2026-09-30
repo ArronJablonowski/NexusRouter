@@ -1,11 +1,11 @@
 # Route explanation inspection
 
-DarwinRouter persists an automatic routing decision before provider inference.
+NexusRouter persists an automatic routing decision before provider inference.
 The decision can be inspected without loading the task's conversation:
 
 ```sh
-./bin/darwin task route --db ./data/darwin.db --task TASK_ID
-curl -H "Authorization: Bearer $DARWIN_API_TOKEN" \
+./bin/nexus task route --db ./data/darwin.db --task TASK_ID
+curl -H "Authorization: Bearer $NEXUS_API_TOKEN" \
   http://127.0.0.1:9786/v1/tasks/TASK_ID/route
 ```
 

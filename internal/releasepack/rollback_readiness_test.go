@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 type receiptVerifierFixture struct {
@@ -142,7 +142,7 @@ func TestRollbackCanonicalEvidenceOutputIsExclusiveAndPrivate(t *testing.T) {
 	if _, err = WriteRollbackReadiness(out, record); err == nil {
 		t.Fatal("existing evidence overwritten")
 	}
-	result := RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: digest, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, RehearsalSHA256: record.Rehearsal.EvidenceSHA256, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, Mode: "first_release", StateSchema: stateschema.Current, ValidUntil: record.Approval.ValidUntil, ReadinessVerifierID: "idp:readiness-verifier", VerifiedAt: "2026-09-08T00:00:00Z"}
+	result := RollbackReadinessResult{SchemaVersion: 1, Scope: "nexusrouter-rollback-readiness-verification", RecordSHA256: digest, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, RehearsalSHA256: record.Rehearsal.EvidenceSHA256, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, Mode: "first_release", StateSchema: stateschema.Current, ValidUntil: record.Approval.ValidUntil, ReadinessVerifierID: "idp:readiness-verifier", VerifiedAt: "2026-09-08T00:00:00Z"}
 	resultBody, err := MarshalRollbackReadinessResult(result)
 	if err != nil {
 		t.Fatal(err)
@@ -305,11 +305,11 @@ func TestCanonicalRollbackRehearsalVerifierDerivesPublishedReleaseIdentity(t *te
 
 func rollbackFixture(mode string) RollbackReadiness {
 	record := RollbackReadiness{
-		SchemaVersion: 1, Project: "DarwinRouter", Scope: rollbackReadinessScope,
-		Current:   RollbackCurrentRelease{PublicationReceiptSHA256: fingerprint("1"), PublicationAuthorizationSHA256: fingerprint("2"), Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 41, StateSchema: stateschema.Current},
+		SchemaVersion: 1, Project: "NexusRouter", Scope: rollbackReadinessScope,
+		Current:   RollbackCurrentRelease{PublicationReceiptSHA256: fingerprint("1"), PublicationAuthorizationSHA256: fingerprint("2"), Repository: "ArronJablonowski/NexusRouter", ReleaseVersion: "1.0.0", SourceCommit: strings.Repeat("a", 40), Tag: "v1.0.0", ReleaseID: 41, StateSchema: stateschema.Current},
 		History:   RollbackHistoryPolicy{Mode: "first_release", FirstReleaseDecision: "approved_no_previous_public_release", FirstReleaseRollback: &FirstReleaseRollbackPolicy{DaemonAction: "stop", BinaryAction: "uninstall", DataAction: "preserve_current_schema_no_restore"}},
 		Rehearsal: RollbackRehearsal{EvidenceSHA256: fingerprint("3"), Scenario: "published_native_install_rollback", FromSchema: 29, ToSchema: stateschema.Current, Status: "passed", RehearsedAt: "2026-09-07T12:00:00Z", VerifierID: "idp:rehearsal-verifier"},
-		Incident:  RollbackIncident{OwnerID: "team:release-incident", StatusURL: "https://status.example.invalid/darwinrouter"},
+		Incident:  RollbackIncident{OwnerID: "team:release-incident", StatusURL: "https://status.example.invalid/nexusrouter"},
 		Approval:  RollbackReadinessApproval{ApproverID: "idp:readiness-approver", PolicyURL: "https://policy.example.invalid/rollback", ApprovedAt: "2026-09-07T13:00:00Z", ValidUntil: "2026-09-09T00:00:00Z"},
 	}
 	if mode == "upgrade" {
@@ -321,7 +321,7 @@ func rollbackFixture(mode string) RollbackReadiness {
 }
 
 func priorFixture() *RollbackPriorSupportedBinary {
-	return &RollbackPriorSupportedBinary{Repository: "ArronJablonowski/DarwinRouter", ReleaseVersion: "0.9.0", SourceCommit: strings.Repeat("b", 40), Tag: "v0.9.0", TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "DarwinRouter_0.9.0_darwin_arm64.tar.gz", ArtifactSHA256: fingerprint("4"), BinarySHA256: fingerprint("5"), PublicationReceiptSHA256: fingerprint("6"), VerificationReceiptSHA256: fingerprint("7"), StateSchema: 28}
+	return &RollbackPriorSupportedBinary{Repository: "ArronJablonowski/NexusRouter", ReleaseVersion: "0.9.0", SourceCommit: strings.Repeat("b", 40), Tag: "v0.9.0", TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "NexusRouter_0.9.0_darwin_arm64.tar.gz", ArtifactSHA256: fingerprint("4"), BinarySHA256: fingerprint("5"), PublicationReceiptSHA256: fingerprint("6"), VerificationReceiptSHA256: fingerprint("7"), StateSchema: 28}
 }
 
 func backupFixture() *RollbackBackup {
@@ -366,7 +366,7 @@ func writeRollbackFixtures(t *testing.T, record RollbackReadiness) (RollbackRead
 	}
 	verifier := &receiptVerifierFixture{identity: PublicationReceiptIdentity{ReceiptSHA256: record.Current.PublicationReceiptSHA256, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, Tag: record.Current.Tag, SourceCommit: record.Current.SourceCommit, PublicationAuthorizationSHA256: record.Current.PublicationAuthorizationSHA256, ReleaseID: record.Current.ReleaseID, VerifiedAt: "2026-09-07T12:30:00Z", VerifierID: "idp:publication-verifier"}}
 	options.ReceiptVerifier = verifier
-	identity := RehearsalEvidenceIdentity{EvidenceSHA256: record.Rehearsal.EvidenceSHA256, Scenario: record.Rehearsal.Scenario, FromSchema: record.Rehearsal.FromSchema, ToSchema: record.Rehearsal.ToSchema, Status: "passed", RehearsedAt: record.Rehearsal.RehearsedAt, VerifierID: record.Rehearsal.VerifierID, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, PublicationAuthorizationSHA256: record.Current.PublicationAuthorizationSHA256, InstallEvidenceSHA256: fingerprint("9"), TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "DarwinRouter_1.0.0_darwin_arm64.tar.gz", ArtifactSHA256: fingerprint("a"), InstalledBinarySHA256: fingerprint("b"), BackupSHA256: fingerprint("c"), RollbackSchema: record.Rehearsal.FromSchema}
+	identity := RehearsalEvidenceIdentity{EvidenceSHA256: record.Rehearsal.EvidenceSHA256, Scenario: record.Rehearsal.Scenario, FromSchema: record.Rehearsal.FromSchema, ToSchema: record.Rehearsal.ToSchema, Status: "passed", RehearsedAt: record.Rehearsal.RehearsedAt, VerifierID: record.Rehearsal.VerifierID, Repository: record.Current.Repository, ReleaseVersion: record.Current.ReleaseVersion, SourceCommit: record.Current.SourceCommit, Tag: record.Current.Tag, ReleaseID: record.Current.ReleaseID, PublicationReceiptSHA256: record.Current.PublicationReceiptSHA256, PublicationAuthorizationSHA256: record.Current.PublicationAuthorizationSHA256, InstallEvidenceSHA256: fingerprint("9"), TargetOS: "darwin", TargetArch: "arm64", ArtifactName: "NexusRouter_1.0.0_darwin_arm64.tar.gz", ArtifactSHA256: fingerprint("a"), InstalledBinarySHA256: fingerprint("b"), BackupSHA256: fingerprint("c"), RollbackSchema: record.Rehearsal.FromSchema}
 	if record.Backup != nil {
 		identity.BackupSHA256 = record.Backup.SHA256
 	}

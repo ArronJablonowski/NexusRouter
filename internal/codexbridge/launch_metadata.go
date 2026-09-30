@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 )
 
 // Only trusted, version-pinned CLI metadata is captured, never stderr or auth.

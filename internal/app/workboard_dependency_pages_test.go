@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func TestWorkboardBridgeProjectsDependencyPage(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestLeaseAttentionHistoryMigrationPreservesBaseline(t *testing.T) {

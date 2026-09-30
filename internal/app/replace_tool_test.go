@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func replaceTestArgs(path, before, after string) json.RawMessage {

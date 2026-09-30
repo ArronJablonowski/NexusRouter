@@ -1,6 +1,6 @@
 # Installation, migration and rollback rehearsal
 
-This rehearsal qualifies the mechanics of a DarwinRouter installation without
+This rehearsal qualifies the mechanics of a NexusRouter installation without
 opening an operator configuration, database or model endpoint. It uses a native
 release archive, private disposable directories, a providerless configuration
 and one synthetic memory fact. It does not qualify live inference, production
@@ -49,7 +49,7 @@ back completely rather than dropping or truncating history. Keep the source and
 pre-upgrade backup unchanged, correct the source only through an explicitly
 reviewed recovery procedure, and rerun migration; no automatic skip is provided.
 
-Runtime subprocesses receive an explicit `DARWIN_PROCESS_OWNER_DIR`, home,
+Runtime subprocesses receive an explicit `NEXUS_PROCESS_OWNER_DIR`, home,
 temporary directory and API token rooted under `testing.T.TempDir`. The build
 subprocess uses the caller's Go cache and home but disables module network
 resolution. No provider is configured. A loopback HTTP listener is used only
@@ -94,7 +94,7 @@ go run ./cmd/verify-install-rehearsal \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
   --target-os darwin \
   --target-arch arm64 \
-  --artifact DarwinRouter_1.0.1_darwin_arm64.tar.gz \
+  --artifact NexusRouter_1.0.1_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 \
   --current-schema 53 \
@@ -122,7 +122,7 @@ go run ./cmd/verify-native-release-evidence \
   --version 1.0.1 \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
   --target-os darwin --target-arch arm64 --go-version go1.27.1 \
-  --artifact DarwinRouter_1.0.1_darwin_arm64.tar.gz \
+  --artifact NexusRouter_1.0.1_darwin_arm64.tar.gz \
   --artifact-sha256 sha256:EXPECTED_ARCHIVE \
   --source-schema 29 --current-schema 53 \
   --backup-sha256 sha256:EXPECTED_BACKUP \
@@ -172,7 +172,7 @@ point the previous binary at that new path, and repeat its configuration,
 startup, inspection and shutdown smoke checks. Never run an old binary against
 the restored path until its digest and schema have been checked.
 
-There is no previous public DarwinRouter release at the time of this document.
+There is no previous public NexusRouter release at the time of this document.
 The automated schema-29 fixture proves the candidate migration code against an
 owned boundary; it is not a historical binary or publication-channel test and
 cannot substitute for a prior published release. Hosted CI must not fetch or

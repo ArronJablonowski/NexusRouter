@@ -44,7 +44,7 @@ func TestOperationDurationValidationAndOTLP(t *testing.T) {
 		t.Fatal(string(body))
 	}
 	items := request.ResourceMetrics[0].ScopeMetrics[0].Metrics
-	if items[len(items)-2].Name != "darwinrouter.operation.duration" || items[len(items)-2].Histogram.DataPoints[0].Count != "1" || items[len(items)-1].Name != "darwinrouter.operation.duration.unavailable" || len(items[len(items)-1].Gauge.DataPoints) != 6 {
+	if items[len(items)-2].Name != "nexusrouter.operation.duration" || items[len(items)-2].Histogram.DataPoints[0].Count != "1" || items[len(items)-1].Name != "nexusrouter.operation.duration.unavailable" || len(items[len(items)-1].Gauge.DataPoints) != 6 {
 		t.Fatal(items[len(items)-2:])
 	}
 

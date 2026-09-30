@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
 )
 
 func TestProcessGuardRejectsInvalidReferenceAndContext(t *testing.T) {

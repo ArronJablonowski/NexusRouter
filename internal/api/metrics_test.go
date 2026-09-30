@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 type metricsUnreadBody struct{ t *testing.T }

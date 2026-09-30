@@ -1,7 +1,7 @@
 # Session summaries through the Go SDK
 
 The embedded `sdk/v1.Client` supports the same explicit draft, review and
-continuation workflow as the CLI and Darwin-native HTTP API. It also supports
+continuation workflow as the CLI and NexusRouter-native HTTP API. It also supports
 opt-in trusted deterministic validation; no validator is selected implicitly.
 These methods do not enable automatic compaction, retry or background inference.
 
@@ -50,7 +50,7 @@ if review.Decision != "approved" {
 }
 ```
 
-DarwinRouter also exports a non-authorizing stock integrity linter:
+NexusRouter also exports a non-authorizing stock integrity linter:
 
 ```go
 registry, err := darwin.NewSummaryValidatorRegistry(map[string]darwin.SummaryValidator{
@@ -123,7 +123,7 @@ explicitly selected for a continuation; it does not update measured fitness.
 ### Interrupted-attempt recovery
 
 After an abnormal owner-process exit, `InspectSummaryAttempt` or the existing
-`darwin summaries show` command may report `status: "interrupted"` with code
+`nexus summaries show` command may report `status: "interrupted"` with code
 `owner_interrupted`. This terminal state means the exact guarded local owner was
 independently proven stopped; it does not say whether the provider received or
 completed the request. The attempt therefore has no draft, token usage or
@@ -149,7 +149,7 @@ Continue with the last returned receipt ID. Concurrent insertion before the
 cursor requires a fresh scan. Inspection is read-only, uses the same cooperative
 ten-second deadline and returns no partial page on failure. There is currently
 no dedicated CLI or HTTP receipt-inspection surface; CLI operators can still see
-the terminal attempt with `darwin summaries list|show`.
+the terminal attempt with `nexus summaries list|show`.
 
 Trusted hosts can request one mutating recovery scan page explicitly:
 

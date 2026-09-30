@@ -12,12 +12,12 @@ source. It must contain at least 32 characters and must not be written into
 YAML, shell history, logs, or a browser:
 
 ```sh
-go run ./cmd/darwin config validate --config examples/local.yaml
-go run ./cmd/darwin serve --config examples/local.yaml
+go run ./cmd/nexus config validate --config examples/local.yaml
+go run ./cmd/nexus serve --config examples/local.yaml
 ```
 
-Use `darwin daemon start --config examples/local.yaml` instead of `serve` for a
-detached daemon, and use `darwin daemon status|stop --config ...` for its
+Use `nexus daemon start --config examples/local.yaml` instead of `serve` for a
+detached daemon, and use `nexus daemon status|stop --config ...` for its
 authenticated lifecycle. Foreground `serve` is preferable while diagnosing
 startup. Readiness proves that the HTTP service and configured supervisors
 started; it does not prove model quality or external-provider availability.
@@ -42,11 +42,11 @@ an approval value in `CHALLENGE_ID.DISPLAY_CODE` form. In a trusted terminal on
 the same host, copy the complete value into:
 
 ```sh
-go run ./cmd/darwin web approve --config examples/local.yaml CHALLENGE_ID.DISPLAY_CODE
+go run ./cmd/nexus web approve --config examples/local.yaml CHALLENGE_ID.DISPLAY_CODE
 ```
 
 Verify the browser and terminal display the same value before approving. The
-command uses `DARWIN_API_TOKEN` to contact the loopback daemon; the token never
+command uses `NEXUS_API_TOKEN` to contact the loopback daemon; the token never
 enters the browser. A successful challenge creates an HttpOnly,
 SameSite=Strict browser cookie. Browser sessions expire according to
 `web_ui.browser_session_ttl` (5 minutes through 24 hours), are process-local,
@@ -137,7 +137,7 @@ fields to audit which effective policy admitted a card.
 An exact retry under the same policy returns the original committed result. If
 configuration changes, reuse of the old idempotency key conflicts because its
 request remains bound to the original config digest. Refresh the board and use a
-fresh operation key to request evaluation under the new policy; DarwinRouter
+fresh operation key to request evaluation under the new policy; NexusRouter
 does not reinterpret the earlier admission. Delegated workers and Workboard
 execution children receive no Workboard write tools or execution authority. A
 parent `ask` policy cannot weaken that denial.
@@ -158,7 +158,7 @@ and request digest. Review the displayed scope and warnings. Denial or revocatio
 does not itself undo an effect. A committed or uncertain effect is never
 automatically retried, even when its operation is otherwise idempotent.
 
-The interactive `darwin chat` command can present approval prompts in a trusted
+The interactive `nexus chat` command can present approval prompts in a trusted
 terminal. Headless queued submissions do not gain a hidden approval presenter.
 Do not enable agent write tools until an operator will actively supervise that
 interactive path.
@@ -246,7 +246,7 @@ taken from a running WAL writer is not a qualified backup.
 2. With trusted SQLite tooling, run `PRAGMA wal_checkpoint(TRUNCATE);` followed
    by `PRAGMA quick_check;` and require the single result `ok`.
 3. Copy the quiescent database to a newly created, access-restricted backup;
-   retain its SHA-256, schema version (`PRAGMA user_version`), DarwinRouter
+   retain its SHA-256, schema version (`PRAGMA user_version`), NexusRouter
    binary version/commit, configuration digest, time, and operator identity.
 4. Test restoration by copying the immutable backup to a different path,
    verifying its digest before opening it, and starting the matching binary
@@ -259,7 +259,7 @@ restore the verified backup to a new path, point the matching prior configuratio
 at it, validate, and start exactly one writer. Rollback discards all records
 committed after the backup; record and approve that loss explicitly.
 
-`darwin memory export` is not a database backup. Copying only the SQLite main
+`nexus memory export` is not a database backup. Copying only the SQLite main
 file while WAL writers are active is not a database backup. The repository's
 installation/migration rehearsal and release rollback documents add release-
 artifact evidence requirements; they do not perform an operator's production
@@ -280,7 +280,7 @@ backup automatically.
   container, SSH, and remote worker backends are not part of v1.
 - Provider fixtures and passing health checks do not prove model correctness,
   cost accuracy, thermal stability, or external availability.
-- Fully local mode enforces an egress-deny transport policy for DarwinRouter's
+- Fully local mode enforces an egress-deny transport policy for NexusRouter's
   configured transports, but cannot firewall arbitrary third-party processes or
   untrusted extension code outside the runtime.
 - Automatic model disabling/removal, destructive tool actions, policy changes,

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 var ErrProviderHealth = errors.New("provider health history unavailable")

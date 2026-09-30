@@ -1,5 +1,26 @@
 # Implementation evidence
 
+## 2026-09-30 — DAR-134 NexusRouter name migration
+
+The implementation adopts NexusRouter across the UI, CLI, Go module/imports,
+release artifacts, maintained documentation and project requirements. `nexus`
+is the executable; the old entry point and build alias remain compatible.
+Canonical NEXUS environment settings take precedence over legacy names,
+including explicit empty values, and both API-token names are redacted.
+Existing configuration, database, feedback and shared admission paths remain
+stable; `docs/nexusrouter-migration.md` records the compatibility exceptions.
+Frozen external benchmark evidence and signed historical evidence are untouched.
+
+Linear workspace, team, project, issue descriptions, PRD and its attachment label
+now use NexusRouter. Stable issue IDs and URL slugs retain their identity.
+Focused environment/configuration/redaction and release checks pass, as do the
+native disposable install/schema-migration/backup/rollback rehearsal and both
+CLI entry-point build checks. Full `make check` is in progress. A stale fixture
+expecting the previous executable name was corrected and its regression passed;
+that initial full run must be followed by a clean successful gate before push
+or deployment. GitHub repository renaming requires an authenticated account;
+the existing SSH remote remains the backup destination until then.
+
 ## 2026-09-27 — Invalid subjective feedback withdrawal
 
 CLI feedback revisions now accept `--outcome withdrawn` with the exact current
@@ -287,7 +308,7 @@ was found was quarantined and receives no release credit.
 
 ## 2026-09-14 — DAR-107 policy-bounded auxiliary intent classification
 
-DarwinRouter now has an opt-in provider-neutral auxiliary classifier for an
+NexusRouter now has an opt-in provider-neutral auxiliary classifier for an
 automatic root or continuation request whose domain and capability intent were
 both omitted and remain ambiguous after deterministic structured
 classification. Explicit domain, capability, privacy, validation,
@@ -464,7 +485,7 @@ provenance, a legal conclusion, or human distribution approval.
 DAR-87 release-contract checkpoint: candidate records are now canonical schema
 2, release manifests are schema 3, and every target archive has seven ordered
 members including target-specific `SBOM.spdx.json`. The canonical SPDX 2.3
-document binds the exact target binary, module-level `cmd/darwin` dependency and
+document binds the exact target binary, module-level `cmd/nexus` dependency and
 Go toolchain closure, and SHA-256 hashes for every checked-in first-party Web UI
 source. Archive member metadata, the manifest, `SHA256SUMS`, production signing,
 and approval-bound verification cover the SBOM and its binary/source bindings.
@@ -666,7 +687,7 @@ was pushed. Muse's reported license-evidence freeze failure was reproduced as a
 workflow-order problem: the freezer deliberately rejects a dirty checkout, and
 Muse attempted it while `go.mod` was modified. From the exact clean pushed
 commit, external RC9 schema-2 license evidence was successfully frozen at
-`/Users/aj_lobster/DarwinRouter-release-evidence/1.0.0-rc.9/license-evidence.json`
+`/Users/aj_lobster/NexusRouter-release-evidence/1.0.0-rc.9/license-evidence.json`
 with digest `edb334e245d53d8365b075b2565334c4132725d1021645282d50c743f8297b03`,
 and `make qualify-license-evidence` independently re-derived and accepted it.
 The four target module counts and notice digests match RC7, as expected because
@@ -708,7 +729,7 @@ authorization, signature, tag, upload or release was created.
 
 Clean pushed commit `622c27ca5e14c923029891219c437a281580444b` was
 frozen as external RC7 schema-2 license evidence at
-`/Users/aj_lobster/DarwinRouter-release-evidence/1.0.0-rc.7/` with exact record
+`/Users/aj_lobster/NexusRouter-release-evidence/1.0.0-rc.7/` with exact record
 SHA-256 `c11f4631b74400b9595dbc7772c3677dc598c435fc75c378542886df3b115204`.
 `make qualify-license-evidence` re-derived and accepted that independently
 supplied digest from the clean checkout. The record observes Go 1.27.1, root
@@ -725,12 +746,12 @@ required human legal review or production approval.
 Licensing-policy verification checkpoint: the project owner selected the same
 license family as the publicly available Hermes Agent. The authoritative Hermes
 repository currently declares MIT and carries the standard MIT grant with
-`Copyright (c) 2025 Nous Research`. DarwinRouter correctly carries the same MIT
+`Copyright (c) 2025 Nous Research`. NexusRouter correctly carries the same MIT
 terms with its own `Copyright (c) 2026 Arron Jablonowski`; architectural
 inspiration does not transfer ownership. The PRD now records that substantial
 copied or adapted Hermes material would retain its applicable upstream notice,
 the README links the authoritative upstream license, and the Go SDK links the
-project license. Release archives already authenticate and install DarwinRouter's
+project license. Release archives already authenticate and install NexusRouter's
 license. Candidate-bound dependency and toolchain notices plus human approval
 remain separate open DAR-48 gates; this checkpoint is not legal approval.
 
@@ -814,7 +835,7 @@ seed. It binds exact canonical candidate, checksum, trust and signing-
 authorization records, independently supplied digests, clean source commit and
 the seed-derived Ed25519 public identity before exclusive signing. The external
 authorization explicitly approves the four targets, dependency notices and
-signing while leaving publication unapproved; DarwinRouter validates but never
+signing while leaving publication unapproved; NexusRouter validates but never
 generates that approval. Signature and directory state are synced, the complete
 signed set is immediately reverified, and uncertain outcomes remain nonretryable.
 No production key, approval, signature, tag or release was created. DAR-51 still
@@ -1011,7 +1032,7 @@ and never contain prompt/output, messages, arguments/results, error details,
 model/provider/tool names or durable task/session/event/route/worker/turn/
 attempt/call identity. Every serialization generates fresh random OTLP trace
 and span IDs, intentionally preventing correlation between exports. CLI
-`darwin traces export`, Go SDK snapshot/export methods, deployment-mode network
+`nexus traces export`, Go SDK snapshot/export methods, deployment-mode network
 policy, explicit credential-name lookup, rotation fencing, redirect denial and
 bounded collector acknowledgement are implemented. Focused race tests passed:
 traces 1.337s, telemetry 147.194s, application 219.986s, SDK 23.835s and CLI
@@ -1290,7 +1311,7 @@ Native Linear is unavailable because the Mac is locked, so no DAR-42
 state/comment change is claimed. The full PRD remains incomplete.
 
 DAR-41 is completion-ready pending native Linear reconciliation. All production
-HTTP clients are constructed over DarwinRouter-owned, endpoint-allowlisted
+HTTP clients are constructed over NexusRouter-owned, endpoint-allowlisted
 transports: built-in provider execution/discovery/health/residency, explicit and
 periodic metrics export, and daemon control. Local-only mode admits only literal
 loopback or pinned `localhost`, never consults DNS for those destinations,
@@ -1329,7 +1350,7 @@ workflow. Native Linear remains unavailable because the Mac is locked, so no
 DAR-37 state/comment change is claimed. The full PRD remains incomplete.
 
 DAR-40 is completion-ready pending native Linear reconciliation. The
-authenticated Darwin-native API exposes synchronous and live task submission,
+authenticated NexusRouter-native API exposes synchronous and live task submission,
 durable detached submissions, cancellation, steering, task/event inspection
 and bounded replay. Task snapshots expose session and parent/retry lineage;
 `route.selected` durable events expose the complete redacted candidate,
@@ -1380,10 +1401,10 @@ issue's stated endpoint requirement. Native Linear remains unavailable because
 the Mac is locked, so no DAR-39 state/comment change is claimed. The full PRD
 remains incomplete.
 
-DAR-38 is completion-ready pending native Linear reconciliation. `darwin run
+DAR-38 is completion-ready pending native Linear reconciliation. `nexus run
 --json` emits versioned committed lifecycle events followed by one terminal
 result, with bounded backpressure, provisional-text redaction, safe broken-pipe
-cancellation and no duplicate plain answer. `darwin chat` uses the same
+cancellation and no duplicate plain answer. `nexus chat` uses the same
 application service and streams provisional text before completion while
 retaining durable task identity. Successful answers advance an explicit
 continuation chain; failures and cancellations preserve the last successful
@@ -1454,7 +1475,7 @@ locked, so no DAR-27 state/comment change is claimed. The full PRD remains
 incomplete.
 
 DAR-12 is verified in the repository and ready for native Linear
-reconciliation. Ollama configuration may now omit `endpoint`; DarwinRouter
+reconciliation. Ollama configuration may now omit `endpoint`; NexusRouter
 deterministically resolves only the standard pinned loopback endpoint
 `http://127.0.0.1:11434`. This is bounded local discovery, not DNS, port
 scanning or remote endpoint selection. OpenAI-compatible providers still
@@ -2037,7 +2058,7 @@ because the local GitHub CLI was not authenticated and the repository API did no
 provide a public run listing.
 
 DAR-6 evidence: configuration resolves defaults, user file, project file,
-`DARWIN__` environment values and flags in increasing precedence. Lower layers
+`NEXUS__` environment values and flags in increasing precedence. Lower layers
 are validated before merge, maps merge recursively, and lists replace. Schema
 version 1 supplies safe defaults and strict validation, including hostile YAML,
 type, bound, identifier, deployment, resource, model, tool, memory, skill,
@@ -2056,7 +2077,7 @@ resource and supervisor startup checks; exposes detailed readiness; supports
 authenticated managed start/status/stop; and joins HTTP, dispatcher, learning and
 metrics services during cooperative shutdown.
 
-A new Unix process test builds and launches the actual DarwinRouter executable,
+A new Unix process test builds and launches the actual NexusRouter executable,
 waits for validated readiness, submits detached model work, and observes the
 provider receive its request. The provider emits a partial delta and blocks. The
 test kills and joins that exact daemon with verified SIGKILL, observes provider
@@ -2303,7 +2324,7 @@ Linux amd64 cross-build passed. Focused bridge and application tests also passed
 three CGO-free Linux ARM64 repetitions in isolated unprivileged, network-disabled
 containers. The first application container omitted a writable process-owner
 directory, so delegation never reached the worker; setting the documented
-DARWIN_PROCESS_OWNER_DIR inside disposable /tmp made the unchanged binary pass.
+NEXUS_PROCESS_OWNER_DIR inside disposable /tmp made the unchanged binary pass.
 This is not Linux race or live Linux Codex qualification. Generated schemas,
 test binaries and inference diagnostics were kept outside the repository.
 
@@ -2930,7 +2951,7 @@ conflicting tasks would otherwise be excluded. Reports recompute count partition
 rates, Wilson bounds and status during validation, with a canonical evidence
 digest and no raw prompt/output/skill/evidence-reference payloads.
 
-Application, SDK, `darwin skills compare --config path` (strict JSON stdin), and
+Application, SDK, `nexus skills compare --config path` (strict JSON stdin), and
 authenticated POST `/v1/skills/comparison` expose the read-only operation.
 Configured secrets are checked before I/O and again against complete observations
 and the report. HTTP shares bounded control capacity with a five-second deadline.
@@ -3245,7 +3266,7 @@ See docs/orphan-worker-recovery.md for scope and compatibility.
 Configured CLI memory checkpoint: the previous turn made verified durable-monitor
 progress and backed up cdc68e7; this turn began from a clean worktree. Requirement
 audit found that raw CLI memory commands bypassed the configured-scope/redaction
-service already used by SDK/HTTP. New `darwin memory ... --config path` commands
+service already used by SDK/HTTP. New `nexus memory ... --config path` commands
 now use that same service for list/show/put/delete, including with retrieval off.
 Explicit legacy `--db/--scope` access remains distinguishable and cannot be mixed
 with configuration, even through empty flags. Creation requires explicit expected
@@ -3462,9 +3483,9 @@ API 9.566s, SDK 18.382s; unchanged packages cached). Final SDK Linux test-binary
 compilation also passed. No automatic-compaction or full MVP claim is made.
 
 Linear access was rechecked: the native app is blocked by the locked Mac. The
-connected plugin reports Cyber Operations Harness, not DarwinRouter. No changes
+connected plugin reports Cyber Operations Harness, not NexusRouter. No changes
 were made to that unrelated workspace or to Linear issue status. The user must
-unlock native Linear or reconnect the connector to DarwinRouter for issue sync.
+unlock native Linear or reconnect the connector to NexusRouter for issue sync.
 Local progress remains possible; full PRD/Linear acceptance is not claimed.
 
 Native compacted-continuation checkpoint: the previous turn made verified
@@ -3909,8 +3930,8 @@ Git fetch found no divergence. Full PRD qualification remains open.
 Durable ownership-location checkpoint: the previous turn delivered verified
 scope-holder inspection and GitHub backup (3684df7). This turn rechecked a clean
 worktree; native Linear remains locked, so no issue mutation is claimed. New
-process guards default to UserConfigDir/DarwinRouter/process-owners, with an
-explicit DARWIN_PROCESS_OWNER_DIR override resolved only at first acquisition.
+process guards default to UserConfigDir/NexusRouter/process-owners, with an
+explicit NEXUS_PROCESS_OWNER_DIR override resolved only at first acquisition.
 Private roots are validated without repair, children are created through pinned
 handles, and file/child/root entries are synced before publishing ownership.
 Existing reference version/schema and root-independent probes are unchanged;
@@ -4084,13 +4105,13 @@ Terminal review independently validates exact bounded argument fields/digests, r
 
 Verification: final aggregate make check passed (format/LOC, vet, full native race suite and production build), make build and Linux amd64 production cross-build passed. Actual loopback HTTP tests verify durable ToolStarted before review, exact approved bytes, denied/malformed/escaped/child proposals, preserved existing targets, consumed approval and released lease, and no fallback after a real file effect followed by injected ToolCompleted storage failure. Owned macOS PTY subprocesses exercise actual RunWithInput→runChat approval/denial/no-overwrite, with separate piped-input and piped-output rejection before provider/database access. Focused race checks cover concurrent no-replace publication, existing symlink/directory/FIFO identity, mode 0600, empty files, root alias/pinning, pre-cancellation, EOF-before-preview, expired/stale/reused IDs, callback snapshot isolation and public SDK configuration/creation. CLI approval/PTY tests also passed three consecutive race-enabled runs. Independent review found no concrete safety blocker within the documented scope. No live Sol/Ollama calls, user configuration changes or writes to user content directories were made; tests use owned fixtures. Linux interactive PTY execution is not qualified by the macOS subprocess tests. Native Linear DAR-17 acceptance/dependencies were inspected and its status changed from Todo to In Progress; no issue completion is claimed.
 
-Latest interactive-streaming checkpoint: production `darwin chat` now uses the combined Service.RunLiveStream / SDK Client.RunLiveStream interface rather than waiting for Result.Text. One unbuffered channel preserves committed lifecycle/text order and bounded backpressure; provisional model lines are terminal-filtered across chunk and metadata boundaries, prefixed with `| `, limited to1MiB redacted text per task, and not duplicated at completion. Trusted status does not enter the model's filter. Only successful application return advances continuation/feedback state and prints the separate completion marker. Failed partial text remains visibly provisional and is not reused as conversation history.
+Latest interactive-streaming checkpoint: production `nexus chat` now uses the combined Service.RunLiveStream / SDK Client.RunLiveStream interface rather than waiting for Result.Text. One unbuffered channel preserves committed lifecycle/text order and bounded backpressure; provisional model lines are terminal-filtered across chunk and metadata boundaries, prefixed with `| `, limited to1MiB redacted text per task, and not duplicated at completion. Trusted status does not enter the model's filter. Only successful application return advances continuation/feedback state and prints the separate completion marker. Failed partial text remains visibly provisional and is not reused as conversation history.
 
 Combined callbacks share an error/panic/cancellation gate; failure cancels and joins execution without recasting durable appends as storage failure. A reviewed edge was corrected: cancellation during TaskCompleted callback now returns context cancellation even if the durable task completed and trailing redactor text was withheld. Existing single-channel streaming APIs and JSON lifecycle output remain unchanged. Statefulness covers escape/control strings and Unicode fragments without retaining unbounded payloads; per-task reset prevents an unterminated escape from hiding the next task. Line quoting distinguishes explicit model-imitation status lines, but is presentation separation rather than authentication. See docs/interactive-streaming.md.
 
 Interactive-streaming verification: full make check passed (format/LOC, vet, native race suite and production build; unchanged packages cached), make build passed and Linux amd64 production cross-build passed. Actual loopback HTTP tests prove prefix delivery before provider completion, split-secret/Unicode handling, no duplicate final answer, active steering into a second model turn, output-failure cancellation, feedback exclusion for failed attempts and next-task retention of only successful history. Owned CLI subprocess tests enter real RunWithInput→runChat with YAML and stdin/stdout pipes, verify early stdout, and distinguish clean exit1/provider cancellation from abrupt SIGPIPE. App/SDK tests cover lifecycle-before-text ordering with read-only SQLite commit evidence, both callback error/panic gates and terminal cancellation preserving the completed journal. Repeated focused display tests cover byte/UTF-8 limits, control suppression across trusted metadata, reset and status quoting. Independent final review found no remaining concrete issue. Tests used fixtures, not new live Sol/Ollama calls or user database/configuration changes; complete PRD qualification remains open.
 
-Native Linear recovery: its previously blank issue view rendered again after a normal Quit/reopen. DAR-38 and DAR-46 acceptance criteria and existing dependencies were inspected in the authenticated DarwinRouter workspace. After GitHub backup80f3dfb, both issues were moved from Todo to In Progress and verified checkpoint comments were posted through the native app: DAR-38 comment13e42ba8 links the interactive-streaming evidence; DAR-46 comment02ebfe2b records release preparation through ea5c279 and its remaining signing/qualification gates. Both resulting comments and status-change activity were read back. Neither issue was marked Done, and dependencies were preserved. Search requires entering the issue ID and pressing Return; list-row center clicks can hit the nested project link, so the issue search result is the reliable native navigation path.
+Native Linear recovery: its previously blank issue view rendered again after a normal Quit/reopen. DAR-38 and DAR-46 acceptance criteria and existing dependencies were inspected in the authenticated NexusRouter workspace. After GitHub backup80f3dfb, both issues were moved from Todo to In Progress and verified checkpoint comments were posted through the native app: DAR-38 comment13e42ba8 links the interactive-streaming evidence; DAR-46 comment02ebfe2b records release preparation through ea5c279 and its remaining signing/qualification gates. Both resulting comments and status-change activity were read back. Neither issue was marked Done, and dependencies were preserved. Search requires entering the issue ID and pressing Return; list-row center clicks can hit the nested project link, so the issue search result is the reliable native navigation path.
 
 Latest release-preparation checkpoint: local packaging now builds macOS/Linux amd64/arm64 from one private snapshot of the explicitly reviewed Git commit, with sanitized CGO-free Go builds, fixed archive metadata, a canonical schema-1 manifest and checksums covering the archives plus manifest. Clean HEAD/worktree checks are operator gates; exact blob materialization, not those checks alone, prevents ignored or concurrently modified worktree content from entering builds. Snapshot bounds, regular-file-only inputs, no local module replacements, bounded subprocess capture/deadlines and atomic no-replace output publication are enforced. Installed toolchain, module cache and caller-owned directories remain trusted; this is not hermetic build provenance.
 
@@ -4108,7 +4129,7 @@ Latest background-learning checkpoint: the opt-in daemon learner now drives dura
 
 Background-learning boundaries: defaults stay disabled and mandatory budget/privacy/model admission is rechecked. Ordinary budget/cooldown exhaustion waits on the same pinned identity with healthy learning_budget_wait status. A started/failed generation, stale source, policy mismatch or publication/storage failure stops for attention; the learner never silently discards an uncertain claim or activates a draft. Native Codex skill generation is explicitly rejected until that auxiliary backend is implemented. The initial signed-in Sol task/audit integration is unchanged. Source scope remains a single-operator destination namespace, not cross-tenant ownership. Current-user configuration was not changed and no live model was called.
 
-Daemon startup/shutdown now starts, cancels and joins the learner; health and readiness include its separate metadata-only observation. `darwin skills learning status --config` and Go SDK Client.SkillLearningState inspect persisted cursor/pending IDs without initialization or inference, even after disabling learning. See docs/background-learning.md for policy drift, kill-switch and recovery limitations. Native Linear still exposes only the window/menu accessibility tree; no issue update is claimed.
+Daemon startup/shutdown now starts, cancels and joins the learner; health and readiness include its separate metadata-only observation. `nexus skills learning status --config` and Go SDK Client.SkillLearningState inspect persisted cursor/pending IDs without initialization or inference, even after disabling learning. See docs/background-learning.md for policy drift, kill-switch and recovery limitations. Native Linear still exposes only the window/menu accessibility tree; no issue update is claimed.
 
 Learning verification: final make check passed (format/LOC, vet, full native race suite and production build), make build passed and Linux amd64 production cross-build passed. Tests exercise real accepted tool workflows → loopback model generation → exactly one inactive draft, new-Service restart, two-Service single-use claims, actual failed terminal-ledger writes retaining started/uncertain attempts, budget pauses, policy/credential guards and supervisor join. Actual CLI daemon processes advance and resume empty-workflow state across restart without provider calls. Storage tests cover canonical bounded decoding, CAS contention, immutable policy/phase transitions and transaction rollback; schema-20 migration preserves complete memory facts and retired identity tombstones and still rejects reuse after upgrade. CLI/SDK inspection tests cover scope, disabled learning and non-creation. Independent review found and corrected a misleading uncertain-claim test, credential-safe policy hashing that still binds endpoint/path changes, and normal budget-wait health semantics. Full PRD qualification, automatic skill validation/activation, stale-source resolution controls, native Codex generation and live learning qualification remain open.
 
@@ -4138,13 +4159,13 @@ Latest deprecation-interface checkpoint: authenticated POST /v1/models/deprecati
 
 Deprecation interface verification: full make check passed (format/LOC, vet, native race suite and production build), make build passed, and Linux amd64 production cross-build passed. Focused API tests cover invalid framing/JSON/numbers, duplicates/aliases, capacity, cancellation, backend panic/error/forged metadata and policy mismatch. Real HTTP-to-Service-to-SQLite inspection verifies no provider calls or storage mutation; SDK tests cover feedback revision without resampling, no inference during inspection, missing-store non-creation and nil/canceled/invalid clients. Independent review found no concrete blocker. Broader runtime-failure population, value thresholds, scheduled suggestions and full PRD qualification remain open. No Linear issue update or completion is claimed.
 
-Latest daemon-lifecycle checkpoint: `darwin daemon start|status|stop --config` adds a detached macOS/Linux launch and authenticated loopback control. A fresh random instance ID binds startup readiness and stop requests; occupied endpoints are refused, socket binding precedes storage initialization, and no PID file grants signaling authority. Startup owns only its spawned process handle, with SIGTERM/two-second grace/hard-kill-and-reap on failed launch. Successful launches survive the calling CLI's exit. Status/stop never create task storage or dispatch model requests; starting the dispatcher may execute existing queued work as intended.
+Latest daemon-lifecycle checkpoint: `nexus daemon start|status|stop --config` adds a detached macOS/Linux launch and authenticated loopback control. A fresh random instance ID binds startup readiness and stop requests; occupied endpoints are refused, socket binding precedes storage initialization, and no PID file grants signaling authority. Startup owns only its spawned process handle, with SIGTERM/two-second grace/hard-kill-and-reap on failed launch. Successful launches survive the calling CLI's exit. Status/stop never create task storage or dispatch model requests; starting the dispatcher may execute existing queued work as intended.
 
 Daemon control exposes only instance metadata through GET /v1/daemon/status and exact-instance POST /v1/daemon/stop, under existing authentication, origin denial, query/body validation and bounded control capacity. Stop acknowledges stopping rather than proving process exit and cannot undo effects. Degraded dispatcher state retains identity so the operator can still stop it; startup waits for its own ready instance rather than treating a different listener as success. Client transport forbids non-loopback destinations, proxies, redirects and automatic POST replay, with bounded strict responses. See docs/daemon-control.md. OS service installation, automatic restart, configuration reload, shared database/resource singleton enforcement and stronger descendant containment remain open.
 
 Daemon verification: full make check passed (format/LOC, vet, native race suite and production build), make build passed, and Linux amd64 production cross-build passed. Focused race tests passed for controller/API validation, client control, owned-child startup and actual cross-process CLI start/status/duplicate/stop/restart. Tests prove duplicate binding cannot initialize storage, successful start survives caller cancellation, failed owned children are reaped, and degraded status still allows authenticated shutdown. Review found and corrected hidden degraded identity and transient-startup handling; both have regression tests. Tests use isolated loopback fixtures/idle queues, not live provider crash qualification. No Linear update or full PRD completion is claimed.
 
-Latest model-deprecation checkpoint: `darwin models deprecation` now exposes a bounded read-only recommendation for one configured model/domain/profile. CLI flags set the trailing evaluation window, minimum eligible samples and strict failure-fraction threshold. Current revisions are resolved coherently in one read transaction, but original evaluation times determine membership; corrections cannot inflate counts or promote an old attempt into the window. Execution, schema and authoritative quality failures are reported separately and unioned without double-counting. Successful judge-only records are excluded, and positive user feedback cannot erase a failed explicit schema measurement. Reports disclose population=evaluated_attempts, a canonical evidence digest, configured local RAM/VRAM estimates and approval_required=true; no disabling, unloading, deletion, routing mutation or inference occurs.
+Latest model-deprecation checkpoint: `nexus models deprecation` now exposes a bounded read-only recommendation for one configured model/domain/profile. CLI flags set the trailing evaluation window, minimum eligible samples and strict failure-fraction threshold. Current revisions are resolved coherently in one read transaction, but original evaluation times determine membership; corrections cannot inflate counts or promote an old attempt into the window. Execution, schema and authoritative quality failures are reported separately and unioned without double-counting. Successful judge-only records are excluded, and positive user feedback cannot erase a failed explicit schema measurement. Reports disclose population=evaluated_attempts, a canonical evidence digest, configured local RAM/VRAM estimates and approval_required=true; no disabling, unloading, deletion, routing mutation or inference occurs.
 
 Deprecation boundaries: missing/corrupt storage produces an error without creation or migration; reads have candidate/row/history/byte bounds and a cooperative application deadline. Model tags with colons/slashes are accepted independently from strict event identifiers. The shared evaluation preflight keeps the original workflow key limit while allowing longer catalog tags for this report. Current secrets are redacted from returned identifiers. Resource figures are configured estimates, not observed reclaimable memory or disk savings. Separate runtime-validity events, unevaluated failures, value thresholds, population-wide scheduled suggestions and native HTTP exposure are not included; this advances PRD §9.3 without claiming it complete.
 
@@ -4218,9 +4239,9 @@ SQLite schema version 3 adds durable resource leases. Tests prove concurrent dat
 
 A bounded in-process supervisor now connects durable task/worker events, read leases, periodic heartbeats, cancellation and explicit output validation. Tests verify acceptance-event ordering, rejected output/panic handling, heartbeat-loss cancellation and keeping a slot occupied until a canceled callback actually returns. This advances DAR-19/DAR-21, but application delegation, inherited context/policy admission, orphan recovery and stall detection remain unfinished. A callback that ignores cancellation can still stall indefinitely; the supervisor does not falsely free its slot. Lease-release errors currently leave a read lease to expire and need operational diagnostics. Durable journal redaction must wrap this supervisor before it is exposed to users.
 
-DAR-22/DAR-27: host profiling now reads Darwin memory statistics/unified-memory identification/swap and Linux host meminfo, while leaving GPU/thermal metrics unknown. The `darwin resources` CLI was exercised on the host. A shared reservation budget checks snapshot freshness, configured percentages, thermal pressure when available, GPU-data availability, unified-memory accounting and concurrency. Race tests verify atomic admission and idempotent release. Cgroup limits, GPU vendor adapters, thermal sensors, model-memory estimates, queue/offload decisions and application reservation integration remain unfinished.
+DAR-22/DAR-27: host profiling now reads Darwin memory statistics/unified-memory identification/swap and Linux host meminfo, while leaving GPU/thermal metrics unknown. The `nexus resources` CLI was exercised on the host. A shared reservation budget checks snapshot freshness, configured percentages, thermal pressure when available, GPU-data availability, unified-memory accounting and concurrency. Race tests verify atomic admission and idempotent release. Cgroup limits, GPU vendor adapters, thermal sensors, model-memory estimates, queue/offload decisions and application reservation integration remain unfinished.
 
-The user supplied the GitHub destination ArronJablonowski/DarwinRouter and requested regular backups. Project workflow instructions now require verified checkpoint commits/pushes, without private keys, databases or generated artifacts. SSH access was verified; hosted CI is not yet verified.
+The user supplied the GitHub destination ArronJablonowski/NexusRouter and requested regular backups. Project workflow instructions now require verified checkpoint commits/pushes, without private keys, databases or generated artifacts. SSH access was verified; hosted CI is not yet verified.
 
 Task inspection now connects the CLI to validated session replay through SQLite `mode=ro`. Integration tests verify completed conversation reconstruction, missing-file non-creation, output failure handling and database write rejection. The unauthenticated GitHub Actions API returned 404 for the supplied repository, so hosted CI remains unverified even though SSH push succeeds.
 
@@ -4228,7 +4249,7 @@ Provider/runtime handoff now validates complete conversation tool batches before
 
 Completed-task continuation is now available through `run --continue-task`. It reconstructs history, appends the new prompt, creates a distinct task, preserves the session ID and records parent/privacy metadata. Fixture integration tests verify source immutability, parent/session attribution, complete context handoff, rejection of unfinished/missing histories and blocking local-history cloud transfer. This advances session/CLI integration without claiming interrupted-task recovery, mutable branch navigation, automatic compaction or token-aware context admission.
 
-DAR-36/DAR-40: foreground `darwin serve` now exposes authenticated loopback health, synchronous task submission and task inspection through the same application service. Tests cover authorization, browser-origin rejection, duplicate/unknown/oversized JSON, bounded concurrency, cancellation, safe error/panic handling, listener cleanup and an actual HTTP-to-provider-fixture-to-SQLite path. API credentials participate in application redaction. Async durable admission, SSE, idempotency keys, separate cancellation, service installation, restart supervision and full health aggregation remain unfinished.
+DAR-36/DAR-40: foreground `nexus serve` now exposes authenticated loopback health, synchronous task submission and task inspection through the same application service. Tests cover authorization, browser-origin rejection, duplicate/unknown/oversized JSON, bounded concurrency, cancellation, safe error/panic handling, listener cleanup and an actual HTTP-to-provider-fixture-to-SQLite path. API credentials participate in application redaction. Async durable admission, SSE, idempotency keys, separate cancellation, service installation, restart supervision and full health aggregation remain unfinished.
 
 Parallel implementation checkpoint (user-authorized sub-agents):
 
@@ -4251,7 +4272,7 @@ Read-only tool integration: opt-in tools configuration binds an operator-selecte
 
 Per-turn context admission now checks serialized messages, tool catalog and output schema plus a 1,024-token reserve before each provider dispatch. Automatic route selection uses the same estimator. Tool-enabled tasks require configured model context metadata. Tests verify initial overflow blocks inference and oversized tool results remain durable while preventing the next model call; task failure records `budget_exhausted`. This is a conservative byte-based estimate, not a tokenizer or generated-output guarantee. Automatic compaction and recovery from budget exhaustion remain unfinished; explicit non-tool legacy models with unknown context remain unbounded by this check.
 
-Operator feedback integration: `darwin feedback` validates completed durable history and derives final-attempt model/provider/domain attribution and measured turn latency. The operator supplies accepted/rejected and observed attempt cost. Immutable feedback plus fitness are written transactionally through the existing evidence store; deterministic IDs make identical retries idempotent, while changed feedback/cost or an existing evaluation conflicts. Completion time anchors recency; preceding turns are not rated. Tests prove negative feedback attribution, no sample inflation, conflict rejection, and missing-database non-creation. Explicit tasks now persist domain/profile metadata; legacy records default to general/default. HTTP feedback, revisions, automatic deterministic validators and schema-outcome producers remain unfinished.
+Operator feedback integration: `nexus feedback` validates completed durable history and derives final-attempt model/provider/domain attribution and measured turn latency. The operator supplies accepted/rejected and observed attempt cost. Immutable feedback plus fitness are written transactionally through the existing evidence store; deterministic IDs make identical retries idempotent, while changed feedback/cost or an existing evaluation conflicts. Completion time anchors recency; preceding turns are not rated. Tests prove negative feedback attribution, no sample inflation, conflict rejection, and missing-database non-creation. Explicit tasks now persist domain/profile metadata; legacy records default to general/default. HTTP feedback, revisions, automatic deterministic validators and schema-outcome producers remain unfinished.
 
 Authenticated HTTP feedback is now wired to the same application adapter through `POST /v1/feedback`. It enforces a strict three-field body, 4 KiB limit, shared concurrency, cancellation propagation and safe status/error mapping. Real HTTP/provider-fixture/SQLite integration verifies completion followed by idempotent feedback and conflict handling without fitness inflation. Additional application tests reject unfinished/failed/canceled histories and verify explicit domain/profile attribution. Feedback revisions and automatic validators remain unfinished.
 
@@ -4261,9 +4282,9 @@ First audit implementation checkpoint: application tasks require nonblank final 
 
 Auxiliary reviewer component: `evaluation.Reviewer.Review` performs one provider call with a fixed rubric, JSON-wrapped untrusted task/output/evidence, no tools, a maximum one-minute deadline, context admission and an operator-estimated cost ceiling. It returns a validated advisory audit and reported usage only. Tests cover abstention, malformed/oversized/truncated output, invented refs, tool proposals, provider errors, cancellation, duplicate stream markers/usage, cost/context rejection and no retries. The host must supply a policy-bound provider and enforce privacy/model admission; this component is not yet wired to automatic daemon execution, durable audit persistence or fitness revisions. Cost estimates are not billing guarantees, and prompt separation does not prove immunity to semantic prompt injection.
 
-Durable audit storage checkpoint: schema 5 stores immutable advisory AuditRecords separately from fitness, including task/attempt attribution, evaluator model/provider, rubric/findings/references, duration, timestamp and optional reported usage. Writes require a persisted completed model turn in a completed or failed task; exact retries are idempotent and identity changes conflict. Bounded read APIs validate records and paginate by task/ID. `darwin audits list|show` uses read-only storage without initializing missing databases. Tests cover record validation, migration, restart, immutable writes and inspection. Automatic audit production, credential/content redaction at the producer boundary, dollar-cost pricing and evaluation supersession remain unfinished.
+Durable audit storage checkpoint: schema 5 stores immutable advisory AuditRecords separately from fitness, including task/attempt attribution, evaluator model/provider, rubric/findings/references, duration, timestamp and optional reported usage. Writes require a persisted completed model turn in a completed or failed task; exact retries are idempotent and identity changes conflict. Bounded read APIs validate records and paginate by task/ID. `nexus audits list|show` uses read-only storage without initializing missing databases. Tests cover record validation, migration, restart, immutable writes and inspection. Automatic audit production, credential/content redaction at the producer boundary, dollar-cost pricing and evaluation supersession remain unfinished.
 
-Audit production is now integrated through Service.AuditTask and `darwin audit`, plus opt-in synchronous post-completion auditing via evaluation.auto_review_model/auto_review_max_cost. It reconstructs durable final-attempt attribution and history, blocks same-model self-review and local-history cloud transfer, enforces deployment mode and model cost/context metadata, reserves local capacity, uses an owned provider transport, redacts configured credentials, and persists validated findings independently of fitness. Judge=false disables review. Tests exercise real HTTP reviewer fixtures, durable redacted output, admission denial, automatic abstaining reviews, failure isolation and kill switch. Native task responses/CLI report audit ID/status. Automatic reviews currently cover successful tasks; manual review can cover failed tasks with completed output. Failed audit attempts lack durable lifecycle records; broad sensitive-field redaction, cost pricing, asynchronous scheduling, quality/validity dimensions and compensating user overrides remain unfinished.
+Audit production is now integrated through Service.AuditTask and `nexus audit`, plus opt-in synchronous post-completion auditing via evaluation.auto_review_model/auto_review_max_cost. It reconstructs durable final-attempt attribution and history, blocks same-model self-review and local-history cloud transfer, enforces deployment mode and model cost/context metadata, reserves local capacity, uses an owned provider transport, redacts configured credentials, and persists validated findings independently of fitness. Judge=false disables review. Tests exercise real HTTP reviewer fixtures, durable redacted output, admission denial, automatic abstaining reviews, failure isolation and kill switch. Native task responses/CLI report audit ID/status. Automatic reviews currently cover successful tasks; manual review can cover failed tasks with completed output. Failed audit attempts lack durable lifecycle records; broad sensitive-field redaction, cost pricing, asynchronous scheduling, quality/validity dimensions and compensating user overrides remain unfinished.
 
 Subjective evaluation revisions: schema6 preserves original evaluations, adds immutable revision chains and a compare-and-swap current head, and adjusts only the quality aggregate in the same transaction. Validation allows user-over-judge or user-over-user corrections while preserving task/attempt identity, domain, metrics, schema result and observation time; objective evidence cannot be replaced. `feedback show` exposes the bounded chain and `feedback revise --expected` records an explicit correction. Tests cover policy denial, history/restart, migration, stale/concurrent updates, rollback and idempotent retries without sample inflation. Actual advisory audit-to-fitness weighting, separate validity/quality dimensions and HTTP revision interfaces remain unfinished.
 
@@ -4277,7 +4298,7 @@ Discovery caching: shared application services cache successful provider model d
 
 Review lifecycle persistence: schema7 tracks admitted review attempts independently of candidate events and fitness. The application persists started before reviewer invocation, then completed linked to the validated audit or failed with a bounded generic code. Cancellation uses a separate five-second cleanup context. CLI `audits attempts` provides read-only, bounded inspection; no prompts or raw provider errors enter lifecycle records. Tests verify start-before-dispatch, malformed review and cancellation persistence, successful audit linkage, schema migration, terminal conflicts and restart inspection. Admission denials still have no attempt record. Crashes/storage errors may leave started as indeterminate, not evidence of a live reviewer; automatic reconciliation and atomic audit-plus-terminal persistence remain unfinished. Live provider qualification and Linear status synchronization remain unverified.
 
-Atomic review completion: application execution now commits the validated audit and completed lifecycle in one SQLite transaction through CompleteReview. Shared transaction helpers retain standalone audit/finish APIs without nested transactions. Conflicts roll back the newly inserted audit, and exact completion retries are idempotent. Failure-injection tests abort the lifecycle update after audit insertion, verifying no orphan evidence survives; concurrent failed-versus-completed transitions across two handles must produce one consistent outcome. Automatic crash reconciliation is still unfinished. The native Linear app was re-inspected on the DarwinRouter board; no issue status changes were made.
+Atomic review completion: application execution now commits the validated audit and completed lifecycle in one SQLite transaction through CompleteReview. Shared transaction helpers retain standalone audit/finish APIs without nested transactions. Conflicts roll back the newly inserted audit, and exact completion retries are idempotent. Failure-injection tests abort the lifecycle update after audit insertion, verifying no orphan evidence survives; concurrent failed-versus-completed transitions across two handles must produce one consistent outcome. Automatic crash reconciliation is still unfinished. The native Linear app was re-inspected on the NexusRouter board; no issue status changes were made.
 
 Objective output validity now affects automatic routing separately from subjective quality. RequireText final turns persist positive as well as negative nonempty checks, excluding tool-only intermediate turns. SQLite reconstructs up to100 checked terminal attempts per execution key, validating check values against completed text, attribution and terminal status. Ranking exposes validity sample/failure counts and a recency/sample-discounted penalty on the quality component; a pass adds no quality bonus and neither result fabricates execution samples, latency or cost. Judge=false does not disable objective checks. Integration tests show a blank model loses the next same-domain route while another domain is unchanged. Legacy missing checks imply no result; older negative-only history can contribute failures without inventing historical passes. This is an initial validity dimension, not compiler/test verification, semantic usefulness detection, per-observation decay, or the full evaluator framework.
 
@@ -4331,7 +4352,7 @@ This endpoint remains connection-owned execution, not detached durable admission
 
 Native-stream checkpoint verification: make check and make build passed. A no-sleep deadline regression verifies set/flush/clear ordering for headers, events and result, including a cleared deadline during model work. Hosted CI, live model behavior and HTTP/2 production qualification are not established by these local tests.
 
-DAR-38 headless JSON lifecycle mode: darwin run --json consumes the same configuration, constraints and prompt as text mode, then emits version1 event/result JSONL envelopes from Service.RunStream. Flags use normal parsing without stripping values; false preserves text output. Success has no appended plain answer; execution errors expose only generic codes and IDs. Short writes, errors and panics latch output failure and cancel the task without retrying partial lines. Actual stdout pipes temporarily register SIGPIPE, use a pollable duplicate with cancellation-aware15-second writes, and restore descriptor flags without closing caller output. Custom embedded writers and regular files retain their own blocking behavior. Argument/config/input errors may precede JSON output; stdin is still read in full before execution cancellation begins.
+DAR-38 headless JSON lifecycle mode: nexus run --json consumes the same configuration, constraints and prompt as text mode, then emits version1 event/result JSONL envelopes from Service.RunStream. Flags use normal parsing without stripping values; false preserves text output. Success has no appended plain answer; execution errors expose only generic codes and IDs. Short writes, errors and panics latch output failure and cancel the task without retrying partial lines. Actual stdout pipes temporarily register SIGPIPE, use a pollable duplicate with cancellation-aware15-second writes, and restore descriptor flags without closing caller output. Custom embedded writers and regular files retain their own blocking behavior. Argument/config/input errors may precede JSON output; stdin is still read in full before execution cancellation begins.
 
 Real-binary tests observe a committed event before releasing provider output, verify redacted JSON-only completion, close stdout during inference, and leave a large stdout pipe open but undrained before sending SIGTERM. Both interrupted cases exit1 normally with durable canceled state. Runtime callback-boundary checks additionally handle cancellation after committed starts, routes, turns and evaluation records before attempting the next ordinary write; true failed/ambiguous persistence remains an inspection-required error. Interactive input, steering, resumable events and detached tasks remain unfinished.
 
@@ -4355,19 +4376,19 @@ DAR-14/DAR-36/DAR-40 detached submission checkpoint: schema12 adds an immutable 
 
 The daemon now starts a durable polling dispatcher only after binding its listener. Detached and synchronous tasks share configured execution capacity; queued work is discovered from SQLite after restart. Submission HTTP requests have separate bounded intake slots and do not own worker cancellation. Authenticated status/cancel controls expose safe metadata without request bodies, raw keys or claim tokens. Known credential-bearing serialized requests are rejected before persistence. Active worker cancellation includes its auxiliary review context; this does not undo tools or delete completed evidence. Configuration changes intentionally leave old queued work pinned until cancellation/resubmission under a new key.
 
-Regression coverage includes claim races, migrations/read-only compatibility, digest verification, byte/queue limits, wrong-owner and expired-lease gates, cancellation before dispatch, preserved cleanup, linked-result attribution, failed admission, shared-capacity cancellation, queued restart and one execution for repeated submissions. A real HTTP/application/provider fixture closes the submitting request, starts a fresh dispatcher, observes the same durable submission/task IDs on retry, rejects changed intent, and obtains one final result from one provider invocation. In-flight crash reconciliation, safe operator recovery, queue listing/retention, CLI submission commands and full daemon health remain unfinished. The local Linear app was inspected in the correct DarwinRouter workspace; DAR-40 remains Todo and no status was changed.
+Regression coverage includes claim races, migrations/read-only compatibility, digest verification, byte/queue limits, wrong-owner and expired-lease gates, cancellation before dispatch, preserved cleanup, linked-result attribution, failed admission, shared-capacity cancellation, queued restart and one execution for repeated submissions. A real HTTP/application/provider fixture closes the submitting request, starts a fresh dispatcher, observes the same durable submission/task IDs on retry, rejects changed intent, and obtains one final result from one provider invocation. In-flight crash reconciliation, safe operator recovery, queue listing/retention, CLI submission commands and full daemon health remain unfinished. The local Linear app was inspected in the correct NexusRouter workspace; DAR-40 remains Todo and no status was changed.
 
 Detached checkpoint verification: make check and make build passed. The HTTP idempotency/disconnect integration also passed five consecutive race-detector runs; a queued HTTP cancellation is verified never to dispatch. Final API validation accepts both queued cancellation without an execution result and canceled/failed results carrying only safe linked attribution, rejecting partial output. Provider fixtures run over loopback; production providers, forced process-crash reconciliation and hosted CI remain unverified.
 
 DAR-36/DAR-38/DAR-40 durable-work discovery and CLI: read-only insertion-fenced pagination lists bounded submission metadata without loading request/result/token columns. Opaque versioned cursors bind the state filter and initial maximum row ID; state and lease observations remain live between pages, not a cross-page historical snapshot. Pages are limited to100 items/1 MiB, task attribution to1000 IDs per item, and oversized/corrupt metadata is rejected before copying its contents into Go. GET /v1/submissions alone permits strict state/after/limit query parameters, uses independent control capacity and validates hook results; other routes continue rejecting queries. Missing application-store listing returns an empty first page without creating storage; CLI database commands require an existing store.
 
-darwin submit reuses native run options, records an idempotent queued request and returns JSON without starting a daemon. darwin submissions list/show/cancel provides local inspection and explicit cancellation across independent processes. Invalid and irrelevant flags/cursors fail before storage access; known secrets and raw failure details are not echoed. Output uses SIGPIPE-safe, cancellation-aware pipe writes with deferred descriptor restoration; arbitrary blocking stdin retains existing CLI input semantics. Read-only discovery never marks an expired worker stopped or reexecutes it.
+nexus submit reuses native run options, records an idempotent queued request and returns JSON without starting a daemon. nexus submissions list/show/cancel provides local inspection and explicit cancellation across independent processes. Invalid and irrelevant flags/cursors fail before storage access; known secrets and raw failure details are not echoed. Output uses SIGPIPE-safe, cancellation-aware pipe writes with deferred descriptor restoration; arbitrary blocking stdin retains existing CLI input semantics. Read-only discovery never marks an expired worker stopped or reexecutes it.
 
 Verification includes real CLI subprocess intake/retry/list/cancel/show over one SQLite store and authenticated HTTP discovery of an expired claim after a fresh service/database open, without runtime dispatch or mutation. Filtering, insertion fences, malformed/duplicate cursors, strict query parsing, independent capacity, missing storage and oversized opaque-column isolation are covered. make check and make build passed. Automatic orphan reconciliation, safe operator reassignment, retention, interactive steering, production-provider qualification and hosted CI remain unfinished; no Linear issue is marked complete.
 
 DAR-14/DAR-36/DAR-43 safe pre-dispatch recovery: schema13 adds an immutable recovery audit trail. A serialized writer transaction verifies matching configuration, expired ownership and absence of any bound task-start event before clearing the former token and returning work to the bounded queue. Cancellation wins; queue saturation defers requeue; after three automatic requeues a further expired undispatched claim fails with recovery_exhausted. Existing task starts, including commits with lost acknowledgement, prevent replay. Old owners cannot append a task start, renew, or finalize after replacement. No request body or idempotency identity changes.
 
-The dispatcher scans one bounded running-submission page at startup and every5 seconds, uses storage as the final eligibility authority and joins its reconciler on shutdown. Expected fenced-owner finalization denial does not poison unrelated work; genuine storage/supervision errors remain visible on close. Recovery history is bounded to four canonical validated records with no raw ownership token and is exposed read-only through GET submission/recoveries and darwin submissions recoveries. Public status/metadata accepts the new exhausted-recovery error code. Migration/read-only and downgrade fixtures cover schema13.
+The dispatcher scans one bounded running-submission page at startup and every5 seconds, uses storage as the final eligibility authority and joins its reconciler on shutdown. Expected fenced-owner finalization denial does not poison unrelated work; genuine storage/supervision errors remain visible on close. Recovery history is bounded to four canonical validated records with no raw ownership token and is exposed read-only through GET submission/recoveries and nexus submissions recoveries. Public status/metadata accepts the new exhausted-recovery error code. Migration/read-only and downgrade fixtures cover schema13.
 
 Tests cover real concurrent task-start/recovery transactions, fresh leases, wrong configuration, cancellation, saturated queues, bounded attempts, stale-owner denial, audit rollback/corruption, paginated scanning and read-only history. A paused runtime is fenced before provider dispatch, and its replacement executes once. A separate process commits an expired claim and is killed by the parent; a fresh dispatcher discovers the durable no-task state, records recovery and completes exactly one provider invocation. This verifies a real process-loss boundary before execution, not recovery after partial model/tool activity. make check passed; general interrupted-task reconciliation, safe side-effect reassignment, production provider behavior and hosted CI remain unverified. No Linear issue is marked complete.
 
@@ -4385,7 +4406,7 @@ The dispatcher tracks each worker and its reconciler independently, including st
 
 DAR-37/DAR-40 durable lifecycle metrics: the public versioned snapshot exposes six fixed identifier-free groups for task/submission/review states and stored evaluation/audit/recovery counts. SQL reads only aggregate metadata in one read transaction; unknown lifecycle states fail without copying their contents. Older schema groups are explicitly unavailable, not measured zero. Missing stores remain missing. Snapshot validation enforces canonical groups, states, availability, serialization-safe timestamps and nonnegative overflow-safe counts.
 
-The authenticated GET /v1/metrics uses independent single-request diagnostic capacity, strict no-body/query/origin rules, generic failures and a five-second route context. The daemon wires the read-only application service; darwin metrics --db path uses the same store with strict arguments and SIGPIPE/cancellation-safe JSON output. Application and SQL contexts are capped at four and three seconds respectively. These are stored-population gauges, not success-quality judgments, process liveness, monotonically increasing counters or full record-integrity validation. Aggregate scans and read-only integrity checks scale with database size despite fixed output cardinality.
+The authenticated GET /v1/metrics uses independent single-request diagnostic capacity, strict no-body/query/origin rules, generic failures and a five-second route context. The daemon wires the read-only application service; nexus metrics --db path uses the same store with strict arguments and SIGPIPE/cancellation-safe JSON output. Application and SQL contexts are capped at four and three seconds respectively. These are stored-population gauges, not success-quality judgments, process liveness, monotonically increasing counters or full record-integrity validation. Aggregate scans and read-only integrity checks scale with database size despite fixed output cardinality.
 
 Tests cover all groups/states, legacy tables actually absent, reopened storage, missing-store no-create, cancellation, invalid state/overflow/labels, large opaque-payload isolation, API authentication/capacity/panic handling and CLI output failures. A real HTTP/application/Ollama-fixture integration executes a successful answer and an empty-output failure, queues/cancels submissions, reopens through a fresh service and verifies unchanged counts with no extra provider calls or private identifiers. OpenTelemetry export, latency/cost histograms, retention, production-scale qualification and hosted CI remain unfinished. Native Linear was inspected in the correct workspace; no issue status changed.
 
@@ -4423,13 +4444,13 @@ For sub-second queue allowances, polling uses one quarter of the allowance rathe
 
 Pressure checkpoint verification: make check and make build passed. Provider-deadline separation, cancellation/timeout of leased waiting submissions, and timeout behind an occupied profiling mutex passed three consecutive race-detector runs. Production provider pressure, fair scheduling and cross-process resource admission remain unqualified.
 
-DAR-22/DAR-37 GPU diagnostic discovery: resources.SurveyGPUs and darwin resources now expose separate NVIDIA/AMD source observations with per-device total/free byte counters. Linux probes run concurrently; unavailable or malformed sources emit no partial devices or raw driver errors and do not erase the other vendor's observation. Unsupported operating systems report unsupported explicitly. This is a diagnostic foundation for device-aware admission, not an aggregate allocator: no VRAM fields, fitness, storage or routing decisions are changed, and survey subprocesses are not introduced into the routing hot path. Model/device binding, per-device reservations, MIG/partition mapping, thermal/utilization measurements and real hardware qualification remain unfinished.
+DAR-22/DAR-37 GPU diagnostic discovery: resources.SurveyGPUs and nexus resources now expose separate NVIDIA/AMD source observations with per-device total/free byte counters. Linux probes run concurrently; unavailable or malformed sources emit no partial devices or raw driver errors and do not erase the other vendor's observation. Unsupported operating systems report unsupported explicitly. This is a diagnostic foundation for device-aware admission, not an aggregate allocator: no VRAM fields, fitness, storage or routing decisions are changed, and survey subprocesses are not introduced into the routing hot path. Model/device binding, per-device reservations, MIG/partition mapping, thermal/utilization measurements and real hardware qualification remain unfinished.
 
 NVIDIA uses a fixed executable/read-only query with a one-second process deadline, 100ms pipe-drain allowance and 64KiB output ceiling; CSV permits at most32 devices and validates UUIDs, duplicates, MiB conversion and capacity bounds. AMD reads at most256 directory entries/32 canonical cards/64 bytes per scalar, validates PCI vendor and byte counters, and deliberately follows kernel sysfs device links. Missing vendor files (including some virtual/non-PCI cards) make the AMD survey unavailable; reads check context but cannot guarantee interruption of a stalled kernel operation. No drivers are installed, model memory moved or device power state changed. Primary references: https://docs.nvidia.com/deploy/nvidia-smi/index.html and https://www.kernel.org/doc/html/latest/gpu/amdgpu/driver-misc.html#mem-info-vram-total .
 
 Fixture tests cover separate and partial source observations, concurrent probing/cancellation, parser overflow/malformed data/device limits, real temporary sysfs symlinks, subprocess timeout/failure/output bounds and preserved CLI host fields with generic failures. Independent review found and fixed an embedded bytes.Buffer.ReadFrom optimization bypassing the output limit; both normal and race tests exercise the copy path. CLI diagnostics now use the shared signal/cancellation and broken-pipe-safe JSON writer. The resource and CLI race suites pass; physical Linux GPUs and hosted CI have not been verified. No Linear issue is marked complete.
 
-GPU diagnostics checkpoint verification: make check, make build and GOOS=linux GOARCH=amd64 go build ./... passed. The rebuilt CLI on this Apple unified-memory host preserves RAM fields and reports both Linux discrete-GPU sources unsupported. Native Linear was inspected in the correct DarwinRouter workspace; issue statuses remain unchanged. This proves cross-compilation and fixture-backed diagnostics, not live Linux driver compatibility or device-aware routing admission.
+GPU diagnostics checkpoint verification: make check, make build and GOOS=linux GOARCH=amd64 go build ./... passed. The rebuilt CLI on this Apple unified-memory host preserves RAM fields and reports both Linux discrete-GPU sources unsupported. Native Linear was inspected in the correct NexusRouter workspace; issue statuses remain unchanged. This proves cross-compilation and fixture-backed diagnostics, not live Linux driver compatibility or device-aware routing admission.
 
 DAR-22/DAR-23/DAR-27 declared device admission: local model configuration now accepts strict source-qualified gpu_device strings with positive VRAM metadata. Empty bindings omit the JSON field so existing unbound configuration fingerprints are preserved. Bound configurations opt into host+GPU profiling; explicit, automatic, audit and summary paths share per-device VRAM reservations and host RAM/slot limits. Missing/stale/ambiguous observations fail as non-retryable resource data, not pressure. Legacy custom aggregate profiles remain supported but cannot overlap live per-device GPU reservations. Canonical UUID case aliases share one pool, and multiple device capacities are never summed into an overflowing aggregate.
 
@@ -4451,7 +4472,7 @@ Tests cover enqueue/complete races, idempotence/conflicts, cancellation/closure/
 
 Steering checkpoint verification: final make check, make build and Linux amd64 cross-build passed after the final-attempt scoring/recovery regressions. Fixtures prove durable queue/application ordering and HTTP behavior, not real-provider compliance with guidance or complete interrupted-work recovery. No production database or Linear issue status was modified during verification.
 
-DAR-38/DAR-40 steering CLI and discovery: darwin steer --config/--task/--key reads bounded guidance from stdin and queues it through the same application service, returning metadata only. Separate steering list/show commands inspect an existing database read-only; list omits text and show explicitly exports it. Required flags are accepted once, invalid arguments are rejected before input consumption, and diagnostics do not echo values. A shared public SteeringReceipt detaches metadata from payloads and applied-sequence pointers. GET /v1/tasks/{id}/steering exposes the same bounded metadata list using independent control capacity.
+DAR-38/DAR-40 steering CLI and discovery: nexus steer --config/--task/--key reads bounded guidance from stdin and queues it through the same application service, returning metadata only. Separate steering list/show commands inspect an existing database read-only; list omits text and show explicitly exports it. Required flags are accepted once, invalid arguments are rejected before input consumption, and diagnostics do not echo values. A shared public SteeringReceipt detaches metadata from payloads and applied-sequence pointers. GET /v1/tasks/{id}/steering exposes the same bounded metadata list using independent control capacity.
 
 Store.ListSteering reads a consistent lifetime queue in insertion order, at most32 records/2MiB total text, and refuses malformed/oversized records, invalid task heads or applied counters beyond the head. Actual legacy stores without a steering table return an empty list without migration; unknown tasks fail. Input reads cap64KiB and enforce UTF-8/nonblank content. Actual pipes use a borrowed nonblocking descriptor and cancellation-triggered read deadlines, joined before cleanup; original flags and ownership are restored. Terminals/sockets are rejected. Regular files and custom readers remain cooperative at the kernel/reader boundary. CLI input has a five-second allowance and uses shared cancellation/broken-pipe-safe output.
 
@@ -4459,7 +4480,7 @@ Tests cover strict arguments, rejected input before mutation, output failures/id
 
 Steering CLI checkpoint verification: make check, make build and Linux amd64 cross-build passed. The actual-pipe input suite also passed three consecutive race-detector runs. No production task database was modified; live-provider semantic compliance, an interactive editor and full recovery remain outside this checkpoint's evidence.
 
-DAR-38 line-oriented chat: darwin chat shares the existing run configuration/routing constraints and application RunStream/SteerTask services. Successful tasks supply persisted continuation for subsequent prompts; failed/canceled tasks retain the prior successful source. Commands expose status, safe-boundary guidance, cancellation, new conversation and quit. Ordinary input while busy is explicitly rejected instead of silently queued. Each task has a five-minute execution deadline; EOF waits for completion, active Ctrl-C cancels without leaving chat, idle Ctrl-C exits, and quit/termination/output failure cancel and join execution. Normal session exit is not an aggregate per-task success code.
+DAR-38 line-oriented chat: nexus chat shares the existing run configuration/routing constraints and application RunStream/SteerTask services. Successful tasks supply persisted continuation for subsequent prompts; failed/canceled tasks retain the prior successful source. Commands expose status, safe-boundary guidance, cancellation, new conversation and quit. Ordinary input while busy is explicitly rejected instead of silently queued. Each task has a five-minute execution deadline; EOF waits for completion, active Ctrl-C cancels without leaving chat, idle Ctrl-C exits, and quit/termination/output failure cancel and join execution. Normal session exit is not an aggregate per-task success code.
 
 The single-writer event loop prints task/turn/tool lifecycle progress and the final answer, not token deltas. Terminal sanitization strips ANSI/clipboard/control/bidi sequences from display without rewriting stored evidence. Input accepts canonical TTYs and UTF-8 files/pipes with bounded64KiB lines. Borrowed descriptors use cancellation deadlines with no idle expiry, joined before restoration/close; terminal echo/canonical state stays unchanged. Custom embedded IO and regular-file kernel operations remain cooperative. Tests cover command races, active/idle signals, failed continuation retention, late completion during audit, rejected steering, EOF, broken output, malicious terminal sequences and an actual Darwin PTY with preserved termios/FD flags. No live provider or production database was used.
 
@@ -4473,7 +4494,7 @@ History display contains validated IDs, resolved outcomes and evidence sources o
 
 Interactive feedback checkpoint verification: make check, make build and Linux amd64 cross-build passed. The real service fixture also verifies empty history before first feedback. These results prove command-to-storage accounting and target safety under fixtures, not production provider quality or full MVP qualification.
 
-PRD6.1 embedded Go SDK: migrated the module and existing internal imports from the temporary darwinrouter path to github.com/ArronJablonowski/DarwinRouter. sdk/v1 exposes a Client backed by the same application service, with public request/result records rather than aliases to internal structs. Requests require Version1 before execution; results declare Version1. Explicit config files and scalar maps retain layered validation, and secret lookup is caller-supplied rather than implicitly reading process environment. One reused client shares admission budgets; separate clients/processes do not share hardware reservations.
+PRD6.1 embedded Go SDK: migrated the module and existing internal imports from the temporary nexusrouter path to github.com/ArronJablonowski/NexusRouter. sdk/v1 exposes a Client backed by the same application service, with public request/result records rather than aliases to internal structs. Requests require Version1 before execution; results declare Version1. Explicit config files and scalar maps retain layered validation, and secret lookup is caller-supplied rather than implicitly reading process environment. One reused client shares admission budgets; separate clients/processes do not share hardware reservations.
 
 The facade includes run/committed-event streaming, durable cancellation and steering, and explicit feedback/history/prior-ID revisions. Nil/zero clients and invalid versions reject safely. Event delivery uses existing failure/panic cancellation and durable cleanup behavior; callers still own deadlines and cooperative callbacks. Construction starts no daemon/background supervisor or persistent database handle, so Close is unnecessary. A compilable public-import example and SDK usage/safety documentation accompany the client. Application-level pluggable Provider/Tool/ContextEngine/MemoryStore/SkillStore/Evaluator/ResourceProfiler contracts and extension hooks remain unfinished; this client is not represented as full SDK or MVP completion. No stable release/tag or Linear status change is made by this checkpoint.
 
@@ -4495,7 +4516,7 @@ SDK event-read checkpoint verification: make check, make build and Linux amd64 c
 
 DAR-22 hardware profiler input hardening: Darwin sysctl/vm_stat now use the shared fixed-command probe with64KiB output, one-second per-process and100ms pipe-drain limits under the existing three-second overall allowance. Linux proc-memory reads are bounded before parsing and require a regular proc/file source; kernel read cancellation remains cooperative. Relevant meminfo counters require strict unsigned kB values, unique keys, nonzero total and available<=total; swap counters are either both present or both absent and must be consistent. Unknown counters do not replace missing facts. Darwin reclaimable-page categories reject duplicates instead of double-counting them. Nil/pre-canceled profile calls reject before host operations. Linux cgroup accounting, additional thermal/load measurements and actual memory admission under production pressure remain unfinished.
 
-Profiler checkpoint verification: make check, make build and Linux amd64 cross-build passed. An actual darwin resources invocation completed successfully on this Apple Silicon host with measured RAM/swap and explicitly unavailable discrete-GPU/thermal fields. Boundary fixtures exercise64KiB reads, duplicate Darwin page categories and malformed/overflowing Linux counters. Linux behavior remains fixture/cross-build verified, not tested on physical Linux hardware; no Linear status changed.
+Profiler checkpoint verification: make check, make build and Linux amd64 cross-build passed. An actual nexus resources invocation completed successfully on this Apple Silicon host with measured RAM/swap and explicitly unavailable discrete-GPU/thermal fields. Boundary fixtures exercise64KiB reads, duplicate Darwin page categories and malformed/overflowing Linux counters. Linux behavior remains fixture/cross-build verified, not tested on physical Linux hardware; no Linear status changed.
 
 DAR-38 headless prompt cancellation: run now installs signal cancellation before configuration/stdin loading and gives prompt input a30-second allowance before the separate five-minute execution budget. Submit uses the same reader under its existing30-second command budget. Both accept at most1MiB valid nonblank UTF-8 and preserve prompt whitespace. The shared reader borrows canonical terminals/pipes through existing pollable descriptor handling, restores ownership/flags and joins cancellation callbacks, without spawning an unjoinable read goroutine. Invalid input fails before task/submission storage is opened. Regular-file kernel reads and custom embedded readers remain cooperative; configuration/summary file operations are not claimed forcibly interruptible. General interactive editing, partial-execution recovery and broad MVP qualification remain unfinished.
 
@@ -4563,7 +4584,7 @@ Membership/mount discovery requires canonical bounded paths, safe mount escapes 
 
 Cgroup checkpoint verification: make check, make build and Linux amd64 cross-build passed. Pure and fixture-map race tests cover parent/child headroom, memory.high, unlimited/over-limit usage, absent controllers versus missing groups, malformed/oversized numbers, exact quota/cpuset bounds, mount-root mapping, path ambiguity/traversal, cancellation, migration and depth limits. An admission test rejects requests exceeding the measured headroom and proves a one-CPU ancestor quota prevents a second reservation despite ample RAM. Tests do not require or mutate real cgroups. Live Linux container/hardware qualification, v1 memory support, broader thermal profiling and the full MVP remain unfinished; no Linear status changed.
 
-DAR-22/DAR-43 live Linux qualification: the local Docker daemon was available and used for isolated Linux/arm64 verification with cached Alpine3.22 image sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce. The real kernel exposed512MiB memory.max,150000/100000 cpu.max and zero swap allowance; darwin resources reported linux-proc-cgroup-v2,536870912 total bytes, bounded availability and one effective CPU. Separately, cross-compiled resources and internal/app test binaries passed in network-disabled read-only Linux containers with tmpfs scratch storage. Resource tests used512MiB/1.5CPUs; application tests used1GiB/2CPUs. These Linux test binaries were non-race; the full native macOS race suite passed separately.
+DAR-22/DAR-43 live Linux qualification: the local Docker daemon was available and used for isolated Linux/arm64 verification with cached Alpine3.22 image sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce. The real kernel exposed512MiB memory.max,150000/100000 cpu.max and zero swap allowance; nexus resources reported linux-proc-cgroup-v2,536870912 total bytes, bounded availability and one effective CPU. Separately, cross-compiled resources and internal/app test binaries passed in network-disabled read-only Linux containers with tmpfs scratch storage. Resource tests used512MiB/1.5CPUs; application tests used1GiB/2CPUs. These Linux test binaries were non-race; the full native macOS race suite passed separately.
 
 Added optional make qualify-linux-cgroup with a cached-image-only, architecture-aware shell runner and bounded Go report verifier. It resolves an immutable image ID, disables dependency/toolchain downloads, mounts only its temporary binary read-only and never mounts credentials/workspace/Docker socket. Exact Docker-created container ID and owned temporary files are cleaned up on normal exit; uncatchable signals or a failed daemon remain cleanup limitations. The runtime command has a container-side15-second timeout, while build/daemon responsiveness remains cooperative. Verification rejects missing/null required counters, malformed output, ignored limits and unsupported environments rather than skipping. make qualify-linux-cgroup, make check, make build, Linux amd64 cross-build and shell syntax checks passed. No Alpine test containers remained after the runs. See docs/linux-qualification.md for scope and repeatability; this is not OOM, GPU, thermal, production-model or full Linux MVP qualification. No Linear status changed.
 
@@ -4767,7 +4788,7 @@ Audit follow-up verification: make check passed (format/LOC, vet, native race su
 
 Grounded audit execution evidence: AuditTask now projects actual ToolCompleted and EvaluationRecorded metadata into individually citable execution_<sequence> references. Each projection retains turn/attempt identity and the relevant error code, effect or explicit acceptance boolean, while excluding raw payloads. Stored audit references exactly match the review envelope. Collection checks contiguous task/session history through the replayed terminal sequence and fails closed above250 records or64KiB projected metadata. Review instructions distinguish earlier tool work from final validation and explicitly prohibit treating tool completion/nonempty/syntax checks as test success. Conversation fields and tool arguments are now redacted before JSON serialization using the existing structured redaction helper, covering escaped credentials.
 
-This advances the PRD audit requirement and evaluation work without changing fitness precedence, retry authority or review activation defaults. It does not add compiler/test execution, external receipt attestation, automatic auditing of failed tasks/delegated children, or real-model quality qualification. Native Linear was re-inspected in the DarwinRouter workspace; no issue was marked complete.
+This advances the PRD audit requirement and evaluation work without changing fitness precedence, retry authority or review activation defaults. It does not add compiler/test execution, external receipt attestation, automatic auditing of failed tasks/delegated children, or real-model quality qualification. Native Linear was re-inspected in the NexusRouter workspace; no issue was marked complete.
 
 Grounded-audit checkpoint verification: make check (full native race suite), make build and Linux amd64 cross-build passed. Tests cover metadata bounds, explicit false acceptance, escaped credential redaction, contradictory conversation/tool outcomes, final candidate identity, exact durable references and invented-reference rejection. Independent review identified that session replay alone does not validate evaluation attribution; AuditTask now checks validation turn/attempt against the current observed turn, with wrong-turn/attempt fixtures proving no dispatch or review claim. Final independent review found no remaining blocker. Hosted CI and live-provider audit accuracy remain unverified.
 
@@ -4785,7 +4806,7 @@ Scheduler prerequisite checkpoint: disabled-by-default skills.learning configura
 
 Prerequisite verification: make check passed (format/LOC, vet, full native race suite and build). Configuration layering and invalid cursor/model/privacy/budget cases are covered. These tests do not qualify a live coordinator/worker run or implement scheduled execution.
 
-CLI coordinator preference and first live checks: the operator requested Codex/ChatGPT CLI instead of requiring direct API credentials. Official noninteractive/authentication documentation and installed CLI help were checked. Codex0.153.4 reports ChatGPT login; an ephemeral read-only gpt-5.6-sol call returned DARWIN_SOL_READY without reading/extracting credentials. A separate DarwinRouter run against installed gemma4:12b-it-q4_K_M returned DARWIN_LOCAL_READY with durable task/validation events in approximately7seconds; Ollama reported about8.1GB loaded afterward, not measured peak usage. These are two successful component checks, not an integrated CLI coordinator/worker loop.
+CLI coordinator preference and first live checks: the operator requested Codex/ChatGPT CLI instead of requiring direct API credentials. Official noninteractive/authentication documentation and installed CLI help were checked. Codex0.153.4 reports ChatGPT login; an ephemeral read-only gpt-5.6-sol call returned DARWIN_SOL_READY without reading/extracting credentials. A separate NexusRouter run against installed gemma4:12b-it-q4_K_M returned DARWIN_LOCAL_READY with durable task/validation events in approximately7seconds; Ollama reported about8.1GB loaded afterward, not measured peak usage. These are two successful component checks, not an integrated CLI coordinator/worker loop.
 
 Added a clearly optional direct-HTTP Sol/local sample profile and simulated two-provider delegation tests covering exact model/auth handling, local credential isolation, untrusted child results, durable parent/work/execution linkage, empty output rejection and privacy denials. The sample disables filesystem tools, memory, automatic learning/activation and auxiliary judging. Its cost estimates are not billing caps. The preferred Codex CLI provider adapter and full live round trip remain next work; API-key setup is not a prerequisite for the standalone authenticated CLI route.
 
@@ -4845,7 +4866,7 @@ Live-hybrid checkpoint verification: make check passed (format/LOC, vet, full na
 
 Application-level negative qualification: new controlled-coordinator tests exercise actual HTTP worker cancellation, the application task lifetime and durable parent/work/execution records. Caller cancellation and a durable request from a newly-created service instance both disconnect an active worker request, stop without coordinator continuation or repeated delegation, close the coordinator once, and remove the private directory. Reopened storage proves all three task records canceled with the correct lineage. The terminal tool record retains the bounded rejection, not accepted output. Invalid Go has separate regression coverage proving failed local validation/work records and a bounded rejection returned for coordinator review without releasing the invalid candidate as accepted output.
 
-This is fixture evidence, not additional real Codex inference, helper-process containment or recovery after killing a process. Native Linear remains readable in the DarwinRouter workspace, but issue/search activation and keyboard navigation did not change its page; a coordinate attempt returned noWindowsAvailable. No issue update was submitted or marked complete; local docs retain this checkpoint pending native UI availability.
+This is fixture evidence, not additional real Codex inference, helper-process containment or recovery after killing a process. Native Linear remains readable in the NexusRouter workspace, but issue/search activation and keyboard navigation did not change its page; a coordinate attempt returned noWindowsAvailable. No issue update was submitted or marked complete; local docs retain this checkpoint pending native UI availability.
 
 Negative-qualification verification: final make check passed (format/LOC, vet, full native race suite and build), Linux amd64 cross-build passed, and the focused cancellation/rejection tests passed ten fresh race-enabled repetitions. Independent review prompted exact go_syntax rejection checks, whole-page history coverage and an explicit required parent rejection record; all passed after tightening. Live negative/cancellation tests, helper lifetime qualification and full PRD/Linear completion remain outstanding.
 
@@ -4941,19 +4962,19 @@ Provider-overflow approved-compaction checkpoint: the off-by-default `auto_use_a
 
 Ordered `previous_task_ids`, retry ancestry and configured route cost now span a safe fallback chain followed by overflow recovery; usage remains unavailable when any failed attempt lacks complete counts. Focused race tests cover automatic and explicit selection, exact compacted context/provenance, partial-output suppression, and the three-task primary-failure/fallback-overflow/same-model-recovery sequence at its exact cost boundary. Final `make check` passed formatting and LOC enforcement, vet, the complete native race suite and production build in 236.31s; application took 230.757s, telemetry 149.826s, CLI 42.503s, SDK 25.170s and tool gate 20.300s. Provider billing certainty, automatic summary generation/approval, mid-task growth, delegated-child recovery and live-service qualification remain open. Linear was not updated in this checkpoint; full PRD qualification remains open.
 
-Configured-model catalog checkpoint: the daemon now exposes authenticated `GET /v1/models` with the OpenAI list envelope and one entry per configured Darwin model alias in configuration order. Entries contain only `id`, fixed `object: model`, fixed `owned_by: darwinrouter`, nullable `shutdown_date`, and `created: 0` because upstream creation time is unknown. Provider/model implementation names, endpoints, credential references, cost, host footprints and health claims are omitted. The endpoint reads a fresh owned ID slice from the daemon's validated immutable settings snapshot and performs no provider discovery, database access, inference or task dispatch. `auto` remains routing policy and is not synthesized as a model.
+Configured-model catalog checkpoint: the daemon now exposes authenticated `GET /v1/models` with the OpenAI list envelope and one entry per configured Darwin model alias in configuration order. Entries contain only `id`, fixed `object: model`, fixed `owned_by: nexusrouter`, nullable `shutdown_date`, and `created: 0` because upstream creation time is unknown. Provider/model implementation names, endpoints, credential references, cost, host footprints and health claims are omitted. The endpoint reads a fresh owned ID slice from the daemon's validated immutable settings snapshot and performs no provider discovery, database access, inference or task dispatch. `auto` remains routing policy and is not synthesized as a model.
 
-The catalog has an independent single-reader capacity slot, preserves the common bearer/origin/query controls, and emits OpenAI-shaped sanitized errors. It rejects unsupported methods, more than 256 entries, invalid IDs and duplicates; absent or failing backends do not yield a partial catalog. Focused race tests cover exact response fields, denial before callback, invalid backend data, capacity isolation and a real round trip through DarwinRouter's production OpenAI-compatible provider adapter. The shape was checked against the official OpenAI List models API documentation. Final `make check` passed formatting and LOC enforcement, vet, the complete native race suite and production build in 235.47s; application took 231.675s, telemetry 148.861s, CLI 42.431s, SDK 25.209s, API 12.817s and tool gate 19.224s. Upstream model creation/owner metadata, live provider availability and a native detailed routing-metadata catalog remain intentionally unclaimed. Linear was not updated in this checkpoint; full PRD qualification remains open.
+The catalog has an independent single-reader capacity slot, preserves the common bearer/origin/query controls, and emits OpenAI-shaped sanitized errors. It rejects unsupported methods, more than 256 entries, invalid IDs and duplicates; absent or failing backends do not yield a partial catalog. Focused race tests cover exact response fields, denial before callback, invalid backend data, capacity isolation and a real round trip through NexusRouter's production OpenAI-compatible provider adapter. The shape was checked against the official OpenAI List models API documentation. Final `make check` passed formatting and LOC enforcement, vet, the complete native race suite and production build in 235.47s; application took 231.675s, telemetry 148.861s, CLI 42.431s, SDK 25.209s, API 12.817s and tool gate 19.224s. Upstream model creation/owner metadata, live provider availability and a native detailed routing-metadata catalog remain intentionally unclaimed. Linear was not updated in this checkpoint; full PRD qualification remains open.
 
-Route-explanation inspection checkpoint: automatic tasks now expose their immutable initial `route.selected` decision through read-only `darwin task route`, Go SDK `InspectRouteExplanation`, and authenticated `GET /v1/tasks/{id}/route`. The versioned metadata-only record contains task/session/route identity, admission time, configuration SHA-256, domain/profile, selected provider/model route, candidate constraint snapshots, routing policy, normalized ranking, closed exclusion reasons, failure-domain-aware fallback order and exploration state. It deliberately has no conversation, prompt, model output, endpoint, credential value/reference or tool payload. Explicit tasks have no route event and return an inspection error/HTTP 404 rather than a fabricated explanation.
+Route-explanation inspection checkpoint: automatic tasks now expose their immutable initial `route.selected` decision through read-only `nexus task route`, Go SDK `InspectRouteExplanation`, and authenticated `GET /v1/tasks/{id}/route`. The versioned metadata-only record contains task/session/route identity, admission time, configuration SHA-256, domain/profile, selected provider/model route, candidate constraint snapshots, routing policy, normalized ranking, closed exclusion reasons, failure-domain-aware fallback order and exploration state. It deliberately has no conversation, prompt, model output, endpoint, credential value/reference or tool payload. Explicit tasks have no route event and return an inspection error/HTTP 404 rather than a fabricated explanation.
 
 The store returns exactly the first two-event boundary, separately validates the current durable head without returning its content, and requires `task.started` immediately followed by `route.selected`. Structural validation rejects nonfinite/out-of-range scores, non-unit weights, duplicate or malformed candidates, incomplete ranked/excluded partitions, unknown, duplicate or reordered exclusion reasons, incorrect rank order, missing/forged primary membership, reordered/incomplete fallbacks, exploration inconsistency, identity mismatch and malformed configuration hashes. CLI/SDK read-only paths do not create or migrate a database; API callback panics and malformed results are sanitized without partial output. Tests cover corrupt storage, absent explicit routes, argument/body/query/method denial before reads, output failure, missing databases, SDK cancellation/version behavior, returned-record mutation isolation, and a real automatic application route without provider redispatch during inspection. Recorded route facts remain historical admission evidence, not current provider health, billing truth, output acceptance, or retry/model-disable authority. Final verification passed `make check` on the exact implementation tree in 239.23 seconds, including source formatting and the 1,000-line limit, `go vet ./...`, the complete race-enabled suite (`internal/api` 13.066s, `internal/app` 235.589s, `internal/cli` 42.512s, `internal/telemetry` 149.313s, `internal/toolgate` 19.343s, `sdk/v1` 25.334s), and `go build ./...`. Linear was not updated and full PRD qualification remains open.
 
-Durable task-discovery checkpoint: newest-first metadata paging now spans SQLite, application service, Go SDK, authenticated `GET /v1/tasks`, raw `darwin task list`, and interactive `/tasks`. Version-one items contain only task/session IDs, state, head sequence and start time. Opaque cursors freeze the insertion boundary and bind the optional state filter; state itself remains live between pages. Start/current-head envelope projections use bounded SQLite types and validate exact task/session/correlation/sequence/state relationships without loading conversation into Go. Corrupt ordinals, scalar types, event identities or head projections fail the complete page without partial output.
+Durable task-discovery checkpoint: newest-first metadata paging now spans SQLite, application service, Go SDK, authenticated `GET /v1/tasks`, raw `nexus task list`, and interactive `/tasks`. Version-one items contain only task/session IDs, state, head sequence and start time. Opaque cursors freeze the insertion boundary and bind the optional state filter; state itself remains live between pages. Start/current-head envelope projections use bounded SQLite types and validate exact task/session/correlation/sequence/state relationships without loading conversation into Go. Corrupt ordinals, scalar types, event identities or head projections fail the complete page without partial output.
 
 Configured boundaries cumulatively recheck credentials after the storage read so rotations cannot turn task/session identities into leaked secrets. Listing never dispatches inference, creates a missing configured database, repairs history or claims continuation eligibility. Raw database CLI output is intentionally distinguished from configured credential-aware access and detects short writes. A real CLI fixture discovers a completed source with `/tasks`, proves no added task/provider call, then selects it through the existing `/resume` eligibility path and creates a separate continuation while preserving the source journal. Focused and full affected-package race suites passed. Final `make check` passed source formatting and the 1,000-line limit, `go vet ./...`, the complete race-enabled suite and `go build ./...` in 240.60 seconds; application took 236.466s, telemetry 156.066s, CLI 44.178s, SDK 30.065s, API 15.489s, sessions 16.723s, runtime 11.126s and tool gate 22.548s. The rebuilt command also read the existing Sol/local smoke database and returned a valid three-item page with a continuation cursor without inference. Task-root filtering, semantic titles, automatic resume and complete PRD/Linear acceptance remain open.
 
-Darwin-native configured-model metadata checkpoint: `darwin models list`, Go SDK `ConfiguredModelCatalog`, and authenticated `GET /v1/routing/models` now return the same version-one configuration snapshot. It carries a SHA-256 of the same redacted settings used by automatic route explanations, plus declared model/provider aliases, implementation name, locality, capabilities, context window, nullable configured cost, RAM/VRAM estimates, optional GPU binding and failure domain. Returned slices and cost pointers are owned. Zero cost is distinct from unknown. Configuration and public validation share the 256-model, 128-capability and bounded safe-label contract; duplicate routes and capabilities fail admission.
+NexusRouter-native configured-model metadata checkpoint: `nexus models list`, Go SDK `ConfiguredModelCatalog`, and authenticated `GET /v1/routing/models` now return the same version-one configuration snapshot. It carries a SHA-256 of the same redacted settings used by automatic route explanations, plus declared model/provider aliases, implementation name, locality, capabilities, context window, nullable configured cost, RAM/VRAM estimates, optional GPU binding and failure domain. Returned slices and cost pointers are owned. Zero cost is distinct from unknown. Configuration and public validation share the 256-model, 128-capability and bounded safe-label contract; duplicate routes and capabilities fail admission.
 
 Inspection performs no provider discovery, health check, reservation, task-storage read or inference. Provider endpoints, credential references/values and executable paths are omitted, and cumulative credential checks cover rotations during assembly. The native HTTP endpoint accepts only an authenticated origin-safe bodyless/queryless GET, shares the model-catalog capacity domain with `/v1/models`, validates the original backend record before copying it, sanitizes failures and preserves valid empty catalogs. The existing `/v1/models` OpenAI-compatible minimal envelope is unchanged. The CLI's earlier pre-release bare model array intentionally changes to a versioned envelope and is documented as a migration. Shared CLI JSON output now rejects short successful writes.
 
@@ -4961,12 +4982,12 @@ Independent read-only reviews found and drove fixes for empty-slice preservation
 
 MVP acceptance reconciliation checkpoint: a fresh `make qualify-mvp` passed all nine named end-to-end scenarios in 10.10 seconds, covering local-only, cloud-only, hybrid Sol coordination, safe fallback and locality, exactly-once feedback, privacy-bounded skills, retained failed-read evidence, and process-kill recovery. A fresh `make qualify-performance` passed in 52.96 seconds. Deterministic automatic task overhead stayed between 55.52 and 57.96 ms/op across three runs, with observed p99 values between 61.95 and 67.28 ms, comfortably below the 150 ms target. The qualification table now correctly states that the repaired failed-read trajectory retains failure evidence and feedback but is excluded from successful-workflow learning.
 
-Native Linear acceptance and dependency review moved DAR-11, DAR-12, DAR-14, DAR-15, DAR-17, DAR-27, DAR-37, DAR-38, DAR-39 and DAR-40 to Done. Their issue bodies were re-read in the authenticated DarwinRouter workspace, prerequisite release activity was observed, and each status transition was verified in the issue activity. This is backlog reconciliation against already-tested repository behavior, not a claim that all PRD work is complete. DAR-41 through DAR-45 still require final dependency-ordered reconciliation, and DAR-46 remains In Progress.
+Native Linear acceptance and dependency review moved DAR-11, DAR-12, DAR-14, DAR-15, DAR-17, DAR-27, DAR-37, DAR-38, DAR-39 and DAR-40 to Done. Their issue bodies were re-read in the authenticated NexusRouter workspace, prerequisite release activity was observed, and each status transition was verified in the issue activity. This is backlog reconciliation against already-tested repository behavior, not a claim that all PRD work is complete. DAR-41 through DAR-45 still require final dependency-ordered reconciliation, and DAR-46 remains In Progress.
 
 Release-qualification CI checkpoint: a new manual-only GitHub Actions workflow binds checkout to the dispatch event's immutable commit, disables credential persistence and cache uploads, runs `make check` and `make qualify-release` on Ubuntu and macOS, verifies the source stays clean, and records the actual host OS/architecture, Go version and gate outcomes. Its summary distinguishes the one natively executed target from inspected cross-builds. Repository permissions are read-only and there are no secrets, artifact uploads, tags, releases or publication commands. A static authority/YAML race test passed three runs, but no hosted workflow run or production-signing evidence is claimed. License choice, supported distribution platforms, production key custody/public trust, release approval and publication authority remain operator gates for DAR-46.
 
 Final MVP backlog reconciliation: the authenticated native Linear board now
-shows 41 of 42 DarwinRouter MVP issues Done, no Todo issues, and only DAR-46 In
+shows 41 of 42 NexusRouter MVP issues Done, no Todo issues, and only DAR-46 In
 Progress. After re-reading their acceptance criteria and confirming released
 dependencies, DAR-41, DAR-42, DAR-43, DAR-44 and DAR-45 were moved to Done in
 dependency order. DAR-43 also received an independent read-only evidence review
@@ -5018,7 +5039,7 @@ and untracked source tree clean. This is local candidate evidence, not the still
 missing hosted Ubuntu/macOS run, native execution of the other three targets,
 production signature, operator approvals or publication.
 
-Release-license discovery checkpoint: the four `cmd/darwin` target dependency
+Release-license discovery checkpoint: the four `cmd/nexus` target dependency
 closures were enumerated separately with the release build tags. Darwin targets
 contain 13 non-standard-library modules and Linux targets contain 12; the only
 difference is Darwin-only `github.com/ncruces/go-strftime`. The new distribution
@@ -5026,12 +5047,12 @@ dependency inventory records every module/version plus SHA-256 digests for the
 upstream license, NOTICE and PATENTS candidates found in the module cache and is
 linked from the release checklist. Test/build-only modules are excluded and no
 license family label is treated as legal approval. A final clean-download
-verification, complete text review, DarwinRouter license choice, attribution
+verification, complete text review, NexusRouter license choice, attribution
 bundle and operator approval remain required.
 
 Project-license decision: the owner explicitly selected the same license family
 as the publicly available NousResearch Hermes Agent. The official repository
-README and commit-pinned license identify that family as MIT. DarwinRouter now
+README and commit-pinned license identify that family as MIT. NexusRouter now
 has the standard MIT text with `Copyright (c) 2026 Arron Jablonowski`; the grant,
 conditions and disclaimer otherwise match the upstream template. This resolves
 the project-license-family decision, not the separate review and publication of
@@ -5152,7 +5173,7 @@ gates.
 
 DAR-67 public audit-operation wiring and documentation checkpoint: the foreground
 daemon now binds the application service's run, restart inspection, cancellation,
-and finite event-replay operations into the authenticated Darwin-native API.
+and finite event-replay operations into the authenticated NexusRouter-native API.
 The route table and output-audit guide document the strict idempotency header and
 bounded request, connection-owned up-to-two-event SSE lifecycle, terminal status
 map, restart/pending behavior, no-automatic-redispatch rule, cancellation race,
@@ -5354,7 +5375,7 @@ authority is claimed.
 DAR-60 independent-verification identity checkpoint: post-publication
 verification now requires a canonical operator identity, rejects the
 publication approver before remote access, and binds both that identity and the
-fixed `darwinrouter-github-post-publication-verification/v1` policy into the
+fixed `nexusrouter-github-post-publication-verification/v1` policy into the
 canonical receipt. Publication preflight carries the authorization's approver
 identity across both point-in-time checks, and the rollback adapter requires its
 independently supplied verifier expectation to match the receipt. The
@@ -5566,9 +5587,9 @@ Longest packages were releasepack 461.604s, application 304.284s, telemetry
 198.919s, CLI 44.810s, SDK 33.850s, toolgate 19.989s, API 17.550s, and workers
 4.574s.
 
-Session-task inspection checkpoint: DarwinRouter now exposes one bounded,
+Session-task inspection checkpoint: NexusRouter now exposes one bounded,
 content-free view of the durable task graph for an exact session through the Go
-SDK, authenticated HTTP, daemon wiring, and `darwin session tasks`. A separate
+SDK, authenticated HTTP, daemon wiring, and `nexus session tasks`. A separate
 version-one contract keeps established global task-list cursors unchanged. Its
 canonical cursor binds the session and insertion high-water mark; pages return
 only task/session IDs, parent/retry lineage, state, head sequence, and start
@@ -5606,7 +5627,7 @@ and the expanded `make qualify-mvp` passed on the integrated tree.
 
 Completed-history branch checkpoint: a caller can now submit one idempotent,
 direct child of an exact completed task head through the Go SDK, authenticated
-HTTP, daemon wiring, or `darwin branch`. Admission binds the source task,
+HTTP, daemon wiring, or `nexus branch`. Admission binds the source task,
 session, canonical physical head event and sequence, full replayed history
 digest, source privacy, and effective privacy ceiling inside the immutable
 submission envelope. The source is replayed and revalidated transactionally at
@@ -5647,7 +5668,7 @@ registered in Codex, but its live workspace read still returns an unknown-tool
 error; no Linear issue status or comment was changed in this checkpoint.
 
 Recovered-history resume checkpoint: the Go SDK, authenticated HTTP
-`POST /v1/tasks/{source}/resumes`, daemon service, and queue-only `darwin resume`
+`POST /v1/tasks/{source}/resumes`, daemon service, and queue-only `nexus resume`
 command now admit a fresh task from an exact `recovered_model` or
 `recovered_delegation` history. This is distinct from reconnecting to an
 existing submission and from branching completed work. The caller supplies a
@@ -5720,7 +5741,7 @@ reviews found no remaining P0/P1 defect; stronger process isolation remains a
 post-MVP requirement.
 
 Production-daemon branch/resume qualification checkpoint: a bounded process
-fixture now builds and starts the real `darwin serve` binary with a disposable
+fixture now builds and starts the real `nexus serve` binary with a disposable
 configuration, loopback Ollama-shaped provider, authenticated HTTP endpoint,
 and SQLite database. It completes one branch source, kills the daemon during a
 partial second source, expires only that owned lease, and restarts against the
@@ -6004,7 +6025,7 @@ requirements, not currently accepted configuration fields.
 The daemon now embeds deterministic version-1 HTML, CSS, and JavaScript assets
 and mounts them at the validated `web_ui.path_prefix` without changing native
 bearer API semantics. A narrow public bootstrap document creates a short-lived
-challenge; `darwin web approve --config PATH CHALLENGE.CODE` approves it over
+challenge; `nexus web approve --config PATH CHALLENGE.CODE` approves it over
 the existing bearer-only loopback transport, and atomic challenge consumption
 creates an HttpOnly, SameSite=Strict browser session. Full shell/application
 assets remain authenticated. Browser credentials are stored only as hashes in a
@@ -6409,7 +6430,7 @@ Schema 38 atomically reconciles cross-session lost acknowledgements, preserves
 the initiating browser subject and recovery subject separately, and marks
 pre-upgrade pending operations so they replay only under their original legacy
 authority. The integrated visual board remains DAR-83 and agent-facing board
-tools remain DAR-84; the Kanban is part of the authenticated DarwinRouter Web UI,
+tools remain DAR-84; the Kanban is part of the authenticated NexusRouter Web UI,
 not a separate application.
 
 Repository-wide verification passed with `make check`: source formatting and
@@ -6421,7 +6442,7 @@ passed 100 focused runs and 50 race-enabled focused runs before the full gate.
 ## 2026-09-09 — DAR-83 first integrated Kanban checkpoint
 
 DAR-83 remains in progress. The authenticated embedded Web UI now includes a
-first-class Workboards destination alongside Chats; this is one DarwinRouter
+first-class Workboards destination alongside Chats; this is one NexusRouter
 application shell and authority boundary, not a separately deployed board app.
 Active workboards open as a responsive seven-lane Kanban using the canonical
 Backlog, Ready, In Progress, Blocked, Review, Done, and Canceled lifecycle
@@ -6843,7 +6864,7 @@ cannot be automatically replayed. Pause/cancel request records may be attributed
 to a trusted model proposer, while worker/system callers remain rejected and
 proof-gated cancellation finalization stays operator-only.
 
-Interactive `darwin chat` can now present every supported workboard mutation as
+Interactive `nexus chat` can now present every supported workboard mutation as
 an exact ASCII-safe approval preview. It binds the tool, interpreted action,
 exact resource scope, original argument bytes and SHA-256, declared behavior,
 and one-use request ID. Duplicate/unknown fields, semantic contract failures,
@@ -6875,7 +6896,7 @@ rebuilt packages were application 578.941s, releasepack 504.639s, telemetry
 ## 2026-09-10 — DAR-83 lifecycle, optimistic reconciliation, and Chrome checkpoint
 
 DAR-83 remains in progress, and the Kanban remains an integrated route inside
-the authenticated DarwinRouter Web UI rather than a separate operator service.
+the authenticated NexusRouter Web UI rather than a separate operator service.
 The browser now validates the server's bounded latest-attempt lifecycle
 projection before indexing it across card pages. Cross-board, cross-card,
 duplicate, stale-attempt, mismatched-claim, malformed acceptance, and malformed
@@ -7655,7 +7676,7 @@ joins it before exporters, the dispatcher, or storage are closed. Scheduler
 shutdown failures remain visible instead of being hidden by HTTP shutdown
 errors. Disabled configurations retain their prior health and lifecycle.
 
-Process qualification builds and starts the real `darwin serve` binary against
+Process qualification builds and starts the real `nexus serve` binary against
 separate bounded loopback worker and reviewer providers. It proves one worker
 execution and one independent audit reach a durable review candidate, and that
 the readiness report contains `workboard_scheduler` as healthy. A second live
@@ -8672,7 +8693,7 @@ is no greater than starts, starts are no greater than arrivals, and arrivals
 exactly equal all submission-state counts. Public JSON and OTLP retain only the
 three fixed labels and counts. They expose no submission, task, session, model,
 provider, content, or exact time. Collectors may derive rates from successive
-snapshots for one database; DarwinRouter does not fabricate a sampled
+snapshots for one database; NexusRouter does not fabricate a sampled
 per-second estimate. Focused metrics and telemetry tests cover durable service
 evidence, running and terminal service, pre-start cancellation, reconciliation,
 legacy availability, and identity absence. Final `make check` passed formatting
@@ -8877,7 +8898,7 @@ The bounded gate transcript is
 and its stderr transcript is the empty-file digest
 `sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 The exact native archive is
-`DarwinRouter_1.0.1_darwin_arm64.tar.gz` at
+`NexusRouter_1.0.1_darwin_arm64.tar.gz` at
 `sha256:c12285a98bd8db7189fda1da69ae965cc195d3495d1507ac019be2ac564917ec`.
 The rehearsal installed and validated version `1.0.1`, migrated an owned
 schema-29 fixture to schema 53 without fabricating legacy usage, retained the
@@ -9009,7 +9030,7 @@ swap-growth measurements, and telemetry aggregates current evaluation heads by
 model/provider/context tier for future routing decisions. Operator feedback
 automatically records the task's tier. Benchmark adapters still need to supply
 their measured peak-memory, swap-growth, timeout, and provider-error values in
-the evaluation record; DarwinRouter does not infer missing measurements.
+the evaluation record; NexusRouter does not infer missing measurements.
 
 Local admission now treats model inventory context as a capability ceiling,
 sends the selected working tier to Ollama as `num_ctx`, and rejects new local
@@ -9244,7 +9265,7 @@ release packaging. Full browser tests also pass with the race detector. Source
 checks, repository-wide vet/build, focused race regressions, and the live smoke
 passed. The separately launched complete `make check` race sweep remains active at
 this checkpoint; do not interpret the ordinary-suite pass as complete race or
-platform/release qualification. DarwinRouter fixes are backed up in f874927.
+platform/release qualification. NexusRouter fixes are backed up in f874927.
 
 ### September 25: benchmark failure analysis and diagnostic logging
 
@@ -9379,7 +9400,7 @@ assets. Build passed. Full validation and live UI verification pending.
 
 Stats readability update: full exact counts use grouped thousands and responsive typography through signed 64-bit totals (including trillions). Removed fixed digit cells and leading zero padding; cloud/local tint retained. Focused shell/API tests pass; full Stats validation remains queued behind cloud validation.
 
-Browser approval CLI now resolves the current user installed live-test service config and launchd credential when omitted. Explicit other configs still require their own credential. Placeholder PATH receives actionable guidance; bootstrap shows the runnable default command. Focused race tests and live approval without DARWIN_API_TOKEN passed. Full validation pending.
+Browser approval CLI now resolves the current user installed live-test service config and launchd credential when omitted. Explicit other configs still require their own credential. Placeholder PATH receives actionable guidance; bootstrap shows the runnable default command. Focused race tests and live approval without NEXUS_API_TOKEN passed. Full validation pending.
 
 Local inventory recovery: normalize provider timestamps to UTC and retain validated size/digest metadata when optional context discovery fails. Partial unavailable totals no longer display 0 B. Provider regression race tests pass; live verification and full validation pending. Totals remain provider-reported logical sizes, digest-deduplicated, not filesystem block allocation.
 

@@ -15,7 +15,7 @@ func TestFinalReleaseNotesBindCandidateIdentityAndTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range [][]byte{
-		[]byte("# DarwinRouter 1.0.0 release notes\n"),
+		[]byte("# NexusRouter 1.0.0 release notes\n"),
 		[]byte("- Release version: `1.0.0`\n"),
 		[]byte("- Source commit: `" + commit + "`\n"),
 		[]byte("- Release date (UTC): `" + created + "`\n"),
@@ -77,7 +77,7 @@ func TestFinalReleaseNotesRejectInvalidTemplateOrIdentity(t *testing.T) {
 func TestFinalReleaseNotesRejectDuplicateGeneratedIdentitySyntax(t *testing.T) {
 	commit := strings.Repeat("a", 40)
 	for _, duplicate := range []string{
-		"# DarwinRouter 1.0.0 release notes",
+		"# NexusRouter 1.0.0 release notes",
 		"- Release version: `1.0.0`",
 		"- Source commit: `" + commit + "`",
 		"- Release date (UTC): `2026-09-14T18:00:00Z`",

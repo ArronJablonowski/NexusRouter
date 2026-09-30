@@ -7,8 +7,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func TestWorkflowDiscoveryApplicationFindsVerifiedTasksWithoutPublishing(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 var ErrWorkflowScanUnavailable = errors.New("workflow scan storage unavailable")

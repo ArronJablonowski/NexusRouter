@@ -25,7 +25,7 @@ fails instead of silently producing incomplete browser evidence.
 
 ## Supported browser matrix
 
-DarwinRouter serves only standards-based, vendored HTML, CSS, JavaScript,
+NexusRouter serves only standards-based, vendored HTML, CSS, JavaScript,
 `fetch`, `EventSource` and same-origin cookies. Support claims are intentionally
 narrower than standards compatibility:
 

@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/classification"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/classification"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 	_ "modernc.org/sqlite"
 )
 

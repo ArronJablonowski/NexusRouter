@@ -3,7 +3,7 @@ package codexbridge
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 	"os"
 	"testing"
 	"time"

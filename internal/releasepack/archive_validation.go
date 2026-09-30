@@ -77,7 +77,7 @@ func validatedReleaseArchiveSBOM(root *os.Root, manifest Manifest, artifact Arti
 				return spdxDocument{}, ErrSignature
 			}
 			sbom = entry
-		case "darwin":
+		case "nexus":
 			binary = entry
 		default:
 			if !utf8.Valid(entry) || bytes.IndexByte(entry, 0) >= 0 || bytes.IndexByte(entry, '\r') >= 0 || entry[len(entry)-1] != '\n' {
@@ -112,12 +112,12 @@ func validateReleaseSBOMBinding(document spdxDocument, manifest Manifest, artifa
 	if manifest.SchemaVersion != releaseManifestSchema || artifact.OS == "" || artifact.Arch == "" || len(document.Packages) < 2 || len(document.Files) < 1 {
 		return ErrSignature
 	}
-	expectedName := fmt.Sprintf("DarwinRouter-%s-%s-%s", manifest.Version, artifact.OS, artifact.Arch)
-	expectedNamespace := fmt.Sprintf("https://github.com/ArronJablonowski/DarwinRouter/releases/%s/%s/%s-%s/sbom", manifest.Version, manifest.Commit, artifact.OS, artifact.Arch)
+	expectedName := fmt.Sprintf("NexusRouter-%s-%s-%s", manifest.Version, artifact.OS, artifact.Arch)
+	expectedNamespace := fmt.Sprintf("https://github.com/ArronJablonowski/NexusRouter/releases/%s/%s/%s-%s/sbom", manifest.Version, manifest.Commit, artifact.OS, artifact.Arch)
 	digest := sha256.Sum256(binary)
 	binarySHA256 := hex.EncodeToString(digest[:])
 	if document.Name != expectedName || document.DocumentNamespace != expectedNamespace || document.CreationInfo.Created != manifest.Created ||
-		document.Packages[0].VersionInfo != manifest.Version || len(document.Packages[0].Checksums) != 0 || document.Files[0].FileName != "./darwin" ||
+		document.Packages[0].VersionInfo != manifest.Version || len(document.Packages[0].Checksums) != 0 || document.Files[0].FileName != "./nexus" ||
 		len(document.Files[0].Checksums) != 1 || document.Files[0].Checksums[0].ChecksumValue != binarySHA256 {
 		return ErrSignature
 	}

@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const meaningfulWorkboardOutputValidator = workboard.MeaningfulTextCandidateValidatorID

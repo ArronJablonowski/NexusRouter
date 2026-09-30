@@ -18,7 +18,7 @@ import (
 const (
 	licenseEvidenceSchema = 3
 	maxLicenseEvidence    = 256 << 10
-	licenseEvidenceScope  = "darwinrouter-candidate-license-evidence"
+	licenseEvidenceScope  = "nexusrouter-candidate-license-evidence"
 )
 
 type LicenseEvidenceOptions struct {

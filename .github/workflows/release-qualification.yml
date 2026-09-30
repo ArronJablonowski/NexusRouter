@@ -117,7 +117,7 @@ jobs:
           EXPECTED_CANDIDATE_RECORD_SHA256: ${{ steps.source.outputs.candidate_record_sha256 }}
         run: |
           set -euo pipefail
-          candidate="$RUNNER_TEMP/darwinrouter-candidate.json"
+          candidate="$RUNNER_TEMP/nexusrouter-candidate.json"
           go run ./cmd/release-candidate freeze \
             --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" --source . --out "$candidate"
           actual="sha256:$(shasum -a 256 "$candidate" | awk '{print $1}')"
@@ -132,7 +132,7 @@ jobs:
           DARWIN_LICENSE_BOOTSTRAP_PARENT: ${{ runner.temp }}
         run: |
           set -euo pipefail
-          evidence="$RUNNER_TEMP/darwinrouter-license-evidence.json"
+          evidence="$RUNNER_TEMP/nexusrouter-license-evidence.json"
           actual=$(sh scripts/license-evidence-bootstrap.sh freeze --commit "$GITHUB_SHA" --source . --out "$evidence")
           test "$actual" = "$EXPECTED_LICENSE_EVIDENCE_SHA256"
           DARWIN_LICENSE_EVIDENCE_RECORD="$evidence" \
@@ -177,7 +177,7 @@ jobs:
           backup_sha256="${backup_value#backup_sha256=}"
           source_schema="${source_value#source_schema=}"
           current_schema="${current_value#current_schema=}"
-          test "$artifact_name" = "DarwinRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"
+          test "$artifact_name" = "NexusRouter_${RELEASE_VERSION}_${EXPECTED_NATIVE_OS}_${EXPECTED_NATIVE_ARCH}.tar.gz"
           test "$source_schema" = 29
           test "$current_schema" = 53
           go run ./cmd/verify-install-rehearsal \
@@ -215,7 +215,7 @@ jobs:
         if: ${{ steps.native_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: darwinrouter-native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-${{ github.sha }}
+          name: nexusrouter-native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}-${{ github.sha }}
           path: |
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.json
             ${{ runner.temp }}/native-${{ matrix.expected_os }}-${{ matrix.expected_arch }}.log

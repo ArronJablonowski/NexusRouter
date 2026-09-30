@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func TestContextCompactionPlanDeadOwnerRecovery(t *testing.T) {

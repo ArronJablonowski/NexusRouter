@@ -60,7 +60,7 @@ func TestRenderTargetSBOMIsCanonicalAndComplete(t *testing.T) {
 		}
 		files[file.FileName] = file.Checksums[0].ChecksumValue
 	}
-	if files["./darwin"] != options.BinarySHA256 || files["./webui/assets/v1/app.js"] != assets[1].SHA256 || files["./webui/assets/v1/index.html"] != assets[0].SHA256 {
+	if files["./nexus"] != options.BinarySHA256 || files["./webui/assets/v1/app.js"] != assets[1].SHA256 || files["./webui/assets/v1/index.html"] != assets[0].SHA256 {
 		t.Fatal("binary or exact frontend source hashes missing", files)
 	}
 	relations := map[string]bool{}
@@ -68,8 +68,8 @@ func TestRenderTargetSBOMIsCanonicalAndComplete(t *testing.T) {
 		relations[relation.ElementID+"\x00"+relation.Type+"\x00"+relation.RelatedID] = true
 	}
 	toolchainID := stableSPDXID("Package", goToolchainModulePath+"@"+toolchain.Version)
-	if !relations["SPDXRef-Package-DarwinRouter\x00GENERATES\x00SPDXRef-File-darwin"] ||
-		!relations[toolchainID+"\x00BUILD_TOOL_OF\x00SPDXRef-Package-DarwinRouter"] {
+	if !relations["SPDXRef-Package-NexusRouter\x00GENERATES\x00SPDXRef-File-nexus"] ||
+		!relations[toolchainID+"\x00BUILD_TOOL_OF\x00SPDXRef-Package-NexusRouter"] {
 		t.Fatal("SPDX build relationships missing", document.Relationships)
 	}
 }

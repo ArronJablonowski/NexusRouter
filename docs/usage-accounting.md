@@ -122,7 +122,7 @@ corruption detection.
 For one task, an authenticated daemon client can request:
 
 ```sh
-curl -H "Authorization: Bearer $DARWIN_API_TOKEN" \
+curl -H "Authorization: Bearer $NEXUS_API_TOKEN" \
   http://127.0.0.1:9786/v1/tasks/TASK_ID/usage
 ```
 
@@ -153,12 +153,12 @@ accounting for schema-30 stores. It includes the six exact roles plus `routed`,
 `auxiliary`, and `overall`, but no task, session, route, provider, model, or
 evidence identity. OTLP exports fixed gauges named:
 
-- `darwinrouter.accounting.records`;
-- `darwinrouter.accounting.usage.known_records` and `.unknown_records`;
-- `darwinrouter.accounting.input_tokens.known` and
+- `nexusrouter.accounting.records`;
+- `nexusrouter.accounting.usage.known_records` and `.unknown_records`;
+- `nexusrouter.accounting.input_tokens.known` and
   `.output_tokens.known`;
-- `darwinrouter.accounting.cost.known_records` and `.unknown_records`; and
-- `darwinrouter.accounting.normalized_cost.known`.
+- `nexusrouter.accounting.cost.known_records` and `.unknown_records`; and
+- `nexusrouter.accounting.normalized_cost.known`.
 
 Each uses one closed `bucket` label for the nine role/aggregate groups. The
 known-cost gauge can mix estimate and reconciled bases; inspect task accounting
@@ -168,7 +168,7 @@ snapshot gauges over retained state, not monotonic billing counters.
 The OpenAI-compatible streaming `include_usage` response remains narrower: it
 reports successful model turns for that task only. It excludes failed route
 attempts, linked fallback tasks, delegated children, summaries, and audits. Use
-the Darwin-native accounting surface for the durable routed/auxiliary split.
+the NexusRouter-native accounting surface for the durable routed/auxiliary split.
 
 ## Schema 29 migration and coverage
 
@@ -212,7 +212,7 @@ ledger and must follow the same private-path and backup policy as session data.
 
 Current limitations:
 
-- classifier accounting is defined but inactive until DarwinRouter has an
+- classifier accounting is defined but inactive until NexusRouter has an
   authoritative model-classifier lifecycle;
 - configured costs are estimates, not invoices, quota observations, or proof
   that a failed request was unbilled;

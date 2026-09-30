@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 // ConfiguredModelCatalog returns owned declared routing metadata. It performs

@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 type validatedExecutionAccount struct {
@@ -25,7 +25,7 @@ func validatedExecutionAccounts(ctx context.Context, tx *sql.Tx, boardID, cardID
 	// Historical settled work on other cards cannot affect this card's budget
 	// or current WIP. Limit canonical replay to globally active admissions plus
 	// this card's bounded attempt history so admission cost does not grow with
-	// every task DarwinRouter has ever completed.
+	// every task NexusRouter has ever completed.
 	rows, err := tx.QueryContext(ctx, `SELECT a.task_id FROM workboard_execution_admissions a
 		WHERE (a.board_id=? AND a.card_id=?) OR NOT EXISTS(
 			SELECT 1 FROM workboard_execution_settlements s WHERE s.admission_id=a.admission_id)

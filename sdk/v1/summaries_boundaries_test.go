@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	v1 "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestPublicSummaryUninitializedAndContextBoundaries(t *testing.T) {

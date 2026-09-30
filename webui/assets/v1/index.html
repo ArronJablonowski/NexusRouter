@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>DarwinRouter</title>
+  <title>NexusRouter</title>
   <link rel="stylesheet" href="__DARWIN_BASE_PATH__/assets/v1/app.css">
 </head>
 <body data-base-path="__DARWIN_BASE_PATH__">
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="shell">
     <header class="topbar">
-      <div><span class="mark" aria-hidden="true">D</span> DarwinRouter</div>
+      <div><span class="mark" aria-hidden="true">D</span> NexusRouter</div>
       <output id="connection-state" class="status">Shell ready</output>
     </header>
     <nav class="rail" aria-label="Primary">
@@ -183,7 +183,7 @@
         <div class="settings-layout">
           <form id="tool-settings-form" class="settings-card" novalidate>
             <div class="settings-card-heading"><div><p class="eyebrow">Routing and permissions</p><h2>Runtime policy</h2></div><output id="settings-restart-badge" class="state-pill" hidden>Restart required</output></div>
-            <p class="settings-intro">Choose specialist locality and whether eligible models may use DarwinRouter's narrowly scoped tools. Saved changes take effect after the DarwinRouter daemon restarts.</p>
+            <p class="settings-intro">Choose specialist locality and whether eligible models may use NexusRouter's narrowly scoped tools. Saved changes take effect after the NexusRouter daemon restarts.</p>
             <h3>Skills</h3>
 <label class="setting-toggle"><span><strong>Use skills</strong><small>Enable the skill system and use eligible active skills from the configured store.</small></span><span class="switch"><input id="skills-enabled" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
 <label class="setting-toggle"><span><strong>Allow skill creation</strong><small>Permit draft creation when skills are enabled. This does not activate drafts or start a background learning job.</small></span><span class="switch"><input id="skills-auto-draft" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
@@ -218,7 +218,7 @@
       </section>
       <section id="routing-view" class="tron-view" aria-labelledby="routing-grid-title" hidden>
         <header class="tron-heading">
-          <div><p class="eyebrow">Command network</p><h1 id="routing-grid-title">Darwin routing grid</h1></div>
+          <div><p class="eyebrow">Command network</p><h1 id="routing-grid-title">NexusRouter routing grid</h1></div>
           <button id="refresh-routing" class="tron-button" type="button">Rescan grid</button>
         </header>
         <output id="routing-live-status" class="tron-status" role="status" aria-live="polite">Synchronizing model routes…</output>
@@ -243,7 +243,7 @@
       </section>
       <section id="elimination-view" class="tron-view elimination-view" aria-labelledby="elimination-title" hidden>
         <header class="tron-heading"><div><p class="eyebrow">Evidence tribunal</p><h1 id="elimination-title">Model elimination matrix</h1></div><button id="refresh-elimination" class="tron-button" type="button">Recalculate</button></header>
-        <p class="tron-intro">DarwinRouter recommends review only when persisted evaluated attempts cross the selected failure threshold. Recommendations never disable or uninstall a model.</p>
+        <p class="tron-intro">NexusRouter recommends review only when persisted evaluated attempts cross the selected failure threshold. Recommendations never disable or uninstall a model.</p>
         <form id="elimination-controls" class="elimination-controls">
           <label for="elimination-job">Performance domain</label><select id="elimination-job"></select>
           <label for="elimination-threshold">Failure threshold</label><select id="elimination-threshold"><option value="0.25">25%</option><option value="0.35" selected>35%</option><option value="0.5">50%</option></select>

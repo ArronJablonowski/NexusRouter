@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubpublish"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubpublish"
 )
 
 type AuthorizedPublicationOptions struct {

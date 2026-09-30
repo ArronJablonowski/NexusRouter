@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 type providerHealthWriter interface {

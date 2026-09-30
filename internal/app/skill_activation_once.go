@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // SkillActivationOperation inspects a durable operation receipt without creating

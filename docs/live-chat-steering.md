@@ -72,7 +72,7 @@ cause failure even when the outer test allows more time. Investigate the actual
 failed boundary before retrying or changing budgets. Do not increase permissions,
 disable admission checks or accept a stale result to make the test pass.
 
-For normal operator use, run `darwin chat` with a reviewed configuration and use
+For normal operator use, run `nexus chat` with a reviewed configuration and use
 `/status`, `/steer TEXT` and `/cancel` during active work. See
 [interactive streaming](interactive-streaming.md) and
 [Codex steering](codex-steering.md) for delivery, privacy and failure semantics.

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/contextengine"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/contextengine"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 type sdkFullContextEngine struct {

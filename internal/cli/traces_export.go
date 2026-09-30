@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 func runTraces(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "export" {
-		fmt.Fprintln(stderr, "usage: darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]")
+		fmt.Fprintln(stderr, "usage: nexus traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]")
 		return 2
 	}
 	fs := flag.NewFlagSet("traces export", flag.ContinueOnError)
@@ -42,7 +42,7 @@ func runTraces(args []string, stdout, stderr io.Writer) int {
 	}
 	options := traces.ExportOptions{Endpoint: values["endpoint"], APIKeyEnv: values["api-key-env"], Limit: limit}
 	if !valid || options.Validate() != nil {
-		fmt.Fprintln(stderr, "usage: darwin traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]")
+		fmt.Fprintln(stderr, "usage: nexus traces export --config path --endpoint URL [--api-key-env ENV_NAME] [--limit 16]")
 		return 2
 	}
 	ctx, stop := submissionCLIContext()

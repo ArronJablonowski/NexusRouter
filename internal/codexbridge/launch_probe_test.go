@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 )
 
 // Explicit diagnostic only. Default CI never starts Codex. This probe makes no

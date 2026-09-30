@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/tools"
-	"github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 // WorkboardBridge presents one authority-gated domain service through the

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestSDKTaskListIsReadOnlyAndCancelable(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func TestResourcesFromSnapshotFixedVocabularyAndOwnership(t *testing.T) {
@@ -152,7 +152,7 @@ func TestMarshalOTLPResources(t *testing.T) {
 	if len(items) != base+5 {
 		t.Fatal(len(items), string(body))
 	}
-	want := []string{"darwinrouter.resource.cpu_threads", "darwinrouter.resource.ram_total_bytes", "darwinrouter.resource.ram_available_bytes", "darwinrouter.resource.unified_memory", "darwinrouter.resource.available"}
+	want := []string{"nexusrouter.resource.cpu_threads", "nexusrouter.resource.ram_total_bytes", "nexusrouter.resource.ram_available_bytes", "nexusrouter.resource.unified_memory", "nexusrouter.resource.available"}
 	for i, name := range want {
 		if items[base+i].Name != name {
 			t.Fatal(i, items[base+i].Name)

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func executionApprovalFixture(t *testing.T) (*Store, string, approvals.Request, Lease) {

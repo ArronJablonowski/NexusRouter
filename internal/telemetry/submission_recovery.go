@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 func validateBranchRecoveryTx(ctx context.Context, tx *sql.Tx, id string) error {

@@ -15,7 +15,7 @@ var ErrOperationJournal = errors.New("GitHub publication operation journal faile
 
 const (
 	operationJournalSchema = 1
-	operationJournalScope  = "darwinrouter-github-publication-operation"
+	operationJournalScope  = "nexusrouter-github-publication-operation"
 	maxOperationJournal    = 1 << 20
 	maxOperationEvents     = 128
 
@@ -387,9 +387,9 @@ func canonicalExpectedState(expected ExpectedDraftState) ([]byte, error) {
 	parts := strings.Split(expected.Identity.Repository, "/")
 	if len(parts) != 2 || !digestRE.MatchString(expected.Identity.AuthorizationSHA256) ||
 		!nameRE.MatchString(parts[0]) || !nameRE.MatchString(parts[1]) || !validTag(expected.Identity.Tag) ||
-		!commitRE.MatchString(expected.Commit) || expected.ReleaseTitle != "DarwinRouter "+expected.Identity.Tag ||
+		!commitRE.MatchString(expected.Commit) || expected.ReleaseTitle != "NexusRouter "+expected.Identity.Tag ||
 		!digestRE.MatchString(expected.ReleaseNotesSHA256) || expected.Prerelease != strings.Contains(expected.Identity.Tag, "-") ||
-		!validTagger(expected.Tagger) || expected.TagMessage != "DarwinRouter release "+expected.Identity.Tag || (expected.Prerelease && expected.MakeLatest) ||
+		!validTagger(expected.Tagger) || expected.TagMessage != "NexusRouter release "+expected.Identity.Tag || (expected.Prerelease && expected.MakeLatest) ||
 		len(expected.Assets) == 0 || len(expected.Assets) > maxAssets {
 		return nil, ErrOperationJournal
 	}

@@ -3,7 +3,7 @@ package app
 import (
 	"encoding/json"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func workboardControlMutationSpec(name string) providers.Tool {

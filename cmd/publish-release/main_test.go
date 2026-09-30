@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubpublish"
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubpublish"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type unusedTransport struct{}
@@ -41,7 +41,7 @@ func TestRunWiresFixedOriginsAndDeferredFDCredential(t *testing.T) {
 			t.Fatal("credential FD was not deferred through the production seam", err)
 		}
 		clear(credential.Token)
-		return githubpublish.PublicationEvidence{SchemaVersion: 1, Scope: "darwinrouter-github-authorized-publication", State: "confirmed_published", Published: true, Immutable: true}, nil
+		return githubpublish.PublicationEvidence{SchemaVersion: 1, Scope: "nexusrouter-github-authorized-publication", State: "confirmed_published", Published: true, Immutable: true}, nil
 	}
 	var stdout, stderr bytes.Buffer
 	code := run(t.Context(), validArgs(int(read.Fd())), &stdout, &stderr, unusedTransport{}, publish)
@@ -86,7 +86,7 @@ func TestRunEmitsPublicUncertainEvidenceAndGenericFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	publish := func(context.Context, githubpublish.CredentialPublicationConfig, releasepack.AuthorizedPublicationOptions) (githubpublish.PublicationEvidence, error) {
-		return githubpublish.PublicationEvidence{SchemaVersion: 1, Scope: "darwinrouter-github-authorized-publication", State: "uncertain", Phase: "upload_asset", RetryAllowed: false}, errors.New("github_pat_leak")
+		return githubpublish.PublicationEvidence{SchemaVersion: 1, Scope: "nexusrouter-github-authorized-publication", State: "uncertain", Phase: "upload_asset", RetryAllowed: false}, errors.New("github_pat_leak")
 	}
 	var stdout, stderr bytes.Buffer
 	if code := run(t.Context(), validArgs(int(read.Fd())), &stdout, &stderr, unusedTransport{}, publish); code != 1 ||
@@ -104,7 +104,7 @@ func validArgs(fd int) []string {
 		"--trust-record", "/trust", "--trust-record-sha256", digest, "--key-id", "release-key",
 		"--key-fingerprint", digest, "--signing-authorization", "/signing", "--signing-authorization-sha256", digest,
 		"--publication-authorization", "/publication", "--publication-authorization-sha256", digest,
-		"--repository", "ArronJablonowski/DarwinRouter", "--release-notes", "/notes", "--journal", "/outside/publication.jsonl",
+		"--repository", "ArronJablonowski/NexusRouter", "--release-notes", "/notes", "--journal", "/outside/publication.jsonl",
 		"--credential-fd", fmtInt(fd),
 	}
 }

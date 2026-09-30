@@ -11,10 +11,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
-	"github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 var chatWorkboardActions = map[string]webui.BoardAction{
@@ -69,7 +69,7 @@ func chatWorkboardApprovalPreview(settings config.Settings, secret func(string) 
 		return "", tools.ErrDenied
 	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "[approval pending %s]\nDarwinRouter Kanban mutation proposed by the local root model.\nTool: %s\nAction: %s\nExact resource scope: %s\n", p.Request.ID, p.Request.ToolName, actionName, strconv.QuoteToASCII(wantScope))
+	fmt.Fprintf(&out, "[approval pending %s]\nNexusRouter Kanban mutation proposed by the local root model.\nTool: %s\nAction: %s\nExact resource scope: %s\n", p.Request.ID, p.Request.ToolName, actionName, strconv.QuoteToASCII(wantScope))
 	fmt.Fprintf(&out, "Exact model arguments: %d UTF-8 bytes, SHA-256 %x\n| %s\n", len(p.Arguments), digest, strconv.QuoteToASCII(string(p.Arguments)))
 	out.WriteString("Warning: approval authorizes this exact one-use request only. A committed or uncertain effect is never automatically replayed.\n")
 	fmt.Fprintf(&out, "Declared behavior: %s (not retry authority)\nUse /approve %s or /deny %s for this request only.\n", p.Request.ToolBehavior, p.Request.ID, p.Request.ID)
@@ -176,7 +176,7 @@ func chatApprovalContainsSecret(settings config.Settings, secret func(string) st
 	if secret == nil {
 		return false
 	}
-	envs := []string{"DARWIN_API_TOKEN"}
+	envs := []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"}
 	for _, provider := range settings.Providers {
 		if provider.APIKeyEnv != "" {
 			envs = append(envs, provider.APIKeyEnv)

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 var ErrSkillGenerationUnavailable = errors.New("skill generation storage unavailable")

@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const configuredAcceptanceAuthority = "workboard-criterion-coordinator"

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestDurationMetricsConcurrentWriterAndReadOnlySnapshots(t *testing.T) {

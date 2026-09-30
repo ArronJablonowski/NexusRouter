@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 var ErrSubmission = errors.New("submission unavailable")
@@ -87,7 +87,7 @@ func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvel
 	// Reject rather than rewrite secret-bearing intent. Check the JSON-escaped
 	// representation too, since credentials may contain quotes or controls.
 	if s.secret != nil {
-		names := []string{"DARWIN_API_TOKEN"}
+		names := []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"}
 		for _, p := range s.settings.Providers {
 			if p.APIKeyEnv != "" {
 				names = append(names, p.APIKeyEnv)

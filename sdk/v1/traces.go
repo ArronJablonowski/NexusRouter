@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 type TraceSnapshot = traces.Snapshot

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 const modelStartLookup = `SELECT task_id,sequence FROM events WHERE json_extract(body,'$.kind')='turn.started' AND json_extract(body,'$.data.model_id')=? AND json_extract(body,'$.data.provider_id')=?`

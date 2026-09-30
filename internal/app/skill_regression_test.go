@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func appRegressionFixture(t *testing.T) (*Service, skills.Version, skills.Version, skills.ActivationState) {

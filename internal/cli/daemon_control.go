@@ -15,9 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/policy"
 )
 
 var errDaemonControl = errors.New("daemon control unavailable")
@@ -148,7 +149,7 @@ func (c *daemonControlClient) request(ctx context.Context, method, path string, 
 
 func runDaemonControl(args []string, stdout, stderr io.Writer) int {
 	invalid := func() int {
-		fmt.Fprintln(stderr, "usage: darwin daemon start|status|stop --config path (requires DARWIN_API_TOKEN)")
+		fmt.Fprintln(stderr, "usage: nexus daemon start|status|stop --config path (requires NEXUS_API_TOKEN; legacy DARWIN_API_TOKEN accepted)")
 		return 2
 	}
 	if len(args) < 1 || (args[0] != "start" && args[0] != "status" && args[0] != "stop") {
@@ -176,7 +177,7 @@ func runDaemonControl(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "daemon configuration unavailable")
 		return 1
 	}
-	token := os.Getenv("DARWIN_API_TOKEN")
+	token := branding.Getenv("DARWIN_API_TOKEN")
 	client, err := daemonClient(cfg, token)
 	if err != nil {
 		fmt.Fprintln(stderr, "daemon control unavailable")

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 // readTaskLeaseTrace exports fixed state classes only. Tokens, owners, scopes,

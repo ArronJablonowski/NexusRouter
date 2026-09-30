@@ -1,4 +1,4 @@
-module github.com/ArronJablonowski/DarwinRouter
+module github.com/ArronJablonowski/NexusRouter
 
 go 1.27.1
 

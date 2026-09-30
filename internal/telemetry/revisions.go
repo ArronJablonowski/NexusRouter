@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 )
 
 // SupersedeEvaluation replaces only a subjective quality contribution. Original

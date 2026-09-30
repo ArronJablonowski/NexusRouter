@@ -6,7 +6,7 @@ key. Completing this document is not release authorization.
 
 ## Trust boundary
 
-DarwinRouter releases use a dedicated Ed25519 identity. Never reuse the Git SSH
+NexusRouter releases use a dedicated Ed25519 identity. Never reuse the Git SSH
 key, an account-login key or an employee's general-purpose identity. The 32-byte
 private seed stays outside the source checkout, release directory, CI logs and
 shell history in operator-controlled secret storage. At least two named operators
@@ -30,8 +30,8 @@ URLs must be authenticated HTTPS locations without credentials or fragments.
 ```json
 {
   "schema_version": 1,
-  "project": "DarwinRouter",
-  "scope": "darwinrouter-release-signing",
+  "project": "NexusRouter",
+  "scope": "nexusrouter-release-signing",
   "key_id": "release-YYYY-NN",
   "algorithm": "Ed25519",
   "public_key": "REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",
@@ -72,7 +72,7 @@ valid archival data but cannot verify a release.
    ```sh
    go run ./cmd/verify-approved-release \
      --dir /ABSOLUTE/QUIESCENT/RELEASE_DIRECTORY \
-     --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
+     --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/NexusRouter \
      --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
      --candidate-record-sha256 sha256:REPLACE_WITH_CANDIDATE_SHA256 \
      --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \

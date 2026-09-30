@@ -12,14 +12,14 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 var ErrRollbackReadiness = errors.New("rollback readiness verification failed")
 
 const (
 	rollbackReadinessSchema = 1
-	rollbackReadinessScope  = "darwinrouter-rollback-readiness"
+	rollbackReadinessScope  = "nexusrouter-rollback-readiness"
 	maxRollbackReadiness    = 32 << 10
 	maxRehearsalEvidence    = 16 << 20
 	maxBackupEvidence       = int64(16 << 30)
@@ -301,7 +301,7 @@ func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptio
 	if verifiedAt.IsZero() || verifiedAt.Location() != time.UTC || verifiedAt.Nanosecond() != 0 || verifiedAt.Before(approvedAt) || verifiedAt.After(validUntil) || ctx.Err() != nil {
 		return result, ErrRollbackReadiness
 	}
-	result = RollbackReadinessResult{SchemaVersion: 1, Scope: "darwinrouter-rollback-readiness-verification", RecordSHA256: options.Expectations.RecordSHA256, PublicationReceiptSHA256: receipt.ReceiptSHA256, Repository: receipt.Repository, ReleaseVersion: receipt.ReleaseVersion, SourceCommit: receipt.SourceCommit, Tag: receipt.Tag, ReleaseID: receipt.ReleaseID, Mode: record.History.Mode, StateSchema: record.Current.StateSchema, ValidUntil: record.Approval.ValidUntil, RehearsalSHA256: rehearsal.EvidenceSHA256, ReadinessVerifierID: options.ReadinessVerifierID, VerifiedAt: verifiedAt.Format("2006-01-02T15:04:05Z")}
+	result = RollbackReadinessResult{SchemaVersion: 1, Scope: "nexusrouter-rollback-readiness-verification", RecordSHA256: options.Expectations.RecordSHA256, PublicationReceiptSHA256: receipt.ReceiptSHA256, Repository: receipt.Repository, ReleaseVersion: receipt.ReleaseVersion, SourceCommit: receipt.SourceCommit, Tag: receipt.Tag, ReleaseID: receipt.ReleaseID, Mode: record.History.Mode, StateSchema: record.Current.StateSchema, ValidUntil: record.Approval.ValidUntil, RehearsalSHA256: rehearsal.EvidenceSHA256, ReadinessVerifierID: options.ReadinessVerifierID, VerifiedAt: verifiedAt.Format("2006-01-02T15:04:05Z")}
 	if _, err = MarshalRollbackReadinessResult(result); err != nil {
 		return RollbackReadinessResult{}, err
 	}
@@ -309,7 +309,7 @@ func VerifyRollbackReadiness(ctx context.Context, options RollbackReadinessOptio
 }
 
 func MarshalRollbackReadinessResult(result RollbackReadinessResult) ([]byte, error) {
-	if result.SchemaVersion != 1 || result.Scope != "darwinrouter-rollback-readiness-verification" || !trustFingerprint(result.RecordSHA256) || !trustFingerprint(result.PublicationReceiptSHA256) || !trustFingerprint(result.RehearsalSHA256) || !rollbackRepository.MatchString(result.Repository) || validate(Options{Version: result.ReleaseVersion, Commit: result.SourceCommit, Out: "release"}) != nil || result.Tag != "v"+result.ReleaseVersion || result.ReleaseID < 1 || (result.Mode != "first_release" && result.Mode != "upgrade") || result.StateSchema != stateschema.Current || !rollbackIdentity.MatchString(result.ReadinessVerifierID) {
+	if result.SchemaVersion != 1 || result.Scope != "nexusrouter-rollback-readiness-verification" || !trustFingerprint(result.RecordSHA256) || !trustFingerprint(result.PublicationReceiptSHA256) || !trustFingerprint(result.RehearsalSHA256) || !rollbackRepository.MatchString(result.Repository) || validate(Options{Version: result.ReleaseVersion, Commit: result.SourceCommit, Out: "release"}) != nil || result.Tag != "v"+result.ReleaseVersion || result.ReleaseID < 1 || (result.Mode != "first_release" && result.Mode != "upgrade") || result.StateSchema != stateschema.Current || !rollbackIdentity.MatchString(result.ReadinessVerifierID) {
 		return nil, ErrRollbackReadiness
 	}
 	verified, e1 := strictRollbackTime(result.VerifiedAt)
@@ -337,7 +337,7 @@ func ParseRollbackReadinessResult(body []byte) (RollbackReadinessResult, error) 
 }
 
 func validateRollbackReadiness(record RollbackReadiness) error {
-	if record.SchemaVersion != rollbackReadinessSchema || record.Project != "DarwinRouter" || record.Scope != rollbackReadinessScope ||
+	if record.SchemaVersion != rollbackReadinessSchema || record.Project != "NexusRouter" || record.Scope != rollbackReadinessScope ||
 		!validCurrentRollback(record.Current) || !rollbackIdentity.MatchString(record.Incident.OwnerID) || !trustHTTPSURL(record.Incident.StatusURL) ||
 		!rollbackIdentity.MatchString(record.Approval.ApproverID) || !trustHTTPSURL(record.Approval.PolicyURL) ||
 		!trustFingerprint(record.Rehearsal.EvidenceSHA256) || record.Rehearsal.Status != "passed" || !rollbackIdentity.MatchString(record.Rehearsal.VerifierID) {
@@ -379,7 +379,7 @@ func validFirstReleasePolicy(policy *FirstReleaseRollbackPolicy) bool {
 }
 
 func validPriorBinary(prior RollbackPriorSupportedBinary, repository string) bool {
-	return prior.Repository == repository && validate(Options{Version: prior.ReleaseVersion, Commit: prior.SourceCommit, Out: "release"}) == nil && prior.Tag == "v"+prior.ReleaseVersion && (prior.TargetOS == "darwin" || prior.TargetOS == "linux") && (prior.TargetArch == "amd64" || prior.TargetArch == "arm64") && prior.ArtifactName == "DarwinRouter_"+prior.ReleaseVersion+"_"+prior.TargetOS+"_"+prior.TargetArch+".tar.gz" && trustFingerprint(prior.ArtifactSHA256) && trustFingerprint(prior.BinarySHA256) && trustFingerprint(prior.PublicationReceiptSHA256) && trustFingerprint(prior.VerificationReceiptSHA256) && prior.StateSchema > 0 && prior.StateSchema <= 1_000_000
+	return prior.Repository == repository && validate(Options{Version: prior.ReleaseVersion, Commit: prior.SourceCommit, Out: "release"}) == nil && prior.Tag == "v"+prior.ReleaseVersion && (prior.TargetOS == "darwin" || prior.TargetOS == "linux") && (prior.TargetArch == "amd64" || prior.TargetArch == "arm64") && prior.ArtifactName == "NexusRouter_"+prior.ReleaseVersion+"_"+prior.TargetOS+"_"+prior.TargetArch+".tar.gz" && trustFingerprint(prior.ArtifactSHA256) && trustFingerprint(prior.BinarySHA256) && trustFingerprint(prior.PublicationReceiptSHA256) && trustFingerprint(prior.VerificationReceiptSHA256) && prior.StateSchema > 0 && prior.StateSchema <= 1_000_000
 }
 
 func validBackup(backup RollbackBackup) bool {

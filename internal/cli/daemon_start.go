@@ -12,8 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 var errDaemonStart = errors.New("managed daemon start unavailable")
@@ -23,7 +24,7 @@ var errDaemonStart = errors.New("managed daemon start unavailable")
 // must identify this fresh launch, not another listener that won the bind race.
 func runDaemonStart(ctx context.Context, cfg config.Settings, path, token string) (daemon.Status, error) {
 	bad := func() (daemon.Status, error) { return daemon.Status{}, errDaemonStart }
-	if ctx == nil || ctx.Err() != nil || path == "" || token == "" || token != os.Getenv("DARWIN_API_TOKEN") {
+	if ctx == nil || ctx.Err() != nil || path == "" || token == "" || token != branding.Getenv("DARWIN_API_TOKEN") {
 		return bad()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)

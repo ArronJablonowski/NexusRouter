@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func parseResumeArgs(args []string) (config.Options, app.Request, string, sessions.TaskHeadFence, error) {
@@ -17,7 +17,7 @@ func parseResumeArgs(args []string) (config.Options, app.Request, string, sessio
 func runResume(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, key, source, err := parseResumeArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin resume --config path --key idempotency-key --task id --session id --sequence n --event id --model id < prompt.txt")
+		fmt.Fprintln(stderr, "usage: nexus resume --config path --key idempotency-key --task id --session id --sequence n --event id --model id < prompt.txt")
 		return 2
 	}
 	ctx, cancel := submissionCLIContext()

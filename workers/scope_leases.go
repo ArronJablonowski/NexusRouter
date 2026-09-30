@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 var ErrScopeLeaseStatus = errors.New("scope lease status unavailable")

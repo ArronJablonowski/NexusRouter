@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func TestConfiguredWorkboardCriterionCoordinatorAcceptsObjectiveEvidence(t *testing.T) {

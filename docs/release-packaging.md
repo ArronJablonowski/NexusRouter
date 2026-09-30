@@ -28,7 +28,7 @@ From the repository root, replace the uppercase placeholders:
 
 ```sh
 go run ./cmd/build-approved-release \
-  --source /ABSOLUTE/PATH/TO/DarwinRouter \
+  --source /ABSOLUTE/PATH/TO/NexusRouter \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
   --out /ABSOLUTE/EXISTING/PARENT/new-release-directory
@@ -66,17 +66,17 @@ are 10,000 regular files, 1 MiB per file and 64 MiB total.
 
 Artifacts are produced for macOS (`darwin`) and Linux, both `amd64` and `arm64`:
 
-- Four `DarwinRouter_VERSION_OS_ARCH.tar.gz` archives. Each contains, in exact
+- Four `NexusRouter_VERSION_OS_ARCH.tar.gz` archives. Each contains, in exact
   order, `INSTALL.md`, `LICENSE`, `RELEASE_NOTES.md`,
   `SBOM.spdx.json`, `THIRD_PARTY_NOTICES.txt`, `config.example.yaml` (all mode
-  0644), and the target executable `darwin` (mode 0755).
+  0644), and the target executable `nexus` (mode 0755).
 - `manifest.json`: schema version 3, release version, source commit, Go version,
   and the four ordered target names, archive SHA-256 hashes, and member
   name/mode/size/SHA-256 metadata.
 - `SHA256SUMS`: sorted checksums of all four archives **and** the manifest.
 
 Each target-specific `SBOM.spdx.json` is canonical SPDX 2.3 JSON. It identifies
-the target binary and its SHA-256, the `cmd/darwin` module dependency closure,
+the target binary and its SHA-256, the `cmd/nexus` module dependency closure,
 the exact Go toolchain component, and every checked-in first-party Web UI source
 asset with its SHA-256. `GENERATED_FROM` relationships connect the embedded
 binary to those frontend sources. Dependencies whose license expression has not
@@ -150,7 +150,7 @@ records `project_license: approved` and `third_party_notices: approved`.
 ## Sign with a separate release identity
 
 A release signing identity must be provisioned by the operator independently
-of repository access. **Never use `git_repo_DarwinRouter_ed25519` or any other
+of repository access. **Never use `git_repo_NexusRouter_ed25519` or any other
 Git/SSH authentication key.** No production release key is generated or
 discovered automatically.
 
@@ -175,7 +175,7 @@ go run ./cmd/sign-release \
   --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
   --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
   --license-evidence-sha256 sha256:EXPECTED_EXACT_LICENSE_EVIDENCE_SHA256 \
-  --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
+  --source /ABSOLUTE/PATH/TO/CLEAN/NexusRouter \
   --expected-sums-sha256 sha256:EXPECTED_EXACT_SHA256SUMS_SHA256 \
   --trust-record /ABSOLUTE/INDEPENDENT/TRUST_RECORD.json \
   --trust-record-sha256 sha256:EXPECTED_EXACT_TRUST_RECORD_SHA256 \
@@ -227,7 +227,7 @@ for a distribution channel.
 
 ## Verify before extracting or running
 
-Use the verifier from an independently trusted DarwinRouter source checkout,
+Use the verifier from an independently trusted NexusRouter source checkout,
 not a binary from the unverified download. Obtain the trusted public key through
 an authenticated channel separate from the release archive. A public key
 downloaded beside an attacker-replaced archive does not establish trust.
@@ -248,7 +248,7 @@ rather than checking the public key alone:
 ```sh
 go run ./cmd/verify-approved-release \
   --dir /ABSOLUTE/RELEASE_DIRECTORY \
-  --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/DarwinRouter \
+  --source /ABSOLUTE/PATH/TO/INDEPENDENT/CLEAN/NexusRouter \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_EXACT_CANDIDATE_RECORD_SHA256 \
   --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
@@ -313,7 +313,7 @@ go run ./cmd/verify-approved-install \
   --install-root /ABSOLUTE/EXISTING/PRIVATE/PARENT/NEW-INSTALL \
   --verifier-id idp:release-verifier \
   --host-id host:reviewed-darwin-arm64 \
-  --public-key-channel https://keys.example.invalid/darwinrouter \
+  --public-key-channel https://keys.example.invalid/nexusrouter \
   --out /ABSOLUTE/EXISTING/PRIVATE/EVIDENCE/NEW-approved-install.json
 ```
 

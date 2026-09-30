@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func learningFixture() skills.LearningState {

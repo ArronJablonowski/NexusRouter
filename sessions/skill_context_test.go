@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestSkillContextLegacySnapshotSerializationCompatibility(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 const branchBody = `{"version":1,"source":{"version":1,"task_id":"source","session_id":"session","head_sequence":2,"head_event_id":"source-terminal"},"request":{"model_id":"model","prompt":"branch prompt"}}`

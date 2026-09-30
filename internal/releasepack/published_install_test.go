@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 func TestPublishedInstallEvidenceBindsDownloadedArchiveAndReceipt(t *testing.T) {
@@ -34,13 +34,13 @@ func TestPublishedInstallEvidenceBindsDownloadedArchiveAndReceipt(t *testing.T) 
 }
 
 func TestPublishedInstallEvidenceUsesExactModesUnderRestrictiveUmask(t *testing.T) {
-	if os.Getenv("DARWINROUTER_PUBLISHED_INSTALL_UMASK_HELPER") == "1" {
+	if os.Getenv("NEXUSROUTER_PUBLISHED_INSTALL_UMASK_HELPER") == "1" {
 		syscall.Umask(0077)
 		receiptFile, installFile, expected := publishedInstallFixture(t)
 		if _, err := CreatePublishedInstallEvidence(context.Background(), receiptFile, installFile, expected); err != nil {
 			t.Fatal(err)
 		}
-		binary := filepath.Join(expected.InstallRoot, "bin", "darwin")
+		binary := filepath.Join(expected.InstallRoot, "bin", "nexus")
 		info, err := os.Lstat(binary)
 		if err != nil || info.Mode().Perm() != 0755 {
 			t.Fatal("restrictive umask changed installed mode", info, err)
@@ -48,7 +48,7 @@ func TestPublishedInstallEvidenceUsesExactModesUnderRestrictiveUmask(t *testing.
 		return
 	}
 	command := exec.Command(os.Args[0], "-test.run=^TestPublishedInstallEvidenceUsesExactModesUnderRestrictiveUmask$")
-	command.Env = append(os.Environ(), "DARWINROUTER_PUBLISHED_INSTALL_UMASK_HELPER=1")
+	command.Env = append(os.Environ(), "NEXUSROUTER_PUBLISHED_INSTALL_UMASK_HELPER=1")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("restrictive-umask subprocess failed: %v\n%s", err, output)
 	}
@@ -168,7 +168,7 @@ func publishedInstallFixtureFromRelease(t *testing.T, preflight PublicationPrefl
 		t.Fatal(err)
 	}
 	targetOS, targetArch := runtime.GOOS, runtime.GOARCH
-	artifactName := "DarwinRouter_" + receipt.ReleaseVersion + "_" + targetOS + "_" + targetArch + ".tar.gz"
+	artifactName := "NexusRouter_" + receipt.ReleaseVersion + "_" + targetOS + "_" + targetArch + ".tar.gz"
 	artifactSHA := receiptAssetSHA(receipt.Assets, artifactName)
 	install := validInstallEvidenceFixture()
 	install.Release = InstallEvidenceRelease{Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit}
@@ -218,7 +218,7 @@ func TestPublishedInstallEvidenceRejectsChangedDownloadsAndUnsafeInstallRoots(t 
 			receiptFile, installFile, expected := publishedInstallFixture(t)
 			switch scenario {
 			case "archive":
-				name := "DarwinRouter_1.0.0_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
+				name := "NexusRouter_1.0.0_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
 				appendPublishedFixtureByte(t, filepath.Join(expected.DownloadDir, name), 0)
 			case "manifest":
 				appendPublishedFixtureByte(t, filepath.Join(expected.DownloadDir, "manifest.json"), ' ')

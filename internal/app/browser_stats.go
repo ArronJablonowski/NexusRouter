@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 )
 
 func (s *Service) BrowserStats(ctx context.Context, reset *usagestats.Reset) (usagestats.Snapshot, error) {

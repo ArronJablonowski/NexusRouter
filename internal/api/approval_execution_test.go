@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
 )
 
 func executionStatusFixture() approvals.ExecutionStatus {

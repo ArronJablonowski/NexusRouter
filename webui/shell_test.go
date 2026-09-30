@@ -37,12 +37,12 @@ func TestShellServesEmbeddedAssetsAndClientRoutes(t *testing.T) {
 	handler := shellFixture(t)
 	for _, test := range []struct{ target, contentType, contains string }{
 		{"/console", "text/html", "/console/assets/v1/app.js"},
-		{"/console/chats/chat-a", "text/html", "DarwinRouter"},
+		{"/console/chats/chat-a", "text/html", "NexusRouter"},
 		{"/console/workboards/board-a", "text/html", "Workboard lanes"},
 		{"/console/assets/v1/app.css", "text/css", "color-scheme"},
-		{"/console/assets/v1/operation-contract.js", "text/javascript", "DarwinOperationContract"},
-		{"/console/assets/v1/inspector.js", "text/javascript", "DarwinInspector"},
-		{"/console/assets/v1/workboard-client.js", "text/javascript", "DarwinWorkboardClient"},
+		{"/console/assets/v1/operation-contract.js", "text/javascript", "NexusOperationContract"},
+		{"/console/assets/v1/inspector.js", "text/javascript", "NexusInspector"},
+		{"/console/assets/v1/workboard-client.js", "text/javascript", "NexusWorkboardClient"},
 		{"/console/assets/v1/workboards.js", "text/javascript", "kanban"},
 		{"/console/assets/v1/workboard-mutations.js", "text/javascript", "idempotency_key"},
 		{"/console/assets/v1/settings.js", "text/javascript", "delegate_read_tools"},
@@ -136,10 +136,10 @@ func TestShellHEADAndConfigurationBounds(t *testing.T) {
 }
 
 func TestEmbeddedShellHasNoExternalResourcesOrInlineCode(t *testing.T) {
-	// Reviewed v1 assets: six new measured categories and strict generation capability filters.
+	// Reviewed v1 assets: NexusRouter branding and consistently renamed browser modules.
 	// Resource, inline-code and browser-storage restrictions below remain unchanged.
 	digest, err := ShellAssetDigest()
-	if err != nil || digest != "323228067e80ac82574e0c9f15d017ffb09d3bee3277a294bf3b1880a495ffeb" || ShellAssetVersion != "v1" {
+	if err != nil || digest != "f5b66a971db9948d56c35bdba499c2f976b910e817862c58a4ed71342a1363d1" || ShellAssetVersion != "v1" {
 		t.Fatal("embedded shell manifest changed without a versioned review", digest, err)
 	}
 	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/models.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
@@ -448,8 +448,8 @@ func TestWorkboardRouteDoesNotStartChatOrInspectorRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := string(script)
-	guard := strings.Index(body, `const workboardRoute = window.DarwinRoutes.workboards(relativePath)`)
-	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals()`)
+	guard := strings.Index(body, `const workboardRoute = window.NexusRoutes.workboards(relativePath)`)
+	chat := strings.Index(body, `loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals()`)
 	csrf := strings.Index(body, `fetch(base + "/api/v1/session/csrf"`)
 	if guard < 0 || !strings.Contains(body[guard:chat], `if (!skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute)`) || chat < guard || csrf < chat {
 		t.Fatal("workboard route does not guard unrelated startup requests")
@@ -487,8 +487,8 @@ let streams = 0;
 const node = {hidden:false, disabled:false, textContent:"", dataset:{}, children:[], classList:{toggle(){}},
   addEventListener(){}, setAttribute(){}, replaceChildren(){this.children=[]}, append(value){this.children.push(value)}};
 global.document = {body:{dataset:{basePath:"/app"}}, querySelector(){return node}, createElement(){return Object.assign({}, node, {dataset:{}, children:[]})}};
-global.window = {location:{pathname:"/app/workboards/%2F"}, DarwinRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
-window.DarwinWorkboardClient = require("./assets/v1/workboard-client.js");
+global.window = {location:{pathname:"/app/workboards/%2F"}, NexusRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+window.NexusWorkboardClient = require("./assets/v1/workboard-client.js");
 global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
 global.EventSource = class { constructor(){ streams++ } close(){} addEventListener(){} };
 require(asset);
@@ -515,8 +515,8 @@ function make() { return {hidden:false, disabled:false, textContent:"", value:""
   focus(){document.activeElement=this}, requestSubmit(){this.events.submit({preventDefault(){}})}}; }
 global.document = {body:{dataset:{basePath:"/app"}}, activeElement:null, querySelector(selector){if(!nodes.has(selector))nodes.set(selector,make());return nodes.get(selector)}, createElement(){return make()}};
 nodes.set("#board-state-filter", Object.assign(make(), {value:"active"}));
-global.window = {location:{pathname:"/app/workboards"}, DarwinRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
-window.DarwinWorkboardClient = require("./assets/v1/workboard-client.js");
+global.window = {location:{pathname:"/app/workboards"}, NexusRoutes:undefined, addEventListener(){}, setTimeout, clearTimeout};
+window.NexusWorkboardClient = require("./assets/v1/workboard-client.js");
 global.fetch = url => { urls.push(String(url)); return Promise.reject(new Error("offline")); };
 global.EventSource = class { close(){} addEventListener(){} };
 require(asset);
@@ -689,7 +689,7 @@ func TestEmbeddedWorkboardMutationsAreFencedAndNeverReplay(t *testing.T) {
 		`new Set([400, 401, 403, 404, 409, 422])`, `response.status === 401 || response.status === 403`,
 		`pendingIntent = Object.freeze({...intent, operationID: error && error.operationID || ""})`, `pendingIntent.operationID ? items.find(item => item.id === pendingIntent.operationID)`,
 		`The exact request is retained and will not be replayed.`, `Acknowledge this unresolved workboard outcome without retrying the exact request?`,
-		`window.DarwinWorkboards.refresh()`, `client.captureCurrent(activeCapture`, `This editor is stale because the authoritative snapshot changed.`,
+		`window.NexusWorkboards.refresh()`, `client.captureCurrent(activeCapture`, `This editor is stale because the authoritative snapshot changed.`,
 		`event.key === "Escape"`, `event.key !== "Tab"`, `document.activeElement === first`, `activeOpener`,
 		`rows.length < 32`, `rows.length > 32`, `textBytes(JSON.stringify(result)) <= 65536`, `clearParent && parent`, `clearAssignee && assignee`,
 		`body.expected_graph_revision = activeCapture.graphRevision`, `client.receiptMatches(body, intent)`, `client.mutationError(body, response.status)`, `client.acknowledgeAllowed(pendingIntent`,

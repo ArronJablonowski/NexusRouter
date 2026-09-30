@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 var testStreamCursorKey = []byte("01234567890123456789012345678901")

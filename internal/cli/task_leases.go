@@ -7,13 +7,13 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func runTaskLeases(args []string, stdout, stderr io.Writer) int {
 	flags, err := parseSteeringFlags(args, "db", "task")
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin task leases --db path --task id")
+		fmt.Fprintln(stderr, "usage: nexus task leases --db path --task id")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

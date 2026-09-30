@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://darwinrouter.local/schema/webui/workboard-v1",
-  "title": "DarwinRouter Workboard Presentation Contract v1",
+  "$id": "https://nexusrouter.local/schema/webui/workboard-v1",
+  "title": "NexusRouter Workboard Presentation Contract v1",
   "$defs": {
     "digest": {
       "type": "string",

@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Wire is an already-admitted, task-owned connection. Close MUST unblock IO.
@@ -25,7 +25,7 @@ type Wire interface {
 
 type Options struct{ Model, CWD, ReasoningEffort string }
 
-// Session adapts one Codex turn into Darwin model/tool segments. A verified
+// Session adapts one Codex turn into NexusRouter model/tool segments. A verified
 // item/tool/call is a paused segment boundary, NOT successful task completion.
 // Only turn/completed can finish the final segment. A caller must defer Close
 // across the entire runtime loop, including while a proposed tool is executing.
@@ -182,7 +182,7 @@ func (s *Session) begin(req providers.Request) error {
 	}
 	dynamic := []map[string]any{}
 	if len(definitions) > 0 {
-		dynamic = append(dynamic, map[string]any{"type": "namespace", "name": "darwin", "description": "DarwinRouter-authorized tools", "tools": definitions})
+		dynamic = append(dynamic, map[string]any{"type": "namespace", "name": "darwin", "description": "NexusRouter-authorized tools", "tools": definitions})
 	}
 	result, err := s.call("2", "thread/start", map[string]any{
 		"model": req.Model, "cwd": s.options.CWD, "ephemeral": true, "allowProviderModelFallback": false,

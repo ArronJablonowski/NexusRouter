@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func runLeaseAttention(args []string, stdout, stderr io.Writer) int {
@@ -20,7 +20,7 @@ func runLeaseAttention(args []string, stdout, stderr io.Writer) int {
 func runLeaseAttentionContext(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	path, options, ok := leaseAttentionFlags(args)
 	if !ok {
-		fmt.Fprintln(stderr, "usage: darwin resources attention --db path [--state open|resolved|all] [--after cursor] [--limit 25]")
+		fmt.Fprintln(stderr, "usage: nexus resources attention --db path [--state open|resolved|all] [--after cursor] [--limit 25]")
 		return 2
 	}
 	page, err := app.InspectLeaseAttention(ctx, path, options)

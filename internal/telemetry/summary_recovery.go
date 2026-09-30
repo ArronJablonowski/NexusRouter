@@ -15,8 +15,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 var ErrSummaryRecovery = errors.New("summary recovery unavailable")

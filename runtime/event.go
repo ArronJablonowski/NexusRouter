@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 type Kind string

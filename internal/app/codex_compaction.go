@@ -1,6 +1,6 @@
 package app
 
-import "github.com/ArronJablonowski/DarwinRouter/sessions"
+import "github.com/ArronJablonowski/NexusRouter/sessions"
 
 // This is a binding check on the private continuation prepared by the host,
 // not independent proof of source accuracy or operator approval. Public inputs

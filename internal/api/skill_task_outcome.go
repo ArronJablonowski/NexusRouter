@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func (h *Handler) serveSkillTaskOutcome(w http.ResponseWriter, r *http.Request) {

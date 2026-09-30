@@ -1,6 +1,6 @@
 # Post-publication verification
 
-DarwinRouter's post-publication verifier is an independent, read-only check of
+NexusRouter's post-publication verifier is an independent, read-only check of
 one externally authorized GitHub release. It does not create or modify a tag,
 release, asset, or approval.
 
@@ -65,7 +65,7 @@ Pass both identities to the production verifier:
 ```sh
 go run ./cmd/verify-published-release \
   --dir /ABSOLUTE/ORIGINAL/SIGNED-RELEASE \
-  --source /ABSOLUTE/INDEPENDENT/CLEAN/DarwinRouter \
+  --source /ABSOLUTE/INDEPENDENT/CLEAN/NexusRouter \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_CANDIDATE \
   --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
@@ -79,7 +79,7 @@ go run ./cmd/verify-published-release \
   --signing-authorization-sha256 sha256:EXPECTED_SIGNING_AUTHORIZATION \
   --publication-authorization /ABSOLUTE/INDEPENDENT/PUBLICATION_AUTHORIZATION.json \
   --publication-authorization-sha256 sha256:EXPECTED_PUBLICATION_AUTHORIZATION \
-  --repository ArronJablonowski/DarwinRouter \
+  --repository ArronJablonowski/NexusRouter \
   --release-notes /ABSOLUTE/INDEPENDENT/RELEASE_NOTES.md \
   --verifier-id idp:INDEPENDENT_RELEASE_VERIFIER \
   --download-dir /ABSOLUTE/EXISTING/PARENT/NEW-downloads \
@@ -106,8 +106,8 @@ decoded DSSE statement must exactly match the CLI's verification result.
 GitHub's ordinary release metadata and asset downloads remain unauthenticated
 public GET requests. The GitHub CLI may require its own authenticated GitHub
 session depending on repository visibility, service behavior, and local CLI
-configuration; establish that session outside DarwinRouter and never place its
-credentials in command arguments, the receipt, or retained logs. DarwinRouter
+configuration; establish that session outside NexusRouter and never place its
+credentials in command arguments, the receipt, or retained logs. NexusRouter
 does not print GitHub CLI stderr or underlying command errors and retains no raw
 statement, bundle, authentication configuration, executable path, or GitHub
 credential. Retain separate operator evidence for the reviewed CLI provenance,
@@ -153,7 +153,7 @@ fails before the binary runs. It then rechecks
 the closed signed release set and the receipt-bound manifest, checksum,
 signature, and whole-archive digests; extracts the authenticated binary; creates
 a new mode-0700 install root and mode-0755 binary through pinned directory
-handles; and runs only `darwin version` with bounded output, time, and
+handles; and runs only `nexus version` with bounded output, time, and
 environment. It revalidates the path and pinned inode chain immediately before
 and after execution, rereads the installed binary and release inputs, and only
 then records a whole-second UTC completion time and commits the canonical

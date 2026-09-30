@@ -2,13 +2,13 @@ package app
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	"math/big"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/contextpolicy"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // chooseContextTier freezes the context allocation before host admission. The

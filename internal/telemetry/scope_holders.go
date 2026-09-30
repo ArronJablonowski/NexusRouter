@@ -6,9 +6,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 // ScopeLeaseStatus observes bounded unresolved holders without probing ownership,

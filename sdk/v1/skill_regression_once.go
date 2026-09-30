@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 type SkillRegressionOperation = skills.RegressionOperation

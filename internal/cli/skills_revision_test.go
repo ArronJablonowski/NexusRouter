@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func cliRevisionFixture(t *testing.T) (*skills.FileStore, string, skills.Key, string, string, skills.ValidatorFunc) {

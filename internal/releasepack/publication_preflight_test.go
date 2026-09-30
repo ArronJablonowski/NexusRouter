@@ -34,7 +34,7 @@ func TestPublicationPreflightBindsVerifiedSignedSet(t *testing.T) {
 	}
 	record := publicationAuthorizationFixture()
 	record.ReleaseVersion, record.SourceCommit = candidate.ReleaseVersion, candidate.SourceCommit
-	record.Tag, record.ReleaseTitle = "v"+candidate.ReleaseVersion, "DarwinRouter v"+candidate.ReleaseVersion
+	record.Tag, record.ReleaseTitle = "v"+candidate.ReleaseVersion, "NexusRouter v"+candidate.ReleaseVersion
 	record.ReleaseNotesSHA256 = publicationDigest(notes)
 	record.CandidateRecordSHA256 = verified.CandidateRecordSHA256
 	record.LicenseEvidenceSHA256 = verified.LicenseEvidenceSHA256

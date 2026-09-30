@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
 )
 
 // DecideBoundApproval binds a server-attributed operator command to the exact

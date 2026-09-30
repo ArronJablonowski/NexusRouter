@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 // Batch position is assigned by the host's ordered fan-out, not tool arguments.

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 func browserGET(target string, cookie *http.Cookie) *http.Request {

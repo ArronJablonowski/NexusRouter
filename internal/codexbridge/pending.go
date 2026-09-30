@@ -12,7 +12,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 var ErrContinuation = errors.New("codex bridge: invalid tool continuation")
@@ -32,7 +32,7 @@ type CallRequest struct {
 	TurnID    string          `json:"turnId"`
 }
 
-// Pending binds a paused server tool request to the exact Darwin inference
+// Pending binds a paused server tool request to the exact NexusRouter inference
 // history that produced it. The host must keep the server request unanswered
 // until its runtime has persisted and authorized the proposal and its result.
 // This binding verifies correspondence, NOT approval or durable persistence.
@@ -46,7 +46,7 @@ type Pending struct {
 	resolved bool
 }
 
-// NewPending admits only tools explicitly supplied by Darwin under the darwin
+// NewPending admits only tools explicitly supplied by NexusRouter under the darwin
 // namespace. Built-in tools and other namespaces cannot become proposals here.
 // This is not a substitute for disabling those tools in the subprocess.
 func NewPending(req providers.Request, threadID, turnID, text string, call CallRequest) (*Pending, error) {

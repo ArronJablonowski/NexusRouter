@@ -41,7 +41,7 @@ The dispatcher consumes the exact approval before dispatch under the shared
 stages and syncs the new bytes, and publishes with a rename. Readers see an
 atomic replacement. This is **not an external-writer compare-and-swap**: unrelated
 editors can change a file after the final check. Stop other writers while
-reviewing/executing; leases fence only cooperating DarwinRouter instances sharing
+reviewing/executing; leases fence only cooperating NexusRouter instances sharing
 the durable lease store.
 
 The backup contains the checked, reviewed preimage. It cannot recover an external
@@ -63,7 +63,7 @@ automatically retried.
 
 Inspect both the current target and the recovery copy before deciding whether
 to restore. Restoration and removal of backups are separate operator actions;
-DarwinRouter does neither automatically. Backups contain the original file's
+NexusRouter does neither automatically. Backups contain the original file's
 sensitive contents and require the same care as source files. This repository
 ignores `.darwin-replace-*/`; add an equivalent exclusion to other configured
 workspaces before use. Ignore rules are not access controls or secret detection.

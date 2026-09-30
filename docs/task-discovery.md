@@ -1,11 +1,11 @@
 # Durable task discovery
 
-DarwinRouter can discover saved task IDs without loading their conversation or
+NexusRouter can discover saved task IDs without loading their conversation or
 tool payloads:
 
 ```sh
-./bin/darwin task list --db ./data/darwin.db --limit 25
-curl -H "Authorization: Bearer $DARWIN_API_TOKEN" \
+./bin/nexus task list --db ./data/darwin.db --limit 25
+curl -H "Authorization: Bearer $NEXUS_API_TOKEN" \
   'http://127.0.0.1:7788/v1/tasks?state=completed&limit=25'
 ```
 

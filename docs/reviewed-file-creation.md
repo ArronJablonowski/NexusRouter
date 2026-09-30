@@ -1,6 +1,6 @@
 # Reviewed creation of local files
 
-`darwin chat` can offer the built-in `create_file` tool to a local model. This is
+`nexus chat` can offer the built-in `create_file` tool to a local model. This is
 an opt-in write capability, not a shell or an existing-file editor. Enable it
 only for a narrow, caller-owned directory whose contents may be shown to the
 model and operator:
@@ -16,13 +16,13 @@ tools:
 
 Both directories must already exist. Configure local model context and resource
 metadata as for read-only tools, then run
-`darwin chat --config path/to/config.yaml --model LOCAL_MODEL_ID` in a terminal.
+`nexus chat --config path/to/config.yaml --model LOCAL_MODEL_ID` in a terminal.
 Input **and** output must be actual terminal descriptors; redirected/headless
 chat cannot approve creation. New files are readable by the model only when
 they also fall within `read_root`. File tools still exclude cloud execution.
 This feature does not grant native Codex or delegated workers a new filesystem
-capability. Environment overrides include `DARWIN__TOOLS__CREATE_ENABLED` and
-`DARWIN__TOOLS__CREATE_ROOT` through the existing layered configuration loader.
+capability. Environment overrides include `NEXUS__TOOLS__CREATE_ENABLED` and
+`NEXUS__TOOLS__CREATE_ROOT` through the existing layered configuration loader.
 
 ## Per-call review
 

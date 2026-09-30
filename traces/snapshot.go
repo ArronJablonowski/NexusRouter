@@ -1,4 +1,4 @@
-// Package traces defines DarwinRouter's bounded, content-free trace export.
+// Package traces defines NexusRouter's bounded, content-free trace export.
 package traces
 
 import (

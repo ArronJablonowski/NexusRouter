@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 const (

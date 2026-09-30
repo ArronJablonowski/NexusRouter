@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func (h *Handler) serveWorkflowDiscovery(w http.ResponseWriter, r *http.Request) {

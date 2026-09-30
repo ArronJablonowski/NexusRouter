@@ -2,7 +2,7 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	if (!window.DarwinRoutes || !window.DarwinRoutes.settings(relative)) return;
+	if (!window.NexusRoutes || !window.NexusRoutes.settings(relative)) return;
 	const view = document.querySelector("#settings-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), models = document.querySelector("#models-view");
 	const form = document.querySelector("#tool-settings-form"), tools = document.querySelector("#tools-enabled"), delegated = document.querySelector("#delegate-read-tools"), specialistsAllowCloud = document.querySelector("#specialists-allow-cloud");
 	const root = document.querySelector("#tools-read-root"), validation = document.querySelector("#settings-validation"), status = document.querySelector("#settings-status");
@@ -41,7 +41,7 @@
 		addSummary("Specialist models", value.active.specialists_allow_cloud ? "Local and cloud" : "Local only");
 		addSummary("Read root", value.active.read_root || "Not configured");
 		syncDependency(); validation.hidden = true;
-		setStatus(value.restart_required ? "Settings are saved. Restart DarwinRouter to activate them." : "Saved settings match the running daemon.", false);
+		setStatus(value.restart_required ? "Settings are saved. Restart NexusRouter to activate them." : "Saved settings match the running daemon.", false);
 	}
 	function load() {
 		setBusy(true); setStatus("Loading settings…", false);

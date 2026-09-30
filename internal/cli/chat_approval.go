@@ -13,9 +13,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 	"github.com/mattn/go-isatty"
 )
 
@@ -110,7 +110,7 @@ func chatApprovalPreview(settings config.Settings, secret func(string) string, p
 	// action. Decoding first catches credentials encoded with JSON escapes.
 	values := []string{args.Path, args.Content, settings.Tools.CreateRoot, p.Request.ID, p.Request.TaskID, p.Request.Scope}
 	if secret != nil {
-		envs := []string{"DARWIN_API_TOKEN"}
+		envs := []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"}
 		for _, provider := range settings.Providers {
 			if provider.APIKeyEnv != "" {
 				envs = append(envs, provider.APIKeyEnv)

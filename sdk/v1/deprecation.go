@@ -3,7 +3,7 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 )
 
 type DeprecationRequest = evaluation.DeprecationRequest

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 // The dispatcher owns this store and closes it after joining workers. Request

@@ -350,7 +350,7 @@ func (v *Verifier) getJSON(ctx context.Context, requestPath string, output any) 
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("X-GitHub-Api-Version", APIVersion)
-	request.Header.Set("User-Agent", "DarwinRouter-release-verifier/1")
+	request.Header.Set("User-Agent", "NexusRouter-release-verifier/1")
 	response, err := v.metadata.Do(request)
 	if err != nil {
 		return ErrVerify
@@ -376,7 +376,7 @@ func (v *Verifier) downloadAsset(ctx context.Context, root *os.Root, remote asse
 		return ObservedAsset{}, ErrVerify
 	}
 	request.Header.Set("Accept", "application/octet-stream")
-	request.Header.Set("User-Agent", "DarwinRouter-release-verifier/1")
+	request.Header.Set("User-Agent", "NexusRouter-release-verifier/1")
 	response, err := v.download.Do(request)
 	if err != nil {
 		return ObservedAsset{}, ErrVerify

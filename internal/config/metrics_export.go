@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 	"go.yaml.in/yaml/v3"
 )
 

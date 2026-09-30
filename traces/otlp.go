@@ -36,14 +36,14 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 			if startErr != nil || endErr != nil {
 				return nil, ErrInvalid
 			}
-			item := otlpSpan{TraceID: traceID, SpanID: ids[i], Name: "darwinrouter." + span.Name, Kind: 1, StartTimeUnixNano: strconv.FormatUint(start, 10), EndTimeUnixNano: strconv.FormatUint(end, 10), Attributes: []otlpAttribute{{Key: "darwinrouter.outcome", Value: otlpValue{StringValue: span.Outcome}}}}
+			item := otlpSpan{TraceID: traceID, SpanID: ids[i], Name: "nexusrouter." + span.Name, Kind: 1, StartTimeUnixNano: strconv.FormatUint(start, 10), EndTimeUnixNano: strconv.FormatUint(end, 10), Attributes: []otlpAttribute{{Key: "nexusrouter.outcome", Value: otlpValue{StringValue: span.Outcome}}}}
 			if span.Parent >= 0 {
 				item.ParentSpanID = ids[span.Parent]
 			}
 			spans = append(spans, item)
 		}
 	}
-	request := otlpRequest{ResourceSpans: []otlpResourceSpans{{Resource: otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}}, ScopeSpans: []otlpScopeSpans{{Scope: otlpScope{Name: "darwinrouter.traces", Version: strconv.Itoa(SnapshotVersion)}, Spans: spans}}}}}
+	request := otlpRequest{ResourceSpans: []otlpResourceSpans{{Resource: otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "NexusRouter"}}}}, ScopeSpans: []otlpScopeSpans{{Scope: otlpScope{Name: "nexusrouter.traces", Version: strconv.Itoa(SnapshotVersion)}, Spans: spans}}}}}
 	body, err := json.Marshal(request)
 	if err != nil || len(body) > 256<<10 {
 		return nil, ErrInvalid

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestWorkboardSchedulerRunsReadyCardThroughDurableWorkerLifecycleOnce(t *testing.T) {

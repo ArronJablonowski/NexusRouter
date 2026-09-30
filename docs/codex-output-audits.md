@@ -1,6 +1,6 @@
 # Sol output audits through the signed-in CLI
 
-The experimental `codex_app_server` provider can now perform Darwin's bounded
+The experimental `codex_app_server` provider can now perform NexusRouter's bounded
 output audits, using the existing Codex login and `gpt-5.6-sol`. No separate API
 key is needed. This is the same advisory audit service used by HTTP reviewers,
 not Codex's repository-oriented `review/start` operation.
@@ -22,10 +22,10 @@ produce no accepted audit and are not automatically retried. The provider is
 closed and the invocation-owned directory removed on completion or failure.
 
 The [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
-defines `turn/start.outputSchema`. Darwin uses it to constrain native review
+defines `turn/start.outputSchema`. NexusRouter uses it to constrain native review
 generation to a closed audit object, pinning evaluator ID, rubric, domain and
 allowed evidence references. The schema is included in context estimation.
-Darwin still independently parses and validates every result, including limits
+NexusRouter still independently parses and validates every result, including limits
 that are stricter than the generation schema. HTTP reviewers retain their
 existing default request format; embedded `evaluation.Reviewer` callers may opt
 into `StructuredOutput` explicitly.
@@ -48,8 +48,8 @@ configuration after a task was written.
 With the existing sample profile, enable judging only for the command:
 
 ```sh
-DARWIN__EVALUATION__LLM_JUDGE_ENABLED=true \
-  ./bin/darwin audit --config examples/sol-codex-local-smoke.yaml \
+NEXUS__EVALUATION__LLM_JUDGE_ENABLED=true \
+  ./bin/nexus audit --config examples/sol-codex-local-smoke.yaml \
   --task CLOUD_ELIGIBLE_TASK_ID --reviewer coordinator --max-cost 0.10
 ```
 
@@ -76,7 +76,7 @@ of correctness.
 
 The daemon and `sdk/v1` expose the same version-one, restart-safe operation
 contract over the application service. HTTP callers authenticate with
-`Authorization: Bearer <DARWIN_API_TOKEN>`; browser-origin requests are denied.
+`Authorization: Bearer <NEXUS_API_TOKEN>`; browser-origin requests are denied.
 Create one operation with:
 
 ```http
@@ -119,7 +119,7 @@ evidence references, rubric/domain provenance, elapsed time and provider usage
 when reported. A pending or failed result does not fabricate those fields.
 Confidence is intentionally absent: model self-assessment is not acceptance
 evidence. Every projection carries the fixed precedence
-`deterministic`, `tool_result`, `user_feedback`, `llm_judge`. Darwin uses
+`deterministic`, `tool_result`, `user_feedback`, `llm_judge`. NexusRouter uses
 objective checks and tool results ahead of explicit user judgment; for
 subjective creative work, user feedback therefore outranks the optional model
 judge.
@@ -157,7 +157,7 @@ The corresponding embedded calls are `Client.RunAudit`, `InspectAudit`,
 usage, provenance, disposition, and callback delivery use the same validation
 rules. HTTP and SDK execution are synchronous: the caller connection/context
 owns the currently running reviewer. If delivery or the process is lost after
-durable admission, restart inspection can still observe `pending`, but Darwin
+durable admission, restart inspection can still observe `pending`, but NexusRouter
 does not guess whether provider inference occurred and never automatically
 dispatches that admitted operation again. An exact POST retry or event replay
 only returns durable state. Operators may cancel an indefinitely pending
@@ -188,7 +188,7 @@ On CLI 0.153.4, Sol rejected a synthetic candidate that only promised to produce
 a requested Go function later. The validated audit contained two findings and
 was persisted without changing the source's six events. The source was produced
 by a loopback provider fixture declared cloud-eligible, not actual local-model
-inference. Prompt-only attempts completed but returned non-JSON, which Darwin
+inference. Prompt-only attempts completed but returned non-JSON, which NexusRouter
 rejected; the structured-output request passed without weakening the parser.
 
 Fixtures additionally cover durable-before-launch ordering, privacy and cost

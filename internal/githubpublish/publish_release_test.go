@@ -200,8 +200,8 @@ func TestPublishReleaseLostMutationResponsesAreUncertain(t *testing.T) {
 func publicationPlan(t *testing.T) PublicationPlan {
 	t.Helper()
 	return PublicationPlan{
-		DraftPlan: testPlan(), TagMessage: "DarwinRouter release v1.2.3-rc.1",
-		Tagger:     Tagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
+		DraftPlan: testPlan(), TagMessage: "NexusRouter release v1.2.3-rc.1",
+		Tagger:     Tagger{Name: "NexusRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"},
 		MakeLatest: false, JournalPath: filepath.Join(t.TempDir(), "publication.jsonl"),
 	}
 }
@@ -255,7 +255,7 @@ func TestFinalVerificationEnforcesLatestPolicy(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := publicationPlan(t)
-			plan.Tag, plan.Name, plan.TagMessage, plan.Prerelease = "v1.2.3", "DarwinRouter v1.2.3", "DarwinRouter release v1.2.3", false
+			plan.Tag, plan.Name, plan.TagMessage, plan.Prerelease = "v1.2.3", "NexusRouter v1.2.3", "NexusRouter release v1.2.3", false
 			plan.MakeLatest = test.makeLatest
 			tagSHA := strings.Repeat("c", 40)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

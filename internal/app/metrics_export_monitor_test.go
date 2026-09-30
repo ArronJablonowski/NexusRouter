@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 func waitMetricsExportHealth(t *testing.T, exporter *MetricsExporter, status string) {
@@ -313,7 +313,7 @@ func TestMetricsExporterEachAttemptReadsFreshDurableSnapshot(t *testing.T) {
 		for _, resource := range payload.ResourceMetrics {
 			for _, scope := range resource.ScopeMetrics {
 				for _, metric := range scope.Metrics {
-					if metric.Name != "darwinrouter.submissions" {
+					if metric.Name != "nexusrouter.submissions" {
 						continue
 					}
 					for _, point := range metric.Gauge.DataPoints {

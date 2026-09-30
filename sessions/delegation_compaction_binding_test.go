@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func delegationCompactionBindingFixture(t *testing.T, index int) DelegationCompactionBinding {

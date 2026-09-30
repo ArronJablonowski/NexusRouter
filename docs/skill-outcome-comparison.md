@@ -1,13 +1,13 @@
 # Comparing skill-version outcomes
 
-DarwinRouter can compare an explicit bounded set of recorded tasks for two
+NexusRouter can compare an explicit bounded set of recorded tasks for two
 versions of one skill. This read-only diagnostic complements deterministic
 regression checks; it does not activate, disable or roll back a skill, update
 fitness, invoke a model, or execute generated validation commands.
 
 ## Interfaces
 
-Supply this versioned JSON object to `darwin skills compare --config config.yaml`
+Supply this versioned JSON object to `nexus skills compare --config config.yaml`
 on standard input, or to authenticated `POST /v1/skills/comparison` with
 `Content-Type: application/json`. The Go SDK exposes `CompareSkillOutcomes`.
 

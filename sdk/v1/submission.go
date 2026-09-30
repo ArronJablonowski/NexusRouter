@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 var ErrSubmission = app.ErrSubmission

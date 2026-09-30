@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/ArronJablonowski/DarwinRouter/accounting"
+	"github.com/ArronJablonowski/NexusRouter/accounting"
 )
 
 // MarshalOTLP encodes an OTLP/HTTP JSON ExportMetricsServiceRequest, without
@@ -33,7 +33,7 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 				TimeUnixNano: at, AsInt: strconv.FormatInt(count.Value, 10),
 			})
 		}
-		items = append(items, otlpMetric{Name: "darwinrouter." + group.Name, Unit: "{record}", Gauge: &otlpGauge{DataPoints: points}})
+		items = append(items, otlpMetric{Name: "nexusrouter." + group.Name, Unit: "{record}", Gauge: &otlpGauge{DataPoints: points}})
 	}
 	if snapshot.TaskDuration != nil {
 		items = append(items, otlpTaskDuration(snapshot.TaskDuration, at)...)
@@ -48,8 +48,8 @@ func MarshalOTLP(snapshot Snapshot) ([]byte, error) {
 		items = append(items, otlpAccounting(snapshot.Accounting, at)...)
 	}
 	request := otlpRequest{ResourceMetrics: []otlpResourceMetrics{{
-		Resource:     otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "DarwinRouter"}}}},
-		ScopeMetrics: []otlpScopeMetrics{{Scope: otlpScope{Name: "darwinrouter.metrics", Version: "1"}, Metrics: items}},
+		Resource:     otlpResource{Attributes: []otlpAttribute{{Key: "service.name", Value: otlpValue{StringValue: "NexusRouter"}}}},
+		ScopeMetrics: []otlpScopeMetrics{{Scope: otlpScope{Name: "nexusrouter.metrics", Version: "1"}, Metrics: items}},
 	}}}
 	body, err := json.Marshal(request)
 	if err != nil || len(body) > 64<<10 {
@@ -73,7 +73,7 @@ func otlpAccounting(totals *accounting.Totals, at string) []otlpMetric {
 		for _, item := range types {
 			points = append(points, otlpPoint{Attributes: []otlpAttribute{{Key: "bucket", Value: otlpValue{StringValue: item.name}}}, TimeUnixNano: at, AsInt: strconv.FormatInt(value(item.total), 10)})
 		}
-		return otlpMetric{Name: "darwinrouter.accounting." + name, Unit: unit, Gauge: &otlpGauge{DataPoints: points}}
+		return otlpMetric{Name: "nexusrouter.accounting." + name, Unit: unit, Gauge: &otlpGauge{DataPoints: points}}
 	}
 	items := []otlpMetric{
 		integer("records", "{record}", func(t accounting.Total) int64 { return t.Records }),
@@ -89,7 +89,7 @@ func otlpAccounting(totals *accounting.Totals, at string) []otlpMetric {
 		value := item.total.KnownNormalizedCost
 		costs = append(costs, otlpPoint{Attributes: []otlpAttribute{{Key: "bucket", Value: otlpValue{StringValue: item.name}}}, TimeUnixNano: at, AsDouble: &value})
 	}
-	return append(items, otlpMetric{Name: "darwinrouter.accounting.normalized_cost.known", Unit: "USD", Gauge: &otlpGauge{DataPoints: costs}})
+	return append(items, otlpMetric{Name: "nexusrouter.accounting.normalized_cost.known", Unit: "USD", Gauge: &otlpGauge{DataPoints: costs}})
 }
 
 func otlpResources(resources *Resources, at string) []otlpMetric {
@@ -100,7 +100,7 @@ func otlpResources(resources *Resources, at string) []otlpMetric {
 		if measurement.Available {
 			available = 1
 			items = append(items, otlpMetric{
-				Name:  "darwinrouter.resource." + measurement.Name,
+				Name:  "nexusrouter.resource." + measurement.Name,
 				Unit:  resourceDefinitions[i].unit,
 				Gauge: &otlpGauge{DataPoints: []otlpPoint{{Attributes: []otlpAttribute{}, TimeUnixNano: at, AsInt: strconv.FormatInt(measurement.Value, 10)}}},
 			})
@@ -110,7 +110,7 @@ func otlpResources(resources *Resources, at string) []otlpMetric {
 			TimeUnixNano: at, AsInt: strconv.FormatInt(available, 10),
 		})
 	}
-	items = append(items, otlpMetric{Name: "darwinrouter.resource.available", Unit: "{bool}", Gauge: &otlpGauge{DataPoints: availability}})
+	items = append(items, otlpMetric{Name: "nexusrouter.resource.available", Unit: "{bool}", Gauge: &otlpGauge{DataPoints: availability}})
 	return items
 }
 

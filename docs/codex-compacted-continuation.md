@@ -12,16 +12,16 @@ First inspect the draft against its complete source, then record your review and
 continue with the configured exact Sol model ID:
 
 ```sh
-./bin/darwin summaries show --db path/to/darwin.db --id SUMMARY_ATTEMPT_ID
-./bin/darwin summary-review --config path/to/config.yaml \
+./bin/nexus summaries show --db path/to/darwin.db --id SUMMARY_ATTEMPT_ID
+./bin/nexus summary-review --config path/to/config.yaml \
   --attempt SUMMARY_ATTEMPT_ID --decision approved \
   --note "Compared requirements, decisions, pending work and effects with source"
-./bin/darwin run --config path/to/config.yaml --model COORDINATOR_MODEL_ID \
+./bin/nexus run --config path/to/config.yaml --model COORDINATOR_MODEL_ID \
   --continue-task SOURCE_TASK_ID --summary-attempt SUMMARY_ATTEMPT_ID < followup.txt
 ```
 
 For an explicitly operator-supplied summary file, use `--compact-keep` and
-`--compact-summary` instead of `--summary-attempt`. The existing Darwin-native
+`--compact-summary` instead of `--summary-attempt`. The existing NexusRouter-native
 task API and SDK `Request` compaction/summary fields reach the same application
 admission path. Public callers cannot supply the private resolved checkpoint.
 
@@ -53,7 +53,7 @@ overrides the transaction's current-review check.
 
 The [official Codex App Server reference](https://learn.chatgpt.com/docs/app-server)
 documents `thread/inject_items` for adding model-visible history without starting
-generation. Darwin uses the existing checked import protocol, not a native
+generation. NexusRouter uses the existing checked import protocol, not a native
 `thread/compact/start` request.
 
 Original system messages retain their roles. A fixed host warning marks the

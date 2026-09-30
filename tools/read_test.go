@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 type readAuthorityFunc func(context.Context, runtime.ToolExecution, string, func(context.Context) (runtime.ToolResult, error)) (runtime.ToolResult, error)

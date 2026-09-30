@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // PlanInterruptedModel records failure of an unfinished model-only journal,

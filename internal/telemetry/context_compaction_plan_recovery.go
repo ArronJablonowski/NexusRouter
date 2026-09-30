@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 var ErrContextCompactionRecovery = errors.New("context compaction recovery unavailable")

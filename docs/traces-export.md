@@ -1,6 +1,6 @@
 # OTLP trace export
 
-DarwinRouter can explicitly export a bounded, content-free view of recent task
+NexusRouter can explicitly export a bounded, content-free view of recent task
 lifecycles as OTLP/HTTP JSON. Snapshot schema version 2 added the
 fixed queue-residency observation, version 3 added fixed tool-effect evidence,
 version 4 added content-free resource-pressure observations, and version 5
@@ -13,7 +13,7 @@ heartbeat observation per worker lifecycle. Version 10 adds a bounded model-
 output activity window per turn:
 
 ```sh
-darwin traces export --config config.yaml \
+nexus traces export --config config.yaml \
   --endpoint http://127.0.0.1:4318/v1/traces --limit 16
 ```
 
@@ -139,7 +139,7 @@ identity. A catalog transition newer than the SQLite observation boundary
 fails that snapshot instead of combining incompatible times.
 
 OTLP trace and span IDs are freshly generated for every serialization. They are
-not hashes or stable pseudonyms for durable DarwinRouter records. Consequently,
+not hashes or stable pseudonyms for durable NexusRouter records. Consequently,
 separate exports cannot be joined by their wire IDs. Operators requiring
 cross-export correlation must add it outside this privacy-preserving interface.
 

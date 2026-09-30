@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func decompositionStore(t *testing.T, path string, limits workboard.DecompositionLimits, config string, actor workboard.Actor) (*Store, *workboard.CardService, string) {

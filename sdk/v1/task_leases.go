@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 // TaskLeaseStatus is a metadata-only observation, never permission to reclaim

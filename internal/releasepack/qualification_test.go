@@ -108,7 +108,7 @@ func TestReleaseQualification(t *testing.T) {
 	keyDigest := sha256.Sum256(public)
 	keyFingerprint := "sha256:" + hex.EncodeToString(keyDigest[:])
 	trustRecord := TrustRecord{
-		SchemaVersion: 1, Project: "DarwinRouter", Scope: trustScope, KeyID: "qualification-key",
+		SchemaVersion: 1, Project: "NexusRouter", Scope: trustScope, KeyID: "qualification-key",
 		Algorithm: "Ed25519", PublicKey: hex.EncodeToString(public), PublicKeySHA256: keyFingerprint,
 		Status: "active", PublishedAt: "2026-09-07T00:00:00Z",
 		ReleasePolicyURL: "https://example.invalid/qualification-policy", RotationRevocationURL: "https://example.invalid/qualification-status",
@@ -130,7 +130,7 @@ func TestReleaseQualification(t *testing.T) {
 		t.Fatal("approved build sums identity")
 	}
 	authorization := SigningAuthorization{
-		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
+		SchemaVersion: signingAuthorizationSchema, Project: "NexusRouter", Scope: signingAuthorizationScope,
 		CandidateRecordSHA256: prefixedDigest(candidateBody), LicenseEvidenceSHA256: licenseEvidenceSHA256,
 		SHA256SUMSSHA256:  prefixedDigest(sumsBody),
 		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: trustRecord.KeyID, KeyFingerprint: keyFingerprint,
@@ -238,7 +238,7 @@ func TestReleaseQualification(t *testing.T) {
 				t.Fatal(err)
 			}
 			got, e := command(ctx, parent, environment(), path, "version")
-			if e != nil || got != "darwin "+version {
+			if e != nil || got != "nexus "+version {
 				t.Fatalf("native version mismatch: %q: %v", got, e)
 			}
 			rehearsalRoot := t.TempDir()
@@ -317,7 +317,7 @@ func qualificationBinary(t *testing.T, path string, artifact Artifact) []byte {
 		if contract.name == noticeName && validateNotice(entry, artifact.OS, artifact.Arch) != nil {
 			t.Fatal("invalid dependency notice")
 		}
-		if contract.name == "darwin" {
+		if contract.name == "nexus" {
 			body = entry
 		}
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // BenchmarkMetricsCompletedTasks measures the actual read-only snapshot path.

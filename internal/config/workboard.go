@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const maxWorkboardJudgeCost = float64(workboard.MaxWorkCostMicros) / 1_000_000

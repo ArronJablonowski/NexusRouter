@@ -116,8 +116,8 @@ client, err := sdk.New(sdk.ConfigOptions{
 })
 ```
 
-Import `context`, `github.com/ArronJablonowski/DarwinRouter/contextengine`, and
-`sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"`. Embedding `Default`
+Import `context`, `github.com/ArronJablonowski/NexusRouter/contextengine`, and
+`sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"`. Embedding `Default`
 provides conservative estimation and unchanged compaction selection. A custom
 estimator may instead implement `Estimate` explicitly.
 

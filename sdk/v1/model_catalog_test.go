@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestSDKConfiguredModelCatalog(t *testing.T) {

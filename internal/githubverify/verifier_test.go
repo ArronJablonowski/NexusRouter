@@ -16,7 +16,7 @@ import (
 func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 	contents := map[string][]byte{}
 	assets := make([]ExpectedAsset, 0, 7)
-	for i, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "DarwinRouter_1.0.0_darwin_arm64.tar.gz", "DarwinRouter_1.0.0_linux_amd64.tar.gz", "DarwinRouter_1.0.0_linux_arm64.tar.gz", "SHA256SUMS", "SHA256SUMS.sig", "manifest.json"} {
+	for i, name := range []string{"NexusRouter_1.0.0_darwin_amd64.tar.gz", "NexusRouter_1.0.0_darwin_arm64.tar.gz", "NexusRouter_1.0.0_linux_amd64.tar.gz", "NexusRouter_1.0.0_linux_arm64.tar.gz", "SHA256SUMS", "SHA256SUMS.sig", "manifest.json"} {
 		body := []byte(fmt.Sprintf("asset-%d\n", i))
 		contents[name] = body
 		contentType := "application/octet-stream"
@@ -27,7 +27,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 	}
 	commit := strings.Repeat("a", 40)
 	tagObjectSHA := strings.Repeat("b", 40)
-	tagger := Tagger{Name: "DarwinRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"}
+	tagger := Tagger{Name: "NexusRouter Release", Email: "release@example.invalid", Date: "2026-09-07T00:01:00Z"}
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.Header.Get("Authorization") != "" {
@@ -39,14 +39,14 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 			for i, asset := range assets {
 				remote[i] = assetResponse{ID: int64(i + 1), Name: asset.Name, State: "uploaded", Size: asset.Size, Digest: asset.SHA256, ContentType: asset.ContentType, BrowserDownloadURL: server.URL + "/acme/router/releases/download/v1.0.0/" + asset.Name}
 			}
-			writeJSON(t, w, releaseResponse{ID: 41, HTMLURL: "https://github.com/acme/router/releases/tag/v1.0.0", TagName: "v1.0.0", TargetCommitish: commit, Name: "DarwinRouter v1.0.0", Body: "notes\n", Immutable: true, PublishedAt: "2026-09-07T01:00:00Z", Assets: remote})
+			writeJSON(t, w, releaseResponse{ID: 41, HTMLURL: "https://github.com/acme/router/releases/tag/v1.0.0", TagName: "v1.0.0", TargetCommitish: commit, Name: "NexusRouter v1.0.0", Body: "notes\n", Immutable: true, PublishedAt: "2026-09-07T01:00:00Z", Assets: remote})
 		case "/repos/acme/router/git/ref/tags/v1.0.0":
 			var ref refResponse
 			ref.Ref, ref.Object.Type, ref.Object.SHA = "refs/tags/v1.0.0", "tag", tagObjectSHA
 			writeJSON(t, w, ref)
 		case "/repos/acme/router/git/tags/" + tagObjectSHA:
 			var tag annotatedTagResponse
-			tag.Tag, tag.SHA, tag.Message, tag.Tagger, tag.Object.Type, tag.Object.SHA = "v1.0.0", tagObjectSHA, "DarwinRouter release v1.0.0", tagger, "commit", commit
+			tag.Tag, tag.SHA, tag.Message, tag.Tagger, tag.Object.Type, tag.Object.SHA = "v1.0.0", tagObjectSHA, "NexusRouter release v1.0.0", tagger, "commit", commit
 			writeJSON(t, w, tag)
 		default:
 			name := filepath.Base(r.URL.Path)
@@ -71,7 +71,7 @@ func TestReadOnlyImmutableReleaseDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "fresh")
-	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: tagger, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out}
+	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "NexusRouter release v1.0.0", Tagger: tagger, Title: "NexusRouter v1.0.0", Body: []byte("notes\n"), Assets: assets, DownloadDir: out}
 	result, err := verifier.Verify(context.Background(), plan)
 	if err != nil || !result.Immutable || result.ObservedAt != "2026-09-07T01:01:00Z" || len(result.Assets) != 7 {
 		t.Fatal("verification failed", result, err)
@@ -125,7 +125,7 @@ func TestNewRequiresReleaseAttestationVerifier(t *testing.T) {
 
 func TestExactAnnotatedTagRejectsLightweightNestedAndMismatchedStates(t *testing.T) {
 	commit, object := strings.Repeat("a", 40), strings.Repeat("b", 40)
-	plan := Plan{Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}}
+	plan := Plan{Tag: "v1.0.0", Commit: commit, TagMessage: "NexusRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}}
 	var valid annotatedTagResponse
 	valid.Tag, valid.SHA, valid.Message, valid.Tagger, valid.Object.Type, valid.Object.SHA = plan.Tag, object, plan.TagMessage, plan.Tagger, "commit", commit
 	if !exactAnnotatedTag(valid, object, plan) {
@@ -205,7 +205,7 @@ func TestRedirectPolicyRejectsUntrustedHosts(t *testing.T) {
 
 func TestExactReleaseRejectsMetadataDrift(t *testing.T) {
 	commit := strings.Repeat("a", 40)
-	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "DarwinRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}, Title: "DarwinRouter v1.0.0", Body: []byte("notes\n")}
+	plan := Plan{Repository: "acme/router", Tag: "v1.0.0", Commit: commit, TagMessage: "NexusRouter release v1.0.0", Tagger: Tagger{Name: "n", Email: "a@b", Date: "2026-09-07T00:01:00Z"}, Title: "NexusRouter v1.0.0", Body: []byte("notes\n")}
 	valid := releaseResponse{
 		ID: 1, HTMLURL: "https://github.com/acme/router/releases/tag/v1.0.0", TagName: plan.Tag,
 		TargetCommitish: commit, Name: plan.Title, Body: string(plan.Body), Immutable: true,

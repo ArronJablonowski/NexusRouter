@@ -32,7 +32,7 @@ func NewFDCredentialSource(fd int) (*FDCredentialSource, error) {
 	if err != nil {
 		return nil, ErrCredentialTransport
 	}
-	file := os.NewFile(uintptr(ownedFD), "darwinrouter-github-credential")
+	file := os.NewFile(uintptr(ownedFD), "nexusrouter-github-credential")
 	if file == nil {
 		closeCredentialDescriptor(ownedFD)
 		return nil, ErrCredentialTransport

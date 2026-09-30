@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func appendStoredCheckpoint(ctx context.Context, tx *sql.Tx, mutation workboard.ProgressMutation, card workboard.Card, body storedWorkboardCard) (int64, int, error) {

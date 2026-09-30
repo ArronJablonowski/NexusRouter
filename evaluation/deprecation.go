@@ -8,7 +8,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 var ErrDeprecation = errors.New("invalid deprecation evidence or policy")

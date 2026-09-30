@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestSupervisorUsesValidatedHostWorkerIdentity(t *testing.T) {

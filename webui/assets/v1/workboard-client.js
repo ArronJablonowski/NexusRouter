@@ -2,7 +2,7 @@
 (function (root, factory) {
 	const client = factory();
 	if (typeof module === "object" && module.exports) module.exports = client;
-	if (root) root.DarwinWorkboardClient = client;
+	if (root) root.NexusWorkboardClient = client;
 })(typeof window === "object" ? window : null, () => {
 	function compareText(left, right) {
 		const a = new TextEncoder().encode(left), b = new TextEncoder().encode(right), count = Math.min(a.length, b.length);

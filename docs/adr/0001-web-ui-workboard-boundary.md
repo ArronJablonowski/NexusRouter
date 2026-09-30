@@ -8,7 +8,7 @@
 
 ## Context
 
-DarwinRouter needs a browser chat experience and an integrated Kanban for
+NexusRouter needs a browser chat experience and an integrated Kanban for
 long-running work without weakening the daemon's existing bearer-authenticated
 API or turning browser presentation state into runtime truth. Existing task
 events contain internal model and tool payloads, existing task discovery is
@@ -66,7 +66,7 @@ document can only create and consume a challenge under the controls below.
 
 The approval operation is a new authenticated native command,
 `POST /v1/browser-session/challenges/{challenge}/approve`, exposed by
-`darwin web approve --config path/to/config.yaml CHALLENGE_ID.DISPLAY_CODE`.
+`nexus web approve --config path/to/config.yaml CHALLENGE_ID.DISPLAY_CODE`.
 It accepts only the opaque challenge identifier and
 display-code proof, is rate limited, and never returns a browser session or host
 token to the CLI.

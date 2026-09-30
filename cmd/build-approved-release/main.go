@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type approvedBuilder func(context.Context, releasepack.ApprovedBuildOptions) (releasepack.ApprovedBuildResult, error)

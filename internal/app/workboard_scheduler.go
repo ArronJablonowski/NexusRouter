@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 const maxWorkboardScheduleScan = 10_000

@@ -2,9 +2,9 @@ package app
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/routing"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 	"math"
 	"testing"
 	"time"

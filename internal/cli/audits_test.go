@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func TestAuditInspectionDoesNotCreateStorage(t *testing.T) {

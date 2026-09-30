@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // invokeProviderStream contains a provider implementation panic at the
@@ -38,7 +38,7 @@ func invokeProviderStream(ctx context.Context, provider providers.Provider, requ
 	})
 }
 
-// invokeProviderEmit keeps a panic in DarwinRouter's own provider callback
+// invokeProviderEmit keeps a panic in NexusRouter's own provider callback
 // distinct from an adapter panic. The callback includes durable appends, so a
 // panic leaves commit state ambiguous and must fail closed as persistence.
 func invokeProviderEmit(emit func(providers.Chunk) error, chunk providers.Chunk) (err error) {

@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func runFeedback(args []string, stdout, stderr io.Writer) int {
@@ -23,7 +23,7 @@ func runFeedback(args []string, stdout, stderr io.Writer) int {
 	outcome := fs.String("outcome", "", "accepted or rejected")
 	cost := fs.Float64("attempt-cost", -1, "observed final model-attempt cost")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *timeout <= 0 || *timeout > 10*time.Minute || *db == "" || *task == "" || (*outcome != "accepted" && *outcome != "rejected") || *cost < 0 || math.IsNaN(*cost) || math.IsInf(*cost, 0) {
-		fmt.Fprintln(stderr, "usage: darwin feedback --db path --task id --outcome accepted|rejected --attempt-cost amount")
+		fmt.Fprintln(stderr, "usage: nexus feedback --db path --task id --outcome accepted|rejected --attempt-cost amount")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)

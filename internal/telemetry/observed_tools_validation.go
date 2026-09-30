@@ -7,8 +7,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 var errObservedToolsValidation = errors.New("observed tools validation unavailable")

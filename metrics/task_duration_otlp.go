@@ -33,5 +33,5 @@ func otlpTaskDuration(d *TaskDuration, at string) []otlpMetric {
 			u.DataPoints = append(u.DataPoints, otlpPoint{Attributes: []otlpAttribute{attrs[0], {Key: "reason", Value: otlpValue{StringValue: reason.State}}}, TimeUnixNano: at, AsInt: strconv.FormatInt(reason.Value, 10)})
 		}
 	}
-	return []otlpMetric{{Name: "darwinrouter.task.duration", Unit: "s", Histogram: h}, {Name: "darwinrouter.task.duration.unavailable", Unit: "{record}", Gauge: u}}
+	return []otlpMetric{{Name: "nexusrouter.task.duration", Unit: "s", Histogram: h}, {Name: "nexusrouter.task.duration.unavailable", Unit: "{record}", Gauge: u}}
 }

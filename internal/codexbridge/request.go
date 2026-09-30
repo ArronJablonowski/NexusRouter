@@ -3,7 +3,7 @@ package codexbridge
 import (
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // Bound input before JSON serialization, including empty-element overhead.

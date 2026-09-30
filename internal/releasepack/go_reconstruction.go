@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	goReconstructionPolicy      = "darwinrouter-public-go-reconstruction-v1"
+	goReconstructionPolicy      = "nexusrouter-public-go-reconstruction-v1"
 	goReconstructionProxy       = "https://proxy.golang.org"
 	goReconstructionSumDatabase = "sum.golang.org"
 )

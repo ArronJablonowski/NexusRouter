@@ -45,7 +45,7 @@
 	let operationsReady = false, operationReadFailed = false, activeApproval = null, approvalOpener = null;
 	let composing = false, announcementTimer = 0, submissionPollTimer = 0, submissionPollCount = 0;
 	let submissionShouldNavigate = false, operationRequest = 0;
-	window.DarwinSession = Object.freeze({
+	window.NexusSession = Object.freeze({
 		csrfHeader: () => csrfToken ? {"X-Darwin-CSRF": csrfToken} : {}
 	});
 	function element(name, className, value) { const node = document.createElement(name); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; }
@@ -170,10 +170,10 @@
 		const createdAt = Date.parse(item && item.created_at);
 		const updatedAt = Date.parse(item && item.updated_at);
 		if (!item || item.version !== 1 || !presentationID.test(item.operation_id) ||
-			!window.DarwinOperationContract.validAction(item.action) ||
+			!window.NexusOperationContract.validAction(item.action) ||
 			!["pending", "committed", "rejected"].includes(item.state) || !Number.isFinite(createdAt) || !Number.isFinite(updatedAt) || updatedAt < createdAt) return null;
 		const hasSubject = item.subject_type !== undefined || item.subject_id !== undefined;
-		if (hasSubject && (!window.DarwinOperationContract.validSubject(item.subject_type) || !presentationID.test(item.subject_id))) return null;
+		if (hasSubject && (!window.NexusOperationContract.validSubject(item.subject_type) || !presentationID.test(item.subject_id))) return null;
 		if (item.state === "committed" && !hasSubject) return null;
 		return Object.freeze({operationID: item.operation_id, action: item.action, state: item.state,
 			subjectType: hasSubject ? item.subject_type : "", subjectID: hasSubject ? item.subject_id : ""});
@@ -306,7 +306,7 @@
 		showMutation("Request in progress…", false);
 		fetch(base + path, {
 			method: "POST", credentials: "same-origin", cache: "no-store",
-			headers: {"Accept": "application/json", "Content-Type": "application/json", ...window.DarwinSession.csrfHeader()},
+			headers: {"Accept": "application/json", "Content-Type": "application/json", ...window.NexusSession.csrfHeader()},
 			body: intent.body
 		}).then(async response => {
 			let body = null;
@@ -503,7 +503,7 @@
 		feedbackRejected.textContent = revise ? "Revise as rejected" : "Record rejected";
 	}
 	function loadTaskContext(taskID) {
-		selectedControls = null; feedbackContext = null; updateControls(); window.DarwinInspector.loadTask(taskID);
+		selectedControls = null; feedbackContext = null; updateControls(); window.NexusInspector.loadTask(taskID);
 		requestJSON("/api/v1/tasks/" + encodeURIComponent(taskID) + "/controls").then(body => {
 			if (selectedTaskID !== taskID) return;
 			const controls = validControls(body);
@@ -709,13 +709,13 @@
 			if (payload.data.state === "completed") loadHistory(selectedChat, "", true, false);
 			} else if (payload.kind === "model.changed") {
 				eventRevision = payload.revision;
-				window.DarwinInspector.modelChanged();
+				window.NexusInspector.modelChanged();
 			} else if (payload.kind === "tool.changed") {
 				eventRevision = payload.revision;
-				window.DarwinInspector.toolChanged(payload.data.task_id);
+				window.NexusInspector.toolChanged(payload.data.task_id);
 			} else if (payload.kind === "route.changed") {
 				eventRevision = payload.revision;
-				window.DarwinInspector.routeChanged(payload.data.task_id);
+				window.NexusInspector.routeChanged(payload.data.task_id);
 			} else if (["worker.changed", "error.changed"].includes(payload.kind)) {
 				eventRevision = payload.revision;
 			} else if (payload.kind === "approval.changed" && payload.data.task_id === (selectedControls && selectedControls.taskID)) {
@@ -758,7 +758,7 @@
 		selectedControls = null;
 		selectedTaskID = "";
 		feedbackContext = null;
-		window.DarwinInspector.clearTask();
+		window.NexusInspector.clearTask();
 		queuedSubmissionID = "";
 		eventRevision = 0;
 		historyCursor = "";
@@ -795,7 +795,7 @@
 		selectedControls = null;
 		selectedTaskID = "";
 		feedbackContext = null;
-		window.DarwinInspector.clearTask();
+		window.NexusInspector.clearTask();
 		queuedSubmissionID = "";
 		eventRevision = 0;
 		transcript.replaceChildren();
@@ -971,13 +971,13 @@
 	loadMoreMessages.addEventListener("click", () => loadHistory(selectedChat, historyNeedsReset ? "" : historyCursor, historyNeedsReset, false));
 	window.addEventListener("beforeunload", () => { if (source) source.close(); });
 	const relativePath = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	const skillsRoute = window.DarwinRoutes.skills(relativePath), statsRoute = window.DarwinRoutes.stats(relativePath);
-	const workboardRoute = window.DarwinRoutes.workboards(relativePath), settingsRoute = window.DarwinRoutes.settings(relativePath), modelsRoute = window.DarwinRoutes.models(relativePath), routingRoute = window.DarwinRoutes.routing(relativePath), eliminationRoute = window.DarwinRoutes.elimination(relativePath);	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
+	const skillsRoute = window.NexusRoutes.skills(relativePath), statsRoute = window.NexusRoutes.stats(relativePath);
+	const workboardRoute = window.NexusRoutes.workboards(relativePath), settingsRoute = window.NexusRoutes.settings(relativePath), modelsRoute = window.NexusRoutes.models(relativePath), routingRoute = window.NexusRoutes.routing(relativePath), eliminationRoute = window.NexusRoutes.elimination(relativePath);	const routeMatch = relativePath.match(/^\/chats\/([^/]+)$/);
 	if (routeMatch) {
 		try { selectChat(decodeURIComponent(routeMatch[1])); } catch (_) { showNotice(transcriptState, "The chat address is invalid.", true); }
 	}
 	if (!skillsRoute && !statsRoute && !workboardRoute && !settingsRoute && !modelsRoute && !routingRoute && !eliminationRoute) {
-	loadChats(""); checkRecentOperations(); window.DarwinInspector.loadGlobals(); updateControls();
+	loadChats(""); checkRecentOperations(); window.NexusInspector.loadGlobals(); updateControls();
 	fetch(base + "/api/v1/session/csrf", {
 		method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
 		body: JSON.stringify({version: 1}), cache: "no-store"
@@ -991,7 +991,7 @@
 		if (!selectedChat) connection.textContent = "Connected";
 	}).catch(() => { connection.textContent = "Session needs attention"; }); }
 	for (const link of document.querySelectorAll("[data-view]")) {
-		const selected = link.dataset.view === "skills" ? skillsRoute : link.dataset.view === "stats" ? statsRoute : link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : link.dataset.view === "models" ? modelsRoute : link.dataset.view === "routing" ? routingRoute : link.dataset.view === "elimination" ? eliminationRoute : window.DarwinRoutes.chats(relativePath);
+		const selected = link.dataset.view === "skills" ? skillsRoute : link.dataset.view === "stats" ? statsRoute : link.dataset.view === "workboards" ? workboardRoute : link.dataset.view === "settings" ? settingsRoute : link.dataset.view === "models" ? modelsRoute : link.dataset.view === "routing" ? routingRoute : link.dataset.view === "elimination" ? eliminationRoute : window.NexusRoutes.chats(relativePath);
 		if (selected) link.setAttribute("aria-current", "page");
 		else link.removeAttribute("aria-current");
 	}

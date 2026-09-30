@@ -57,7 +57,7 @@ func TestWebLaunchTokenFailsClosed(t *testing.T) {
 		{" environment = {\n DARWIN_API_TOKEN => " + token + "\n }", token},
 		{"DARWIN_API_TOKEN => short", ""},
 		{"OTHER_TOKEN => " + token, ""},
-		{"exec /usr/bin/env DARWIN_API_TOKEN=" + token + " darwin serve", token},
+		{"exec /usr/bin/env DARWIN_API_TOKEN=" + token + " nexus serve", token},
 		{"DARWIN_API_TOKEN => " + token + "\nDARWIN_API_TOKEN => " + token, ""},
 	} {
 		if got := webLaunchToken(tc.raw); got != tc.want {

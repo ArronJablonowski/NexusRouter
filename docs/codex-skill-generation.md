@@ -30,7 +30,7 @@ The existing 30-second generation deadline includes startup and streaming.
 Completion or failure closes the provider and removes that owned directory.
 
 Trusted instructions remain a system message; recorded examples remain an
-untrusted user JSON envelope. Generation exposes no Darwin tools. Unexpected
+untrusted user JSON envelope. Generation exposes no NexusRouter tools. Unexpected
 tool calls, malformed streams, non-stop finishes, excess output and invalid
 schemas/results are rejected. The shared CLI launch profile independently
 restricts built-in tools, extensions and inherited context; this feature does

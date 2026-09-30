@@ -64,7 +64,7 @@ func Archive(w io.Writer, entries []Entry) error {
 	tw := tar.NewWriter(gz)
 	for _, e := range owned {
 		mode := int64(0644)
-		if e.Name == "darwin" {
+		if e.Name == "nexus" {
 			mode = 0755
 		}
 		h := &tar.Header{Name: e.Name, Mode: mode, Size: int64(len(e.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const fixturePackage = "github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+const fixturePackage = "github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 
 func TestAnalyzeReportsSlowestTopLevelTestsAndMargin(t *testing.T) {
 	stream := strings.Join([]string{

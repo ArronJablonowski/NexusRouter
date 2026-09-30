@@ -3,7 +3,7 @@ package webuiapp
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"time"
 )

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 func TestFeedbackRevisionStorePreservesAtomicHistory(t *testing.T) {

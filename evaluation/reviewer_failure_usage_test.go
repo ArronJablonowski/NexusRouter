@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestReviewerPreservesOnlyVerifiedTerminalFailureUsage(t *testing.T) {

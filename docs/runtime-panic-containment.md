@@ -1,6 +1,6 @@
 # Runtime panic containment
 
-DarwinRouter treats provider, tool, journal, and dispatcher implementations as
+NexusRouter treats provider, tool, journal, and dispatcher implementations as
 failure boundaries. A panic is not evidence that an operation had no effect and
 is never exposed through returned errors, durable events, submission results, or
 route evidence.
@@ -15,7 +15,7 @@ as a completed turn after the provider panics, so no proposed tool can execute.
 The provider callback retains stronger boundary errors. Persistence ambiguity,
 durable cancellation, and execution-lease loss take precedence even when the
 provider ignores the callback result and then panics. A journal panic is treated
-as `ErrPersistence`: DarwinRouter cannot know whether the append committed and
+as `ErrPersistence`: NexusRouter cannot know whether the append committed and
 therefore does not fabricate a terminal event or authorize a retry.
 
 ## Tool boundary

@@ -1,6 +1,6 @@
 # Release signing authorization record
 
-Status: verifier contract for an external operator record. DarwinRouter does
+Status: verifier contract for an external operator record. NexusRouter does
 not generate this record because software must not fabricate approval.
 
 Before a production signing operation, an authorized operator must create a
@@ -32,8 +32,8 @@ digests, principal, policy and time:
 ```json
 {
   "schema_version": 2,
-  "project": "DarwinRouter",
-  "scope": "darwinrouter-release-signing-authorization",
+  "project": "NexusRouter",
+  "scope": "nexusrouter-release-signing-authorization",
   "candidate_record_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",
   "license_evidence_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",
   "sha256sums_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",

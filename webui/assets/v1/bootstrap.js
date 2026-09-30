@@ -31,7 +31,7 @@
     const challenge = await response.json();
 		const expiresAt = Date.parse(challenge.expires_at);
     code.textContent = challenge.approval_code;
-    commandCode.textContent = "darwin web approve " + challenge.approval_code;
+    commandCode.textContent = "nexus web approve " + challenge.approval_code;
     command.hidden = false; copy.disabled = false;
     status.textContent = "Waiting for terminal approval.";
     while (!stopped) {
@@ -40,7 +40,7 @@
       const completed = await post("/api/v1/session", {version: 1, challenge_id: challenge.challenge_id});
       if (completed.status === 401) continue;
       if (!completed.ok) throw new Error("session unavailable");
-      status.textContent = "Connected. Opening DarwinRouter.";
+      status.textContent = "Connected. Opening NexusRouter.";
       window.location.replace(base + "/");
       return;
     }

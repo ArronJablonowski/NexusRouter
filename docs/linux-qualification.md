@@ -6,8 +6,8 @@ Linux amd64 or arm64 image. This is an explicit developer qualification, not par
 of `make check` or CI. The script does not download images or Go dependencies.
 
 The script resolves the cached tag to an immutable image ID, requires the image to match the Docker server's architecture and
-cross-builds DarwinRouter for that architecture, then
-runs only `darwin resources` in an ephemeral container with no network, a
+cross-builds NexusRouter for that architecture, then
+runs only `nexus resources` in an ephemeral container with no network, a
 read-only filesystem, all capabilities dropped, no new privileges, 512 MiB RAM,
 no swap allowance, and a 1.5-CPU quota. Only the temporary built binary is mounted
 into the container; the workspace, credentials, and Docker socket are not
@@ -35,7 +35,7 @@ observed Linux kernel belongs to Docker's VM, not the macOS host.
 The live command passed on Docker Linux/arm64 with Alpine image ID and repository
 digest `sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce`.
 The kernel exposed a 536,870,912-byte memory limit, a 150,000/100,000 CPU quota,
-and zero swap allowance. DarwinRouter reported the cgroup-v2 source, the same
+and zero swap allowance. NexusRouter reported the cgroup-v2 source, the same
 total RAM limit, bounded available RAM, and one effective CPU.
 
 Separately, Linux/arm64 test binaries for `resources` and `internal/app` passed

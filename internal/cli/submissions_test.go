@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 func TestSubmitParserReusesRunOptions(t *testing.T) {

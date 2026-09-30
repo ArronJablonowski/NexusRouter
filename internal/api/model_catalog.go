@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 func (h *Handler) serveConfiguredModels(w http.ResponseWriter, r *http.Request) {

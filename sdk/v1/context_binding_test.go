@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 type bindingEstimator struct{}

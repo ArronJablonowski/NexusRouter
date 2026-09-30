@@ -1,12 +1,12 @@
 # CLI-managed daemon lifecycle
 
-With an explicit configuration and `DARWIN_API_TOKEN` already set to at least
+With an explicit configuration and `NEXUS_API_TOKEN` already set to at least
 32 characters:
 
 ```sh
-./bin/darwin daemon start --config config.yaml
-./bin/darwin daemon status --config config.yaml
-./bin/darwin daemon stop --config config.yaml
+./bin/nexus daemon start --config config.yaml
+./bin/nexus daemon status --config config.yaml
+./bin/nexus daemon stop --config config.yaml
 ```
 
 Control requires a literal loopback address or `localhost` and a fixed nonzero
@@ -21,7 +21,7 @@ On macOS/Linux, start launches the same executable in a detached session with an
 absolute configuration path, inherited working directory/environment, and private
 random instance identity. Credentials remain in the existing environment, not
 arguments. Child standard input/output/error go to the null device; use
-`darwin serve --config config.yaml` in the foreground for startup diagnostics.
+`nexus serve --config config.yaml` in the foreground for startup diagnostics.
 
 Any existing listener at the configured address causes refusal. Socket binding
 is the authoritative race-safe duplicate gate and occurs before database opening

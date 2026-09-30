@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func providerStreamDetail(err error) string {

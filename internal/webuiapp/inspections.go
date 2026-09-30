@@ -3,15 +3,15 @@ package webuiapp
 import (
 	"context"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type InspectionServices struct {

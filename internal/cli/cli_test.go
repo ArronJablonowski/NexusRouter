@@ -16,8 +16,8 @@ func TestCommands(t *testing.T) {
 	}{
 		{"default", nil, 0, "Usage:"},
 		{"help", []string{"--help"}, 0, "separate-command steering are available"},
-		{"version", []string{"version"}, 0, "darwin test-build\n"},
-		{"version flag", []string{"--version"}, 0, "darwin test-build\n"},
+		{"version", []string{"version"}, 0, "nexus test-build\n"},
+		{"version flag", []string{"--version"}, 0, "nexus test-build\n"},
 		{"unknown", []string{"api-key-secret"}, 2, ""},
 		{"extra args", []string{"version", "secret"}, 2, ""},
 	} {

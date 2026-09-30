@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 func (h *Handler) serveMetrics(w http.ResponseWriter, r *http.Request) {

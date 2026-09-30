@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 // OutcomeSelectionCheckpoint inspects saved evidence, not a completion receipt.

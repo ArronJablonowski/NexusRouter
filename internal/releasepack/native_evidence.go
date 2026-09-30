@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 const (
@@ -368,7 +368,7 @@ func VerifyNativeEvidenceAgainst(nativePath, installRehearsalPath string, expect
 }
 
 func validNativeEvidenceExpectations(e NativeEvidenceExpectations) bool {
-	expectedArtifactName := "DarwinRouter_" + e.Version + "_" + e.TargetOS + "_" + e.TargetArch + ".tar.gz"
+	expectedArtifactName := "NexusRouter_" + e.Version + "_" + e.TargetOS + "_" + e.TargetArch + ".tar.gz"
 	if !validInstallDigest(e.RecordSHA256) || !validInstallDigest(e.InstallRehearsalRecordSHA256) ||
 		validate(Options{Version: e.Version, Commit: e.Commit, Out: "evidence"}) != nil ||
 		validateNativeGo(nativeGoEnvironment{GOOS: e.TargetOS, GOARCH: e.TargetArch, GOHOSTOS: e.TargetOS, GOHOSTARCH: e.TargetArch, GOVERSION: e.GoVersion}) != nil ||
@@ -445,7 +445,7 @@ func validNativeInstallBinding(record NativeEvidence) bool {
 	if binding == nil {
 		return false
 	}
-	expectedName := "DarwinRouter_" + record.ReleaseVersion + "_" + record.Target.OS + "_" + record.Target.Arch + ".tar.gz"
+	expectedName := "NexusRouter_" + record.ReleaseVersion + "_" + record.Target.OS + "_" + record.Target.Arch + ".tar.gz"
 	return validInstallDigest(binding.RecordSHA256) && binding.ArtifactName == expectedName &&
 		validInstallDigest(binding.ArtifactSHA256) && validInstallDigest(binding.BackupSHA256) &&
 		binding.SourceSchema == 29 && binding.CurrentSchema == stateschema.Current

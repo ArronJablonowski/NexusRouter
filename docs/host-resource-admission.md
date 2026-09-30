@@ -1,15 +1,15 @@
 # Host-wide local resource admission
 
-DarwinRouter daemons coordinate local model capacity through a private SQLite
+NexusRouter daemons coordinate local model capacity through a private SQLite
 WAL database that is separate from project telemetry. This prevents daemons
 using different task databases from independently consuming the same configured
 RAM, VRAM, device, and concurrency budget.
 
 The default database is stored under the operating system user configuration
-directory at `DarwinRouter/host-resources/resource-coordinator.db`. Its immediate
+directory at `NexusRouter/host-resources/resource-coordinator.db`. Its immediate
 directory must be private and the database must be owner-only. Controlled tests
 and deployments may select an absolute path with
-`DARWIN_RESOURCE_COORDINATOR_DB`. When `DARWIN_PROCESS_OWNER_DIR` is explicitly
+`NEXUS_RESOURCE_COORDINATOR_DB`. When `NEXUS_PROCESS_OWNER_DIR` is explicitly
 set and no coordinator override is supplied, the daemon keeps the coordinator
 beside that private owner root so isolated process groups share one authority.
 
@@ -30,7 +30,7 @@ never be replayed as fresh authorization.
 Fixed and adaptive coordinators persist one exact host policy. A daemon with
 incompatible concurrency, percentage, age, or adaptive settings fails closed
 instead of applying a more permissive policy to the same database. To change
-that policy, stop every DarwinRouter daemon, preserve the database for audit if
+that policy, stop every NexusRouter daemon, preserve the database for audit if
 needed, and select a new empty coordinator database deliberately.
 
 Health reports include an identifier-free `resources/reservations` check.
@@ -39,7 +39,7 @@ expired and released claims, and reserved RAM/VRAM. Reservation IDs, task IDs,
 process paths, model/provider names, devices, endpoints, configuration digests,
 prompts, outputs, and credentials are never exported by those surfaces.
 
-The coordinator governs DarwinRouter processes on one host. It does not fence
+The coordinator governs NexusRouter processes on one host. It does not fence
 unrelated inference clients or prove that an inference server actually released
 physical memory. See [Managed local model residency](model-residency.md) for the
 separate provider-lifecycle boundary.

@@ -2,7 +2,7 @@ package v1
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 type MemoryFact = memory.Fact

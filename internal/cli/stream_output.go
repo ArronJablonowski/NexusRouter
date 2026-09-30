@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 // prepareStreamOutput borrows an actual stdout pipe exclusively for the run.

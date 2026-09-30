@@ -7,8 +7,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func appendEventLog(ctx context.Context, tx *sql.Tx, event runtime.Event, body []byte) error {

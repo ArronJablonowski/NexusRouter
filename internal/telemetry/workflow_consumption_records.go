@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 const consumptionProjection = `revision,length(CAST(body AS BLOB)),CASE WHEN length(CAST(body AS BLOB))<=524288 THEN body END`

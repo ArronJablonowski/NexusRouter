@@ -19,7 +19,7 @@ credentials were extracted and no separate API key was used.
 ## Initial scope
 
 1. Sol receives a small, non-sensitive task and delegates a bounded subtask.
-2. One local worker at a time returns its result through DarwinRouter.
+2. One local worker at a time returns its result through NexusRouter.
 3. Sol reviews the worker result, identifies omissions or suspected defects,
    and produces the final answer. Review opinions are not test execution proof.
 4. Inspect the parent/worker event history and provide explicit user feedback.
@@ -51,7 +51,7 @@ local-only privacy.
 ## Verified live checks
 
 - Sol through Codex CLI: returned the requested marker and exited successfully.
-- Local worker through DarwinRouter: `gemma4:12b-it-q4_K_M` returned
+- Local worker through NexusRouter: `gemma4:12b-it-q4_K_M` returned
   `DARWIN_LOCAL_READY`; the task and nonempty validation were persisted. The
   observed one-turn cold-start run took about seven seconds. Ollama subsequently
   reported approximately8.1GB loaded memory; this is not a peak-memory or
@@ -65,7 +65,7 @@ Codex CLI configuration. Its local worker can be checked independently:
 
 ```sh
 printf '%s\n' 'Reply with exactly DARWIN_LOCAL_READY. Do not call tools.' |
-  go run ./cmd/darwin run --config examples/sol-local-smoke.yaml \
+  go run ./cmd/nexus run --config examples/sol-local-smoke.yaml \
     --model local-worker --set workers.delegate_model= --local-required \
     --domain smoke --json
 ```
@@ -120,7 +120,7 @@ Reproduce from the repository root with this non-sensitive prompt:
 
 ```sh
 printf '%s\n' 'Use only darwin.delegate exactly once. Ask the worker to output raw Go source: package answer with func Answer() int returning 42. Set validation to go_source. Review the result. Do not use other tools or read files.' |
-  go run ./cmd/darwin run --config examples/sol-codex-local-smoke.yaml \
+  go run ./cmd/nexus run --config examples/sol-codex-local-smoke.yaml \
     --model coordinator --domain code --json
 ```
 

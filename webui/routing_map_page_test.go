@@ -14,7 +14,7 @@ func TestRoutingAndEliminationPagesUseLiveBoundedEvidence(t *testing.T) {
 			t.Fatalf("routing page markup missing %q", required)
 		}
 	}
-	for _, required := range []string{`fetch(base + "/api/v1/models"`, `fetch(base + "/api/v1/models/deprecation?"`, `row.models.length <= 3`, `snapshot.specialists_allow_cloud || model.locality === "local"`, `snapshot.rankings || []`, `learned(model,job)`, `routing score`, `context ceiling`, `Selected context`, `Advertised maximum`, `element("details","route-model-details")`, `expandedModels.has(expansionKey)`, `window.history.replaceState`, `DarwinRouter ID`, `Estimated RAM`, `routing-flow routing-flow-`, `window.setTimeout(loadRouting`, `document.addEventListener("visibilitychange"`, `No model crosses the evidence threshold`, `No recommendation was manufactured`, `credentials:"same-origin"`, `cache:"no-store"`} {
+	for _, required := range []string{`fetch(base + "/api/v1/models"`, `fetch(base + "/api/v1/models/deprecation?"`, `row.models.length <= 3`, `snapshot.specialists_allow_cloud || model.locality === "local"`, `snapshot.rankings || []`, `learned(model,job)`, `routing score`, `context ceiling`, `Selected context`, `Advertised maximum`, `element("details","route-model-details")`, `expandedModels.has(expansionKey)`, `window.history.replaceState`, `NexusRouter ID`, `Estimated RAM`, `routing-flow routing-flow-`, `window.setTimeout(loadRouting`, `document.addEventListener("visibilitychange"`, `No model crosses the evidence threshold`, `No recommendation was manufactured`, `credentials:"same-origin"`, `cache:"no-store"`} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("routing client lost required behavior %q", required)
 		}

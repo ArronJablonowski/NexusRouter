@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 const (

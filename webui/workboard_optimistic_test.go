@@ -45,9 +45,9 @@ func TestEmbeddedWorkboardOptimismIsExplicitAndAuthoritativelyReconciled(t *test
 	}
 	mutationSource, boardSource := string(mutations), string(boards)
 	for _, required := range []string{
-		`window.DarwinWorkboards.previewPosition(intent.capture)`,
+		`window.NexusWorkboards.previewPosition(intent.capture)`,
 		`Pending position preview — not saved.`,
-		`if (positioned) window.DarwinWorkboards.refresh()`,
+		`if (positioned) window.NexusWorkboards.refresh()`,
 		`The provisional position was removed`,
 	} {
 		if !strings.Contains(mutationSource, required) {

@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 func runAudit(args []string, stdout, stderr io.Writer) int {
@@ -21,7 +21,7 @@ func runAudit(args []string, stdout, stderr io.Writer) int {
 	model := fs.String("reviewer", "", "configured reviewer ID")
 	cost := fs.Float64("max-cost", 0, "estimated review cost ceiling")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *path == "" || *task == "" || *model == "" || *cost < 0 || math.IsNaN(*cost) || math.IsInf(*cost, 0) {
-		fmt.Fprintln(stderr, "usage: darwin audit --config path --task id --reviewer model-id [--max-cost amount]")
+		fmt.Fprintln(stderr, "usage: nexus audit --config path --task id --reviewer model-id [--max-cost amount]")
 		return 2
 	}
 	cfg, err := config.Load(config.Options{ProjectFile: *path, Env: config.Environment(os.Environ())})

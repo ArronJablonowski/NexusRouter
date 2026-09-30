@@ -3,8 +3,8 @@ package sessions
 import (
 	"math"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // MaxTerminalRouteAttempts leaves room in the 66-history recovery envelope for

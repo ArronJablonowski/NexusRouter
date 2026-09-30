@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	sdk "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func TestSDKScopeLeasesReadOnly(t *testing.T) {

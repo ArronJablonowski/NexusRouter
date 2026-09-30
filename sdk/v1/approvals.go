@@ -2,8 +2,8 @@ package v1
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 // InspectApproval reads task-bound approval metadata, without invoking a

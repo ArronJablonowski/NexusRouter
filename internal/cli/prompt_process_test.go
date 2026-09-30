@@ -18,7 +18,7 @@ func TestPromptBlockedProcessSIGTERM(t *testing.T) {
 	buildCtx, stopBuild := context.WithTimeout(context.Background(), time.Minute)
 	defer stopBuild()
 	binary := filepath.Join(t.TempDir(), "darwin")
-	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/darwin")
+	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/nexus")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build failed: %v %s", err, output)
 	}

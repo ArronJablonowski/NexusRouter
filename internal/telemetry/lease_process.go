@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
 )
 
 func registerLeaseProcess(ctx context.Context, tx *sql.Tx, ref processguard.Reference) error {

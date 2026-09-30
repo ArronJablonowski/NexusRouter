@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubverify"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubverify"
 )
 
 type PublishedReleaseReader interface {
@@ -24,7 +24,7 @@ type PublishedVerificationOptions struct {
 // PostPublicationVerificationPolicy identifies the exact verifier contract
 // enforced by this implementation. It is fixed by code rather than supplied by
 // an operator so a receipt cannot claim a different policy than the one run.
-const PostPublicationVerificationPolicy = "darwinrouter-github-post-publication-verification/v2"
+const PostPublicationVerificationPolicy = "nexusrouter-github-post-publication-verification/v2"
 
 // PostPublicationReceipt is canonical public evidence of one remote observation
 // and approval-bound verification. It is not a durability or future-state claim.
@@ -142,7 +142,7 @@ func verifyPublishedReleaseWithLicenseEvidenceVerifier(ctx context.Context, remo
 		return empty, ErrPublicationAuthorization
 	}
 	receipt := PostPublicationReceipt{
-		SchemaVersion: 2, Scope: "darwinrouter-github-post-publication-verification",
+		SchemaVersion: 2, Scope: "nexusrouter-github-post-publication-verification",
 		PublicationAuthorizationSHA256: preflight.PublicationAuthorizationSHA256,
 		Repository:                     preflight.Repository, ReleaseVersion: preflight.ReleaseVersion,
 		ReleaseID: observation.ReleaseID, ReleaseURL: observation.ReleaseURL,
@@ -176,12 +176,12 @@ func postPublicationAttestation(attestation githubverify.ReleaseAttestationEvide
 }
 
 func MarshalPostPublicationReceipt(receipt PostPublicationReceipt) ([]byte, error) {
-	if receipt.SchemaVersion != 2 || receipt.Scope != "darwinrouter-github-post-publication-verification" ||
+	if receipt.SchemaVersion != 2 || receipt.Scope != "nexusrouter-github-post-publication-verification" ||
 		!trustFingerprint(receipt.PublicationAuthorizationSHA256) || !githubRepository.MatchString(receipt.Repository) ||
 		receipt.ReleaseID < 1 || validate(Options{Version: receipt.ReleaseVersion, Commit: receipt.SourceCommit, Out: "release"}) != nil ||
 		receipt.Tag != "v"+receipt.ReleaseVersion || !validGitHubReleaseURL(receipt.ReleaseURL, receipt.Repository, receipt.Tag) ||
-		!commitPattern.MatchString(receipt.TagObjectSHA) || receipt.TagMessage != "DarwinRouter release "+receipt.Tag || !validPublicationTagger(receipt.Tagger) ||
-		receipt.ReleaseTitle != "DarwinRouter "+receipt.Tag || !trustFingerprint(receipt.ReleaseNotesSHA256) || !receipt.Immutable ||
+		!commitPattern.MatchString(receipt.TagObjectSHA) || receipt.TagMessage != "NexusRouter release "+receipt.Tag || !validPublicationTagger(receipt.Tagger) ||
+		receipt.ReleaseTitle != "NexusRouter "+receipt.Tag || !trustFingerprint(receipt.ReleaseNotesSHA256) || !receipt.Immutable ||
 		(receipt.Prerelease && receipt.AuthorizedMakeLatest) || receipt.Prerelease != strings.Contains(receipt.ReleaseVersion, "-") ||
 		!wholeSecondUTC(receipt.PublishedAt) || !wholeSecondUTC(receipt.ObservedAt) || len(receipt.Assets) != 7 ||
 		!observationAfterPublication(receipt.PublishedAt, receipt.ObservedAt) || !ValidPostPublicationVerifierID(receipt.VerifierID) ||

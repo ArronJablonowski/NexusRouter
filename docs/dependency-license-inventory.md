@@ -1,8 +1,8 @@
 # Distribution dependency license inventory
 
 This is a historical mechanical inventory for release review, not legal advice
-or approval to distribute DarwinRouter. It records the non-standard-library Go
-modules in the `cmd/darwin` dependency closure at commit
+or approval to distribute NexusRouter. It records the non-standard-library Go
+modules in the `cmd/nexus` dependency closure at commit
 `074dd303cb31d6ae875000716937dfc3c3a63cb7`. The release operator must review
 the complete upstream files, decide which texts/notices must accompany each
 distribution channel, and record approval in the [release
@@ -22,7 +22,7 @@ For a candidate, freeze the canonical schema-3 evidence outside the checkout:
 ```sh
 sh scripts/license-evidence-bootstrap.sh freeze \
   --commit FULL_LOWERCASE_40_CHARACTER_COMMIT \
-  --source /ABSOLUTE/PATH/TO/CLEAN/DarwinRouter \
+  --source /ABSOLUTE/PATH/TO/CLEAN/NexusRouter \
   --out /ABSOLUTE/OPERATOR_CONTROLLED/LICENSE_EVIDENCE.json
 ```
 
@@ -63,7 +63,7 @@ license fields intentionally remain `NOASSERTION` unless mechanically reviewed.
 This SPDX 2.3 document is a module-level inventory only—not a vulnerability
 scan, complete build provenance, legal conclusion, or replacement for the legal
 files, rendered notices, and human approval described here.
-The DarwinRouter package declares MIT from reviewed root evidence, while the
+The NexusRouter package declares MIT from reviewed root evidence, while the
 composite package conclusion, executable conclusion, and individual file
 conclusions remain `NOASSERTION`; a statically linked binary must not inherit a
 single project-license conclusion over its unresolved dependency set.

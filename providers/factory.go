@@ -42,7 +42,7 @@ func validPurpose(purpose Purpose) bool {
 
 // Factory creates a replaceable provider engine. Returned adapters must obey
 // Provider's sequential, synchronous callback contract and be safe for their
-// intended concurrent use. The host owns their lifetime; Darwin never calls
+// intended concurrent use. The host owns their lifetime; NexusRouter never calls
 // Close. Transport lifetime remains controlled by the application.
 type Factory interface {
 	Build(context.Context, Connection) (Provider, error)

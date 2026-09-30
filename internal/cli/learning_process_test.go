@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -24,7 +24,7 @@ func TestDaemonLearningAdvancesAndResumesAcrossProcesses(t *testing.T) {
 	defer cancel()
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "darwin")
-	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/darwin").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/nexus").CombinedOutput(); err != nil {
 		t.Fatal(err, string(output))
 	}
 	var calls atomic.Int32

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://darwinrouter.local/schema/webui/v1",
-  "title": "DarwinRouter Web UI Contract v1",
+  "$id": "https://nexusrouter.local/schema/webui/v1",
+  "title": "NexusRouter Web UI Contract v1",
   "oneOf": [
     {
       "$ref": "#/$defs/chat_request"

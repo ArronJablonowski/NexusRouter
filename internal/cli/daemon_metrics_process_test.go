@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 // Uses only the owned child and collector from the lifecycle fixture. No task

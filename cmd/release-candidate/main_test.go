@@ -65,7 +65,7 @@ func TestFreezeAndVerifyCommands(t *testing.T) {
 	gitCommand(t, source, "add", ".")
 	gitCommand(t, source, "-c", "user.name=Candidate Test", "-c", "user.email=candidate@example.invalid", "commit", "-m", "candidate fixture")
 	commit := strings.TrimSpace(gitCommand(t, source, "rev-parse", "HEAD"))
-	record := filepath.Join(evidence, "DarwinRouter_1.0.0_candidate.json")
+	record := filepath.Join(evidence, "NexusRouter_1.0.0_candidate.json")
 	freeze := []string{"freeze", "--version", "1.0.0", "--commit", commit, "--source", source, "--out", record}
 	var output bytes.Buffer
 	if code := run(context.Background(), freeze, &output); code != 0 {
@@ -74,7 +74,7 @@ func TestFreezeAndVerifyCommands(t *testing.T) {
 	if code := run(context.Background(), []string{"verify", "--record", record, "--source", source}, &output); code != 0 {
 		t.Fatalf("verify code %d: %s", code, output.String())
 	}
-	notes := filepath.Join(evidence, "DarwinRouter_1.0.0_RELEASE_NOTES.md")
+	notes := filepath.Join(evidence, "NexusRouter_1.0.0_RELEASE_NOTES.md")
 	if code := run(context.Background(), []string{"notes", "--record", record, "--source", source, "--out", notes}, &output); code != 0 {
 		t.Fatalf("notes code %d: %s", code, output.String())
 	}

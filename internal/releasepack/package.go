@@ -255,12 +255,12 @@ func Package(ctx context.Context, o Options) (resultErr error) {
 		if _, e = command(ctx, buildSource, reconstructionEnv, goExecutable, "mod", "verify"); e != nil {
 			return e
 		}
-		binary := filepath.Join(stage, "darwin")
+		binary := filepath.Join(stage, "nexus")
 		buildEnv := append(append([]string(nil), reconstructionEnv...), "GOOS="+target.os, "GOARCH="+target.arch)
 		if err = goIdentity.verify(); err != nil {
 			return err
 		}
-		_, err = command(ctx, buildSource, buildEnv, goExecutable, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+o.Version, "-o", binary, "./cmd/darwin")
+		_, err = command(ctx, buildSource, buildEnv, goExecutable, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+o.Version, "-o", binary, "./cmd/nexus")
 		if err != nil {
 			return err
 		}
@@ -282,7 +282,7 @@ func Package(ctx context.Context, o Options) (resultErr error) {
 		if e != nil {
 			return e
 		}
-		name := "DarwinRouter_" + o.Version + "_" + target.os + "_" + target.arch + ".tar.gz"
+		name := "NexusRouter_" + o.Version + "_" + target.os + "_" + target.arch + ".tar.gz"
 		binaryDigest := sha256.Sum256(data)
 		sbom, e := renderTargetSBOM(TargetSBOMOptions{
 			Version: o.Version, Commit: o.Commit, TargetOS: target.os, TargetArch: target.arch,

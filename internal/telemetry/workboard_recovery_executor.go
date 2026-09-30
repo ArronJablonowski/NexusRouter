@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 // WorkboardClaimRecoveryRequest deliberately has no proof fields. It is an

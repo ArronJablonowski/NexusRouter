@@ -3,8 +3,8 @@ package v1
 import (
 	"context"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 type TaskHeadFence = sessions.TaskHeadFence

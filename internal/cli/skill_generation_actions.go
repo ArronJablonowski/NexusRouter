@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 var generationModelIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
@@ -22,7 +22,7 @@ var generationModelIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0
 // stable attempt ID. Neither action activates a skill or retries inference.
 func runSkillGenerationAction(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin skill-generations generate --config path --id id --model id --name name --tasks id,id [--max-cost amount] | publish --config path --id id")
+		fmt.Fprintln(stderr, "usage: nexus skill-generations generate --config path --id id --model id --name name --tasks id,id [--max-cost amount] | publish --config path --id id")
 		return 2
 	}
 	if len(args) == 0 || (args[0] != "generate" && args[0] != "publish") {

@@ -1,6 +1,6 @@
 package app
 
-import "github.com/ArronJablonowski/DarwinRouter/responsecontract"
+import "github.com/ArronJablonowski/NexusRouter/responsecontract"
 
 // Select only the current user turn before adding memories, skills, history or
 // host reminders. Those sources cannot introduce a completion requirement.

@@ -8,16 +8,16 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 // Input contains the exact previewed request and a stable decision ID. Actor
 // attribution comes from the invoking OS identity, never model-authored JSON.
 func runApprovalDecision(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) != 2 || args[0] != "--config" || args[1] == "" {
-		fmt.Fprintln(stderr, "usage: darwin approval-decision --config path < decision.json")
+		fmt.Fprintln(stderr, "usage: nexus approval-decision --config path < decision.json")
 		return 2
 	}
 	ctx, cancel := submissionCLIContext()

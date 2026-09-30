@@ -1,5 +1,5 @@
 // Command verify-install-rehearsal validates a canonical, path-free record
-// retained by DarwinRouter's actual native archive installation rehearsal.
+// retained by NexusRouter's actual native archive installation rehearsal.
 package main
 
 import (
@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 var errUsage = errors.New("invalid install-rehearsal verification arguments")

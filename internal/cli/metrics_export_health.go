@@ -3,7 +3,7 @@ package cli
 import (
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 func metricsExportDegraded(check health.Check) bool {

@@ -1,6 +1,6 @@
 # Configured outcome rollback supervision
 
-DarwinRouter can supervise activation-bound outcome comparisons in the daemon or
+NexusRouter can supervise activation-bound outcome comparisons in the daemon or
 an explicitly started Go SDK lifecycle. The supervisor is disabled by default.
 It observes one configured catalog scope and one exact configured execution
 model; it does not run a validator, provider, tool, or LLM judge.

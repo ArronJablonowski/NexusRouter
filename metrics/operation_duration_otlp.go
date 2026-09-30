@@ -25,7 +25,7 @@ func otlpOperationDuration(d *OperationDuration, at string) []otlpMetric {
 		}
 	}
 	return []otlpMetric{
-		{Name: "darwinrouter.operation.duration", Unit: "s", Histogram: histogram},
-		{Name: "darwinrouter.operation.duration.unavailable", Unit: "{record}", Gauge: unavailable},
+		{Name: "nexusrouter.operation.duration", Unit: "s", Histogram: histogram},
+		{Name: "nexusrouter.operation.duration.unavailable", Unit: "{record}", Gauge: unavailable},
 	}
 }

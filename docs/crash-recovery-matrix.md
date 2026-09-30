@@ -1,6 +1,6 @@
 # Crash, replay, and lease-recovery qualification
 
-DarwinRouter recovers from durable observations; it does not infer safety from
+NexusRouter recovers from durable observations; it does not infer safety from
 an expired timer or automatically repeat an operation whose effects are known or
 uncertain. The current MVP qualification covers these boundaries:
 

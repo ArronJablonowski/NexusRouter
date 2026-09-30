@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // SummaryIntegrityValidatorID changes whenever the validator's deterministic

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func TestWorkboardBudgetProjectionRejectsAuxiliaryAccountingGuardTamper(t *testing.T) {

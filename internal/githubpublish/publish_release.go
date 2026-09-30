@@ -50,7 +50,7 @@ type PublicationEvidence struct {
 // PublishRelease performs the one authorized create-only publication state
 // machine. Every mutation is preceded and followed by a durable journal event.
 func (p *Publisher) PublishRelease(ctx context.Context, input PublicationPlan) (PublicationEvidence, error) {
-	evidence := PublicationEvidence{SchemaVersion: 1, Scope: "darwinrouter-github-authorized-publication", State: "not_started", Phase: "validate", RetryAllowed: true, UploadedAssets: []EvidenceAsset{}}
+	evidence := PublicationEvidence{SchemaVersion: 1, Scope: "nexusrouter-github-authorized-publication", State: "not_started", Phase: "validate", RetryAllowed: true, UploadedAssets: []EvidenceAsset{}}
 	plan, err := validatePublicationPlan(input)
 	if err != nil || ctx == nil || ctx.Err() != nil || p == nil {
 		return evidence, ErrPublish
@@ -207,7 +207,7 @@ func (p *Publisher) PublishRelease(ctx context.Context, input PublicationPlan) (
 
 func validatePublicationPlan(input PublicationPlan) (PublicationPlan, error) {
 	draft, err := validateAndClone(input.DraftPlan)
-	if err != nil || input.JournalPath == "" || input.TagMessage != "DarwinRouter release "+input.Tag ||
+	if err != nil || input.JournalPath == "" || input.TagMessage != "NexusRouter release "+input.Tag ||
 		!validTagger(input.Tagger) || (input.Prerelease && input.MakeLatest) {
 		return PublicationPlan{}, ErrPublish
 	}

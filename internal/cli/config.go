@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 type overrides map[string]string
@@ -25,7 +25,7 @@ func (o overrides) Set(s string) error {
 
 func runConfig(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || (args[0] != "validate" && args[0] != "show") {
-		_, _ = fmt.Fprintln(stderr, "usage: darwin config validate|show [--config path] [--user-config path] [--set key=value]")
+		_, _ = fmt.Fprintln(stderr, "usage: nexus config validate|show [--config path] [--user-config path] [--set key=value]")
 		return 2
 	}
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)
@@ -48,7 +48,10 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 	}
 	if *user == "" {
 		if dir, err := os.UserConfigDir(); err == nil {
-			candidate := filepath.Join(dir, "darwinrouter", "config.yaml")
+			candidate := filepath.Join(dir, "nexusrouter", "config.yaml")
+			if _, err := os.Stat(candidate); os.IsNotExist(err) {
+				candidate = filepath.Join(dir, "darwinrouter", "config.yaml")
+			}
 			if _, err := os.Stat(candidate); err == nil {
 				*user = candidate
 			} else if !os.IsNotExist(err) {

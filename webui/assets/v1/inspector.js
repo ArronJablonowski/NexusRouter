@@ -414,7 +414,7 @@
 		if (selectedTaskID) loadTask(selectedTaskID);
 	});
 
-	window.DarwinInspector = Object.freeze({
+	window.NexusInspector = Object.freeze({
 		clearTask,
 		loadGlobals,
 		loadTask,

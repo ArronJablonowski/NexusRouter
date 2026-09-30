@@ -11,18 +11,18 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 var ErrInstallRehearsalEvidence = errors.New("install rehearsal evidence verification failed")
 
 const (
 	installEvidenceSchema = 1
-	installEvidenceScope  = "darwinrouter-native-install-migration-rehearsal"
+	installEvidenceScope  = "nexusrouter-native-install-migration-rehearsal"
 	maxInstallEvidence    = 32 << 10
 )
 
-var installArtifactName = regexp.MustCompile(`^DarwinRouter_[0-9A-Za-z.-]+_(darwin|linux)_(amd64|arm64)\.tar\.gz$`)
+var installArtifactName = regexp.MustCompile(`^NexusRouter_[0-9A-Za-z.-]+_(darwin|linux)_(amd64|arm64)\.tar\.gz$`)
 
 // InstallRehearsalEvidence is a path-free record produced only after the native
 // archive rehearsal has observed every listed result. It contains no operator
@@ -214,7 +214,7 @@ func retainInstallRehearsalEvidence(source, out string, record InstallRehearsalE
 
 func validateInstallEvidence(r InstallRehearsalEvidence) error {
 	passed := func(value string) bool { return value == "passed" }
-	expectedName := "DarwinRouter_" + r.Release.Version + "_" + r.Target.OS + "_" + r.Target.Arch + ".tar.gz"
+	expectedName := "NexusRouter_" + r.Release.Version + "_" + r.Target.OS + "_" + r.Target.Arch + ".tar.gz"
 	if r.SchemaVersion != installEvidenceSchema || r.Scope != installEvidenceScope ||
 		validate(Options{Version: r.Release.Version, Commit: r.Release.Commit, Out: "evidence"}) != nil ||
 		(r.Target.OS != "darwin" && r.Target.OS != "linux") || (r.Target.Arch != "amd64" && r.Target.Arch != "arm64") ||

@@ -152,7 +152,7 @@ func endpoint(value, githubHost string) (*url.URL, error) {
 }
 
 func (p *Publisher) PublishDraft(ctx context.Context, input DraftPlan) (Evidence, error) {
-	evidence := Evidence{SchemaVersion: 1, Scope: "darwinrouter-github-create-only-draft", State: "not_started", Phase: "validate", RetryAllowed: true, UploadedAssets: []EvidenceAsset{}}
+	evidence := Evidence{SchemaVersion: 1, Scope: "nexusrouter-github-create-only-draft", State: "not_started", Phase: "validate", RetryAllowed: true, UploadedAssets: []EvidenceAsset{}}
 	plan, err := validateAndClone(input)
 	if err != nil {
 		return evidence, ErrPublish
@@ -226,7 +226,7 @@ func (p *Publisher) PublishDraft(ctx context.Context, input DraftPlan) (Evidence
 func validateAndClone(input DraftPlan) (DraftPlan, error) {
 	if !digestRE.MatchString(input.AuthorizationSHA256) || !digestRE.MatchString(input.ReleaseNotesSHA256) ||
 		!nameRE.MatchString(input.Owner) || !nameRE.MatchString(input.Repository) || !validTag(input.Tag) ||
-		!commitRE.MatchString(input.Commit) || !input.Draft || input.Name != "DarwinRouter "+input.Tag ||
+		!commitRE.MatchString(input.Commit) || !input.Draft || input.Name != "NexusRouter "+input.Tag ||
 		input.Body == "" || len(input.Body) > 1<<20 || digest([]byte(input.Body)) != input.ReleaseNotesSHA256 ||
 		input.Prerelease != strings.Contains(input.Tag, "-") || len(input.Assets) == 0 || len(input.Assets) > maxAssets {
 		return DraftPlan{}, ErrPublish
@@ -311,7 +311,7 @@ func (p *Publisher) request(ctx context.Context, evidence *Evidence, origin *url
 	request.Response = nil
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("X-GitHub-Api-Version", APIVersion)
-	request.Header.Set("User-Agent", "DarwinRouter-create-only-publisher/1")
+	request.Header.Set("User-Agent", "NexusRouter-create-only-publisher/1")
 	evidence.Requests++
 	return request, nil
 }

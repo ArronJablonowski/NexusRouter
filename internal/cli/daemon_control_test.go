@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/internal/api"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/internal/api"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func TestDaemonControlArgumentsAndBoundaries(t *testing.T) {

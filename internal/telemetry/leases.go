@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 	"strings"
 	"time"
 )

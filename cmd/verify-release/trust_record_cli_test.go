@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 func TestTrustRecordCLIEndToEnd(t *testing.T) {
@@ -45,7 +45,7 @@ func TestTrustRecordCLIEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	originalPolicyURL := record.ReleasePolicyURL
-	record.ReleasePolicyURL = "https://example.invalid/darwinrouter/attacker-policy"
+	record.ReleasePolicyURL = "https://example.invalid/nexusrouter/attacker-policy"
 	tamperedRecordBody, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +115,7 @@ func signedCLITrustFixture(t *testing.T) (string, string, string, string, string
 	}
 	repository := filepath.Clean(filepath.Join(filepath.Dir(testFile), "../.."))
 	source := filepath.Join(t.TempDir(), "source")
-	for _, directory := range []string{"cmd/darwin", "docs", "examples", "webui/assets/v1"} {
+	for _, directory := range []string{"cmd/nexus", "docs", "examples", "webui/assets/v1"} {
 		if err := os.MkdirAll(filepath.Join(source, directory), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func signedCLITrustFixture(t *testing.T) (string, string, string, string, string
 		t.Fatal(err)
 	}
 	mainBody := []byte("package main\n\nimport (\n\t\"fmt\"\n\t_ \"github.com/mattn/go-isatty\"\n)\n\nvar version = \"dev\"\n\nfunc main() { fmt.Println(version) }\n")
-	if err := os.WriteFile(filepath.Join(source, "cmd/darwin/main.go"), mainBody, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(source, "cmd/nexus/main.go"), mainBody, 0644); err != nil {
 		t.Fatal(err)
 	}
 	git := func(args ...string) string {
@@ -196,16 +196,16 @@ func signedCLITrustFixture(t *testing.T) (string, string, string, string, string
 	keyID := "release-test-01"
 	record := releasepack.TrustRecord{
 		SchemaVersion:         1,
-		Project:               "DarwinRouter",
-		Scope:                 "darwinrouter-release-signing",
+		Project:               "NexusRouter",
+		Scope:                 "nexusrouter-release-signing",
 		KeyID:                 keyID,
 		Algorithm:             "Ed25519",
 		PublicKey:             hex.EncodeToString(public),
 		PublicKeySHA256:       keyFingerprint,
 		Status:                "active",
 		PublishedAt:           "2026-09-07T12:34:56Z",
-		ReleasePolicyURL:      "https://example.invalid/darwinrouter/release-policy",
-		RotationRevocationURL: "https://example.invalid/darwinrouter/key-status",
+		ReleasePolicyURL:      "https://example.invalid/nexusrouter/release-policy",
+		RotationRevocationURL: "https://example.invalid/nexusrouter/key-status",
 	}
 	recordBody, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {

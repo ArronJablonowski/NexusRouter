@@ -18,7 +18,7 @@ var ErrPublicationAuthorization = errors.New("release publication authorization 
 
 const (
 	publicationAuthorizationSchema = 1
-	publicationAuthorizationScope  = "darwinrouter-github-publication-authorization"
+	publicationAuthorizationScope  = "nexusrouter-github-publication-authorization"
 	maxPublicationAuthorization    = 32 << 10
 )
 
@@ -133,11 +133,11 @@ func ReadPublicationAuthorization(path string, expected PublicationAuthorization
 }
 
 func validatePublicationAuthorization(record PublicationAuthorization) error {
-	if record.SchemaVersion != publicationAuthorizationSchema || record.Project != "DarwinRouter" ||
+	if record.SchemaVersion != publicationAuthorizationSchema || record.Project != "NexusRouter" ||
 		record.Scope != publicationAuthorizationScope || record.GitHubHost != "github.com" ||
 		!githubRepository.MatchString(record.Repository) || validate(Options{Version: record.ReleaseVersion, Commit: record.SourceCommit, Out: "release"}) != nil ||
-		record.Tag != "v"+record.ReleaseVersion || record.ReleaseTitle != "DarwinRouter "+record.Tag ||
-		record.TagMessage != "DarwinRouter release "+record.Tag || !validPublicationTagger(record.Tagger) ||
+		record.Tag != "v"+record.ReleaseVersion || record.ReleaseTitle != "NexusRouter "+record.Tag ||
+		record.TagMessage != "NexusRouter release "+record.Tag || !validPublicationTagger(record.Tagger) ||
 		record.Prerelease != strings.Contains(record.ReleaseVersion, "-") || (record.Prerelease && record.MakeLatest) ||
 		!trustFingerprint(record.ReleaseNotesSHA256) || !trustFingerprint(record.CandidateRecordSHA256) ||
 		!trustFingerprint(record.LicenseEvidenceSHA256) || !trustFingerprint(record.SHA256SUMSSHA256) ||
@@ -181,7 +181,7 @@ func validPublicationTagger(tagger PublicationTagger) bool {
 func publicationAssetNames(version string) []string {
 	names := []string{"SHA256SUMS", signatureName, "manifest.json"}
 	for _, target := range licenseEvidenceTargets {
-		names = append(names, "DarwinRouter_"+version+"_"+target[0]+"_"+target[1]+".tar.gz")
+		names = append(names, "NexusRouter_"+version+"_"+target[0]+"_"+target[1]+".tar.gz")
 	}
 	sort.Strings(names)
 	return names

@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func runWorkflowDiscovery(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin skill-generations discover --config path --domain id [--after cursor --scan-limit 20]")
+		fmt.Fprintln(stderr, "usage: nexus skill-generations discover --config path --domain id [--after cursor --scan-limit 20]")
 		return 2
 	}
 	if len(args) == 0 || args[0] != "discover" {

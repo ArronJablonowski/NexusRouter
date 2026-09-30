@@ -17,14 +17,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 var ErrPublishedInstallEvidence = errors.New("published install evidence verification failed")
 
 const (
 	publishedInstallSchema = 1
-	publishedInstallScope  = "darwinrouter-published-native-install-rehearsal"
+	publishedInstallScope  = "nexusrouter-published-native-install-rehearsal"
 )
 
 // PublishedInstallEvidence binds an independently retained native install and
@@ -98,7 +98,7 @@ func CreatePublishedInstallEvidence(ctx context.Context, receiptFile, installFil
 	if err != nil || ctx.Err() != nil {
 		return empty, ErrPublishedInstallEvidence
 	}
-	artifactName := "DarwinRouter_" + receipt.ReleaseVersion + "_" + expected.TargetOS + "_" + expected.TargetArch + ".tar.gz"
+	artifactName := "NexusRouter_" + receipt.ReleaseVersion + "_" + expected.TargetOS + "_" + expected.TargetArch + ".tar.gz"
 	artifactSHA := receiptAssetSHA(receipt.Assets, artifactName)
 	if !validInstallDigest(artifactSHA) {
 		return empty, ErrPublishedInstallEvidence
@@ -151,7 +151,7 @@ func CreatePublishedInstallEvidence(ctx context.Context, receiptFile, installFil
 func MarshalPublishedInstallEvidence(evidence PublishedInstallEvidence) ([]byte, error) {
 	observedAt, observedErr := time.Parse("2006-01-02T15:04:05Z", evidence.PublicationObservedAt)
 	verifiedAt, verifiedErr := time.Parse("2006-01-02T15:04:05Z", evidence.VerifiedAt)
-	expectedArtifact := "DarwinRouter_" + evidence.ReleaseVersion + "_" + evidence.TargetOS + "_" + evidence.TargetArch + ".tar.gz"
+	expectedArtifact := "NexusRouter_" + evidence.ReleaseVersion + "_" + evidence.TargetOS + "_" + evidence.TargetArch + ".tar.gz"
 	if evidence.SchemaVersion != publishedInstallSchema || evidence.Scope != publishedInstallScope ||
 		!trustFingerprint(evidence.PublicationReceiptSHA256) || !trustFingerprint(evidence.PublicationAuthorizationSHA256) ||
 		!githubRepository.MatchString(evidence.Repository) || validate(Options{Version: evidence.ReleaseVersion, Commit: evidence.SourceCommit, Out: "evidence"}) != nil ||
@@ -160,7 +160,7 @@ func MarshalPublishedInstallEvidence(evidence PublishedInstallEvidence) ([]byte,
 		!trustFingerprint(evidence.InstallEvidenceSHA256) || (evidence.TargetOS != "darwin" && evidence.TargetOS != "linux") ||
 		(evidence.TargetArch != "amd64" && evidence.TargetArch != "arm64") || evidence.ArtifactName != expectedArtifact ||
 		!validInstallDigest(evidence.ArtifactSHA256) || !validInstallDigest(evidence.InstalledBinarySHA256) ||
-		evidence.InstalledBinaryMode != "0755" || evidence.VersionOutput != "darwin "+evidence.ReleaseVersion ||
+		evidence.InstalledBinaryMode != "0755" || evidence.VersionOutput != "nexus "+evidence.ReleaseVersion ||
 		evidence.SourceSchema != 29 || evidence.CurrentSchema != stateschema.Current ||
 		!validInstallDigest(evidence.BackupSHA256) || evidence.RollbackSchema != 29 || !rollbackIdentity.MatchString(evidence.VerifierID) {
 		return nil, ErrPublishedInstallEvidence
@@ -285,7 +285,7 @@ func executePublishedNativeArchive(ctx context.Context, downloadDir, installRoot
 	if err != nil || installedBinErr != nil || !binInfo.IsDir() || binInfo.Mode().Perm() != 0700 || !os.SameFile(binInfo, installedBinInfo) {
 		return "", "", ErrPublishedInstallEvidence
 	}
-	file, err := binRoot.OpenFile("darwin", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0755)
+	file, err := binRoot.OpenFile("nexus", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0755)
 	if err != nil {
 		return "", "", ErrPublishedInstallEvidence
 	}
@@ -300,7 +300,7 @@ func executePublishedNativeArchive(ctx context.Context, downloadDir, installRoot
 	if err = syncPublishedInstallRoot(binRoot); err != nil || syncPublishedInstallRoot(installedRoot) != nil || syncPublishedInstallRoot(parentRoot) != nil {
 		return "", "", ErrPublishedInstallEvidence
 	}
-	binaryPath := filepath.Join(install, "bin", "darwin")
+	binaryPath := filepath.Join(install, "bin", "nexus")
 	if !publishedInstallChainMatches(parentRoot, installedRoot, binRoot, parentInfo, installedInfo, binInfo, info) ||
 		!publishedInstallPathMatches(realParent, install, binaryPath, parentInfo, installedInfo, binInfo, info) {
 		return "", "", ErrPublishedInstallEvidence
@@ -313,14 +313,14 @@ func executePublishedNativeArchive(ctx context.Context, downloadDir, installRoot
 	command.Dir = install
 	command.Env = []string{"HOME=" + install, "TMPDIR=" + install, "PATH=/usr/bin:/bin", "LANG=C", "LC_ALL=C", "TZ=UTC"}
 	command.Stdout, command.Stderr = &output, &output
-	if err = command.Run(); err != nil || output.overflow || strings.TrimSpace(output.String()) != "darwin "+receipt.ReleaseVersion {
+	if err = command.Run(); err != nil || output.overflow || strings.TrimSpace(output.String()) != "nexus "+receipt.ReleaseVersion {
 		return "", "", ErrPublishedInstallEvidence
 	}
 	if !publishedInstallChainMatches(parentRoot, installedRoot, binRoot, parentInfo, installedInfo, binInfo, info) ||
 		!publishedInstallPathMatches(realParent, install, binaryPath, parentInfo, installedInfo, binInfo, info) {
 		return "", "", ErrPublishedInstallEvidence
 	}
-	installed, err := binRoot.Open("darwin")
+	installed, err := binRoot.Open("nexus")
 	if err != nil {
 		return "", "", ErrPublishedInstallEvidence
 	}
@@ -365,7 +365,7 @@ func publishedInstallChainMatches(parentRoot, installRoot, binRoot *os.Root, par
 	actualInstall, installErr := installRoot.Stat(".")
 	installBin, installBinErr := installRoot.Stat("bin")
 	actualBin, binErr := binRoot.Stat(".")
-	actualBinary, binaryErr := binRoot.Stat("darwin")
+	actualBinary, binaryErr := binRoot.Stat("nexus")
 	return parentErr == nil && parentInstallErr == nil && installErr == nil && installBinErr == nil && binErr == nil && binaryErr == nil &&
 		os.SameFile(parentInfo, actualParent) && os.SameFile(installInfo, parentInstall) && os.SameFile(installInfo, actualInstall) &&
 		os.SameFile(binInfo, installBin) && os.SameFile(binInfo, actualBin) && os.SameFile(binaryInfo, actualBinary) &&
@@ -402,7 +402,7 @@ func extractAuthenticatedBinary(archive []byte, artifact Artifact) ([]byte, erro
 		if readErr != nil || int64(len(body)) != header.Size || !validEntryMetadata(artifact.Entries[i], i, body) {
 			return nil, ErrPublishedInstallEvidence
 		}
-		if contract.name == "darwin" {
+		if contract.name == "nexus" {
 			binary = body
 		}
 	}

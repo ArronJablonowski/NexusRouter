@@ -3,7 +3,7 @@ package workers
 import (
 	"math"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // LeaseAttentionTransition preserves an observation, not evidence authorizing

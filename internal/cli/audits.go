@@ -8,12 +8,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 )
 
 func runAudits(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin audits list|show|attempts --db path [--task id] [--id audit-id] [--after id] [--limit n]")
+		fmt.Fprintln(stderr, "usage: nexus audits list|show|attempts --db path [--task id] [--id audit-id] [--after id] [--limit n]")
 		return 2
 	}
 	if len(args) == 0 || (args[0] != "list" && args[0] != "show" && args[0] != "attempts") {

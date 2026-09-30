@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/accounting"
+	"github.com/ArronJablonowski/NexusRouter/accounting"
 )
 
 func TestSummaryRecoveryOwnerProcess(t *testing.T) {

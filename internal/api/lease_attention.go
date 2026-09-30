@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func leaseAttentionQuery(raw string) (workers.LeaseAttentionOptions, error) {

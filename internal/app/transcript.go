@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 const historyTaskPageSize = 100

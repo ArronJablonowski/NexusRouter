@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubverify"
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubverify"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type readerFactory func(string, string) (releasepack.PublishedReleaseReader, error)

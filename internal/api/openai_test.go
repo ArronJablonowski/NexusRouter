@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 const chatFixture = `{"model":"m","messages":[{"role":"system","content":"Be concise."},{"role":"user","content":"Hi"},{"role":"assistant","content":"Hello"},{"role":"user","content":"你好\nagain"}]}`

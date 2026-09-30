@@ -1,6 +1,6 @@
 # Response completion and benchmark diagnosis
 
-DarwinRouter checks a conservative subset of explicit user response requirements:
+NexusRouter checks a conservative subset of explicit user response requirements:
 JSON (including compact JSON), an ending answer marker, code-only output, and
 line limits. Requirements come from the current user message before context
 assembly. Quoted/reference material, tool output, memory, and model-generated

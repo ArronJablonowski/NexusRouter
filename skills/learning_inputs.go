@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
 )
 
 // WorkflowExample is supplied by a trusted host from completed, attributable

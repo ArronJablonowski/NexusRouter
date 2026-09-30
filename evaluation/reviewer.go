@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // MaxReviewDuration is the single upper bound shared by reviewer execution,
@@ -17,7 +17,7 @@ import (
 const MaxReviewDuration = 5 * time.Minute
 
 // MaxReviewCost is the largest floating-point cost that can be converted to
-// DarwinRouter's integer micro-cost ledger without overflow.
+// NexusRouter's integer micro-cost ledger without overflow.
 const MaxReviewCost = 1_000_000
 
 // ReviewEvidence is caller-attributed material, not evaluator-generated proof.

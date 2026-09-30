@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func appComparisonSelectionRequest(r skills.ComparisonRequest) skills.ComparisonSelectionRequest {

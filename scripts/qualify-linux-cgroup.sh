@@ -49,7 +49,7 @@ host_arch=$(GOTOOLCHAIN=local go env GOHOSTARCH)
 CGO_ENABLED=0 GOOS="$host_os" GOARCH="$host_arch" GOTOOLCHAIN=local GOPROXY=off GONOPROXY=none GOSUMDB=off go build -trimpath \
   -o "$qualification_dir/verify" ./scripts/qualify-cgroup
 CGO_ENABLED=0 GOOS=linux GOARCH="$target_arch" GOTOOLCHAIN=local GOPROXY=off GONOPROXY=none GOSUMDB=off \
-  go build -trimpath -o "$qualification_dir/darwin" ./cmd/darwin
+  go build -trimpath -o "$qualification_dir/darwin" ./cmd/nexus
 
 docker run --rm --pull=never --platform "$image_platform" \
   --cidfile "$qualification_dir/container.id" \

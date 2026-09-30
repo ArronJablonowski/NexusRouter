@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserops"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserauth"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func expectedBrowserOperationID(subject, key string) string {

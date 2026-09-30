@@ -1,8 +1,8 @@
 # Steering the Codex coordinator
 
 The experimental Codex CLI adapter now consumes durable user guidance at the
-same safe boundaries as DarwinRouter's provider-neutral loop. Use `/steer TEXT`
-in `darwin chat`, the separate `darwin steer` command, or the existing authenticated
+same safe boundaries as NexusRouter's provider-neutral loop. Use `/steer TEXT`
+in `nexus chat`, the separate `nexus steer` command, or the existing authenticated
 HTTP/SDK steering controls. This does not change the queue, policy or permissions.
 
 The runtime commits `steering.applied` before dispatching the next model segment.

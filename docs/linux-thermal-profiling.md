@@ -6,7 +6,7 @@ It performs no network calls, subprocess launches or sysfs writes. It does not
 change governors, enable sensors, emulate temperatures or stress hardware.
 
 The kernel publishes current and trip temperatures in millidegrees Celsius;
-trip attributes are optional. DarwinRouter recognizes `passive`, `hot` and
+trip attributes are optional. NexusRouter recognizes `passive`, `hot` and
 `critical` trip types and compares each usable positive threshold against that
 zone's current temperature. Equality is treated conservatively as pressure.
 See the [Linux thermal ABI](https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-thermal).
@@ -58,7 +58,7 @@ positive evidence alongside unknown zones, exact and excessive discovery bounds,
 symlinks, cancellation and actual reservation denial. They pass with race
 detection on macOS and execute as a CGO-free Linux/arm64 test binary in an
 unprivileged, read-only, network-disabled container with temporary fixture files.
-That container's rebuilt `darwin resources` command also measured its real
+That container's rebuilt `nexus resources` command also measured its real
 512 MiB cgroup limit and two CPUs, preserving `ThermalPressure: null` because no
 usable sensors were exposed. This is Linux execution and absence handling, not
 physical hot-sensor qualification. No user model or user data was accessed.

@@ -48,7 +48,7 @@ func TestInspectionSchemaFixturesAndGoldenFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	compiler := jsonschema.NewCompiler()
-	const location = "https://darwinrouter.local/schema/webui/v1"
+	const location = "https://nexusrouter.local/schema/webui/v1"
 	if err = compiler.AddResource(location, document); err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func compileInspectionSchema(t *testing.T) (*jsonschema.Compiler, string) {
 		t.Fatal("invalid schema")
 	}
 	compiler := jsonschema.NewCompiler()
-	const location = "https://darwinrouter.local/schema/webui/v1"
+	const location = "https://nexusrouter.local/schema/webui/v1"
 	if err = compiler.AddResource(location, document); err != nil {
 		t.Fatal(err)
 	}

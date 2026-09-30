@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 const emptySummaryProposal = `{"version":1,"summary":{"decisions":[],"requirements":[],"pending_work":[],"failures":[],"artifacts":[],"activity":[]}}`

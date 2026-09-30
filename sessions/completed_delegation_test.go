@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func completedDelegationFixture(t *testing.T, submitted bool) ([]runtime.Event, []runtime.Event) {

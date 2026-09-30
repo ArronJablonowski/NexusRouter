@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func TestWorkboardCreateReadListAndRestartReplay(t *testing.T) {

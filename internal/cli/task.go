@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func runTaskInspection(args []string, stdout, stderr io.Writer) int {
@@ -28,7 +28,7 @@ func runTaskInspection(args []string, stdout, stderr io.Writer) int {
 		return runTaskRoute(args[1:], stdout, stderr)
 	}
 	if len(args) == 0 || args[0] != "show" {
-		fmt.Fprintln(stderr, "usage: darwin task list|show|continuation|route|leases --db path")
+		fmt.Fprintln(stderr, "usage: nexus task list|show|continuation|route|leases --db path")
 		return 2
 	}
 	fs := flag.NewFlagSet("task show", flag.ContinueOnError)
@@ -36,7 +36,7 @@ func runTaskInspection(args []string, stdout, stderr io.Writer) int {
 	path := fs.String("db", "", "existing database")
 	task := fs.String("task", "", "task ID")
 	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 || *path == "" || *task == "" {
-		fmt.Fprintln(stderr, "usage: darwin task show --db path --task id")
+		fmt.Fprintln(stderr, "usage: nexus task show --db path --task id")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -57,7 +57,7 @@ func runTaskInspection(args []string, stdout, stderr io.Writer) int {
 func runTaskRoute(args []string, stdout, stderr io.Writer) int {
 	flags, err := parseSteeringFlags(args, "db", "task")
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin task route --db path --task id")
+		fmt.Fprintln(stderr, "usage: nexus task route --db path --task id")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -78,7 +78,7 @@ func runTaskRoute(args []string, stdout, stderr io.Writer) int {
 func runTaskContinuation(args []string, stdout, stderr io.Writer) int {
 	flags, err := parseSteeringFlags(args, "db", "task")
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin task continuation --db path --task id")
+		fmt.Fprintln(stderr, "usage: nexus task continuation --db path --task id")
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

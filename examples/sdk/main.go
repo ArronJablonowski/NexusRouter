@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	darwin "github.com/ArronJablonowski/DarwinRouter/sdk/v1"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	darwin "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
 func main() {

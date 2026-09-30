@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
 )
 
 func TestFirstReleaseRollbackReadinessCanonicalChain(t *testing.T) {
@@ -129,7 +129,7 @@ func firstReleaseRollbackChainFixture(t *testing.T, preflight PublicationPreflig
 	}
 	record := RollbackReadiness{
 		SchemaVersion: 1,
-		Project:       "DarwinRouter",
+		Project:       "NexusRouter",
 		Scope:         rollbackReadinessScope,
 		Current: RollbackCurrentRelease{
 			PublicationReceiptSHA256:       rollbackDigest(receiptBody),
@@ -159,7 +159,7 @@ func firstReleaseRollbackChainFixture(t *testing.T, preflight PublicationPreflig
 			RehearsedAt:    evidence.VerifiedAt,
 			VerifierID:     evidence.VerifierID,
 		},
-		Incident: RollbackIncident{OwnerID: "team:release-incident", StatusURL: "https://status.example.invalid/darwinrouter"},
+		Incident: RollbackIncident{OwnerID: "team:release-incident", StatusURL: "https://status.example.invalid/nexusrouter"},
 		Approval: RollbackReadinessApproval{
 			ApproverID: "idp:readiness-approver",
 			PolicyURL:  "https://policy.example.invalid/rollback",

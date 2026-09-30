@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexbridge"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 const codexSummaryFixtureOutput = `{"version":1,"summary":{"requirements":["Preserve the creative request private-token"]}}`

@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func parseBranchArgs(args []string) (config.Options, app.Request, string, sessions.TaskHeadFence, error) {
@@ -67,7 +67,7 @@ func parseBranchArgs(args []string) (config.Options, app.Request, string, sessio
 func runBranch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, key, source, err := parseBranchArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin branch --config path --key idempotency-key --task id --session id --sequence n --event id --model id < prompt.txt")
+		fmt.Fprintln(stderr, "usage: nexus branch --config path --key idempotency-key --task id --session id --sequence n --event id --model id < prompt.txt")
 		return 2
 	}
 	ctx, cancel := submissionCLIContext()

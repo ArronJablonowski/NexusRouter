@@ -10,9 +10,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 type modelsDeprecationArgs struct {
@@ -55,7 +55,7 @@ func deprecationIdentifier(s string) bool {
 
 func runModelsDeprecation(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "deprecation" {
-		fmt.Fprintln(stderr, "usage: darwin models deprecation --config path --model id [--domain general --profile default --window 50 --minimum-samples 20 --failure-threshold 0.35]")
+		fmt.Fprintln(stderr, "usage: nexus models deprecation --config path --model id [--domain general --profile default --window 50 --minimum-samples 20 --failure-threshold 0.35]")
 		return 2
 	}
 	parsed, err := parseModelsDeprecationArgs(args[1:])

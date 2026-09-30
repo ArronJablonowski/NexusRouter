@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/health"
 )
 
 func TestConfiguredOutcomeSupervisionHealthComposition(t *testing.T) {

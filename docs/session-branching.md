@@ -1,6 +1,6 @@
 # Durable session branching
 
-DarwinRouter can queue a new direct child from one exact completed task head.
+NexusRouter can queue a new direct child from one exact completed task head.
 This is a stricter operation than an ordinary continuation: it never waits for
 a running source and never treats recovered failed history as completed.
 
@@ -10,7 +10,7 @@ task and session IDs, head sequence, and canonical terminal event ID. Submit it
 with one new prompt through:
 
 - Go SDK: `Client.SubmitBranch(ctx, key, fence, request)`
-- CLI: `darwin branch --config path --key key --task task --session session --sequence n --event event --model model < prompt.txt`
+- CLI: `nexus branch --config path --key key --task task --session session --sequence n --event event --model model < prompt.txt`
 - HTTP: authenticated `POST /v1/tasks/{task}/branches` with an
   `Idempotency-Key` and strict `{version, source, request}` JSON body
 

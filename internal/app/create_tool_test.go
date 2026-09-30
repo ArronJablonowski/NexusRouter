@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/tools"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 )
 
 func TestCreateToolNewOnlyAndConfinement(t *testing.T) {

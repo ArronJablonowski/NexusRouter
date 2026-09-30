@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/responsecontract"
+	"github.com/ArronJablonowski/NexusRouter/responsecontract"
 )
 
 func has(violations []responsecontract.Violation, wanted responsecontract.Violation) bool {

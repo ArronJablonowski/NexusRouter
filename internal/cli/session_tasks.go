@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func runSessionInspection(args []string, stdout, stderr io.Writer) int {
 	invalid := func() int {
-		fmt.Fprintln(stderr, "usage: darwin session tasks --db path --session id [--after cursor --limit 25]")
+		fmt.Fprintln(stderr, "usage: nexus session tasks --db path --session id [--after cursor --limit 25]")
 		return 2
 	}
 	if len(args) == 0 || args[0] != "tasks" {

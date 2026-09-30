@@ -2,7 +2,7 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	if (!window.DarwinRoutes || !window.DarwinRoutes.models(relative)) return;
+	if (!window.NexusRoutes || !window.NexusRoutes.models(relative)) return;
 	const view = document.querySelector("#models-view"), chat = document.querySelector("#chat-view"), workboards = document.querySelector("#workboard-view"), settings = document.querySelector("#settings-view");
 	const refresh = document.querySelector("#refresh-models"), liveStatus = document.querySelector("#models-live-status");
 	const total = document.querySelector("#local-model-total"), totalDetail = document.querySelector("#local-model-total-detail");

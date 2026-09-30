@@ -255,7 +255,7 @@ func fixtureAttestationRunner(body []byte, failure error) attestationCommand {
 
 func releaseAttestationPlanFixture() ReleaseAttestationPlan {
 	assets := make([]ExpectedAsset, 0, 7)
-	for i, name := range []string{"DarwinRouter_1.0.0_darwin_amd64.tar.gz", "DarwinRouter_1.0.0_darwin_arm64.tar.gz", "DarwinRouter_1.0.0_linux_amd64.tar.gz", "DarwinRouter_1.0.0_linux_arm64.tar.gz", "SHA256SUMS", "SHA256SUMS.sig", "manifest.json"} {
+	for i, name := range []string{"NexusRouter_1.0.0_darwin_amd64.tar.gz", "NexusRouter_1.0.0_darwin_arm64.tar.gz", "NexusRouter_1.0.0_linux_amd64.tar.gz", "NexusRouter_1.0.0_linux_arm64.tar.gz", "SHA256SUMS", "SHA256SUMS.sig", "manifest.json"} {
 		assets = append(assets, ExpectedAsset{Name: name, SHA256: "sha256:" + strings.Repeat(string(rune('1'+i)), 64)})
 	}
 	return ReleaseAttestationPlan{Repository: "acme/router", Tag: "v1.0.0", ReleaseID: 41, TagObjectSHA: strings.Repeat("a", 40), Assets: assets}

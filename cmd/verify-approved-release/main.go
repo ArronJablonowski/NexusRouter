@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type approvedVerifier func(context.Context, releasepack.ApprovedVerificationOptions) (releasepack.ApprovedVerificationResult, error)

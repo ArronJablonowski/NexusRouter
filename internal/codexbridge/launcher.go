@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
 )
 
 // LaunchSpec is trusted host input, never user prompt or model-generated data.

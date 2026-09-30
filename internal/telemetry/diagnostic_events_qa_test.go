@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/diagnostics"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/diagnostics"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 func TestDiagnosticsResumeAfterBoundedSuppressedOnlyPage(t *testing.T) {

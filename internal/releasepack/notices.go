@@ -75,7 +75,7 @@ type noticeFile struct {
 }
 
 // thirdPartyNotices derives the attribution bundle from the exact target's
-// cmd/darwin build closure. It intentionally excludes the main module: the
+// cmd/nexus build closure. It intentionally excludes the main module: the
 // project license is a separate release-approval decision.
 func thirdPartyNotices(ctx context.Context, source, targetOS, targetArch string, env []string) ([]byte, error) {
 	items, err := targetNoticeModules(ctx, source, targetOS, targetArch, env)
@@ -97,7 +97,7 @@ func targetNoticeClosure(ctx context.Context, source, targetOS, targetArch strin
 	if err != nil || goExecutable != reconstruction.goExecutable.path || toolchain.Sum != "" || toolchain.GoModSum != "" {
 		return targetClosure{}, ErrInvalid
 	}
-	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
+	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json", "./cmd/nexus")
 	if err != nil {
 		return targetClosure{}, err
 	}
@@ -276,7 +276,7 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 	if err != nil {
 		return nil, err
 	}
-	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json", "./cmd/darwin")
+	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json", "./cmd/nexus")
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func renderThirdPartyNotices(targetOS, targetArch string, modules []noticeModule
 		return ordered[i].Path < ordered[j].Path
 	})
 	var body bytes.Buffer
-	fmt.Fprintf(&body, "DarwinRouter third-party notices\nTarget: %s/%s\nGenerated from the cmd/darwin dependency closure and exact Go build toolchain.\nModule-Count: %d\n", targetOS, targetArch, len(ordered))
+	fmt.Fprintf(&body, "NexusRouter third-party notices\nTarget: %s/%s\nGenerated from the cmd/nexus dependency closure and exact Go build toolchain.\nModule-Count: %d\n", targetOS, targetArch, len(ordered))
 	previousModule := ""
 	toolchainCount := 0
 	for _, module := range ordered {
@@ -553,9 +553,9 @@ func validateNotice(body []byte, targetOS, targetArch string) error {
 		return ErrSignature
 	}
 	reader := bytes.NewReader(body)
-	if !expectNoticeLine(reader, "DarwinRouter third-party notices") ||
+	if !expectNoticeLine(reader, "NexusRouter third-party notices") ||
 		!expectNoticeLine(reader, "Target: "+targetOS+"/"+targetArch) ||
-		!expectNoticeLine(reader, "Generated from the cmd/darwin dependency closure and exact Go build toolchain.") {
+		!expectNoticeLine(reader, "Generated from the cmd/nexus dependency closure and exact Go build toolchain.") {
 		return ErrSignature
 	}
 	moduleCount, ok := noticeCountLine(reader, "Module-Count: ")

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // ValidateInitialMessages checks whether a complete conversation can be

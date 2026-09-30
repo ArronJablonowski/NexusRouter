@@ -80,7 +80,7 @@ func TestApprovedSigningPreflightDoesNotReadKey(t *testing.T) {
 			case "sums":
 				options.ExpectedSumsSHA256 = "sha256:" + strings.Repeat("0", 64)
 			case "artifact":
-				path := filepath.Join(options.Dir, "DarwinRouter_1.0.0_darwin_amd64.tar.gz")
+				path := filepath.Join(options.Dir, "NexusRouter_1.0.0_darwin_amd64.tar.gz")
 				body, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -382,7 +382,7 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	if err = os.WriteFile(filepath.Join(source, "go.mod"), []byte(goModBody), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err = os.MkdirAll(filepath.Join(source, "cmd", "darwin"), 0755); err != nil {
+	if err = os.MkdirAll(filepath.Join(source, "cmd", "nexus"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	if err = os.MkdirAll(filepath.Join(source, "webui", "assets", "v1"), 0755); err != nil {
@@ -397,9 +397,9 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	program := "package main\n\nimport _ \"" + dependencyPath + "\"\n\nfunc main() {}\n"
 	dependencyImport := "  _ \"" + dependencyPath + "\"\n"
 	if executableVersion != "" {
-		program = "package main\n\nimport (\n  \"fmt\"\n" + dependencyImport + "  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"darwin " + executableVersion + "\")\n    return\n  }\n  os.Exit(2)\n}\n"
+		program = "package main\n\nimport (\n  \"fmt\"\n" + dependencyImport + "  \"os\"\n)\n\nfunc main() {\n  if len(os.Args) == 2 && os.Args[1] == \"version\" {\n    fmt.Println(\"nexus " + executableVersion + "\")\n    return\n  }\n  os.Exit(2)\n}\n"
 	}
-	if err = os.WriteFile(filepath.Join(source, "cmd", "darwin", "main.go"), []byte(program), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(source, "cmd", "nexus", "main.go"), []byte(program), 0644); err != nil {
 		t.Fatal(err)
 	}
 	fixtureEnv := environment()
@@ -474,7 +474,7 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	manifest := Manifest{SchemaVersion: releaseManifestSchema, Version: "1.0.0", Commit: commit, Created: created, Toolchain: toolchainEvidence.GOVERSION}
 	var sums strings.Builder
 	for _, target := range [][2]string{{"darwin", "amd64"}, {"darwin", "arm64"}, {"linux", "amd64"}, {"linux", "arm64"}} {
-		name := "DarwinRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
+		name := "NexusRouter_1.0.0_" + target[0] + "_" + target[1] + ".tar.gz"
 		modules, entryErr := targetNoticeModules(ctx, source, target[0], target[1], fixtureEnv)
 		if entryErr != nil {
 			t.Fatal("load target notice modules", target, entryErr)
@@ -507,7 +507,7 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 		if executableVersion != "" && target[0] == runtime.GOOS && target[1] == runtime.GOARCH {
 			binaryPath := filepath.Join(t.TempDir(), "darwin")
 			buildEnv := append(append([]string(nil), fixtureEnv...), "GOOS="+target[0], "GOARCH="+target[1])
-			if _, entryErr = command(ctx, source, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", binaryPath, "./cmd/darwin"); entryErr != nil {
+			if _, entryErr = command(ctx, source, buildEnv, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", binaryPath, "./cmd/nexus"); entryErr != nil {
 				t.Fatal("build fixture executable", entryErr)
 			}
 			binary, entryErr = os.ReadFile(binaryPath)
@@ -589,7 +589,7 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	keyDigest := sha256.Sum256(public)
 	keyFingerprint := "sha256:" + hex.EncodeToString(keyDigest[:])
 	record := TrustRecord{
-		SchemaVersion: 1, Project: "DarwinRouter", Scope: trustScope, KeyID: "release-test-01",
+		SchemaVersion: 1, Project: "NexusRouter", Scope: trustScope, KeyID: "release-test-01",
 		Algorithm: "Ed25519", PublicKey: hex.EncodeToString(public), PublicKeySHA256: keyFingerprint,
 		Status: "active", PublishedAt: "2026-09-07T00:00:00Z",
 		ReleasePolicyURL: "https://example.invalid/release-policy", RotationRevocationURL: "https://example.invalid/key-status",
@@ -602,7 +602,7 @@ func approvedSigningFixtureWithDependency(t *testing.T, mismatchNotice bool, exe
 	trustFile := filepath.Join(t.TempDir(), "trust.json")
 	writeSigningFixture(t, trustFile, trustBody, 0644)
 	authorization := SigningAuthorization{
-		SchemaVersion: signingAuthorizationSchema, Project: "DarwinRouter", Scope: signingAuthorizationScope,
+		SchemaVersion: signingAuthorizationSchema, Project: "NexusRouter", Scope: signingAuthorizationScope,
 		CandidateRecordSHA256: prefixedDigest(candidateBody), LicenseEvidenceSHA256: licenseEvidenceSHA256,
 		SHA256SUMSSHA256:  prefixedDigest(sumsBody),
 		TrustRecordSHA256: prefixedDigest(trustBody), KeyID: record.KeyID, KeyFingerprint: keyFingerprint,

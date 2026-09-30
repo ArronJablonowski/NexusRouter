@@ -1,6 +1,6 @@
 # Automatic skill comparison windows
 
-`darwin skills compare-select --config config.yaml < request.json` selects recent
+`nexus skills compare-select --config config.yaml < request.json` selects recent
 recorded exposures automatically. The Go SDK exposes `SelectSkillComparison` and
 the authenticated HTTP API exposes `POST /v1/skills/comparison/select`.
 

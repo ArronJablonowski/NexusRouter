@@ -9,11 +9,11 @@ reconciliation. Schema 23 now uses it for narrowly scoped
 ## Ownership protocol
 
 The first lease acquisition lazily creates one private `darwin-owner-*` directory
-under `DarwinRouter/process-owners` in the operating system's user configuration
+under `NexusRouter/process-owners` in the operating system's user configuration
 directory (on macOS, `~/Library/Application Support`; on Linux,
-`$XDG_CONFIG_HOME` or `~/.config`). Set `DARWIN_PROCESS_OWNER_DIR` before startup
+`$XDG_CONFIG_HOME` or `~/.config`). Set `NEXUS_PROCESS_OWNER_DIR` before startup
 to select an alternate absolute directory. Its `owner.lock` file contains
-an immutable random identity. DarwinRouter holds an exclusive, nonblocking OS
+an immutable random identity. NexusRouter holds an exclusive, nonblocking OS
 flock on that file for the execution image's lifetime. The owning file and
 directory handles remain strongly referenced; there is no owning Close method,
 finalizer or Store.Close cleanup. Every database and Store handle in that process
@@ -90,7 +90,7 @@ unattended daemon availability across those conditions.
 
 `make check` and `make test` select a disposable private root for synthetic guard
 fixtures, rather than writing the developer's application state. For direct
-`go test` runs that acquire leases, set `DARWIN_PROCESS_OWNER_DIR` to a private
+`go test` runs that acquire leases, set `NEXUS_PROCESS_OWNER_DIR` to a private
 test directory. The production runtime never cleans up retained guards.
 
 ## Upgrade and remaining work

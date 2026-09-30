@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 var ErrLeaseAttention = errors.New("lease attention unavailable")

@@ -1,6 +1,6 @@
 package submissions
 
-import "github.com/ArronJablonowski/DarwinRouter/runtime"
+import "github.com/ArronJablonowski/NexusRouter/runtime"
 
 // StreamEvent assigns a durable submission-wide sequence to one immutable
 // runtime event. Runtime event task-local identities remain unchanged.

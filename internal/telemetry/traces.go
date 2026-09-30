@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/traces"
+	"github.com/ArronJablonowski/NexusRouter/traces"
 )
 
 var errTraces = errors.New("traces unavailable")

@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -59,7 +59,7 @@ func TestDaemonRestartRecoversInterruptedModelWithoutRedispatch(t *testing.T) {
 	binary := os.Getenv("DARWIN_TEST_DAEMON_BINARY")
 	if binary == "" {
 		binary = filepath.Join(dir, "darwin")
-		if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/darwin").CombinedOutput(); err != nil {
+		if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/nexus").CombinedOutput(); err != nil {
 			t.Fatal(err, string(output))
 		}
 	} else if !filepath.IsAbs(binary) {

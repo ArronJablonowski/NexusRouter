@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
 )
 
 // Every mutable guard belongs to a separate process. Tests never invalidate the

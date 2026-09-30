@@ -6,15 +6,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/hostresources"
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/hostresources"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 const (
@@ -47,8 +47,8 @@ func InstallHostResourceCoordinator(ctx context.Context, service *Service, daemo
 	// associated host coordinator in that same private root unless its own path
 	// was explicitly selected; this also makes multiple fixture daemons sharing
 	// one owner root contend in the same deterministic host scope.
-	ownerRoot := os.Getenv("DARWIN_PROCESS_OWNER_DIR")
-	if os.Getenv("DARWIN_RESOURCE_COORDINATOR_DB") == "" && filepath.IsAbs(ownerRoot) && filepath.Clean(ownerRoot) == ownerRoot {
+	ownerRoot := branding.Getenv("DARWIN_PROCESS_OWNER_DIR")
+	if branding.Getenv("DARWIN_RESOURCE_COORDINATOR_DB") == "" && filepath.IsAbs(ownerRoot) && filepath.Clean(ownerRoot) == ownerRoot {
 		path := filepath.Join(ownerRoot, "host-resources.db")
 		if service.settings.Hardware.Concurrent == "auto" {
 			coordinator, err = hostresources.OpenPathAdaptive(ctx, path, service.resourceLimits)

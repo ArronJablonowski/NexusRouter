@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/policy"
 )
 
 // ExportMetrics explicitly sends one current aggregate snapshot. It never starts

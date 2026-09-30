@@ -1,6 +1,8 @@
-# DarwinRouter
+# NexusRouter
 
-A Go-based, local-first agent runtime with adaptive model routing. The product specification is in [DarwinRouter_PRD.md](DarwinRouter_PRD.md). The repeatable release-candidate gate is documented in [MVP qualification](docs/mvp-qualification.md).
+For existing installations, see the [name migration guide](docs/nexusrouter-migration.md).
+
+A Go-based, local-first agent runtime with adaptive model routing. The product specification is in [NexusRouter_PRD.md](NexusRouter_PRD.md). The repeatable release-candidate gate is documented in [MVP qualification](docs/mvp-qualification.md).
 
 ## Development status
 
@@ -40,7 +42,7 @@ and publication authority remain operator gates.
 
 The executable supports layered configuration, automatic or explicit-model tasks, line-oriented interactive chat, and an authenticated loopback HTTP service with durable SQLite/WAL history. Provider calls use an allowlisted transport, with loopback-only enforcement for local models. Operator memory and skill commands, opt-in local read tools, reviewed new-file creation and bounded existing-file replacement are available. Interactive CLI chat, the OpenAI-compatible HTTP endpoint and Go SDK support provisional, incrementally redacted live text. General patch editing, delegated writes and unattended write approvals remain unfinished; reviewed custom Go SDK tools have separate safety requirements. See the implementation evidence for remaining work; passing the testable-MVP gate is not a published or production-qualified release.
 
-DarwinRouter 1.0 now requires an authenticated embedded Web UI with streaming
+NexusRouter 1.0 now requires an authenticated embedded Web UI with streaming
 chat and a native durable Kanban board that operators and policy-constrained
 agents can use for long-running work. The PRD defines the browser security,
 dependency, claim/lease, checkpoint, acceptance, and restart invariants. Linear
@@ -232,7 +234,7 @@ model-audit labeling, and exact multi-event acceptance receipt correlation.
 Schema 40 adds immutable recovery-to-replacement lineage with conservative,
 unambiguous migration of existing recovered attempts.
 
-DarwinRouter is licensed under the [MIT License](LICENSE), matching the license
+NexusRouter is licensed under the [MIT License](LICENSE), matching the license
 family used by [Hermes Agent](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE).
 Third-party dependency licenses and notices remain separate and are inventoried
 for release review.
@@ -257,18 +259,18 @@ boundary, upgrade requirements and unresolved crashed-holder reconciliation.
 
 Automatic routing separately tracks nonempty-output validity from the latest 100 checked terminal attempts per model/provider/domain/profile. It verifies each check against saved final output and task status. Failures discount the quality component using sample confidence and recency decay; passing this check never proves semantic quality or creates cost/latency measurements. This objective signal remains active when LLM judging is disabled. Legacy tasks without a check contribute no assumed outcome. Compiler/test validation and broader objective checks remain unfinished.
 
-For Go-generation tasks, opt into `darwin run --config path --model auto --validate go_source < prompt.txt`, or supply `"validation":"go_source"` to native `POST /v1/tasks`. Ask for a raw complete Go source file: prose and Markdown fences are rejected, not extracted. The check parses at most 1 MiB of UTF-8 source without loading imports, compiling, or executing anything. Invalid syntax fails the task and records objective evidence; syntax-valid code can still have type errors, missing dependencies, security bugs or failing tests. Validation uses the redacted output that is persisted and delivered. Validity populations are separated by requested validation mode; the OpenAI-compatible endpoint does not expose this extension.
+For Go-generation tasks, opt into `nexus run --config path --model auto --validate go_source < prompt.txt`, or supply `"validation":"go_source"` to native `POST /v1/tasks`. Ask for a raw complete Go source file: prose and Markdown fences are rejected, not extracted. The check parses at most 1 MiB of UTF-8 source without loading imports, compiling, or executing anything. Invalid syntax fails the task and records objective evidence; syntax-valid code can still have type errors, missing dependencies, security bugs or failing tests. Validation uses the redacted output that is persisted and delivered. Validity populations are separated by requested validation mode; the OpenAI-compatible endpoint does not expose this extension.
 
-Read-only model recommendations are available with `darwin models deprecation
+Read-only model recommendations are available with `nexus models deprecation
 --config config.yaml --model MODEL_ID`. The report requires sufficient persisted
 evaluation evidence and operator approval for any later model changes; it does
 not automatically prune models. The same inspection is exposed through authenticated
 `POST /v1/models/deprecation` and the Go SDK's `Client.ModelDeprecation`.
 See [model deprecation](docs/model-deprecation.md).
 
-`darwin daemon start|status|stop --config config.yaml` now controls a background
+`nexus daemon start|status|stop --config config.yaml` now controls a background
 daemon on macOS/Linux using authenticated, instance-bound loopback requests.
-Set `DARWIN_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
+Set `NEXUS_API_TOKEN` first. See [daemon lifecycle](docs/daemon-control.md) for
 readiness, shutdown semantics and limits; `serve` remains the foreground option.
 
 ### Background skill learning
@@ -276,7 +278,7 @@ readiness, shutdown semantics and limits; `serve` remains the foreground option.
 The daemon can now scan repeated accepted tool workflows and publish generated
 skills as inactive drafts. It requires explicit `skills.learning.enabled: true`
 and an aggregate generation budget; it remains off by default. Inspect its
-durable cursor with `darwin skills learning status --config config.yaml`.
+durable cursor with `nexus skills learning status --config config.yaml`.
 See [background learning](docs/background-learning.md) for setup, recovery,
 privacy boundaries and validation requirements.
 
@@ -285,19 +287,19 @@ start learning plus durable regression monitoring through the shared
 [configured lifecycle](docs/configured-learning-supervision.md). The stock binary
 ships no qualified domain validator and fails closed on unknown selections.
 
-`darwin task skill-outcome --config config.yaml --task TASK_ID` inspects recorded
+`nexus task skill-outcome --config config.yaml --task TASK_ID` inspects recorded
 fresh skill versions and current task feedback without running anything. It keeps
 quality evidence separate from nonempty-text/Go-syntax checks. The same report is
 available through the SDK and authenticated HTTP API; see
 [skill outcome attribution](docs/skill-outcome-attribution.md).
 
-`darwin skills compare --config config.yaml` accepts a bounded JSON task-set
+`nexus skills compare --config config.yaml` accepts a bounded JSON task-set
 request on stdin and compares two recorded skill versions using current quality
 evidence. Reports are advisory; creative tasks require user feedback and no model
 judge can qualify. See [outcome comparison](docs/skill-outcome-comparison.md) for
 the SDK/HTTP interfaces, sample requirements and statistical limitations.
 
-`darwin skills compare-select --config config.yaml` automatically selects bounded
+`nexus skills compare-select --config config.yaml` automatically selects bounded
 latest exposure windows before examining outcomes. See [selection rules and
 schema27 migration](docs/skill-comparison-selection.md). This remains diagnostic;
 it cannot automatically roll back a skill.
@@ -353,11 +355,11 @@ observational limitations.
 
 Dedicated Ollama endpoints can opt into `manage_residency: true` for inspected,
 confirmed low-memory model switching. This requires exclusive use by one
-DarwinRouter Service; shared servers must leave it disabled. Logical reservation
+NexusRouter Service; shared servers must leave it disabled. Logical reservation
 release alone does not unload a model. See [model residency](docs/model-residency.md).
 
 Daemon processes also share a private per-host SQLite admission coordinator, so
-different DarwinRouter workspaces cannot independently overcommit the same local
+different NexusRouter workspaces cannot independently overcommit the same local
 slot. Claims are process/daemon fenced, renewed during execution, conservatively
 recovered after crashes, and reported only as identifier-free aggregates. See
 [host resource admission](docs/host-resource-admission.md).
@@ -384,7 +386,7 @@ memory:
 ```
 
 The default empty scope disables retrieval. Facts come from the same configured
-SQLite database used by `darwin memory` commands. Retrieval pages through scoped,
+SQLite database used by `nexus memory` commands. Retrieval pages through scoped,
 unexpired candidates (at most 1,024 facts, 8 MiB and a cooperative three-second
 deadline). It ranks positive unique keyword overlap with the current user request,
 then confidence and ID, selecting at most `max_facts` whole facts fitting the
@@ -463,8 +465,8 @@ Requires Go 1.27.1 and Make. SQLite uses the pinned pure-Go `modernc.org/sqlite`
 ```sh
 make check
 make build
-./bin/darwin help
-./bin/darwin version
+./bin/nexus help
+./bin/nexus version
 ```
 
 `make check` checks formatting without rewriting files, enforces the 1,000-line maximum on handwritten Go files (including tests), runs `go vet`, tests with the race detector, and builds every package. `make fmt` intentionally rewrites Go formatting. CI runs the same checks on Linux and macOS once this repository is pushed to GitHub.
@@ -478,7 +480,7 @@ rather than replaces `make check`.
 
 ## Layout
 
-- `cmd/darwin`: thin executable entry point.
+- `cmd/nexus`: thin executable entry point.
 - `internal/cli`: command parsing, output, and exit behavior.
 - `internal/config`: typed YAML settings, merging, overrides, and validation.
 - `runtime`: versioned event envelope, event kinds, and validation.
@@ -495,7 +497,7 @@ rather than replaces `make check`.
 - `cmd/check` and `internal/quality`: source quality gates.
 - `docs/architecture.md`: package boundaries and implementation sequence.
 
-The module path is `github.com/ArronJablonowski/DarwinRouter`. The development
+The module path is `github.com/ArronJablonowski/NexusRouter`. The development
 [Go SDK](sdk/v1/README.md) embeds the same application service through `sdk/v1`;
 see [the compilable example](examples/sdk/main.go). It is not yet a tagged stable
 release, and remaining application-level extension contracts and production
@@ -508,7 +510,7 @@ unfinished turn in an active task is not proof its worker has stopped; inspect
 lifecycle state before deciding what to do next. Missing, corrupt or oversized
 history returns an error without partial conversation output.
 
-For a metadata-only check, use `darwin task continuation --db path --task TASK_ID`,
+For a metadata-only check, use `nexus task continuation --db path --task TASK_ID`,
 SDK `InspectTaskContinuation`, or authenticated `GET /v1/tasks/{task}/continuation`.
 The versioned result contains `task_id`, observed `sequence`, `state`,
 `history_eligible`, and a fixed `reason`; it excludes prompts, tool arguments and
@@ -523,7 +525,7 @@ The CLI exits zero for a successful inspection even when `history_eligible` is
 false; scripts must inspect that field, not treat command success as permission.
 
 Task-owned lease and recovery counts are available through
-`darwin task leases --db path --task TASK_ID`, SDK `InspectTaskLeases`, and
+`nexus task leases --db path --task TASK_ID`, SDK `InspectTaskLeases`, and
 authenticated `GET /v1/tasks/{task}/leases`. These metadata-only observations
 exclude lease tokens, owner/scope names and conversation content. Unexpired
 leases are not proof of living owners; counts do not authorize release or retry.
@@ -531,7 +533,7 @@ See [task lease inspection](docs/task-lease-inspection.md) for limits and schema
 availability.
 
 To identify tasks holding an overlapping resource scope, use
-`darwin resources leases --db path --scope workspace`, SDK `InspectScopeLeases`,
+`nexus resources leases --db path --scope workspace`, SDK `InspectScopeLeases`,
 or authenticated `GET /v1/resources/leases?scope=workspace`. This bounded,
 read-only list grants no execution or recovery authority. See
 [scope holder inspection](docs/scope-holder-inspection.md).
@@ -539,15 +541,15 @@ read-only list grants no execution or recovery authority. See
 ## Configuration
 
 The daemon durably flags expired unreleased leases. Inspect them with
-`darwin resources attention --db path`, SDK `ListLeaseAttention`, or authenticated
+`nexus resources attention --db path`, SDK `ListLeaseAttention`, or authenticated
 `GET /v1/resources/attention?state=open&limit=25`; an alert
 never grants release or retry authority. See [lease attention](docs/lease-attention.md)
 for schema-26 upgrade guidance and observation limits. Inspect recorded transitions
-with `darwin resources attention-history --db path --id ATTENTION_ID`.
+with `nexus resources attention-history --db path --id ATTENTION_ID`.
 
-Process-ownership guards default to private `DarwinRouter/process-owners`
+For mixed-version safety, process-ownership guards retain the private legacy `DarwinRouter/process-owners`
 storage beneath the OS user configuration directory. Set
-`DARWIN_PROCESS_OWNER_DIR` before startup to override it with an absolute private
+`NEXUS_PROCESS_OWNER_DIR` before startup to override it with an absolute private
 directory. Keep referenced guard files: deleting them does not safely release
 leases. See [ownership and retention](docs/process-lifetime-ownership.md).
 
@@ -565,31 +567,31 @@ they remain held until separately proven terminal-reader recovery. Undispatched
 proposals, writes, legacy behavior and uncertain effects remain unsupported.
 
 ```sh
-./bin/darwin config validate --config examples/local.yaml
-./bin/darwin config show --config examples/local.yaml --set workers.max_in_process=1
-DARWIN__MODE=local_only ./bin/darwin config validate
+./bin/nexus config validate --config examples/local.yaml
+./bin/nexus config show --config examples/local.yaml --set workers.max_in_process=1
+NEXUS__MODE=local_only ./bin/nexus config validate
 
 # Read-only configuration catalogs; output is safe for diagnostics.
-./bin/darwin providers list --config examples/local.yaml
-./bin/darwin models list --config examples/local.yaml
+./bin/nexus providers list --config examples/local.yaml
+./bin/nexus models list --config examples/local.yaml
 
 # Inspect one automatic task's metadata-only durable routing decision.
-./bin/darwin task route --db ./data/darwin.db --task TASK_ID
+./bin/nexus task route --db ./data/darwin.db --task TASK_ID
 
 # Discover newest durable task IDs without loading conversation content.
-./bin/darwin task list --db ./data/darwin.db --limit 25
+./bin/nexus task list --db ./data/darwin.db --limit 25
 
 # Inspect content-free lineage for one durable session.
-./bin/darwin session tasks --db ./data/darwin.db --session SESSION_ID --limit 25
+./bin/nexus session tasks --db ./data/darwin.db --session SESSION_ID --limit 25
 
 # Queue a child from one exact completed head returned by that inspection.
-./bin/darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+./bin/nexus branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
 
 # Queue new work from one exact safely recovered failed history.
-./bin/darwin resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+./bin/nexus resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
 
 # Query the authenticated health report of the running daemon.
-DARWIN_API_TOKEN=replace-me ./bin/darwin doctor --config examples/local.yaml
+NEXUS_API_TOKEN=replace-me ./bin/nexus doctor --config examples/local.yaml
 ```
 
 The provider and model catalogs only inspect configuration and never perform
@@ -600,7 +602,7 @@ environment-variable names. See [configured model metadata](docs/configured-mode
 `doctor` validates the daemon's comprehensive
 `/v1/health` report and exits nonzero when the daemon is unavailable or not ready.
 
-Precedence: defaults → OS user config directory `/darwinrouter/config.yaml` → working-directory `config.yaml` → `DARWIN__SECTION__FIELD` environment variables → repeated `--set section.field=value` flags. `--user-config` and `--config` select explicit files; missing explicit paths are errors. Nested mappings merge; arrays replace wholesale. Environment and CLI overrides address scalar settings only. Unknown fields, duplicate keys, aliases, nulls, and multi-document YAML are rejected. Configuration files are limited to 1 MiB.
+Precedence: defaults → OS user config directory `/nexusrouter/config.yaml` → working-directory `config.yaml` → `NEXUS__SECTION__FIELD` environment variables → repeated `--set section.field=value` flags. `--user-config` and `--config` select explicit files; missing explicit paths are errors. Nested mappings merge; arrays replace wholesale. Environment and CLI overrides address scalar settings only. Unknown fields, duplicate keys, aliases, nulls, and multi-document YAML are rejected. Configuration files are limited to 1 MiB.
 
 Integer fields (counts, token limits, byte sizes, and schema version) require
 unquoted integer values in YAML: `max_facts: 8`, not `8.5` or `"8"`. Values must
@@ -642,7 +644,7 @@ workboard:
 hierarchies. A top-level card has depth 1; `max_children_per_parent` counts only
 direct parent/child links, not dependency edges. Version 1 defaults to depth 4
 and 8 children, and validates both values from 1 through the hard limit of 64.
-The effective numeric values appear in redacted `darwin config show` output and
+The effective numeric values appear in redacted `nexus config show` output and
 participate in the configuration fingerprint. Models cannot override the policy
 or its digest through card-tool arguments.
 
@@ -665,7 +667,7 @@ cancels and joins every scheduling cycle before closing SQLite. Independent
 review, provider-side token ceilings, and lifecycle recovery remain enforced
 at the qualified application boundaries.
 
-Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; DarwinRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
+Provider keys are referenced by `api_key_env`; the loader never resolves credential values. Configuration text is literal (shell `${...}` expansion is not performed). Set concrete endpoint/database values in files or override scalar settings through the environment. An Ollama provider with no `endpoint` uses the deterministic standard `http://127.0.0.1:11434` endpoint; NexusRouter does not scan ports, use DNS, or discover a remote destination. Other provider kinds require their endpoint or executable explicitly. The display redacts endpoints and database paths. HTTP providers may set `request_timeout` from `100ms` through `5m`; omission retains the five-minute default, and a shorter caller deadline remains authoritative. The timeout covers discovery and the complete streaming response. Custom provider engines receive the same deadline cooperatively. Provider execution uses an owned transport enforcing loopback-only destinations in local-only mode. Recognized loopback addresses and `localhost` are pinned in every mode, including hybrid/cloud calls through a local proxy; remote HTTPS hosts still use normal DNS. Cloud routes and the Codex coordinator are rejected before construction in local-only mode, and remote metrics export uses the same boundary. This is not an operating-system sandbox: trusted in-process provider, tool, context, evaluator, or store extensions remain responsible for any networking they perform themselves.
 
 The provider-neutral runtime contains panics at the exact provider, journal, and
 tool extension boundaries. Provider panics become sanitized, non-retryable
@@ -695,13 +697,13 @@ alone does not establish execution readiness. On Apple unified memory include
 GPU allocations in RAM and leave `vram_bytes` zero. Then run:
 
 ```sh
-./bin/darwin run --config examples/local.yaml --model local-fast < prompt.txt
+./bin/nexus run --config examples/local.yaml --model local-fast < prompt.txt
 
 # Stream committed lifecycle events and the final result as JSON lines.
-./bin/darwin run --config examples/local.yaml --model local-fast --json < prompt.txt
-./bin/darwin task show --db ./data/darwin.db --task TASK_ID
-./bin/darwin resources
-./bin/darwin run --config examples/local.yaml --model local-fast --continue-task TASK_ID < followup.txt
+./bin/nexus run --config examples/local.yaml --model local-fast --json < prompt.txt
+./bin/nexus task show --db ./data/darwin.db --task TASK_ID
+./bin/nexus resources
+./bin/nexus run --config examples/local.yaml --model local-fast --continue-task TASK_ID < followup.txt
 ```
 
 `run --json` emits versioned JSONL envelopes: `{"version":1,"type":"event","event":{...}}` for each committed, redacted runtime event, then `{"version":1,"type":"result","result":{...}}`. Failure results include a generic top-level `error` and task IDs without partial output text. Exit status is 0 for success, 1 for execution/output failure, and 2 for invalid arguments. Configuration and input failures before execution are reported on stderr and may produce no JSON record. No plain answer is appended to JSON stdout. Raw token text remains suppressed; completed turn text is redacted. Closing an output pipe cancels execution and permits durable cleanup instead of terminating immediately on SIGPIPE. Actual stdout pipes also have cancelable, fifteen-second bounded writes, so a reader that stops draining cannot indefinitely block cleanup. Custom embedded writers and regular files retain their own blocking semantics. This remains headless execution with stdin consumed as one prompt, not an interactive prompt loop or resumable event delivery. Signal cancellation is installed before input reading. Treat an absent final result as an unknown delivery outcome and inspect task history before retrying.
@@ -783,9 +785,9 @@ discrete-GPU inventory.
 Inspect durable approval metadata without invoking the reviewer or executing work:
 
 ```sh
-darwin approvals list --db path/to/events.db --task task-id --limit 25
-darwin approvals show --db path/to/events.db --task task-id --id approval-id
-darwin approvals execution --db path/to/events.db --task task-id --id approval-id
+nexus approvals list --db path/to/events.db --task task-id --limit 25
+nexus approvals show --db path/to/events.db --task task-id --id approval-id
+nexus approvals execution --db path/to/events.db --task task-id --id approval-id
 ```
 
 The authenticated daemon exposes `GET /v1/tasks/{task_id}/approvals?limit=25`
@@ -827,7 +829,7 @@ Submit a JSON object containing `expected` (the complete inspected `request`),
 `id` (a stable, unique decision ID), and `allowed` (a JSON boolean):
 
 ```sh
-darwin approval-decision --config path/to/config.yaml < decision.json
+nexus approval-decision --config path/to/config.yaml < decision.json
 ```
 
 The daemon also accepts authenticated
@@ -900,9 +902,9 @@ and general interrupted-session recovery remain unfinished.
 From a second terminal using configuration that points to the same task database:
 
 ```sh
-./bin/darwin steer --config examples/local.yaml --task TASK_ID --key unique-message-1 < guidance.txt
-./bin/darwin steering list --db ./data/darwin.db --task TASK_ID
-./bin/darwin steering show --db ./data/darwin.db --task TASK_ID --id MESSAGE_ID
+./bin/nexus steer --config examples/local.yaml --task TASK_ID --key unique-message-1 < guidance.txt
+./bin/nexus steering list --db ./data/darwin.db --task TASK_ID
+./bin/nexus steering show --db ./data/darwin.db --task TASK_ID --id MESSAGE_ID
 ```
 
 `steer` stores guidance only; the already-running task consumes it at its next
@@ -922,7 +924,7 @@ Output uses existing cancellation/broken-pipe handling.
 ### Line-oriented interactive chat
 
 ```sh
-./bin/darwin chat --config examples/local.yaml --model auto
+./bin/nexus chat --config examples/local.yaml --model auto
 ```
 
 Enter one prompt per line; wait for its final answer before entering the next
@@ -989,7 +991,7 @@ To shorten a completed conversation, supply an operator-reviewed summary file:
 ```
 
 ```sh
-./bin/darwin run --config examples/local.yaml --model auto --continue-task TASK_ID --compact-keep 6 --compact-summary summary.json < followup.txt
+./bin/nexus run --config examples/local.yaml --model auto --continue-task TASK_ID --compact-keep 6 --compact-summary summary.json < followup.txt
 ```
 
 Compaction retains at least the requested recent message count, expanding backward to keep tool-call/result batches complete. All original system messages remain. Summary fields are untrusted reference data, not permissions; each category permits at most 128 nonblank entries and the serialized summary is limited to 64 KiB. At least one summary entry and one removable non-system message are required. Configured credentials are redacted before summary use. Models need known `context_tokens`; compaction does not guarantee that the resulting input fits.
@@ -999,9 +1001,9 @@ The new task atomically records its compacted input and a versioned summary chec
 The Go `sessions.Summarizer` component generates bounded proposals, and the application now exposes explicit draft generation through the CLI:
 
 ```sh
-./bin/darwin summary --config path/to/config.yaml --task TASK_ID --model SUMMARY_MODEL_ID --keep 6 --max-cost 0
-./bin/darwin summaries list --db ./data/darwin.db --task TASK_ID
-./bin/darwin summaries show --db ./data/darwin.db --id SUMMARY_ATTEMPT_ID
+./bin/nexus summary --config path/to/config.yaml --task TASK_ID --model SUMMARY_MODEL_ID --keep 6 --max-cost 0
+./bin/nexus summaries list --db ./data/darwin.db --task TASK_ID
+./bin/nexus summaries show --db ./data/darwin.db --id SUMMARY_ATTEMPT_ID
 ```
 
 The selected model needs configured `context_tokens` and `estimated_cost`; local models also need `ram_bytes`. The default zero cost ceiling permits only a configured zero-cost estimate. The sample local configuration supplies that zero-cost estimate but deliberately keeps context and RAM at zero until the operator provides conservative values; it is not ready for summary generation as shipped. Summarization may use the source model because it is not an independent quality audit; `evaluation.judge` does not disable explicitly requested summaries.
@@ -1017,9 +1019,9 @@ Generation makes one auxiliary call without tools or retries. Application admiss
 Drafting never modifies the source, starts a continuation or affects fitness. Inspect the full proposal and verify its accuracy before recording an operator review:
 
 ```sh
-./bin/darwin summary-review --config path/to/config.yaml --attempt SUMMARY_ATTEMPT_ID --decision approved --note "Describe the source checks supporting approval"
-./bin/darwin summary-reviews --db ./data/darwin.db --attempt SUMMARY_ATTEMPT_ID
-./bin/darwin run --config path/to/config.yaml --model auto --continue-task TASK_ID --summary-attempt SUMMARY_ATTEMPT_ID < followup.txt
+./bin/nexus summary-review --config path/to/config.yaml --attempt SUMMARY_ATTEMPT_ID --decision approved --note "Describe the source checks supporting approval"
+./bin/nexus summary-reviews --db ./data/darwin.db --attempt SUMMARY_ATTEMPT_ID
+./bin/nexus run --config path/to/config.yaml --model auto --continue-task TASK_ID --summary-attempt SUMMARY_ATTEMPT_ID < followup.txt
 ```
 
 `--summary-attempt` uses the frozen draft's retained-message count and summary; it cannot be combined with manual compaction flags. The draft must match the source and have a current approval. Its review ID is recorded in the new task's compaction metadata. Approval is checked again in the same SQLite transaction as task start, so a rejection committed before that start blocks dispatch. To change a decision, use `summary-review --expected CURRENT_REVIEW_ID --decision rejected --note "Explain the issue"` with the same config and attempt. Stale decisions conflict; history is immutable and limited to 100 reviews per attempt. Review notes are capped at 4 KiB and credentials are redacted.
@@ -1047,7 +1049,7 @@ already-compacted continuations, and `codex_app_server` fail closed.
 
 The explicit preflight does not invoke a custom `ContextEstimator`, because doing so again inside the durable runtime could make a stateful estimator disagree or perform work twice. A custom estimator may therefore reject a built-in-fitting full or compact request at task start with the normal durable context error.
 
-The same opt-in policy can recover from a provider-reported `context_overflow`, but only by starting one separately linked task with the currently approved summary and the same model. Before doing so, DarwinRouter replays the failed task and requires an exact first-turn event shape proving that the provider produced no model output, tool activity or side effect. Partial output, uncertain state, a missing/currently rejected summary, a different parent, an unrecognized model/provider pair, cancellation, delegated work, exhausted route-attempt capacity or an insufficient aggregate cost budget all leave the original failure terminal. The new task repeats ordinary admission and the transactional approval check; it never replays the failed call. Aggregate route cost and ordered failed-task lineage cover any safe fallback attempts that preceded the overflow. Later growth uses only the frozen in-task activation path above; it never repeats an already dispatched provider call.
+The same opt-in policy can recover from a provider-reported `context_overflow`, but only by starting one separately linked task with the currently approved summary and the same model. Before doing so, NexusRouter replays the failed task and requires an exact first-turn event shape proving that the provider produced no model output, tool activity or side effect. Partial output, uncertain state, a missing/currently rejected summary, a different parent, an unrecognized model/provider pair, cancellation, delegated work, exhausted route-attempt capacity or an insufficient aggregate cost budget all leave the original failure terminal. The new task repeats ordinary admission and the transactional approval check; it never replays the failed call. Aggregate route cost and ordered failed-task lineage cover any safe fallback attempts that preceded the overflow. Later growth uses only the frozen in-task activation path above; it never repeats an already dispatched provider call.
 
 Embedded Go applications can generate, inspect, list and review these same
 proposals through the [SDK session-summary workflow](docs/sdk-session-summaries.md).
@@ -1080,7 +1082,7 @@ It cannot delegate recursively. A local-only parent cannot send its child to
 the cloud, even in hybrid mode.
 
 Model tool use (`tools.enabled`) is enabled by default. Built-in read-only file
-access defaults to the directory where DarwinRouter is launched; set an absolute
+access defaults to the directory where NexusRouter is launched; set an absolute
 `tools.read_root` to choose another workspace. An explicit `tools.enabled: false`
 still disables it. Optional read tools are supplied only to eligible models;
 ordinary cloud models and models without a known context bound can still answer
@@ -1152,12 +1154,12 @@ estimates. Disable delegation by leaving `delegate_model` empty.
 
 ## Local HTTP service
 
-Set `DARWIN_API_TOKEN` to a securely generated secret of at least 32 characters, then run `darwin serve --config examples/local.yaml`. The configured daemon address must be loopback. This foreground process stops on SIGINT/SIGTERM and cancels active requests during shutdown. It is not yet an installed operating-system service.
+Set `NEXUS_API_TOKEN` to a securely generated secret of at least 32 characters, then run `nexus serve --config examples/local.yaml`. The configured daemon address must be loopback. This foreground process stops on SIGINT/SIGTERM and cancels active requests during shutdown. It is not yet an installed operating-system service.
 
 All endpoints require `Authorization: Bearer <token>`:
 
-- `GET /v1/models`: bounded OpenAI-shaped list of configured Darwin model IDs. It reads the daemon's immutable configuration snapshot without provider discovery or inference and exposes no provider endpoint, credential reference, cost, resource footprint or health assertion. Each item uses `object: "model"`, `owned_by: "darwinrouter"`, `shutdown_date: null`, and `created: 0`; the zero timestamp explicitly means DarwinRouter does not know the upstream model's creation time. Configuration order is preserved. `auto` is routing policy rather than a configured model and is not synthesized into the catalog. The response follows the current [OpenAI list-models envelope](https://developers.openai.com/api/reference/ruby/resources/models/methods/list) while documenting these Darwin-specific metadata semantics.
-- `GET /v1/routing/models`: versioned Darwin-native configured routing metadata, including provider/model aliases, locality, capabilities, context, optional configured cost and resource/failure-domain declarations. It shares the bounded catalog capacity domain with `/v1/models` but performs no discovery, health check, reservation, storage read or inference. Endpoints and credential references/values are omitted. This is not an availability or execution-authority response; see [configured model metadata](docs/configured-model-catalog.md).
+- `GET /v1/models`: bounded OpenAI-shaped list of configured NexusRouter model IDs. It reads the daemon's immutable configuration snapshot without provider discovery or inference and exposes no provider endpoint, credential reference, cost, resource footprint or health assertion. Each item uses `object: "model"`, `owned_by: "nexusrouter"`, `shutdown_date: null`, and `created: 0`; the zero timestamp explicitly means NexusRouter does not know the upstream model's creation time. Configuration order is preserved. `auto` is routing policy rather than a configured model and is not synthesized into the catalog. The response follows the current [OpenAI list-models envelope](https://developers.openai.com/api/reference/ruby/resources/models/methods/list) while documenting these NexusRouter-specific metadata semantics.
+- `GET /v1/routing/models`: versioned NexusRouter-native configured routing metadata, including provider/model aliases, locality, capabilities, context, optional configured cost and resource/failure-domain declarations. It shares the bounded catalog capacity domain with `/v1/models` but performs no discovery, health check, reservation, storage read or inference. Endpoints and credential references/values are omitted. This is not an availability or execution-authority response; see [configured model metadata](docs/configured-model-catalog.md).
 - `GET /health`: lightweight database and live supervisor check. Its legacy response still declares `providers_checked: false`; it performs no provider discovery.
 - `GET /v1/health`: detailed operational report described below, including bounded provider/model discovery.
 - `GET /v1/resources/attention`: read-only paginated lease-attention records;
@@ -1189,7 +1191,7 @@ All endpoints require `Authorization: Bearer <token>`:
 - `GET /v1/feedback/{task_id}`: original final-attempt evaluation followed by its revision history.
 - `POST /v1/feedback/revisions`: JSON `{"task_id":"TASK_ID","expected_id":"EVALUATION_ID","outcome":"rejected"}` (or `accepted`). Uses the same subjective-only correction policy as the CLI, with a 4 KiB body limit and shared capacity. Identical retries return 200; stale/conflicting corrections return 409; evidence-policy denials return 422. Execution measurements cannot be changed through this endpoint.
 
-All summary endpoints share task concurrency capacity and enforce authentication, origin denial and request deadlines. Summary POST bodies require JSON and are limited to 8 KiB; review notes remain limited to 4 KiB. Overload returns 503 with `Retry-After`. Review is still operator attestation, not an automatic quality judge. The OpenAI-compatible endpoint does not accept these Darwin-native extensions.
+All summary endpoints share task concurrency capacity and enforce authentication, origin denial and request deadlines. Summary POST bodies require JSON and are limited to 8 KiB; review notes remain limited to 4 KiB. Overload returns 503 with `Retry-After`. Review is still operator attestation, not an automatic quality judge. The OpenAI-compatible endpoint does not accept these NexusRouter-native extensions.
 
 `POST /v1/chat/completions` accepts `model`, text-only system/user/assistant `messages`, optional `stream`, and `stream_options.include_usage` when streaming. Other OpenAI parameters are rejected. Streaming responses use live, incrementally redacted assistant text (`X-Darwin-Stream-Mode: live-redacted`). Known credentials are withheld across chunk boundaries; partial secret matches can delay text delivery. Content is provisional and may include intermediate assistant turns; tool arguments/results and delegated child streams are not exposed. Only successful durable task completion can produce the finish chunk and `[DONE]`. Failures after headers produce a sanitized SSE error without a success marker. Disconnects cancel execution. Token text is not durably replayable; native lifecycle events remain the inspection/replay interface.
 
@@ -1197,7 +1199,7 @@ With `"stream_options":{"include_usage":true}`, ordinary chunks carry
 `usage:null`. After successful completion, a separate chunk with `choices:[]`
 reports known prompt, completion and total token counts before `[DONE]`, following
 the [OpenAI streaming usage shape](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
-`X-Darwin-Usage-Scope: successful-task-model-turns` identifies Darwin's accounting
+`X-Darwin-Usage-Scope: successful-task-model-turns` identifies NexusRouter's accounting
 scope: all model turns in the successful task, excluding failed routing attempts,
 delegated child tasks and auxiliary audit/summarization calls. This is not a
 whole-request billing total. Missing, invalid or overflowing counts produce a
@@ -1313,16 +1315,16 @@ the requested limit. Inspect an individual submission to retrieve its result.
 The CLI can operate on the same private SQLite store:
 
 ```sh
-darwin submit --config examples/local.yaml --key unique-request-key-001 --model local-fast < prompt.txt
-darwin branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
-darwin resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
-darwin submissions list --db /absolute/path/tasks.db --state running --limit 25
-darwin submissions show --db /absolute/path/tasks.db --id SUBMISSION_ID
-darwin submissions cancel --db /absolute/path/tasks.db --id SUBMISSION_ID
+nexus submit --config examples/local.yaml --key unique-request-key-001 --model local-fast < prompt.txt
+nexus branch --config examples/local.yaml --key unique-branch-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+nexus resume --config examples/local.yaml --key unique-resume-key-001 --task TASK_ID --session SESSION_ID --sequence HEAD_SEQUENCE --event HEAD_EVENT_ID --model local-fast < prompt.txt
+nexus submissions list --db /absolute/path/tasks.db --state running --limit 25
+nexus submissions show --db /absolute/path/tasks.db --id SUBMISSION_ID
+nexus submissions cancel --db /absolute/path/tasks.db --id SUBMISSION_ID
 ```
 
 `submit` durably queues the request and prints JSON; it does not start a daemon
-or wait for model execution. Run `darwin serve` with matching configuration to
+or wait for model execution. Run `nexus serve` with matching configuration to
 execute it. It accepts the run command's constraints and continuation options,
 but not `--json`: submission output is already a single JSON status. Preserve
 the exact key, input and configuration for an idempotent retry. Do not place
@@ -1364,7 +1366,7 @@ This does not resume an interrupted conversation or retry tool effects.
 Each decision is recorded transactionally in an immutable recovery history with
 its action, reason and timestamp. Inspect it using
 `GET /v1/submissions/{id}/recoveries` or
-`darwin submissions recoveries --db /absolute/path/tasks.db --id SUBMISSION_ID`.
+`nexus submissions recoveries --db /absolute/path/tasks.db --id SUBMISSION_ID`.
 These read-only views return at most four JSON records and expose no claim tokens
 or queued content. Automatic recovery after partial inference/tool execution is
 not implemented.
@@ -1409,9 +1411,9 @@ the tested provider, tool, compaction, fitness and worker transaction boundaries
 
 ## Automatic routing and local knowledge
 
-Record operator feedback on a completed task with `darwin feedback --db path --task TASK_ID --outcome accepted --attempt-cost 0` (or `rejected`). Supply the observed final model-attempt cost explicitly; zero is appropriate only when known. This updates immutable user-feedback evidence and domain fitness atomically. Identical retries do not add samples; conflicting initial feedback or a pre-existing evaluation requires the explicit revision workflow below. Feedback covers the final attempt, not every preceding tool/model turn. No model tool can invoke this adapter. CLI submission output contains no task contents. The authenticated HTTP submission endpoint uses the same initial-record rules.
+Record operator feedback on a completed task with `nexus feedback --db path --task TASK_ID --outcome accepted --attempt-cost 0` (or `rejected`). Supply the observed final model-attempt cost explicitly; zero is appropriate only when known. This updates immutable user-feedback evidence and domain fitness atomically. Identical retries do not add samples; conflicting initial feedback or a pre-existing evaluation requires the explicit revision workflow below. Feedback covers the final attempt, not every preceding tool/model turn. No model tool can invoke this adapter. CLI submission output contains no task contents. The authenticated HTTP submission endpoint uses the same initial-record rules.
 
-Explicit subjective corrections are available through `darwin feedback show --db path --task TASK_ID`, then `darwin feedback revise --db path --task TASK_ID --expected EVALUATION_ID --outcome accepted` (or `rejected`), or through the HTTP endpoints above. Revisions preserve original evidence and execution measurements, adjust only the quality contribution, and retain one sample per attempt. A user assessment can supersede subjective judge/user evidence, not objective test/tool evidence. Stale revisions conflict; identical retries are idempotent. The revision chain is capped at 100 revisions. Objective validity remains separate from subjective quality. Stored advisory audits may contribute only bounded route-quality influence; they are never converted into direct fitness samples.
+Explicit subjective corrections are available through `nexus feedback show --db path --task TASK_ID`, then `nexus feedback revise --db path --task TASK_ID --expected EVALUATION_ID --outcome accepted` (or `rejected`), or through the HTTP endpoints above. Revisions preserve original evidence and execution measurements, adjust only the quality contribution, and retain one sample per attempt. A user assessment can supersede subjective judge/user evidence, not objective test/tool evidence. Stale revisions conflict; identical retries are idempotent. The revision chain is capped at 100 revisions. Objective validity remains separate from subjective quality. Stored advisory audits may contribute only bounded route-quality influence; they are never converted into direct fitness samples.
 
 Opt in to the built-in `read_file` tool with a narrow workspace directory:
 
@@ -1474,7 +1476,7 @@ so a fresh operation is required. These audit fields are projected in Workboard
 event inspection without prompts, raw tool arguments, credentials, or card
 content.
 Returned board/card content becomes sensitive durable session content.
-Interactive `darwin chat` displays the exact model arguments, digest, tool,
+Interactive `nexus chat` displays the exact model arguments, digest, tool,
 action, scope, behavior, and no-replay warning using an ASCII-safe terminal
 preview before accepting `/approve REQUEST_ID` or `/deny REQUEST_ID`. The
 preview rejects configured credentials even when JSON escaping hides their raw
@@ -1525,7 +1527,7 @@ remains a coarse observation, not a reservation or guarantee of task admission.
 ### Explicit discrete-GPU bindings
 
 For a Linux backend already pinned to a device, set a local model's `gpu_device`
-to `nvidia:GPU-<UUID>` or `amd:cardN`, using the identifier from `darwin resources`.
+to `nvidia:GPU-<UUID>` or `amd:cardN`, using the identifier from `nexus resources`.
 Provide positive conservative `ram_bytes` and `vram_bytes` footprints. Both
 host and device observations must be fresh; missing devices, failed probes,
 ambiguous inventories and Apple unified-memory/double-pool configurations are
@@ -1626,7 +1628,7 @@ lineage and redacted route attribution. The paired local-required case proves
 that the cloud adapter receives neither discovery nor inference traffic. This
 is protocol-fixture evidence, not a live-provider availability claim.
 
-`darwin memory list|show|export|put|delete --config path` inspects and maintains factual
+`nexus memory list|show|export|put|delete --config path` inspects and maintains factual
 memory through the configured scope and credential-redaction boundary. Put reads
 a complete fact as strict JSON from stdin and requires `--expected 0` for creation
 or the current revision for correction. Delete requires `--id` and `--expected`.
@@ -1646,7 +1648,7 @@ available when prompt retrieval is disabled and do not invoke models. See
 [operator memory management](docs/memory-management.md) for the authenticated
 HTTP contract, redaction, storage requirements and uncertain-write handling.
 
-`darwin skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires an explicitly selected trusted validator; these commands do not enable automatic skill mutation. The configured-learning path offers the protected `darwin_observed_tools_activation_v1` provenance validator, but it remains disabled unless the operator enables every activation prerequisite and selects that exact identity. Treat memory and skill exports as sensitive. Skill privacy is durable provenance: `"privacy":"public"` explicitly permits cloud-model context, while `"privacy":"local_only"` confines the workflow to local models. Legacy drafts with no privacy field fail closed as local-only. Automatically generated skills inherit local-only when any admitted source is local-only, and later configuration changes cannot relax that restriction.
+`nexus skills list|show|history|state|draft|rollback --root path --scope scope` maintains procedural skills. Draft reads strict JSON from stdin; rollback requires `--name` and `--expected-version`. Inspection never initializes stores. Activation still requires an explicitly selected trusted validator; these commands do not enable automatic skill mutation. The configured-learning path offers the protected `darwin_observed_tools_activation_v1` provenance validator, but it remains disabled unless the operator enables every activation prerequisite and selects that exact identity. Treat memory and skill exports as sensitive. Skill privacy is durable provenance: `"privacy":"public"` explicitly permits cloud-model context, while `"privacy":"local_only"` confines the workflow to local models. Legacy drafts with no privacy field fail closed as local-only. Automatically generated skills inherit local-only when any admitted source is local-only, and later configuration changes cannot relax that restriction.
 
 Rollback undoes the latest activation that has not already been reversed, not
 the latest appearance of a version ID. Reactivating an older version therefore
@@ -1742,7 +1744,7 @@ are not implied by these operations.
 Operator surfaces expose that same read-only discovery:
 
 ```sh
-darwin skill-generations discover --config /path/to/config.yaml --domain creative --scan-limit 20
+nexus skill-generations discover --config /path/to/config.yaml --domain creative --scan-limit 20
 ```
 
 The authenticated HTTP equivalent is
@@ -1768,9 +1770,9 @@ inference nor reserves a generation attempt; scheduler integration is unfinished
 Generate from two or more accepted completed tasks, then publish explicitly:
 
 ```sh
-darwin skill-generations generate --config /path/to/config.yaml --id workflow-attempt-1 --model generator --name review-workflow --tasks TASK_A,TASK_B --max-cost 0
-darwin skill-generations show --db /path/to/darwin.db --scope project --id workflow-attempt-1
-darwin skill-generations publish --config /path/to/config.yaml --id workflow-attempt-1
+nexus skill-generations generate --config /path/to/config.yaml --id workflow-attempt-1 --model generator --name review-workflow --tasks TASK_A,TASK_B --max-cost 0
+nexus skill-generations show --db /path/to/darwin.db --scope project --id workflow-attempt-1
+nexus skill-generations publish --config /path/to/config.yaml --id workflow-attempt-1
 ```
 
 Both mutation commands require a configuration file and take scope exclusively
@@ -1812,8 +1814,8 @@ configured `model_id` alias.
 Inspect saved generation without re-running it:
 
 ```sh
-darwin skill-generations list --db /path/to/darwin.db --scope project --limit 25
-darwin skill-generations show --db /path/to/darwin.db --scope project --id ATTEMPT_ID
+nexus skill-generations list --db /path/to/darwin.db --scope project --limit 25
+nexus skill-generations show --db /path/to/darwin.db --scope project --id ATTEMPT_ID
 ```
 
 Lists contain metadata only; show includes the saved proposal and may contain
@@ -1887,7 +1889,7 @@ callbacks may run concurrently, but closed failed checks cannot commit a late
 rollback. See [durable monitoring](docs/durable-skill-regression-monitor.md) for
 bounded retention, policy bindings, inspection and remaining daemon limitations.
 
-`darwin audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with a configured model. Independent evaluators are preferred; a separate invocation of the candidate model is permitted as explicitly bounded self-critique. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
+`nexus audit --config path --task TASK_ID --reviewer MODEL_ID --max-cost 0` reviews saved output with a configured model. Independent evaluators are preferred; a separate invocation of the candidate model is permitted as explicitly bounded self-critique. The reviewer requires context and cost metadata, plus memory estimates for local execution. Local history cannot be reviewed in the cloud. Shared services reserve local resources during review; separate CLI processes do not share reservations. Review calls have no tools and no automatic retries. Configured credentials are redacted from review inputs and findings; other sensitive content still requires operator care.
 
 The experimental signed-in Sol CLI provider now supports this audit service,
 including structured generation and independent result validation. See the
@@ -1928,13 +1930,13 @@ credentials, and admits at most 250 records totaling 64 KiB. Oversized metadata
 denies review instead of silently omitting failures. These references identify
 events within the audit's task, not independently verified external receipts.
 
-`darwin audits list --db path --task TASK_ID` and `darwin audits show --db path --id AUDIT_ID` inspect immutable advisory audits. `darwin audits attempts --db path --task TASK_ID` inspects admitted review lifecycles, including failures. Lists accept `--after` and `--limit` (1–100); inspection never creates storage. Audit records are separate from fitness and retain reported usage rather than fabricated dollar costs. Findings may contain sensitive content, so protect exports.
+`nexus audits list --db path --task TASK_ID` and `nexus audits show --db path --id AUDIT_ID` inspect immutable advisory audits. `nexus audits attempts --db path --task TASK_ID` inspects admitted review lifecycles, including failures. Lists accept `--after` and `--limit` (1–100); inspection never creates storage. Audit records are separate from fitness and retain reported usage rather than fabricated dollar costs. Findings may contain sensitive content, so protect exports.
 
 Review execution persists `started` before calling the reviewer, then records the validated audit and `completed` status in one transaction, or `failed` with a generic code. Cancellation cleanup has an independent five-second storage deadline. Admission denials do not create attempts. A crash or storage failure can leave an attempt `started`; this means indeterminate, not proof that a review is still running. Automatic reconciliation is not implemented. Failed reviews never become candidate performance evidence. The standalone audit-storage API remains available for imported records; only `CompleteReview`, used by application execution, guarantees atomic audit/lifecycle persistence.
 
 ## Durable lifecycle metrics
 
-`darwin metrics --db /absolute/path/to/darwin.db` reads a versioned JSON snapshot
+`nexus metrics --db /absolute/path/to/darwin.db` reads a versioned JSON snapshot
 from existing storage. The daemon exposes the same snapshot through authenticated
 `GET /v1/metrics`, with a separate one-request diagnostic slot. Requests with a
 body, query parameters or browser origin are rejected. Missing or unreadable
@@ -1972,7 +1974,7 @@ start and terminals require both a start and terminal submission state, so a
 pre-start cancellation is not mislabeled as service and fallback tasks do not
 double count a submission. The totals reconcile with submission state and
 contain no identity or exact timestamp. Derive rates from successive snapshots
-for the same database; DarwinRouter does not guess a sampled per-second rate.
+for the same database; NexusRouter does not guess a sampled per-second rate.
 
 Schema-28-and-newer stores also expose cumulative provider-turn and tool-call
 duration histograms derived from paired durable events. Missing starts, missing
@@ -2065,4 +2067,4 @@ observability qualification remain unfinished.
 
 See [implementation evidence](docs/progress.md) for completed local work and remaining checks by Linear issue.
 
-See the [Linear project](https://linear.app/darwinrouter/project/darwinrouter-mvp-fc9fe6d48fda) for the full delivery backlog.
+See the [Linear project](https://linear.app/nexusrouter/project/nexusrouter-mvp-fc9fe6d48fda) for the full delivery backlog.

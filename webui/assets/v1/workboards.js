@@ -2,14 +2,14 @@
 (() => {
 	const base = document.body.dataset.basePath || "";
 	const relative = window.location.pathname.startsWith(base) ? window.location.pathname.slice(base.length) : "";
-	window.DarwinRoutes = window.DarwinRoutes || Object.freeze({
+	window.NexusRoutes = window.NexusRoutes || Object.freeze({
 		workboards: path => /^\/workboards(?:\/[^/]+)?$/.test(path), chats: path => /^\/chats(?:\/[^/]+)?$/.test(path),
 		models: path => path === "/models", routing: path => path === "/routing-map",
 		elimination: path => path === "/model-elimination", settings: path => path === "/settings", skills: path => path === "/skills", stats: path => path === "/stats"
 	});
-	const route = window.DarwinRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
+	const route = window.NexusRoutes.workboards(relative) ? relative.match(/^\/workboards(?:\/([^/]+))?$/) : null;
 	if (!route) return;
-	const client = window.DarwinWorkboardClient;
+	const client = window.NexusWorkboardClient;
 	if (!client) return;
 	const idPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 	const validatorPattern = /^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*$/;
@@ -581,7 +581,7 @@
 			if (reset && pendingFocusVersion === current) { client.restoreFocusAnchor(focusAnchor, boardID, cardNodes, refresh, document.activeElement, document.body); pendingFocusAnchor = null; pendingFocusVersion = 0; }
 		});
 	}
-	window.DarwinWorkboards = Object.freeze({
+	window.NexusWorkboards = Object.freeze({
 		context: () => Object.freeze({
 			board: currentBoard, card: selectedCard, graphRevision: snapshotGraphRevision,
 			cards: Object.freeze((pendingPosition ? client.provisionalPosition(loadedCards, pendingPosition) : loadedCards).map(card => Object.freeze({id: card.id, state: card.state, rank: card.rank, revision: card.revision, criteria_revision: card.criteria_revision, remaining_dependencies: card.remaining_dependencies, current_attempt_id: card.current_attempt_id || "", current_claim_id: card.current_claim_id || "", acceptance_id: card.acceptance_id || "", pause_requested: card.pause_requested, pause_phase: card.pause_phase || "", cancel_requested: card.cancel_requested, supervision: supervisionByCard.get(card.id) || null, provisional: Boolean(card.provisional)}))),

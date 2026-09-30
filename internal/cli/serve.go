@@ -18,21 +18,22 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/api"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserauth"
-	"github.com/ArronJablonowski/DarwinRouter/internal/browserops"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/internal/webuiapp"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/skills"
-	"github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/api"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserauth"
+	"github.com/ArronJablonowski/NexusRouter/internal/browserops"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/internal/webuiapp"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func runServe(args []string, stdout, stderr io.Writer) int {
@@ -48,7 +49,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	path := fs.String("config", "", "configuration file")
 	instance := fs.String("instance-id", "", "managed launch identity")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *path == "" || (*instance != "" && !daemon.ValidID(*instance)) {
-		fmt.Fprintln(stderr, "usage: darwin serve --config path (requires DARWIN_API_TOKEN)")
+		fmt.Fprintln(stderr, "usage: nexus serve --config path (requires NEXUS_API_TOKEN; legacy DARWIN_API_TOKEN accepted)")
 		return 2
 	}
 	s, err := config.Load(config.Options{ProjectFile: *path, Env: config.Environment(os.Environ())})
@@ -71,9 +72,9 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	token := os.Getenv("DARWIN_API_TOKEN")
+	token := branding.Getenv("DARWIN_API_TOKEN")
 	if len(token) < 32 {
-		fmt.Fprintln(stderr, "DARWIN_API_TOKEN must contain at least 32 characters")
+		fmt.Fprintln(stderr, "NEXUS_API_TOKEN (or legacy DARWIN_API_TOKEN) must contain at least 32 characters")
 		return 1
 	}
 	service, err := app.NewService(s, os.Getenv)
@@ -570,7 +571,7 @@ func serveHTTP(ctx context.Context, listener net.Listener, handler http.Handler,
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 5*time.Minute + 15*time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10, ErrorLog: log.New(io.Discard, "", 0), BaseContext: func(net.Listener) context.Context { return ctx }}
 	done := make(chan error, 1)
 	go func() { done <- server.Serve(listener) }()
-	if _, err := fmt.Fprintln(stdout, "DarwinRouter listening on", listener.Addr()); err != nil {
+	if _, err := fmt.Fprintln(stdout, "NexusRouter listening on", listener.Addr()); err != nil {
 		server.Close()
 		<-done
 		return err

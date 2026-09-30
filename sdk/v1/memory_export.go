@@ -2,7 +2,7 @@ package v1
 
 import "context"
 
-import "github.com/ArronJablonowski/DarwinRouter/memory"
+import "github.com/ArronJablonowski/NexusRouter/memory"
 
 type MemoryExport = memory.ExportSnapshot
 type MemoryExporter = memory.Exporter

@@ -24,12 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
-	darwinruntime "github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/memory"
+	darwinruntime "github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/webui"
 	_ "modernc.org/sqlite"
 )
 
@@ -55,7 +55,7 @@ func TestNativeInstallMigrationRehearsal(t *testing.T) {
 	}
 	built := filepath.Join(root, "built-darwin")
 	env := append(environment(), "GOCACHE="+filepath.Join(root, "go-cache"), "GOPROXY=off", "GOSUMDB=off", "GOOS="+runtime.GOOS, "GOARCH="+runtime.GOARCH)
-	if _, err = command(ctx, source, env, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+rehearsalVersion, "-o", built, "./cmd/darwin"); err != nil {
+	if _, err = command(ctx, source, env, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -X main.version="+rehearsalVersion, "-o", built, "./cmd/nexus"); err != nil {
 		t.Fatal(err)
 	}
 	binary, err := os.ReadFile(built)
@@ -91,7 +91,7 @@ func TestNativeInstallMigrationRehearsal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	archive := filepath.Join(root, "DarwinRouter_"+rehearsalVersion+"_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz")
+	archive := filepath.Join(root, "NexusRouter_"+rehearsalVersion+"_"+runtime.GOOS+"_"+runtime.GOARCH+".tar.gz")
 	f, err := os.OpenFile(archive, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -130,12 +130,12 @@ func rehearseNativeInstallAndMigration(t *testing.T, ctx context.Context, source
 			t.Fatal("exclusive install prefix", err)
 		}
 	}
-	installed := filepath.Join(installPrefix, "bin", "darwin")
+	installed := filepath.Join(installPrefix, "bin", "nexus")
 	if err := writeExclusive(installed, binary, 0755); err != nil {
 		t.Fatal(err)
 	}
 	assertMode(t, installed, 0755)
-	if got, err := runInstalled(ctx, installed, root, nil, nil, "version"); err != nil || strings.TrimSpace(got) != "darwin "+version {
+	if got, err := runInstalled(ctx, installed, root, nil, nil, "version"); err != nil || strings.TrimSpace(got) != "nexus "+version {
 		t.Fatalf("installed version mismatch: %q: %v", got, err)
 	}
 
@@ -318,7 +318,7 @@ func rehearsalArchiveBinary(t *testing.T, archive []byte, artifact Artifact) []b
 		if contract.name == noticeName && validateNotice(body, artifact.OS, artifact.Arch) != nil {
 			t.Fatal("invalid notice payload")
 		}
-		if contract.name == "darwin" {
+		if contract.name == "nexus" {
 			binary = body
 		}
 	}
@@ -847,7 +847,7 @@ func TestExclusiveRehearsalCopyRejectsOverwrite(t *testing.T) {
 
 func TestPinnedRehearsalArchiveRejectsUnsafeIdentity(t *testing.T) {
 	root := t.TempDir()
-	name := "DarwinRouter_1.0.0_darwin_arm64.tar.gz"
+	name := "NexusRouter_1.0.0_darwin_arm64.tar.gz"
 	path := filepath.Join(root, name)
 	body := []byte("one immutable descriptor snapshot")
 	if err := os.WriteFile(path, body, 0600); err != nil {

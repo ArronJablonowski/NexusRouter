@@ -1,19 +1,19 @@
 # Diagnostic logging
 
-DarwinRouter continuously records redacted input, complete model turns, tool
+NexusRouter continuously records redacted input, complete model turns, tool
 activity, routing decisions, revisions, evaluations, and terminal errors in its
-SQLite event journal. `darwin logs` exposes those committed records as versioned
+SQLite event journal. `nexus logs` exposes those committed records as versioned
 JSON lines without creating another automatic content store.
 
 ```sh
 # Follow new activity and errors. No prompts or answer content by default.
-darwin logs --config /path/to/config.yaml --follow
+nexus logs --config /path/to/config.yaml --follow
 
 # Inspect one task, including its redacted prompt, answers, and tool I/O.
-darwin logs --config /path/to/config.yaml --task TASK_ID --include-content
+nexus logs --config /path/to/config.yaml --task TASK_ID --include-content
 
 # Resume an export using the last diagnostic.checkpoint.next_after value.
-darwin logs --config /path/to/config.yaml --task TASK_ID --after 1234 --include-content
+nexus logs --config /path/to/config.yaml --task TASK_ID --after 1234 --include-content
 ```
 
 `--limit` limits visible records per page (1–100, default 100). A one-shot command

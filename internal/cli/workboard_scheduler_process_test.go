@@ -18,13 +18,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -255,7 +255,7 @@ func buildWorkboardDaemonBinary(t *testing.T, ctx context.Context, dir string) s
 		return binary
 	}
 	binary := filepath.Join(dir, "darwin")
-	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/darwin").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/nexus").CombinedOutput(); err != nil {
 		t.Fatal(err, string(output))
 	}
 	return binary

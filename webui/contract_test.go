@@ -258,7 +258,7 @@ func TestPublishedSchemaAcceptsFixturesAndRejectsUnsafeShapes(t *testing.T) {
 		t.Fatal(err)
 	}
 	compiler := jsonschema.NewCompiler()
-	const location = "https://darwinrouter.local/schema/webui/v1"
+	const location = "https://nexusrouter.local/schema/webui/v1"
 	if err := compiler.AddResource(location, document); err != nil {
 		t.Fatal(err)
 	}

@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"sort"
 
-	"github.com/ArronJablonowski/DarwinRouter/contextpolicy"
-	"github.com/ArronJablonowski/DarwinRouter/evaluation"
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/contextpolicy"
+	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 // ContextEvidence returns outcome summaries by allocated context tier. Records

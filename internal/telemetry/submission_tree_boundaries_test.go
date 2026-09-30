@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/submissions"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
 
 func TestTerminalTreeAggregateSourceByteBudget(t *testing.T) {

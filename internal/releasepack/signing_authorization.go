@@ -16,7 +16,7 @@ var ErrSigningAuthorization = errors.New("release signing authorization validati
 
 const (
 	signingAuthorizationSchema = 2
-	signingAuthorizationScope  = "darwinrouter-release-signing-authorization"
+	signingAuthorizationScope  = "nexusrouter-release-signing-authorization"
 	maxSigningAuthorization    = 16 << 10
 )
 
@@ -117,7 +117,7 @@ func ReadSigningAuthorization(path string, expected SigningAuthorizationExpectat
 }
 
 func validateSigningAuthorization(record SigningAuthorization) error {
-	if record.SchemaVersion != signingAuthorizationSchema || record.Project != "DarwinRouter" ||
+	if record.SchemaVersion != signingAuthorizationSchema || record.Project != "NexusRouter" ||
 		record.Scope != signingAuthorizationScope || !trustFingerprint(record.CandidateRecordSHA256) ||
 		!trustFingerprint(record.LicenseEvidenceSHA256) ||
 		!trustFingerprint(record.SHA256SUMSSHA256) || !trustFingerprint(record.TrustRecordSHA256) ||

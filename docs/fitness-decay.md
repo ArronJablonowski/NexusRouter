@@ -1,6 +1,6 @@
 # Fitness observation decay
 
-DarwinRouter applies exponential recency decay to each current evidence
+NexusRouter applies exponential recency decay to each current evidence
 observation before aggregation. It does not multiply a lifetime average by the
 newest record's age.
 

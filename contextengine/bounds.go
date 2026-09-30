@@ -3,7 +3,7 @@ package contextengine
 import (
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // CheckMessages bounds raw bytes/counts and checks complete conversations before

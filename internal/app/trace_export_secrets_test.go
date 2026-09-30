@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 func TestTraceExportCredentialParticipatesInRedaction(t *testing.T) {

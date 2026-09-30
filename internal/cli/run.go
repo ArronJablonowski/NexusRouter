@@ -17,9 +17,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // parseRunArgs validates constraints before configuration, storage or providers
@@ -201,7 +201,7 @@ func readCompactionSummary(path string) (sessions.Summary, error) {
 func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, jsonMode, err := parseRunOptions(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
+		fmt.Fprintln(stderr, "usage: nexus run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
 		fmt.Fprintln(stderr, "go_source validation expects output containing a raw full Go source file")
 		fmt.Fprintln(stderr, "continuation compaction: --continue-task id --compact-keep n --compact-summary summary.json")
 		fmt.Fprintln(stderr, "approved stored summary: --continue-task id --summary-attempt id")

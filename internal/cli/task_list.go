@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func runTaskList(args []string, stdout, stderr io.Writer) int {
 	invalid := func() int {
-		fmt.Fprintln(stderr, "usage: darwin task list --db path [--state state --after cursor --limit 25]")
+		fmt.Fprintln(stderr, "usage: nexus task list --db path [--state state --after cursor --limit 25]")
 		return 2
 	}
 	seen := map[string]bool{}

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
 )
 
 func runSkillGenerations(args []string, stdout, stderr io.Writer) int {
@@ -19,7 +19,7 @@ func runSkillGenerations(args []string, stdout, stderr io.Writer) int {
 		return runSkillGenerationAction(args, stdout, stderr)
 	}
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin skill-generations list|show --db path --scope id [--id id] [--after id --limit 25]")
+		fmt.Fprintln(stderr, "usage: nexus skill-generations list|show --db path --scope id [--id id] [--after id --limit 25]")
 		return 2
 	}
 	if len(args) == 0 || (args[0] != "list" && args[0] != "show") {

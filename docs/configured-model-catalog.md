@@ -1,6 +1,6 @@
 # Configured model metadata catalog
 
-DarwinRouter exposes the validated routing metadata declared in configuration
+NexusRouter exposes the validated routing metadata declared in configuration
 without probing a provider, reserving hardware, opening the task database or
 running inference. This is an inspection snapshot, not a readiness report or
 execution authorization.
@@ -8,7 +8,7 @@ execution authorization.
 Use the CLI:
 
 ```sh
-darwin models list --config config.yaml
+nexus models list --config config.yaml
 ```
 
 The command now returns a versioned object with `version`, `config_id` and a
@@ -17,7 +17,7 @@ array; consumers must update for this intentional pre-release schema change.
 `config_id` is the SHA-256 fingerprint of the same redacted configuration used
 by automatic route explanations.
 
-Each model includes its Darwin alias, provider alias, implementation name,
+Each model includes its NexusRouter alias, provider alias, implementation name,
 locality, capabilities, context-window declaration, optional configured cost,
 RAM/VRAM estimates, optional GPU binding and optional failure domain. A null
 `estimated_cost` means no estimate was configured; zero is a distinct explicit
@@ -42,7 +42,7 @@ billing or availability claim. All normal privacy, provider, resource, budget
 and tool-policy checks run later when a task is admitted.
 
 `GET /v1/models` remains the separate OpenAI-compatible minimal catalog. It
-contains only configured Darwin model IDs and compatibility fields; its response
+contains only configured NexusRouter model IDs and compatibility fields; its response
 shape has not changed.
 
 ### Cloud context recommendations

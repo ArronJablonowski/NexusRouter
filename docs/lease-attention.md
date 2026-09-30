@@ -5,8 +5,8 @@ inspection. This includes legacy or unverifiable process ownership: creating an
 attention record never requires a guard probe or authorizes release or retry.
 
 ```sh
-darwin resources attention --db path/to/darwin.db
-darwin resources attention --db path/to/darwin.db --state all --limit 25
+nexus resources attention --db path/to/darwin.db
+nexus resources attention --db path/to/darwin.db --state all --limit 25
 ```
 
 CLI defaults are `--state open` and `--limit 25`. Follow a nonempty
@@ -54,8 +54,8 @@ append nothing. Before updating an existing record, the observer verifies that
 the latest history snapshot matches its current projection.
 
 ```sh
-darwin resources attention-history --db path/to/darwin.db --id ATTENTION_ID
-darwin resources attention-history --db path/to/darwin.db --id ATTENTION_ID --after-sequence 25 --limit 25
+nexus resources attention-history --db path/to/darwin.db --id ATTENTION_ID
+nexus resources attention-history --db path/to/darwin.db --id ATTENTION_ID --after-sequence 25 --limit 25
 ```
 
 The SDK exposes `ListLeaseAttentionHistory(ctx, id,

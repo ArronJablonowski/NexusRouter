@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-var collateralNames = []string{installName, licenseName, releaseNotesName, sbomName, noticeName, configName, "darwin"}
+var collateralNames = []string{installName, licenseName, releaseNotesName, sbomName, noticeName, configName, "nexus"}
 
 func TestCollateralLoadAndSevenMemberContract(t *testing.T) {
 	source := collateralSourceFixture(t)
@@ -116,10 +116,10 @@ func TestReleaseEntriesEnforcesEveryMemberBound(t *testing.T) {
 			}
 		})
 	}
-	if archiveContract[6].name != "darwin" || archiveContract[6].max != maxArtifact {
+	if archiveContract[6].name != "nexus" || archiveContract[6].max != maxArtifact {
 		t.Fatal("binary bound is not maxArtifact")
 	}
-	invalid := archiveEntryMetadata{Name: "darwin", Mode: 0755, Size: maxArtifact + 1, SHA256: strings.Repeat("0", 64)}
+	invalid := archiveEntryMetadata{Name: "nexus", Mode: 0755, Size: maxArtifact + 1, SHA256: strings.Repeat("0", 64)}
 	if validEntryMetadata(invalid, 6, binary) {
 		t.Fatal("oversize binary metadata accepted")
 	}
@@ -227,7 +227,7 @@ func TestSigningRejectsCollateralMemberTamperMissingExtraAndReorder(t *testing.T
 	for _, scenario := range []string{"tamper", "missing", "extra", "reordered"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, seed, public := signingFixture(t)
-			path := filepath.Join(dir, "DarwinRouter_1.0.0_darwin_amd64.tar.gz")
+			path := filepath.Join(dir, "NexusRouter_1.0.0_darwin_amd64.tar.gz")
 			members := collateralReadArchiveFile(t, path)
 			entries := make([]Entry, len(members))
 			for i, member := range members {
@@ -427,7 +427,7 @@ func collateralRawArchive(t *testing.T, entries []Entry) []byte {
 	tw := tar.NewWriter(gz)
 	for _, entry := range entries {
 		mode := int64(0644)
-		if entry.Name == "darwin" {
+		if entry.Name == "nexus" {
 			mode = 0755
 		}
 		header := &tar.Header{Name: entry.Name, Mode: mode, Size: int64(len(entry.Data)), ModTime: time.Unix(0, 0), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
@@ -468,7 +468,7 @@ func collateralRewriteSums(t *testing.T, dir string, manifest Manifest) {
 }
 
 func TestCollateralContractNamesAreCanonicalAndSorted(t *testing.T) {
-	if !reflect.DeepEqual(collateralNames, []string{"INSTALL.md", "LICENSE", "RELEASE_NOTES.md", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.txt", "config.example.yaml", "darwin"}) {
+	if !reflect.DeepEqual(collateralNames, []string{"INSTALL.md", "LICENSE", "RELEASE_NOTES.md", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.txt", "config.example.yaml", "nexus"}) {
 		t.Fatal("unexpected collateral contract names", collateralNames)
 	}
 	for i := 1; i < len(collateralNames); i++ {

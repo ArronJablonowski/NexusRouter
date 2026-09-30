@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/metrics"
+	"github.com/ArronJablonowski/NexusRouter/metrics"
 )
 
 func metricsExportFixture(t *testing.T) *Service {
@@ -72,7 +72,7 @@ func TestMetricsExportContentFreeOwnedSQLite(t *testing.T) {
 		for _, resource := range payload.ResourceMetrics {
 			for _, scope := range resource.ScopeMetrics {
 				for _, metric := range scope.Metrics {
-					if metric.Name == "darwinrouter.submissions" && len(metric.Gauge.DataPoints) == 5 && metric.Gauge.DataPoints[0].AsInt == "1" {
+					if metric.Name == "nexusrouter.submissions" && len(metric.Gauge.DataPoints) == 5 && metric.Gauge.DataPoints[0].AsInt == "1" {
 						queued = true
 					}
 				}

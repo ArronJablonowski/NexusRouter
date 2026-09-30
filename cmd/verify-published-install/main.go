@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 type verifier func(context.Context, string, string, releasepack.PublishedInstallExpectations) (releasepack.PublishedInstallEvidence, error)

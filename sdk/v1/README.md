@@ -1,6 +1,6 @@
 # Embedded Go client
 
-This SDK is distributed under DarwinRouter's root [MIT License](../../LICENSE).
+This SDK is distributed under NexusRouter's root [MIT License](../../LICENSE).
 
 `Client.RunAudit` starts an independently attributed, idempotent orchestrator
 review of an existing terminal task. Supply a version-one `AuditRequest`, a
@@ -10,7 +10,7 @@ normally receives the durable pending event followed by one terminal event
 through its synchronous callback. Restart or concurrent replay emits only the
 lifecycle state committed at read time, which can be pending-only. If delivery
 fails, retry the exact request and key or resume from `Client.ReadAuditEvents`;
-DarwinRouter does not repeat reviewer inference for an admitted operation.
+NexusRouter does not repeat reviewer inference for an admitted operation.
 `Client.InspectAudit` is a
 restart-safe read, and `Client.CancelAudit` durably requests cancellation of a
 pending review.
@@ -40,7 +40,7 @@ Set `ConfigOptions.Evaluator` to an `sdk.Evaluator` when the embedding process
 has its own bounded output-review engine. The evaluator publishes a stable
 `EvaluatorDescriptor` and receives an owned, versioned `EvaluatorRequest` with
 the candidate, requirements, and caller-attributed evidence. It returns an
-`EvaluatorResponse`; DarwinRouter independently validates the evaluator identity,
+`EvaluatorResponse`; NexusRouter independently validates the evaluator identity,
 rubric, domain, verdict, size, and every cited evidence reference before writing
 an audit. Typed nils, panics, private callback errors, descriptor changes,
 malformed results, invented references, and cooperative timeouts fail closed.
@@ -89,10 +89,10 @@ declared routing metadata and the redacted configuration fingerprint. It does
 no provider discovery, storage read, reservation or inference and makes no live
 health or availability claim. See [configured model metadata](../../docs/configured-model-catalog.md).
 
-Import `github.com/ArronJablonowski/DarwinRouter/sdk/v1` with Go1.27.1 or newer.
+Import `github.com/ArronJablonowski/NexusRouter/sdk/v1` with Go1.27.1 or newer.
 The versioned client is under development; this is not a tagged stable release.
 The snippet below assumes the alias import
-`darwin "github.com/ArronJablonowski/DarwinRouter/sdk/v1"` and standard `os`.
+`darwin "github.com/ArronJablonowski/NexusRouter/sdk/v1"` and standard `os`.
 
 ```go
 client, err := darwin.New(darwin.ConfigOptions{
@@ -116,7 +116,7 @@ required. Callers own cancellation and should set appropriate deadlines.
 view, and `Client.ExportTraces(ctx, TraceExportOptions{...})` explicitly sends
 it as OTLP/HTTP JSON. The limit is 1–32; export defaults to 16. Wire trace/span
 IDs are fresh for every serialization and do not expose or stably represent
-DarwinRouter identities. Running roots end at snapshot observation time and
+NexusRouter identities. Running roots end at snapshot observation time and
 contain only durably paired child operations. Model-generated draft outcomes
 and committed skill activations/rollbacks are separate content-free operation
 roots. `Client.StartTraceExport` returns an owned periodic
@@ -169,7 +169,7 @@ device binding, pressure status, and the maximum number of additional identical
 local workloads visible at that instant. An explicit swap-pressure signal is
 treated like thermal pressure; historical swap allocation alone is not evidence
 of current pressure. Unknown, stale, future, malformed, or impossible facts
-fail closed. DarwinRouter planning creates no reservation, provider, model call,
+fail closed. NexusRouter planning creates no reservation, provider, model call,
 database, durable event, or network operation beyond invoking the configured
 trusted profiler. It cannot override mode or privacy policy,
 and a positive result is not execution authorization: callers must still run the
@@ -979,7 +979,7 @@ in the request are rejected rather than silently changing the stored intent.
 Use `SubmissionStatus(ctx, id)` to inspect durable lifecycle and completed output,
 `ListSubmissions(ctx, submissions.ListOptions{Limit: 25})` for metadata-only
 discovery, and `CancelSubmission(ctx, id)` for durable cancellation. Import the
-public `github.com/ArronJablonowski/DarwinRouter/submissions` package for list
+public `github.com/ArronJablonowski/NexusRouter/submissions` package for list
 options and queue conflict/capacity error identities. Listing supports limits1–100
 and opaque insertion-fenced cursors; changing task states are not frozen across
 pages. Read methods never create or migrate missing storage. Cancellation of
@@ -1003,7 +1003,7 @@ work only from an exact history whose durable recovery terminal is eligible for
 resume. It is distinct from completed-history branching: the application
 replays and revalidates the recovered source, its fence, unresolved tool
 effects, and submission lineage before admission. The authenticated HTTP form
-is `POST /v1/tasks/{source_task}/resumes`, and the CLI form is `darwin resume`;
+is `POST /v1/tasks/{source_task}/resumes`, and the CLI form is `nexus resume`;
 both require the same source task, session, head sequence, head event, new
 prompt, and 16–128-byte printable idempotency key. These surfaces queue work but
 never execute inference themselves. Retry uncertain admission only with the

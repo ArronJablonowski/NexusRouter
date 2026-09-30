@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 const workboardKey = "workboard-operation-key-01"

@@ -50,7 +50,7 @@ func TestTargetClosureBindsPackagesEdgesAndModuleSums(t *testing.T) {
 	const sumB = "h1:m8S8VeM9r4dzDwjrKO0a1sZP3YjeMamRRlD+fmR2Q/0="
 	packages := []listedPackage{
 		{ImportPath: "unsafe", Standard: true, Imports: nil},
-		{ImportPath: "example.com/root/cmd/darwin", Imports: []string{"unsafe", "example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
+		{ImportPath: "example.com/root/cmd/nexus", Imports: []string{"unsafe", "example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
 		{ImportPath: "example.com/dep", Imports: []string{"example.com/leaf", "unsafe"}, Module: &listedModule{Path: "example.com/dep", Version: "v1.0.0", Dir: depDir, Sum: sumA, GoModSum: sumB}},
 		{ImportPath: "example.com/leaf", Imports: []string{"unsafe"}, Module: &listedModule{Path: "example.com/leaf", Version: "v1.0.0", Dir: leafDir, Sum: sumB, GoModSum: sumA}},
 	}
@@ -62,7 +62,7 @@ func TestTargetClosureBindsPackagesEdgesAndModuleSums(t *testing.T) {
 	if err != nil || first.PackageCount != 4 || !trustFingerprint(first.DependencyGraphSHA256) || len(first.Modules) != 3 {
 		t.Fatal("valid target closure rejected", first, err)
 	}
-	wantGraph := `[{"import_path":"example.com/dep","source":"example.com/dep@v1.0.0","imports":["example.com/leaf","unsafe"]},{"import_path":"example.com/leaf","source":"example.com/leaf@v1.0.0","imports":["unsafe"]},{"import_path":"example.com/root/cmd/darwin","source":"main:example.com/root","imports":["example.com/dep","unsafe"]},{"import_path":"unsafe","source":"stdlib","imports":[]}]`
+	wantGraph := `[{"import_path":"example.com/dep","source":"example.com/dep@v1.0.0","imports":["example.com/leaf","unsafe"]},{"import_path":"example.com/leaf","source":"example.com/leaf@v1.0.0","imports":["unsafe"]},{"import_path":"example.com/root/cmd/nexus","source":"main:example.com/root","imports":["example.com/dep","unsafe"]},{"import_path":"unsafe","source":"stdlib","imports":[]}]`
 	if first.DependencyGraphSHA256 != licenseEvidenceDigest([]byte(wantGraph)) {
 		t.Fatal("graph did not bind canonical package sources and edges", first.DependencyGraphSHA256)
 	}
@@ -111,7 +111,7 @@ func TestTargetClosureRejectsUntrustedModuleIdentityAndDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := []listedPackage{
-		{ImportPath: "example.com/root/cmd/darwin", Imports: []string{"example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
+		{ImportPath: "example.com/root/cmd/nexus", Imports: []string{"example.com/dep"}, Module: &listedModule{Path: "example.com/root", Main: true, Dir: "/source"}},
 		{ImportPath: "example.com/dep", Module: &listedModule{Path: "example.com/dep", Version: "v1.0.0", Dir: inside, Sum: sum, GoModSum: sum}},
 	}
 	for name, mutate := range map[string]func(*listedModule){
@@ -458,7 +458,7 @@ func TestNoticeArchiveOrderModesAndTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	var archive bytes.Buffer
-	if err = Archive(&archive, []Entry{{Name: "darwin", Data: []byte("binary")}, {Name: noticeName, Data: notice}}); err != nil {
+	if err = Archive(&archive, []Entry{{Name: "nexus", Data: []byte("binary")}, {Name: noticeName, Data: notice}}); err != nil {
 		t.Fatal(err)
 	}
 	gz, err := gzip.NewReader(bytes.NewReader(archive.Bytes()))
@@ -476,7 +476,7 @@ func TestNoticeArchiveOrderModesAndTarget(t *testing.T) {
 		t.Fatal("notice body is not target-bound", err)
 	}
 	header, err = tr.Next()
-	if err != nil || !canonicalArchiveHeader(header, "darwin", 0755, maxArtifact) {
+	if err != nil || !canonicalArchiveHeader(header, "nexus", 0755, maxArtifact) {
 		t.Fatal("binary entry is not second and executable", err)
 	}
 	if body, err = io.ReadAll(tr); err != nil || string(body) != "binary" {

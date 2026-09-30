@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func (h *Handler) serveSkillComparisonSelection(w http.ResponseWriter, r *http.Request) {

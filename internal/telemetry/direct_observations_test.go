@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
+	"github.com/ArronJablonowski/NexusRouter/routing"
 )
 
 func TestDirectObservationSetUsesCurrentVerdictWithoutDroppingCorrectionHistory(t *testing.T) {

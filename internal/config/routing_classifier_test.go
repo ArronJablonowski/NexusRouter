@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/classification"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/classification"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 func TestRoutingClassifierDefaultsLayersAndFingerprint(t *testing.T) {

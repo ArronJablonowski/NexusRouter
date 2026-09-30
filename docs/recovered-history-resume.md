@@ -1,6 +1,6 @@
 # Recovered-history resume
 
-DarwinRouter can queue new work from an exact failed task history only after
+NexusRouter can queue new work from an exact failed task history only after
 durable recovery has proven that history safe to reuse. This is not execution
 retry: the new task receives the recovered context plus a new prompt, while the
 interrupted provider call and any tool effect are never replayed.
@@ -15,7 +15,7 @@ authority from SQLite; the public caller never supplies that digest.
 ## CLI
 
 ```sh
-darwin resume \
+nexus resume \
   --config examples/local.yaml \
   --key unique-resume-key-001 \
   --task TASK_ID \
@@ -26,7 +26,7 @@ darwin resume \
 ```
 
 The key must contain 16–128 printable non-space ASCII bytes. Standard routing
-constraints accepted by `darwin submit` are also accepted. `--continue-task`,
+constraints accepted by `nexus submit` are also accepted. `--continue-task`,
 stored/manual compaction, and JSON lifecycle streaming are rejected because the
 source fence already identifies the only permitted history. Input is nonblank
 UTF-8 bounded to 1 MiB. Success prints one durable submission status; an

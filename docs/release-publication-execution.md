@@ -1,6 +1,6 @@
 # Authorized immutable publication execution
 
-`githubpublish.PublishRelease` is DarwinRouter's mockable publication state
+`githubpublish.PublishRelease` is NexusRouter's mockable publication state
 machine. It accepts an already-authorized exact plan and does not obtain or
 create credentials. Its transport and GitHub origins are injected; repository
 tests use loopback HTTP only.

@@ -2,7 +2,7 @@ package webuiapp
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/internal/usagestats"
+	"github.com/ArronJablonowski/NexusRouter/internal/usagestats"
 	"net/http"
 	"net/http/httptest"
 	"testing"

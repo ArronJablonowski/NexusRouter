@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
 )
 
 func (h *Handler) serveDaemonControl(w http.ResponseWriter, r *http.Request) {

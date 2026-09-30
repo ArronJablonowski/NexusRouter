@@ -10,13 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/health"
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexbridge"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/policy"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/health"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexbridge"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/policy"
+	"github.com/ArronJablonowski/NexusRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 var ErrHealth = errors.New("health report unavailable")
@@ -58,8 +58,10 @@ func (s *Service) HealthReport(outer context.Context, supervisor health.Check) (
 	secrets := []string{}
 	providerKeys := make([]string, len(s.settings.Providers))
 	if s.secret != nil {
-		if value := s.secret("DARWIN_API_TOKEN"); value != "" {
-			secrets = append(secrets, value)
+		for _, name := range []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN"} {
+			if value := s.secret(name); value != "" {
+				secrets = append(secrets, value)
+			}
 		}
 		for i, p := range s.settings.Providers {
 			if p.APIKeyEnv != "" {

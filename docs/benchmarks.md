@@ -30,7 +30,7 @@ measured 0.277–0.469 microseconds. Race-enabled low/mid/high tier, RAM/VRAM,
 thermal/unknown-pressure, queue/reject/offload, shared explicit/automatic
 capacity and concurrent admission tests separately passed three repetitions.
 
-DarwinRouter does not currently enable an auxiliary intent classifier, so the
+NexusRouter does not currently enable an auxiliary intent classifier, so the
 conditional 500 ms auxiliary-classification target has no executable MVP path
 to measure. Adding one requires its own benchmark before activation. These local
 figures are reproducible evidence for the current deterministic runtime, not a

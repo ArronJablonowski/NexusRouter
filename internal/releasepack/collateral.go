@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 const (
@@ -46,7 +46,7 @@ var archiveContract = []struct {
 	{sbomName, 0644, maxTargetSBOM},
 	{noticeName, 0644, maxNotice},
 	{configName, 0644, maxConfig},
-	{"darwin", 0755, maxArtifact},
+	{"nexus", 0755, maxArtifact},
 }
 
 func loadCollateral(source string) (collateral, error) {
@@ -113,7 +113,7 @@ func canonicalText(body []byte) bool {
 }
 
 func releaseEntries(c collateral, notice, sbom, binary []byte) ([]Entry, []archiveEntryMetadata, error) {
-	entries := []Entry{{installName, c.install}, {licenseName, c.license}, {releaseNotesName, c.notes}, {sbomName, sbom}, {noticeName, notice}, {configName, c.config}, {"darwin", binary}}
+	entries := []Entry{{installName, c.install}, {licenseName, c.license}, {releaseNotesName, c.notes}, {sbomName, sbom}, {noticeName, notice}, {configName, c.config}, {"nexus", binary}}
 	metadata := make([]archiveEntryMetadata, len(entries))
 	for i, entry := range entries {
 		contract := archiveContract[i]

@@ -50,7 +50,7 @@ func (h *Handler) serveModels(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		seen[id] = struct{}{}
-		items[i] = modelCatalogItem{ID: id, Object: "model", Created: 0, OwnedBy: "darwinrouter"}
+		items[i] = modelCatalogItem{ID: id, Object: "model", Created: 0, OwnedBy: "nexusrouter"}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": items})
 }

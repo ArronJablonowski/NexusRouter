@@ -16,8 +16,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/processguard"
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/internal/branding"
+	"github.com/ArronJablonowski/NexusRouter/internal/processguard"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 	_ "modernc.org/sqlite"
 )
 
@@ -38,7 +39,7 @@ type Coordinator struct {
 }
 
 func Path() (string, error) {
-	if p := os.Getenv(environmentPath); p != "" {
+	if p := branding.Getenv(environmentPath); p != "" {
 		if !filepath.IsAbs(p) || filepath.Clean(p) != p {
 			return "", resources.ErrReservation
 		}

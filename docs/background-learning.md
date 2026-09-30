@@ -10,7 +10,7 @@ owns optional durable regression monitoring. The stock CLI registers only the
 protected `darwin_observed_tools_activation_v1` provenance validator; custom
 semantic domain validators require trusted Go-host registration, and unknown
 enabled selections are rejected.
-The default remains off; upgrading DarwinRouter does not enable model calls.
+The default remains off; upgrading NexusRouter does not enable model calls.
 
 ## Enable deliberately
 
@@ -49,7 +49,7 @@ Local-only policy applies to generation transport
 and source material. Cost numbers must use the same units as model estimates;
 they are reservations, not measured provider invoices.
 
-Start or restart `darwin serve --config config.yaml` or the managed daemon to
+Start or restart `nexus serve --config config.yaml` or the managed daemon to
 load these settings. Normal foreground task runs and SDK construction do not
 start a background loop. To stop new learning, set `skills.learning.enabled:
 false` and restart the daemon. Shutdown cancels and joins its current operation;
@@ -119,7 +119,7 @@ do not delete or rewrite the old cursor or activation intent to bypass a conflic
 Validated learning still requires `skills.learning.enabled`, generation budgets,
 and `skills.auto_activate_after_validation`. Disabling learning stops progression;
 disabled activation policy rejects the validated entry point. Standard
-`darwin serve` continues to use draft-only learning because it has no configured
+`nexus serve` continues to use draft-only learning because it has no configured
 trusted validator. These methods do not expose a remote proof-submission endpoint.
 
 After a drafted result is published, validation adds two separate phases while
@@ -173,7 +173,7 @@ remain present for inspection and operator-controlled work.
 ## Inspect and recover
 
 ```sh
-darwin skills learning status --config config.yaml
+nexus skills learning status --config config.yaml
 ```
 
 This command prints persisted phase, revisions, epoch and pending identities.
@@ -182,8 +182,8 @@ with learning or automatic drafting disabled. The Go SDK exposes the same read
 through `Client.SkillLearningState(ctx)`. Live daemon health includes a separate
 `learning` component; it contains no task text, provider errors or private paths.
 
-Inspect a pending attempt with `darwin skill-generations show` and inspect
-inactive catalog versions with `darwin skills history`. Restore compatible
+Inspect a pending attempt with `nexus skill-generations show` and inspect
+inactive catalog versions with `nexus skills history`. Restore compatible
 settings to resume a recoverable phase. There is no automatic discard/reset of
 an uncertain generation, no CLI that marks it successful, and no automatic
 source-repair policy in this checkpoint. Do not change scan names, attempt IDs

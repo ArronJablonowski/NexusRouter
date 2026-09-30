@@ -1,10 +1,10 @@
 # Session task inspection
 
-DarwinRouter exposes a content-free, read-only view of the task graph inside one
+NexusRouter exposes a content-free, read-only view of the task graph inside one
 durable session. It is available through:
 
 - Go SDK: `Client.ListSessionTasks(ctx, sessionID, options)`
-- CLI: `darwin session tasks --db path --session id`
+- CLI: `nexus session tasks --db path --session id`
 - authenticated HTTP: `GET /v1/sessions/{session_id}/tasks`
 
 Each item contains only the version, task and session IDs, optional parent and

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 const skillGenerationActionBody = `{"version":1,"id":"attempt","model_id":"model","name":"workflow","task_ids":["task-a","task-b"]}`

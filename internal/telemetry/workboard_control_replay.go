@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/workboard"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/workboard"
 )
 
 func (s *Store) ReplayControlMutation(ctx context.Context, mutation workboard.ControlMutation) (workboard.OperationReceipt, bool, error) {

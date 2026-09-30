@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 var workboardTables = []string{

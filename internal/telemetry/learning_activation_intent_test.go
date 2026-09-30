@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func activationIntentFixture(t *testing.T) (*Store, string, skills.LearningActivationIntent) {

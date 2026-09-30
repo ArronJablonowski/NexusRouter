@@ -18,8 +18,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/githubpublish"
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/githubpublish"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 const (

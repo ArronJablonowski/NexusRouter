@@ -4,8 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/ArronJablonowski/DarwinRouter/routing"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/routing"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
 )
 
 type specialistScope struct {

@@ -2,7 +2,7 @@ package telemetry
 
 import (
 	"context"
-	"github.com/ArronJablonowski/DarwinRouter/memory"
+	"github.com/ArronJablonowski/NexusRouter/memory"
 )
 
 // OpenMemoryControl opens only existing current-schema WAL storage. Operator

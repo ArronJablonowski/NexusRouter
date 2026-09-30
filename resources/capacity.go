@@ -44,7 +44,7 @@ func ValidateNeed(need Need) error {
 }
 
 // CapacityHeadroom is the usable byte ceiling after observed host usage and
-// live DarwinRouter reservations. VRAM is relevant either to the requested
+// live NexusRouter reservations. VRAM is relevant either to the requested
 // device or to the snapshot's explicitly aggregated VRAM measurement.
 type CapacityHeadroom struct {
 	RAMBytes  uint64 `json:"ram_bytes"`

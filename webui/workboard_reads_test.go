@@ -189,8 +189,8 @@ func TestCardReviseRejectsExplicitFalseClearFlags(t *testing.T) {
 func TestWorkboardReadSchemaParity(t *testing.T) {
 	compiler := jsonschema.NewCompiler()
 	for _, item := range []struct{ location, path string }{
-		{"https://darwinrouter.local/schema/webui/v1", "schema/v1.schema.json"},
-		{"https://darwinrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/v1", "schema/v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
 	} {
 		body, err := os.ReadFile(item.path)
 		if err != nil {
@@ -220,14 +220,14 @@ func TestWorkboardReadSchemaParity(t *testing.T) {
 	}
 	for definition, value := range values {
 		body, _ := json.Marshal(value)
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+definition, body, true)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/workboard-v1#/$defs/"+definition, body, true)
 	}
 	invalidation := BoardChangedData{BoardID: "board-a", CardID: "card-a", Change: "card_changed"}
 	if invalidation.Validate() != nil {
 		t.Fatal("state-free durable card invalidation rejected")
 	}
 	invalidationBody, _ := json.Marshal(invalidation)
-	validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/v1#/$defs/board_changed_data", invalidationBody, true)
+	validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/v1#/$defs/board_changed_data", invalidationBody, true)
 	for definition, body := range map[string]string{
 		"board_snapshot_options": `{"limit":1,"state":"active"}`,
 		"dependency_page":        `{"version":1,"board_id":"board-a","card_id":"card-a","direction":"prerequisites","graph_revision":1,"graph_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","items":[],"has_more":true}`,
@@ -239,15 +239,15 @@ func TestWorkboardReadSchemaParity(t *testing.T) {
 		if definition == "board_event_partial" {
 			schemaDefinition = "board_event"
 		}
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+schemaDefinition, json.RawMessage(body), false)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/workboard-v1#/$defs/"+schemaDefinition, json.RawMessage(body), false)
 	}
 }
 
 func TestPublishedWorkboardReadFixtures(t *testing.T) {
 	compiler := jsonschema.NewCompiler()
 	for _, item := range []struct{ location, path string }{
-		{"https://darwinrouter.local/schema/webui/v1", "schema/v1.schema.json"},
-		{"https://darwinrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/v1", "schema/v1.schema.json"},
+		{"https://nexusrouter.local/schema/webui/workboard-v1", "schema/workboard-v1.schema.json"},
 	} {
 		body, err := os.ReadFile(item.path)
 		if err != nil {
@@ -267,6 +267,6 @@ func TestPublishedWorkboardReadFixtures(t *testing.T) {
 		t.Fatal("invalid fixture")
 	}
 	for _, definition := range []string{"board_list_options", "board_snapshot_options", "dependency_options", "dependency_page", "board_event_options", "board_event_page"} {
-		validateSchemaValue(t, compiler, "https://darwinrouter.local/schema/webui/workboard-v1#/$defs/"+definition, fixture[definition], true)
+		validateSchemaValue(t, compiler, "https://nexusrouter.local/schema/webui/workboard-v1#/$defs/"+definition, fixture[definition], true)
 	}
 }

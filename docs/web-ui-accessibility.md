@@ -1,6 +1,6 @@
 # Web UI accessibility and browser support
 
-DarwinRouter's embedded chat and Workboard UI targets WCAG 2.2 Level AA. The
+NexusRouter's embedded chat and Workboard UI targets WCAG 2.2 Level AA. The
 application remains usable without pointer input: navigation, board selection,
 filters, card disclosure, adjacent reordering, lifecycle controls, acceptance
 review, dialogs, refresh, and reconciliation are native keyboard controls.

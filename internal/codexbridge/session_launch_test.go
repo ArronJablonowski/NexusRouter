@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/codexrpc"
-	"github.com/ArronJablonowski/DarwinRouter/providers"
+	"github.com/ArronJablonowski/NexusRouter/internal/codexrpc"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 const checkedConfig = `{"config":{"features":{"hooks":false},"mcp_servers":{},"plugins":{},"project_doc_max_bytes":0,"notify":[],"web_search":"disabled"}}`

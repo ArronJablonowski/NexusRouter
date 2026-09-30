@@ -10,7 +10,7 @@ independently identifies the exact canonical record described below.
 Signing authorization deliberately leaves publication unapproved. After all
 candidate, licensing, platform, signing, and independent-verification gates are
 complete, the publication approver may author a separate canonical schema-1
-record outside the repository and release directory. DarwinRouter provides a
+record outside the repository and release directory. NexusRouter provides a
 strict parser and offline preflight, but no command that generates this record.
 
 The record binds one `github.com` owner/repository, exact version and full source
@@ -29,15 +29,15 @@ digest is `sha256:` plus 64 lowercase hexadecimal characters.
 ```json
 {
   "schema_version": 1,
-  "project": "DarwinRouter",
-  "scope": "darwinrouter-github-publication-authorization",
+  "project": "NexusRouter",
+  "scope": "nexusrouter-github-publication-authorization",
   "github_host": "github.com",
   "repository": "OWNER/REPOSITORY",
   "release_version": "1.0.1",
   "source_commit": "REPLACE_WITH_40_LOWERCASE_HEX_CHARACTERS",
   "tag": "v1.0.1",
-  "release_title": "DarwinRouter v1.0.1",
-  "tag_message": "DarwinRouter release v1.0.1",
+  "release_title": "NexusRouter v1.0.1",
+  "tag_message": "NexusRouter release v1.0.1",
   "tagger": {
     "name": "REPLACE_WITH_APPROVED_TAGGER_NAME",
     "email": "REPLACE_WITH_APPROVED_TAGGER_EMAIL",
@@ -54,22 +54,22 @@ digest is `sha256:` plus 64 lowercase hexadecimal characters.
   "signing_authorization_sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS",
   "assets": [
     {
-      "name": "DarwinRouter_1.0.1_darwin_amd64.tar.gz",
+      "name": "NexusRouter_1.0.1_darwin_amd64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.1_darwin_arm64.tar.gz",
+      "name": "NexusRouter_1.0.1_darwin_arm64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.1_linux_amd64.tar.gz",
+      "name": "NexusRouter_1.0.1_linux_amd64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
     {
-      "name": "DarwinRouter_1.0.1_linux_arm64.tar.gz",
+      "name": "NexusRouter_1.0.1_linux_arm64.tar.gz",
       "size": 1,
       "sha256": "sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS"
     },
@@ -124,7 +124,7 @@ disabled if desired:
 ```sh
 go run ./cmd/verify-publication-authorization \
   --dir /ABSOLUTE/SIGNED_RELEASE_DIRECTORY \
-  --source /ABSOLUTE/CLEAN/TRUSTED/DarwinRouter \
+  --source /ABSOLUTE/CLEAN/TRUSTED/NexusRouter \
   --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
   --candidate-record-sha256 sha256:EXPECTED_CANDIDATE \
   --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
@@ -138,7 +138,7 @@ go run ./cmd/verify-publication-authorization \
   --signing-authorization-sha256 sha256:EXPECTED_SIGNING_AUTHORIZATION \
   --publication-authorization /ABSOLUTE/INDEPENDENT/PUBLICATION_AUTHORIZATION.json \
   --publication-authorization-sha256 sha256:EXPECTED_PUBLICATION_AUTHORIZATION \
-  --repository ArronJablonowski/DarwinRouter \
+  --repository ArronJablonowski/NexusRouter \
   --release-notes /ABSOLUTE/APPROVED/RELEASE_NOTES.md
 ```
 
@@ -181,7 +181,7 @@ the complete preflight arguments shown above:
 YOUR_TRUSTED_SECRET_COMMAND | \
   go run ./cmd/publish-release \
     --dir /ABSOLUTE/SIGNED_RELEASE_DIRECTORY \
-    --source /ABSOLUTE/CLEAN/TRUSTED/DarwinRouter \
+    --source /ABSOLUTE/CLEAN/TRUSTED/NexusRouter \
     --candidate-record /ABSOLUTE/INDEPENDENT/CANDIDATE.json \
     --candidate-record-sha256 sha256:EXPECTED_CANDIDATE \
     --license-evidence /ABSOLUTE/INDEPENDENT/LICENSE_EVIDENCE.json \
@@ -195,7 +195,7 @@ YOUR_TRUSTED_SECRET_COMMAND | \
     --signing-authorization-sha256 sha256:EXPECTED_SIGNING_AUTHORIZATION \
     --publication-authorization /ABSOLUTE/INDEPENDENT/PUBLICATION_AUTHORIZATION.json \
     --publication-authorization-sha256 sha256:EXPECTED_PUBLICATION_AUTHORIZATION \
-    --repository ArronJablonowski/DarwinRouter \
+    --repository ArronJablonowski/NexusRouter \
     --release-notes /ABSOLUTE/APPROVED/RELEASE_NOTES.md \
     --journal /ABSOLUTE/PRIVATE/NEW-publication-operation.jsonl \
     --credential-fd 0
@@ -231,7 +231,7 @@ receipt's `sha256:` digest. The receipt path must be outside the source,
 approved signed-release, and download directories. `--verifier-id` is required,
 is recorded in the receipt, and must identify the independent operator who ran
 the check. The receipt also binds the code-fixed, versioned verifier policy
-`darwinrouter-github-post-publication-verification/v1`; it cannot be selected by
+`nexusrouter-github-post-publication-verification/v1`; it cannot be selected by
 the operator. The verifier identity must differ from the publication approver
 bound into the canonical publication authorization; matching identities are
 rejected before any GitHub request. The current authorization schema does not

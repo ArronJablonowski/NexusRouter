@@ -1,7 +1,7 @@
-# Install a DarwinRouter release
+# Install a NexusRouter release
 
-These instructions install one already verified DarwinRouter release archive.
-Verify it first with an independently trusted DarwinRouter verifier and release
+These instructions install one already verified NexusRouter release archive.
+Verify it first with an independently trusted NexusRouter verifier and release
 public key. A checksum or key obtained only beside the archive does not establish
 authenticity.
 
@@ -24,9 +24,9 @@ version directory must not already exist.
 set -eu
 release_dir=/ABSOLUTE/VERIFIED/RELEASE_DIRECTORY
 release_version=RELEASE_VERSION
-install_root=/ABSOLUTE/USER_CONTROLLED/DARWINROUTER
+install_root=/ABSOLUTE/USER_CONTROLLED/NEXUSROUTER
 install_prefix="$install_root/releases/$release_version"
-stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/darwinrouter-install.XXXXXX")
+stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/nexusrouter-install.XXXXXX")
 trap 'rm -rf -- "$stage_dir"' EXIT HUP INT TERM
 
 case "$(uname -s)" in
@@ -40,26 +40,26 @@ case "$(uname -m)" in
   *) echo "unsupported architecture" >&2; exit 1 ;;
 esac
 
-archive="$release_dir/DarwinRouter_${release_version}_${release_os}_${release_arch}.tar.gz"
+archive="$release_dir/NexusRouter_${release_version}_${release_os}_${release_arch}.tar.gz"
 test "$(tar -tzf "$archive")" = "INSTALL.md
 LICENSE
 RELEASE_NOTES.md
 SBOM.spdx.json
 THIRD_PARTY_NOTICES.txt
 config.example.yaml
-darwin"
+nexus"
 tar -xzf "$archive" -C "$stage_dir"
-test -f "$stage_dir/darwin" && test ! -L "$stage_dir/darwin"
-test "$("$stage_dir/darwin" version)" = "darwin $release_version"
+test -f "$stage_dir/nexus" && test ! -L "$stage_dir/nexus"
+test "$("$stage_dir/nexus" version)" = "nexus $release_version"
 mkdir -p "$install_root/releases"
 mkdir "$install_prefix"
 mkdir "$install_prefix/bin"
-install -m 0755 "$stage_dir/darwin" "$install_prefix/bin/darwin"
+install -m 0755 "$stage_dir/nexus" "$install_prefix/bin/nexus"
 for file in INSTALL.md LICENSE RELEASE_NOTES.md SBOM.spdx.json THIRD_PARTY_NOTICES.txt; do
   install -m 0644 "$stage_dir/$file" "$install_prefix/$file"
 done
 install -m 0600 "$stage_dir/config.example.yaml" "$install_prefix/config.example.yaml"
-test "$("$install_prefix/bin/darwin" version)" = "darwin $release_version"
+test "$("$install_prefix/bin/nexus" version)" = "nexus $release_version"
 ```
 
 The example configuration is intentionally not execution-ready. Copy it to a
@@ -69,7 +69,7 @@ deployment-specific values. Use a stable absolute database path whose parent
 already exists. Validate the result before starting the daemon:
 
 ```sh
-"$install_prefix/bin/darwin" config validate --config /ABSOLUTE/PRIVATE/config.yaml
+"$install_prefix/bin/nexus" config validate --config /ABSOLUTE/PRIVATE/config.yaml
 ```
 
 Keep the previous versioned installation and its matching pre-upgrade database

@@ -7,13 +7,13 @@ successful execution that still produces an incorrect or incomplete answer.
 Increasing a turn budget or changing storage cannot by itself fix answer quality.
 
 On the 11 models shared by the original all-local Standard campaign and the
-historical Mac Studio exports (17 tasks each), DarwinRouter passed 92/187 with
+historical Mac Studio exports (17 tasks each), NexusRouter passed 92/187 with
 64 execution errors; Hermes passed 130/187 with zero execution errors, direct
 Ollama 122/187 with 15 errors, and OpenClaw 117/187 with six errors. These are
 historical observations, not controlled simultaneous A/B measurements.
 
 After the earlier reliability fixes, regrading with behavioral-v1.1 yielded
-13/17 for DarwinRouter with Qwen3 Coder (including delegation to Gemma 12B),
+13/17 for NexusRouter with Qwen3 Coder (including delegation to Gemma 12B),
 versus Pi 10/17 and COH 11/17; Gemma 31B yielded 14/17 with all three. The latest
 five-task Gemma retest passed only 1/5. The latest isolated Muse coding retest
 finished 74 turns and passed 4/6 checks: it omitted a required public export and
@@ -23,7 +23,7 @@ not more blind retries or a claim of general superiority.
 The harnesses differ materially. Pi's Standard adapter disables tools; its
 coding tools provide targeted multi-edit operations and concise guidance.
 Hermes' coding adapter allows 150 turns, a 64K window, and terminal/file/code
-execution tools; the earlier Darwin adapter allowed 32 turns. Goose's adapter
+execution tools; the earlier NexusRouter adapter allowed 32 turns. Goose's adapter
 allows 100 turns. Current COH source binds execution profiles, task contracts,
 output conformance and artifact requirements. Current installed source does not
 prove which behavior caused a historical score. Same model names alone do not
@@ -95,7 +95,7 @@ not evidence that short coding answers generalize to large repository tasks.
    and successful repair beats the unchanged harness on held-out fixtures.
 2. **Portable agent tools.** Add precise edits/patches, bounded search and reads,
    structured exit codes, output truncation, and bounded recoverable diagnostics
-   to a supported DarwinRouter coding host. Keep workspace isolation and native
+   to a supported NexusRouter coding host. Keep workspace isolation and native
    tool authority. Compare edit errors, tool calls, tokens and time on the same
    fixed models; retain changes only when quality is preserved or improved.
 3. **Complete outcome telemetry.** Record a separate typed execution outcome for

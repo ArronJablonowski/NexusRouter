@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ArronJablonowski/DarwinRouter/classification"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/classification"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // BeginIntentClassification persists the started state before a provider call.

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func runLeaseAttentionHistory(args []string, stdout, stderr io.Writer) int {
@@ -21,7 +21,7 @@ func runLeaseAttentionHistory(args []string, stdout, stderr io.Writer) int {
 func runLeaseAttentionHistoryContext(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	path, id, options, ok := leaseAttentionHistoryFlags(args)
 	if !ok {
-		fmt.Fprintln(stderr, "usage: darwin resources attention-history --db path --id ID [--after-sequence 0] [--limit 25]")
+		fmt.Fprintln(stderr, "usage: nexus resources attention-history --db path --id ID [--after-sequence 0] [--limit 25]")
 		return 2
 	}
 	page, err := app.InspectLeaseAttentionHistory(ctx, path, id, options)

@@ -9,7 +9,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/releasepack"
+	"github.com/ArronJablonowski/NexusRouter/internal/releasepack"
 )
 
 func run(args []string, stderr io.Writer) int {

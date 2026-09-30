@@ -6,14 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArronJablonowski/DarwinRouter/approvals"
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/approvals"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 func runApprovals(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin approvals list --db path --task id [--after call-id --limit 25] | show|execution --db path --task id --id approval-id")
+		fmt.Fprintln(stderr, "usage: nexus approvals list --db path --task id [--after call-id --limit 25] | show|execution --db path --task id --id approval-id")
 		return 2
 	}
 	if len(args) < 1 || (args[0] != "list" && args[0] != "show" && args[0] != "execution") || len(args) > 11 {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/resources"
 )
 
 func runResources(args []string, stdout, stderr io.Writer) int {
@@ -20,7 +20,7 @@ func runResources(args []string, stdout, stderr io.Writer) int {
 		return runScopeLeases(args[1:], stdout, stderr)
 	}
 	if len(args) != 0 {
-		fmt.Fprintln(stderr, "usage: darwin resources")
+		fmt.Fprintln(stderr, "usage: nexus resources")
 		return 2
 	}
 	parent, stop := submissionCLIContext()

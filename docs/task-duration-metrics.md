@@ -16,7 +16,7 @@ unavailable, never clamped to a zero-duration success.
 
 ## Inspection and export
 
-Existing `darwin metrics --db path`, application metrics, authenticated
+Existing `nexus metrics --db path`, application metrics, authenticated
 `GET /v1/metrics`, SDK export and periodic daemon export carry the new
 `task_duration` field for schema-29-and-newer stores. Older schemas omit it rather than
 inventing measurements. No additional endpoint or export permission is introduced.
@@ -37,9 +37,9 @@ count in the same SQLite read snapshot. Running tasks are not finished-duration
 samples. No task, session, model or provider identifiers, prompts, tool arguments,
 outputs or error messages are exported.
 
-OTLP exports `darwinrouter.task.duration`, unit `s`, as a cumulative histogram with
+OTLP exports `nexusrouter.task.duration`, unit `s`, as a cumulative histogram with
 the persisted migration epoch as its start timestamp and snapshot time as its
-observation timestamp. `darwinrouter.task.duration.unavailable` is a gauge with
+observation timestamp. `nexusrouter.task.duration.unavailable` is a gauge with
 fixed `state` and `reason` attributes. The existing lifecycle gauges are unchanged.
 These representations follow the [OpenTelemetry metric data model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/)
 and [OTLP metric schema](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/metrics/v1/metrics.proto).

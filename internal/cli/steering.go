@@ -10,11 +10,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/app"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/telemetry"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
-	"github.com/ArronJablonowski/DarwinRouter/sessions"
+	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 type steeringReceipt = runtime.SteeringReceipt
@@ -76,7 +76,7 @@ func runSteer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func runSteerContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags, err := parseSteeringFlags(args, "config", "task", "key")
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: darwin steer --config path --task id --key opaque < guidance.txt")
+		fmt.Fprintln(stderr, "usage: nexus steer --config path --task id --key opaque < guidance.txt")
 		return 2
 	}
 	inputCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -106,7 +106,7 @@ func runSteerContext(ctx context.Context, args []string, stdin io.Reader, stdout
 
 func runSteering(args []string, stdout, stderr io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(stderr, "usage: darwin steering list|show --db path --task id [--id message]")
+		fmt.Fprintln(stderr, "usage: nexus steering list|show --db path --task id [--id message]")
 		return 2
 	}
 	if len(args) == 0 || (args[0] != "show" && args[0] != "list") {

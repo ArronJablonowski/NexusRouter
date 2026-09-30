@@ -4,7 +4,7 @@ Inspect existing storage without dispatching models, profiling hardware, probing
 process guards, migrating schemas, releasing leases or retrying work:
 
 ```sh
-darwin resources leases --db path/to/darwin.db --scope workspace
+nexus resources leases --db path/to/darwin.db --scope workspace
 ```
 
 The Go SDK exposes `Client.InspectScopeLeases(ctx, scope)`. The authenticated

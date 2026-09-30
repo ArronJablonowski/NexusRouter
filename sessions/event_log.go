@@ -6,7 +6,7 @@ import (
 	"errors"
 	"unicode/utf8"
 
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 const MaxCommittedEventPageBytes = 8 << 20

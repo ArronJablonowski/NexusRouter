@@ -1,6 +1,6 @@
 # Live text in interactive chat
 
-`darwin chat --config path/to/config.yaml --model MODEL_ID` now combines
+`nexus chat --config path/to/config.yaml --model MODEL_ID` now combines
 committed lifecycle events with provisional live assistant text. Configure the
 model and conservative local memory estimate first; the sample configuration
 does not guess those values. This works through the existing application
@@ -22,7 +22,7 @@ boundaries as well, without interrupting an active inference stream.
 Ctrl-C requests cancellation during work and exits when idle. `/quit` and SIGTERM
 cancel and join active execution. EOF waits for the active task. A normal chat
 session exits zero even after an individual failed task, as before; use headless
-`darwin run` for per-task process exit status.
+`nexus run` for per-task process exit status.
 
 When idle, `/resume TASK_ID` selects eligible saved history from the configured
 database. Selection is read-only and does not launch inference or rerun tools.

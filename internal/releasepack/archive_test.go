@@ -14,7 +14,7 @@ import (
 )
 
 func TestArchiveDeterministic(t *testing.T) {
-	entries := []Entry{{"z", []byte("last")}, {"darwin", []byte("binary")}}
+	entries := []Entry{{"z", []byte("last")}, {"nexus", []byte("binary")}}
 	var a, b bytes.Buffer
 	if err := Archive(&a, entries); err != nil {
 		t.Fatal(err)
@@ -42,14 +42,14 @@ func TestArchiveDeterministic(t *testing.T) {
 		}
 		names = append(names, h.Name)
 		wantMode := int64(0644)
-		if h.Name == "darwin" {
+		if h.Name == "nexus" {
 			wantMode = 0755
 		}
 		if h.Uid != 0 || h.Gid != 0 || h.Uname != "" || h.Gname != "" || h.ModTime.Unix() != 0 || h.Mode != wantMode {
 			t.Fatal(h)
 		}
 	}
-	if !reflect.DeepEqual(names, []string{"darwin", "z"}) {
+	if !reflect.DeepEqual(names, []string{"nexus", "z"}) {
 		t.Fatal(names)
 	}
 }

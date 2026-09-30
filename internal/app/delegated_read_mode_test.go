@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
 )
 
 func TestDelegatedReadModeRequiresExactOperatorAuthority(t *testing.T) {

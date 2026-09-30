@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/skills"
+	"github.com/ArronJablonowski/NexusRouter/skills"
 )
 
 func selectionAPIFixture(t *testing.T) (skills.ComparisonSelectionRequest, skills.ComparisonSelectionReport) {

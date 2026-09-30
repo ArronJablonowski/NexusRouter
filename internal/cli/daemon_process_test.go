@@ -20,11 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/daemon"
-	"github.com/ArronJablonowski/DarwinRouter/internal/config"
-	"github.com/ArronJablonowski/DarwinRouter/internal/stateschema"
-	contract "github.com/ArronJablonowski/DarwinRouter/webui"
-	"github.com/ArronJablonowski/DarwinRouter/workers"
+	"github.com/ArronJablonowski/NexusRouter/daemon"
+	"github.com/ArronJablonowski/NexusRouter/internal/config"
+	"github.com/ArronJablonowski/NexusRouter/internal/stateschema"
+	contract "github.com/ArronJablonowski/NexusRouter/webui"
+	"github.com/ArronJablonowski/NexusRouter/workers"
 )
 
 func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
@@ -32,7 +32,7 @@ func TestDaemonLifecycleAcrossCLIProcesses(t *testing.T) {
 	defer cancel()
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "darwin")
-	if out, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/darwin").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/nexus").CombinedOutput(); err != nil {
 		t.Fatal(err, string(out))
 	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -342,7 +342,7 @@ func qualifyDaemonWebUI(t *testing.T, ctx context.Context, binary, configuration
 		t.Fatal("real daemon browser session failed", response.StatusCode, string(raw))
 	}
 	response, shell := request(http.MethodGet, "/console/workboards", "")
-	if response.StatusCode != http.StatusOK || !bytes.Contains(shell, []byte("DarwinRouter")) || bytes.Contains(shell, []byte(token)) {
+	if response.StatusCode != http.StatusOK || !bytes.Contains(shell, []byte("NexusRouter")) || bytes.Contains(shell, []byte(token)) {
 		t.Fatal("authenticated embedded shell unavailable", response.StatusCode)
 	}
 	native, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+"/v1/health", nil)

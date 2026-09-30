@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArronJablonowski/DarwinRouter/diagnostics"
-	"github.com/ArronJablonowski/DarwinRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/diagnostics"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
 // DiagnosticEvents reads a bounded, read-only projection of the durable journal.

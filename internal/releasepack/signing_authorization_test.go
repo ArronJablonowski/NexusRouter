@@ -11,7 +11,7 @@ import (
 func signingAuthorizationFixture() SigningAuthorization {
 	return SigningAuthorization{
 		SchemaVersion:         signingAuthorizationSchema,
-		Project:               "DarwinRouter",
+		Project:               "NexusRouter",
 		Scope:                 signingAuthorizationScope,
 		CandidateRecordSHA256: "sha256:" + strings.Repeat("1", 64),
 		LicenseEvidenceSHA256: "sha256:" + strings.Repeat("5", 64),
@@ -22,7 +22,7 @@ func signingAuthorizationFixture() SigningAuthorization {
 		Targets:               append([]SigningAuthorizationTarget(nil), authorizedTargets...),
 		Gates:                 append([]SigningAuthorizationGate(nil), signingAuthorizationGates...),
 		ApproverID:            "github:release-approver",
-		ReleasePolicyURL:      "https://example.invalid/darwinrouter/release-policy/v1",
+		ReleasePolicyURL:      "https://example.invalid/nexusrouter/release-policy/v1",
 		ApprovedAt:            "2026-09-07T19:20:21Z",
 	}
 }
