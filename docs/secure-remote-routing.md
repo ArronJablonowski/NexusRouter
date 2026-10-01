@@ -1563,12 +1563,33 @@ references, percent specifiers and quotes are included; the real process's cwd
 and admission environment must match literally. Cleanup stops and unlinks the
 fixture unit and reloads the user manager. No production unit is edited.
 
-Both fixtures bind loopback, use generated test TLS identities and private
+Both fixtures default to loopback, use generated test TLS identities and private
 storage, grant only capability inspection, and reject any provider POST. The
 macOS race run and Linux ARM64 native run passed; Linux was cross-built without
 race instrumentation. Binary hashes were verified before running on the Spark.
 These checks establish local service lifecycle on each platform, not separate-
-system task dispatch, cancellation or recovery. Those network checks remain open.
+system task dispatch, cancellation or recovery; the separate physical fixture below covers those cases.
+
+For the Linux fixture only, setting `NEXUS_REMOTE_SERVICE_INTERFACE` to an
+explicit up, multicast-capable private IPv4 interface binds that address and
+adds advertisement settings to the generated unit. The fixture browses after
+startup and after restart, checking the exact instance, endpoint, certificate
+fingerprint, TLS name, SSH hint and unverified status. It browses again after
+stop to require absence. Presence checks allow up to three bounded scans for
+UDP loss; this is test observation retry, never task replay. A native Spark run
+passed all three checks with zero provider POSTs (36.80 seconds, no Linux race
+instrumentation). These observations originate on the Spark itself and do not
+establish independent-host service discovery.
+
+Mac user-agent multicast remains unqualified. A standalone Go receiver received
+a Spark query in ordinary execution but timed out under a temporary launchd
+user agent. This is consistent with, but does not prove, a Local Network privacy
+restriction. Apple's [TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)
+requires permission for incoming multicast and excludes user agents from the
+daemon exemption. Qualify the intended signed app/agent identity and its Local
+Network permission before claiming installed Mac discovery works. Do not infer
+this from a successful loopback capability request or change global privacy
+settings to make a fixture pass.
 
 ### Opt-in physical two-host qualification
 

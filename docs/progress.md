@@ -1819,3 +1819,23 @@ advertisement qualification remains open. Full combined gate/normal push queued
 behind live frozen systemd validation; no production daemon replaced.
 
 Complete remote race suite also passed26.230s after config integration.
+
+
+## 2026-10-01 — native systemd advertisement lifecycle
+
+Extended the opt-in Linux user-service fixture with an explicitly selected
+private IPv4 interface and generated advertisement flags. Independent browses
+at startup, after forced-crash restart and after stop assert exact unverified
+claims and final absence. The production host and frozen graders are unchanged.
+Native DGX Spark run passed 36.80 seconds with zero provider POSTs; both transferred
+binary hashes were checked. Linux test binary is not race-instrumented. Local
+service-template race tests passed 1.618 seconds; remote vet and diff checks pass.
+An incidental Mac browse occurred during restart and found nothing, so it is
+not cross-host qualification. Mac launchd multicast remains unqualified; the
+previous minimal-receiver reproduction and Apple TN3179 guidance are recorded
+in the remote operations documentation. No privacy settings were changed.
+
+Evidence: reporting outputs/systemd-advertisement-qualification/manifest.json
+and native-test.log. Full combined make check and normal push will be queued
+behind the already running systemd checkpoint; no full-gate pass or live
+deployment is claimed. DAR-133 remains In Progress.
