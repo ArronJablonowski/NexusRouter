@@ -1306,3 +1306,11 @@ not authorize another combined dispatch. Exact request/deadline/policy retries
 cannot overwrite the private intent. Browser and daemon automatic enrollment
 remain separate integrations; this command provides an explicit operator-owned
 workflow without installing or enabling a service.
+
+Embedding hosts may use `Client.RunReviewJobs` to supervise an existing private
+queue. It performs an immediate pass, then waits fifteen seconds between passes.
+Only `ErrReviewQueueBusy` is retried; queue integrity/storage failures stop the
+loop for operator attention. Individual terminal job receipts remain durable.
+Cancel and join the call before closing the evaluator, shared resource coordinator
+or evidence databases. This library lifecycle does not enable daemon enrollment
+or install a background service.

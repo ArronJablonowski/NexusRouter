@@ -3,9 +3,11 @@
 package remote
 
 import (
-	"golang.org/x/sys/unix"
+	"errors"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/sys/unix"
 )
 
 func lockReviewQueue(directory string) (func(), error) {
@@ -19,7 +21,11 @@ func lockReviewQueue(directory string) (func(), error) {
 	if err != nil || !st.Mode().IsRegular() || st.Mode().Perm()&0077 != 0 {
 		return fail()
 	}
-	if unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB) != nil {
+	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		if errors.Is(err, unix.EWOULDBLOCK) || errors.Is(err, unix.EAGAIN) {
+			file.Close()
+			return nil, ErrReviewQueueBusy
+		}
 		return fail()
 	}
 	current, err := os.Lstat(path)

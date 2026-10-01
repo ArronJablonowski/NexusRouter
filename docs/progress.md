@@ -1400,3 +1400,18 @@ synthetic output/evaluator fixtures through production mTLS/protocol/storage,
 not physical-host qualification. Browser/daemon enrollment remains next; the
 explicit combined CLI and existing queue worker form the current usable workflow.
 Full repository gate/push remains queued after the active Settings gate.
+
+## 2026-10-01 — remote review supervision lifecycle
+
+Added cancellation-aware RunReviewJobs for embedding hosts: immediate pass,
+fifteen-second interval, retry only explicitly identified worker-lock contention.
+Storage/integrity failures stop supervision instead of silently retrying. Queue
+receipts and evaluator admission still prevent repeated evaluation; the worker
+never dispatches tasks. Callers must cancel and join before closing dependencies.
+
+Remote/CLI race suites passed (26.732s / 2.080s), targeted vet and source checks
+passed. New tests cover lock contention followed by malformed storage, prompt
+shutdown and reopened supervision after interrupted receipt publication using
+one evaluator invocation. Synthetic fixtures, not deployed daemon or physical
+host evidence. Daemon config/startup/health and browser enrollment remain open.
+Full repository validation and normal branch backup are queued separately.
