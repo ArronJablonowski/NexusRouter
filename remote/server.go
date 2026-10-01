@@ -100,6 +100,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	op, key := "", ""
 	if r.URL.Path == "/v1/remote/info" && r.Method == "GET" {
 		op = "info"
+	} else if r.URL.Path == "/v1/remote/tasks" && r.Method == "GET" {
+		op = "inspect"
 	} else {
 		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/remote/tasks/"), "/")
 		if strings.HasPrefix(r.URL.Path, "/v1/remote/tasks/") && len(parts) >= 1 && requestID(parts[0]) {
@@ -138,7 +140,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result any
-	if op == "info" {
+	if r.URL.Path == "/v1/remote/tasks" {
+		result, err = s.taskPage(ctx, peer.ID, r.Header.Get("X-Nexus-After-Request"))
+	} else if op == "info" {
 		var info Info
 		if scoped, ok := s.backend.(interface {
 			InfoFor(context.Context, []string, bool) (Info, error)

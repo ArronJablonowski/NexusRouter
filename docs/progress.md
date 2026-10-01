@@ -11246,3 +11246,23 @@ native isolated SSH enabled passed (20.632s); CLI discovery race tests passed
 push are queued behind prior frozen gates. Physical two-host qualification,
 native-harness capability attestations, pairing UI, automatic remote joint
 selection and operational rate/retention policy remain open.
+
+### DAR-133 — caller-owned remote task inventory
+
+Added `remote.Client.Tasks`, `GET /v1/remote/tasks` and `nexus-remote tasks` with
+request-ID pagination. The destination queries only the authenticated caller's
+retained control-journal requests under the existing inspect scope, and projects
+current lifecycle metadata without prompts, output text or configuration digests.
+Unbound/lost-response reservations and temporarily unavailable backend status
+remain explicitly unknown. Listing never dispatches or retries work. This is a
+live ordered traversal; new keys before an earlier cursor require a fresh scan.
+
+Focused tests verify exact caller separation, bounded 100-item pages, malformed
+cursor rejection at both client and server, permission revocation, audit records,
+cancellation visibility, unknown delivery and no replay. Native OpenSSH loopback
+qualification now includes task inventory. Full remote/CLI race tests with native
+SSH enabled passed (20.774s/1.367s), as did targeted vet, source formatting/size and
+diff checks. Full repository validation and push are queued behind the preceding
+remote-observation checkpoint; no full-gate pass is claimed for this change.
+Physical two-host qualification, device discovery/pairing UI, automatic remote
+accuracy-first selection and operational policy remain incomplete.

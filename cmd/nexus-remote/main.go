@@ -34,7 +34,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -49,6 +49,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	configFile := flags.String("config", "", "dedicated runtime configuration file (serve)")
 	request := flags.String("request", "", "persisted caller request ID, 16–64 letters/digits/_/-")
 	task := flags.String("task", "", "owned task ID (events)")
+	afterRequest := flags.String("after-request", "", "last caller request ID from previous tasks page")
 	after := flags.Int64("after", 0, "committed event cursor")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -89,6 +90,8 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	switch operation {
 	case "info":
 		result, err = client.Info(ctx, *instance)
+	case "tasks":
+		result, err = client.Tasks(ctx, *instance, *afterRequest)
 	case "status":
 		result, err = client.Status(ctx, *instance, *request)
 	case "cancel":

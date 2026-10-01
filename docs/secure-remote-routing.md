@@ -124,11 +124,27 @@ The SDK backend requires known, finite, nonnegative model cost estimates within
 the requested ceiling, including zero. These are admission estimates, not a hard
 provider billing guarantee. Destination runtime constraints still apply.
 
+The `tasks` command lists the authenticated caller's retained request IDs and
+current lifecycle state, task IDs and cancellation flag. It uses the same
+`inspect` permission and works over HTTPS or SSH. Pages contain at most 100
+requests in request-ID order; pass the returned `next` as `--after-request` while
+`has_more` is true. The HTTP cursor is `X-Nexus-After-Request`.
+
+This is a live traversal, not a snapshot: restart with an empty cursor to see new
+requests sorting before an earlier page. It includes terminal and uncertain
+requests, so callers can filter running tasks without silently hiding ambiguity.
+`unknown` means the destination cannot presently resolve an owned reservation;
+it is not a failure verdict or permission to dispatch again. Recover using the
+original persisted request key and exact payload. Listing never submits work.
+Prompts, result text, configuration digests and other callers' requests are not
+returned. Use `status` and `events` for an individual owned request's details.
+
 ## Protocol and durability
 
 | Method and path | Scope | Result |
 | --- | --- | --- |
 | GET `/v1/remote/info` | info | versioned allowed model catalog and availability |
+| GET `/v1/remote/tasks` | inspect | paginated caller-owned lifecycle metadata |
 | POST `/v1/remote/tasks/{key}` | dispatch | durable submission status; JSON task body |
 | GET `/v1/remote/tasks/{key}` | inspect | submission state and completed result |
 | POST `/v1/remote/tasks/{key}/cancel` | cancel | durable cancellation request/status |
@@ -142,7 +158,7 @@ connections, headers and backend deadlines are bounded. There are 32 simultaneou
 HTTP operation slots. This is not a multi-tenant billing or rate-quota system.
 
 Caller identity comes from the authenticated certificate pin. Task keys and event
-access are scoped to that caller. There is no remote database-wide task listing,
+access are scoped to that caller. Caller-scoped task inventory is available; there is no remote database-wide task listing,
 filesystem endpoint, runtime configuration mutation, or cross-caller cancellation.
 `info` retains configured capabilities and adds fresh advisory observations.
 The shipped SDK backend filters the paired model/cloud scope before probing

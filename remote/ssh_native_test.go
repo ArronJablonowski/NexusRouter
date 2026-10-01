@@ -72,6 +72,10 @@ func TestSSHNativeLoopback(t *testing.T) {
 	}
 	peer.SSH.IdentityFile = clientKey
 	writeRegistry(t, f.clientTrust, peer)
+	page, e := f.client.Tasks(ctx, "node-a", "")
+	if e != nil || len(page.Tasks) != 1 || page.Tasks[0].RequestID != "native-ssh-000001" || page.Tasks[0].State != "queued" {
+		t.Fatal(page, e)
+	}
 	canceled, e := f.client.Cancel(ctx, "node-a", "native-ssh-000001")
 	if e != nil || !canceled.CancelRequested {
 		t.Fatal(canceled, e)
