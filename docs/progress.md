@@ -1935,3 +1935,32 @@ Source formatting/size gate, remote vet and diff checks passed. Operations docs
 updated. Evidence: reporting outputs/spark-openclaw-qualification/physical-test.log
 and registration.json plus previously verified runtime manifest. DAR-133 remains
 In Progress; combined full gate/normal push queued behind existing live gate.
+
+## 2026-10-01 — Goose physical crash defect and Linux correction
+
+Fresh official release API reports Goose1.52.0, matching the adapter; installed
+Spark Goose1.50.0 remains unchanged. Staged isolated Linux ARM64 release1.52.0,
+verified official asset SHA256, executable version and hash. Initial physical
+HTTPS/SSH cases passed, but owned-host SIGKILL left a Goose child running; fixture
+stopped that exact child and failed24.82s. This is preserved, not relabeled.
+
+Linux Goose now sets kernel parent-death SIGKILL on the direct harness process.
+The launching Go thread stays locked until child reaping because Linux associates
+this signal with the creating thread. Darwin remains unchanged; ordinary group
+cancellation remains. New Linux subprocess regression kills the owning host and
+requires the direct child to stop; cleanup binds PID to Linux start time. Native
+Spark regression passed0.01s. Broader arbitrary tool descendants are not covered.
+
+Fresh hash-verified corrected Linux host passed complete physical Mac/Spark
+HTTPS/SSH, cancellation, committed-response loss, duplicate suppression,
+revocation and host-crash recovery51.10s (Mac race package52.659s), eight synthetic
+provider calls. Original children stopped naturally; interrupted lineage failed
+without replay/fabricated text and queued work completed once. Independent cleanup
+found no fixture directories and OllamaPID2145 untouched. Goose Mac race1.892s,
+remote race26.359s, source formatting/size, vet and diff checks passed. Linux host
+and regression are not race-instrumented; no real model-quality claim.
+Evidence: reporting outputs/spark-goose-qualification/ includes release metadata,
+source/binary hashes, original physical-test.log, parent-death-test.log and
+physical-parent-death-fixed.log. DAR-133 remains In Progress, including unresolved
+Mac advertised-service identity/permission qualification. Combined full validation
+and normal push queued behind the existing frozen gate.

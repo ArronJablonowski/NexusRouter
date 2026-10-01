@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -260,6 +261,10 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 func runProcess(cmd *exec.Cmd) error {
 	if !processSupported() {
 		return ErrRun
+	}
+	if runtime.GOOS == "linux" {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 	}
 	configureProcess(cmd)
 	cmd.Cancel = func() error { return killProcessGroup(cmd) }

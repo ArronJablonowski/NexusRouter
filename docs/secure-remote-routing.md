@@ -1625,10 +1625,10 @@ it does not change TLS certificate validity, evidence/review timestamps or the
 destination's resource-admission clock checks. Configured identity remains an
 advisory preview and must match the actual completed harness identity.
 
-### Physical Pi and OpenClaw fixtures
+### Physical Pi, OpenClaw and Goose fixtures
 
 The two-host fixture optionally accepts `NEXUS_REMOTE_TEST_HARNESS_FIXTURE`, a
-local JSON file containing one pinned Pi or OpenClaw registration for destination model
+local JSON file containing one pinned Pi, OpenClaw or Goose registration for destination model
 `chat`, revision `fixture-v1`, with native tools disabled. The referenced
 executable must already exist on the destination. `NEXUS_REMOTE_TEST_PATH` may
 supply an explicit absolute-component PATH for its Node runtime; it changes
@@ -1645,3 +1645,10 @@ seconds (zombies are not running); surviving fixture children are stopped and
 cause failure. This qualifies the selected harness in text mode without native tools, not arbitrary
 external tool side effects or power loss. Synthetic provider call totals must
 remain eight.
+
+On Linux the Goose adapter additionally requests a kernel parent-death SIGKILL
+for its direct child and pins the launching Go thread through process completion.
+This prevents the direct harness from surviving an abrupt host exit. It is not a
+general descendant-tree or external-tool side-effect guarantee; arbitrary tools
+and power loss require separate qualification. Existing process-group cleanup
+continues to apply to ordinary cancellation.
