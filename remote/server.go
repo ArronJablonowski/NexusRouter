@@ -99,7 +99,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	op, key := "", ""
-	if (r.URL.Path == "/v1/remote/info" || r.URL.Path == "/v1/remote/harness-identity" || r.URL.Path == "/v1/remote/harness-capacity" || r.URL.Path == "/v1/remote/harness-readiness") && r.Method == "GET" {
+	if (r.URL.Path == "/v1/remote/info" || r.URL.Path == "/v1/remote/catalogue" || r.URL.Path == "/v1/remote/harness-identity" || r.URL.Path == "/v1/remote/harness-capacity" || r.URL.Path == "/v1/remote/harness-readiness") && r.Method == "GET" {
 		op = "info"
 	} else if r.URL.Path == "/v1/remote/tasks" && r.Method == "GET" {
 		op = "inspect"
@@ -150,7 +150,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result any
-	if r.URL.Path == "/v1/remote/harness-readiness" {
+	if r.URL.Path == "/v1/remote/catalogue" {
+		result, err = s.catalogue(ctx, peer)
+	} else if r.URL.Path == "/v1/remote/harness-readiness" {
 		result, err = s.harnessReadiness(ctx, peer, r)
 	} else if r.URL.Path == "/v1/remote/harness-capacity" {
 		result, err = s.harnessCapacity(ctx, peer, r)

@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|catalogue|candidates|rank|auto-dispatch|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -61,10 +61,17 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
-	if operation == "route-binding" && flags.NArg() == 0 {
+	if (operation == "route-binding" || operation == "automatic-choice") && flags.NArg() == 0 {
 		store, e := remote.OpenRouteStore(*routes)
 		if e != nil {
 			return e
+		}
+		if operation == "automatic-choice" {
+			choice, e := store.AutomaticChoice(*request)
+			if e != nil {
+				return e
+			}
+			return json.NewEncoder(output).Encode(choice)
 		}
 		binding, e := store.Lookup(*request)
 		if e != nil {
@@ -106,6 +113,13 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	var result any
 	switch operation {
+	case "candidates", "rank", "auto-dispatch":
+		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
+			return remote.ErrInvalid
+		}
+		result, err = automaticOperation(ctx, &client, operation, *routes, *evidence, *request, input)
+	case "catalogue":
+		result, err = client.Catalogue(ctx, *instance)
 	case "harness-readiness":
 		result, err = client.HarnessReadiness(ctx, *instance, remote.HarnessIdentityRequest{ModelID: *modelID, HarnessID: *harnessID, ContextTokens: *contextTokens})
 	case "harness-capacity":

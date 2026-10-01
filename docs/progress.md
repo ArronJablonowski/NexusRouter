@@ -11514,3 +11514,21 @@ contains the pre-correction fixture and is not a passing validation claim.
 Full repository gate and push will queue behind the running capacity revision.
 Evaluation scheduling, pairing/discovery UI, physical two-host qualification and
 production held-out model/harness comparisons remain open.
+
+### DAR-133 discovery-driven automatic routing
+
+Added a configuration-only paired catalogue and bounded candidate discovery.
+Ineligible cloud/policy/budget combinations are excluded before readiness or
+capacity probes; changed caller credentials/trust abort discovery. Candidate
+collection measures prerequisites and capacity, while final ranking rechecks and
+uses caller-owned destination evidence. CLI catalogue/candidates/rank/auto-dispatch
+and offline automatic-choice operations expose the path. CLI exploration remains
+explicitly unsupported; the existing Go evaluator API retains bounded policy.
+
+Recovery checks the durable choice before discovery, preserving same-key replay
+without fallback when metadata becomes unavailable. Native Pi/OpenSSH SDK tests
+now use discovery for the first automatic dispatch. Remote/CLI race packages
+passed (36.635s/1.777s); final policy-change/cloud/no-probe/CLI input tests passed
+(2.729s/1.458s), with vet/source/diff checks. Full make check and push remain queued
+behind running capacity validation. Pairing/discovery UI, background evaluation,
+physical two-host and production held-out qualification remain open.

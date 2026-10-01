@@ -143,7 +143,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	service.ConfigureHarnessEvidence(ledger)
 	f := setup(t)
 	f.http.Close()
-	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Provider: "local", Model: "fixture", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
+	backend := &SDKBackend{Available: func(context.Context) bool { return true }, Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Provider: "local", Model: "fixture", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
 	if native {
 		backend.Identify = service.NativeHarnessIdentity
 		backend.PlanHarness = service.NativeHarnessCapacity
@@ -199,18 +199,16 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		t.Fatal(e)
 	}
 	request := "request-sdk-00001"
-	var candidates []DestinationCandidate
 	var automatic AutomaticRequest
 	root := filepath.Join(t.TempDir(), "caller-ranking-evidence")
 	if native {
 		automatic = AutomaticRequest{Version: 1, Prompt: task.Prompt, Routing: harness.Request{Version: 1, Task: harness.TaskClass{Domain: task.Domain, Profile: task.Profile, Difficulty: task.HarnessDifficulty}, Mode: "local_only", LocalRequired: task.Private, ContextTokens: int64(task.ContextTokens), MaxCost: task.MaxCost}}
-		candidates = []DestinationCandidate{{Destination: "node-a", ModelID: task.ModelID, HarnessID: task.HarnessID, Candidate: harness.Candidate{Identity: *task.ExpectedHarnessIdentity, Local: true, Available: true, Authorized: true, Compatible: true, CapacityAvailable: true, CredentialAvailable: true, ContextTokens: int64(task.ContextTokens)}}}
 	}
 	dispatchPrimary := func() (submissions.Status, error) {
 		if !native {
 			return f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
 		}
-		status, choice, err := f.client.DispatchAutomatic(ctx, routeStore, root, request, automatic, harness.DefaultPolicy(), candidates, 0)
+		status, choice, err := f.client.DispatchDiscovered(ctx, routeStore, root, request, automatic, harness.DefaultPolicy(), 0)
 		if choice.Version != 0 {
 			recovered, e := choice.Task(automatic)
 			if e != nil || hash(recovered) != hash(task) {
@@ -220,7 +218,6 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		return status, err
 	}
 	first, e := dispatchPrimary()
-	candidates = nil // Restart/recovery must use the persisted choice, not discovery.
 
 	if interruptedSSH {
 		if e == nil || !dropped.Load() {

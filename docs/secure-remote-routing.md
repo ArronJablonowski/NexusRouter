@@ -674,3 +674,37 @@ context are intersected with observed configuration, and cost uses the greater
 estimate. Hosts without this endpoint are excluded from automatic selection.
 Explicit dispatch still performs normal admission. These observations are advisory:
 credentials, files and provider availability can change before execution.
+
+### Discovering candidates and automatic CLI dispatch
+
+`catalogue` returns paired model/harness configuration without provider inventory
+or resource probes. `candidates` enumerates only the caller's trust registry and
+returns observed candidates plus discovery exclusions. Each eligible registration
+gets fresh readiness and measured capacity. Discovery has a thirty-second total
+context and at most 4,096 registrations; exhausted time or changed caller/trust
+configuration aborts the result. No discovery adds a peer, grants permission,
+starts inference or imports remote quality scores. Readiness/capacity can change,
+so `rank` and dispatch recheck them against current caller-owned outcome evidence.
+
+`candidates` and `rank` read a `harness.Request` JSON object from stdin, for example:
+
+```json
+{"Version":1,"Task":{"Domain":"coding","Profile":"benchmark-v1","Difficulty":"hard"},"Mode":"local_only","LocalRequired":true,"ContextTokens":32768,"MaxCost":0,"Capabilities":["chat"]}
+```
+
+`auto-dispatch` reads `{"Version":1,"Prompt":"...","Routing":{...}}`, where
+`Routing` is that same request. Supply the usual `--trust`, `--cert`, `--key` and
+`--ca`, plus `--routes`, `--evidence`, and a persisted `--request` key. Do not supply
+`--instance`, `--model`, `--harness` or `--context`: selection uses the routing
+request and paired catalogue. CLI automatic operations reject `AllowExploration`;
+ordinary accuracy-first selection uses the default policy. Explicit evaluator
+workflows can use the Go API's bounded policy and draw.
+
+Save the original JSON and caller key before the first command. On uncertain
+transport or output failure, rerun the exact same request/key. An existing durable
+choice is recovered before any catalogue query, even if discovery is unavailable;
+there is no automatic fallback to another destination. `automatic-choice --routes
+DIR --request KEY` reads the stored choice without network traffic or exposing
+the prompt. The choice's Go `Task(originalRequest)` reconstructs the exact pinned
+payload for existing reconciliation/review operations. UI and background evaluator
+integration remain separate work.

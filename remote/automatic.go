@@ -102,6 +102,20 @@ func (s *RouteStore) AutomaticChoice(key string) (AutomaticChoice, error) {
 // Lost responses, changed rankings and admission failures never trigger fallback.
 // Candidates must still come from the embedding host's fresh admission checks.
 func (c *Client) DispatchAutomatic(ctx context.Context, routes *RouteStore, evidenceRoot, key string, request AutomaticRequest, policy harness.Policy, candidates []DestinationCandidate, draw float64) (submissions.Status, AutomaticChoice, error) {
+	return c.dispatchAutomatic(ctx, routes, evidenceRoot, key, request, policy, candidates, draw, nil)
+}
+
+// DispatchDiscovered recovers an existing choice before any discovery. A fresh
+// request enumerates paired candidates, then uses the normal bound evidence and
+// admission checks. It never reroutes an uncertain or already-bound request.
+func (c *Client) DispatchDiscovered(ctx context.Context, routes *RouteStore, evidenceRoot, key string, request AutomaticRequest, policy harness.Policy, draw float64) (submissions.Status, AutomaticChoice, error) {
+	return c.dispatchAutomatic(ctx, routes, evidenceRoot, key, request, policy, nil, draw, func() ([]DestinationCandidate, error) {
+		discovered, err := c.DiscoverCandidates(ctx, request.Routing)
+		return discovered.Candidates, err
+	})
+}
+func (c *Client) dispatchAutomatic(ctx context.Context, routes *RouteStore, evidenceRoot, key string, request AutomaticRequest, policy harness.Policy, candidates []DestinationCandidate, draw float64, discover func() ([]DestinationCandidate, error)) (submissions.Status, AutomaticChoice, error) {
+
 	var status submissions.Status
 	var choice AutomaticChoice
 	if c == nil || ctx == nil || ctx.Err() != nil || routes == nil || !requestID(key) || request.Version != Version || len(request.Prompt) == 0 || len(request.Prompt) > MaxBody/2 || request.Routing.ContextTokens < 8192 || request.Routing.ContextTokens > 1<<24 {
@@ -124,6 +138,13 @@ func (c *Client) DispatchAutomatic(ctx context.Context, routes *RouteStore, evid
 				e = ErrConflict
 			}
 			return status, choice, e
+		}
+		if discover != nil {
+			var e error
+			candidates, e = discover()
+			if e != nil {
+				return status, choice, e
+			}
 		}
 		selected, e := c.RankRecordedCandidates(ctx, evidenceRoot, request.Routing, policy, candidates, draw)
 		if e != nil {
