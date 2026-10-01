@@ -11495,3 +11495,22 @@ passed (1.962s / 1.485s). Final SSH capacity/ranking tests passed 2.322s;
 vet/source/diff passed. Combined full repository validation and push remain queued.
 Capability/credential observation, evaluation scheduling, UI and physical two-host
 qualification remain open.
+
+### DAR-133 remote harness readiness
+
+Added scoped `harness-readiness` CLI/HTTP/Go observations and same-service
+executable-pin, credential-presence and model-inventory checks. Two-second
+callback context and fifteen-second freshness apply. Negative observations cannot
+be overridden by positive caller flags during automatic destination selection;
+context/capabilities intersect and cost retains the larger estimate. No inference,
+reservation or quality evidence is produced. Runtime dependency/version/tool
+attestation remains an execution responsibility.
+
+Remote/CLI race suites with native SSH and Pi passed (36.465s/1.682s), including
+negative-readiness ranking tests. App prerequisite test passed (1.711s); its first
+fixture omitted mandatory harness overhead and was corrected. Vet/source/diff
+checks passed. An earlier broader app test process remains live; its binary
+contains the pre-correction fixture and is not a passing validation claim.
+Full repository gate and push will queue behind the running capacity revision.
+Evaluation scheduling, pairing/discovery UI, physical two-host qualification and
+production held-out model/harness comparisons remain open.

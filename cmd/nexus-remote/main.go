@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|harness-identity|harness-capacity|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -106,6 +106,8 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	var result any
 	switch operation {
+	case "harness-readiness":
+		result, err = client.HarnessReadiness(ctx, *instance, remote.HarnessIdentityRequest{ModelID: *modelID, HarnessID: *harnessID, ContextTokens: *contextTokens})
 	case "harness-capacity":
 		result, err = client.HarnessCapacity(ctx, *instance, remote.HarnessIdentityRequest{ModelID: *modelID, HarnessID: *harnessID, ContextTokens: *contextTokens})
 	case "harness-identity":
@@ -229,7 +231,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{Client: client, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{Client: client, Identify: service.NativeHarnessIdentity, PlanHarness: service.NativeHarnessCapacity, CheckHarness: service.NativeHarnessReadiness, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}

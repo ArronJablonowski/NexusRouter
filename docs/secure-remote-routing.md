@@ -649,3 +649,28 @@ not a reservation or proof of executable/model capability, provider credentials,
 or all other processes' future usage. Shared process admission and all normal
 execution checks still apply when dispatch actually runs. Native capability and
 credential collection, evaluation scheduling and UI integration remain open.
+
+### Fresh harness prerequisites
+
+`nexus-remote harness-readiness --model MODEL --harness REGISTRATION --context
+TOKENS` observes the configured executable SHA-256, credential presence, and
+provider model inventory through HTTPS or SSH. Paired model/harness and cloud
+permissions are checked before file, secret or provider access. The SDK callback
+gets a two-second deadline; responses expire after fifteen seconds. No credential,
+installation path, prompt, provider error or quality claim is returned.
+
+A successful inventory distinguishes present from absent; failed discovery is
+unknown. Missing credentials, incompatible configuration or a changed executable
+skip discovery. Observation does not execute the harness or inference, reserve
+capacity, or create evidence. Executable reads are capped at 256 MiB. Installation
+files and secret callbacks are trusted host inputs. This does not attest package
+dependencies, runtime version, model weights or actual tool support; execution
+still verifies its runtime contract.
+
+Automatic ranking requires both measured capacity and fresh readiness. Negative
+host gates remain vetoes; positive flags cannot bypass an absent/unknown model,
+changed executable, missing credential or incompatible identity. Capabilities and
+context are intersected with observed configuration, and cost uses the greater
+estimate. Hosts without this endpoint are excluded from automatic selection.
+Explicit dispatch still performs normal admission. These observations are advisory:
+credentials, files and provider availability can change before execution.

@@ -17,12 +17,13 @@ import (
 // A normal matching daemon/dispatcher must run separately. Submission is not
 // execution; all runtime policy, privacy, tools and resource admission still run.
 type SDKBackend struct {
-	PlanHarness func(context.Context, string, string, int) (harness.Identity, resources.Need, resources.CapacityResult, error)
-	Identify    func(string, string, int) (harness.Identity, error)
-	Harnesses   []Harness
-	Client      *sdk.Client
-	Models      []Model
-	Available   func(context.Context) bool
+	CheckHarness func(context.Context, string, string, int) (harness.Readiness, error)
+	PlanHarness  func(context.Context, string, string, int) (harness.Identity, resources.Need, resources.CapacityResult, error)
+	Identify     func(string, string, int) (harness.Identity, error)
+	Harnesses    []Harness
+	Client       *sdk.Client
+	Models       []Model
+	Available    func(context.Context) bool
 	// Observe receives only the permitted model catalogue when called by Server.
 	// It may attach advisory observations, not change configured capabilities.
 	Observe func(context.Context, []Model) ([]ModelObservation, *ResourceObservation, error)

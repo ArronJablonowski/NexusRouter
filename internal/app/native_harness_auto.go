@@ -136,10 +136,14 @@ func nativeArtifactMatches(entry NativeHarness) bool {
 // Discover only policy-eligible endpoints; fresh inventory is shared across the
 // pairs for this selection, never carried over from an earlier request.
 func (s *Service) nativeModels(ctx context.Context, p config.Provider, local bool) map[string]bool {
+	models, _ := s.nativeModelInventory(ctx, p, local)
+	return models
+}
+func (s *Service) nativeModelInventory(ctx context.Context, p config.Provider, local bool) (map[string]bool, error) {
 	models := map[string]bool{}
 	tr, err := policy.NewTransport(s.settings.Mode == "local_only" || local, []string{p.ResolvedEndpoint()})
 	if err != nil {
-		return models
+		return nil, err
 	}
 	defer tr.CloseIdleConnections()
 	check, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -150,16 +154,16 @@ func (s *Service) nativeModels(ctx context.Context, p config.Provider, local boo
 	}
 	adapter, err := providers.Build(check, s.providerFactory, providers.Connection{Version: 1, ID: p.ID, Endpoint: p.ResolvedEndpoint(), Kind: p.Kind, Purpose: providers.PurposeDiscovery, Timeout: httpProviderTimeout(p), APIKey: key, Transport: tr})
 	if err != nil {
-		return models
+		return nil, err
 	}
 	names, err := adapter.Models(check)
 	if err != nil {
-		return models
+		return nil, err
 	}
 	for _, name := range names {
 		models[name] = true
 	}
-	return models
+	return models, nil
 }
 
 // Take one independent draw per evaluation request, reused after pre-dispatch

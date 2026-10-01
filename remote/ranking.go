@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
@@ -29,7 +30,7 @@ type DestinationSelection struct {
 }
 
 // RankRecordedCandidates reads only caller-owned destination evidence and fresh
-// configured identities. It does not dispatch, reserve resources or choose a new
+// configured identities, capacity and readiness. It does not dispatch or choose a new
 // destination for an existing request. The host must recheck admission and use
 // DispatchRecorded to persist the selected choice before sending any task.
 func (c *Client) RankRecordedCandidates(ctx context.Context, root string, request harness.Request, policy harness.Policy, candidates []DestinationCandidate, draw float64) (DestinationSelection, error) {
@@ -74,6 +75,26 @@ func (c *Client) RankRecordedCandidates(ctx context.Context, root string, reques
 				candidate.Compatible = false
 			}
 			candidate.CapacityAvailable = candidate.CapacityAvailable && e == nil && preview.Capacity.Action == resources.CapacityAdmit
+			ready, re := c.HarnessReadiness(ctx, proposal.Destination, HarnessIdentityRequest{proposal.ModelID, proposal.HarnessID, int(request.ContextTokens)})
+			if re != nil {
+				candidate.Available = false
+			} else {
+				r := ready.Readiness
+				candidate.Available = candidate.Available && r.ExecutableMatched && r.ModelState == "present"
+				candidate.Compatible = candidate.Compatible && r.Compatible && r.Identity == candidate.Identity
+				candidate.CredentialAvailable = candidate.CredentialAvailable && r.CredentialState != "missing"
+				candidate.Local = candidate.Local && r.Local
+				candidate.ContextTokens = min(candidate.ContextTokens, r.ContextTokens)
+				candidate.EstimatedCost = max(candidate.EstimatedCost, r.EstimatedCost)
+				caps := []string{}
+				for _, cap := range candidate.Capabilities {
+					if slices.Contains(r.Capabilities, cap) {
+						caps = append(caps, cap)
+					}
+				}
+				candidate.Capabilities = caps
+			}
+
 		}
 		scoped = append(scoped, harness.ScopedCandidate{Scope: proposal.Destination, Candidate: candidate})
 	}

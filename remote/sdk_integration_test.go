@@ -147,6 +147,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	if native {
 		backend.Identify = service.NativeHarnessIdentity
 		backend.PlanHarness = service.NativeHarnessCapacity
+		backend.CheckHarness = service.NativeHarnessReadiness
 		backend.Harnesses = []Harness{{ID: task.HarnessID, ModelID: "chat", Kind: cfg.NativeHarnesses[0].Kind, ModelRevision: "fixture-v1"}}
 		authorized := f.clientPeer
 		authorized.Harnesses = []string{task.HarnessID}
