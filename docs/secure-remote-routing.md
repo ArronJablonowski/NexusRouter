@@ -1151,3 +1151,22 @@ unconfirmed. Admission, model/harness permissions, private/local requirements,
 resource limits and revocation remain enforced by the normal remote client and
 destination. This form is explicit routing; automatic accuracy-first selection
 and advisory evaluation remain separate CLI workflows, not automatic UI effects.
+
+### Inspect a saved request without its prompt
+
+`nexus remote recorded-status --trust /private/nexus/peers.json --cert
+/private/nexus/client.pem --key /private/nexus/client-key.pem --ca
+/private/nexus/ca.pem --routes /private/nexus/routes --request REQUEST_ID`
+reads the existing caller-side route binding and inspects that destination over
+its configured HTTPS or SSH transport. It takes no stdin or prompt and rejects
+explicit destination/model/harness/context overrides. The original caller
+certificate remains required; current trust, inspect permission and revocation
+still apply. A missing or unsafe route directory fails without creating it.
+
+This works for explicit and automatic dispatch after a route binding exists.
+It does not discover candidates, select a new destination, repair uncertain
+intake, resubmit work, cancel, or apply quality feedback. A status lookup cannot
+prove that a newly supplied task matches the original intent: outcome and review
+operations retain their existing exact-request checks. Missing or uncertain
+remote status remains an error, never evidence of successful completion. Browser
+integration with automatic routing remains separate work.

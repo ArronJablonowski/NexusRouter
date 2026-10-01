@@ -1209,3 +1209,19 @@ recovery without another dispatch. This corrects a deployment gap not covered by
 the earlier synthetic UI fixture; prior browser evidence alone was insufficient
 to prove production recovery. Reviewed asset digest updated; full combined gate
 remains required before push.
+
+## 2026-10-01 — saved remote request status without prompt persistence
+
+Added read-only `Client.InspectRecorded` and `nexus remote recorded-status`.
+The existing immutable route binding supplies destination and caller certificate;
+current peer authorization and transport checks remain in force. No original
+prompt, candidate discovery, inference, repair, or directory creation is needed.
+This supports recovery of explicit and automatic selections without persisting
+prompts in browser state; automatic browser integration remains unfinished.
+
+Real mTLS package and CLI fixtures cover saved destination, unchanged record,
+no stdin, original caller pin, live revocation, forbidden destination override,
+and uncertain intake with no repair or extra dispatch. The initial revocation
+fixture failed because its parent directory was not private; corrected the
+fixture, preserving the production security check. Full repository gate and
+normal push remain pending; no deployment or physical second-host claim.
