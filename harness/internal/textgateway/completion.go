@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"bufio"
@@ -13,7 +13,7 @@ import (
 const MaxRecordBytes = 1 << 20
 const maxStreamBytes = 16 << 20
 
-type verifiedCompletion struct {
+type Completion struct {
 	Text   string
 	Stream []byte
 }
@@ -21,8 +21,8 @@ type verifiedCompletion struct {
 // verifyCompletion buffers until a normal terminal, [DONE], and EOF. An upstream
 // HTTP status or a harness envelope alone cannot establish completion. Only the
 // canonicalized verified stream may be released to the native process.
-func verifyCompletion(reader io.Reader, model string) (verifiedCompletion, error) {
-	bad := func() (verifiedCompletion, error) { return verifiedCompletion{}, ErrProjection }
+func verifyCompletion(reader io.Reader, model string) (Completion, error) {
+	bad := func() (Completion, error) { return Completion{}, ErrProjection }
 	if !identifier(model) {
 		return bad()
 	}
@@ -158,7 +158,7 @@ func verifyCompletion(reader io.Reader, model string) (verifiedCompletion, error
 	if scanner.Err() != nil || limited.N <= 0 || event.Len() != 0 || !done || !finished || strings.TrimSpace(text.String()) == "" {
 		return bad()
 	}
-	return verifiedCompletion{Text: text.String(), Stream: wire.Bytes()}, nil
+	return Completion{Text: text.String(), Stream: wire.Bytes()}, nil
 }
 
 func validUsage(body []byte) bool {

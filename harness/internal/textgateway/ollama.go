@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-func ollamaRequest(body []byte, c gatewayConfig) ([]byte, error) {
+func ollamaRequest(body []byte, c Config) ([]byte, error) {
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(body, &fields) != nil {
 		return nil, ErrProjection

@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"context"
@@ -47,7 +47,7 @@ func TestGatewayUsesOnlyPolicyTransportAndProviderCredential(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completionFixture("model")))}, nil
 	})
-	base, key, _, closeGateway, e := startGateway(context.Background(), c)
+	base, key, _, closeGateway, e := Start(context.Background(), c)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -72,7 +72,7 @@ func TestGatewayDeniedTransportHasNoDirectFallback(t *testing.T) {
 	c := gatewayFixture()
 	c.BaseURL = provider.URL
 	c.Transport = policyTransport(func(*http.Request) (*http.Response, error) { policy.Add(1); return nil, errors.New("policy denied") })
-	base, key, _, closeGateway, e := startGateway(context.Background(), c)
+	base, key, _, closeGateway, e := Start(context.Background(), c)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -106,7 +106,7 @@ func TestGatewayDoesNotFollowRedirect(t *testing.T) {
 		calls.Add(1)
 		return &http.Response{StatusCode: 302, Header: http.Header{"Location": []string{"https://other.invalid/"}}, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})
-	base, key, _, closeGateway, e := startGateway(context.Background(), c)
+	base, key, _, closeGateway, e := Start(context.Background(), c)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -130,7 +130,7 @@ func TestGatewayCloseCancelsAndJoinsUpstream(t *testing.T) {
 		close(joined)
 		return nil, r.Context().Err()
 	})
-	base, key, _, closeGateway, e := startGateway(context.Background(), c)
+	base, key, _, closeGateway, e := Start(context.Background(), c)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -159,8 +159,8 @@ func TestGatewayCloseCancelsAndJoinsUpstream(t *testing.T) {
 	<-done
 }
 
-func gatewayFixture() gatewayConfig {
-	return gatewayConfig{Model: "model", BaseURL: "https://provider.invalid/v1", APIKey: "secret-one", Timeout: 5 * time.Second, ContextTokens: 32768, MaxOutputTokens: 1024}
+func gatewayFixture() Config {
+	return Config{Model: "model", BaseURL: "https://provider.invalid/v1", APIKey: "secret-one", Timeout: 5 * time.Second, ContextTokens: 32768, MaxOutputTokens: 1024}
 }
 
 func TestGatewayPreservesHostContext(t *testing.T) {
@@ -175,7 +175,7 @@ func TestGatewayPreservesHostContext(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completionFixture("model")))}, nil
 	})
-	base, key, _, closeGateway, err := startGateway(context.Background(), c)
+	base, key, _, closeGateway, err := Start(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,12 +186,48 @@ func TestGatewayPreservesHostContext(t *testing.T) {
 }
 func TestGatewayRequiresTransport(t *testing.T) {
 	c := gatewayFixture()
-	if _, _, _, _, e := startGateway(context.Background(), c); e == nil {
+	if _, _, _, _, e := Start(context.Background(), c); e == nil {
 		t.Fatal("nil transport")
 	}
 	var p policyTransport
 	c.Transport = p
-	if _, _, _, _, e := startGateway(context.Background(), c); e == nil {
+	if _, _, _, _, e := Start(context.Background(), c); e == nil {
 		t.Fatal("typed nil transport")
+	}
+}
+
+func TestMissingOutputLimitUsesHostBound(t *testing.T) {
+	for _, tc := range []struct {
+		body  string
+		valid bool
+	}{
+		{strings.Replace(gatewayBody, `"max_tokens":1024,`, "", 1), true},
+		{strings.Replace(gatewayBody, "1024", "2048", 1), false},
+		{strings.Replace(gatewayBody, "1024", "0", 1), false},
+		{strings.Replace(gatewayBody, `"max_tokens":1024`, `"MAX_TOKENS":128`, 1), false},
+		{strings.Replace(gatewayBody, `"max_tokens":1024`, `"max_tokens":null`, 1), false},
+	} {
+		c := gatewayFixture()
+		c.DefaultMissingOutputLimit = true
+		calls := 0
+		c.Transport = policyTransport(func(r *http.Request) (*http.Response, error) {
+			calls++
+			var body struct {
+				MaxTokens int `json:"max_tokens"`
+			}
+			if json.NewDecoder(r.Body).Decode(&body) != nil || body.MaxTokens != 1024 {
+				t.Error("host output bound absent")
+			}
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(completionFixture("model")))}, nil
+		})
+		base, key, _, closeGateway, err := Start(context.Background(), c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		code := gatewayCall(t, base, key, tc.body)
+		closeGateway()
+		if (code == 200) != tc.valid || (calls == 1) != tc.valid {
+			t.Fatal("invalid output limit acceptance", code, calls)
+		}
 	}
 }

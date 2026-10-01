@@ -9957,3 +9957,31 @@ Full make check remains queued before push. Production gateway verification,
 interpreter/artifact binding, process admission/cleanup, canonical execution and
 SDK registration for Hermes are still required. Configuration tests alone do not
 prove a complete or sandboxed Hermes adapter.
+
+## Shared verified gateway and Hermes qualification — DAR-132 (2026-10-01)
+
+Moved the OpenClaw gateway, context encoding, OpenAI stream verifier and native
+Ollama translation (with their tests) into harness/internal/textgateway. OpenClaw
+continues through a thin wrapper. Hermes native qualification now uses this same
+boundary, rather than treating its CLI envelope as proof of model completion.
+
+Hermes omits a token cap in its native request. An explicit gateway option fills
+only absent limit fields with the host cap; supplied invalid, zero, null,
+case-aliased or excessive caps still fail before dispatch. Gateway configuration
+now also requires an output cap below its context window and at most 65,536.
+Host context replaces native assembled messages and only the host transport holds
+the real provider credential. Discovery requests never reach upstream inference.
+
+Installed Hermes tests verify normal completion and rejection of a length-stopped
+response, exact host messages, a 128-token cap, no tools and exactly one upstream
+inference in both cases. Failed completion exposes no verified result even when
+Hermes reports an error through its own terminal envelope. Native CLI retries
+cannot dispatch a second provider call through the one-dispatch gateway.
+
+Verification: Hermes native/emitter/parser race suite passed (5.452s), shared
+gateway race suite passed (1.447s), and OpenClaw native/projector/runner race suite
+passed (28.537s). SDK OpenClaw context/evidence and same-model Pi/OpenClaw
+learning regression race tests passed (20.304s). Targeted vet, source gate and
+diff checks passed. Full make check
+is queued before push. Production Hermes process admission/lifecycle, artifact
+binding, canonical execution and SDK registration remain incomplete.

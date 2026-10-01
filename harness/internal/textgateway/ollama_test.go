@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 
 func TestOllamaTranslationPreservesLimitsAndRejectsUnsupportedControls(t *testing.T) {
 	body := `{"model":"fixture","messages":[{"role":"system","content":"policy"},{"role":"user","content":[{"type":"text","text":"first"},{"type":"text","text":"second"}]}],"stream":true,"max_tokens":1024,"temperature":0.2}`
-	got, err := ollamaRequest([]byte(body), gatewayConfig{Model: "fixture", ContextTokens: 32768, MaxOutputTokens: 1024})
+	got, err := ollamaRequest([]byte(body), Config{Model: "fixture", ContextTokens: 32768, MaxOutputTokens: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,13 +23,13 @@ func TestOllamaTranslationPreservesLimitsAndRejectsUnsupportedControls(t *testin
 		t.Fatal(string(got))
 	}
 
-	smaller, err := ollamaRequest([]byte(strings.Replace(body, `"max_tokens":1024`, `"max_tokens":512`, 1)), gatewayConfig{Model: "fixture", ContextTokens: 32768, MaxOutputTokens: 1024})
+	smaller, err := ollamaRequest([]byte(strings.Replace(body, `"max_tokens":1024`, `"max_tokens":512`, 1)), Config{Model: "fixture", ContextTokens: 32768, MaxOutputTokens: 1024})
 	if err != nil || !strings.Contains(string(smaller), `"num_predict":512`) {
 		t.Fatal("child output cap enlarged", string(smaller), err)
 	}
 	for _, field := range []string{`,"frequency_penalty":1`, `,"reasoning_effort":"high"`, `,"tools":[]`} {
 		bad := strings.TrimSuffix(body, "}") + field + "}"
-		if _, err := ollamaRequest([]byte(bad), gatewayConfig{}); err == nil {
+		if _, err := ollamaRequest([]byte(bad), Config{}); err == nil {
 			t.Fatal("silently discarded unsupported control", field)
 		}
 	}

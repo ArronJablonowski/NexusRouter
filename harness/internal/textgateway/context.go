@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"encoding/json"
@@ -6,9 +6,9 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
-// contextMessages encodes host-assembled roles exactly for the single native
+// ContextMessages encodes host-assembled roles exactly for the single native
 // completion. Tool-bearing history requires a separately supported capability.
-func contextMessages(messages []providers.Message) ([]byte, error) {
+func ContextMessages(messages []providers.Message) ([]byte, error) {
 	if len(messages) == 0 {
 		return nil, nil
 	}

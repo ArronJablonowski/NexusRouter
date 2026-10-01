@@ -1,4 +1,4 @@
-package openclaw
+package textgateway
 
 import (
 	"context"
@@ -80,7 +80,7 @@ func TestGatewayDoesNotReleaseTruncatedCompletion(t *testing.T) {
 			}
 			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(stream))}, nil
 		})
-		base, key, verified, closeGateway, err := startGateway(context.Background(), c)
+		base, key, verified, closeGateway, err := Start(context.Background(), c)
 		if err != nil {
 			t.Fatal(err)
 		}
