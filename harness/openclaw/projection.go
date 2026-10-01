@@ -56,7 +56,7 @@ func ParseProjection(body []byte, exitCode int, provider, model string) (Project
 			Failures        int
 			TotalToolTimeMS float64
 		}
-		Usage   map[string]float64
+		Usage   map[string]json.RawMessage
 		CostUSD *float64
 	}
 	if json.Unmarshal(body, &e) != nil || e.OK == nil || !*e.OK || e.Status != "ok" || len(e.Error) != 0 || e.Provider != provider || e.Model != model || !identifier(e.SessionID) || e.AssistantTurns == nil || *e.AssistantTurns != 1 || (e.CodeModeEngaged != nil && *e.CodeModeEngaged) || strings.TrimSpace(e.Final) == "" || len(e.Final) > MaxTextBytes || len(e.Payloads) > 1024 {
@@ -70,7 +70,23 @@ func ParseProjection(body []byte, exitCode int, provider, model string) (Project
 	if t := e.ToolSummary; t != nil && (t.Calls != 0 || len(t.Tools) != 0 || t.Failures != 0 || t.TotalToolTimeMS != 0) {
 		return bad()
 	}
-	for _, count := range e.Usage {
+	for key, raw := range e.Usage {
+		if key == "cost" {
+			var costs map[string]float64
+			if json.Unmarshal(raw, &costs) != nil {
+				return bad()
+			}
+			for _, cost := range costs {
+				if math.IsNaN(cost) || math.IsInf(cost, 0) || cost < 0 {
+					return bad()
+				}
+			}
+			continue
+		}
+		var count float64
+		if json.Unmarshal(raw, &count) != nil {
+			return bad()
+		}
 		if math.IsNaN(count) || math.IsInf(count, 0) || count < 0 || count > 1<<53 || math.Trunc(count) != count {
 			return bad()
 		}

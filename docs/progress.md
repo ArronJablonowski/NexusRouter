@@ -9779,3 +9779,33 @@ Verification: `NEXUS_OPENCLAW_PROJECTION=1 go test -race ./harness/openclaw` pas
 process isolation, policy gateway integration, SDK routing and held-out quality
 qualification remain outstanding. This boundary is preparatory adapter work,
 not completed OpenClaw support. Full repository validation is queued separately.
+
+## OpenClaw isolated native configuration — DAR-132 (2026-10-01)
+
+Qualified the installed 2026.9.7 CLI with a disposable private configuration,
+workspace, home override and auth/state directories, scrubbed child environment,
+explicit built-in OpenClaw runtime, replaced model catalog, no fallbacks, plugins
+and skills disabled, and wildcard tool denial. The model endpoint received one
+loopback fixture completion with no tools and the exact 128-token output cap.
+No real provider, operator credential, live Gateway or production configuration
+was used. This is trusted-installation configuration isolation, not an OS sandbox.
+
+The native fixture found two differences from the pure projector fixture: usage
+includes a nested cost object, and current OpenClaw discards the legacy global
+contextTokens setting. Parsing now validates nested cost fields, and the generated
+configuration uses per-model contextWindow/contextTokens. The isolated directory
+must be empty, private and not a symlink; configuration is exclusively created
+with mode 0600, and only a loopback gateway URL is accepted. The child receives
+an ephemeral gateway token, never the upstream provider credential.
+
+`NEXUS_OPENCLAW_NATIVE=1 NEXUS_OPENCLAW_PROJECTION=1 go test -race ./harness/openclaw`
+passed (5.696s), including a real installed CLI round trip, one-dispatch/no-tool
+checks, projection parsing, directory/environment restrictions and the pure
+projector stop-reason ambiguity test. The native helper is not a production Run
+API: gateway response binding, artifact/config provenance, admission, bounded
+process cleanup, cancellation and SDK integration still need implementation.
+Full repository validation will run against this checkpoint before push.
+
+SSH follow-up: the separate frozen 7b8f3c1 checkpoint passed its entire make check
+and was pushed. Fresh remote branch lookup confirmed the exact SHA; DAR-133 was
+updated. Physical second-host qualification remains unverified.
