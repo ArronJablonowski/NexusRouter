@@ -127,7 +127,7 @@ func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req ap
 		switch {
 		case deliveryErr != nil || errors.Is(runErr, app.ErrEventDelivery):
 			code = "event_delivery_failed"
-		case errors.Is(runErr, app.ErrAdmission):
+		case errors.Is(runErr, app.ErrAdmission), errors.Is(runErr, app.ErrHarnessUnsupported):
 			code = "admission_denied"
 		case errors.Is(runErr, context.DeadlineExceeded) || r.Context().Err() == context.DeadlineExceeded:
 			code = "deadline_exceeded"

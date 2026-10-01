@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
@@ -62,7 +63,7 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil || r.Context().Err() != nil {
 		status, code, kind := 500, "task_failed", "server_error"
-		if errors.Is(err, app.ErrAdmission) {
+		if errors.Is(err, app.ErrAdmission) || errors.Is(err, app.ErrHarnessUnsupported) {
 			status, code, kind = 422, "admission_denied", "invalid_request_error"
 		}
 		if errors.Is(err, context.DeadlineExceeded) || r.Context().Err() == context.DeadlineExceeded {
@@ -104,9 +105,14 @@ func decodeChatRequest(body []byte) (app.Request, chatStreamOptions, error) {
 	bad := errors.New("unsupported or invalid chat request")
 	req := app.Request{}
 	stream := chatStreamOptions{}
-	fields, err := chatObject(body, "model", "messages", "stream", "stream_options")
+	fields, err := chatObject(body, "model", "messages", "stream", "stream_options", "harness_id")
 	if err != nil || chatString(fields["model"], &req.ModelID) != nil || strings.TrimSpace(req.ModelID) == "" || len(req.ModelID) > 256 {
 		return req, stream, bad
+	}
+	if raw, ok := fields["harness_id"]; ok {
+		if chatString(raw, &req.HarnessID) != nil || req.HarnessID == "" || len(req.HarnessID) > 128 || strings.TrimSpace(req.HarnessID) != req.HarnessID || strings.ContainsFunc(req.HarnessID, unicode.IsControl) {
+			return req, stream, bad
+		}
 	}
 	if raw, ok := fields["stream"]; ok {
 		if string(raw) != "true" && string(raw) != "false" {

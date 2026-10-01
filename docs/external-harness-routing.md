@@ -516,6 +516,24 @@ leaving it nil preserves the file registrations. An SDK-supplied HarnessEvidence
 store can be attached without replacing the configured list.
 
 This CLI path currently supports explicit, synchronous text tasks. Persistent
-operator evidence-store configuration for automatic learning, API selection,
-queued dispatch and tool-bearing tasks are still unfinished. No task can supply
+operator evidence-store configuration for automatic learning, queued dispatch
+and tool-bearing tasks are still unfinished. No task can supply
 an executable path or mutate these registrations through its request.
+
+## Authenticated chat API harness selection
+
+`POST /v1/chat/completions` accepts the optional NexusRouter extension
+`"harness_id":"<registration-id>"` alongside `model` and `messages`. The model
+must match the operator-registered pair. The existing bearer authentication,
+origin restrictions, capacity admission and execution deadline apply. Clients
+cannot supply executable paths, digests or registrations in the request. An
+omitted harness ID preserves ordinary model routing.
+
+Both ordinary JSON responses and `stream:true` are supported. Native harness
+text is released after durable completion; this is not incremental native token
+streaming. An unsupported selection returns an admission error (HTTP 422 for a
+non-streaming request, an SSE error frame without `[DONE]` after streaming headers).
+Malformed IDs and unknown registration fields fail before dispatch. This does
+not enable queued `/v1/tasks` harness execution or automatic pair selection in
+the operator service; persistent evidence-store configuration is still required
+for that learning path.

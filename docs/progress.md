@@ -10271,3 +10271,20 @@ passed. This is initial explicit synchronous CLI access, not finished API/queue/
 tool integration. Persistent operator evidence configuration for automatic
 learning is still required. Full gate queued before push; no live configuration
 or installed runtime changed.
+
+## Registered harness selection through chat API — DAR-132 (2026-10-01)
+
+Authenticated `/v1/chat/completions` requests now accept an optional `harness_id`
+for an operator-registered model/harness pair. Both JSON and SSE paths preserve
+host context and authority. Invalid IDs, duplicate fields and executable/config
+injection fail before dispatch. Unsupported selections produce admission errors;
+SSE errors after headers omit the success sentinel. Native text delivery uses the
+existing durable-completion path, not provisional native token streaming.
+
+Verification: full API race suite passed (89.683s), targeted vet, formatting/source
+limit and diff checks passed. Tests cover authorized context/selection forwarding,
+unauthorized non-dispatch, malformed/config injection and both error transports.
+Existing native SDK fixtures cover actual adapters; no real inference or live
+configuration changed. Full repository gate remains queued before push. Persistent
+operator learning-store configuration, queued tasks, tool workflows and held-out
+accuracy qualification remain open; this does not complete DAR-132.
