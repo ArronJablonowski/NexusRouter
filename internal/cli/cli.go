@@ -27,6 +27,7 @@ Usage:
     Queue new work from an exact recovered-history head; does not run inference
   nexus submissions list --db path [--state state --after cursor --limit 25]
   nexus submissions show|cancel|recoveries --db path --id submission-id
+  nexus remote help  Inspect and control explicitly paired remote instances
   nexus resources  Inspect current host memory and CPU capacity
   nexus doctor --config path  Inspect the running daemon and dependency health
   nexus providers list --config path  List safe configured provider metadata
@@ -94,6 +95,9 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 }
 
 func RunWithInput(args []string, stdin io.Reader, stdout, stderr io.Writer, version string) int {
+	if len(args) > 0 && args[0] == "remote" {
+		return runRemote(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "daemon" {
 		return runDaemonControl(args[1:], stdout, stderr)
 	}

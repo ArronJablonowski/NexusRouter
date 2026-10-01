@@ -11568,3 +11568,22 @@ admission matrix accepts branch/resume versions 2–7 and rejects versions 1/8
 (12.063s), with vet/source/diff checks. The older full check is still running and
 its failure remains preserved. A corrected descendant full check must run before
 push; targeted passes do not relabel the prior failure as a successful gate.
+
+### DAR-133 remote commands in the release executable
+
+Moved the remote CLI implementation/tests into internal/remotecli and wired
+`nexus remote` through the normal CLI input/output and signal lifecycle. The
+standalone nexus-remote command remains a thin compatibility entry point. Existing
+release builds already package cmd/nexus and derive its exact dependency closure,
+so remote support no longer depends on a separately built companion executable.
+No remote listener starts implicitly; explicit trust/configuration remains required.
+
+Shared CLI and main-entry integration race tests passed (1.427s/1.613s), including
+private expected-digest trust replacement, validation, help and supplied stderr.
+The first test fixture lacked a private parent directory; corrected its permissions
+without weakening trust validation. All four release targets (macOS arm64/amd64,
+Linux amd64/arm64) compiled with CGO disabled; native packaged remote help returned
+success. Standalone compatibility help and all shared CLI tests also passed.
+Vet/source/diff passed. Full repository validation/push remain queued. This is
+build inclusion, not signed release publication, native service installation or
+physical two-system qualification. OpenSSH is still an external SSH prerequisite.

@@ -5,7 +5,9 @@ instances. It dispatches independent native tasks through the existing SDK queue
 and destination dispatcher. It does not pool GPU memory, expose the ordinary
 local daemon API, or automatically trust discovered devices.
 
-The runnable entry point is `go run ./cmd/nexus-remote`. The reusable Go API is
+The main release binary exposes `nexus remote` (from source: `go run ./cmd/nexus remote`).
+The standalone `nexus-remote` command remains a compatibility entry point using the
+same `internal/remotecli` implementation. The reusable Go API is
 `remote.Client`, `remote.Server`, `remote.SDKBackend`, and `remote.TrustFile`.
 The destination host owns a dedicated normal runtime configuration and telemetry
 store. Do not point this experimental host at a running production daemon's
@@ -53,9 +55,9 @@ With a prepared `next-peers.json`, initial pairing and later updates are explici
 local administration operations:
 
 ```sh
-nexus-remote replace-trust --trust /private/nexus/peers.json --expected absent < next-peers.json
-nexus-remote validate-trust --trust /private/nexus/peers.json
-nexus-remote replace-trust --trust /private/nexus/peers.json --expected CURRENT_DIGEST < next-peers.json
+nexus remote replace-trust --trust /private/nexus/peers.json --expected absent < next-peers.json
+nexus remote validate-trust --trust /private/nexus/peers.json
+nexus remote replace-trust --trust /private/nexus/peers.json --expected CURRENT_DIGEST < next-peers.json
 ```
 
 Validation prints the current canonical registry digest. Updates take an exclusive
@@ -84,12 +86,18 @@ local destination administrator's task controls afterward.
 
 ## Host and client commands
 
-Build with `go build -o /desired/path/nexus-remote ./cmd/nexus-remote`.
+Build the main entry point with `go build -o /desired/path/nexus ./cmd/nexus`.
+For the compatibility executable, use `go build -o /desired/path/nexus-remote ./cmd/nexus-remote`.
+Existing release archives build `cmd/nexus`, so remote commands are included in
+the same executable and generated dependency closure. No extra network listener
+starts unless the operator explicitly runs `nexus remote serve`. OpenSSH remains
+an external runtime prerequisite for SSH transport. Packaging/native service
+installation and physical two-host qualification remain distinct checks.
 Start an explicitly configured listener; no service installation or existing
 listener modification happens automatically:
 
 ```sh
-nexus-remote serve --instance node-b --listen 192.168.1.20:8443 \
+nexus remote serve --instance node-b --listen 192.168.1.20:8443 \
   --trust /private/nexus/peers.json --cert /private/nexus/node.pem \
   --key /private/nexus/node-key.pem --ca /private/nexus/ca.pem \
   --journal /private/nexus/control --config /private/nexus/runtime.yaml
@@ -390,7 +398,7 @@ remain separate requirements.
 
 ## Exact configured harness identity preview
 
-`nexus-remote harness-identity --instance NODE --model MODEL --harness REGISTRATION
+`nexus remote harness-identity --instance NODE --model MODEL --harness REGISTRATION
 --context 32768` (with the usual trust/certificate flags) requests a configured
 identity for that exact model/registration/context. The Go client exposes
 `HarnessIdentity`; the transport is `GET /v1/remote/harness-identity` with
@@ -474,7 +482,7 @@ accuracy ranking remain separate work.
 
 ## Reconcile completed remote harness evidence
 
-`nexus-remote reconcile --routes /private/nexus/caller-routes --evidence
+`nexus remote reconcile --routes /private/nexus/caller-routes --evidence
 /private/nexus/remote-evidence --request KEY` takes the saved exact task JSON on
 stdin and the usual trust/certificate flags. The saved route selects the
 instance; an optional `--instance` must agree. The task must have pinned
@@ -508,7 +516,7 @@ provided by this reconciliation step.
 
 `reconcile` returns `receipt`, `receipt_sha256` and `execution_sha256`. Preserve that receipt and
 review the exact remote result it identifies. An authorized local operator can
-then use `nexus-remote review --routes /private/nexus/caller-routes --evidence
+then use `nexus remote review --routes /private/nexus/caller-routes --evidence
 /private/nexus/remote-evidence --request KEY --review /private/nexus/review.json`
 with the usual trust/certificate flags and the exact saved task JSON on stdin.
 The optional `--instance` must match the saved destination. The review file must
@@ -623,7 +631,7 @@ CLI input from untrusted candidate claims. Those integration requirements remain
 
 ## Measured harness capacity
 
-`nexus-remote harness-capacity --model MODEL --harness REGISTRATION --context
+`nexus remote harness-capacity --model MODEL --harness REGISTRATION --context
 TOKENS` uses the normal destination/trust/certificate flags over HTTPS or SSH.
 The Go method is `Client.HarnessCapacity`; the endpoint is
 `GET /v1/remote/harness-capacity` with the identity-preview headers. Both paired
@@ -652,7 +660,7 @@ credential collection, evaluation scheduling and UI integration remain open.
 
 ### Fresh harness prerequisites
 
-`nexus-remote harness-readiness --model MODEL --harness REGISTRATION --context
+`nexus remote harness-readiness --model MODEL --harness REGISTRATION --context
 TOKENS` observes the configured executable SHA-256, credential presence, and
 provider model inventory through HTTPS or SSH. Paired model/harness and cloud
 permissions are checked before file, secret or provider access. The SDK callback
