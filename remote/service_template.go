@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net"
+	"net/netip"
 	"path"
 	"strconv"
 	"strings"
@@ -16,18 +17,21 @@ import (
 // never reads credentials, writes files, installs a service or opens a socket.
 // Both templates are per-user services, not privileged system services.
 type ServiceTemplateSpec struct {
-	Platform         string
-	Executable       string
-	WorkingDirectory string
-	OwnerDirectory   string
-	Instance         string
-	Listen           string
-	Config           string
-	Journal          string
-	Trust            string
-	Certificate      string
-	Key              string
-	CA               string
+	Platform           string
+	Executable         string
+	WorkingDirectory   string
+	OwnerDirectory     string
+	Instance           string
+	Listen             string
+	Config             string
+	Journal            string
+	Trust              string
+	Certificate        string
+	Key                string
+	CA                 string
+	AdvertiseInterface string
+	AdvertiseName      string
+	AdvertiseSSHPort   int
 }
 
 func servicePath(value string) bool {
@@ -35,7 +39,7 @@ func servicePath(value string) bool {
 }
 
 // RenderServiceTemplate emits either a launchd agent plist or a systemd user
-// unit. It does not enable discovery or SSH server installation. Operators must
+// unit. Discovery requires explicit options; it never installs an SSH server. Operators must
 // separately validate filesystem permissions, credentials and runtime readiness.
 func RenderServiceTemplate(s ServiceTemplateSpec) ([]byte, error) {
 	if (s.Platform != "launchd" && s.Platform != "systemd") || !id(s.Instance) {
@@ -55,6 +59,16 @@ func RenderServiceTemplate(s ServiceTemplateSpec) ([]byte, error) {
 		return nil, ErrInvalid
 	}
 	args := []string{s.Executable, "remote", "serve", "--instance", s.Instance, "--listen", s.Listen, "--config", s.Config, "--journal", s.Journal, "--trust", s.Trust, "--cert", s.Certificate, "--key", s.Key, "--ca", s.CA}
+	if s.AdvertiseInterface != "" || s.AdvertiseName != "" || s.AdvertiseSSHPort != 0 {
+		address, err := netip.ParseAddr(host)
+		if err != nil || !address.Is4() || !address.IsPrivate() || !id(s.AdvertiseInterface) || !discoveryDNSName(s.AdvertiseName) || s.Instance != strings.ToLower(s.Instance) || s.AdvertiseSSHPort < 0 || s.AdvertiseSSHPort > 65535 {
+			return nil, ErrInvalid
+		}
+		args = append(args, "--advertise-interface", s.AdvertiseInterface, "--advertise-name", s.AdvertiseName)
+		if s.AdvertiseSSHPort != 0 {
+			args = append(args, "--advertise-ssh-port", strconv.Itoa(s.AdvertiseSSHPort))
+		}
+	}
 	if s.Platform == "launchd" {
 		return renderLaunchAgent(s, args), nil
 	}

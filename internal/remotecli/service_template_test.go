@@ -19,6 +19,12 @@ func TestServiceTemplateDoesNotRequireOrCreateLiveFiles(t *testing.T) {
 	output.Reset()
 	args = append(args, "--advertise-interface", "en0")
 	if err := Run(context.Background(), args, bytes.NewReader(nil), &output, &diagnostic); err == nil || output.Len() != 0 {
-		t.Fatal("unknown service option accepted")
+		t.Fatal("incomplete discovery configuration accepted")
+	}
+	output.Reset()
+	diagnostic.Reset()
+	args = append(args, "--advertise-name", "node-a", "--advertise-ssh-port", "22")
+	if err := Run(context.Background(), args, bytes.NewReader(nil), &output, &diagnostic); err != nil || !strings.Contains(output.String(), "--advertise-ssh-port") || diagnostic.Len() != 0 {
+		t.Fatal("explicit discovery template", err, output.String(), diagnostic.String())
 	}
 }

@@ -105,3 +105,49 @@ func TestLaunchdTemplateNativePlistDecoding(t *testing.T) {
 		t.Fatal(parsed)
 	}
 }
+
+func TestServiceTemplateExplicitDiscovery(t *testing.T) {
+	for _, platform := range []string{"launchd", "systemd"} {
+		s := serviceFixture()
+		s.Platform = platform
+		s.AdvertiseInterface = "en1"
+		s.AdvertiseName = "node-a"
+		s.AdvertiseSSHPort = 22
+		body, err := RenderServiceTemplate(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, value := range []string{"--advertise-interface", "en1", "--advertise-name", "node-a", "--advertise-ssh-port", "22"} {
+			if !strings.Contains(string(body), value) {
+				t.Fatal("missing explicit argument", platform, value)
+			}
+		}
+		s.AdvertiseSSHPort = 0
+		body, err = RenderServiceTemplate(s)
+		if err != nil || strings.Contains(string(body), "--advertise-ssh-port") {
+			t.Fatal("invented SSH advertisement", err)
+		}
+	}
+	for name, mutate := range map[string]func(*ServiceTemplateSpec){
+		"missing interface": func(s *ServiceTemplateSpec) { s.AdvertiseInterface = "" },
+		"missing name":      func(s *ServiceTemplateSpec) { s.AdvertiseName = "" },
+		"interface newline": func(s *ServiceTemplateSpec) { s.AdvertiseInterface = "en1\nBad" },
+		"name injection":    func(s *ServiceTemplateSpec) { s.AdvertiseName = "a$HOME" },
+		"public address":    func(s *ServiceTemplateSpec) { s.Listen = "8.8.8.8:443" },
+		"loopback":          func(s *ServiceTemplateSpec) { s.Listen = "127.0.0.1:443" },
+		"IPv6":              func(s *ServiceTemplateSpec) { s.Listen = "[fd00::1]:443" },
+		"large SSH port":    func(s *ServiceTemplateSpec) { s.AdvertiseSSHPort = 65536 },
+		"negative SSH port": func(s *ServiceTemplateSpec) { s.AdvertiseSSHPort = -1 },
+		"mixed instance":    func(s *ServiceTemplateSpec) { s.Instance = "Node-A" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := serviceFixture()
+			s.AdvertiseInterface = "en1"
+			s.AdvertiseName = "node-a"
+			mutate(&s)
+			if b, e := RenderServiceTemplate(s); e == nil || len(b) != 0 {
+				t.Fatal("invalid discovery rendered")
+			}
+		})
+	}
+}

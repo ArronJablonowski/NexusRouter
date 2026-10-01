@@ -1457,15 +1457,15 @@ membership hides and invalidates pending results. Pairing still requires explici
 identity verification, permission review and the current trust-registry digest.
 The discovery endpoint never writes the registry or contacts the task endpoint.
 
-Browser behavior and BFF authority tests use synthetic discovery results. Actual
-multicast discovery between physical hosts still requires qualification; the
-Settings control being available is not evidence that a peer is reachable.
+Browser behavior and BFF authority tests use synthetic discovery results. The
+separate physical Mac-to-Spark IPv4 fixture also passes; that does not make the
+Settings control itself evidence that an arbitrary peer is reachable.
 
 ### Generate a per-user remote-host service template
 
 `nexus remote service-template` renders a launchd agent or systemd user unit to
 standard output. It does not inspect credentials, create directories, install or
-start a service, change trust, or enable discovery. Use the main `nexus` binary
+start a service or change trust. Discovery is omitted by default. Use the main `nexus` binary
 (the template invokes `nexus remote serve`), not the compatibility executable.
 For example, replace every illustrative path and address before use:
 
@@ -1479,6 +1479,15 @@ nexus remote service-template --platform launchd \
   --trust /private/nexus/peers.json --cert /private/nexus/cert.pem \
   --key /private/nexus/key.pem --ca /private/nexus/ca.pem
 ```
+
+To include explicit LAN advertising in the generated service, add
+`--advertise-interface INTERFACE --advertise-name TLS_NAME`, optionally with
+`--advertise-ssh-port PORT`. The renderer requires both interface and name, a
+private IPv4 listener, a lowercase instance and a valid optional SSH port.
+It does not read certificates or enumerate remote interfaces. At service
+startup, the host checks interface ownership and certificate identity/validity
+before opening its discovery responder; discovery still confers no trust. The
+SSH port is only a hint and does not configure or install an SSH server.
 
 Use `--platform systemd` for a Linux user unit and Linux paths. Every path must be
 absolute and normalized. The working directory must exist. The owner directory

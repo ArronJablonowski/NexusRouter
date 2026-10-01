@@ -1765,3 +1765,20 @@ network interoperability, IPv6, fragmented bundles, external-harness crash side
 effects, power loss and production deployment remain open. Only the previous
 waiting gate was superseded; combined full validation/ordinary push queued
 behind the live frozen systemd checkpoint.
+
+## 2026-10-01: Optional discovery in installed-service templates
+
+Closed a configuration gap: the standalone remote host could advertise but
+service-template generation could not preserve those settings. Added explicit
+advertise-interface/name/optional SSH-port fields and CLI flags to launchd and
+systemd templates. Defaults omit discovery. Incomplete names/interfaces, invalid
+SSH ports, non-private/non-IPv4 listeners and mixed-case advertised IDs reject
+without output. Rendering remains free of filesystem/network/service mutation;
+actual certificate and interface ownership checks stay at host startup.
+
+Focused template race tests passed (remote1.913s/CLI1.565s), complete remote/CLI
+race suites passed (26.714s/1.578s), vet/source/diff passed. Tests cover defaults,
+explicit argv and incomplete/unsafe settings. No live installed service changed;
+new advertised templates still need native-manager discovery qualification.
+Full combined repository validation/ordinary push remains queued behind the
+live systemd gate; only preceding waiting checkpoint superseded.

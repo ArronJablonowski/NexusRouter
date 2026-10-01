@@ -22,6 +22,9 @@ func serviceTemplate(args []string, output, diagnostic io.Writer) error {
 	f.StringVar(&s.Certificate, "cert", "", "absolute PEM certificate path")
 	f.StringVar(&s.Key, "key", "", "absolute private PEM key path")
 	f.StringVar(&s.CA, "ca", "", "absolute trusted CA PEM path")
+	f.StringVar(&s.AdvertiseInterface, "advertise-interface", "", "opt-in private IPv4 DNS-SD interface; validated on host startup")
+	f.StringVar(&s.AdvertiseName, "advertise-name", "", "explicit advertised TLS DNS name; certificate checked on startup")
+	f.IntVar(&s.AdvertiseSSHPort, "advertise-ssh-port", 0, "optional SSH port hint; does not install an SSH server")
 	if err := f.Parse(args); err != nil {
 		return err
 	}
