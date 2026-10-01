@@ -259,3 +259,32 @@ be presented as provider-measured usage. Durable usage/cost accounting, ordinary
 quality-review ingestion into the joint ledger, automatic model/harness selection,
 CLI/API registration, native Ollama support, tools and other harness adapters
 remain outstanding. A successful execution alone creates no quality vote.
+
+
+## SDK outcome reconciliation and evaluated feedback
+
+The embedding host opens a private `harness.EvidenceStore` and owns its lifetime.
+After an SDK task completes, call
+`client.ReconcileHarnessOutcome(ctx, ledger, taskID)` to copy the canonical
+completed outcome into that ledger. The SDK reads its configured task journal;
+it accepts neither caller-provided execution identity nor an imported output.
+Reconciliation is idempotent and never performs inference or assigns quality.
+If a write is uncertain, retry reconciliation rather than rerunning the task.
+
+After evaluating that exact output, an authenticated operator/evaluator may call
+`client.ReviewHarnessOutcome(ctx, ledger, taskID, review)`. The review must bind
+`ExecutionDigest` to the canonical outcome, identify its actual method, reviewer
+and rubric version, and use the exact `ExpectedHead` for a revision. The embedding
+host must authenticate the reviewer and method; a string identifying a human or
+AI is not authentication. Never expose this method as a model tool or unprotected
+remote endpoint. Failed, canceled, incomplete and non-harness tasks are rejected.
+The existing model-only `Feedback` API does not stand in for this joint evidence.
+
+Identical retries preserve one vote, including replay after a later revision;
+withdrawal removes the active vote without rewriting history. The existing
+`Snapshot` and accuracy-first `harness.Select` consume these current heads with
+method-specific confidence and exact model/harness/configuration/task binding.
+This SDK bridge makes evaluated outcomes available to selection; automatic
+invocation of evaluation and automatic route dispatch remain separate unfinished
+integration work. A completed run still contributes no quality sample until an
+actual bound evaluation is supplied.

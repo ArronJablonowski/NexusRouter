@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -109,6 +111,23 @@ func TestSDKNativePiUsesAdmissionContextAndDurableEvents(t *testing.T) {
 	page, err := client.ReadEvents(context.Background(), result.TaskID, 0, 10)
 	if err != nil || page.State != "completed" || len(page.Events) != 2 || page.Events[1].Data.HarnessOutcome == nil {
 		t.Fatal("missing canonical SDK native events", page, err)
+	}
+
+	ledger, err := harness.OpenEvidenceStore(filepath.Join(t.TempDir(), "learning"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ledger.Close()
+	outcome, err := client.ReconcileHarnessOutcome(context.Background(), ledger, result.TaskID)
+	if err != nil || outcome != *result.HarnessOutcome {
+		t.Fatal("SDK reconciliation lost native provenance", outcome, err)
+	}
+	digest, _ := outcome.Digest()
+	review := harness.Review{Version: 1, ID: "native-fixture-review", ExecutionDigest: digest, Verdict: "passed", Method: "deterministic", MethodVersion: "exact-fixture-text-v1", Reviewer: "sdk-native-test", Confidence: 1, Quality: 1, CreatedAt: time.Now().UTC()}
+	// This test's explicit equality check above supplies the fixture verdict;
+	// ordinary completion never synthesizes a review.
+	if err := client.ReviewHarnessOutcome(context.Background(), ledger, result.TaskID, review); err != nil {
+		t.Fatal(err)
 	}
 	if result.Usage != nil {
 		t.Fatal("harness normalized usage mislabeled provider-measured")

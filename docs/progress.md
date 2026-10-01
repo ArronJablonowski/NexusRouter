@@ -9658,3 +9658,21 @@ persistence, CLI/API configuration and remaining native adapters. Registration
 currently requires openai_compatible; Ollama needs a native bridge preserving its
 context/output options. Reported usage is deliberately not exposed as measured
 usage. No live deployment or benchmark inference was performed.
+
+
+## Canonical SDK harness learning bridge — DAR-132 (2026-10-01)
+
+Added SDK ReconcileHarnessOutcome and ReviewHarnessOutcome for the host-owned
+joint evidence ledger. Both use the client's canonical journal; reviews must bind
+the exact completed output and retain authenticated-host reviewer/method metadata
+and expected-current-head revisions. No arbitrary outcome import, task rerun,
+model-only feedback substitution or automatic pass verdict is introduced.
+
+SDK evidence race tests verify pending-without-quality, exact retry, wrong-output
+binding rejection, failed-lineage rejection, stale-head rejection, restart/reopen,
+revision retention and withdrawal. The installed-Pi SDK test also reconciles its
+actual canonical result and writes a deterministic fixture-content review without
+another provider dispatch. Automatic evaluation scheduling and joint route
+selection/dispatch remain open; this is an integration checkpoint, not DAR-132
+completion. The waiting SDK full-gate supervisor was stopped before starting;
+other gate processes were left untouched, and this checkpoint will replace it.
