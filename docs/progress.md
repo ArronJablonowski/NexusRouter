@@ -10913,3 +10913,25 @@ real-model quality result or browser UI verification. Other harness native tool
 adapters and held-out accuracy evidence remain open. The earlier SDK full gate
 is still running; its known releasepack failures have a separately verified
 correction on this branch. A fresh complete gate is required before pushing.
+
+### 2026-10-01 — DAR-132 OpenHands host tool embedding
+
+Implemented native SDK 1.50.1 tool execution through the existing host-owned agent
+runtime and authenticated gateway. The bridge exposes only host schemas, maps
+native action IDs without trusting child arguments, enforces sequential execution,
+returns concrete registered observations, and rejects unsupported/error lifecycles.
+Its final text must equal the independently verified gateway result. Resource
+admission, scoped execution, journal-before-effect, cancellation and per-turn usage
+use existing host mechanisms. Native tools have a separate configuration-bound
+identity and immutable configuration snapshot; legacy text mode stays separate.
+
+Initial installed-SDK agent race qualification passed (25.363s). Expanded coverage
+adds cancellation inside a tool, turn-budget rejection and identity snapshot checks.
+Application/SDK registration remains Pi-only; OpenHands integration there, real
+approval-controlled writes and held-out quality evidence are still required.
+No live service or model inference was used. Full checkpoint validation/push will
+queue behind the existing SDK gate; its frozen checkout remains untouched.
+
+Expanded full OpenHands package race suite, including all installed-SDK native
+cases and legacy text regressions, passed (45.135s). Targeted vet, source formatting
+and diff checks passed. No full-repository pass or push is claimed yet.

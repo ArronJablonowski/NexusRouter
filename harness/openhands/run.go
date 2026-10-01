@@ -88,7 +88,11 @@ func (c Config) validate() error {
 // Run performs one admitted isolated text-only execution. The native process
 // must exit and its projection must bind to the gateway's verified response.
 // Incomplete, canceled or uncertain runs return no accepted output and no retry.
-func Run(ctx context.Context, c Config, prompt string) (result Result, runErr error) {
+func Run(ctx context.Context, c Config, prompt string) (Result, error) {
+	return runConfigured(ctx, c, prompt, nil)
+}
+
+func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExecution) (result Result, runErr error) {
 	if ctx == nil || ctx.Err() != nil || c.validate() != nil || !utf8.ValidString(prompt) || strings.TrimSpace(prompt) == "" || len(prompt) > MaxRecordBytes/2 {
 		return Result{}, ErrProjection
 	}
@@ -103,6 +107,9 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 		return Result{}, ErrProjection
 	}
 	identity, err := c.Identity()
+	if agent != nil {
+		identity, err = agent.identity, nil
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -150,17 +157,40 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			runErr = ErrRun
 		}
 	}()
-	base, key, verified, closeGateway, err := textgateway.Start(ctx, textgateway.Config{DefaultMissingOutputLimit: true, UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages})
+	var base, key string
+	var closeGateway func()
+	var gateway *textgateway.AgentGateway
+	gatewayConfig := textgateway.Config{DefaultMissingOutputLimit: true, UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages}
+	if agent == nil {
+		base, key, verified, closeGateway, err = textgateway.Start(ctx, gatewayConfig)
+	} else {
+		gateway, err = textgateway.StartAgent(ctx, textgateway.AgentConfig{Config: gatewayConfig, Actual: identity, Session: agent.session, Tools: agent.config.Tools})
+		if err == nil {
+			base, key, closeGateway = gateway.BaseURL, gateway.Token, gateway.Close
+		}
+	}
 	if err != nil {
 		return Result{}, err
 	}
 	defer closeGateway()
+
 	env := []string{"PATH=/usr/bin:/bin", "HOME=" + dir, "OPENHANDS_SUPPRESS_BANNER=1", "LITELLM_LOCAL_MODEL_COST_MAP=True"}
 	bridge := filepath.Join(dir, "bridge.py")
-	if err := os.WriteFile(bridge, []byte(bridgeSource), 0600); err != nil {
+	source := bridgeSource
+	if agent != nil {
+		source = agentBridgeSource
+	}
+	if err := os.WriteFile(bridge, []byte(source), 0600); err != nil {
 		return Result{}, ErrRun
 	}
-	config, err := json.Marshal(map[string]any{"base_url": base, "api_key": key, "model": "openai/" + c.Model, "workspace": dir, "max_output_tokens": c.MaxOutputTokens, "context_tokens": c.ContextTokens, "timeout_seconds": int(math.Ceil(c.Timeout.Seconds()))})
+	settings := map[string]any{"base_url": base, "api_key": key, "model": "openai/" + c.Model, "workspace": dir, "max_output_tokens": c.MaxOutputTokens, "context_tokens": c.ContextTokens, "timeout_seconds": int(math.Ceil(c.Timeout.Seconds()))}
+	if agent != nil {
+		entries, _ := agentToolEntries(agent.config.Tools)
+		settings["tools"] = entries
+		settings["tool_token"] = gateway.ToolToken
+		settings["max_turns"] = agent.config.MaxTurns
+	}
+	config, err := json.Marshal(settings)
 	if err != nil {
 		return Result{}, ErrProjection
 	}
@@ -181,6 +211,13 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	projection, err := ParseProjection(output.data, command.ProcessState.ExitCode(), "openai/"+c.Model)
 	if err != nil {
 		return Result{}, err
+	}
+	if agent != nil {
+		text, e := gateway.Final()
+		if e != nil || projection.Text != text {
+			return Result{}, ErrProjection
+		}
+		return Result{Text: text, Identity: identity}, nil
 	}
 	completion, err := verified()
 	if err != nil || projection.Text != completion.Text {

@@ -791,3 +791,29 @@ cancellation leave no file or successful harness outcome; a late decision after
 cancellation is rejected. The approval inspection excludes raw file content.
 These tests exercise the durable API workflow, not browser presentation or model
 accuracy.
+
+## OpenHands host tool embedding
+
+`openhands.AgentConfig`, `RunAgentTask`, and `RunAgent` add native SDK 1.50.1
+host-tool execution. This is an embedding entry point; normal application/SDK
+`native_tools` registration remains Pi-only until its routing integration is added.
+Supply the ordinary fenced/redacting journal, policy transport, resource admission
+and scoped approval/schema-enforcing executor. The native child cannot grant tool
+permissions or supply authoritative tool arguments.
+
+The private bridge registers only host schemas, disables default tools and MCP,
+and uses one tool worker. It maps each native action object to its emitted call ID
+and sends only that ID to the authenticated host bridge. Canonical arguments,
+effects, redacted results and per-turn usage remain in the shared host gateway and
+runtime. Native errors are sticky; observations must match host results, and final
+text must match the gateway's verified final response. No automatic retry,
+compaction, critic, local shell or aggregate child usage is enabled.
+
+The `openhands-sdk-tools-v1` identity binds the bridge source, schemas, turn limit
+and existing pinned runtime/model/transport configuration. It cannot reuse legacy
+text-only quality evidence. A completed task still requires quality feedback.
+Installed-SDK fixture qualification covers normal/recoverable/end-tool flows,
+policy denial, cancellation before dispatch and during a tool, turn limits,
+wrong-model refusal, OpenAI-compatible and Ollama delivery, canonical usage and
+completed-task replay rejection. This is not a real-model accuracy benchmark or
+application/approval UI qualification.
