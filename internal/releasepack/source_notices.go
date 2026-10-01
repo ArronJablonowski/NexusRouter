@@ -44,6 +44,7 @@ func appendSourceNotices(root *os.Root, files []noticeFile, sources []string) ([
 	}
 	previous := ""
 	var sourceBytes int64
+	var combined bytes.Buffer
 	for _, source := range sources {
 		if source == previous {
 			continue
@@ -87,17 +88,18 @@ func appendSourceNotices(root *os.Root, files []noticeFile, sources []string) ([
 		}
 		sourceHash := sha256.Sum256(body)
 		extracted := []byte("Attribution comments from target-selected Go source: " + source + "\nSource-SHA-256: " + hex.EncodeToString(sourceHash[:]) + "\n\n" + comments.String())
-		digest := sha256.Sum256([]byte(source))
-		name := "NOTICE-SOURCE-" + hex.EncodeToString(digest[:]) + ".txt"
-		if names[name] || len(files) >= 1000 {
-			return nil, ErrInvalid
-		}
-		names[name] = true
 		total += len(extracted)
 		if total > maxNotice {
 			return nil, ErrInvalid
 		}
-		files = append(files, noticeFile{Name: name, Body: extracted})
+		combined.Write(extracted)
+	}
+	if combined.Len() > 0 {
+		const name = "NOTICE-SOURCE-ATTRIBUTIONS.txt"
+		if names[name] || len(files) >= 1000 {
+			return nil, ErrInvalid
+		}
+		files = append(files, noticeFile{Name: name, Body: combined.Bytes()})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
 	return files, nil

@@ -412,8 +412,8 @@ not authority to infer or waive a decision.
 
 The notices collector supplements module-root legal files with attribution
 comments from third-party Go files selected by `go list` for each release target.
-Derived `NOTICE-SOURCE-<path-sha256>.txt` entries contain the module-relative
-source path, complete source SHA-256 and original matched comment bytes. They are
+One derived `NOTICE-SOURCE-ATTRIBUTIONS.txt` entry per module contains the module-relative
+source paths, complete source SHA-256 values and original matched comment bytes. These are
 derived evidence, not files that can be copied by that name from the module cache.
 Reconstruct them through the same notice collector when checking evidence.
 Repeated identical comments within one source appear once. The collector retains

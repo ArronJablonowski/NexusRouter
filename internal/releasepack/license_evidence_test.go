@@ -27,6 +27,8 @@ func TestRepositoryLicenseEvidenceDerivation(t *testing.T) {
 	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(marker) {
 		t.Fatal("ambient user cache was consulted", err)
 	}
+	raw, _ := json.MarshalIndent(record, "", "  ")
+	t.Logf("record bytes=%d limit=%d", len(raw)+1, maxLicenseEvidence)
 	body, err := marshalLicenseEvidence(record)
 	if err != nil || len(body) == 0 || len(record.Targets) != 4 {
 		t.Fatal("repository evidence contract", err)

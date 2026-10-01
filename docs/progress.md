@@ -2075,3 +2075,14 @@ source-format/size gates passed. Initial broad keyword collection exceeded the
 notice bound; final selection plus exact-comment deduplication passes without
 raising it. Previous candidate and license records remain immutable; this source
 requires new candidate/evidence and full validation before normal backup.
+
+### Follow-up — keep expanded attribution evidence within its bound
+
+The first clean bootstrap freeze for39ebadd failed. A real four-target derivation
+isolated the cause: one record per source produced287264 bytes against the
+unchanged262144-byte evidence limit. Preserved diagnostic log externally. Group
+source sections into one NOTICE-SOURCE-ATTRIBUTIONS.txt per module, retaining
+every selected source path/hash and unique original comment. This reduces record
+metadata without dropping attribution or increasing either safety bound. The
+actual repository evidence-derivation test now reports its canonical byte size.
+The waiting39ebadd validation was superseded before it ran; dc73f7f remains live.
