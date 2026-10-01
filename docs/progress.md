@@ -11108,3 +11108,21 @@ This checkpoint supplies RunAgent/RunAgentTask only. Hermes native_tools SDK/app
 registration, broader approval/HTTP/CLI qualification and real-model comparisons
 remain outstanding. Full repository validation and push are queued behind the
 previous frozen branch's live gate; no deployment is claimed.
+
+### DAR-132: Hermes tools through SDK, HTTP and CLI
+
+Hermes native_tools registrations now use the common native agent lifecycle in
+SDK/application routing, with source/runtime pins, local-model policy, tool-scope
+identity and queue binding. The text-only adapter remains separate. Configured
+Hermes registrations retain hermes_source_dir when constructed through the SDK.
+
+Installed Hermes passed all eight SDK fixture modes (25.350s race driver): read,
+approved create, deny, contract, root escape, automatic selection, queue and YAML
+configuration. HTTP plain/streaming/contract/cancellation and durable operator
+approve/deny/cancel qualification passed (23.285s); compiled CLI plain/JSON output
+and admission rejection of unreviewable writes passed (7.327s). Shared constructor,
+identity and config race checks passed (1.892/1.371s), along with targeted vet and
+source/diff checks. Tests use controlled providers; they do not rank real models.
+Full make check and push are queued behind the previous live frozen gate. No
+service was deployed. OpenClaw native host tools, real-model comparative runs and
+remaining remote-routing product/physical-host qualification remain outstanding.

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
+	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -47,7 +48,26 @@ func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
 		e = nil
 	}
-	var runtimeDigest string
+	var runtimeDigest, source string
+	if kind == "hermes" {
+		source = "/Users/aj_lobster/.hermes/hermes-agent"
+		sum := sha256.Sum256([]byte(source))
+		key := hex.EncodeToString(sum[:])[:16]
+		facts, err := os.ReadFile(filepath.Join("/Users/aj_lobster/.hermes/installs", key, "facts.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var state struct {
+			Packages struct{ Venv struct{ Environment string } }
+		}
+		if json.Unmarshal(facts, &state) != nil || state.Packages.Venv.Environment == "" {
+			t.Fatal("missing Hermes runtime")
+		}
+		executable = filepath.Join(state.Packages.Venv.Environment, "bin", "python")
+		digest := sha256.Sum256(facts)
+		runtimeDigest = hex.EncodeToString(digest[:])
+		e = nil
+	}
 	if kind == "openhands" {
 		executable = os.Getenv("NEXUS_OPENHANDS_PYTHON")
 		var manifest []byte
@@ -113,7 +133,7 @@ func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 			cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: provider.URL, RequestTimeout: "15s"}}
 			zero := 0.0
 			cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}, EstimatedCost: &zero}}
-			cfg.NativeHarnesses = []config.NativeHarness{{ID: "native-tools", Kind: kind, RuntimeSHA256: runtimeDigest, NativeTools: true, ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
+			cfg.NativeHarnesses = []config.NativeHarness{{ID: "native-tools", Kind: kind, RuntimeSHA256: runtimeDigest, HermesSourceDir: source, NativeTools: true, ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(pin[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
 			if mode == "deny_create" {
 				cfg.Tools.CreateEnabled = true
 				cfg.Tools.CreateRoot = root
@@ -214,4 +234,11 @@ func TestCLINativeGooseHostTools(t *testing.T) {
 		t.Skip("requires installed Goose")
 	}
 	testCLINativeHostTools(t, "goose", goose.AgentAdapterVersion)
+}
+
+func TestCLINativeHermesHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_HERMES_NATIVE") != "1" {
+		t.Skip("requires installed Hermes")
+	}
+	testCLINativeHostTools(t, "hermes", hermes.AgentAdapterVersion)
 }

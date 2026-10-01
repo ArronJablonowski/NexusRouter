@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
+	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -15,12 +16,15 @@ import (
 )
 
 func TestNativeToolsIdentityAndConstructorSnapshot(t *testing.T) {
-	for _, kind := range []string{"pi", "openhands", "goose"} {
+	for _, kind := range []string{"pi", "openhands", "goose", "hermes"} {
 		t.Run(kind, func(t *testing.T) { testNativeToolsSnapshot(t, kind) })
 	}
 }
 func testNativeToolsSnapshot(t *testing.T, kind string) {
 	adapter := pi.AgentAdapterVersion
+	if kind == "hermes" {
+		adapter = hermes.AgentAdapterVersion
+	}
 	if kind == "goose" {
 		adapter = goose.AgentAdapterVersion
 	}
@@ -32,7 +36,7 @@ func testNativeToolsSnapshot(t *testing.T, kind string) {
 	cfg.Tools.Enabled = false
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:11434", RequestTimeout: "15s"}}
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, ContextTokens: 16384, Capabilities: []string{"chat"}}}
-	cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-local", NativeTools: true, Kind: kind, RuntimeSHA256: strings.Repeat("b", 64), ModelID: "chat", Executable: "/operator/pi", ExecutableSHA256: strings.Repeat("a", 64), ModelRevision: "v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
+	cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-local", NativeTools: true, Kind: kind, HermesSourceDir: "/operator/hermes", RuntimeSHA256: strings.Repeat("b", 64), ModelID: "chat", Executable: "/operator/pi", ExecutableSHA256: strings.Repeat("a", 64), ModelRevision: "v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
 	extension := func(scope string) *tools.Extension {
 		e, err := tools.NewExtension([]tools.Definition{{Tool: providers.Tool{Name: "lookup", Parameters: json.RawMessage(`{"type":"object"}`)}, Scope: scope, ReadOnly: true, Behavior: runtime.BehaviorReadOnly, Handler: func(context.Context, json.RawMessage) (runtime.ToolResult, error) {
 			t.Fatal("registration invoked tool")

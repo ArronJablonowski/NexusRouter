@@ -16,6 +16,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/approvals"
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
+	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
@@ -233,4 +234,11 @@ func TestHTTPNativeGooseDurableOperatorApproval(t *testing.T) {
 		t.Skip("requires installed Goose")
 	}
 	testHTTPNativeApproval(t, "goose", goose.AgentAdapterVersion)
+}
+
+func TestHTTPNativeHermesDurableOperatorApproval(t *testing.T) {
+	if os.Getenv("NEXUS_HERMES_NATIVE") != "1" {
+		t.Skip("requires installed Hermes")
+	}
+	testHTTPNativeApproval(t, "hermes", hermes.AgentAdapterVersion)
 }

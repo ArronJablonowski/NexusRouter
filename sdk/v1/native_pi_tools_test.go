@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
+	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -128,7 +129,7 @@ func nativeSDKHostTools(t *testing.T, kind, adapterVersion string) {
 				}
 				if mode == "configured" {
 					h := o.NativeHarnesses[0]
-					c.NativeHarnesses = []config.NativeHarness{{ID: h.ID, Kind: h.Kind, ModelID: h.ModelID, NativeTools: true, Executable: h.Executable, ExecutableSHA256: h.ExecutableSHA256, RuntimeSHA256: h.RuntimeSHA256, ModelRevision: h.ModelRevision, MaxOutputTokens: h.MaxOutputTokens, OverheadRAMBytes: h.OverheadRAMBytes, Prices: &config.NativeHarnessPrices{}}}
+					c.NativeHarnesses = []config.NativeHarness{{ID: h.ID, Kind: h.Kind, ModelID: h.ModelID, NativeTools: true, Executable: h.Executable, ExecutableSHA256: h.ExecutableSHA256, RuntimeSHA256: h.RuntimeSHA256, HermesSourceDir: h.HermesSourceDir, ModelRevision: h.ModelRevision, MaxOutputTokens: h.MaxOutputTokens, OverheadRAMBytes: h.OverheadRAMBytes, Prices: &config.NativeHarnessPrices{}}}
 					o.NativeHarnesses = nil
 				}
 				settings = *c
@@ -232,4 +233,11 @@ func TestSDKNativeGooseHostTools(t *testing.T) {
 		t.Skip("requires installed Goose")
 	}
 	nativeSDKHostTools(t, "goose", goose.AgentAdapterVersion)
+}
+
+func TestSDKNativeHermesHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_HERMES_NATIVE") != "1" {
+		t.Skip("requires installed Hermes")
+	}
+	nativeSDKHostTools(t, "hermes", hermes.AgentAdapterVersion)
 }

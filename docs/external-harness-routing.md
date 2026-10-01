@@ -735,11 +735,11 @@ registry, approval authority and selection identity.
 
 ## Opt-in host tools in SDK routing
 
-Set `native_tools: true` on a Pi, OpenHands or Goose `native_harnesses` registration, or set
+Set `native_tools: true` on a Pi, OpenHands, Goose or Hermes `native_harnesses` registration, or set
 `NativeTools: true` on the SDK registration. Configure the ordinary host tools and
 approval reviewer/presenter as for a direct NexusRouter task. At least one tool
 must be configured. This mode requires a local model and Pi 0.99.2, OpenHands
-SDK 1.50.1 or Goose 1.52.0; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
+SDK 1.50.1, Goose 1.52.0 or the pinned Hermes 0.21.5 source/runtime; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
 The adapter does not expose Pi built-in tools, arbitrary extensions or shell access.
 
 SDK execution (and the shared CLI/API service path) reuses the normal rooted file
@@ -765,7 +765,7 @@ approval-backed create, denied writes, path traversal rejection, response contra
 automatic selection, queued idempotency, redaction and measured per-turn usage.
 This is integration evidence, not a real-model quality ranking or deployment.
 
-Authenticated HTTP qualification runs installed Pi, OpenHands and Goose through the real chat
+Authenticated HTTP qualification runs installed Pi, OpenHands, Goose and Hermes through the real chat
 handler and application service with pinned Ollama-wire fixtures. Plain and SSE
 responses preserve canonical completion and measured multi-turn usage; file-tool
 secrets remain redacted. Client cancellation after the tool completes leaves a
@@ -865,3 +865,27 @@ forged/unauthenticated decisions, duplicate approval, denial and cancellation.
 Compiled CLI tests cover plain/JSON output and admission rejection of configured
 writes without an approval handler. These are fixture-backed integration results;
 browser presentation and real-model comparative accuracy remain separate work.
+
+
+## Hermes host tool embedding
+
+`hermes.AgentConfig`, `RunAgentTask` and `RunAgent` support host-owned tool
+execution. Normal SDK/application registrations enable it with `NativeTools: true`
+or `native_tools: true`, `kind: hermes`, the pinned Python executable,
+`hermes_source_dir`, and `runtime_sha256` for the installed dependency manifest.
+The same local-model, resource admission, scoped tools, approvals, response
+contracts, secret redaction and durable submission controls apply as for Pi.
+
+Hermes receives a private `nexus__` tool catalogue and a loopback provider gateway.
+Its built-in tools, tool-search rewriting, memory and context-file discovery are
+disabled. The pinned embedding retains distinct host call IDs even when their
+arguments match; the ordered host bridge executes each registered call once.
+The native transcript must match host-verified calls, results and final text.
+Neither native summaries nor aggregate usage replace canonical journal evidence.
+Tool-mode evidence has a separate adapter identity from the text-only runner.
+
+Installed-runtime fixtures cover SDK reads, approved/denied writes, file-root
+boundaries, response contracts, automatic selection, queue idempotency and YAML
+registration. These fixtures validate execution and attribution, not comparative
+model accuracy. OpenClaw host-tool embedding and real-model comparisons remain
+separate work.
