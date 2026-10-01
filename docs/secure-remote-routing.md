@@ -235,12 +235,12 @@ can implement `InfoFor(ctx, allowedModels, allowCloud)` to scope discovery befor
 network effects; the server still filters returned models independently.
 
 The private control journal stores caller/key, canonical task hash, submission
-binding, and append-only action/outcome metadata. It stores no prompt or result.
+binding, and action/outcome metadata (append-only during task operations). It stores no prompt or result.
 The existing runtime store retains normal task evidence. A journal identity is
 bound to one destination. Keep both stores and the stable node identity together;
 never delete/reset them to recover an uncertain dispatch. Backups must be SQLite
-consistent. Audit growth and retention need operator disk monitoring; this first
-version does not automatically prune replay identities or audit history.
+consistent. Audit growth needs operator disk monitoring. Explicit archive-then-prune
+maintenance is described below; request replay identities never expire automatically.
 
 A request is audited before dispatch. The canonical task hash is reserved before
 SDK submission; the SDK key derives from destination, caller and request ID.
@@ -788,7 +788,56 @@ recorded outcome; it contains no prompt/result text and is not a quality verdict
 These metadata can still be sensitive: protect any redirected exports.
 
 Inspection neither deletes audit records nor expires durable request identities.
-It does not implement archive verification, automatic retention, compaction or
-an authenticated remote audit endpoint. Operators must continue monitoring disk
+Inspection itself does not implement archive verification, automatic retention,
+compaction or an authenticated remote audit endpoint. Operators must continue monitoring disk
 usage; deleting replay identities to reclaim space can duplicate previously
 accepted work and is not a supported retention procedure.
+
+### Explicit audit retention with verified archives
+
+Use the local administrator commands to move an old audit prefix into a private
+archive. These commands do not run on a timer and never run from peer requests.
+The archive directory must already exist with owner-private permissions.
+
+```sh
+nexus remote audit-archive --journal /private/nexus/control --instance node-a \
+  --archive /private/nexus/archives/control-batch-001.json
+# Inspect the archive receipt and protect/back up the saved file, then use its hash:
+nexus remote audit-prune --journal /private/nexus/control --instance node-a \
+  --archive /private/nexus/archives/control-batch-001.json --expected ARCHIVE_SHA256
+```
+
+Archive creation takes a consistent database snapshot and exports the oldest at
+most 10,000 currently stored audit entries. Optional `--through` selects an exact
+existing upper sequence, subject to the same row limit. The JSON is canonical,
+limited to 32 MiB, written with private permissions, synced, and published without
+overwriting a different existing file. No rows are removed during export. Save
+its returned `sha256`, instance, entry count and upper sequence with the archive.
+Repeated export to the same file succeeds only when the exact snapshot matches;
+use its original `--through` if newer events have arrived.
+
+Pruning requires the exact archive hash, a valid private file, matching instance,
+and an exact comparison of every currently stored row in the selected prefix.
+An omitted/changed row, stale conflicting export, malformed file or unavailable
+archive aborts before deletion. A transaction removes only that audit prefix and
+appends an `audit_prune` marker containing the archive SHA-256. Failure to write
+the marker rolls back the deletion. Concurrent new rows above the prefix remain.
+An unchanged archive can recover a lost successful response while its marker is
+still in the live journal; `already_applied` reports that case. If a later prune
+has archived that marker too, the old retry fails closed. Inspect the retained
+archive chain instead of reconstructing or resetting the journal.
+
+Request IDs, caller ownership, task hashes, submission bindings, runtime task
+records and model/harness learning evidence are never pruned by these commands.
+Removed SQLite pages become reusable; the file is not vacuumed or guaranteed to
+shrink, and retained request identities still require disk planning. Coordinate
+maintenance with paginated audit readers: pruning during their multi-page scan
+can remove rows they have not read. Archive creation uses a single transaction
+and does not have that multi-page exposure.
+
+Keep all archives, including earlier batches referenced by later prune markers.
+The hash binds exact bytes for maintenance; it is not a digital signature,
+external attestation or protection against an administrator rewriting both the
+database and archive. The operator remains responsible for backup durability,
+access permissions, archive lifetime and applicable retention requirements.
+No live journal is pruned merely by upgrading or starting NexusRouter.

@@ -11623,3 +11623,24 @@ vet/source/diff checks passed. Byte bounds also reject embedded-NUL oversized
 SQLite text. Full repository validation and push remain queued
 behind the existing gate. Physical second-host qualification, operational archive
 retention, pairing UI and remote evaluator scheduling remain open.
+
+### DAR-133 — explicit archive-bound control-audit retention (2026-10-01)
+
+Added local administrator `audit-archive` and `audit-prune` operations. Export
+captures a consistent oldest prefix of up to 10,000 entries into canonical private
+JSON, syncs it and publishes without overwriting another archive. Prune requires
+its exact hash and compares the entire current prefix before deleting audit rows
+and appending an archive-hash marker in one transaction. Requests, submission
+bindings, runtime evidence and learning ledgers remain untouched. Same-archive
+retry recognizes a retained marker; a marker already archived by subsequent
+maintenance yields a conflict. No maintenance was run on live data.
+
+Remote/shared-CLI race suites passed (15.977s/1.782s); vet/source/diff passed.
+Tests cover new events after export, retained replay identity/conflict, exact
+archive retries, marker failure rollback, tamper/omission/hash/instance rejection,
+unsafe archive paths, canceled operations, 10,000-entry batching, no overwrite,
+missing-journal noncreation and CLI hash requirements. This provides explicit
+retention with operator-managed archive backups, not scheduled deletion, SQLite
+file compaction, cryptographic administrator attestation or replay-ID expiration.
+Full make check and push remain queued behind the live earlier gate; physical
+second-host qualification, pairing UI and background remote evaluation stay open.

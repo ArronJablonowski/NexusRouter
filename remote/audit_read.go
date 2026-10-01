@@ -36,31 +36,18 @@ func ReadAuditPage(ctx context.Context, directory, instance string, after, throu
 	if !id(instance) || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || after < 0 || through < 0 || after > through {
 		return fail(ErrInvalid)
 	}
-	for _, path := range []string{directory, filepath.Join(directory, "remote.sqlite")} {
-		st, err := os.Lstat(path)
-		if err != nil {
-			return fail(err)
-		}
-		if st.Mode()&os.ModeSymlink != 0 || st.Mode().Perm()&0077 != 0 || (path == directory && !st.IsDir()) || (path != directory && !st.Mode().IsRegular()) {
-			return fail(ErrDenied)
-		}
-	}
-	u := url.URL{Scheme: "file", Path: filepath.Join(directory, "remote.sqlite")}
-	db, err := sql.Open("sqlite", u.String()+"?mode=ro&_pragma=query_only(1)&_pragma=busy_timeout(5000)")
+	db, err := openAuditDatabase(directory, false)
 	if err != nil {
 		return fail(err)
 	}
 	defer db.Close()
-	db.SetMaxOpenConns(1)
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return fail(err)
 	}
 	defer tx.Rollback()
-	var count, version int
-	var owner string
-	if tx.QueryRowContext(ctx, "SELECT count(*) FROM identity").Scan(&count) != nil || count != 1 || tx.QueryRowContext(ctx, "SELECT version,CASE WHEN length(CAST(instance AS BLOB))<=256 THEN instance END FROM identity").Scan(&version, &owner) != nil || version != Version || owner != instance {
-		return fail(ErrConflict)
+	if err = checkAuditIdentity(ctx, tx, instance); err != nil {
+		return fail(err)
 	}
 	var maximum int64
 	if err = tx.QueryRowContext(ctx, "SELECT coalesce(max(sequence),0) FROM audit").Scan(&maximum); err != nil {
@@ -73,7 +60,49 @@ func ReadAuditPage(ctx context.Context, directory, instance string, after, throu
 		return fail(ErrConflict)
 	}
 	page := AuditPage{Instance: instance, Through: through, Entries: make([]AuditEntry, 0)}
-	// Bound each field before allocation, including on a damaged local database.
+	entries, err := readAuditRows(ctx, tx, instance, after, through, 101)
+	if err != nil {
+		return fail(err)
+	}
+	if len(entries) > 100 {
+		page.Next = entries[99].Sequence
+		entries = entries[:100]
+	}
+	page.Entries = entries
+	if err = tx.Commit(); err != nil {
+		return fail(err)
+	}
+	return page, nil
+}
+
+func openAuditDatabase(directory string, writable bool) (*sql.DB, error) {
+	if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
+		return nil, ErrInvalid
+	}
+	for _, path := range []string{directory, filepath.Join(directory, "remote.sqlite")} {
+		st, err := os.Lstat(path)
+		if err != nil {
+			return nil, err
+		}
+		if st.Mode()&os.ModeSymlink != 0 || st.Mode().Perm()&0077 != 0 || (path == directory && !st.IsDir()) || (path != directory && !st.Mode().IsRegular()) {
+			return nil, ErrDenied
+		}
+	}
+	u := url.URL{Scheme: "file", Path: filepath.Join(directory, "remote.sqlite")}
+	options := "?mode=ro&_pragma=query_only(1)&_pragma=busy_timeout(5000)"
+	if writable {
+		options = "?mode=rw&_pragma=synchronous(FULL)&_pragma=busy_timeout(5000)"
+	}
+	db, err := sql.Open("sqlite", u.String()+options)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	return db, nil
+}
+
+func readAuditRows(ctx context.Context, tx *sql.Tx, instance string, after, through int64, limit int) ([]AuditEntry, error) {
+	// Count bytes rather than SQLite text characters (which stop at NUL).
 	rows, err := tx.QueryContext(ctx, `SELECT sequence,
  CASE WHEN length(CAST(at AS BLOB))<=64 THEN at END,
  CASE WHEN length(CAST(caller AS BLOB))<=256 THEN caller END,
@@ -81,35 +110,26 @@ func ReadAuditPage(ctx context.Context, directory, instance string, after, throu
  CASE WHEN length(CAST(action AS BLOB))<=256 THEN action END,
  CASE WHEN length(CAST(request_id AS BLOB))<=256 THEN request_id END,
  CASE WHEN length(CAST(outcome AS BLOB))<=256 THEN outcome END
- FROM audit WHERE sequence>? AND sequence<=? ORDER BY sequence LIMIT 101`, after, through)
+ FROM audit WHERE sequence>? AND sequence<=? ORDER BY sequence LIMIT ?`, after, through, limit)
 	if err != nil {
-		return fail(err)
+		return nil, err
 	}
 	defer rows.Close()
+	entries := make([]AuditEntry, 0)
 	for rows.Next() {
 		var entry AuditEntry
 		var at string
 		if err = rows.Scan(&entry.Sequence, &at, &entry.Caller, &entry.Destination, &entry.Action, &entry.RequestID, &entry.Outcome); err != nil {
-			return fail(err)
+			return nil, err
 		}
 		entry.At, err = time.Parse(time.RFC3339Nano, at)
 		if err != nil || entry.Destination != instance {
-			return fail(ErrConflict)
+			return nil, ErrConflict
 		}
-		if len(page.Entries) == 100 {
-			page.Next = page.Entries[99].Sequence
-			break
-		}
-		page.Entries = append(page.Entries, entry)
+		entries = append(entries, entry)
 	}
 	if err = rows.Err(); err != nil {
-		return fail(err)
+		return nil, err
 	}
-	if err = rows.Close(); err != nil {
-		return fail(err)
-	}
-	if err = tx.Commit(); err != nil {
-		return fail(err)
-	}
-	return page, nil
+	return entries, nil
 }

@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote audit|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -33,7 +33,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus remote", flag.ContinueOnError)
 	flags.SetOutput(errorOutput)
-	expected := flags.String("expected", "", "current validated registry digest, or absent for initial pairing")
+	expected := flags.String("expected", "", "current registry digest (absent for pairing), or archive SHA-256 for audit-prune")
 	trust := flags.String("trust", "", "owner-private paired-peer JSON registry")
 	cert := flags.String("cert", "", "local PEM certificate")
 	key := flags.String("key", "", "owner-private PEM key")
@@ -52,9 +52,32 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
 	after := flags.Int64("after", 0, "committed event or audit cursor")
+	archiveFile := flags.String("archive", "", "absolute private audit archive path")
 	through := flags.Int64("through", 0, "audit high-water sequence returned by first page")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
+	}
+	if operation == "audit-archive" || operation == "audit-prune" {
+		if flags.NArg() != 0 || *after != 0 {
+			return remote.ErrInvalid
+		}
+		var result any
+		var err error
+		if operation == "audit-archive" {
+			if *expected != "" {
+				return remote.ErrInvalid
+			}
+			result, err = remote.ArchiveAudit(ctx, *journal, *instance, *archiveFile, *through)
+		} else {
+			if *through != 0 {
+				return remote.ErrInvalid
+			}
+			result, err = remote.PruneAudit(ctx, *journal, *instance, *archiveFile, *expected)
+		}
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(result)
 	}
 	if operation == "audit" {
 		if flags.NArg() != 0 {
