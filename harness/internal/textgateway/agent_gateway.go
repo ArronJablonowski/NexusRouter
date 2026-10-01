@@ -62,7 +62,7 @@ type AgentGateway struct {
 }
 
 func StartAgent(ctx context.Context, c AgentConfig) (*AgentGateway, error) {
-	if ctx == nil || ctx.Err() != nil || c.Session == nil || c.Actual.Validate() != nil || c.Actual.Model != c.Model || len(c.Tools) == 0 || len(c.Tools) > 128 || c.Transport == nil || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.ContextTokens < 8192 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.MaxOutputTokens >= c.ContextTokens || (c.UpstreamProtocol != "" && c.UpstreamProtocol != "openai_compatible") {
+	if ctx == nil || ctx.Err() != nil || c.Session == nil || c.Actual.Validate() != nil || c.Actual.Model != c.Model || len(c.Tools) == 0 || len(c.Tools) > 128 || c.Transport == nil || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.ContextTokens < 8192 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.MaxOutputTokens >= c.ContextTokens || (c.UpstreamProtocol != "" && c.UpstreamProtocol != "openai_compatible" && c.UpstreamProtocol != "ollama") {
 		return nil, ErrProjection
 	}
 	switch reflect.ValueOf(c.Transport).Kind() {
@@ -75,7 +75,11 @@ func StartAgent(ctx context.Context, c AgentConfig) (*AgentGateway, error) {
 	if e != nil || (target.Scheme != "http" && target.Scheme != "https") || target.Host == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
 		return nil, ErrProjection
 	}
-	target.Path = strings.TrimRight(target.Path, "/") + "/chat/completions"
+	suffix := "/chat/completions"
+	if c.UpstreamProtocol == "ollama" {
+		suffix = "/api/chat"
+	}
+	target.Path = strings.TrimRight(target.Path, "/") + suffix
 	target.RawPath = ""
 	messages, e := copyAgentMessages(c.Messages)
 	if e != nil {
@@ -221,6 +225,9 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "text/event-stream")
+	if g.config.UpstreamProtocol == "ollama" {
+		request.Header.Set("Accept", "application/x-ndjson")
+	}
 	if g.config.APIKey != "" {
 		request.Header.Set("Authorization", "Bearer "+g.config.APIKey)
 	}
@@ -231,12 +238,19 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer response.Body.Close()
-	if response.StatusCode != 200 || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
+	native := g.config.UpstreamProtocol == "ollama"
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if response.StatusCode != 200 || (!native && contentType != "text/event-stream") || (native && contentType != "application/x-ndjson" && contentType != "application/json") {
 		g.fault = ErrProjection
 		deny(502)
 		return
 	}
-	completed, e := VerifyAgentCompletion(response.Body, g.config.Model)
+	var completed Completion
+	if native {
+		completed, e = ollamaAgentCompletion(response.Body, g.config.Model)
+	} else {
+		completed, e = VerifyAgentCompletion(response.Body, g.config.Model)
+	}
 	if e != nil || run.Err() != nil {
 		g.fault = ErrProjection
 		deny(502)

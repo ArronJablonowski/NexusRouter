@@ -64,10 +64,20 @@ func (g *AgentGateway) requestBody() ([]byte, error) {
 		return nil, ErrProjection
 	}
 	messages := make([]any, 0, len(g.messages))
+	native := g.config.UpstreamProtocol == "ollama"
+	callNames := map[string]string{}
 	for _, m := range g.messages {
 		entry := map[string]any{"role": m.Role, "content": providers.ToolResultContent(m)}
 		if m.Role == "tool" {
-			entry["tool_call_id"] = m.ToolCallID
+			if native {
+				name, ok := callNames[m.ToolCallID]
+				if !ok {
+					return nil, ErrProjection
+				}
+				entry["tool_name"] = name
+			} else {
+				entry["tool_call_id"] = m.ToolCallID
+			}
 		}
 		if len(m.ToolCalls) > 0 {
 			calls := make([]any, 0, len(m.ToolCalls))
@@ -75,7 +85,12 @@ func (g *AgentGateway) requestBody() ([]byte, error) {
 				if !identifier(c.ID) || !agentToolName(c.Name) || !uniqueJSON(c.Arguments) {
 					return nil, ErrProjection
 				}
-				calls = append(calls, map[string]any{"id": c.ID, "type": "function", "function": map[string]any{"name": c.Name, "arguments": string(c.Arguments)}})
+				callNames[c.ID] = c.Name
+				var args any = string(c.Arguments)
+				if native {
+					args = json.RawMessage(c.Arguments)
+				}
+				calls = append(calls, map[string]any{"id": c.ID, "type": "function", "function": map[string]any{"name": c.Name, "arguments": args}})
 			}
 			entry["tool_calls"] = calls
 		}
@@ -86,6 +101,15 @@ func (g *AgentGateway) requestBody() ([]byte, error) {
 		fields["tools"] = g.tools
 		fields["tool_choice"] = "auto"
 		fields["parallel_tool_calls"] = false
+	}
+	if native {
+		delete(fields, "stream_options")
+		delete(fields, "max_tokens")
+		delete(fields, "store")
+		delete(fields, "tool_choice")
+		delete(fields, "parallel_tool_calls")
+		fields["think"] = false
+		fields["options"] = map[string]int{"num_ctx": g.config.ContextTokens, "num_predict": g.config.MaxOutputTokens}
 	}
 	body, e := json.Marshal(fields)
 	// Conservative byte-based context bound includes schemas and tool results.

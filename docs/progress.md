@@ -10714,3 +10714,30 @@ user-facing native tools can be enabled. It is not an OS sandbox, admission laye
 or approval authority: normal host transport/resource/tool policies remain required.
 The active SDK checkpoint stays unchanged under full validation; this cumulative
 branch will queue its full make check and normal push after that job succeeds.
+
+### 2026-10-01 — DAR-132 native Ollama multi-turn tool gateway
+
+Added native /api/chat transport to the agent gateway. Host-owned tool arguments
+use native objects, tool responses bind through tool_name, and context/output
+limits map to num_ctx/num_predict with think=false. Native responses must match
+the pinned model and complete through stop plus clean EOF before canonical SSE
+is released. Fresh host call identities bind native proposals to the existing
+scoped bridge. Optional native function type/ID metadata is validated, duplicate
+IDs are refused, numeric argument spelling is retained, and nontext modalities,
+reasoning, duplicate JSON keys, invalid accounting and truncated streams fail
+closed. Large text is emitted in bounded UTF-8-safe canonical frames.
+
+Wire mapping checked against the existing providers implementation and the
+official Ollama tool-calling documentation:
+https://docs.ollama.com/capabilities/tool-calling
+
+Runtime + SQLite + HTTP fixture qualification passed: two provider turns, one
+scoped tool invocation despite repeated tool requests, redacted result delivery,
+object-valued arguments with exact large integers, correct endpoint/limits and
+30 input / 8 output measured tokens across the two journaled turns. Native parser
+checks also cover terminal/EOF failures, wrong model, duplicate arguments,
+reasoning/media rejection, usage presence/zero/error distinctions, call limits
+and UTF-8 framing. All harness race tests passed (gateway 18.133s), plus targeted
+vet, source and diff checks. These are fixture-provider results; installed Pi
+extension/RPC and live native provider qualification remain before enabling
+user-facing native tools. Full branch gate/push queues behind SDK validation.
