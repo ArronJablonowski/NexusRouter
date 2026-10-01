@@ -10606,3 +10606,32 @@ pinned multi-turn provider gateway and isolated Pi extension, native host recove
 new-format outcome/audit ingestion, then other adapters and real task qualification.
 Native tools remain disabled until those boundaries are connected and verified.
 Full branch gate/push remains queued behind the prior live Pi validation job.
+
+### 2026-10-01 — DAR-132 native agent outcome and audit ingestion
+
+Connected native-tools-v1 to canonical outcome reconciliation, SDK confirmed
+reviews, durable advisory audits and existing evidence catch-up. Every native
+agent event is now validated before accepting its completed outcome: selecting
+only start/terminal records cannot hide unpaired or uncertain tools. Legacy
+text-only journals retain their strict two-event contract. Failed/canceled and
+incomplete native agent histories remain ineligible for quality evidence.
+
+Canonical reconciliation uses bounded single-event pages (386 events, 32 MiB
+aggregate), rejects stale cursors, and keeps one read-only store open per SDK
+operation. This preserves the storage page-byte bound without repeated database
+initialization. Audit ingestion retains all native events within the same bounds
+and binds the source digest to the actual completed combination/output. Tool
+execution evidence remains metadata; original tool text stays conversation
+context, not a claim that an operation succeeded. Exact historical review replay
+is harmless and does not displace a newer expected-head confirmed revision.
+
+Race tests passed for SDK native agent outcome/catch-up, durable audit and replay,
+failed-lineage exclusion and current-head ranking (5.680s), runtime complete
+pagination/stale-cursor and corrupted-history rejection (4.279s), plus existing
+SDK native text audit/evidence/catch-up regressions (16.758s). Tests assert one
+confirmed current sample after historical advisory replay and unchanged tool/
+evaluator call counts during reconciliation. Targeted vet/source/diff checks
+passed. No native user-facing tool route is enabled yet: pinned multi-turn
+provider gateway, isolated Pi extension and host recovery remain integration
+requirements before other adapters and real tool-task qualification. Full branch
+validation/push remains queued behind the live prior Pi gate.

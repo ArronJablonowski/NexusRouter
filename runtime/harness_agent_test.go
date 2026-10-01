@@ -119,6 +119,25 @@ func TestHarnessAgentBridgeDurableProposalAndResult(t *testing.T) {
 	if totalsErr != nil || totals.Primary.Records != 1 || totals.Primary.InputTokens == nil || *totals.Primary.InputTokens != 50 || totals.Primary.OutputTokens == nil || *totals.Primary.OutputTokens != 12 {
 		t.Fatal("native turn accounting", totals, totalsErr)
 	}
+	reads := 0
+	paged, e := runtime.ReadHarnessJournal(ctx, harnessReader(func(c context.Context, task string, after int64, limit int) ([]runtime.Event, error) {
+		reads++
+		if limit != 1 {
+			t.Error("byte cap unsafe page")
+		}
+		return db.Read(c, task, after, limit)
+	}), r.Request.TaskID)
+	if e != nil || len(paged) != len(events) || reads != len(events)+1 {
+		t.Fatal("incomplete native pagination", len(paged), reads, e)
+	}
+	reads = 0
+	_, e = runtime.ReadHarnessJournal(ctx, harnessReader(func(context.Context, string, int64, int) ([]runtime.Event, error) {
+		reads++
+		return []runtime.Event{events[0]}, nil
+	}), r.Request.TaskID)
+	if e == nil || reads != 2 {
+		t.Fatal("stuck cursor not rejected", e, reads)
+	}
 	usage, replayErr := runtime.ValidateHarnessAgentJournal(events, r.Request.TaskID)
 	if replayErr != nil || usage == nil || usage.InputTokens != 50 || usage.OutputTokens != 12 {
 		t.Fatal("native journal replay", usage, replayErr)
@@ -150,10 +169,12 @@ func TestHarnessAgentBridgeDurableProposalAndResult(t *testing.T) {
 			t.Errorf("accepted corrupt journal %s", mode)
 		}
 	}
-	// Legacy ingestion must fail closed rather than silently treating a native
-	// agent as a two-event completion before the new projector is implemented.
-	if _, err = runtime.ValidateHarnessOutcome(events, r.Request.TaskID); err == nil {
-		t.Fatal("legacy reader accepted new protocol")
+	// Quality ingestion validates every tool event, not just the first and last.
+	if got, e := runtime.ValidateHarnessOutcome(events, r.Request.TaskID); e != nil || got != out {
+		t.Fatal("new-format outcome lost", got, e)
+	}
+	if _, e := runtime.ValidateHarnessOutcome([]runtime.Event{events[0], events[len(events)-1]}, r.Request.TaskID); e == nil {
+		t.Fatal("partial native history accepted")
 	}
 	if _, _, err = runtime.RunHarnessAgent(ctx, db, r); !errors.Is(err, runtime.ErrPersistence) || calls.Load() != 1 {
 		t.Fatal("duplicate run executed", err)

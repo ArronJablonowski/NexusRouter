@@ -41,6 +41,7 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 	}
 	var start, end runtime.Event
 	var nativeEvents []runtime.Event
+	nativeBytes := 0
 	var executionEvents []runtime.Event
 	var delegations []auditDelegation
 	batchSizes := make(map[string]int)
@@ -56,7 +57,12 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 				return bad()
 			}
 			seq = e.Sequence
-			if e.Data.Harness != nil || e.Data.HarnessOutcome != nil {
+			if len(nativeEvents) > 0 || e.Data.Harness != nil || e.Data.HarnessOutcome != nil {
+				body, encodeErr := e.Encode()
+				if encodeErr != nil || len(body) > 32<<20-nativeBytes || len(nativeEvents) >= runtime.MaxHarnessAgentEvents {
+					return bad()
+				}
+				nativeBytes += len(body)
 				nativeEvents = append(nativeEvents, e)
 			}
 			switch e.Kind {
@@ -122,12 +128,12 @@ func (s *Service) auditTask(ctx context.Context, task, reviewerID string, maxCos
 	sourceKind, sourceID := "", start.AttemptID
 	if len(nativeEvents) > 0 {
 		outcome, e := runtime.ValidateHarnessOutcome(nativeEvents, task)
-		if e != nil || seq != 2 || history.State != "completed" {
+		if e != nil || seq != int64(len(nativeEvents)) || history.State != "completed" {
 			return bad()
 		}
 		sourceKind = "harness"
 		sourceID, _ = outcome.Digest()
-		start, end = nativeEvents[0], nativeEvents[1]
+		start, end = nativeEvents[0], nativeEvents[len(nativeEvents)-1]
 	} else if start.AttemptID == "" || end.AttemptID != start.AttemptID {
 		return bad()
 	}

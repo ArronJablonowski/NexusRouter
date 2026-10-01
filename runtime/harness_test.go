@@ -200,7 +200,13 @@ func TestHarnessReconciliationRejectsIncompleteOrChangedJournal(t *testing.T) {
 				input[1].Data.HarnessOutcome = nil
 				input[1].Data.Text = ""
 			}
-			reader := harnessReader(func(context.Context, string, int64, int) ([]runtime.Event, error) { return input, nil })
+			reader := harnessReader(func(_ context.Context, _ string, after int64, limit int) ([]runtime.Event, error) {
+				if after >= int64(len(input)) {
+					return nil, nil
+				}
+				end := min(len(input), int(after)+limit)
+				return input[int(after):end], nil
+			})
 			if _, e := runtime.RecordHarnessOutcome(ctx, reader, ledger, r.TaskID, now); e == nil {
 				t.Fatal("unbound journal accepted")
 			}

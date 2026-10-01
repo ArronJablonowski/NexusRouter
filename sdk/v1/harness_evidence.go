@@ -6,7 +6,9 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
+	"github.com/ArronJablonowski/NexusRouter/sessions"
 )
 
 // ReconcileHarnessOutcome copies a verified completed outcome from this client's
@@ -14,20 +16,18 @@ import (
 // inference or creates a quality vote. Retry this operation, not Run, after an
 // uncertain ledger write. The host owns the ledger's lifetime and access policy.
 func (c *Client) ReconcileHarnessOutcome(ctx context.Context, ledger *harness.EvidenceStore, task string) (harness.Execution, error) {
-	if !c.valid(ctx) || ledger == nil {
+	if !c.valid(ctx) || ledger == nil || !sessions.ValidEventPageID(task) {
 		return harness.Execution{}, ErrAdmission
 	}
-	return runtime.RecordHarnessOutcome(ctx, sdkHarnessReader{c}, ledger, task, time.Now().UTC())
-}
-
-type sdkHarnessReader struct{ client *Client }
-
-func (r sdkHarnessReader) Read(ctx context.Context, task string, after int64, limit int) ([]runtime.Event, error) {
-	page, err := r.client.ReadEvents(ctx, task, after, limit)
+	db, err := telemetry.OpenReadOnly(ctx, c.database)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return harness.Execution{}, ctx.Err()
+		}
+		return harness.Execution{}, app.ErrInspection
 	}
-	return page.Events, nil
+	defer db.Close()
+	return runtime.RecordHarnessOutcome(ctx, db, ledger, task, time.Now().UTC())
 }
 
 // ReviewHarnessOutcome is an operator/evaluator-only write, never a model tool.
@@ -37,7 +37,7 @@ func (r sdkHarnessReader) Read(ctx context.Context, task string, after int64, li
 // Revisions require ExpectedHead; identical retries do not add learning weight.
 // This does not synthesize judgments, rerun inference or modify the task journal.
 func (c *Client) ReviewHarnessOutcome(ctx context.Context, ledger *harness.EvidenceStore, task string, review harness.Review) error {
-	if !c.valid(ctx) || ledger == nil || review.Validate() != nil {
+	if !c.valid(ctx) || ledger == nil || !sessions.ValidEventPageID(task) || review.Validate() != nil {
 		return ErrAdmission
 	}
 	now := time.Now().UTC()
@@ -46,21 +46,29 @@ func (c *Client) ReviewHarnessOutcome(ctx context.Context, ledger *harness.Evide
 	}
 	// Read and bind before writing anything: a review for another execution must
 	// not even reconcile the requested task as a side effect.
-	events, err := (sdkHarnessReader{c}).Read(ctx, task, 0, 3)
+	db, err := telemetry.OpenReadOnly(ctx, c.database)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return app.ErrInspection
+	}
+	defer db.Close()
+	events, err := runtime.ReadHarnessJournal(ctx, db, task)
 	if err != nil {
 		return err
 	}
-	if len(events) != 2 || events[1].Data.HarnessOutcome == nil {
-		return runtime.ErrProtocol
+	outcome, err := runtime.ValidateHarnessOutcome(events, task)
+	if err != nil {
+		return err
 	}
-	outcome := *events[1].Data.HarnessOutcome
 	digest, err := outcome.Digest()
 	if err != nil || digest != review.ExecutionDigest || review.CreatedAt.Before(outcome.CompletedAt) {
 		return harness.ErrConflict
 	}
 	// Reconciliation rechecks the complete start/terminal protocol and immutable
 	// output binding using the same canonical reader. No caller outcome is trusted.
-	if _, err = c.ReconcileHarnessOutcome(ctx, ledger, task); err != nil {
+	if _, err = runtime.RecordHarnessOutcome(ctx, db, ledger, task, now); err != nil {
 		return err
 	}
 	return ledger.AppendReview(ctx, review, time.Now().UTC())

@@ -18,16 +18,21 @@ func validateAuditSource(ctx context.Context, tx *sql.Tx, task, id, kind string)
 		if state != "completed" {
 			return evaluation.ErrAudit
 		}
-		rows, err := tx.QueryContext(ctx, "SELECT CASE WHEN length(body)<=4194304 THEN body END FROM events WHERE task_id=? ORDER BY sequence LIMIT 3", task)
+		rows, err := tx.QueryContext(ctx, "SELECT CASE WHEN length(body)<=4194304 THEN body END FROM events WHERE task_id=? ORDER BY sequence LIMIT ?", task, runtime.MaxHarnessAgentEvents+1)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		var events []runtime.Event
+		total := 0
 		for rows.Next() {
 			var body []byte
 			var event runtime.Event
 			if rows.Scan(&body) != nil || json.Unmarshal(body, &event) != nil {
+				return evaluation.ErrAudit
+			}
+			total += len(body)
+			if total > 32<<20 {
 				return evaluation.ErrAudit
 			}
 			events = append(events, event)
