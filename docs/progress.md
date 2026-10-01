@@ -11053,3 +11053,33 @@ The complete Goose package also passed with native qualification enabled
 vet, source formatting/size and diff checks passed. Full repository validation
 and push will follow the already-running predecessor gate; no deployment is
 claimed.
+
+### 2026-10-01 — DAR-132 Goose SDK routing and operator qualification
+
+Enabled explicit native_tools registrations for Goose in config validation and
+the closed application adapter registry. Identity selection and execution share
+the Goose agent configuration; schemas, turn limits and extension policy remain
+bound to the queue/learning identity. Existing local-model, resource, exact
+catalogue, approval and response-contract controls are reused. Legacy text
+registrations do not acquire tool authority; Hermes/OpenClaw still reject this
+flag. No live configuration or deployment was changed.
+
+SDK qualification exposed an overstrict native-output check: provider response
+IDs may repeat across turns, while the verifier incorrectly required global
+message-ID uniqueness. Removed that unsupported constraint; transcript order and
+verified tool-call IDs still reject duplicate/missing/altered lifecycle records.
+Added a repeated-response-ID regression and retained replay rejection tests.
+The constructor fixture was also updated to expect Goose's own adapter identity.
+
+Installed Goose passed all eight SDK modes (25.425s race driver): rooted reads,
+approved create, denied create, response contract, escape rejection, automatic
+selection, queued idempotency and YAML configuration. Authenticated HTTP plain/SSE
+and durable operator decisions passed (22.972s): pending writes remain absent,
+forged/unauthenticated decisions reject, duplicate approval has one effect, denial
+and cancellation leave no successful outcome, and late approval rejects. Compiled
+CLI qualification passed (4.462s), preserving plain/JSON output, redaction and
+canonical usage while rejecting unreviewable writes at admission. Targeted
+projection, constructor and config race tests passed (1.444/1.710/1.697s), as did
+vet, source formatting/size and diff checks. These are controlled fixtures, not
+real-model quality rankings or browser presentation qualification.
+Full make check/push remains queued behind the prior branch's live gate.

@@ -37,7 +37,7 @@ func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens
 	}
 	c := nativePiConfig(entry, p, m, tokens, policyDigest, key, tr, messages)
 	if entry.NativeTools {
-		if (entry.Kind != "pi" && entry.Kind != "openhands") || len(toolConfig.Catalog) == 0 {
+		if (entry.Kind != "pi" && entry.Kind != "openhands" && entry.Kind != "goose") || len(toolConfig.Catalog) == 0 {
 			return nativeAdapter{}, ErrHarnessUnsupported
 		}
 		c.TransportPolicySHA256 = toolConfig.policyDigest(policyDigest)
@@ -63,6 +63,13 @@ func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens
 		}}, nil
 	case "goose":
 		oc := goose.Config{Executable: c.Executable, ExecutableSHA256: c.ExecutableSHA256, Provider: c.Provider, Model: c.Model, ModelRevision: c.ModelRevision, BaseURL: c.BaseURL, APIKey: c.APIKey, UpstreamProtocol: c.UpstreamProtocol, TransportPolicySHA256: c.TransportPolicySHA256, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Messages: c.Messages, Transport: c.Transport, Admit: c.Admit, Prices: &goose.Prices{Input: c.Prices.Input, Output: c.Prices.Output, CacheRead: c.Prices.CacheRead, CacheWrite: c.Prices.CacheWrite}}
+		if entry.NativeTools {
+			agent := goose.AgentConfig{Config: oc, Tools: toolConfig.Catalog, MaxTurns: toolConfig.MaxTurns}
+			return nativeAdapter{Identity: agent.Identity, MaxOutputTokens: oc.MaxOutputTokens, Agent: &nativeAgentAdapter{Tools: agent.Tools, MaxTurns: agent.MaxTurns, MaxOutputTokens: agent.MaxOutputTokens, Run: func(ctx context.Context, prompt string, session *runtime.HarnessAgentSession) (runtime.HarnessOutput, error) {
+				result, e := goose.RunAgent(ctx, agent, prompt, session)
+				return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text}, e
+			}}}, nil
+		}
 		return nativeAdapter{Identity: oc.Identity, MaxOutputTokens: oc.MaxOutputTokens, Run: func(ctx context.Context, prompt string) (runtime.HarnessOutput, error) {
 			result, err := goose.Run(ctx, oc, prompt)
 			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text, Usage: result.Usage}, err

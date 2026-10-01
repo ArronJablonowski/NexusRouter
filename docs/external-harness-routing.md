@@ -735,11 +735,11 @@ registry, approval authority and selection identity.
 
 ## Opt-in host tools in SDK routing
 
-Set `native_tools: true` on a Pi or OpenHands `native_harnesses` registration, or set
+Set `native_tools: true` on a Pi, OpenHands or Goose `native_harnesses` registration, or set
 `NativeTools: true` on the SDK registration. Configure the ordinary host tools and
 approval reviewer/presenter as for a direct NexusRouter task. At least one tool
-must be configured. This mode requires a local model and Pi 0.99.2 or OpenHands
-SDK 1.50.1; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
+must be configured. This mode requires a local model and Pi 0.99.2, OpenHands
+SDK 1.50.1 or Goose 1.52.0; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
 The adapter does not expose Pi built-in tools, arbitrary extensions or shell access.
 
 SDK execution (and the shared CLI/API service path) reuses the normal rooted file
@@ -765,7 +765,7 @@ approval-backed create, denied writes, path traversal rejection, response contra
 automatic selection, queued idempotency, redaction and measured per-turn usage.
 This is integration evidence, not a real-model quality ranking or deployment.
 
-Authenticated HTTP qualification runs installed Pi and OpenHands through the real chat
+Authenticated HTTP qualification runs installed Pi, OpenHands and Goose through the real chat
 handler and application service with pinned Ollama-wire fixtures. Plain and SSE
 responses preserve canonical completion and measured multi-turn usage; file-tool
 secrets remain redacted. Client cancellation after the tool completes leaves a
@@ -776,14 +776,14 @@ that remains an operator registration setting. Browser approval presentation
 remains unqualified; compiled CLI and HTTP operator approval qualification are
 described below.
 
-Compiled CLI qualification builds `cmd/nexus` and runs both installed harnesses with a private
+Compiled CLI qualification builds `cmd/nexus` and runs all three installed harnesses with a private
 CLI home and process-owner directory. Both plain output and `--json` preserve
 rooted reads, redaction, verified per-turn usage and the durable tool journal.
 The test uses the production host resource profiler and requires measurable local
 capacity. A CLI invocation without a reviewer/presenter refuses configured writes
 at admission, before inference or task storage; it does not implicitly approve them.
 
-Authenticated HTTP operator decisions are qualified with both installed harnesses and a
+Authenticated HTTP operator decisions are qualified with all three installed harnesses and a
 controlled provider. A pending create leaves the file absent; unauthenticated and
 argument-digest-mismatched decisions are rejected. Replaying the same bound
 approval records one operator decision and one confirmed write. Denial and request
@@ -830,8 +830,8 @@ separate work.
 ## Goose host tool embedding
 
 `goose.AgentConfig`, `RunAgentTask`, and `RunAgent` provide native Goose 1.52.0
-host-tool embedding. Normal SDK/application `native_tools` registration for Goose
-is not enabled yet. Supply the usual fenced/redacting journal, policy transport,
+host-tool embedding and normal SDK/application `native_tools: true` registration
+with `kind: goose`. Supply the usual fenced/redacting journal, policy transport,
 resource admission and scoped approval/schema-enforcing executor.
 
 The private recipe enables only a named `nexus` MCP extension over authenticated
@@ -852,4 +852,16 @@ this mode from text-only evidence and binds schemas, turns and protocol settings
 Installed-binary qualification uses controlled OpenAI-compatible/Ollama fixtures,
 covering normal and concurrent calls, recoverable/terminal tool results, denial,
 wrong-model refusal, cancellation, turn limits and completed-task replay. It does
-not establish comparative model accuracy or SDK/HTTP/CLI approval integration.
+not establish comparative model accuracy. SDK/config routing and HTTP/CLI
+approval qualification are described below.
+
+
+Goose uses the same host registry, local-model restrictions, approval authority,
+response contracts and queued idempotency as Pi and OpenHands. SDK fixtures cover
+approved/denied creates, rooted reads, traversal rejection, secret redaction,
+automatic selection, YAML registration, queued execution and per-turn usage.
+Authenticated HTTP plain/SSE and operator-decision tests cover pending writes,
+forged/unauthenticated decisions, duplicate approval, denial and cancellation.
+Compiled CLI tests cover plain/JSON output and admission rejection of configured
+writes without an approval handler. These are fixture-backed integration results;
+browser presentation and real-model comparative accuracy remain separate work.

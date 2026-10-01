@@ -42,7 +42,6 @@ func parseAgentProjection(body []byte, exit int, model string, transcript []prov
 	scan.Buffer(make([]byte, 4096), MaxRecordBytes)
 	index := 0
 	pending := map[string]providers.Message{}
-	seenMessages := map[string]bool{}
 	var final []byte
 	finished := false
 	var out Projection
@@ -82,10 +81,9 @@ func parseAgentProjection(body []byte, exit int, model string, transcript []prov
 			continue
 		}
 		m := event.Message
-		if event.Type != "message" || m == nil || !label(m.ID) || seenMessages[m.ID] || len(m.Content) == 0 || len(final) != 0 {
+		if event.Type != "message" || m == nil || !label(m.ID) || len(m.Content) == 0 || len(final) != 0 {
 			return bad()
 		}
-		seenMessages[m.ID] = true
 		switch m.Role {
 		case "assistant":
 			if len(pending) != 0 || index >= len(transcript) || transcript[index].Role != "assistant" || m.Metadata.Inference == nil || m.Metadata.Inference.Provider != "openai" || m.Metadata.Inference.RequestedModel != model {

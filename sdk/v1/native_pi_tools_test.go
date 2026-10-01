@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -224,4 +225,11 @@ func nativeSDKHostTools(t *testing.T, kind, adapterVersion string) {
 			}
 		})
 	}
+}
+
+func TestSDKNativeGooseHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_GOOSE_NATIVE") != "1" {
+		t.Skip("requires installed Goose")
+	}
+	nativeSDKHostTools(t, "goose", goose.AgentAdapterVersion)
 }

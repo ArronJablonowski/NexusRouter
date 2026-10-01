@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
@@ -189,4 +190,11 @@ func testHTTPNativeHostTools(t *testing.T, kind, adapter string) {
 			}
 		})
 	}
+}
+
+func TestHTTPNativeGooseHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_GOOSE_NATIVE") != "1" {
+		t.Skip("requires installed Goose")
+	}
+	testHTTPNativeHostTools(t, "goose", goose.AgentAdapterVersion)
 }

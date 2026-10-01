@@ -18,7 +18,7 @@ func TestNativeHarnessConfigValidation(t *testing.T) {
 		t.Fatal("valid registration rejected")
 	}
 	for _, change := range []func(*Settings){
-		func(s *Settings) { s.NativeHarnesses[0].NativeTools = true; s.NativeHarnesses[0].Kind = "goose" },
+		func(s *Settings) { s.NativeHarnesses[0].NativeTools = true; s.NativeHarnesses[0].Kind = "openclaw" },
 		func(s *Settings) { s.NativeHarnesses[0].Executable = "relative" },
 		func(s *Settings) { s.NativeHarnesses[0].Prices = nil },
 		func(s *Settings) { s.NativeHarnesses[0].ExecutableSHA256 = "unpinned" },

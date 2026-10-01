@@ -12,6 +12,10 @@ import (
 func nativeHTTPRegistration(t *testing.T, kind string) config.NativeHarness {
 	t.Helper()
 	executable, e := exec.LookPath("pi")
+	if kind == "goose" {
+		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
+		e = nil
+	}
 	var runtimeDigest string
 	if kind == "openhands" {
 		executable = os.Getenv("NEXUS_OPENHANDS_PYTHON")

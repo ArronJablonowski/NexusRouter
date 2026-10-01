@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -42,6 +43,10 @@ func TestCLINativeOpenHandsHostTools(t *testing.T) {
 }
 func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 	executable, e := exec.LookPath("pi")
+	if kind == "goose" {
+		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
+		e = nil
+	}
 	var runtimeDigest string
 	if kind == "openhands" {
 		executable = os.Getenv("NEXUS_OPENHANDS_PYTHON")
@@ -202,4 +207,11 @@ func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 			}
 		})
 	}
+}
+
+func TestCLINativeGooseHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_GOOSE_NATIVE") != "1" {
+		t.Skip("requires installed Goose")
+	}
+	testCLINativeHostTools(t, "goose", goose.AgentAdapterVersion)
 }

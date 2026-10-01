@@ -28,7 +28,7 @@ type NativeHarnessPrices = pi.Prices
 // and OverheadRAMBytes must be verified host metadata, not model self-reports.
 // Registration grants no task authority; ordinary admission still applies.
 type NativeHarness struct {
-	NativeTools bool // Explicit host-tool mode; supported by Pi and OpenHands.
+	NativeTools bool // Explicit host-tool mode; supported by Pi, OpenHands and Goose.
 	// HermesSourceDir binds Hermes source; RuntimeSHA256 attests Hermes or OpenHands dependencies.
 	HermesSourceDir, RuntimeSHA256                                 string
 	ID, ModelID, Kind, Executable, ExecutableSHA256, ModelRevision string
@@ -49,7 +49,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		return err
 	}
 	for _, entry := range registrations {
-		if entry.Prices == nil || (entry.NativeTools && entry.Kind != "pi" && entry.Kind != "openhands") {
+		if entry.Prices == nil || (entry.NativeTools && entry.Kind != "pi" && entry.Kind != "openhands" && entry.Kind != "goose") {
 			return ErrAdmission
 		}
 		prices := *entry.Prices

@@ -26,10 +26,17 @@ func TestAgentProjectionRequiresCompleteHostTranscript(t *testing.T) {
 	if e != nil || p.Text != "answer" {
 		t.Fatal(p, e)
 	}
+	// Provider response IDs are not required to be globally unique across turns.
+	// Transcript position and tool-call IDs bind lifecycle, not native message IDs.
+	repeated := strings.Replace(body, `"id":"c"`, `"id":"a"`, 1)
+	if _, e := parseAgentProjection([]byte(repeated), 0, "fixture", transcript); e != nil {
+		t.Fatal("repeated provider response ID", e)
+	}
+
 	for _, pair := range [][2]string{
 		{"nexus__lookup", "lookup"}, {"9007199254740993", "9007199254740992"}, {"host result", "fabricated"}, {`"isError":false`, `"isError":true`},
 		{`"status":"success"`, `"status":"error"`}, {`"requestedModel":"fixture"`, `"requestedModel":"other"`}, {`"role":"user"`, `"role":"system"`},
-		{`"id":"b"`, `"id":"a"`}, {`"type":"toolResponse"`, `"type":"image"`}, {`"total_tokens":0`, `"total_tokens":-1`},
+		{`"id":"b"`, `"id":""`}, {`"type":"toolResponse"`, `"type":"image"`}, {`"total_tokens":0`, `"total_tokens":-1`},
 		{`"text":"answer"`, `"text":"fake answer"`}, {`"name":"nexus__lookup"`, `"name":"nexus__lookup","name":"nexus__shell"`},
 	} {
 		changed := strings.Replace(body, pair[0], pair[1], 1)
