@@ -28,7 +28,20 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v %s", err, out)
 	}
+	var sshTransport *SSH
+	if os.Getenv("NEXUS_REMOTE_EVALUATION_SSH") == "1" {
+		native := nativeSSHServer(t)
+		sshTransport = &native
+	}
+	useTransport := func(f *fixture) {
+		if sshTransport != nil {
+			f.serverPeer.Transport = "ssh"
+			f.serverPeer.SSH = sshTransport
+			writeRegistry(t, f.clientTrust, f.serverPeer)
+		}
+	}
 	f, routes, key, task, v, _, backend := reviewFixture(t)
+	useTransport(f)
 	var calls atomic.Int32
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -92,6 +105,7 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	// reuses one canonical task/execution, which must not acquire another review
 	// head merely because a different request key points to it.
 	f, routes, _, task, _, _, backend = reviewFixture(t)
+	useTransport(f)
 	f.server.backend = rankingBackend{backend, *task.ExpectedHarnessIdentity}
 	args = []string{"remote", "auto-evaluate", "--trust", f.clientTrust, "--cert", f.client.Credentials.CertificateFile, "--key", f.client.Credentials.KeyFile, "--ca", f.client.Credentials.CAFile, "--routes", routes.directory, "--evidence", root, "--request", key, "--config", configPath, "--reviewer", "reviewer", "--review-max-cost", "0"}
 	request := AutomaticRequest{Version: 1, Prompt: task.Prompt, Routing: harness.Request{Version: 1, Task: harness.TaskClass{Domain: task.Domain, Profile: task.Profile, Difficulty: task.HarnessDifficulty}, Mode: "local_only", LocalRequired: true, ContextTokens: int64(task.ContextTokens)}}

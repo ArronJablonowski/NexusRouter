@@ -972,3 +972,22 @@ suites passed (22.989s / 1.971s); targeted vet, source format/size and diff pass
 Full repository check and conditional push are queued. This is per-request
 supervised review, not whole-fleet automatic enrollment, service installation or
 review UI; those and physical two-host/real-model qualification remain open.
+
+### DAR-133 — native SSH review watcher and shipped CLI qualification
+
+Extended the shipped evaluator CLI subprocess test with opt-in actual OpenSSH
+transport (`NEXUS_REMOTE_EVALUATION_SSH=1`). Both direct and automatic evaluation
+and watch commands now run through isolated sshd plus pinned mTLS; repeat CLI
+processes reconcile the same advisory result without new evaluator or original
+inference calls. Added a native SSH watcher test covering queued/running/success,
+restart reconciliation, wrong host-key rejection with zero remote polls (despite
+a directly reachable HTTPS endpoint), and NexusRouter revocation through SSH.
+Transport failures write no review evidence. Disposable keys/listener only;
+system SSH service and live routing configuration remain untouched.
+
+Native qualification passed with `NEXUS_REMOTE_SSH_NATIVE=1` and
+`NEXUS_REMOTE_EVALUATION_SSH=1`: watcher 2.95s, main CLI 3.99s, race package 8.540s.
+Targeted vet, source format/size and diff checks passed. This qualifies actual
+SSH lifecycle on one Mac with synthetic evaluator output, not physical two-host,
+network partition, cross-platform or model-quality behavior. Full repository
+gate/normal push remain queued with the preceding implementation checkpoints.
