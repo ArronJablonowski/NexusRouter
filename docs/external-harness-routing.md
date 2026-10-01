@@ -104,3 +104,39 @@ failed-lineage zero feedback, canceled writes, malformed stored records and file
 permissions. This is not physical power-loss qualification or proof of native
 harness execution. SDK/runtime provenance ingestion, reviewer authentication,
 native adapters and automatic selection wiring are still required under DAR-132.
+
+## Native Pi RPC checkpoint
+
+`harness/pi.Run` supports pinned Pi 0.99.2 in an isolated text-only RPC session.
+The caller supplies the CLI artifact digest, explicit provider/model/base URL,
+context/output limits, prices, deadline and a mandatory admission/reservation
+callback. The callback must enforce destination privacy, credentials, resource
+and cost policy before execution. Progress callbacks are trusted host code and
+must honor their context. The host installation and Node runtime are trusted;
+this adapter is not an operating-system sandbox.
+
+The adapter writes private temporary model/auth/settings files, starts with an
+empty working directory and sanitized environment, disables tools, extensions,
+skills, project context, session persistence, compaction and retries, and removes
+temporary credentials after process cleanup. API keys use the opaque auth-file
+field, not command-interpolated model configuration. Admission is released once
+on all post-admission exit paths. No inference is retried.
+
+RPC state must match the configured endpoint, provider/model and token limits.
+Only final assistant text with matching provider/model, a successful stop reason,
+a completed turn and `agent_settled` yields a result. Prompt acceptance and
+`agent_end` alone are insufficient. Tools, model changes, retries, malformed or
+oversized streams and premature termination fail closed. Intermediate text may
+be delivered as progress; it is not a final answer or quality evidence.
+
+`NEXUS_PI_NATIVE=1 go test -race ./harness/pi` exercises the installed Pi against
+an isolated local OpenAI-compatible streaming fixture, including cancellation,
+single dispatch and reservation release. Protocol tests reject identity/config
+changes, tool output, truncation, retries and invalid completion ordering. These
+are native harness protocol tests, not actual-model accuracy measurements.
+
+Still required: authorized tool-enabled coding execution, canonical runtime
+identity/configuration and usage accounting, durable SDK task ownership,
+authenticated ledger ingestion, automatic joint selection, remaining harness
+adapters and held-out quality evaluation. This package is not yet wired into
+production routing and makes no comparative accuracy claim.

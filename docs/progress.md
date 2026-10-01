@@ -9580,3 +9580,16 @@ restart-equivalent rankings, revisions, withdrawals, corruption and canceled
 transactions. Runtime ingestion/authentication and native harness adapters remain
 unfinished. The full repository gate/push is pending; the SSH checkpoint's live
 validation is being preserved in its own checkout.
+
+## Native Pi RPC adapter checkpoint — DAR-132 (2026-10-01)
+
+Added `harness/pi` for pinned Pi 0.99.2 text-only execution with mandatory host
+admission, isolated temporary configuration, sanitized environment, bounded RPC
+streams, explicit configuration/actual-model checks and settled-event completion.
+Tool-bearing runs and retries fail closed. Native installed-Pi loopback streaming
+and cancellation qualification passed under the race detector; adversarial
+protocol tests, targeted vet and source formatting/size checks passed. Full
+repository validation remains pending behind the SSH and evidence-ledger gates.
+No live provider calls or service deployment occurred. Tool authorization,
+SDK/ledger/selection integration and other native harness adapters remain open;
+this is a native protocol checkpoint, not completion of DAR-132.
