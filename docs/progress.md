@@ -1536,3 +1536,25 @@ Complete remote/CLI race suites passed (27.358s / 1.686s), targeted vet and
 source/diff checks passed. Three-second two-worker DNS fuzz run completed
 61,007 executions without failure. Full repository validation and normal backup
 remain queued; no actual multicast interoperability result is claimed.
+
+### 2026-10-01 — DAR-133 opt-in discovery advertiser and SSH hint
+
+Added explicit serve-only advertisement interface/TLS-name/optional SSH-port flags.
+The advertiser derives the fingerprint from the loaded certificate, checks its
+validity and SAN and requires the concrete private listener IPv4 to belong to the
+selected interface. Socket setup precedes dispatcher start. Bounded legacy-unicast
+PTR responses carry the complete connection bundle with a 30-second TTL; private
+source/interface/TTL checks and eight replies per second limit exposure. No
+unsolicited announcements, trust changes or task/credential advertisement. Host
+shutdown cancels and joins the responder; responder transport failure stops HTTP.
+SSH hints do not assert SSH readiness or grant access; strict known-hosts checking
+and inner mutual TLS remain required for actual SSH routing.
+
+Remote and CLI race suites passed (26.765s/1.708s); subsequent targeted advertiser
+race tests including loopback blocked-reader cancellation passed (1.548s/1.868s).
+Vet, source formatting/size and diff checks passed. Synthetic DNS certificate/SAN/
+expiry/forged-field/bounds roundtrips remain explicitly untrusted. No multicast
+broadcast or live service configuration was performed. Full combined make check
+and ordinary push are queued behind the already running frozen validation gate.
+Physical two-system multicast/SSH qualification, Settings discovery, IPv6,
+fragment assembly and general mDNS probing/collision handling remain open.

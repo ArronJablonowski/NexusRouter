@@ -14,3 +14,12 @@ func TestUnpairedDiscoveryRequiresExplicitBoundedInterface(t *testing.T) {
 		}
 	}
 }
+
+func TestAdvertisementFlagsRequireExplicitServeConfiguration(t *testing.T) {
+	for _, args := range [][]string{{"peers", "--advertise-interface", "en0", "--advertise-name", "node.local"}, {"serve", "--advertise-interface", "en0"}, {"serve", "--advertise-name", "node.local"}, {"serve", "--advertise-interface", "en0", "--advertise-name", "node.local", "--advertise-ssh-port", "65536"}} {
+		var output, diagnostic bytes.Buffer
+		if err := Run(context.Background(), args, bytes.NewReader(nil), &output, &diagnostic); err == nil || output.Len() != 0 {
+			t.Fatal(args, err, output.String())
+		}
+	}
+}

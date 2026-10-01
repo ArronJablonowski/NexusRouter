@@ -3,6 +3,7 @@ package remotecli
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -42,6 +43,9 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	key := flags.String("key", "", "owner-private PEM key")
 	ca := flags.String("ca", "", "trusted CA PEM")
 	instance := flags.String("instance", "", "local instance ID (serve) or destination ID (client)")
+	advertiseInterface := flags.String("advertise-interface", "", "opt-in private IPv4 DNS-SD interface (serve only)")
+	advertiseName := flags.String("advertise-name", "", "explicit TLS certificate DNS name (serve only)")
+	advertiseSSH := flags.Int("advertise-ssh-port", 0, "optional SSH port hint (serve only)")
 	listen := flags.String("listen", "127.0.0.1:8443", "explicit IP:port listener")
 	journal := flags.String("journal", "", "absolute private remote journal directory")
 	configFile := flags.String("config", "", "dedicated runtime configuration file (serve)")
@@ -64,6 +68,11 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	through := flags.Int64("through", 0, "audit high-water sequence returned by first page")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
+	}
+	if *advertiseInterface != "" || *advertiseName != "" || *advertiseSSH != 0 {
+		if operation != "serve" || *advertiseInterface == "" || *advertiseName == "" || *advertiseSSH < 0 || *advertiseSSH > 65535 {
+			return remote.ErrInvalid
+		}
 	}
 	if operation == "audit-archive" || operation == "audit-prune" {
 		if flags.NArg() != 0 || *after != 0 {
@@ -157,7 +166,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	}
 	credentials := remote.Credentials{CertificateFile: *cert, KeyFile: *key, CAFile: *ca}
 	if operation == "serve" {
-		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials)
+		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials, *advertiseInterface, *advertiseName, *advertiseSSH)
 	}
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	if operation == "enqueue-review" || operation == "enqueue-auto-review" || operation == "run-review-jobs" || operation == "auto-dispatch-review-job" {
@@ -340,7 +349,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	}
 	return json.NewEncoder(output).Encode(result)
 }
-func serve(ctx context.Context, instance, address, journalDir, configFile string, trust remote.TrustFile, credentials remote.Credentials) error {
+func serve(ctx context.Context, instance, address, journalDir, configFile string, trust remote.TrustFile, credentials remote.Credentials, advertiseInterface, advertiseName string, advertiseSSH int) error {
 	host, port, err := net.SplitHostPort(address)
 	number, e := strconv.Atoi(port)
 	if err != nil || net.ParseIP(host) == nil || e != nil || number < 1 || number > 65535 || configFile == "" {
@@ -399,6 +408,18 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer listener.Close()
+	var advertiser *remote.DiscoveryAdvertiser
+	if advertiseInterface != "" {
+		leaf, e := x509.ParseCertificate(httpServer.TLSConfig.Certificates[0].Certificate[0])
+		if e != nil {
+			return remote.ErrInvalid
+		}
+		advertiser, err = remote.OpenDiscoveryAdvertiser(advertiseInterface, remote.DiscoveryAdvertisement{Instance: instance, Address: address, ServerName: advertiseName, SSHPort: advertiseSSH, Certificate: leaf})
+		if err != nil {
+			return err
+		}
+		defer advertiser.Close()
+	}
 	dispatcher, err := app.StartDispatcher(ctx, service)
 	if err != nil {
 		return err
@@ -407,9 +428,28 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 	backend.Available = func(context.Context) bool { return dispatcher.Health().Status == "healthy" }
 	done := make(chan error, 1)
 	go func() { done <- httpServer.ServeTLS(listener, "", "") }()
+	var advertiseDone chan error
+	if advertiser != nil {
+		advertiseCtx, cancel := context.WithCancel(ctx)
+		advertiseDone = make(chan error, 1)
+		joined := make(chan struct{})
+		go func() { defer close(joined); advertiseDone <- advertiser.Run(advertiseCtx) }()
+		defer func() { cancel(); advertiser.Close(); <-joined }()
+	}
 	select {
 	case err := <-done:
 		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case err := <-advertiseDone:
+		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if e := httpServer.Shutdown(shutdown); e != nil {
+			_ = httpServer.Close()
+		}
+		<-done
+		if ctx.Err() != nil {
 			return nil
 		}
 		return err

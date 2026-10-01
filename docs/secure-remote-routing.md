@@ -1361,7 +1361,7 @@ grants are advertised. The receiver timestamps observations and caps their
 lifetime at 120 seconds; zero-TTL goodbye records do not become candidates.
 The parser caps TXT strings/count/total bytes before projection and performs no
 network or registry operation. The explicit IPv4 browse below binds the interface and bounds packet collection
-and conflicts; advertising lifecycle and Settings integration remain open. This contract alone does not discover devices on the network.
+and conflicts; Settings integration and physical multicast qualification remain open. This contract alone does not discover devices on the network.
 
 ### Explicit IPv4 discovery browse
 
@@ -1383,7 +1383,30 @@ for the browse, expired records are dropped, and resource exhaustion fails
 without presenting a partial success. Results remain explicitly unverified.
 
 This first transport supports IPv4 and complete same-packet bundles only;
-fragmented DNS record assembly, IPv6 browsing, owned advertisement lifecycle,
+fragmented DNS record assembly, IPv6 browsing,
 Settings integration and actual multicast cross-host qualification remain open.
 The packet parser uses golang.org/x/net/dns/dnsmessage v0.56.0; interface controls
 use its ipv4 package. No external mDNS daemon or zeroconf dependency is installed.
+
+### Opt-in host discovery responses
+
+A dedicated remote host can add `--advertise-interface en0
+--advertise-name node-a.local --advertise-ssh-port 22` to `nexus remote serve`.
+The interface and certificate DNS name are both required; the SSH port is an
+optional operator-supplied hint, not proof that an SSH server is available.
+The listener must use an exact private IPv4 address owned by that interface.
+The advertised fingerprint is derived from the loaded TLS certificate, which
+must currently be valid for the explicit name. No private machine hostname,
+credentials, task content or permissions enter the advertisement.
+
+The responder opens before dispatch starts and shuts down with the host. It
+answers only service PTR queries from ephemeral ports on the selected interface
+with TTL 255 and a private source address. Replies are unicast, bounded to 1400
+bytes and eight per second, and carry a complete bundle with a 30-second TTL.
+It sends no unsolicited announcements. Discovery never pairs a peer or grants
+trust; independently verify both the certificate and SSH host key before pairing.
+This narrow legacy-unicast responder is not a general mDNS service: multicast
+queries from port 5353, IPv6, probing/collision resolution and fragmented record
+assembly are unsupported. Actual multicast operation across two physical systems
+and Settings integration remain unqualified. Advertisement stops responding if
+the loaded certificate expires; certificate replacement requires host restart.
