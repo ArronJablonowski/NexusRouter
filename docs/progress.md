@@ -9985,3 +9985,32 @@ learning regression race tests passed (20.304s). Targeted vet, source gate and
 diff checks passed. Full make check
 is queued before push. Production Hermes process admission/lifecycle, artifact
 binding, canonical execution and SDK registration remain incomplete.
+
+## Hermes admitted runner and canonical execution — DAR-132 (2026-10-01)
+
+Added Hermes Run/RunTask embedding entry points. Configuration pins the installed
+dependency-environment Python executable hash and supported source revision;
+source must have no tracked changes. A required host-attested dependency-manifest
+digest is included in the versioned learning identity along with model revision,
+provider, policy, endpoint and budgets. Installed dependencies remain trusted code;
+these checks are neither an OS sandbox nor protection against concurrent mutation.
+
+The runner admits resources before process work, uses a disposable private home
+with lazy maintenance disabled, drives the native CLI through its installed Python,
+and accepts only a successful process exit with matching verified gateway text.
+Process groups are canceled and checked for orphaned descendants on macOS/Linux;
+unsupported platforms fail closed. Gateway cleanup joins provider handlers before
+admission is released. Context/output/deadline/stdout bounds remain enforced.
+
+RunTask uses the canonical durable runtime journal, host context and supplied
+redaction/fencing. Native fixtures verify success and truncation rejection, one
+provider dispatch, admission release, committed outcome identity and refusal to
+reuse a task ID. Additional tests cover admission denial, wrong executable hash,
+invalid source checkout, dependency/policy identity changes, credential rotation,
+process-group cleanup and output overflow.
+
+Verification: installed native/emitter/parser/runner race suite passed (12.850s),
+focused source/runtime/admission race tests passed, targeted vet and source gate
+passed. Full make check remains queued before push. No real inference or live
+router configuration changed. SDK registration, broader native cancellation and
+Ollama qualification, tool-bearing runs and other requested harnesses remain open.

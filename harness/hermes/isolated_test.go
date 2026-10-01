@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/harness/internal/textgateway"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"net/http"
 	"net/http/httptest"
@@ -57,10 +59,10 @@ func TestNativeIsolatedChat(t *testing.T) {
 		t.Skip("native Hermes qualification is opt-in")
 	}
 	for _, good := range []bool{true, false} {
-		t.Run(fmt.Sprint(good), func(t *testing.T) { nativeGatewayFixture(t, good) })
+		t.Run(fmt.Sprint(good), func(t *testing.T) { nativeGatewayFixture(t, good, false) })
 	}
 }
-func nativeGatewayFixture(t *testing.T, good bool) {
+func nativeGatewayFixture(t *testing.T, good, runner bool) {
 	root := "/Users/aj_lobster/.hermes/hermes-agent"
 	revision, err := exec.Command("git", "-C", root, "rev-parse", "HEAD").Output()
 	if err != nil || strings.TrimSpace(string(revision)) != SupportedRevision {
@@ -137,6 +139,42 @@ func nativeGatewayFixture(t *testing.T, good bool) {
 		t.Fatal("missing runtime")
 	}
 	python := filepath.Join(record.Packages.Venv.Environment, "bin", "python")
+	if runner {
+		artifact, err := os.ReadFile(python)
+		if err != nil {
+			t.Fatal(err)
+		}
+		admitted, released := 0, 0
+		c := Config{Executable: python, ExecutableSHA256: fmt.Sprintf("%x", sha256.Sum256(artifact)), SourceDir: root, RuntimeSHA256: fmt.Sprintf("%x", sha256.Sum256(facts)), Provider: "fixture-provider", Model: "fixture", ModelRevision: "fixture-r1", BaseURL: server.URL + "/v1", APIKey: "fixture-key", TransportPolicySHA256: strings.Repeat("a", 64), ContextTokens: 32768, MaxOutputTokens: 128, Timeout: 30 * time.Second, Prices: &Prices{}, Messages: []providers.Message{{Role: "user", Content: "host-owned question"}}, Transport: http.DefaultTransport, Admit: func(context.Context) (func(), error) { admitted++; return func() { released++ }, nil }}
+		journal, err := telemetry.Open(ctx, filepath.Join(t.TempDir(), "native.db"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer journal.Close()
+		task := Task{ID: "hermes-fixture", SessionID: "session-fixture", Prompt: "Return answer.", Class: harness.TaskClass{Domain: "fixture", Profile: "exact-v1", Difficulty: "easy"}, MaxOutputBytes: 4096}
+		taskResult, err := RunTask(ctx, journal, c, task)
+		result := taskResult.Result
+		if good && err == nil {
+			events, e := journal.Read(ctx, task.ID, 0, 10)
+			if e != nil || len(events) != 2 || events[1].Data.HarnessOutcome == nil || *events[1].Data.HarnessOutcome != taskResult.Execution {
+				t.Fatal("canonical outcome missing", e)
+			}
+		}
+		if _, e := RunTask(ctx, journal, c, task); e == nil {
+			t.Fatal("reused task identity")
+		}
+
+		if (err == nil) != good || calls.Load() != 1 || invalid.Load() || admitted != 1 || released != 1 {
+			t.Fatal("runner contract", err, calls.Load(), admitted, released)
+		}
+		if good && (result.Text != "answer" || result.Identity.Harness != "hermes" || result.Identity.Provider != "fixture-provider") {
+			t.Fatal("runner attribution", result)
+		}
+		if !good && result != (Result{}) {
+			t.Fatal("failed run exposed result")
+		}
+		return
+	}
 	bootstrap := "import sys; sys.path.insert(0," + strconv.Quote(root) + "); import hermes_bootstrap; from hermes_cli.main import main; sys.exit(main())"
 	cmd := exec.CommandContext(ctx, python, "-I", "-c", bootstrap, "chat", "--model", "fixture", "--provider", "nexus-gateway", "--reasoning", "none", "--toolsets", "all", "--max-turns", "1", "--run-budget", "20", "--ignore-rules", "--query-file", "-", "--oneshot", "--format", "stream-json")
 	cmd.Dir = dir
