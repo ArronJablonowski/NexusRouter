@@ -115,6 +115,20 @@ func TestRemoteEvaluationCLIReconcilesAcrossProcesses(t *testing.T) {
 	if backend.submits.Load() != 1 || calls.Load() != 0 {
 		t.Fatal("reviewer preflight dispatched work")
 	}
+	publicRoot := filepath.Join(t.TempDir(), "public-evidence")
+	if err := os.Mkdir(publicRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+	invalidStoreArgs := append([]string{}, flowArgs...)
+	for i := range invalidStoreArgs {
+		if invalidStoreArgs[i] == "--evidence" {
+			invalidStoreArgs[i+1] = publicRoot
+		}
+	}
+	run(invalidStoreArgs, input, false)
+	if backend.submits.Load() != 1 || calls.Load() != 0 {
+		t.Fatal("invalid evidence directory dispatched work", backend.submits.Load(), calls.Load())
+	}
 	for range 2 {
 		run(flowArgs, input, true)
 	}

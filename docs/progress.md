@@ -1015,3 +1015,22 @@ intent is rejected. Native SSH-enabled full remote/CLI race suites passed
 Synthetic provider/loopback evidence does not establish real-model accuracy or
 physical two-host behavior. Full repository gate/push queued. Global enrollment
 of other clients' tasks, installed background service and review UI remain open.
+
+### DAR-132 / DAR-133 — reject unusable review storage before dispatch
+
+A shipped-CLI regression demonstrated that direct dispatch-evaluate accepted an
+absolute but publicly accessible evidence root, submitted original work, and only
+then failed review persistence (backend submits rose from fixture baseline 1 to
+2, reviewer calls stayed 0). Added a common storage preflight before either
+direct or automatic submission. It reuses the strict private-root checks and
+verifies synced temporary-file creation/removal without generating receipts,
+evaluation attempts or quality votes. Existing post-completion checks remain;
+preflight does not promise immunity to later capacity/permission/I/O changes.
+
+The same CLI regression now passes with zero extra dispatch/evaluator calls.
+Focused race tests also cover private-root reuse, no residual records, public
+mode, regular-file and symlink roots, relative paths and missing parents.
+Race package passed 4.211s; targeted vet, source formatting/size and diff passed.
+Original failure is retained in this note; no production inference was involved.
+Full repository validation and conditional push remain queued. This fixes an
+admission-order defect, without changing evidence ownership or grading policy.

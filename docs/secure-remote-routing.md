@@ -976,8 +976,10 @@ trust/TLS flags, `--routes`, `--evidence`, `--request`, evaluator `--config`,
 the same default accuracy-first discovery/selection policy as `auto-dispatch`.
 Explicit exploration remains disabled in these CLI commands.
 
-Reviewer configuration, privacy and declared cost policy are validated before
-original work is submitted. Actual evaluator resource admission and credential
+Reviewer configuration, privacy, declared cost policy and private evidence-root
+storage are validated before original work is submitted. The storage preflight
+creates, syncs and removes a small private probe; it creates no quality evidence.
+It cannot guarantee against later disk exhaustion or permission changes. Actual evaluator resource admission and credential
 resolution occur after successful canonical completion; a later evaluator failure
 does not undo the original task. No remote task is implicitly canceled when the
 caller exits or its review deadline expires.

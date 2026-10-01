@@ -53,6 +53,9 @@ func dispatchReviewOperation(ctx context.Context, client *remote.Client, automat
 		return result, err
 	}
 	defer closeCoordinator()
+	if err = remote.PrepareOutcomeEvidence(root); err != nil {
+		return result, err
+	}
 	store, err := remote.OpenRouteStore(routes)
 	if err != nil {
 		return result, err
