@@ -1204,3 +1204,30 @@ status/result, lifecycle progress and cancellation controls. Starting another
 independent request replaces the recovery link and may duplicate unresolved work;
 preserve earlier IDs and inspect them first. Browser quality-review integration
 is still pending. No live configuration is enabled by this change.
+
+### Browser advisory-review API (UI integration pending)
+
+A separate `web_ui.remote_review` opt-in sets `model` and an explicit `max_cost`
+(including zero). It requires automatic evidence storage and the configured
+evaluation judge. Startup validates reviewer policy without invoking inference.
+Private requests require a local reviewer; each invocation uses the daemon's
+existing shared resource coordinator and configured evaluator admission. Review
+time is bounded to one minute, inside a 75-second browser request limit.
+
+Authenticated, CSRF-protected POST `/api/v1/remote-auto-review` accepts `action`
+(`evaluate` or `status`) and `request` containing the exact original automatic
+browser-dispatch fields. The original prompt and routing intent must match the
+immutable selection and route binding. No reviewer, cost override, verdict,
+method or receipt supplied by the browser is accepted as authority. The service
+authenticates completed output and its actual model/harness provenance before
+using the existing durable one-attempt evaluator. Incomplete tasks are not
+reviewed. Uncertain evaluator calls are not automatically repeated.
+
+Evaluation responses report attempt status and whether a review was applied;
+they do not assert that its verdict remains the current head. The `status`
+action performs no evaluation or ledger creation and projects the current
+classification, method and verdict after authenticating original completion.
+AI reviews remain advisory. Existing operator heads are not automatically
+replaced. No prompt is stored by the browser API for reload recovery: callers
+must supply the original request again. Settings review form and automatic
+background supervision are not implemented by this API.

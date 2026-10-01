@@ -202,3 +202,38 @@ func TestAutomaticRemoteBrowserRequiresExplicitEvidenceOptIn(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteBrowserReviewerNeedsExplicitPolicyAndCost(t *testing.T) {
+	s := Defaults()
+	zero := 0.0
+	s.WebUI.RemoteReview = &WebUIRemoteReview{Model: "reviewer", MaxCost: &zero}
+	if s.Validate() == nil {
+		t.Fatal("disabled UI review")
+	}
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTaskControls = true
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
+	s.WebUI.RemoteDispatchDirectory = "/private/routes"
+	if s.Validate() == nil {
+		t.Fatal("review without outcome evidence")
+	}
+	s.WebUI.RemoteAutomaticEvidenceDirectory = "/private/evidence"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.RemoteReview.MaxCost = nil
+	if s.Validate() == nil {
+		t.Fatal("implicit cost allowed")
+	}
+	negative := -1.0
+	s.WebUI.RemoteReview.MaxCost = &negative
+	if s.Validate() == nil {
+		t.Fatal("negative cost allowed")
+	}
+	s.WebUI.RemoteReview.MaxCost = &zero
+	s.WebUI.RemoteReview.Model = ""
+	if s.Validate() == nil {
+		t.Fatal("implicit reviewer allowed")
+	}
+}

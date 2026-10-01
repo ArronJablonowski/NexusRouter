@@ -50,7 +50,12 @@ type WebUIRemoteClient struct {
 	CAFile          string `yaml:"ca_file" json:"ca_file"`
 }
 
+type WebUIRemoteReview struct {
+	Model   string   `yaml:"model" json:"model"`
+	MaxCost *float64 `yaml:"max_cost" json:"max_cost"`
+}
 type WebUI struct {
+	RemoteReview                     *WebUIRemoteReview `yaml:"remote_review,omitempty" json:"remote_review,omitempty"`
 	RemoteAutomaticEvidenceDirectory string             `yaml:"remote_automatic_evidence_directory,omitempty" json:"remote_automatic_evidence_directory,omitempty"`
 	RemoteDispatchDirectory          string             `yaml:"remote_dispatch_directory,omitempty" json:"remote_dispatch_directory,omitempty"`
 	RemoteTaskControls               bool               `yaml:"remote_task_controls" json:"remote_task_controls"`

@@ -282,6 +282,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
+		var remoteReviewer webuiapp.RemoteAutomaticReviewer
 		var remoteAutomatic webuiapp.RemoteAutomatic
 		var remoteDispatcher webuiapp.RemoteDispatcher
 		var remoteInspector webuiapp.RemoteInspector
@@ -302,13 +303,25 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 						return 1
 					}
 					remoteAutomatic = &webuiapp.RecordedRemoteAutomatic{Client: client, Store: store, EvidenceRoot: root}
+					if review := s.WebUI.RemoteReview; review != nil {
+						model, cost := review.Model, *review.MaxCost
+						policy := func(private bool) (remote.RemoteEvaluator, error) {
+							e, local, err := service.ConfiguredEvaluator(model, cost, private)
+							return remote.RemoteEvaluator{Evaluator: e, Local: local, Timeout: time.Minute}, err
+						}
+						if _, err := policy(false); err != nil {
+							fmt.Fprintln(stderr, "cannot initialize remote reviewer policy")
+							return 1
+						}
+						remoteReviewer = &webuiapp.RecordedRemoteReviewer{Client: client, Store: store, EvidenceRoot: root, Policy: policy}
+					}
 				}
 			}
 			if s.WebUI.RemoteTaskControls {
 				remoteTaskController = client
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

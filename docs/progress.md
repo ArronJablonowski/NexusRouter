@@ -1280,3 +1280,22 @@ a protocol-integration gap in prior synthetic browser tests; it does not prove
 model quality, ranking among multiple candidates, installed-harness execution,
 physical two-system behavior or browser review completion. Combined full gate
 and push remain pending. No live service or inference was used.
+
+## 2026-10-01 — opt-in browser remote advisory review API
+
+Added explicit reviewer-model/cost configuration and session/CSRF-protected
+evaluate/status API for completed automatic requests. Resolve original intent
+before reviewer policy; use the daemon's configured evaluator/shared resource
+coordinator and existing durable no-replay evaluation receipts. Authenticated
+actual output provenance and private/local policy remain enforced by the remote
+evaluator. Browser verdicts, reviewer overrides and arbitrary receipt imports
+are not accepted. Evaluation responses do not project a possibly superseded
+review; separate read-only status shows current ledger classification/head.
+
+BFF/config race suites passed, as did targeted CLI/BFF/config vet and source/diff
+checks. Tests cover unauthorized and malformed requests, no callback before
+valid original binding, disabled configuration, explicit cost, uncertainty
+without retry, metadata projection and advisory automated-AI current-head status.
+These are interface/policy tests, not completed browser-to-provider qualification.
+Settings review form, combined background supervision, full repository gate and
+physical-host qualification remain pending. No live evaluator invoked.
