@@ -20,6 +20,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/remoteconfig"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"go.yaml.in/yaml/v3"
 )
@@ -85,6 +86,11 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	cfg.Providers = []config.Provider{{ID: "local", Kind: "ollama", Endpoint: "http://127.0.0.1:FIXTURE_PORT"}}
 	zero := 0.0
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, ContextTokens: 8192, EstimatedCost: &zero}}
+	registration := physicalHarnessRegistration(t)
+	if registration != nil {
+		cfg.NativeHarnesses = []config.NativeHarness{*registration}
+		cfg.NativeHarnessEvidenceDir = "FIXTURE_DIRECTORY/evidence"
+	}
 	ca := newCA(t)
 	sc, sp := ca.leaf(t, "node-a")
 	cc, cp := ca.leaf(t, "node-b")
@@ -103,6 +109,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	files["config.yaml"] = base64.StdEncoding.EncodeToString(cfgBody)
 	caller := testPeer("node-b", cp, "https://127.0.0.1:443")
+	if registration != nil {
+		caller.Harnesses = []string{registration.ID}
+	}
 	trustBody, _ := json.Marshal(Registry{Version: 1, Peers: []Peer{caller}})
 	files["trust.json"] = base64.StdEncoding.EncodeToString(trustBody)
 	payload, _ := json.Marshal(map[string]any{"files": files, "address": address, "binary": binary, "sha256": digest})
@@ -134,7 +143,7 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	if os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_FROM_CONFIG") == "1" {
 		advertisedInterface = ""
 	}
-	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort, "advertise_interface": advertisedInterface})
+	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort, "advertise_interface": advertisedInterface, "fixture_path": os.Getenv("NEXUS_REMOTE_TEST_PATH")})
 	runCtx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	args := append(append([]string{}, ssh...), "-o", "ExitOnForwardFailure=yes", "-R", fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%s", host.ProviderPort, localPort), user+"@"+address, "python3 -c "+quote(twoHostRun))
@@ -155,6 +164,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	trust := filepath.Join(local, "peers.json")
 	destination := testPeer("node-a", sp, fmt.Sprintf("https://%s:%d", address, host.Port))
+	if registration != nil {
+		destination.Harnesses = []string{registration.ID}
+	}
 	writeRegistry(t, trust, destination)
 	client := &Client{Trust: TrustFile(trust), Credentials: cc}
 	deadline := time.Now().Add(15 * time.Second)
@@ -205,6 +217,16 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			}
 			writeRegistry(t, trust, destination)
 			task := testTask()
+			if registration != nil {
+				task.HarnessID = registration.ID
+				task.HarnessDifficulty = "hard"
+				task.ContextTokens = cfg.Models[0].ContextTokens
+				expected, e := client.HarnessIdentity(ctx, "node-a", HarnessIdentityRequest{ModelID: task.ModelID, HarnessID: task.HarnessID, ContextTokens: task.ContextTokens})
+				if e != nil {
+					t.Fatal(e)
+				}
+				task.ExpectedHarnessIdentity = &expected.Identity
+			}
 			request := "physical-" + transport + "-success-001"
 			routes, err := OpenRouteStore(filepath.Join(local, "routes-"+transport))
 			if err != nil {
@@ -240,6 +262,12 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			page, err := client.Events(ctx, "node-a", request, result.TaskIDs[0], 0)
 			if err != nil || len(page.Events) == 0 {
 				t.Fatal("missing durable events", err)
+			}
+			if registration != nil {
+				actual, e := runtime.ValidateHarnessOutcome(page.Events, result.TaskIDs[0])
+				if e != nil || actual.Actual != *task.ExpectedHarnessIdentity || actual.Actual.Harness != registration.Kind || actual.Actual.ModelRevision != registration.ModelRevision || actual.Task.Difficulty != "hard" {
+					t.Fatal("physical harness identity mismatch", actual, e)
+				}
 			}
 			routes, err = OpenRouteStore(filepath.Join(local, "routes-"+transport))
 			if err != nil {
@@ -291,6 +319,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			}
 			wait(blockedKey, "canceled")
 		})
+	}
+	if t.Failed() {
+		return
 	}
 	physicalRestartRecovery(t, ctx, client, local, blocked, func() {
 		input, _ := json.Marshal(map[string]string{"directory": host.Directory, "binary": binary})

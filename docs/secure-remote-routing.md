@@ -1613,3 +1613,30 @@ directory/processes at teardown. Existing model services and SSH configuration
 are not modified. Do not point this test at a production router's storage or
 credentials. The remote binary is not race-instrumented merely because the
 caller uses `-race`.
+
+
+### Remote observation clock tolerance
+
+Capability, harness identity/readiness and advisory capacity timestamps may be
+up to one second ahead of the caller clock. Observations older than 15 seconds
+remain unavailable. Both peers should still synchronize their clocks. This
+bounded allowance addresses measured approximately 40ms Mac/Spark clock skew;
+it does not change TLS certificate validity, evidence/review timestamps or the
+destination's resource-admission clock checks. Configured identity remains an
+advisory preview and must match the actual completed harness identity.
+
+### Physical Pi fixture
+
+The two-host fixture optionally accepts `NEXUS_REMOTE_TEST_HARNESS_FIXTURE`, a
+local JSON file containing one pinned Pi registration for destination model
+`chat`, revision `fixture-v1`, with native tools disabled. The referenced
+executable must already exist on the destination. `NEXUS_REMOTE_TEST_PATH` may
+supply an explicit absolute-component PATH for its Node runtime; it changes
+only the disposable host environment. No installer runs from this fixture.
+
+The transport cases use this harness for successful dispatch, response-loss
+recovery and running cancellation over both HTTPS and SSH. Identity is read
+from the authenticated destination, bound to each task, then independently
+matched against durable completion events. The following host-crash cases
+still use the native model path; they do not qualify external-harness crash
+side effects. Synthetic provider call totals must remain eight.

@@ -138,9 +138,12 @@ func (b *SDKBackend) Events(ctx context.Context, id string, after int64, limit i
 	return b.Client.ReadEvents(ctx, id, after, limit)
 }
 
-func freshObservation(t time.Time) bool {
-	now := time.Now()
-	return !t.IsZero() && !t.After(now) && !t.Before(now.Add(-15*time.Second))
+// Remote nodes have independent clocks. Permit at most one second of positive
+// skew for advisory observations; old observations retain the 15-second limit.
+// This does not alter certificate validity or destination resource admission.
+func freshObservation(t time.Time) bool { return freshObservationAt(t, time.Now()) }
+func freshObservationAt(t, now time.Time) bool {
+	return !t.IsZero() && !t.After(now.Add(time.Second)) && !t.Before(now.Add(-15*time.Second))
 }
 func cloneModels(source []Model) []Model {
 	out := slices.Clone(source)

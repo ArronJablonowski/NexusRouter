@@ -1839,3 +1839,30 @@ Evidence: reporting outputs/systemd-advertisement-qualification/manifest.json
 and native-test.log. Full combined make check and normal push will be queued
 behind the already running systemd checkpoint; no full-gate pass or live
 deployment is claimed. DAR-133 remains In Progress.
+
+
+## 2026-10-01 — physical Pi routing and remote clock skew
+
+Extended the physical Mac/Spark fixture with an explicit pinned Pi registration,
+separate harness evidence and caller/destination scopes. Actual authenticated
+harness identity is bound before dispatch and compared with immutable terminal
+events. HTTPS and SSH now exercise Pi success, committed-response loss recovery,
+reopened caller deduplication and running cancellation. Later crash recovery
+continues to use the native-model path, not arbitrary harness side effects.
+
+The first physical identity probes exposed a real interoperability defect:
+Spark replies were about 40ms ahead of the Mac, and any positive clock difference
+was rejected. Advisory observation validation now allows up to one second ahead
+while retaining the 15-second stale limit. Certificate/evidence times and local
+resource admission are unchanged. Boundary tests cover zero, measured offset,
+maximum and excessive skew, and stale observations. Initial failure produced
+zero harness dispatches; it was not counted as a quality failure.
+
+With the fix, the actual pinned Spark Pi 0.99.2 test passed 50.17s (Mac race package
+51.615s), eight synthetic provider calls total. No real-model quality, Linux race
+instrumentation or deployment claimed. Installed Pi 0.85.1 remains unchanged;
+Pi 0.99.2 uses the isolated previously hash-verified runtime. All fixture host
+directories removed and existing Ollama untouched. Relevant focused race tests
+passed 1.583s; full remote race suite passed 27.427s. Source checks and targeted vet pass. Full repository validation remains queued.
+Evidence: reporting outputs/spark-pi-qualification/physical-test-clock-fix.log.
+DAR-133 remains In Progress; full check/normal push queued behind frozen gate.

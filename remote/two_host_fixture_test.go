@@ -24,6 +24,9 @@ import sys,json,pathlib,subprocess,os
 p=json.load(sys.stdin);d=pathlib.Path(p['directory']);assert str(d).startswith('/tmp/nexus-two-host-')
 assert json.loads((d/'owner.json').read_text())['binary']==p['binary']
 env=dict(os.environ);env['DARWIN_PROCESS_OWNER_DIR']=str(d/'owners')
+if p.get('fixture_path'):
+ assert all(pathlib.Path(v).is_absolute() for v in p['fixture_path'].split(':'))
+ env['PATH']=p['fixture_path']
 args=[p['binary'],'remote','serve','--instance','node-a','--listen',p['address']+':'+str(p['port']),'--config',str(d/'config.yaml'),'--journal',str(d/'journal'),'--trust',str(d/'trust.json'),'--cert',str(d/'cert.pem'),'--key',str(d/'key.pem'),'--ca',str(d/'ca.pem')]
 if p.get('advertise_interface'):args+=['--advertise-interface',p['advertise_interface'],'--advertise-name','node-a','--advertise-ssh-port','22']
 with (d/'host.log').open('w') as log:
