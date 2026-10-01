@@ -81,7 +81,11 @@ func (c Config) validate() error {
 // Run performs one admitted isolated text-only execution. The native process
 // must exit and its projection must bind to the gateway's verified response.
 // Incomplete, canceled or uncertain runs return no accepted output and no retry.
-func Run(ctx context.Context, c Config, prompt string) (result Result, runErr error) {
+func Run(ctx context.Context, c Config, prompt string) (Result, error) {
+	return runConfigured(ctx, c, prompt, nil)
+}
+
+func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExecution) (result Result, runErr error) {
 	if ctx == nil || ctx.Err() != nil || c.validate() != nil || !utf8.ValidString(prompt) || strings.TrimSpace(prompt) == "" || len(prompt) > MaxRecordBytes/2 {
 		return Result{}, ErrProjection
 	}
@@ -96,6 +100,9 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 		return Result{}, ErrProjection
 	}
 	identity, err := c.Identity()
+	if agent != nil {
+		identity, err = agent.identity, nil
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -143,7 +150,19 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			runErr = ErrRun
 		}
 	}()
-	base, key, verified, closeGateway, err := startGateway(ctx, gatewayConfig{UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages})
+	var base, key string
+	var closeGateway func()
+	var gateway *textgateway.AgentGateway
+	gc := textgateway.Config{UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages}
+	if agent == nil {
+		base, key, verified, closeGateway, err = textgateway.Start(ctx, gc)
+	} else {
+		gateway, err = textgateway.StartAgent(ctx, textgateway.AgentConfig{Config: gc, Actual: identity, Session: agent.session, Tools: agent.config.Tools, NamespaceTools: true})
+		if err == nil {
+			base, key, closeGateway = gateway.BaseURL, gateway.Token, gateway.Close
+		}
+	}
+
 	if err != nil {
 		return Result{}, err
 	}
@@ -151,6 +170,14 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	path, env, err := isolatedFiles(dir, base, key, c.Provider, c.Model, c.ContextTokens, c.MaxOutputTokens)
 	if err != nil {
 		return Result{}, err
+	}
+	var receipts string
+	if agent != nil {
+		env = append(env, "HOME="+dir)
+		receipts, err = agentFiles(dir, path, agent, gateway, c.Timeout)
+		if err != nil {
+			return Result{}, err
+		}
 	}
 	versionCtx, versionCancel := context.WithTimeout(ctx, 10*time.Second)
 	version := exec.CommandContext(versionCtx, c.Executable, "--version")
@@ -180,6 +207,21 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	}
 	if err != nil {
 		return Result{}, ErrRun
+	}
+	if agent != nil {
+		transcript, e := gateway.Transcript()
+		if e != nil {
+			return Result{}, e
+		}
+		projection, e := parseAgentProjection(output.data, command.ProcessState.ExitCode(), c.Provider, c.Model, receipts, transcript)
+		if e != nil {
+			return Result{}, e
+		}
+		final, e := gateway.Final()
+		if e != nil || projection.Text != strings.TrimRightFunc(final, jsWhitespace) {
+			return Result{}, ErrProjection
+		}
+		return Result{Text: projection.Text, Identity: identity}, nil
 	}
 	projection, err := ParseProjection(output.data, command.ProcessState.ExitCode(), c.Provider, c.Model)
 	if err != nil {

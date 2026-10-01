@@ -11126,3 +11126,28 @@ source/diff checks. Tests use controlled providers; they do not rank real models
 Full make check and push are queued behind the previous live frozen gate. No
 service was deployed. OpenClaw native host tools, real-model comparative runs and
 remaining remote-routing product/physical-host qualification remain outstanding.
+
+### DAR-132: OpenClaw native host-tool embedding
+
+Added OpenClaw 2026.9.7 RunAgent/RunAgentTask with a pinned private plugin,
+explicit host-only tool catalogue and disabled native tool-search rewriting.
+Original callback IDs authorize calls through the ordered loopback host bridge;
+normalized native provider IDs never replace canonical journal identity. Bounded
+plugin receipts are reconciled against canonical calls, exact JSON arguments,
+results and failure flags. Native turn/tool/failure counts and final payload are
+also checked against host evidence. Recoverable errors use details.status=error;
+OpenClaw's overall ok flag alone never proves successful execution. No installed
+package or production configuration was changed.
+
+Installed OpenClaw passed ten native race fixture modes (61.608s driver): normal,
+identical-argument distinct calls, recoverable failure, end-tool-use, denied tool,
+wrong model, provider/tool cancellation, turn ceiling and Ollama. Negative receipt
+and summary reconciliation plus identity/ownership tests passed (1.416s); targeted
+vet, source formatting/size and diff checks passed. Direct answers with no tool
+calls are accepted only with an empty receipt stream and canonical final answer.
+These are controlled fixtures, not real-model comparative evidence.
+
+This checkpoint exposes embedding only. OpenClaw native_tools SDK/application
+registration and HTTP/CLI/approval qualification remain next. Full make check and
+push are queued behind the preceding frozen branch's live validation; no
+production deployment or completed DAR-132 claim.
