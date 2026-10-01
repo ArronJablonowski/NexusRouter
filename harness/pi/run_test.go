@@ -84,7 +84,7 @@ func TestNativePiIsolatedRPC(t *testing.T) {
 	}
 	verifyNativeLearningBoundary(t, result, journal, taskResult.Execution)
 	expectedIdentity, identityErr := cfg.Identity()
-	if identityErr != nil || result.Identity != expectedIdentity || result.Usage == nil || *result.Usage.Input != 20 || *result.Usage.Output != 4 || *result.Usage.TotalTokens != 24 {
+	if identityErr != nil || result.Identity != expectedIdentity || result.MeasuredUsage == nil || result.MeasuredUsage.InputTokens != 20 || result.MeasuredUsage.OutputTokens != 4 || result.Usage == nil || *result.Usage.Input != 20 || *result.Usage.Output != 4 || *result.Usage.TotalTokens != 24 {
 		t.Fatal("lost native provenance/usage", result, identityErr)
 	}
 	if calls.Load() != 1 || released.Load() != 1 {

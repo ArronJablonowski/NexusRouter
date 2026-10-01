@@ -43,7 +43,7 @@ func TestGatewayUsesOnlyPolicyTransportAndProviderCredential(t *testing.T) {
 		if r.URL.String() != "https://provider.invalid/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer secret-one" || r.Header.Get("X-Untrusted") != "" {
 			t.Error("policy request changed endpoint or leaked headers")
 		}
-		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: [DONE]\n\n"))}, nil
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(`data: {"id":"fixture","object":"chat.completion.chunk","model":"model","choices":[{"index":0,"delta":{"content":"answer"},"finish_reason":"stop"}]}` + "\n\ndata: [DONE]\n\n"))}, nil
 	})
 	base, key, closeGateway, e := startGateway(context.Background(), c)
 	if e != nil {
@@ -172,5 +172,30 @@ func TestGatewayConfigRequiresExplicitTransportPolicy(t *testing.T) {
 	c.TransportPolicySHA256 = ""
 	if c.validate() == nil {
 		t.Fatal("missing policy identity accepted")
+	}
+}
+
+func TestVerifiedGatewayRejectsTruncatedOrWrongModel(t *testing.T) {
+	for _, bad := range []string{
+		`data: {"id":"fixture","object":"chat.completion.chunk","model":"model","choices":[{"index":0,"delta":{"content":"answer"},"finish_reason":"length"}]}` + "\n\ndata: [DONE]\n\n",
+		`data: {"id":"fixture","object":"chat.completion.chunk","model":"other","choices":[{"index":0,"delta":{"content":"answer"},"finish_reason":"stop"}]}` + "\n\ndata: [DONE]\n\n",
+		"data: [DONE]\n\n",
+	} {
+		c := identityConfig()
+		var calls atomic.Int32
+		c.Transport = policyTransport(func(*http.Request) (*http.Response, error) {
+			calls.Add(1)
+			return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(bad))}, nil
+		})
+		base, key, verified, closeGateway, err := startVerifiedGateway(context.Background(), c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		code := gatewayCall(t, base, key, gatewayBody)
+		got, err := verified()
+		closeGateway()
+		if code != 502 || err == nil || got.Usage != nil || got.Text != "" || calls.Load() != 1 {
+			t.Fatal("unverified provider success", code, got, err)
+		}
 	}
 }

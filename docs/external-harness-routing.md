@@ -245,7 +245,7 @@ providers and `/api/chat` for Ollama. Use the actual configured provider kind;
 Ollama context allocation is enforced through its native options, not inferred
 from compatibility-endpoint metadata.
 
-Adapter `pi-rpc-text-v4` forwards the host-assembled system/user/assistant messages
+Adapter `pi-rpc-text-v5` forwards the host-assembled system/user/assistant messages
 through the single-request policy gateway, retaining their roles. The durable
 start records the same context; successful terminal events bind the delivered,
 redacted text to `Result.HarnessOutcome`. `ReadEvents` exposes that canonical
@@ -255,11 +255,13 @@ delegation, tools and unsupported capabilities are rejected without a substitute
 execution. Deterministic response-contract failure is terminal, without repair or
 hidden inference retry.
 
-`Result.Usage` remains absent: Pi's normalized harness-reported counters must not
-be presented as provider-measured usage. Durable usage/cost accounting, ordinary
-broader model/harness selection across adapters,
-CLI/API registration, tools and other harness adapters
-remain outstanding. A successful execution alone creates no quality vote.
+`Result.Usage` contains verified upstream measurements when reported; it remains
+nil when unreported. Pi-normalized counters are retained only on the low-level
+native result and never substituted for measurements. The shared gateway binds
+normal provider completion and exact native text before returning success.
+Usage is persisted in the terminal journal; accounting aggregation and incomplete
+attempt measurements remain unfinished. CLI/API registration and tools remain
+outstanding. A successful execution alone creates no quality vote.
 
 
 ## SDK outcome reconciliation and evaluated feedback

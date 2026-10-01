@@ -39,7 +39,7 @@ func RunTask(ctx context.Context, j runtime.Journal, c Config, t Task) (TaskResu
 		Execute: func(run context.Context) (runtime.HarnessOutput, error) {
 			var e error
 			native, e = Run(run, c, t.Prompt)
-			return runtime.HarnessOutput{Actual: native.Identity, Text: native.Text}, e
+			return runtime.HarnessOutput{Actual: native.Identity, Text: native.Text, Usage: native.MeasuredUsage}, e
 		},
 	})
 	if err != nil {

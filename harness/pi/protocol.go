@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"strings"
 	"unicode/utf8"
 )
@@ -20,6 +21,8 @@ const MaxRecords = 10000
 // Result describes execution, not correctness. Quality requires a separately
 // bound evaluation. Thinking, tool arguments and raw errors are not returned.
 type Result struct {
+	// MeasuredUsage comes only from the verified upstream gateway, not Pi normalization.
+	MeasuredUsage         *providers.Usage
 	Provider, Model, Text string
 	Identity              harness.Identity
 	Usage                 *Usage

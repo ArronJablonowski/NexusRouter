@@ -10198,3 +10198,19 @@ separate protocol and measurements from adapter failures before verified normal
 completion. Current runners return unknown usage on those failures; this change
 does not invent counts or claim complete failure accounting. No live accounting
 store, provider or router configuration was changed.
+
+## Pi verified provider boundary and measured usage — DAR-132 (2026-10-01)
+
+Pi now uses the shared verified gateway instead of raw upstream SSE forwarding.
+Success requires a normally completed provider stream with matching actual model,
+DONE and EOF, plus exact native output. Adapter identity is pi-rpc-text-v5 so
+prior evidence is not silently treated as equivalent. Native Pi-normalized Usage
+remains separate; MeasuredUsage supplies SDK/journal input/output measurements.
+
+Native Pi suite passed (8.465s); added wrong-model, truncated/length and lone-DONE
+refusal tests plus measured native-result checks passed (8.710s selected suite).
+SDK native Pi context, measured usage, Ollama terminal/cancel and response-contract
+fixtures passed (15.867s). Two old assertions requiring nil usage despite fixture
+provider counts were updated to require exact verified counts. Vet/source/diff
+checks passed. Full gate queued before push. Accounting aggregation and measured
+usage from incomplete attempts remain unfinished; no live state was changed.

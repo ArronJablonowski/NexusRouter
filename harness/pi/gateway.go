@@ -3,168 +3,18 @@ package pi
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/harness/internal/textgateway"
 	"io"
-	"log"
-	"net"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
-// startGateway exposes only one authenticated completion operation to the
-// isolated child. All upstream traffic uses the host policy transport. The
-// opaque child token is distinct from the provider credential.
-func startGateway(ctx context.Context, c Config) (base, key string, closeGateway func(), err error) {
-	target, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return "", "", nil, ErrProtocol
-	}
-	suffix := "/chat/completions"
-	if c.UpstreamProtocol == "ollama" {
-		suffix = "/api/chat"
-	}
-	target.Path = strings.TrimRight(target.Path, "/") + suffix
-	target.RawPath = ""
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		return "", "", nil, ErrRun
-	}
-	var handlers sync.WaitGroup
-	var lifecycle sync.Mutex
-	closed := false
-	token := rand.Text()
-	var dispatched atomic.Bool
-	client := &http.Client{Transport: c.Transport, Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		lifecycle.Lock()
-		if closed {
-			lifecycle.Unlock()
-			http.Error(w, "gateway closed", http.StatusServiceUnavailable)
-			return
-		}
-		handlers.Add(1)
-		lifecycle.Unlock()
-		defer handlers.Done()
-		deny := func(code int) { http.Error(w, "harness request denied", code) }
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/chat/completions" || r.URL.RawQuery != "" || r.URL.RawPath != "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+token)) != 1 {
-			deny(http.StatusForbidden)
-			return
-		}
-		body, e := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxRecordBytes))
-		if e != nil || !validGatewayRequest(body, c.Model, c.MaxOutputTokens) {
-			deny(http.StatusBadRequest)
-			return
-		}
-		// Normalize nested JSON through the same parser used for validation so
-		// upstream parsers cannot reinterpret duplicate nested fields.
-		var canonical any
-		d := json.NewDecoder(bytes.NewReader(body))
-		d.UseNumber()
-		if d.Decode(&canonical) != nil {
-			deny(http.StatusBadRequest)
-			return
-		}
-		if len(c.Messages) > 0 {
-			contextBody, contextErr := contextMessages(c.Messages)
-			if contextErr != nil {
-				deny(http.StatusBadRequest)
-				return
-			}
-			canonical.(map[string]any)["messages"] = json.RawMessage(contextBody)
-		}
-		body, e = json.Marshal(canonical)
-		if e != nil || len(body) > MaxRecordBytes || !validGatewayRequest(body, c.Model, c.MaxOutputTokens) {
-			deny(http.StatusBadRequest)
-			return
-		}
-		if c.UpstreamProtocol == "ollama" {
-			body, e = ollamaRequest(body, c)
-			if e != nil {
-				deny(http.StatusBadRequest)
-				return
-			}
-		}
-		if !dispatched.CompareAndSwap(false, true) {
-			deny(http.StatusConflict)
-			return
-		}
-		upstream, cancel := context.WithCancel(ctx)
-		defer cancel()
-		stop := context.AfterFunc(r.Context(), cancel)
-		defer stop()
-		request, e := http.NewRequestWithContext(upstream, http.MethodPost, target.String(), bytes.NewReader(body))
-		if e != nil {
-			deny(http.StatusBadGateway)
-			return
-		}
-		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Accept", "text/event-stream")
-		if c.UpstreamProtocol == "ollama" {
-			request.Header.Set("Accept", "application/x-ndjson")
-		}
-		if c.APIKey != "" {
-			request.Header.Set("Authorization", "Bearer "+c.APIKey)
-		}
-		response, e := client.Do(request)
-		if e != nil {
-			deny(http.StatusBadGateway)
-			return
-		}
-		defer response.Body.Close()
-
-		if c.UpstreamProtocol == "ollama" {
-			if response.StatusCode != http.StatusOK {
-				deny(http.StatusBadGateway)
-				return
-			}
-			translated, err := ollamaCompletion(response.Body, c.Model)
-			if err != nil {
-				deny(http.StatusBadGateway)
-				return
-			}
-			w.Header().Set("Content-Type", "text/event-stream")
-			w.Header().Set("Cache-Control", "no-store")
-			_, _ = w.Write(translated)
-			return
-		}
-		if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
-			deny(http.StatusBadGateway)
-			return
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-store")
-		w.WriteHeader(http.StatusOK)
-		// The RPC reader has independent framing/output caps. Bound the raw provider
-		// stream too; truncation cannot manufacture the native completion marker.
-		_, _ = io.CopyN(flushWriter{w}, response.Body, 16<<20)
-	})
-	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: c.Timeout, WriteTimeout: c.Timeout, MaxHeaderBytes: 8192, ErrorLog: log.New(io.Discard, "", 0)}
-	done := make(chan struct{})
-	go func() { defer close(done); _ = server.Serve(listener) }()
-	return "http://" + listener.Addr().String() + "/v1", token, func() {
-		lifecycle.Lock()
-		closed = true
-		lifecycle.Unlock()
-		_ = server.Close()
-		<-done
-		handlers.Wait()
-	}, nil
+func startVerifiedGateway(ctx context.Context, c Config) (string, string, func() (textgateway.Completion, error), func(), error) {
+	return textgateway.Start(ctx, textgateway.Config{UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages})
 }
 
-type flushWriter struct{ http.ResponseWriter }
-
-func (w flushWriter) Write(p []byte) (int, error) {
-	n, err := w.ResponseWriter.Write(p)
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
-	return n, err
+func startGateway(ctx context.Context, c Config) (string, string, func(), error) {
+	base, key, _, closeGateway, err := startVerifiedGateway(ctx, c)
+	return base, key, closeGateway, err
 }
 
 func validGatewayRequest(body []byte, model string, limit int) bool {

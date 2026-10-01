@@ -134,7 +134,7 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if version.Run() != nil || strings.TrimSpace(string(versionOutput.data)) != SupportedVersion {
 		return Result{}, ErrProtocol
 	}
-	gatewayURL, gatewayKey, closeGateway, gatewayErr := startGateway(ctx, c)
+	gatewayURL, gatewayKey, verified, closeGateway, gatewayErr := startVerifiedGateway(ctx, c)
 	if gatewayErr != nil {
 		return Result{}, gatewayErr
 	}
@@ -231,8 +231,16 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 		}
 		if settled {
 			result, err := protocol.Result()
+			if err != nil {
+				return Result{}, err
+			}
+			completion, e := verified()
+			if e != nil || result.Text != completion.Text {
+				return Result{}, ErrProtocol
+			}
 			result.Identity = identity
-			return result, err
+			result.MeasuredUsage = completion.Usage
+			return result, nil
 		}
 	}
 	if ctx.Err() != nil {

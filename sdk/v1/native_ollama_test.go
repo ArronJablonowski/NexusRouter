@@ -65,7 +65,7 @@ func TestSDKNativePiOllamaContextAndTerminal(t *testing.T) {
 				t.Fatal("unexpected inference count", calls.Load(), err)
 			}
 			if mode == "valid" {
-				if err != nil || result.Text != "native Ollama answer" || result.HarnessOutcome == nil || result.Usage != nil {
+				if err != nil || result.Text != "native Ollama answer" || result.HarnessOutcome == nil || result.Usage == nil || result.Usage.InputTokens != 10 || result.Usage.OutputTokens != 4 {
 					t.Fatal(result, err)
 				}
 			} else if err == nil || result.Text != "" || result.HarnessOutcome != nil || strings.Contains(err.Error(), "private") {

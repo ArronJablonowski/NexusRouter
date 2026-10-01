@@ -9,7 +9,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/harness"
 )
 
-const AdapterVersion = "pi-rpc-text-v4"
+const AdapterVersion = "pi-rpc-text-v5"
 
 // Identity binds the actual protocol-checked provider/model to the admitted
 // configuration. ModelRevision is a trusted host attestation of the deployed

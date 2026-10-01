@@ -144,8 +144,8 @@ func TestSDKNativePiUsesAdmissionContextAndDurableEvents(t *testing.T) {
 	if err := client.ReviewHarnessOutcome(context.Background(), ledger, result.TaskID, review); err != nil {
 		t.Fatal(err)
 	}
-	if result.Usage != nil {
-		t.Fatal("harness normalized usage mislabeled provider-measured")
+	if result.Usage == nil || result.Usage.InputTokens != 20 || result.Usage.OutputTokens != 4 {
+		t.Fatal("verified provider measurement missing")
 	}
 	if _, err := client.Submit(context.Background(), "native-queue-not-supported", req); !errors.Is(err, sdk.ErrHarnessUnsupported) {
 		t.Fatal("queued native request accepted without durable registration", err)
@@ -213,4 +213,11 @@ func TestSDKNativePiCancellationAndResponseContract(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSDKPiMeasuredContextAndEvidence(t *testing.T) {
+	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
+		t.Skip("native Pi required")
+	}
+	nativeSDKContextAndEvidence(t, "pi")
 }

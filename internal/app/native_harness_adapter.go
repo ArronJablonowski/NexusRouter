@@ -32,7 +32,7 @@ func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens
 	case "pi":
 		return nativeAdapter{Identity: c.Identity, MaxOutputTokens: c.MaxOutputTokens, Run: func(ctx context.Context, prompt string) (runtime.HarnessOutput, error) {
 			result, err := pi.Run(ctx, c, prompt)
-			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text}, err
+			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text, Usage: result.MeasuredUsage}, err
 		}}, nil
 	case "openclaw":
 		oc := openclaw.Config{Executable: c.Executable, ExecutableSHA256: c.ExecutableSHA256, Provider: c.Provider, Model: c.Model, ModelRevision: c.ModelRevision, BaseURL: c.BaseURL, APIKey: c.APIKey, UpstreamProtocol: c.UpstreamProtocol, TransportPolicySHA256: c.TransportPolicySHA256, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Messages: c.Messages, Transport: c.Transport, Admit: c.Admit, Prices: &openclaw.Prices{Input: c.Prices.Input, Output: c.Prices.Output, CacheRead: c.Prices.CacheRead, CacheWrite: c.Prices.CacheWrite}}
