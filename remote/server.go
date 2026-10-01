@@ -140,7 +140,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var result any
 	if op == "info" {
 		var info Info
-		info, err = s.backend.Info(ctx)
+		if scoped, ok := s.backend.(interface {
+			InfoFor(context.Context, []string, bool) (Info, error)
+		}); ok {
+			info, err = scoped.InfoFor(ctx, slices.Clone(peer.Models), peer.AllowCloudInference)
+		} else {
+			info, err = s.backend.Info(ctx)
+		}
 		if err == nil {
 			info.Version = Version
 			info.Instance = s.instance

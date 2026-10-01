@@ -144,8 +144,25 @@ HTTP operation slots. This is not a multi-tenant billing or rate-quota system.
 Caller identity comes from the authenticated certificate pin. Task keys and event
 access are scoped to that caller. There is no remote database-wide task listing,
 filesystem endpoint, runtime configuration mutation, or cross-caller cancellation.
-`info` advertises configured capabilities, not a live provider capability probe
-or a promise of free capacity; dispatch independently checks actual admission.
+`info` retains configured capabilities and adds fresh advisory observations.
+The shipped SDK backend filters the paired model/cloud scope before probing
+provider inventories, so callers cannot trigger unrelated provider lookups.
+Each distinct eligible provider/locality policy is queried once per request;
+no result is cached across requests. A model observation is `present`, `absent`
+or `unknown`, with `checked_at`. Credentials missing, rejected policy, or a failed
+provider query yield unknown, not absence or available capacity. Inventories do
+not attest model digests, native tool support or configured capabilities.
+
+Provider probes have two-second limits inside a ten-second observation budget.
+The response also includes a fresh RAM observation (`measured` or `unknown`),
+using the normal host profiler with a two-second context. Missing measurements
+stay absent. Available RAM is a snapshot, not unreserved capacity or a promise of
+admission; no model is loaded/unloaded and no inference runs for `info`.
+`available` continues to describe dispatcher health only. Dispatch independently
+checks live admission. Resource and model observations older than 15 seconds,
+future observations and inconsistent capacity values fail closed. Custom backends
+can implement `InfoFor(ctx, allowedModels, allowCloud)` to scope discovery before
+network effects; the server still filters returned models independently.
 
 The private control journal stores caller/key, canonical task hash, submission
 binding, and append-only action/outcome metadata. It stores no prompt or result.
@@ -187,7 +204,7 @@ one separately canceled running task; the queued canceled task never executes).
 
 This is a first implementation, not completed DAR-133 qualification. Remaining:
 physical two-system/network-fault tests; cross-platform certificate/storage and
-service packaging; device discovery/pairing UI; current resource/model probes;
+service packaging; device discovery/pairing UI; native-harness capability attestations;
 caller inventory UI; automatic remote destination selection integrated with
 DAR-132's versioned, accuracy-first model–harness evidence; and operational
 rate/retention policy. The endpoint currently takes an explicit model and peer.

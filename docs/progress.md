@@ -11221,3 +11221,28 @@ Goose full race suite passed (46.553s), with new token-fragment native mode;
 targeted vet, formatting/size and diff checks passed. No new model inference was
 used for diagnosis. Full corrected-commit gate and push are queued after the
 preceding frozen validation; no deployment or real-provider retry is claimed.
+
+
+### DAR-133 fresh scoped remote observations — 2026-10-01
+
+The opt-in remote info endpoint now probes only the authenticated peer's permitted
+model/cloud catalogue before any provider discovery. The CLI uses normal privacy
+transports and bounded inventory requests, shared per provider/locality within one
+request, never cached across calls. Model states distinguish present, absent and
+unknown; missing credentials or failures do not become positive availability.
+Configured capabilities remain configuration claims, not weight/tool attestation.
+
+Info also reports a timestamped normal-host-profiler RAM snapshot, with absent
+values for unknown measurements. It grants no reservation or execution authority;
+dispatch rechecks admission and the existing available field means dispatcher
+health. Stale/future observations and inconsistent resource reports fail closed.
+Inputs/outputs are copied so observers cannot mutate the configured catalogue.
+
+Tests cover fresh lookup after model removal, per-request provider sharing,
+missing credentials, provider failure, cancellation, scoped discovery through
+actual mTLS, and stale/invalid observations. Full focused remote race suite with
+native isolated SSH enabled passed (20.632s); CLI discovery race tests passed
+(1.488s). No live service or SSH account changed. Full repository validation and
+push are queued behind prior frozen gates. Physical two-host qualification,
+native-harness capability attestations, pairing UI, automatic remote joint
+selection and operational rate/retention policy remain open.

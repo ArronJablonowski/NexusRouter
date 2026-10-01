@@ -10,6 +10,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/NexusRouter/sessions"
@@ -45,7 +46,21 @@ func (t Task) Validate() error {
 	return nil
 }
 
+// ModelObservation is a fresh advisory inventory lookup, not a capability
+// attestation or reservation. Unknown must never be interpreted as available.
+type ModelObservation struct {
+	State     string    `json:"state"` // present, absent, unknown
+	CheckedAt time.Time `json:"checked_at"`
+}
+type ResourceObservation struct {
+	State        string    `json:"state"` // measured, unknown
+	CheckedAt    time.Time `json:"checked_at"`
+	TotalRAM     *uint64   `json:"total_ram_bytes,omitempty"`
+	AvailableRAM *uint64   `json:"available_ram_bytes,omitempty"`
+}
 type Model struct {
+	Observation *ModelObservation `json:"observation,omitempty"`
+
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
 	ID            string   `json:"id"`
 	Provider      string   `json:"provider"`
@@ -56,9 +71,10 @@ type Model struct {
 	Local         bool     `json:"local"`
 }
 type Info struct {
-	Version  int     `json:"version"`
-	Instance string  `json:"instance"`
-	Models   []Model `json:"models"`
+	Resources *ResourceObservation `json:"resources,omitempty"`
+	Version   int                  `json:"version"`
+	Instance  string               `json:"instance"`
+	Models    []Model              `json:"models"`
 	// Availability is advisory; Submit and the destination dispatcher recheck.
 	Available bool `json:"available"`
 }
