@@ -14,6 +14,8 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
+var errHarnessReviewHeadConflict = errors.New("harness review head conflict")
+
 // ReconcileHarnessAudit consumes a durable, completed advisory review. It never
 // invokes an evaluator, changes the task journal or supersedes an operator head.
 func ReconcileHarnessAudit(ctx context.Context, path string, ledger *harness.EvidenceStore, task, operation string) (harness.Review, error) {
@@ -25,6 +27,10 @@ func ReconcileHarnessAudit(ctx context.Context, path string, ledger *harness.Evi
 		return harness.Review{}, err
 	}
 	defer db.Close()
+	return reconcileHarnessAuditStore(ctx, db, ledger, task, operation)
+}
+
+func reconcileHarnessAuditStore(ctx context.Context, db *telemetry.Store, ledger *harness.EvidenceStore, task, operation string) (harness.Review, error) {
 	attempt, err := db.ReviewAttempt(ctx, operation)
 	if err != nil || attempt.TaskID != task || attempt.Status != "completed" || attempt.SourceKind != "harness" {
 		return harness.Review{}, ErrAdmission
@@ -59,6 +65,9 @@ func ReconcileHarnessAudit(ctx context.Context, path string, ledger *harness.Evi
 		}
 	}
 	if err = ledger.AppendReview(ctx, review, time.Now().UTC()); err != nil {
+		if errors.Is(err, harness.ErrConflict) {
+			err = errors.Join(errHarnessReviewHeadConflict, err)
+		}
 		return harness.Review{}, err
 	}
 	return review, nil

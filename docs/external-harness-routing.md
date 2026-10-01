@@ -667,3 +667,14 @@ stable tie-break among otherwise authorized eligible pairs and explicitly labels
 its reason `insufficient_evidence_stable_tiebreak`. This cold start is not an
 accuracy claim. Earlier empty-store non-dispatch tests also had no registered
 candidates; they do not establish a general prohibition on cold-start inference.
+
+The same daemon worker also scans up to 100 review-attempt rows per tick with a
+separate five-second budget. Unlike immutable completion events, review attempts
+can complete after their row was scanned, so this cursor cycles back to zero at
+the end. Only completed, validated harness audits are copied as bound advisory AI
+reviews; it never invokes the evaluator. Failed and pending reviews add no vote.
+An existing different review head is preserved and does not block later rows.
+Storage or canonical-validation failures retain the failed position and degrade
+worker health. SDK hosts can schedule `ReconcileHarnessAuditPage`; its result
+reports copied/replayed reviews, preserved-head conflicts and cycle completion.
+Neither a replay count nor a successful copy means new independent quality evidence.

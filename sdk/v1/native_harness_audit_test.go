@@ -144,3 +144,115 @@ func TestSDKNativeHarnessAuditFailureNeverRetries(t *testing.T) {
 		t.Fatal("failed reviewer reran", replay, evaluator.calls.Load())
 	}
 }
+
+func TestSDKHarnessAuditCatchupLateCompletionAndConflict(t *testing.T) {
+	ctx := context.Background()
+	evaluator := validSDKEvaluator()
+	entered, release := make(chan struct{}), make(chan struct{})
+	evaluator.call = func(ctx context.Context, _ sdk.EvaluatorRequest) (sdk.EvaluatorResponse, error) {
+		close(entered)
+		select {
+		case <-release:
+			return evaluator.response, nil
+		case <-ctx.Done():
+			return sdk.EvaluatorResponse{}, ctx.Err()
+		}
+	}
+	client, _, digest := nativeAuditClient(t, evaluator)
+	ledgerDir := filepath.Join(t.TempDir(), "catchup")
+	ledger, err := harness.OpenEvidenceStore(ledgerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { ledger.Close() }()
+	request := sdk.AuditRequest{Version: 1, IdempotencyKey: "harness-catchup-late-v1", TaskID: "native-completed", ReviewerModelID: "reviewer"}
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { _, e := client.RunAudit(runCtx, request, func(sdk.AuditEvent) error { return nil }); done <- e }()
+	select {
+	case <-entered:
+	case e := <-done:
+		t.Fatal("review exited before evaluator", e)
+	case <-time.After(30 * time.Second):
+		t.Fatal("review did not start")
+	}
+	page, err := client.ReconcileHarnessAuditPage(ctx, ledger, sdk.HarnessEvidenceCursor{})
+	if err != nil || !page.CycleComplete || page.Copied != 0 || page.Cursor.After != 0 {
+		t.Fatal(page, err)
+	}
+	close(release)
+	if err = <-done; err != nil {
+		t.Fatal(err)
+	}
+	ledger.Close()
+	failed, err := client.ReconcileHarnessAuditPage(ctx, ledger, page.Cursor)
+	if err == nil || failed.Cursor.After != 0 || failed.Copied != 0 {
+		t.Fatal("failed copy skipped", failed, err)
+	}
+	ledger, err = harness.OpenEvidenceStore(ledgerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err = client.ReconcileHarnessAuditPage(ctx, ledger, failed.Cursor)
+	if err != nil || page.Copied != 1 || page.Conflicts != 0 || !page.CycleComplete {
+		t.Fatal("late review lost", page, err)
+	}
+	replay, err := client.ReconcileHarnessAuditPage(ctx, ledger, page.Cursor)
+	if err != nil || replay.Copied != 1 || evaluator.calls.Load() != 1 {
+		t.Fatal("review rerun", replay, err)
+	}
+	// Existing exact review replays preserve the same sample count.
+	events, err := client.ReadEvents(ctx, request.TaskID, 0, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome := *events.Events[1].Data.HarnessOutcome
+	now := time.Now().UTC()
+	snapshot, err := ledger.Snapshot(ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection, err := harness.Select(harness.Request{Version: 1, Task: outcome.Task, Mode: "local_only", ContextTokens: 8192}, harness.DefaultPolicy(), []harness.Candidate{{Identity: outcome.Actual, Local: true, Available: true, Authorized: true, Compatible: true, CapacityAvailable: true, CredentialAvailable: true, ContextTokens: 8192}}, snapshot, now, 0)
+	if err != nil || selection.Primary.AdvisorySamples != 1 || selection.Primary.ConfirmedSamples != 0 {
+		t.Fatal(selection, err)
+	}
+	operatorLedger, err := harness.OpenEvidenceStore(filepath.Join(t.TempDir(), "operator"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer operatorLedger.Close()
+	review := harness.Review{Version: 1, ID: "operator", ExecutionDigest: digest, Verdict: "passed", Method: "human", MethodVersion: "fixture", Reviewer: "fixture-operator", Confidence: 1, Quality: 1, CreatedAt: time.Now().UTC()}
+	if err = client.ReviewHarnessOutcome(ctx, operatorLedger, request.TaskID, review); err != nil {
+		t.Fatal(err)
+	}
+	conflict, err := client.ReconcileHarnessAuditPage(ctx, operatorLedger, sdk.HarnessEvidenceCursor{})
+	if err != nil || conflict.Conflicts != 1 || conflict.Copied != 0 || !conflict.CycleComplete {
+		t.Fatal("operator head changed or blocked cycle", conflict, err)
+	}
+	if evaluator.calls.Load() != 1 {
+		t.Fatal("catch-up reran evaluator")
+	}
+}
+
+func TestSDKHarnessAuditCatchupSkipsFailedReview(t *testing.T) {
+	evaluator := validSDKEvaluator()
+	evaluator.call = func(context.Context, sdk.EvaluatorRequest) (sdk.EvaluatorResponse, error) {
+		return sdk.EvaluatorResponse{}, errors.New("fixture failure")
+	}
+	client, _, _ := nativeAuditClient(t, evaluator)
+	ctx := context.Background()
+	_, err := client.RunAudit(ctx, sdk.AuditRequest{Version: 1, IdempotencyKey: "harness-catchup-failed-v1", TaskID: "native-completed", ReviewerModelID: "reviewer"}, func(sdk.AuditEvent) error { return nil })
+	if err == nil {
+		t.Fatal("failed review accepted")
+	}
+	ledger, err := harness.OpenEvidenceStore(filepath.Join(t.TempDir(), "failed-review"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ledger.Close()
+	page, err := client.ReconcileHarnessAuditPage(ctx, ledger, sdk.HarnessEvidenceCursor{})
+	if err != nil || page.Copied != 0 || page.Conflicts != 0 || !page.CycleComplete || evaluator.calls.Load() != 1 {
+		t.Fatal(page, err, evaluator.calls.Load())
+	}
+}

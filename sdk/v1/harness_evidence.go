@@ -87,3 +87,16 @@ func (c *Client) ReconcileHarnessEvidencePage(ctx context.Context, ledger *harne
 	}
 	return app.ReconcileHarnessEvidencePage(ctx, c.database, ledger, cursor)
 }
+
+// HarnessAuditPage reports bounded review recovery progress and preserved heads.
+type HarnessAuditPage = app.HarnessAuditPage
+
+// ReconcileHarnessAuditPage copies completed canonical advisory reviews without
+// invoking an evaluator. Existing different heads remain authoritative. Schedule
+// repeated pages, including after CycleComplete, to discover later completions.
+func (c *Client) ReconcileHarnessAuditPage(ctx context.Context, ledger *harness.EvidenceStore, cursor HarnessEvidenceCursor) (HarnessAuditPage, error) {
+	if !c.valid(ctx) {
+		return HarnessAuditPage{Cursor: cursor}, ErrAdmission
+	}
+	return app.ReconcileHarnessAuditPage(ctx, c.database, ledger, cursor)
+}

@@ -96,7 +96,7 @@ func StartHarnessEvidenceCatchup(ctx context.Context, s *Service, db *telemetry.
 	go func() {
 		defer close(w.done)
 		defer w.set("unavailable", "supervisor_stopped")
-		var cursor HarnessEvidenceCursor
+		var cursor, auditCursor HarnessEvidenceCursor
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
@@ -106,6 +106,13 @@ func StartHarnessEvidenceCatchup(ctx context.Context, s *Service, db *telemetry.
 			page, cancelPage := context.WithTimeout(child, 5*time.Second)
 			next, _, err := reconcileHarnessEvidenceStore(page, db, ledger, cursor)
 			cancelPage()
+			auditPage, cancelAudit := context.WithTimeout(child, 5*time.Second)
+			auditResult, auditErr := reconcileHarnessAuditPageStore(auditPage, db, ledger, auditCursor)
+			cancelAudit()
+			auditCursor = auditResult.Cursor
+			if err == nil {
+				err = auditErr
+			}
 			cursor = next
 			if err != nil {
 				w.set("degraded", "supervisor_error")

@@ -10431,3 +10431,25 @@ whitespace checks passed. Full make check remains queued behind the live Pi base
 gate before push. No live data/configuration changed. Tools, real held-out quality,
 OS-kill/orphan/network/platform qualification and automatic audit-review catch-up
 remain open; this worker copies outcomes, not judgments.
+
+### 2026-10-01 — DAR-132 interrupted audit reconciliation
+
+Completed native audit operations now reach the advisory evidence ledger through
+the configured daemon catch-up worker even if the original result-copy step was
+interrupted. Review rows are scanned in bounded cyclic pages because a pending
+row can complete after it has been passed. Each copy revalidates the durable
+operation, audit and canonical execution; no evaluator or inference is invoked.
+Existing different review heads are preserved without blocking later reviews.
+Other persistence/protocol failures retain scan position and degrade health.
+SDK hosts can call ReconcileHarnessAuditPage and inspect replay, conflict and
+cycle-complete counts. Both outcome and review pages have separate five-second
+budgets and at most 100 rows per worker tick.
+
+SDK race coverage passed (6.434s): review completing after initial scan, failed
+ledger retry, identical replay retaining one advisory sample, preservation of an
+operator head, failed-review exclusion and one evaluator call only. Initial test
+failures were invalid short fixture idempotency keys and were corrected to the
+existing minimum length. Outcome catch-up/lifecycle regressions passed (6.226s).
+Targeted vet/source/diff checks passed. Full gate remains queued behind the live
+base gate before push. No production state or inference changed. Tools, held-out
+comparative quality, OS-kill/network/platform qualification remain outstanding.
