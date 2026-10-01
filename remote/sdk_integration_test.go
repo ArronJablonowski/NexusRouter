@@ -277,8 +277,14 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		t.Fatal(e)
 	}
 	defer dispatcher.Close()
+	readPrimary := func() (submissions.Status, error) {
+		if native {
+			return f.client.AutomaticStatus(ctx, routeStore, request, automatic)
+		}
+		return f.client.Status(ctx, "node-a", request)
+	}
 	for {
-		status, e := f.client.Status(ctx, "node-a", request)
+		status, e := readPrimary()
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -294,8 +300,8 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 				t.Fatal(page, e)
 			}
 			if native {
-				verified, err := f.client.RecordedOutcome(ctx, routeStore, request, task)
-				if err != nil {
+				verified, err := f.client.AutomaticOutcome(ctx, routeStore, request, automatic)
+				if err != nil || verified.Output() != status.Result.Text {
 					t.Fatal("reconcile completed remote outcome", err)
 				}
 				root := filepath.Join(t.TempDir(), "caller-evidence")
@@ -311,7 +317,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 				// deterministic review is not a judgment of a production model.
 				evaluation := OutcomeReview{Version: 1, ReceiptSHA256: receiptDigest, Review: harness.Review{Version: 1, ID: "remote-fixture-review", ExecutionDigest: executionDigest, Verdict: "passed", Method: "deterministic", MethodVersion: "exact-fixture-text-v1", Reviewer: "remote-sdk-fixture", Confidence: 1, Quality: 1, CreatedAt: time.Now().UTC()}}
 				for range 2 {
-					if err = f.client.ReviewRecordedOutcome(ctx, routeStore, root, request, task, evaluation); err != nil {
+					if err = f.client.ReviewAutomaticOutcome(ctx, routeStore, root, request, automatic, evaluation); err != nil {
 						t.Fatal("SSH bound review", err)
 					}
 				}

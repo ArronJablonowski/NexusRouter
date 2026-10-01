@@ -708,3 +708,30 @@ DIR --request KEY` reads the stored choice without network traffic or exposing
 the prompt. The choice's Go `Task(originalRequest)` reconstructs the exact pinned
 payload for existing reconciliation/review operations. UI and background evaluator
 integration remain separate work.
+
+### Following and reviewing an automatic request
+
+The `auto-status`, `auto-cancel`, `auto-output`, `auto-reconcile` and `auto-review`
+commands read the original `AutomaticRequest` JSON from stdin. Supply the same
+`--routes` and `--request` plus normal trust/TLS flags; omit destination/model/
+harness/context overrides. They verify the saved choice against the ordinary route
+binding and the exact original request. No command discovers candidates, dispatches
+inference or repairs a missing binding. Missing/inconsistent records fail; recover
+an interrupted first dispatch with the original `auto-dispatch` request instead.
+
+Status and cancellation authenticate as the original bound caller. `auto-output`
+returns text only after canonical completed events, intent, attribution and output
+hash have been checked, alongside receipt/execution hashes for an evaluator.
+Treat this stdout as sensitive task content. `auto-reconcile --evidence DIR`
+records the immutable receipt and execution, not a quality verdict; its result
+contains hashes/receipt without output text. Result text is held only in memory
+by the verified outcome object and is not added to the evidence store.
+
+After evaluating that exact output, `auto-review --evidence DIR --review FILE`
+applies an operator-supplied bound review using the existing private-file rules.
+It reauthenticates the destination and canonical completion before writing.
+Identical review retries count once, revisions require the current expected head,
+and automated AI reviews remain advisory. Neither reconciliation nor successful
+execution supplies a pass automatically. Reviewer authentication remains the
+embedding host/operator's responsibility. The Go equivalents are ResolveAutomatic,
+AutomaticStatus, CancelAutomatic, AutomaticOutcome and ReviewAutomaticOutcome.

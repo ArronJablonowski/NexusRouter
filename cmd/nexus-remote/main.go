@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|catalogue|candidates|rank|auto-dispatch|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -113,6 +113,12 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	var result any
 	switch operation {
+	case "auto-status", "auto-cancel", "auto-output", "auto-reconcile", "auto-review":
+		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
+			return remote.ErrInvalid
+		}
+		result, err = automaticResultOperation(ctx, &client, operation, *routes, *evidence, *request, *reviewFile, input)
+
 	case "candidates", "rank", "auto-dispatch":
 		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
 			return remote.ErrInvalid

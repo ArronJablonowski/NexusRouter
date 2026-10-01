@@ -11532,3 +11532,22 @@ passed (36.635s/1.777s); final policy-change/cloud/no-probe/CLI input tests pass
 (2.729s/1.458s), with vet/source/diff checks. Full make check and push remain queued
 behind running capacity validation. Pairing/discovery UI, background evaluation,
 physical two-host and production held-out qualification remain open.
+
+### DAR-133 automatic result reconciliation and review
+
+Added original-request APIs and CLI commands for automatic status, cancellation,
+verified output, reconciliation and bound content review. Both durable choice and
+route binding must agree with the saved request; original caller identity is
+retained. These paths never discover, dispatch, repair missing bindings or reroute.
+Verified output is available in memory for evaluators; persistent evidence still
+contains only hashes and attribution. Completion adds no quality vote, repeated
+bound review counts once, and existing expected-head/advisory review rules apply.
+
+Remote/CLI race packages passed (38.044s/1.483s), including installed Pi over real
+isolated OpenSSH using the new automatic outcome/review APIs, changed-intent and
+choice corruption rejection, credential rotation, cancellation, and no repeated
+inference. Initial rotation test expected denial rather than the existing identity
+conflict error; corrected assertion before the passing suite. Vet/source/diff
+checks passed. Full make check/push remains queued behind running capacity work.
+Background evaluation, UI, physical two-host and held-out production qualification
+remain open; evaluator identity and truthful content grading are host duties.

@@ -27,6 +27,16 @@ type OutcomeReceipt struct {
 type VerifiedOutcome struct {
 	receipt  OutcomeReceipt
 	verified bool
+	output   string
+}
+
+// Output returns content checked against the canonical completion hash. It is
+// held only in memory; Record persists hashes and attribution, never this text.
+func (v VerifiedOutcome) Output() string {
+	if !v.verified {
+		return ""
+	}
+	return v.output
 }
 
 func (v VerifiedOutcome) Receipt() OutcomeReceipt { return v.receipt }
@@ -69,6 +79,7 @@ func (c *Client) RecordedOutcome(ctx context.Context, routes *RouteStore, key st
 		return out, err
 	}
 	out.receipt = OutcomeReceipt{Version, binding, status.ID, hash(events), execution}
+	out.output = status.Result.Text
 	out.verified = true
 	return out, nil
 }
