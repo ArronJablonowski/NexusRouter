@@ -10525,3 +10525,30 @@ Full gate/push remains queued behind the live Pi gate. No live configuration or
 inference changed. This provides bounded evaluation-task selection, not automatic
 quality certification or a real held-out model leaderboard. Native tools,
 incremental adapter progress, held-out quality and wider qualification remain open.
+
+### 2026-10-01 — DAR-132 host-owned native tool bridge foundation
+
+Added harness/toolbridge, a per-run authenticated loopback HTTP rendezvous for
+host-verified tool proposals. The child supplies only a registered call ID;
+canonical task/session/turn/attempt, tool name and copied arguments remain owned
+by the host. Changed bindings, unknown calls, malformed requests and browser
+origins are denied. Concurrent duplicate calls join one invocation and replay
+its result; failed, canceled, panicking or uncertain invocations never execute
+again within that bridge. Close cancels and joins in-flight host callbacks.
+Invalid effect values and oversized/invalid text fail closed without raw errors.
+
+The callback must enforce schemas, permissions, approvals, durable lifecycle
+records, effect reconciliation and redaction. Registration/authentication do not
+confer tool permission. Real tools.Executor integration fixtures verify denied
+schemas/policies, Ask and writes without authority never reach handlers. Race
+coverage also verifies immutable argument binding, concurrent replay, uncertain
+non-reexecution, HTTP rejection and cancellation joining. Focused race tests
+passed (1.421s), targeted vet and source formatting/size/diff checks passed.
+
+This is groundwork, not native tool support: no adapter, gateway, listener or
+live route uses it yet. Native tools remain disabled. Wiring requires verified
+provider tool-call ingestion, versioned durable native tool events and recovery,
+and an isolated Pi extension before the remaining adapters. The existing text
+protocol's two-event journal must not be silently reinterpreted. In-memory replay
+cannot authorize replay after restart. Full gate/push remains queued behind the
+live prior Pi gate; physical-host remote and held-out quality gaps remain open.
