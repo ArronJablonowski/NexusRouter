@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/runtime"
 )
 
@@ -202,6 +203,64 @@ func TestHarnessReconciliationRejectsIncompleteOrChangedJournal(t *testing.T) {
 			reader := harnessReader(func(context.Context, string, int64, int) ([]runtime.Event, error) { return input, nil })
 			if _, e := runtime.RecordHarnessOutcome(ctx, reader, ledger, r.TaskID, now); e == nil {
 				t.Fatal("unbound journal accepted")
+			}
+		})
+	}
+}
+
+func TestHarnessUsageDurableWithoutQualityAcceptance(t *testing.T) {
+	for _, mode := range []string{"success", "failure", "cancel", "absent", "zero", "invalid", "wrong_identity"} {
+		t.Run(mode, func(t *testing.T) {
+			s, _ := store(t)
+			var calls atomic.Int32
+			r := nativeRequest(&calls)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			original := r.Execute
+			r.Execute = func(c context.Context) (runtime.HarnessOutput, error) {
+				out, _ := original(c)
+				out.Usage = &providers.Usage{InputTokens: 17, OutputTokens: 4}
+				switch mode {
+				case "failure":
+					return out, errors.New("failed after measured completion")
+				case "cancel":
+					cancel()
+				case "absent":
+					out.Usage = nil
+				case "zero":
+					out.Usage = &providers.Usage{}
+				case "invalid":
+					out.Usage.InputTokens = -1
+				case "wrong_identity":
+					out.Actual.Model = "other"
+				}
+				return out, nil
+			}
+			_, text, err := runtime.RunHarness(ctx, s, r)
+			failed := mode == "failure" || mode == "cancel" || mode == "invalid" || mode == "wrong_identity"
+			if (err != nil) != failed {
+				t.Fatal(err)
+			}
+			events, e := s.Read(context.Background(), r.TaskID, 0, 10)
+			if e != nil || len(events) != 2 {
+				t.Fatal(e)
+			}
+			terminal := events[1]
+			if failed && (text != "" || terminal.Data.HarnessOutcome != nil) {
+				t.Fatal("failure promoted to success")
+			}
+			want := mode != "absent" && mode != "invalid" && mode != "wrong_identity"
+			if (terminal.Data.Usage != nil) != want {
+				t.Fatal("usage presence changed", mode)
+			}
+			if want {
+				in, out := int64(17), int64(4)
+				if mode == "zero" {
+					in, out = 0, 0
+				}
+				if terminal.Data.Usage.InputTokens != in || terminal.Data.Usage.OutputTokens != out {
+					t.Fatal("lost measurement")
+				}
 			}
 		})
 	}

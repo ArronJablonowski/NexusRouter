@@ -88,7 +88,7 @@ func nativeSDKContextAndEvidence(t *testing.T, kind string) {
 			t.Errorf("%s lost host context or credentials", kind)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, `data: {"id":"fixture","object":"chat.completion.chunk","model":"fixture","choices":[{"index":0,"delta":{"role":"assistant","content":"correct answer"},"finish_reason":"stop"}]}`+"\n\ndata: [DONE]\n\n")
+		fmt.Fprint(w, `data: {"id":"fixture","object":"chat.completion.chunk","model":"fixture","choices":[{"index":0,"delta":{"role":"assistant","content":"correct answer"},"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":4,"total_tokens":21}}`+"\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
 	registration := nativeRegistration(t, kind)
@@ -98,11 +98,11 @@ func nativeSDKContextAndEvidence(t *testing.T, kind string) {
 	})
 	var delivered strings.Builder
 	result, err := client.RunTextStream(context.Background(), sdk.Request{Version: 1, ModelID: "chat", HarnessID: registration.ID, Domain: "writing", Profile: "fixture-v1", Messages: []providers.Message{{Role: "system", Content: "Exact host policy."}, {Role: "user", Content: "Answer briefly."}}}, func(text string) error { delivered.WriteString(text); return nil })
-	if err != nil || result.Text != "correct answer" || delivered.String() != result.Text || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != kind || result.Usage != nil || profiled.Load() == 0 || calls.Load() != 1 {
+	if err != nil || result.Text != "correct answer" || delivered.String() != result.Text || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != kind || (result.Usage == nil || result.Usage.InputTokens != 17 || result.Usage.OutputTokens != 4) || profiled.Load() == 0 || calls.Load() != 1 {
 		t.Fatal("native SDK failed", result, err)
 	}
 	page, err := client.ReadEvents(context.Background(), result.TaskID, 0, 10)
-	if err != nil || page.State != "completed" || len(page.Events) != 2 || page.Events[1].Data.HarnessOutcome == nil {
+	if err != nil || page.State != "completed" || len(page.Events) != 2 || page.Events[1].Data.HarnessOutcome == nil || page.Events[1].Data.Usage == nil || *page.Events[1].Data.Usage != *result.Usage {
 		t.Fatal("missing native journal", err)
 	}
 	ledger, err := harness.OpenEvidenceStore(filepath.Join(t.TempDir(), "ledger"))

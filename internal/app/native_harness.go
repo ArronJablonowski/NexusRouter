@@ -183,12 +183,17 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if m.Locality == "local" {
 		privacy = "local_only"
 	}
+	var measured *providers.Usage
 	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task, Selection: r.nativeSelection}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {
 		estimate, e := providers.EstimateWith(run, r.contextEstimator, providers.Request{Model: m.Model, Messages: messages, ContextTokens: int64(tokens), MaxOutputTokens: int64(c.MaxOutputTokens)})
 		if e != nil || estimate+c.MaxOutputTokens > tokens {
 			return runtime.HarnessOutput{}, runtime.ErrContextOverflow
 		}
 		native, e := c.Run(run, "Execute the host-supplied task context.")
+		if native.Usage != nil {
+			copy := *native.Usage
+			measured = &copy
+		}
 		instructions := responseInstructions(r)
 		if e == nil && redact(instructions, secrets) == instructions && len(responsecontract.Infer(instructions).Validate(redact(native.Text, secrets))) > 0 {
 			e = runtime.ErrInvalidOutput
@@ -200,6 +205,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	result.HarnessOutcome = nil
 	if err == nil {
 		result.HarnessOutcome = &outcome
+		result.Usage = measured
 		result.Turns = 1
 		result.FinishReason = "stop"
 	}

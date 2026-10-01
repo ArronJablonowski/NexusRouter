@@ -10176,3 +10176,25 @@ Verification: shared-gateway race tests passed (1.357s), native OpenHands counts
 through both protocols plus existing failure/cancellation tests (14.690s), other
 runner non-native race regressions, targeted vet/source/diff checks passed. Full
 gate queued before push. No live provider request or accounting store changed.
+
+## Durable harness usage and SDK projection — DAR-132 (2026-10-01)
+
+Trusted native output now carries measured usage through runtime HarnessOutput to
+the same atomic terminal journal event as execution disposition. Invalid counts
+or mismatched actual identity cannot enter that measurement. A trusted count may
+survive a later failure/cancellation without a success outcome, accepted output
+or quality feedback. Nil and measured zero remain distinct. A missing measurement
+is never inferred from successful text or nominal context size.
+
+OpenClaw/Hermes/Goose/OpenHands SDK results now expose committed successful-run
+usage; their RunTask paths preserve it as well. Runtime tests cover completed,
+failed, canceled, absent, zero, negative and wrong-identity measurements (race
+suite 23.746s). Installed native SDK fixtures for all four adapters verified exact
+host context, provider credentials, measured result and matching journal counts
+(16.961s). Targeted vet/source/diff checks passed; full gate queued before push.
+
+Still incomplete: accounting-ledger aggregation, cache/cost distinctions, Pi's
+separate protocol and measurements from adapter failures before verified normal
+completion. Current runners return unknown usage on those failures; this change
+does not invent counts or claim complete failure accounting. No live accounting
+store, provider or router configuration was changed.

@@ -22,6 +22,8 @@ type HarnessAttribution struct {
 	Task      harness.TaskClass
 }
 type HarnessOutput struct {
+	// Usage is a trusted adapter measurement, never a model-estimated count.
+	Usage  *providers.Usage
 	Actual harness.Identity
 	Text   string
 }
@@ -75,6 +77,15 @@ func RunHarness(ctx context.Context, j Journal, r HarnessRequest) (harness.Execu
 		return harness.Execution{}, "", err
 	}
 	output, runErr := invokeHarness(ctx, r.Execute)
+	var usage *providers.Usage
+	if output.Usage != nil {
+		if output.Actual != attribution.Identity || output.Usage.InputTokens < 0 || output.Usage.OutputTokens < 0 || output.Usage.InputTokens > 1<<40 || output.Usage.OutputTokens > 1<<40 {
+			runErr = ErrProtocol
+		} else {
+			measured := *output.Usage
+			usage = &measured
+		}
+	}
 	if ctx.Err() != nil {
 		runErr = ctx.Err()
 	}
@@ -108,7 +119,7 @@ func RunHarness(ctx context.Context, j Journal, r HarnessRequest) (harness.Execu
 	}
 	// Outcome and task terminal are one journal append. There is no window where
 	// accepted output can escape before its terminal provenance commits.
-	event := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, Sequence: seq + 1, Time: outcome.CompletedAt, Kind: kind, Data: Data{HarnessOutcome: &outcome, Text: text, Code: code}}
+	event := Event{Version: 1, ID: rand.Text(), TaskID: r.TaskID, SessionID: r.SessionID, CorrelationID: r.TaskID, Sequence: seq + 1, Time: outcome.CompletedAt, Kind: kind, Data: Data{HarnessOutcome: &outcome, Text: text, Code: code, Usage: usage}}
 	// A failed adapter may never have established actual execution identity.
 	// Preserve the failed task journal, but do not invent an Actual identity for
 	// evidence ingestion. Only completed, verified results receive an outcome.
