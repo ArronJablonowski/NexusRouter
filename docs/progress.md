@@ -9904,3 +9904,26 @@ format/size gate and diff checks passed. Full make check remains queued before
 push. No live router/agent configuration or real model calls changed. Hermes,
 Goose, OpenHands, tool-bearing runs, queue/CLI/API registration, measured usage
 accounting, broader platform support and held-out qualification remain open.
+
+## Hermes output protocol boundary — DAR-132 (2026-10-01)
+
+Added a bounded parser for pinned Hermes 0.21.5+4983.g6633626 stream-json.
+It requires a successful process exit, one init, matching configured model and
+session, agreeing text deltas, exactly one successful terminal and complete EOF.
+Tool activity, duplicate terminals, malformed/ambiguous records, mismatched text
+and incomplete framing return no partial output. Normalized token fields are
+validated but never presented as measured usage or actual provider attribution.
+
+The installed native emitter was exercised through its pure callbacks, without
+starting an agent or loading credentials. It drops provider and finish-reason
+fields and permits duplicate result emissions. Therefore this parser alone does
+not prove successful inference; Hermes execution still needs an independently
+verified policy gateway, isolated configuration, admission and process cleanup.
+
+Extracted the OpenClaw JSON ambiguity check into a shared internal helper. It
+rejects Unicode simple-fold key aliases as well as ordinary duplicate keys,
+matching Go JSON struct decoding behavior. Hermes uses the same boundary.
+Focused race tests (including both installed emitter/projector qualifications),
+targeted vet and the source gate passed. Full make check remains queued before
+push. Native Hermes execution and SDK registration remain incomplete; no live
+configuration or real model inference changed.

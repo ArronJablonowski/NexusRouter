@@ -5,13 +5,13 @@
 package openclaw
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"math"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/ArronJablonowski/NexusRouter/harness/internal/wirejson"
 )
 
 const SupportedVersion = "2026.9.7"
@@ -129,54 +129,4 @@ func jsWhitespace(r rune) bool {
 	return r == '\t' || r == '\n' || r == '\v' || r == '\f' || r == '\r' || r == ' ' || r == '\u00a0' || r == '\u1680' || r >= '\u2000' && r <= '\u200a' || r == '\u2028' || r == '\u2029' || r == '\u202f' || r == '\u205f' || r == '\u3000' || r == '\ufeff'
 }
 
-// encoding/json otherwise accepts duplicate keys, making provenance ambiguous.
-func uniqueJSON(body []byte) bool {
-	d := json.NewDecoder(bytes.NewReader(body))
-	d.UseNumber()
-	var value func(int) bool
-	value = func(depth int) bool {
-		if depth > 32 {
-			return false
-		}
-		t, err := d.Token()
-		if err != nil {
-			return false
-		}
-		delim, ok := t.(json.Delim)
-		if !ok {
-			return true
-		}
-		switch delim {
-		case '{':
-			seen := map[string]bool{}
-			for d.More() {
-				k, err := d.Token()
-				key, ok := k.(string)
-				if err != nil || !ok || seen[strings.ToLower(key)] {
-					return false
-				}
-				seen[strings.ToLower(key)] = true
-				if !value(depth + 1) {
-					return false
-				}
-			}
-			end, err := d.Token()
-			return err == nil && end == json.Delim('}')
-		case '[':
-			for d.More() {
-				if !value(depth + 1) {
-					return false
-				}
-			}
-			end, err := d.Token()
-			return err == nil && end == json.Delim(']')
-		default:
-			return false
-		}
-	}
-	if !value(0) {
-		return false
-	}
-	_, err := d.Token()
-	return err == io.EOF
-}
+func uniqueJSON(body []byte) bool { return wirejson.Unique(body) }
