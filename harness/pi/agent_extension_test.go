@@ -3,6 +3,8 @@ package pi
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,10 +58,15 @@ func TestAgentExtensionConfiguration(t *testing.T) {
 
 func TestNativePiHostToolExtension(t *testing.T) {
 	for _, mode := range []string{"normal", "recoverable", "end"} {
-		t.Run(mode, func(t *testing.T) { testNativePiHostToolExtension(t, mode) })
+		t.Run(mode, func(t *testing.T) { testNativePiHostToolExtension(t, mode, false) })
 	}
 }
-func testNativePiHostToolExtension(t *testing.T, mode string) {
+func TestNativePiAgentTask(t *testing.T) {
+	for _, mode := range []string{"normal", "recoverable", "end", "wrong_model", "cancel", "ollama"} {
+		t.Run(mode, func(t *testing.T) { testNativePiHostToolExtension(t, mode, true) })
+	}
+}
+func testNativePiHostToolExtension(t *testing.T, mode string, production bool) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("native Pi qualification requires NEXUS_PI_NATIVE=1")
 	}
@@ -81,6 +88,10 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 	var requests, effects atomic.Int32
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := requests.Add(1)
+		if mode == "cancel" {
+			cancel()
+			return
+		}
 		data, _ := io.ReadAll(r.Body)
 		if !strings.Contains(string(data), "host task") || !strings.Contains(string(data), "nexus_lookup") {
 			t.Error("missing host context/tools", string(data))
@@ -98,6 +109,19 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 		if n == 2 && !strings.Contains(string(data), "fixture result") {
 			t.Error("missing host tool result")
 		}
+		if mode == "ollama" {
+			if r.URL.Path != "/api/chat" {
+				t.Error("wrong native endpoint", r.URL.Path)
+			}
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			message := map[string]any{"role": "assistant", "content": "native tool answer"}
+			if n == 1 {
+				message = map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"function": map[string]any{"name": "nexus_lookup", "arguments": map[string]string{"path": "fixture"}}}}}
+			}
+			body, _ := json.Marshal(map[string]any{"model": "model", "message": message, "done": true, "done_reason": "stop", "prompt_eval_count": 10, "eval_count": 3})
+			fmt.Fprintf(w, "%s\n", body)
+			return
+		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		delta := map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{"index": 0, "id": "host-call-1", "type": "function", "function": map[string]string{"name": "nexus_lookup", "arguments": `{"path":"fixture"}`}}}}
 		finish := "tool_calls"
@@ -106,13 +130,34 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 			finish = "stop"
 		}
 		for _, piece := range []map[string]any{{"delta": delta, "finish_reason": nil, "index": 0}, {"delta": map[string]string{}, "finish_reason": finish, "index": 0}} {
-			body, _ := json.Marshal(map[string]any{"id": "fixture", "object": "chat.completion.chunk", "model": "model", "choices": []any{piece}})
+			responseModel := "model"
+			if mode == "wrong_model" {
+				responseModel = "fallback"
+			}
+			body, _ := json.Marshal(map[string]any{"id": "fixture", "object": "chat.completion.chunk", "model": responseModel, "choices": []any{piece}})
 			fmt.Fprintf(w, "data: %s\n\n", body)
 		}
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer provider.Close()
 	actual := harness.Identity{Version: 1, Harness: "pi", HarnessVersion: SupportedVersion, AdapterVersion: "extension-fixture", Provider: "nexus-test", Model: "model", ModelRevision: "fixture", ConfigSHA256: strings.Repeat("a", 64)}
+	artifact, e := os.ReadFile(executable)
+	if e != nil {
+		t.Fatal(e)
+	}
+	digest := sha256.Sum256(artifact)
+	var released atomic.Int32
+	cfg := AgentConfig{Config: Config{Transport: http.DefaultTransport, TransportPolicySHA256: strings.Repeat("c", 64), ModelRevision: "fixture", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "model", BaseURL: provider.URL + "/v1", ContextTokens: 32768, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Messages: []providers.Message{{Role: "user", Content: "host task"}}, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}, Tools: extensionSchema(), MaxTurns: 3}
+	if mode == "ollama" {
+		cfg.UpstreamProtocol = "ollama"
+		cfg.BaseURL = provider.URL
+	}
+	if production {
+		actual, e = cfg.Identity()
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
 	q := runtime.HarnessAgentRequest{Request: runtime.HarnessRequest{TaskID: "native-extension", SessionID: "native-extension", Attribution: runtime.HarnessAttribution{Identity: actual, Task: harness.TaskClass{Domain: "code", Profile: "fixture", Difficulty: "easy"}}, Messages: []providers.Message{{Role: "user", Content: "host task"}}, ContextTokens: 32768, MaxOutputBytes: 65536}, MaxTurns: 3, Tools: extensionTools{func(c context.Context, x runtime.ToolExecution) (runtime.ToolResult, error) {
 		effects.Add(1)
 		events, e := db.Read(c, x.TaskID, 0, 10)
@@ -163,8 +208,16 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 			return runtime.HarnessOutput{}, e
 		}
 		defer func() { input.Close(); stop(); command.Wait(); output.Close() }()
+		protocol, e := NewAgentProtocol("nexus-test", "model", 3, []string{"nexus_lookup"})
+		if e != nil {
+			return runtime.HarnessOutput{}, e
+		}
+		protocol.base.expectURL = g.BaseURL
+		protocol.base.expectContext = 32768
+		protocol.base.expectOutput = 1024
+		sent := false
 		encoder := json.NewEncoder(input)
-		if e = encoder.Encode(map[string]string{"id": "prompt", "type": "prompt", "message": "Use the fixture tool then answer."}); e != nil {
+		if e = encoder.Encode(map[string]string{"id": "state", "type": "get_state"}); e != nil {
 			return runtime.HarnessOutput{}, e
 		}
 		scanner := bufio.NewScanner(output)
@@ -185,14 +238,30 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 				return runtime.HarnessOutput{}, ErrProtocol
 			}
 			types = append(types, event.Type)
+			settled, protocolErr := protocol.Consume(scanner.Bytes())
+			if protocolErr != nil {
+				t.Log("rejected fixture RPC", string(scanner.Bytes()))
+				return runtime.HarnessOutput{}, protocolErr
+			}
+			if protocol.Ready() && !sent {
+				sent = true
+				if e = encoder.Encode(map[string]string{"id": "prompt", "type": "prompt", "message": "Use the fixture tool then answer."}); e != nil {
+					return runtime.HarnessOutput{}, e
+				}
+			}
+
 			if event.Type == "tool_execution_end" {
 				var result struct{ IsError bool }
 				if json.Unmarshal(scanner.Bytes(), &result) != nil || result.IsError != (mode == "recoverable") {
 					t.Error("Pi tool failure flag mismatch")
 				}
 			}
-			if event.Type == "agent_settled" {
+			if settled {
 				text, e := g.Final()
+				result, resultErr := protocol.Result()
+				if resultErr != nil || result.Text != text {
+					return runtime.HarnessOutput{}, ErrProtocol
+				}
 				if e != nil {
 					t.Log("native lifecycle", types)
 					t.Log("fixture terminal", string(scanner.Bytes()))
@@ -203,7 +272,39 @@ func testNativePiHostToolExtension(t *testing.T, mode string) {
 		t.Log("native lifecycle", types)
 		return runtime.HarnessOutput{}, ErrRun
 	}
-	out, text, e := runtime.RunHarnessAgent(ctx, db, q)
+	var out harness.Execution
+	var text string
+	if production {
+		task := Task{ID: q.Request.TaskID, SessionID: q.Request.SessionID, Prompt: "Use the fixture tool then answer.", Class: q.Request.Attribution.Task, MaxOutputBytes: 65536}
+		var result TaskResult
+		result, e = RunAgentTask(ctx, db, cfg, task, q.Tools)
+		out, text = result.Execution, result.Result.Text
+		if e == nil && result.Result.Identity != actual {
+			t.Error("agent provenance mismatch")
+		}
+		if _, retryErr := RunAgentTask(ctx, db, cfg, task, q.Tools); retryErr == nil {
+			t.Error("replayed native task")
+		}
+		if released.Load() != 1 {
+			t.Error("resource release count", released.Load())
+		}
+	} else {
+		out, text, e = runtime.RunHarnessAgent(ctx, db, q)
+	}
+	if mode == "wrong_model" || mode == "cancel" {
+		if e == nil || out.Status != "" || text != "" || requests.Load() != 1 || effects.Load() != 0 {
+			t.Fatal("failed native run accepted", out, text, e, requests.Load(), effects.Load())
+		}
+		events, readErr := db.Read(context.Background(), q.Request.TaskID, 0, 20)
+		want := runtime.TaskFailed
+		if mode == "cancel" {
+			want = runtime.TaskCanceled
+		}
+		if readErr != nil || len(events) == 0 || events[len(events)-1].Kind != want || events[len(events)-1].Data.HarnessOutcome != nil {
+			t.Fatal("lost failed lineage", events, readErr)
+		}
+		return
+	}
 	if e != nil || out.Status != "completed" || text != "native tool answer" || requests.Load() != 2 || effects.Load() != 1 {
 		t.Fatal(out, text, e, requests.Load(), effects.Load())
 	}

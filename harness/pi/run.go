@@ -82,22 +82,38 @@ func (c Config) validate() error {
 // Run launches one isolated, text-only, no-tool RPC session. Unsupported tool,
 // retry, compaction or model-switch behavior fails closed. No retry is performed.
 // Success means a settled valid execution, never a quality verdict.
-func Run(ctx context.Context, c Config, prompt string) (result Result, runErr error) {
+func Run(ctx context.Context, c Config, prompt string) (Result, error) {
+	return runConfigured(ctx, c, prompt, nil)
+}
+func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExecution) (result Result, runErr error) {
+	activeSystemPrompt := systemPrompt
+	if agent != nil {
+		activeSystemPrompt = agentSystemPrompt
+	}
 	if c.Prices != nil {
 		prices := *c.Prices
 		c.Prices = &prices
 	}
-	if ctx == nil || ctx.Err() != nil || c.validate() != nil || strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > MaxRecordBytes/2 || len(prompt)+len(systemPrompt)+4096+c.MaxOutputTokens > c.ContextTokens {
+	if ctx == nil || ctx.Err() != nil || c.validate() != nil || strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > MaxRecordBytes/2 || len(prompt)+len(activeSystemPrompt)+4096+c.MaxOutputTokens > c.ContextTokens {
 		return Result{}, ErrProtocol
 	}
 	c.Messages = append([]providers.Message(nil), c.Messages...)
 	contextBody, contextErr := contextMessages(c.Messages)
+	if agent != nil {
+		contextBody, contextErr = json.Marshal(c.Messages)
+		if providers.ValidateMessages(c.Messages) != nil {
+			contextErr = ErrProtocol
+		}
+	}
 	if contextErr != nil || (len(contextBody) > 0 && len(contextBody)+4096+c.MaxOutputTokens > c.ContextTokens) {
 		return Result{}, ErrProtocol
 	}
 	identity, identityErr := c.Identity()
 	if identityErr != nil {
 		return Result{}, identityErr
+	}
+	if agent != nil {
+		identity = agent.identity
 	}
 	// Run this after process, gateway and private-state cleanup so late failures
 	// retain verified consumption without releasing accepted text.
@@ -146,7 +162,18 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if version.Run() != nil || strings.TrimSpace(string(versionOutput.data)) != SupportedVersion {
 		return Result{}, ErrProtocol
 	}
-	gatewayURL, gatewayKey, verified, closeGateway, gatewayErr := startVerifiedGateway(ctx, c)
+	var gatewayURL, gatewayKey string
+	var closeGateway func()
+	var gatewayErr error
+	var agentGateway *textgateway.AgentGateway
+	if agent == nil {
+		gatewayURL, gatewayKey, verified, closeGateway, gatewayErr = startVerifiedGateway(ctx, c)
+	} else {
+		agentGateway, gatewayErr = textgateway.StartAgent(ctx, textgateway.AgentConfig{Config: textgateway.Config{UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages}, Actual: identity, Session: agent.session, Tools: agent.config.Tools})
+		if gatewayErr == nil {
+			gatewayURL, gatewayKey, closeGateway = agentGateway.BaseURL, agentGateway.Token, agentGateway.Close
+		}
+	}
 	if gatewayErr != nil {
 		return Result{}, gatewayErr
 	}
@@ -160,7 +187,25 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			return Result{}, ErrRun
 		}
 	}
-	command := exec.CommandContext(ctx, c.Executable, "--mode", "rpc", "--no-session", "--offline", "--no-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files", "--no-approve", "--thinking", "off", "--system-prompt", systemPrompt, "--provider", c.Provider, "--model", c.Model)
+	args := []string{"--mode", "rpc", "--no-session", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files", "--no-approve", "--thinking", "off", "--system-prompt", activeSystemPrompt, "--provider", c.Provider, "--model", c.Model}
+	toolNames := []string{}
+	if agent == nil {
+		args = append(args, "--no-tools")
+	} else {
+		for _, tool := range agent.config.Tools {
+			toolNames = append(toolNames, tool.Name)
+		}
+		module, err := renderAgentExtension(agentGateway.BaseURL, agentGateway.ToolToken, c.Timeout, agent.config.Tools)
+		if err != nil {
+			return Result{}, err
+		}
+		modulePath := filepath.Join(dir, "host-tools.js")
+		if os.WriteFile(modulePath, module, 0600) != nil {
+			return Result{}, ErrRun
+		}
+		args = append(args, "--no-builtin-tools", "--tools", strings.Join(toolNames, ","), "--extension", modulePath)
+	}
+	command := exec.CommandContext(ctx, c.Executable, args...)
 	command.Env = env
 	command.Dir = dir
 	command.Stderr = io.Discard
@@ -200,13 +245,26 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if encoder.Encode(map[string]string{"id": "state", "type": "get_state"}) != nil {
 		return Result{}, ErrRun
 	}
-	protocol, e := NewProtocol(c.Provider, c.Model)
-	if e != nil {
-		return Result{}, e
+	var protocol nativeProtocol
+	if agent == nil {
+		p, err := NewProtocol(c.Provider, c.Model)
+		if err != nil {
+			return Result{}, err
+		}
+		p.expectURL = gatewayURL
+		p.expectContext = c.ContextTokens
+		p.expectOutput = c.MaxOutputTokens
+		protocol = p
+	} else {
+		p, err := NewAgentProtocol(c.Provider, c.Model, agent.config.MaxTurns, toolNames)
+		if err != nil {
+			return Result{}, err
+		}
+		p.base.expectURL = gatewayURL
+		p.base.expectContext = c.ContextTokens
+		p.base.expectOutput = c.MaxOutputTokens
+		protocol = p
 	}
-	protocol.expectURL = gatewayURL
-	protocol.expectContext = c.ContextTokens
-	protocol.expectOutput = c.MaxOutputTokens
 	scanner := bufio.NewScanner(output)
 	scanner.Buffer(make([]byte, 4096), MaxRecordBytes+1)
 	sent := false
@@ -246,12 +304,19 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			if err != nil {
 				return Result{}, err
 			}
-			completion, e := verified()
-			if e != nil || result.Text != completion.Text {
-				return Result{}, ErrProtocol
+			if agentGateway != nil {
+				text, err := agentGateway.Final()
+				if err != nil || result.Text != text {
+					return Result{}, ErrProtocol
+				}
+			} else {
+				completion, err := verified()
+				if err != nil || result.Text != completion.Text {
+					return Result{}, ErrProtocol
+				}
+				result.MeasuredUsage = completion.Usage
 			}
 			result.Identity = identity
-			result.MeasuredUsage = completion.Usage
 			return result, nil
 		}
 	}

@@ -10768,3 +10768,30 @@ fixture providers and temporary state; they do not establish real-model accuracy
 Production runner/provenance and multi-turn RPC validation still need integration
 before user-facing native tools can be enabled. Full branch validation/push queues
 behind the unchanged SDK checkpoint.
+
+### 2026-10-01 — DAR-132 Pi native agent runner and RPC boundary
+
+Added RunAgentTask as a host embedding entry point backed by the existing
+admission, executable pin/version check, private Pi process lifecycle, native
+agent gateway, scoped executor and fenced journal. A separate pi-rpc-tools-v1
+identity binds tool schemas, turn ceiling, extension source and host deployment
+configuration; credentials remain outside the learning identity. Mutable context
+and schemas are snapshotted. Provider usage remains per journaled turn, never a
+Pi-supplied aggregate. Legacy text execution retains its no-tool protocol.
+
+The multi-turn RPC validator requires pinned state/identity, one prompt, bounded
+turns, paired sequential tool start/end/result messages and final settlement.
+Unknown/nested tools, retries, compaction, wrong models, duplicate keys and
+incomplete tool batches fail closed. RPC events confer no execution authority;
+only the host gateway registers model proposals. Final child text must equal the
+verified gateway result before the canonical task can complete.
+
+Installed Pi qualification passed for the full package with NEXUS_PI_NATIVE=1
+under race (22.758s), including production runner normal/recoverable/EndToolUse,
+wrong-model rejection, cancellation, exactly-once resource release, no repeated
+inference for a reused task ID and legacy native text paths. Additional installed
+Pi qualification through native Ollama wire fixtures passed (3.336s). RPC
+negative-lifecycle and identity policy tests passed. These use fixture providers,
+not a real-model quality comparison. SDK/CLI/API native tool routing remains
+disabled pending host tool/admission/privacy policy integration in that layer.
+Full branch gate and push remain queued behind the unchanged SDK checkpoint.

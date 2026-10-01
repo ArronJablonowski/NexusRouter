@@ -72,3 +72,31 @@ func TestUsageRejectsMissingOrInconsistentCounts(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentIdentitySeparatesToolsAndTurnPolicy(t *testing.T) {
+	c := AgentConfig{Config: identityConfig(), Tools: extensionSchema(), MaxTurns: 3}
+	id, e := c.Identity()
+	if e != nil {
+		t.Fatal(e)
+	}
+	legacy, e := c.Config.Identity()
+	if e != nil || id == legacy || id.AdapterVersion != AgentAdapterVersion {
+		t.Fatal("native tools borrowed text identity")
+	}
+	c.APIKey = "rotated"
+	rotated, e := c.Identity()
+	if e != nil || rotated != id {
+		t.Fatal("credential affected identity")
+	}
+	c.MaxTurns = 4
+	changed, e := c.Identity()
+	if e != nil || changed == id {
+		t.Fatal("turn policy not bound")
+	}
+	c.MaxTurns = 3
+	c.Tools[0].Description = "changed schema contract"
+	changed, e = c.Identity()
+	if e != nil || changed == id {
+		t.Fatal("tool configuration not bound")
+	}
+}
