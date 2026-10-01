@@ -74,7 +74,7 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 				o.NativeHarnesses = registrations
 				o.HarnessEvidence = ledger
 			})
-			req := sdk.Request{Version: 1, HarnessID: registrations[0].ID, ModelID: "chat", Prompt: "Write an answer.", Domain: "writing", Profile: "queue-v1"}
+			req := sdk.Request{Version: 1, HarnessID: registrations[0].ID, ModelID: "chat", Prompt: "Write an answer.", Domain: "writing", Profile: "queue-v1", HarnessDifficulty: "hard"}
 			queued, err := client.Submit(ctx, "native-queue-authority-key", req)
 			if err != nil || queued.State != "queued" {
 				t.Fatal(queued, err)
@@ -132,7 +132,7 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 							t.Fatal(status, e, calls.Load())
 						}
 						outcome, e := client.ReconcileHarnessOutcome(ctx, ledger, status.Result.TaskID)
-						if e != nil || outcome.Actual.Model != "fixture" {
+						if e != nil || outcome.Actual.Model != "fixture" || outcome.Task.Difficulty != "hard" {
 							t.Fatal(outcome, e)
 						}
 						again, e := client.Submit(ctx, "native-queue-authority-key", req)

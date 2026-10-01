@@ -96,8 +96,8 @@ func TestSDKNativeAutoLearnsExactPairsAndHonorsBudget(t *testing.T) {
 	reviews := map[string]harness.Review{}
 	tasks := map[string]string{}
 	for _, name := range []string{"alpha", "beta"} {
-		result, e := client.Run(ctx, sdk.Request{Version: 1, HarnessID: "pi-" + name, ModelID: name + "-id", Prompt: "Fixture answer.", Domain: "writing", Profile: "rubric-1", ContextTokens: 16384})
-		if e != nil || result.Text != name+" fixture" || result.HarnessOutcome == nil {
+		result, e := client.Run(ctx, sdk.Request{Version: 1, HarnessID: "pi-" + name, ModelID: name + "-id", Prompt: "Fixture answer.", Domain: "writing", Profile: "rubric-1", HarnessDifficulty: "hard", ContextTokens: 16384})
+		if e != nil || result.Text != name+" fixture" || result.HarnessOutcome == nil || result.HarnessOutcome.Task.Difficulty != "hard" {
 			t.Fatal(result, e)
 		}
 		digest, _ := result.HarnessOutcome.Digest()
@@ -115,7 +115,7 @@ func TestSDKNativeAutoLearnsExactPairsAndHonorsBudget(t *testing.T) {
 		reviews[name] = review
 		tasks[name] = result.TaskID
 	}
-	req := sdk.Request{Version: 1, HarnessID: "auto", ModelID: "auto", Prompt: "Fixture answer.", Domain: "writing", Profile: "rubric-1", ContextTokens: 16384, MaxCost: 1}
+	req := sdk.Request{Version: 1, HarnessID: "auto", ModelID: "auto", Prompt: "Fixture answer.", Domain: "writing", Profile: "rubric-1", HarnessDifficulty: "hard", ContextTokens: 16384, MaxCost: 1}
 	result, err := client.Run(ctx, req)
 	if err != nil || result.Text != "beta fixture" || result.HarnessSelection == nil || result.HarnessSelection.Validate() != nil || result.HarnessSelection.Primary.ConfirmedSamples != 1 {
 		t.Fatal("accuracy did not beat price", result, err)
@@ -180,12 +180,18 @@ func TestSDKNativeAutoLearnsExactPairsAndHonorsBudget(t *testing.T) {
 	if err != nil || result.Text != "alpha fixture" || result.HarnessSelection.Primary.ConfirmedSamples != 1 {
 		t.Fatal("latest review ignored", result, err)
 	}
+	req.HarnessDifficulty = "easy"
+	result, err = client.Run(ctx, req)
+	if err != nil || result.HarnessOutcome.Task.Difficulty != "easy" || result.HarnessSelection.Primary.EffectiveSamples != 0 || result.HarnessSelection.Reason != "insufficient_evidence_stable_tiebreak" {
+		t.Fatal("borrowed other difficulty", result, err)
+	}
+	req.HarnessDifficulty = "hard"
 	req.Profile = "unseen-profile"
 	result, err = client.Run(ctx, req)
 	if err != nil || result.HarnessSelection.Reason != "insufficient_evidence_stable_tiebreak" || result.HarnessSelection.Primary.EffectiveSamples != 0 {
 		t.Fatal("borrowed unrelated evidence", result, err)
 	}
-	if calls.Load() != 8 {
+	if calls.Load() != 9 {
 		t.Fatal("duplicate or missing inference", calls.Load())
 	}
 }

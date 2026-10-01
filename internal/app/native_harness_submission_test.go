@@ -40,3 +40,20 @@ func TestNativeSubmissionFingerprintIncludesAdapterContract(t *testing.T) {
 		t.Fatal("unknown queued registration admitted", err)
 	}
 }
+
+func TestNativeDifficultyAdmission(t *testing.T) {
+	s := &Service{}
+	for _, d := range []string{"hard", "easy", "medium", "unknown"} {
+		if _, err := s.bindNativeHarness(Request{HarnessDifficulty: d}); !errors.Is(err, ErrHarnessUnsupported) {
+			t.Fatal("ignored non-native label", d, err)
+		}
+	}
+	for _, d := range []string{"HARD", " hard", "impossible"} {
+		if _, err := s.bindNativeHarness(Request{HarnessID: "auto", HarnessDifficulty: d}); !errors.Is(err, ErrHarnessUnsupported) {
+			t.Fatal(d, err)
+		}
+	}
+	if nativeDifficulty("") != "unknown" {
+		t.Fatal("legacy difficulty changed")
+	}
+}

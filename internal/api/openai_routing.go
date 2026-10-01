@@ -16,9 +16,19 @@ var chatCapability = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 // Routing metadata constrains selection, never runtime registration or authority.
 func decodeChatRouting(raw json.RawMessage, req *app.Request) error {
 	bad := errors.New("invalid routing constraints")
-	fields, err := chatObject(raw, "domain", "profile", "context_tokens", "max_cost", "local_required", "capabilities")
+	fields, err := chatObject(raw, "difficulty", "domain", "profile", "context_tokens", "max_cost", "local_required", "capabilities")
 	if err != nil {
 		return bad
+	}
+	if v, ok := fields["difficulty"]; ok {
+		if chatString(v, &req.HarnessDifficulty) != nil || req.HarnessID == "" {
+			return bad
+		}
+		switch req.HarnessDifficulty {
+		case "unknown", "easy", "medium", "hard":
+		default:
+			return bad
+		}
 	}
 	for name, target := range map[string]*string{"domain": &req.Domain, "profile": &req.Profile} {
 		if value, ok := fields[name]; ok {

@@ -129,6 +129,7 @@ type Client struct {
 }
 
 type Request struct {
+	HarnessDifficulty               string
 	HarnessID                       string
 	Version                         int
 	SummaryAttemptID                string
@@ -215,7 +216,7 @@ func New(options ConfigOptions) (*Client, error) {
 }
 
 func (r Request) internal() app.Request {
-	return app.Request{HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
+	return app.Request{HarnessDifficulty: r.HarnessDifficulty, HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
 }
 func publicResult(r app.Result) Result {
 	return Result{Version: 1, HarnessEvidenceStatus: r.HarnessEvidenceStatus, HarnessOutcome: r.HarnessOutcome, HarnessSelection: r.HarnessSelection, HarnessReview: r.HarnessReview, HarnessReviewStatus: r.HarnessReviewStatus, HarnessAuditOperationID: r.HarnessAuditOperationID, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}

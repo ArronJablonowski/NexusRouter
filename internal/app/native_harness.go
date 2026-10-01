@@ -97,7 +97,13 @@ func (deniedNativeTransport) RoundTrip(*http.Request) (*http.Response, error) {
 
 func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	if r.HarnessID == "" {
+		if r.HarnessDifficulty != "" {
+			return Request{}, ErrHarnessUnsupported
+		}
 		return r, nil
+	}
+	if !validHarnessDifficulty(r.HarnessDifficulty) {
+		return Request{}, ErrHarnessUnsupported
 	}
 	if (r.submissionID != "" && r.submissionToken == "") || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" {
 		return Request{}, ErrHarnessUnsupported
@@ -182,7 +188,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if profile == "" {
 		profile = "default"
 	}
-	task := harness.TaskClass{Domain: r.Domain, Profile: profile, Difficulty: "unknown"}
+	task := harness.TaskClass{Domain: r.Domain, Profile: profile, Difficulty: nativeDifficulty(r.HarnessDifficulty)}
 	privacy := "cloud_allowed"
 	if m.Locality == "local" {
 		privacy = "local_only"
@@ -214,4 +220,18 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 		result.FinishReason = "stop"
 	}
 	return result, err
+}
+
+func validHarnessDifficulty(d string) bool {
+	switch d {
+	case "", "unknown", "easy", "medium", "hard":
+		return true
+	}
+	return false
+}
+func nativeDifficulty(d string) string {
+	if d == "" {
+		return "unknown"
+	}
+	return d
 }

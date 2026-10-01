@@ -678,3 +678,20 @@ Storage or canonical-validation failures retain the failed position and degrade
 worker health. SDK hosts can schedule `ReconcileHarnessAuditPage`; its result
 reports copied/replayed reviews, preserved-head conflicts and cycle completion.
 Neither a replay count nor a successful copy means new independent quality evidence.
+
+## Difficulty-specific routing evidence
+
+Native requests accept an explicit `HarnessDifficulty` in the SDK,
+`harness_difficulty` on the native task API, `routing.difficulty` on the chat API,
+and `--harness-difficulty` on the CLI. Values are `easy`, `medium`, `hard`, and
+`unknown`; omission preserves `unknown`. This is a caller-supplied task label,
+not a claim that the router measured difficulty. The label requires a harness
+route and follows both explicit and automatic execution into the immutable
+outcome. Selection uses the exact domain/profile/difficulty class and does not
+borrow evidence across difficulty labels.
+
+Durable queue contract generation 4 binds the new request field. Historical
+storage validators can still read generation 2/3 envelopes, but the application
+retires old-generation queued work under its existing configuration-change rules.
+Reconcile pending work before deploying this version; this change does not migrate
+or execute a live queue. Existing completed outcomes retain their original labels.

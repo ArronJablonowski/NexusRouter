@@ -208,3 +208,20 @@ func TestRunTaskJSONRejectsInvalidEventsWithoutOutput(t *testing.T) {
 		t.Fatal(code, out.String())
 	}
 }
+
+func TestRunHarnessDifficultyFlags(t *testing.T) {
+	for _, d := range []string{"easy", "medium", "hard", "unknown"} {
+		_, req, _, err := parseRunOptions([]string{"--config", "project.yaml", "--model", "auto", "--harness", "auto", "--harness-difficulty", d})
+		if err != nil || req.HarnessDifficulty != d {
+			t.Fatal(req, err)
+		}
+	}
+	for _, d := range []string{"", "HARD", " hard", "impossible"} {
+		if _, _, _, err := parseRunOptions([]string{"--config", "project.yaml", "--model", "auto", "--harness", "auto", "--harness-difficulty", d}); err == nil {
+			t.Fatal("invalid difficulty", d)
+		}
+	}
+	if _, _, _, err := parseRunOptions([]string{"--config", "project.yaml", "--model", "auto", "--harness-difficulty", "hard"}); err == nil {
+		t.Fatal("ignored difficulty without harness")
+	}
+}

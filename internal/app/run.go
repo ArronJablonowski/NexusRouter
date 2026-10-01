@@ -27,6 +27,7 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	HarnessDifficulty               string `json:"harness_difficulty,omitempty"`
 	HarnessID                       string `json:"harness_id,omitempty"`
 	nativeHarness                   *NativeHarness
 	nativeSelection                 *harness.Selection

@@ -10453,3 +10453,26 @@ existing minimum length. Outcome catch-up/lifecycle regressions passed (6.226s).
 Targeted vet/source/diff checks passed. Full gate remains queued behind the live
 base gate before push. No production state or inference changed. Tools, held-out
 comparative quality, OS-kill/network/platform qualification remain outstanding.
+
+### 2026-10-01 — DAR-132 difficulty-specific native routing
+
+Closed a production integration gap: the joint ranker already separated difficulty
+classes, but native requests always emitted unknown. Explicit easy/medium/hard/
+unknown labels now pass through SDK, CLI, native task API, chat routing metadata,
+and durable queue into both selection and canonical outcome. Omission preserves
+unknown. Invalid labels and labels on non-harness requests are rejected. Labels
+are caller-provided, not automatically measured task difficulty.
+
+Queue generation 4 fences the added request semantics; storage readers retain
+historical generations 2/3. This version retires older pending envelopes using
+configuration-change behavior, requiring rollout reconciliation. No active queue
+or completed evidence was edited.
+
+Installed Pi with fixture provider passed accuracy/adaptation and cross-difficulty
+isolation tests under race (10.865s), plus durable explicit/automatic queue and
+cancellation/fingerprint scenarios with label preservation (17.881s). Application
+admission tests passed (3.359s), API metadata tests (1.967s), CLI flags (1.541s),
+branch/resume storage regressions (38.782s), targeted vet and source/diff checks.
+These controlled fixture labels do not establish real model accuracy. Full gate
+remains queued before push. Tools, held-out comparisons, automatic difficulty
+assessment and broader crash/network/platform qualification remain open.

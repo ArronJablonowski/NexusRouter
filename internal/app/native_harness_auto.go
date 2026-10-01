@@ -93,7 +93,7 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 		}
 		candidates = append(candidates, candidate)
 	}
-	request := harness.Request{Version: 1, Task: harness.TaskClass{Domain: r.Domain, Profile: r.Profile, Difficulty: "unknown"}, Mode: s.settings.Mode, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: int64(r.ContextTokens), MaxCost: r.MaxCost}
+	request := harness.Request{Version: 1, Task: harness.TaskClass{Domain: r.Domain, Profile: r.Profile, Difficulty: nativeDifficulty(r.HarnessDifficulty)}, Mode: s.settings.Mode, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: int64(r.ContextTokens), MaxCost: r.MaxCost}
 	for range candidates {
 		selected, e := harness.Select(request, harness.DefaultPolicy(), candidates, evidence, now, 0)
 		if e != nil {

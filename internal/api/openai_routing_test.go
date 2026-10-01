@@ -18,7 +18,7 @@ func TestChatRoutingConstraintsReachService(t *testing.T) {
 		calls := 0
 		run := func(_ context.Context, r app.Request) (app.Result, error) {
 			calls++
-			if r.HarnessID != "auto" || r.ModelID != "auto" || r.Domain != "writing" || r.Profile != "rubric-v1" || r.ContextTokens != 32768 || r.MaxCost != 0.25 || !r.LocalRequired || len(r.Capabilities) != 1 || r.Capabilities[0] != "chat" || r.Messages[0].Content != "task" {
+			if r.HarnessID != "auto" || r.ModelID != "auto" || r.Domain != "writing" || r.Profile != "rubric-v1" || r.HarnessDifficulty != "hard" || r.ContextTokens != 32768 || r.MaxCost != 0.25 || !r.LocalRequired || len(r.Capabilities) != 1 || r.Capabilities[0] != "chat" || r.Messages[0].Content != "task" {
 				t.Fatal("lost constraints", r)
 			}
 			return app.Result{Text: "answer", FinishReason: "stop"}, nil
@@ -35,7 +35,7 @@ func TestChatRoutingConstraintsReachService(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		body := `{"model":"auto","harness_id":"auto","messages":[{"role":"user","content":"task"}],"routing":{"domain":"writing","profile":"rubric-v1","context_tokens":32768,"max_cost":0.25,"local_required":true,"capabilities":["chat"]}`
+		body := `{"model":"auto","harness_id":"auto","messages":[{"role":"user","content":"task"}],"routing":{"domain":"writing","profile":"rubric-v1","difficulty":"hard","context_tokens":32768,"max_cost":0.25,"local_required":true,"capabilities":["chat"]}`
 		if streaming {
 			body += `,"stream":true`
 		}
@@ -87,5 +87,25 @@ func TestChatAutoHarnessWithEmptyOperatorEvidenceDoesNotDispatch(t *testing.T) {
 	h.ServeHTTP(w, request("POST", "/v1/chat/completions", `{"model":"auto","harness_id":"auto","messages":[{"role":"user","content":"task"}],"routing":{"domain":"writing","profile":"rubric-v1","context_tokens":8192,"max_cost":0}}`))
 	if w.Code != 422 || !strings.Contains(w.Body.String(), "admission_denied") {
 		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
+func TestHarnessDifficultyDecoders(t *testing.T) {
+	for _, d := range []string{"easy", "medium", "hard", "unknown"} {
+		r, e := decodeRequest(strings.NewReader(`{"model_id":"chat","harness_id":"pi-local","harness_difficulty":"` + d + `","prompt":"fixture"}`))
+		if e != nil || r.HarnessDifficulty != d {
+			t.Fatal(r, e)
+		}
+	}
+	for _, d := range []string{`null`, `""`, `"HARD"`, `" hard"`, `1`, `"impossible"`} {
+		if _, e := decodeRequest(strings.NewReader(`{"model_id":"chat","harness_id":"pi-local","harness_difficulty":` + d + `,"prompt":"fixture"}`)); e == nil {
+			t.Fatal("native accepted", d)
+		}
+		if _, _, e := decodeChatRequest([]byte(`{"model":"chat","harness_id":"pi-local","messages":[{"role":"user","content":"x"}],"routing":{"difficulty":` + d + `}}`)); e == nil {
+			t.Fatal("chat accepted", d)
+		}
+	}
+	if _, _, e := decodeChatRequest([]byte(`{"model":"chat","messages":[{"role":"user","content":"x"}],"routing":{"difficulty":"hard"}}`)); e == nil {
+		t.Fatal("unconsumed difficulty accepted")
 	}
 }
