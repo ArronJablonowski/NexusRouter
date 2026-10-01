@@ -22,6 +22,21 @@ func TestSDKNativeHarnessQueueDurableAuthority(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi qualification")
 	}
+	nativeQueueAuthority(t, "pi")
+}
+
+func TestSDKAdditionalNativeHarnessQueueAuthority(t *testing.T) {
+	for _, pair := range []struct{ kind, env string }{{"openclaw", "NEXUS_OPENCLAW_NATIVE"}, {"hermes", "NEXUS_HERMES_NATIVE"}, {"goose", "NEXUS_GOOSE_NATIVE"}, {"openhands", "NEXUS_OPENHANDS_PYTHON"}} {
+		t.Run(pair.kind, func(t *testing.T) {
+			if os.Getenv(pair.env) == "" {
+				t.Skip("requires installed native qualification")
+			}
+			nativeQueueAuthority(t, pair.kind)
+		})
+	}
+}
+
+func nativeQueueAuthority(t *testing.T, kind string) {
 	for _, mode := range []string{"complete", "changed_registration", "cancel_queued", "cancel_running"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -47,7 +62,7 @@ func TestSDKNativeHarnessQueueDurableAuthority(t *testing.T) {
 				fmt.Fprintln(w, `{"model":"fixture","message":{"role":"assistant","content":"queued native answer"},"done":true,"done_reason":"stop","prompt_eval_count":10,"eval_count":4}`)
 			}))
 			defer provider.Close()
-			registrations := nativeFixtureRegistrations(t, nil, 64<<20)
+			registrations := []sdk.NativeHarness{nativeRegistration(t, kind)}
 			ledger, err := harness.OpenEvidenceStore(filepath.Join(t.TempDir(), "evidence"))
 			if err != nil {
 				t.Fatal(err)
@@ -59,7 +74,7 @@ func TestSDKNativeHarnessQueueDurableAuthority(t *testing.T) {
 				o.NativeHarnesses = registrations
 				o.HarnessEvidence = ledger
 			})
-			req := sdk.Request{Version: 1, HarnessID: "pi-fixture", ModelID: "chat", Prompt: "Write an answer.", Domain: "writing", Profile: "queue-v1"}
+			req := sdk.Request{Version: 1, HarnessID: registrations[0].ID, ModelID: "chat", Prompt: "Write an answer.", Domain: "writing", Profile: "queue-v1"}
 			queued, err := client.Submit(ctx, "native-queue-authority-key", req)
 			if err != nil || queued.State != "queued" {
 				t.Fatal(queued, err)

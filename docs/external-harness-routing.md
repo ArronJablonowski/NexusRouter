@@ -608,8 +608,9 @@ Native TaskStarted records carry the submission ID, so the existing claim token,
 lease, cancellation and durable task-binding checks cover native execution.
 Request retries retain one submission/task lineage. Queued and running
 cancellation use the existing lifecycle; interrupted native work must not be
-blindly resubmitted. Native loopback Pi qualification covers explicit and reviewed
-automatic completion, accounting/provenance, duplicate submission, pre-dispatch
-and running cancellation, and changed-registration retirement without inference.
-It does not establish real model quality or qualify every native harness/platform
-under process crashes and network faults.
+blindly resubmitted. Native loopback qualification for Pi, OpenClaw, Hermes, Goose and OpenHands
+covers explicit and reviewed automatic completion, accounting/provenance,
+duplicate submission, pre-dispatch and running cancellation, and changed-registration
+retirement without inference. The 20-scenario installed-runtime race suite passed
+in 93.138 seconds on this Mac. It does not establish real model quality or
+qualify every platform under process crashes and network faults.

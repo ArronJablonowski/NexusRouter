@@ -10354,3 +10354,17 @@ Follow-up verification passed: branch/resume storage race suite (35.023s),
 authenticated resume/native decoder/branch API regressions (4.093s), targeted
 vet, source formatting/size and diff checks. The original broader API failure
 was corrected; a complete repository gate remains required before push.
+
+## Five-harness queue qualification — DAR-132 (2026-10-01)
+
+Extended the native queue authority suite from Pi to installed OpenClaw, Hermes,
+Goose and OpenHands using the same operator-pinned registration helper. All five
+passed the race suite in 93.138s: 20 named scenarios, including explicit and
+reviewed-auto completion, durable provenance/usage, duplicate admission/terminal
+replay, changed model-revision retirement with zero inference, queued cancellation
+and running provider cancellation. Providers are local HTTP fixtures; reviews
+bind exact known fixture text and are not real accuracy rankings. No live model
+requests, configuration edits or harness installations occurred. Targeted vet,
+source formatting/size and diff checks passed. Full repository gate is queued
+before push; process-crash recovery, network faults, other platforms and tool
+workflows remain unfinished.
