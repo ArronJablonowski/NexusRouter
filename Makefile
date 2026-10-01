@@ -14,7 +14,7 @@ test:
 	DARWIN_PROCESS_OWNER_DIR="$$(mktemp -d)" go test -p=1 -race -timeout=45m ./...
 
 fmt:
-	gofmt -w cmd internal runtime providers tools routing harness policy evaluation sessions workers resources memory skills health metrics traces submissions approvals contextengine sdk examples scripts/qualify-cgroup
+	gofmt -w cmd internal runtime providers tools routing harness remote policy evaluation sessions workers resources memory skills health metrics traces submissions approvals contextengine sdk examples scripts/qualify-cgroup
 
 # Run every releasepack test under the same declared package timeout as the
 # supported full-suite command, reject skips, require the historical DAR-127

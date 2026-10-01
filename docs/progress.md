@@ -9518,3 +9518,27 @@ Added Research & document understanding, Data analysis & databases, Reasoning & 
 Audio candidates need an explicit audio/speech/transcription capability; chat/vision support is insufficient. This broad preview does not promise every audio input/output direction, and actual dispatch must still enforce the concrete request. Image/video generation cards now require their respective generation capability, even when historical feedback exists; image understanding does not imply generation. API and browser bounds expand to fourteen cards, with positive sample counts required for measured scopes. Regression coverage checks exact profile isolation, backend scoring parity, withdrawn heads, missing capabilities despite evidence, empty evidence states and fourteen-card browser/API validation. Focused app/web UI race tests passed (42.791s / 2.132s), including the reviewed embedded-asset digest. Full validation, safe backup, deployment and browser verification pending.
 
 Final verification: full `make check` passed for `b3cdb42e7088467c1158a4fa721a533d145d25f1` in the reused clean detached checkout, preserving the primary checkout's untracked diagnostics. The checked commit was pushed without divergence and deployed through the existing launchd service; binary SHA256 `10d14bd68b75bedb5bd78f7e91c04f92592173b45a616273314cc839b51734fc`. Authenticated API and real-browser verification show fourteen cards and all six new `benchmark-v1` scopes in the expected insufficient-evidence state. The browser synchronization timestamp advanced from 08:23:04 to 08:23:28 MDT without manual refresh; the model projection took 1.886s with a 10,000ms polling interval after response completion. OCR and CLI profiles/rankings remain unchanged; image/video generation correctly have no eligible advertised generation models. Cloud usage remains 45,405 input / 546 output, partial=2, trip revision=0. Task/evaluation/usage heads, records, trip markers and normal configuration hashes were preserved. Browser console verification reported no errors or warnings. Deployment, API/browser receipts and screenshot are retained in the reporting workspace. No benchmark or live inference was run for this grid expansion. This follow-up records verification only; the deployed functional source is the checked commit.
+
+
+## Secure remote instance control — DAR-133 (2026-09-30)
+
+Added an opt-in `remote` package and `cmd/nexus-remote` host/client. The transport
+uses TLS 1.3 mutual CA validation and explicit leaf pins, per-peer operation/model
+permissions, private-network/local-inference checks, and live registry revocation
+on reused connections. Local registry changes use validated atomic replacement
+with an expected current digest. Scoped task ownership, canonical request hashes,
+a separate private audit journal and stable SDK submission keys cover duplicate
+and uncertain-delivery recovery. The host runs normal destination admission and
+a dedicated dispatcher; no live service was deployed or reconfigured.
+
+Focused race tests, source-format checks and targeted vet pass, including a real
+SDK/dispatcher fixture for results, committed progress, queued/running cancellation
+and no duplicate inference. Zero estimated cost is enforced as a remote ceiling,
+not the explicit local API's legacy zero override. Test providers use loopback;
+no paid or live model invocation is required. Full `make check` remains pending.
+
+DAR-133 remains In Progress. Physical two-system/network-fault qualification,
+cross-platform packaging, discovery/pairing UI, live capability/resource probes,
+operational rate/retention policy and automatic remote selection with DAR-132's
+joint accuracy evidence remain unimplemented/unverified. See
+`docs/secure-remote-routing.md` for the trust model, protocol and operator steps.
