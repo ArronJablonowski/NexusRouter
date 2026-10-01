@@ -183,3 +183,52 @@ func TestIdentityBindsRuntimeAndBridgePolicy(t *testing.T) {
 		t.Fatal("missing policy transport accepted")
 	}
 }
+
+func TestFailedHarnessKeepsOnlyVerifiedConsumption(t *testing.T) {
+	python := os.Getenv("NEXUS_OPENHANDS_PYTHON")
+	if python == "" {
+		t.Skip("pinned Python fixture required")
+	}
+	for _, mode := range []string{"exit", "mismatch", "truncated"} {
+		t.Run(mode, func(t *testing.T) {
+			shim := filepath.Join(t.TempDir(), "fixture-python")
+			code := "#!" + python + "\n" + `import json,sys,urllib.request
+c=json.load(sys.stdin)
+request=urllib.request.Request(c['base_url']+'/chat/completions',data=json.dumps({'model':'test-model','messages':[{'role':'user','content':'answer'}],'stream':True,'max_tokens':128}).encode(),headers={'Authorization':'Bearer '+c['api_key'],'Content-Type':'application/json'})
+try:
+ urllib.request.urlopen(request,timeout=10).read()
+except Exception:
+ sys.exit(3)
+`
+			if mode == "mismatch" {
+				code += `print(json.dumps({'sdk_version':'1.50.1','model':'openai/test-model','status':'finished','events':[{'kind':'MessageEvent','source':'agent','llm_response_id':'one','llm_message':{'role':'assistant','content':[{'type':'text','text':'fabricated'}],'tool_calls':None,'reasoning_content':None}}]}))` + "\n"
+			} else {
+				code += "sys.exit(2)\n"
+			}
+			if err := os.WriteFile(shim, []byte(code), 0700); err != nil {
+				t.Fatal(err)
+			}
+			c := runnerFixture(t, shim)
+			var calls atomic.Int32
+			c.Transport = policyTransport(func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				body := strings.Replace(completionFixture("test-model"), `"finish_reason":"stop"}]}`, `"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":4,"total_tokens":21}}`, 1)
+				if mode == "truncated" {
+					body = strings.Replace(body, "data: [DONE]\n\n", "", 1)
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			result, err := Run(context.Background(), c, "answer")
+			if err == nil || result.Text != "" || calls.Load() != 1 {
+				t.Fatal("failure became success or repeated inference", result, err)
+			}
+			if mode == "truncated" {
+				if result.Usage != nil {
+					t.Fatal("unverified usage accepted")
+				}
+			} else if result.Usage == nil || result.Usage.InputTokens != 17 || result.Usage.OutputTokens != 4 || result.Identity.Model != "test-model" {
+				t.Fatal("verified consumption lost", result)
+			}
+		})
+	}
+}

@@ -106,6 +106,17 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if err != nil {
 		return Result{}, err
 	}
+	// Run this after process, gateway and private-state cleanup so late failures
+	// retain verified consumption without releasing accepted text.
+	var verified func() (textgateway.Completion, error)
+	defer func() {
+		if runErr != nil && verified != nil {
+			completion, e := verified()
+			if e == nil && completion.Usage != nil {
+				result = Result{Identity: identity, Usage: completion.Usage}
+			}
+		}
+	}()
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	release, err := c.Admit(ctx)

@@ -10235,3 +10235,21 @@ Cache-aware cost normalization and measurements for incomplete upstream streams
 remain outstanding. Unknown counts are not estimated; normalized cost remains
 unknown without appropriate pricing evidence. No live accounting database was
 modified or backfilled.
+
+## Measured provider completion followed by harness failure — DAR-132 (2026-10-01)
+
+All five runners now retain verified provider consumption when a later native
+process/projection/cleanup failure prevents accepted output. The finalizer runs
+after owned process, gateway and private-state cleanup; only a successfully
+verified gateway measurement supplies identity/counts, with no accepted text.
+The existing runtime failure terminal and ledger retain that measurement without
+successful execution evidence or a quality vote. Pi's normalized Usage remains
+separate from MeasuredUsage.
+
+An isolated Python shim fixture verifies provider completion followed by exit
+failure or fabricated mismatching native text: both preserve exact usage with
+one upstream call and no accepted output. Truncated provider framing stays
+unknown. Failure fixture race test passed (1.909s), all other runner non-native
+race suites passed, vet/source/diff checks passed. Full gate queued before push.
+Measurements inside an incomplete/invalid upstream stream are still unknown;
+no estimate or cache-aware cost is synthesized. No live state was changed.

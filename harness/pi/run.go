@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/harness/internal/textgateway"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"io"
 	"math"
@@ -98,6 +99,17 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	if identityErr != nil {
 		return Result{}, identityErr
 	}
+	// Run this after process, gateway and private-state cleanup so late failures
+	// retain verified consumption without releasing accepted text.
+	var verified func() (textgateway.Completion, error)
+	defer func() {
+		if runErr != nil && verified != nil {
+			completion, e := verified()
+			if e == nil && completion.Usage != nil {
+				result = Result{Identity: identity, MeasuredUsage: completion.Usage}
+			}
+		}
+	}()
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 	release, e := c.Admit(ctx)
