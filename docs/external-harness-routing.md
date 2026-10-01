@@ -225,7 +225,7 @@ remain required before this is offered as a configured production route.
 
 `ConfigOptions.NativeHarnesses` registers operator-pinned model/harness pairs.
 Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`
-or `Kind: "openclaw"`, `Kind: "hermes"`, or `Kind: "goose"`,
+or `Kind: "openclaw"`, `Kind: "hermes"`, `Kind: "goose"`, or `Kind: "openhands"`,
 absolute `Executable`, `ExecutableSHA256`, trusted `ModelRevision`, positive
 `MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*sdk.NativeHarnessPrices` (the earlier `*pi.Prices` remains
 compatible). Prices
@@ -467,3 +467,31 @@ the shared evidence paths. Cancellation joins provider handlers and cleans up
 owned process groups before release. Tool-bearing runs, queued and CLI/API
 registration, measured usage accounting, broader platform and held-out accuracy
 qualification remain open. Process ownership currently supports macOS/Linux.
+
+
+## Native OpenHands SDK through SDK v1
+
+Register `Kind: "openhands"` for official `openhands-sdk` 1.50.1. `Executable`
+is the absolute Python interpreter path in the installed isolated environment;
+`ExecutableSHA256` pins that interpreter and `RuntimeSHA256` is the host-attested
+dependency manifest digest. SDK package files and host libraries remain trusted.
+The adapter verifies the SDK version and binds the embedded bridge digest into
+its learning identity. This uses the native OpenHands SDK, not the CLI, whose
+current new-conversation path restores default tools.
+
+The bridge uses an empty tool list including builtins, no MCP, condenser or
+critic, zero LLM retries, one iteration and private state. Host context, output
+limits, privacy transport and model admission remain authoritative. The verified
+gateway supports OpenAI-compatible and Ollama providers; child-local gateway
+identity is never substituted for actual host provider/model attribution.
+Cancellation joins provider cleanup and owned process groups before releasing
+resources. This is configuration isolation, not an OS sandbox.
+
+Explicit and automatic SDK routes use canonical evidence and current review
+heads. Native fixture tests qualify host-context delivery, durable outcomes,
+OpenHands/Pi selection reversal, and advisory accept/reject/abstain/failure
+handling. Set NEXUS_OPENHANDS_PYTHON and NEXUS_OPENHANDS_MANIFEST to the pinned
+interpreter and dependency manifest for native tests; Pi pair tests also require
+NEXUS_PI_NATIVE=1. Fixture scores are not comparative quality qualification.
+Tools, queued/CLI/API registration, measured usage, wider-platform and held-out
+accuracy qualification remain incomplete.

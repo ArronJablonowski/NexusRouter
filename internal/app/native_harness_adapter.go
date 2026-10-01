@@ -8,6 +8,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/openclaw"
+	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/providers"
@@ -43,6 +44,12 @@ func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens
 		oc := goose.Config{Executable: c.Executable, ExecutableSHA256: c.ExecutableSHA256, Provider: c.Provider, Model: c.Model, ModelRevision: c.ModelRevision, BaseURL: c.BaseURL, APIKey: c.APIKey, UpstreamProtocol: c.UpstreamProtocol, TransportPolicySHA256: c.TransportPolicySHA256, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Messages: c.Messages, Transport: c.Transport, Admit: c.Admit, Prices: &goose.Prices{Input: c.Prices.Input, Output: c.Prices.Output, CacheRead: c.Prices.CacheRead, CacheWrite: c.Prices.CacheWrite}}
 		return nativeAdapter{Identity: oc.Identity, MaxOutputTokens: oc.MaxOutputTokens, Run: func(ctx context.Context, prompt string) (runtime.HarnessOutput, error) {
 			result, err := goose.Run(ctx, oc, prompt)
+			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text}, err
+		}}, nil
+	case "openhands":
+		oc := openhands.Config{RuntimeSHA256: entry.RuntimeSHA256, Executable: c.Executable, ExecutableSHA256: c.ExecutableSHA256, Provider: c.Provider, Model: c.Model, ModelRevision: c.ModelRevision, BaseURL: c.BaseURL, APIKey: c.APIKey, UpstreamProtocol: c.UpstreamProtocol, TransportPolicySHA256: c.TransportPolicySHA256, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Messages: c.Messages, Transport: c.Transport, Admit: c.Admit, Prices: &openhands.Prices{Input: c.Prices.Input, Output: c.Prices.Output, CacheRead: c.Prices.CacheRead, CacheWrite: c.Prices.CacheWrite}}
+		return nativeAdapter{Identity: oc.Identity, MaxOutputTokens: oc.MaxOutputTokens, Run: func(ctx context.Context, prompt string) (runtime.HarnessOutput, error) {
+			result, err := openhands.Run(ctx, oc, prompt)
 			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text}, err
 		}}, nil
 	case "hermes":

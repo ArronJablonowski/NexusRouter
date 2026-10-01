@@ -47,6 +47,13 @@ func nativeRegistration(t *testing.T, kind string) sdk.NativeHarness {
 		}
 		executable = filepath.Join(r.Packages.Venv.Environment, "bin", "python")
 		runtimeDigest = fmt.Sprintf("%x", sha256.Sum256(facts))
+	} else if kind == "openhands" {
+		executable = os.Getenv("NEXUS_OPENHANDS_PYTHON")
+		manifest, e := os.ReadFile(os.Getenv("NEXUS_OPENHANDS_MANIFEST"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		runtimeDigest = fmt.Sprintf("%x", sha256.Sum256(manifest))
 	} else if kind == "goose" {
 		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
 	} else {
@@ -78,7 +85,7 @@ func nativeSDKContextAndEvidence(t *testing.T, kind string) {
 			Messages []providers.Message
 		}
 		if json.NewDecoder(r.Body).Decode(&request) != nil || request.Model != "fixture" || len(request.Messages) != 2 || request.Messages[0].Role != "system" || request.Messages[0].Content != "Exact host policy." || request.Messages[1].Content != "Answer briefly." || r.Header.Get("Authorization") != "Bearer native-fixture-secret" {
-			t.Error("OpenClaw lost host context or credentials")
+			t.Errorf("%s lost host context or credentials", kind)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprint(w, `data: {"id":"fixture","object":"chat.completion.chunk","model":"fixture","choices":[{"index":0,"delta":{"role":"assistant","content":"correct answer"},"finish_reason":"stop"}]}`+"\n\ndata: [DONE]\n\n")

@@ -26,7 +26,7 @@ type NativeHarnessPrices = pi.Prices
 // and OverheadRAMBytes must be verified host metadata, not model self-reports.
 // Registration grants no task authority; ordinary admission still applies.
 type NativeHarness struct {
-	// HermesSourceDir and RuntimeSHA256 bind the installed Hermes source and host-attested dependency manifest.
+	// HermesSourceDir binds Hermes source; RuntimeSHA256 attests Hermes or OpenHands dependencies.
 	HermesSourceDir, RuntimeSHA256                                 string
 	ID, ModelID, Kind, Executable, ExecutableSHA256, ModelRevision string
 	MaxOutputTokens                                                int
@@ -50,7 +50,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		}
 		prices := *entry.Prices
 		entry.Prices = &prices
-		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || (entry.Kind != "pi" && entry.Kind != "openclaw" && entry.Kind != "hermes" && entry.Kind != "goose") || entry.OverheadRAMBytes == 0 {
+		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || (entry.Kind != "pi" && entry.Kind != "openclaw" && entry.Kind != "hermes" && entry.Kind != "goose" && entry.Kind != "openhands") || entry.OverheadRAMBytes == 0 {
 			return ErrAdmission
 		}
 		if _, exists := entries[entry.ID]; exists {

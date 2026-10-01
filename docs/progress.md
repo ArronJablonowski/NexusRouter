@@ -10139,3 +10139,21 @@ and admission denial. Process-group/orphan/output-bound tests passed separately.
 Targeted vet/source/diff checks passed. Full gate queued before push. Public SDK
 registration, joint model-harness learning tests, tools and measured usage remain
 incomplete. No live model request or configuration change was made.
+
+## OpenHands SDK routing and learning — DAR-132 (2026-10-01)
+
+Registered the native OpenHands SDK adapter in the same closed identity/execution
+registry as Pi, OpenClaw, Hermes and Goose. Constructor validation requires its
+runtime attestation and ordinary pinned executable/model/price/resource metadata.
+Explicit routing and automatic policy-filtered model/harness selection use the
+normal admission, canonical journal and current evidence-head paths.
+
+Installed-SDK race fixtures passed (30.084s): exact host system/user context and
+provider credentials, streamed result and durable execution evidence, OpenHands
+versus Pi selection reversal after controlled review-head changes, and automatic
+advisory accept/reject/abstain/failure handling without repeated inference during
+reconciliation. These are mechanism tests, not real comparative accuracy scores.
+Targeted vet/source/diff checks passed. Full gate remains queued before push.
+All five named harnesses now have initial text-only SDK integration; tool-bearing
+workflows, queue/CLI/API registration, measured usage accounting, cross-platform
+and held-out qualification remain open. No live configuration was changed.
