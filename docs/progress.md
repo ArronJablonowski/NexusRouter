@@ -1340,3 +1340,24 @@ browser session, preserving the production limit. Execution and evaluator output
 are synthetic; this is boundary/provenance/learning qualification, not real model
 quality or physical second-host evidence. Full gate/push remains queued behind
 the unchanged Settings gate. Earlier 3d1a065 full gate passed and was pushed.
+
+## 2026-10-01 — opt-in live remote lifecycle progress
+
+Added Follow progress to the Settings task lifecycle view. It reads new events
+through the existing authenticated, scoped HTTPS/SSH API every five seconds,
+with one request in flight, one displayed page and a 30-minute following limit.
+It drains terminal pages before stopping. Stop, hidden/collapsed/removed views,
+failed reads, malformed pages and regressing heads stop following; no automatic
+failure retry or task dispatch/cancellation is introduced. Responses arriving
+after Stop cannot resume polling or overwrite its status. Last-loaded task state
+is labelled separately from newly observed lifecycle state; results remain an
+explicit status read.
+
+Behavior tests cover unchanged heads, terminal backlog, failed/revoked reads,
+head regression, manual refresh, overlap, late-response suppression, explicit
+resume and visibility/time bounds. Real IAB with synthetic endpoints traversed
+started/heartbeat/completed automatically and stopped; updated wording following
+visual inspection. Evidence is in reporting outputs/remote-progress-follow-browser-qa.
+This is browser/read-flow qualification, not physical-host or push-stream evidence.
+Reviewed asset digest and targeted tests are recorded with the checkpoint;
+full repository validation/push remains queued behind the active Settings gate.

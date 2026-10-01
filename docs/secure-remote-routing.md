@@ -1117,8 +1117,15 @@ revocation and selected HTTPS/SSH transport. The browser projection contains onl
 event sequence, kind and timestamp, plus page state/cursors. Raw runtime data
 (prompt messages, tool arguments and configuration) is not forwarded; final text
 remains available from task status. Failed or malformed pages clear displayed
-progress and require an explicit refresh. There is no background polling, event
-stream, inference dispatch or automatic retry in these controls.
+progress and require an explicit refresh. **Follow progress** explicitly starts
+cursor-based reads every five seconds, with at most one request in flight and
+one latest page displayed. It drains committed terminal pages before stopping;
+completion does not automatically load result text. Following stops on a failed
+or malformed response, regressing event head, Stop, a hidden/removed view, or
+30 minutes. Restarting requires another explicit click. Late responses after
+Stop are ignored. These are bounded reads over the selected HTTPS/SSH transport,
+not a push stream, inference dispatch, cancellation or automatic failure retry.
+The parent task state is labelled last loaded, independently of event progress.
 
 
 ### Explicit browser dispatch

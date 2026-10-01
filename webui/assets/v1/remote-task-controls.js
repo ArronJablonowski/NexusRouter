@@ -22,7 +22,7 @@ window.NexusRemoteTaskControls = (()=>{
     const taskIDs=value.task_ids===null?[]:value.task_ids;
     if(!Array.isArray(taskIDs)||taskIDs.length>128)throw Error();
     taskIDs.forEach(id=>window.NexusRemoteEvents.attach(events,peer.id,task.request_id,id,base,csrf));
-    current=value;status.textContent="State: "+value.state+(value.cancel_requested?" · cancellation requested":"")+". Refresh to check for changes.";result.textContent=value.result_text||"";
+    current=value;status.textContent="Last loaded task state: "+value.state+(value.cancel_requested?" · cancellation requested":"")+". Refresh to check for changes.";result.textContent=value.result_text||"";
    }catch{status.textContent=action==="cancel"?"Cancellation could not be confirmed. It may have taken effect. Load current status before deciding whether to try again.":"Current status is unavailable. No task was dispatched or retried.";}
    finally{lock(false);}
   }
