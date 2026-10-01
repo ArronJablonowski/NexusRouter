@@ -225,7 +225,7 @@ remain required before this is offered as a configured production route.
 
 `ConfigOptions.NativeHarnesses` registers operator-pinned model/harness pairs.
 Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`
-or `Kind: "openclaw"` or `Kind: "hermes"`,
+or `Kind: "openclaw"`, `Kind: "hermes"`, or `Kind: "goose"`,
 absolute `Executable`, `ExecutableSHA256`, trusted `ModelRevision`, positive
 `MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*sdk.NativeHarnessPrices` (the earlier `*pi.Prices` remains
 compatible). Prices
@@ -345,10 +345,10 @@ ReadEvents and canonical outcome reconciliation validate those bindings. Reviews
 written through the SDK affect later selection immediately, including after SDK
 restart; unreviewed outputs never acquire a success vote automatically.
 
-Current registered adapters are Pi, OpenClaw and Hermes text-only routes, with native Ollama or
+Current registered adapters are Pi, OpenClaw, Hermes and Goose text-only routes, with native Ollama or
 OpenAI-compatible providers. This is selection among the registered eligible
 pairs, not a claim of the globally best model/harness or a comparative ranking
-against unimplemented Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
+against the unimplemented OpenHands adapter. Additional adapters, tools, queued registration authority,
 CLI/API configuration, durable usage/cost accounting and held-out qualification
 remain required for the full feature.
 
@@ -417,7 +417,7 @@ dependencies, not an attested sandbox. Unsupported platforms, tool-bearing runs,
 queue submission and continuation are rejected. Registrations are constructor
 options and do not alter the user's live Gateway or configuration. Native tests
 use disposable configuration and fixture providers; they do not establish a
-real-world accuracy ranking. Goose and OpenHands integration, tool support,
+real-world accuracy ranking. OpenHands integration, tool support,
 queue/CLI/API registration and held-out comparative qualification remain open.
 
 
@@ -445,3 +445,25 @@ are bounded; failure does not produce an accepted result. Tool-bearing execution
 queue/CLI/API registration, measured usage accounting and broader platform
 qualification remain incomplete. Fixture review labels test selection behavior,
 not comparative real-world model/harness quality.
+
+
+## Native Goose through SDK v1
+
+Register `Kind: "goose"` with the absolute pinned Goose 1.52.0 binary path and
+its SHA256. The adapter uses a private GOOSE_PATH_ROOT, no profile extensions,
+no saved session, one turn, stdin instructions and quiet stream-json output.
+It does not install or update Goose, inherit provider credentials, or configure
+the user's existing sessions. Configuration isolation is not an OS sandbox.
+
+The gateway supplies host context and missing output caps, routes through the
+host policy transport, and requires verified normal completion before matching
+the native text. OpenAI-compatible and native Ollama protocols are qualified.
+The child always sees the ephemeral local OpenAI-compatible gateway; canonical
+identity records the actual host-configured provider/model and Goose version.
+Native metadata or normalized usage alone cannot establish model success.
+
+Explicit SDK routing, automatic pair selection and bound advisory feedback use
+the shared evidence paths. Cancellation joins provider handlers and cleans up
+owned process groups before release. Tool-bearing runs, queued and CLI/API
+registration, measured usage accounting, broader platform and held-out accuracy
+qualification remain open. Process ownership currently supports macOS/Linux.

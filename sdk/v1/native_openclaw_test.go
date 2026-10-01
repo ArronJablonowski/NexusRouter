@@ -47,6 +47,8 @@ func nativeRegistration(t *testing.T, kind string) sdk.NativeHarness {
 		}
 		executable = filepath.Join(r.Packages.Venv.Environment, "bin", "python")
 		runtimeDigest = fmt.Sprintf("%x", sha256.Sum256(facts))
+	} else if kind == "goose" {
+		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
 	} else {
 		executable, err = exec.LookPath(kind)
 	}

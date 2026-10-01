@@ -50,7 +50,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		}
 		prices := *entry.Prices
 		entry.Prices = &prices
-		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || (entry.Kind != "pi" && entry.Kind != "openclaw" && entry.Kind != "hermes") || entry.OverheadRAMBytes == 0 {
+		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || (entry.Kind != "pi" && entry.Kind != "openclaw" && entry.Kind != "hermes" && entry.Kind != "goose") || entry.OverheadRAMBytes == 0 {
 			return ErrAdmission
 		}
 		if _, exists := entries[entry.ID]; exists {

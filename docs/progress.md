@@ -10064,3 +10064,31 @@ Goose gateway/runner/SDK integration is not yet implemented.
 
 Sources: https://github.com/aaif-goose/goose/releases/tag/v1.52.0 and pinned
 crates/goose-cli/src/session/mod.rs, crates/goose-provider-types/src/conversation/message.rs.
+
+## Goose native runner and SDK learning — DAR-132 (2026-10-01)
+
+Added pinned Goose Run/RunTask with host admission, executable hash/version checks,
+private state, bounded process groups/stdout/deadline and shared verified gateway.
+Only matching successful native text and a normally completed provider stream
+produce an execution result. Native local gateway attribution is translated to
+the actual host-configured provider/model in canonical identity. No normalized
+Goose token count is treated as measured accounting.
+
+Registered Goose in SDK explicit and automatic routing. Native fixture tests cover
+OpenAI-compatible and Ollama, canonical journal results, duplicate task prevention,
+context/credential delivery, admission release and cancellation/provider joining.
+A fabricated valid Goose projection without provider dispatch is rejected;
+truncated provider output cannot return success or cause a second upstream call.
+Private-state tests reject non-loopback endpoints, symlinks and nonempty homes.
+
+SDK fixtures verify selection between Goose/Pi using current review heads and
+advisory accept/reject/abstain/failure handling. Reversing controlled quality
+reviews changes the next selected pair without repeating original inference;
+these scores do not constitute real comparative quality evidence.
+
+Verification: Goose native/process/parser/isolation race suite passed (12.042s),
+Goose SDK context/learning/advisory race suite passed (17.124s), targeted vet,
+source gate and diff checks passed. Full check queued before push. OpenHands,
+tool-bearing workflows, queue/CLI/API registration, usage accounting and wider
+platform/held-out qualification remain incomplete. No real model calls or live
+router configuration changes were used.
