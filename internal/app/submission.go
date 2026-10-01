@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
@@ -25,7 +26,7 @@ var ErrSubmission = errors.New("submission unavailable")
 // submissionContractVersion fences durable queued work from binaries whose
 // admission or canonicalization semantics differ. Increment it whenever a
 // change can reinterpret a persisted submission request.
-const submissionContractVersion = 2
+const submissionContractVersion = 3
 
 const submissionIntentVersion = 1
 
@@ -51,9 +52,11 @@ func submissionDigest(body []byte) string {
 
 func (s *Service) submissionConfigDigest() string {
 	body, _ := json.Marshal(struct {
-		Version  int             `json:"version"`
-		Settings config.Settings `json:"settings"`
-	}{Version: submissionContractVersion, Settings: s.settings})
+		Version                int                         `json:"version"`
+		Settings               config.Settings             `json:"settings"`
+		NativeHarnesses        map[string]NativeHarness    `json:"native_harnesses,omitempty"`
+		NativeHarnessContracts map[string]harness.Identity `json:"native_harness_contracts,omitempty"`
+	}{Version: submissionContractVersion, Settings: s.settings, NativeHarnesses: s.nativeHarnesses, NativeHarnessContracts: s.nativeHarnessIdentities})
 	return submissionDigest(body)
 }
 
@@ -62,8 +65,8 @@ func (s *Service) submissionPayload(key string, r Request) (string, string, []by
 }
 
 func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
-	if envelope.Request.HarnessID != "" {
-		return "", "", nil, ErrHarnessUnsupported
+	if _, err := s.bindNativeHarness(envelope.Request); err != nil {
+		return "", "", nil, errors.Join(ErrAdmission, err)
 	}
 	if envelope.Version != submissionContractVersion || envelope.Intent.Version != 0 {
 		return "", "", nil, ErrAdmission

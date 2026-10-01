@@ -10326,3 +10326,31 @@ response field remains the requested alias; canonical records retain the actual
 pair. No live inference/configuration changed. Full repository gate remains
 queued before push. Queue authority, tool workflows and held-out quality/platform
 qualification remain outstanding.
+
+## Queued native harness routing — DAR-132 (2026-10-01)
+
+SDK/native task submissions now admit registered text harnesses, including auto
+selection against current reviewed evidence at dispatch. Contract generation 3
+binds queue configuration to effective programmatic/file registrations and their
+compiled adapter identities. Equivalent startup preserves idempotency; changed
+model revisions or adapter contracts fence queued work. Native start events carry
+the submission ID and use the existing claim-token/lease-bound journal. The native
+API accepts only a harness ID, not executable/registration authority. Unsupported
+native admission remains an admission error. Tools and continuation stay rejected.
+
+Installed Pi/local fixture race tests passed: explicit completion, same-key
+retries, provenance/usage, automatic selection after an exact fixture review,
+queued/running cancellation, and changed-registration retirement with zero
+inference (16.188s). Contract/restart/fingerprint tests passed (7.237s). A broader
+API regression found stale generation-2-only branch/resume storage validators;
+they now recognize generations 2 and 3 for historical validation while current
+application config/claim gates prevent replay under changed authority. Follow-up
+verification is recorded with this checkpoint. No live configuration or database
+was upgraded. Deployment must account for retiring prior-generation queued work.
+Full repository gate and wider harness/platform interruption qualification remain
+outstanding; fixture labels are not measured comparative model quality.
+
+Follow-up verification passed: branch/resume storage race suite (35.023s),
+authenticated resume/native decoder/branch API regressions (4.093s), targeted
+vet, source formatting/size and diff checks. The original broader API failure
+was corrected; a complete repository gate remains required before push.

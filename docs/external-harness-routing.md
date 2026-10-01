@@ -515,8 +515,7 @@ with a non-nil NativeHarnesses option (including an explicitly empty list);
 leaving it nil preserves the file registrations. An SDK-supplied HarnessEvidence
 store can be attached without replacing the configured list.
 
-This CLI path supports synchronous text tasks. Queued dispatch and tool-bearing
-tasks are still unfinished. No task can supply
+This CLI path supports synchronous text tasks. Tool-bearing tasks remain unfinished. No task can supply
 an executable path or mutate these registrations through its request.
 
 ## Authenticated chat API harness selection
@@ -532,8 +531,8 @@ Both ordinary JSON responses and `stream:true` are supported. Native harness
 text is released after durable completion; this is not incremental native token
 streaming. An unsupported selection returns an admission error (HTTP 422 for a
 non-streaming request, an SSE error frame without `[DONE]` after streaming headers).
-Malformed IDs and unknown registration fields fail before dispatch. This does
-not enable queued `/v1/tasks` harness execution. Automatic pair selection uses the routing constraints described below.
+Malformed IDs and unknown registration fields fail before dispatch. Queued native task execution is described below. Automatic pair selection uses
+the routing constraints described below.
 
 ## Operator evidence store
 
@@ -587,3 +586,30 @@ whether execution is permitted. An empty evidence store is not a quality signal.
 Both JSON and SSE paths forward these constraints. The OpenAI-compatible `model`
 response field retains the requested routing alias; canonical task records retain
 the actual pair. The API does not accept evidence-store paths or review verdicts.
+
+## Durable queued native tasks
+
+SDK `Submit` and the native task API accept `harness_id` for registered text-only
+pairs. The native API uses its existing snake_case task fields (`model_id`,
+`prompt`, `domain`, `profile`, `context_tokens`, `max_cost`, `local_required`,
+`capabilities`), rather than the chat API's nested routing object. Submit explicit
+pairs or `harness_id: auto` with `model_id: auto` and sufficient context. Automatic
+selection uses the current reviewed evidence when the dispatcher executes work.
+Tools, branching/continuation and delegated native tasks remain unsupported.
+
+Queue contract generation 3 binds admitted work to the effective operator and
+programmatic registrations plus compiled adapter identities. Equivalent restarts
+preserve idempotency; registration, model-revision or adapter-contract changes
+fence old work through configuration-change reconciliation. Older-generation
+queued requests are retired, not silently replayed under the new contract. This
+requires an explicit rollout/reconciliation plan before updating a live daemon.
+
+Native TaskStarted records carry the submission ID, so the existing claim token,
+lease, cancellation and durable task-binding checks cover native execution.
+Request retries retain one submission/task lineage. Queued and running
+cancellation use the existing lifecycle; interrupted native work must not be
+blindly resubmitted. Native loopback Pi qualification covers explicit and reviewed
+automatic completion, accounting/provenance, duplicate submission, pre-dispatch
+and running cancellation, and changed-registration retirement without inference.
+It does not establish real model quality or qualify every native harness/platform
+under process crashes and network faults.

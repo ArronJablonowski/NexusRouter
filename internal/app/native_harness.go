@@ -40,6 +40,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		return ErrAdmission
 	}
 	entries := make(map[string]NativeHarness, len(registrations))
+	identities := make(map[string]harness.Identity, len(registrations))
 	digest, err := settingsConfigID(s.settings)
 	if err != nil {
 		return err
@@ -75,12 +76,15 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		if e != nil {
 			return e
 		}
-		if _, e := c.Identity(); e != nil {
+		identity, e := c.Identity()
+		if e != nil {
 			return ErrAdmission
 		}
 		entries[entry.ID] = entry
+		identities[entry.ID] = identity
 	}
 	s.nativeHarnesses = entries
+	s.nativeHarnessIdentities = identities
 	s.harnessEvidence = ledger
 	return nil
 }
@@ -95,7 +99,7 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	if r.HarnessID == "" {
 		return r, nil
 	}
-	if r.submissionID != "" || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" {
+	if (r.submissionID != "" && r.submissionToken == "") || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" {
 		return Request{}, ErrHarnessUnsupported
 	}
 	if r.HarnessID == "auto" {
@@ -184,7 +188,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 		privacy = "local_only"
 	}
 	var measured *providers.Usage
-	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task, Selection: r.nativeSelection}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {
+	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, SubmissionID: r.submissionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task, Selection: r.nativeSelection}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {
 		estimate, e := providers.EstimateWith(run, r.contextEstimator, providers.Request{Model: m.Model, Messages: messages, ContextTokens: int64(tokens), MaxOutputTokens: int64(c.MaxOutputTokens)})
 		if e != nil || estimate+c.MaxOutputTokens > tokens {
 			return runtime.HarnessOutput{}, runtime.ErrContextOverflow

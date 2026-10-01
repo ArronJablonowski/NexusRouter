@@ -381,6 +381,13 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 		}
 		var target *string
 		switch key {
+		case "harness_id":
+			id, ok := value.(string)
+			if !ok || id == "" || len(id) > 128 || strings.TrimSpace(id) != id || strings.ContainsFunc(id, unicode.IsControl) {
+				return req, bad
+			}
+			req.HarnessID = id
+			continue
 		case "model_id":
 			target = &req.ModelID
 		case "prompt":

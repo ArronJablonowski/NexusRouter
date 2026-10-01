@@ -151,8 +151,8 @@ func TestSDKNativePiUsesAdmissionContextAndDurableEvents(t *testing.T) {
 	if result.Usage == nil || result.Usage.InputTokens != 20 || result.Usage.OutputTokens != 4 {
 		t.Fatal("verified provider measurement missing")
 	}
-	if _, err := client.Submit(context.Background(), "native-queue-not-supported", req); !errors.Is(err, sdk.ErrHarnessUnsupported) {
-		t.Fatal("queued native request accepted without durable registration", err)
+	if queued, err := client.Submit(context.Background(), "native-queue-registered", req); err != nil || queued.State != "queued" {
+		t.Fatal("registered native request failed durable admission", queued, err)
 	}
 	req.HarnessID = "unknown"
 	if _, err := client.Run(context.Background(), req); !errors.Is(err, sdk.ErrHarnessUnsupported) {

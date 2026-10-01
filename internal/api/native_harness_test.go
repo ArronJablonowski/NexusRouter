@@ -92,3 +92,15 @@ func TestChatUnsupportedHarnessIsAdmissionFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeTaskDecoderHarnessAuthority(t *testing.T) {
+	req, err := decodeRequest(strings.NewReader(`{"model_id":"chat","harness_id":"pi-local","prompt":"fixture"}`))
+	if err != nil || req.HarnessID != "pi-local" {
+		t.Fatal(req, err)
+	}
+	for _, fields := range []string{`"harness_id":null`, `"harness_id":""`, `"harness_id":" x"`, `"harness_id":"x\n"`, `"harness_id":"x","harness_id":"y"`, `"harness_id":"x","executable":"/tmp/evil"`} {
+		if _, err := decodeRequest(strings.NewReader(`{"model_id":"chat","prompt":"fixture",` + fields + `}`)); err == nil {
+			t.Fatal("invalid authority admitted", fields)
+		}
+	}
+}

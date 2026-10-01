@@ -36,6 +36,7 @@ import (
 type Service struct {
 	nativeHarnesses            map[string]NativeHarness
 	harnessEvidence            *harness.EvidenceStore
+	nativeHarnessIdentities    map[string]harness.Identity
 	taskStoreMu                sync.Mutex
 	taskStore                  *telemetry.Store
 	toolExtension              *tools.Extension
