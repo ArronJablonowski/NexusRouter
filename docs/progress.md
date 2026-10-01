@@ -10038,3 +10038,29 @@ OpenClaw/Pi plus Hermes SDK regression 24.026s. Targeted vet, source and diff ch
 passed. Full make check remains queued before push. Goose, OpenHands, tools,
 queue/CLI/API registration, measured usage accounting, wider-platform support
 and held-out comparative qualification remain incomplete.
+
+## Goose protocol qualification — DAR-132 (2026-10-01)
+
+Goose was not installed. Downloaded official v1.52.0 arm64 macOS binary into the
+reporting workspace's isolated harness-runtime directory, verifying release archive
+SHA256 7674b0124aab685c71f8782fb7e65bac100c736ce3de0c9d3bf46ba07910e412.
+Executable SHA256 is b7a38f3ff1e2d48b34b6550f84cf4104f3f7d797429e1231d1255d0501d47702.
+No global install or personal provider configuration was added.
+
+Read pinned upstream CLI serialization/source and exercised actual Goose with a
+private GOOSE_PATH_ROOT, --no-profile, --no-session and a loopback fixture.
+--quiet is necessary to suppress a non-JSON startup banner. The native run made
+one streaming request with no tools and produced an assistant message followed
+by complete. The captured normalized token totals were zero, and message
+metadata supplied requested provider/model but no stop reason. Gateway verification
+will remain mandatory; normalized totals cannot serve as measured accounting.
+
+Added bounded JSONL parser and captured native fixture. It requires successful
+process exit, one text-only assistant message with matching attribution, one
+complete event and EOF. It rejects tools/errors, duplicate terminals/keys,
+malformed or incomplete framing and invalid usage fields, returning no partial
+result. Focused race tests, vet and source gate pass; full gate queued before push.
+Goose gateway/runner/SDK integration is not yet implemented.
+
+Sources: https://github.com/aaif-goose/goose/releases/tag/v1.52.0 and pinned
+crates/goose-cli/src/session/mod.rs, crates/goose-provider-types/src/conversation/message.rs.

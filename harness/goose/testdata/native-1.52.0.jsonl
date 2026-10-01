@@ -1,0 +1,2 @@
+{"type":"message","message":{"id":"fixture","role":"assistant","created":1790841413,"content":[{"type":"text","text":"answer"}],"metadata":{"userVisible":true,"agentVisible":true,"inference":{"provider":"openai","requestedModel":"fixture"}}}}
+{"type":"complete","total_tokens":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_write_input_tokens":0}
