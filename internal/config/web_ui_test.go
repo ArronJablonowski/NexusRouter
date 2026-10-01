@@ -151,3 +151,29 @@ func TestWebUIRemoteTaskControlRequiresExplicitClient(t *testing.T) {
 		t.Fatal("disabled UI retains control")
 	}
 }
+
+func TestRemoteBrowserDispatchOptInAndEvidencePath(t *testing.T) {
+	s := Defaults()
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
+	s.WebUI.RemoteDispatchDirectory = "/private/routes"
+	if s.Validate() == nil {
+		t.Fatal("dispatch without task controls")
+	}
+	s.WebUI.RemoteTaskControls = true
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"relative", "/private/../routes", "/private/route\n"} {
+		s.WebUI.RemoteDispatchDirectory = path
+		if s.Validate() == nil {
+			t.Fatalf("accepted %q", path)
+		}
+	}
+	s.WebUI = Defaults().WebUI
+	s.WebUI.RemoteDispatchDirectory = "/private/routes"
+	if s.Validate() == nil {
+		t.Fatal("disabled UI dispatch authority")
+	}
+}

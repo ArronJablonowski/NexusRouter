@@ -282,16 +282,25 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
+		var remoteDispatcher webuiapp.RemoteDispatcher
 		var remoteInspector webuiapp.RemoteInspector
 		var remoteTaskController webuiapp.RemoteTaskController
 		if c := s.WebUI.RemoteClient; c != nil {
 			client := &remote.Client{Trust: remote.TrustFile(s.WebUI.RemoteTrustFile), Credentials: remote.Credentials{CertificateFile: c.CertificateFile, KeyFile: c.KeyFile, CAFile: c.CAFile}}
 			remoteInspector = client
+			if dir := s.WebUI.RemoteDispatchDirectory; dir != "" {
+				store, err := remote.OpenRouteStore(dir)
+				if err != nil {
+					fmt.Fprintln(stderr, "cannot initialize remote dispatch evidence")
+					return 1
+				}
+				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store}
+			}
 			if s.WebUI.RemoteTaskControls {
 				remoteTaskController = client
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

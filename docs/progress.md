@@ -1166,3 +1166,31 @@ is UI fixture evidence, not physical remote-system qualification. Reviewed asset
 digest updated after the display-label correction. Full repository check and
 normal backup remain queued requirements. Browser dispatch, continuous streaming,
 unpaired discovery and physical two-host qualification remain incomplete.
+
+
+## 2026-10-01 — DAR-133 opt-in browser dispatch
+
+Added remote_dispatch_directory configuration and RecordedRemoteDispatcher wiring,
+with session/CSRF-protected bounded dispatch BFF. Exact destination/certificate/
+task digest persists in the private RouteStore before network dispatch. UI
+requires explicit model selection, request review and send; only opaque peer/key
+recovery references enter the URL before sending. No automatic retry or prompt
+persistence. The initial session-storage approach was rejected by the existing
+shell guard and replaced; the guard remains unchanged.
+
+Actual mTLS BFF fixture covers persisted binding, changed-task conflict and
+revocation with zero additional dispatch on rejection. UI tests cover review
+invalidation, single send, failed recovery-link persistence, reload without
+resending, and queued status with no task IDs. Browser testing exposed membership
+unlock incorrectly enabling independently disabled task buttons; fixed by
+restoring only buttons locked by the membership operation, with regression test.
+Real IAB test with synthetic HTTP fixture confirms recovery URL, same request ID
+after reload and status recovery, with one dispatch for the final test identity.
+Evidence: reporting outputs/remote-dispatch-browser-qa. Initial storage experiment
+remains separately present in its call log, not relabeled as final behavior.
+
+Focused webui/webuiapp/config race suites and vet/source/diff checks pass; full
+repository validation and push remain pending. No live daemon, SSH account or
+trust changes. This exposes explicit routing only; automated accuracy selection
+in the browser, continuous streaming, discovery and physical two-host
+qualification remain incomplete.

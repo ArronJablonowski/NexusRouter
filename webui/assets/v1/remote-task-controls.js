@@ -19,8 +19,9 @@ window.NexusRemoteTaskControls = (()=>{
     const response=await fetch(base+"/api/v1/remote-task-control",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify(body)});
     if(!response.ok)throw Error();const value=await response.json();
     if(!value||value.version!==1||value.instance!==peer.id||value.request_id!==task.request_id||typeof value.submission_id!=="string"||!value.submission_id||!["queued","running","succeeded","failed","canceled"].includes(value.state)||typeof value.cancel_requested!=="boolean"||(action==="cancel"&&value.submission_id!==expected))throw Error();
-    if(!Array.isArray(value.task_ids)||value.task_ids.length>128)throw Error();
-    value.task_ids.forEach(id=>window.NexusRemoteEvents.attach(events,peer.id,task.request_id,id,base,csrf));
+    const taskIDs=value.task_ids===null?[]:value.task_ids;
+    if(!Array.isArray(taskIDs)||taskIDs.length>128)throw Error();
+    taskIDs.forEach(id=>window.NexusRemoteEvents.attach(events,peer.id,task.request_id,id,base,csrf));
     current=value;status.textContent="State: "+value.state+(value.cancel_requested?" · cancellation requested":"")+". Refresh to check for changes.";result.textContent=value.result_text||"";
    }catch{status.textContent=action==="cancel"?"Cancellation could not be confirmed. It may have taken effect. Load current status before deciding whether to try again.":"Current status is unavailable. No task was dispatched or retried.";}
    finally{lock(false);}

@@ -1119,3 +1119,34 @@ event sequence, kind and timestamp, plus page state/cursors. Raw runtime data
 remains available from task status. Failed or malformed pages clear displayed
 progress and require an explicit refresh. There is no background polling, event
 stream, inference dispatch or automatic retry in these controls.
+
+
+### Explicit browser dispatch
+
+An operator can opt in with `web_ui.remote_dispatch_directory`, a dedicated
+private absolute path for durable routing bindings. This requires remote client
+credentials and `remote_task_controls: true`; defaults remain disabled. Startup
+opens the private RouteStore before exposing dispatch. The browser cannot choose
+its path or a network endpoint. All authenticated browser operators share the
+configured remote certificate and its paired scopes.
+
+Peers with dispatch permission expose a form for an explicitly chosen model,
+optional external harness, task domain/profile, context, cost and privacy. The
+user reviews the exact request before sending. A new random request ID and peer
+are put in the page URL before sending; these are recovery references, never
+authority. No prompt, credential or authoritative task state enters browser
+storage or the URL. Bookmark/copy this recovery URL before closing the page if
+it is needed later. Changing to a new request replaces the recovery reference
+in the current page; it does not cancel or retry earlier work.
+
+The BFF uses DispatchRecorded: the exact task digest, destination and caller
+certificate are durably bound before any request to the peer. Changed reuse of
+a request ID is rejected. The browser sends once, then exposes status controls,
+including after an uncertain response. Reloading the recovery URL performs no
+dispatch. Starting another independent request is an explicit user action and
+can create duplicate work if used as a replacement before inspecting the prior
+request. BFF failures after dispatch invocation are conservatively reported as
+unconfirmed. Admission, model/harness permissions, private/local requirements,
+resource limits and revocation remain enforced by the normal remote client and
+destination. This form is explicit routing; automatic accuracy-first selection
+and advisory evaluation remain separate CLI workflows, not automatic UI effects.

@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,13 +42,15 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	var calls, cancellations atomic.Int32
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if (r.Method != "GET" && !(r.Method == "POST" && r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel")) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
+		if (r.Method != "GET" && !(r.Method == "POST" && (r.URL.Path == "/v1/remote/tasks/request-existing-0001/cancel" || r.URL.Path == "/v1/remote/tasks/request-browser-0001"))) || r.Header.Get("X-Nexus-Instance") != "node-a" || r.TLS == nil || len(r.TLS.VerifiedChains) == 0 {
 			http.Error(w, "denied", 403)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Nexus-Instance", "node-a")
 		switch r.URL.Path {
+		case "/v1/remote/tasks/request-browser-0001":
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-browser", State: "queued"})
 		case "/v1/remote/info":
 			json.NewEncoder(w).Encode(remote.Info{Version: 1, Instance: "node-a", Available: true})
 		case "/v1/remote/tasks":
@@ -149,14 +152,46 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 8 {
 		t.Fatal("events did not use authenticated status and events calls", calls.Load())
 	}
+	previous = registry.Digest()
+	registry.Peers[0].Operations = append(registry.Peers[0].Operations, "dispatch")
+	registry.Peers[0].Models = []string{"model-a"}
+	registry.Peers[0].AllowPrivate = true
+	if err = trust.Replace(registry, previous); err != nil {
+		t.Fatal(err)
+	}
+	routeStore, err := remote.OpenRouteStore(filepath.Join(dir, "routes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.remoteDispatcher = &RecordedRemoteDispatcher{Client: h.remoteInspector.(*remote.Client), Store: routeStore}
+	dispatch := func(body string, want int) {
+		t.Helper()
+		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-dispatch", body)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("dispatch %d want %d: %s", w.Code, want, w.Body.String())
+		}
+	}
+	body := browserDispatchBody(t)
+	dispatch(body, 200)
+	binding, err := routeStore.Lookup("request-browser-0001")
+	if err != nil || binding.Destination != "node-a" || binding.CallerFingerprint != remote.Fingerprint(cert) {
+		t.Fatal("missing bound dispatch", binding, err)
+	}
+	dispatch(strings.Replace(body, "test task", "changed task", 1), 503)
+	if calls.Load() != 9 {
+		t.Fatal("changed task dispatched", calls.Load())
+	}
 	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}
+	dispatch(body, 503)
 	events(503)
 	inspect("info", 503)
 	inspect("tasks", 503)
 	control("cancel", 503)
-	if calls.Load() != 8 || cancellations.Load() != 1 {
+	if calls.Load() != 9 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
 }

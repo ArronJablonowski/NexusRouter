@@ -4,8 +4,9 @@ window.NexusRemoteMembership = (() => {
   const form=document.querySelector("#remote-pair-form"), verified=document.querySelector("#remote-identity-verified"), pair=document.querySelector("#remote-pair"), refresh=document.querySelector("#remote-refresh"), status=document.querySelector("#remote-status"), peers=document.querySelector("#remote-peers");
   const editor=window.NexusRemotePairForm.mount(form,verified);
   let page=null, busy=false, confirmations=[];
+  const lockedButtons=new Map();
   function message(text) { status.textContent=text; }
-  function lock(value) { confirmations.forEach(node=>node.hidden=true); busy=value; pair.disabled=value||!page||!page.enabled; refresh.disabled=value; editor.lock(value); verified.disabled=value; peers.querySelectorAll("button").forEach(b=>b.disabled=value); }
+  function lock(value) { confirmations.forEach(node=>node.hidden=true); busy=value; pair.disabled=value||!page||!page.enabled; refresh.disabled=value; editor.lock(value); verified.disabled=value; if(value){peers.querySelectorAll("button").forEach(b=>{lockedButtons.set(b,b.disabled);b.disabled=true;});}else{lockedButtons.forEach((disabled,b)=>b.disabled=disabled);lockedButtons.clear();} }
   function render(value) {
    if (!value || value.version!==1 || typeof value.enabled!=="boolean" || (value.enabled && (!/^[a-f0-9]{64}$/.test(value.digest) || !value.registry || value.registry.version!==1 || !Array.isArray(value.registry.peers) || value.registry.peers.length>128))) throw Error("invalid response");
    page=value; confirmations=[]; peers.replaceChildren(); form.hidden=!value.enabled;
@@ -21,7 +22,7 @@ window.NexusRemoteMembership = (() => {
     revoke.addEventListener("click",()=>{if(!busy&&page===value){confirmations.forEach(node=>node.hidden=true);confirmation.hidden=false;confirm.focus();}});
     dismiss.addEventListener("click",()=>{confirmation.hidden=true;revoke.focus();});
     confirm.addEventListener("click",()=>{if(!confirmation.hidden&&!busy&&page===value)mutate({action:"revoke",instance:peer.id});});
-    card.append(title,content,revoke,confirmation); if(value.inspection_enabled) window.NexusRemoteInspection.attach(card,peer,base,csrf,value.task_controls_enabled); peers.append(card);
+    card.append(title,content,revoke,confirmation); if(value.inspection_enabled) window.NexusRemoteInspection.attach(card,peer,base,csrf,value.task_controls_enabled); if(value.dispatch_enabled && (peer.operations||[]).includes("dispatch")) window.NexusRemoteDispatch.attach(card,peer,base,csrf); peers.append(card);
    });
    message(value.registry.peers.length+" configured peers. Availability has not been checked.");
   }
