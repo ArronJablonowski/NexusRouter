@@ -11551,3 +11551,20 @@ conflict error; corrected assertion before the passing suite. Vet/source/diff
 checks passed. Full make check/push remains queued behind running capacity work.
 Background evaluation, UI, physical two-host and held-out production qualification
 remain open; evaluator identity and truthful content grading are host duties.
+
+### Submission version 7 branch/resume regression
+
+The full 810648d repository gate exposed HTTP resume returning invalid_submission.
+Reproduced independently: application envelopes had advanced to version 7 for
+remote harness identity pins, while both durable branch/resume parsers still
+accepted only versions 2–6. Extended those explicit allowlists to version 7;
+historical readability, canonical request checks, source/privacy fences and the
+application's exact current configuration fence remain intact. No live queue was
+upgraded or resumed.
+
+The failing authenticated API test now passes (4.253s package). New durable
+admission matrix accepts branch/resume versions 2–7 and rejects versions 1/8
+(3.161s). Four application branch/resume execution/restart/source-drift tests pass
+(12.063s), with vet/source/diff checks. The older full check is still running and
+its failure remains preserved. A corrected descendant full check must run before
+push; targeted passes do not relabel the prior failure as a successful gate.
