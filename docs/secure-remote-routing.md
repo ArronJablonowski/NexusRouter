@@ -1484,9 +1484,34 @@ settings. Save and review the output as a private file. On macOS, `plutil -lint`
 checks the plist; on Linux, `systemd-analyze --user verify` checks the unit against
 the installed manager. Installing/enabling, host startup/restart, inherited
 credentials, crash recovery and shutdown must be qualified separately on each
-platform. Native plist decoding passed on this Mac; no service was installed and
-native systemd validation was unavailable here. Rendering is not deployment
-qualification.
+platform. Native fixture lifecycle checks now pass on macOS launchd and Linux ARM64
+systemd, as described below. These disposable services do not establish production
+deployment qualification.
 
 Serialization references: [systemd command syntax](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml)
 and [systemd environment and working-directory parsers](https://github.com/systemd/systemd/blob/main/src/core/load-fragment.c).
+
+### Native service lifecycle qualification
+
+`NEXUS_REMOTE_LAUNCHD=1 go test ./remote -run
+'^TestNativeLaunchdRemoteHostLifecycle$'` explicitly registers a unique temporary
+macOS user agent using the generated template and the built production binary.
+It verifies authenticated startup, a forced crash and restart under a different
+PID, shutdown and loss of endpoint reachability. The test removes its own agent.
+
+On Linux with a running user manager, set `NEXUS_REMOTE_SYSTEMD=1` and
+`NEXUS_REMOTE_TEST_BINARY=/absolute/path/to/native/nexus`, then run
+`TestNativeSystemdRemoteHostLifecycle`. The test accepts a prebuilt binary so Go
+need not be installed on the target. It verifies the generated unit with native
+systemd-analyze, links only a uniquely named temporary user unit, and exercises
+the same startup/crash/restart/shutdown lifecycle. Paths containing spaces, dollar
+references, percent specifiers and quotes are included; the real process's cwd
+and admission environment must match literally. Cleanup stops and unlinks the
+fixture unit and reloads the user manager. No production unit is edited.
+
+Both fixtures bind loopback, use generated test TLS identities and private
+storage, grant only capability inspection, and reject any provider POST. The
+macOS race run and Linux ARM64 native run passed; Linux was cross-built without
+race instrumentation. Binary hashes were verified before running on the Spark.
+These checks establish local service lifecycle on each platform, not separate-
+system task dispatch, cancellation or recovery. Those network checks remain open.

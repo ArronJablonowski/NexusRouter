@@ -1651,3 +1651,30 @@ Docker CLI exists but its local daemon socket is absent; no Linux systemd runtim
 was available or started. Native Linux validation and physical separate-system
 routing remain open. Full combined check/ordinary push remains queued behind
 active frozen validation.
+
+### 2026-10-01 — DAR-133 native Linux ARM64 systemd lifecycle on Spark
+
+User supplied the Spark and Mac mini connection route. Authenticated to the Spark
+through the mini with strict existing host-key verification. User subsequently
+authorized copying its dedicated Spark identity locally; copied with 0600 mode
+and saved verified host-key entries separately, then proved direct authentication.
+No private key or credential bytes enter the repository or qualification report.
+
+Added explicit NEXUS_REMOTE_SYSTEMD=1 qualification using an absolute prebuilt
+native nexus binary. Cross-built main/test executables for Linux ARM64, verified
+SHA-256 equality after transfer, and ran on the Spark's actual systemd user
+manager. Native systemd-analyze verification, unique temporary unit link/start,
+pinned mTLS capability read, literal working/config/admission paths containing
+spaces/dollar/percent/quotes, owned-service SIGKILL/restart under a new PID,
+stop and endpoint closure passed. Test cleanup removes its own unit links.
+Independent post-check found no fixture units/files/processes; existing Ollama
+PID 2145 remained present, with zero provider POSTs during the test.
+
+Native test passed in 30.86s, no skip; cross-built Linux binary has no race
+instrumentation. Mac compile/vet/source/diff gates passed. Main binary SHA-256
+was a7ab00128f1114e568cf9a17accfc169ad3130808cf84d83b4a5006499675382;
+test binary 3f70ebf6d8d20dc8c78ec641b2fafdb39b800454004813c1df4669fa23f61724.
+Reporting evidence: outputs/spark-systemd-qualification/manifest.json and
+native-test.log. Full combined gate/normal push remains queued behind active
+frozen validation. This closes native Linux fixture lifecycle, not physical
+cross-system dispatch/cancellation/recovery or production deployment.
