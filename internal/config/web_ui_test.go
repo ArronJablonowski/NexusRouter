@@ -93,3 +93,22 @@ func TestWebUIDefaultModelMustReferenceConfiguredModel(t *testing.T) {
 		t.Fatal("disabled web UI retained an active default model")
 	}
 }
+
+func TestWebUIRemoteMembershipOptInPath(t *testing.T) {
+	s := Defaults()
+	s.WebUI.Enabled = true
+	for _, path := range []string{"relative.json", "/private/../peers.json", "/private/peers\n.json"} {
+		s.WebUI.RemoteTrustFile = path
+		if s.Validate() == nil {
+			t.Fatal("accepted", path)
+		}
+	}
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.WebUI.Enabled = false
+	if s.Validate() == nil {
+		t.Fatal("disabled UI retains trust authority")
+	}
+}

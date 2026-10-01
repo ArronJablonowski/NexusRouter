@@ -215,6 +215,22 @@
             <div class="settings-advisory"><strong>Safety boundary</strong><p>Tool use and cloud specialists remain disabled by default. This setting cannot enable unrestricted shell commands, write access, or access beyond the configured directory. Benchmark tools retain their host-defined schemas and scopes.</p></div>
           </aside>
         </div>
+        <section id="remote-membership" class="settings-card" aria-labelledby="remote-membership-title">
+          <h2 id="remote-membership-title">Trusted remote instances</h2>
+          <p>Manage the configured peers for HTTPS and SSH routing. Membership does not indicate that a system is online. Revoking a peer blocks subsequent requests; it does not cancel work already admitted.</p>
+          <button id="remote-refresh" type="button" class="secondary">Refresh membership</button>
+          <output id="remote-status" role="status" aria-live="polite">Loading membership…</output>
+          <div id="remote-peers"></div>
+          <form id="remote-pair-form" hidden>
+            <h3>Pair a verified instance</h3>
+            <p>Exchange the peer configuration through a trusted channel. Review its endpoint, certificate fingerprints, model and operation permissions, privacy policy, and resource limits. For SSH, also verify the host key and dedicated key configuration. This grants access using the supplied scopes.</p>
+            <label for="remote-peer-json">Peer configuration (JSON)</label>
+            <textarea id="remote-peer-json" rows="12" maxlength="65536" spellcheck="false" required aria-describedby="remote-pair-help"></textarea>
+            <p id="remote-pair-help">Paste one Peer object from the remote-routing configuration. Existing peers retain their scopes. Key file paths refer to this system; never paste private keys or passwords.</p>
+            <label><input id="remote-identity-verified" type="checkbox" required> I independently verified the peer identity, SSH host key if applicable, and requested permissions.</label>
+            <button id="remote-pair" type="submit">Pair verified instance</button>
+          </form>
+        </section>
       </section>
       <section id="routing-view" class="tron-view" aria-labelledby="routing-grid-title" hidden>
         <header class="tron-heading">
@@ -482,6 +498,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-client.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboards.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/routing-map.js" defer></script>

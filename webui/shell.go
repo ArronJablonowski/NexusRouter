@@ -33,7 +33,7 @@ var embeddedShellAssets embed.FS
 // filesystem metadata.
 func ShellAssetDigest() (string, error) {
 	hash := sha256.New()
-	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
+	for _, name := range []string{"assets/v1/index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js", "assets/v1/bootstrap.html", "assets/v1/bootstrap.css", "assets/v1/bootstrap.js"} {
 		body, err := fs.ReadFile(embeddedShellAssets, name)
 		if err != nil {
 			return "", err
@@ -217,7 +217,7 @@ func (h *shellHandler) resolve(request *http.Request) (name string, route bool, 
 }
 
 func loadShellAssets(basePath string) (map[string]shellAsset, error) {
-	names := []string{"index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js"}
+	names := []string{"index.html", "assets/v1/app.css", "assets/v1/operation-contract.js", "assets/v1/inspector.js", "assets/v1/workboard-client.js", "assets/v1/workboards.js", "assets/v1/workboard-mutations.js", "assets/v1/settings.js", "assets/v1/remote-membership.js", "assets/v1/stats.js", "assets/v1/skills.js", "assets/v1/models.js", "assets/v1/routing-map.js", "assets/v1/app.js"}
 	loaded := make(map[string]shellAsset, len(names))
 	for _, name := range names {
 		embedName := name

@@ -363,3 +363,9 @@ input, select { padding: .55rem .7rem; }
 @media(prefers-reduced-motion:reduce){.odometer-digit{transition:none}}
 
 .odometer-unavailable{font-size:clamp(1rem,2vw,1.5rem);letter-spacing:0}
+#remote-membership { margin-top: 1.3rem; }
+#remote-membership output { display: block; margin: .8rem 0; }
+#remote-peers details { padding: .8rem 0; border-bottom: 1px solid #34415d; }
+#remote-peers pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#remote-pair-form > label { display: block; margin: .8rem 0; }
+#remote-identity-verified { width: auto; }

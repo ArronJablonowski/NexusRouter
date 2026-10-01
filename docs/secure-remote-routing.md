@@ -995,3 +995,33 @@ submission and evaluator replay protection. Automatic retries use the saved
 choice without fresh discovery. There is no hidden fallback or automatic retry
 of uncertain evaluator inference. These opt-in combined commands enroll their
 own request for review, not every task submitted by another client.
+
+
+## Browser membership administration
+
+The authenticated Settings page can manage an existing private trust registry
+when the operator sets `web_ui.remote_trust_file` to its absolute, normalized
+path before starting the daemon. The default is empty (disabled). Initialize
+that registry using the local CLI first, and use the same registry path for the
+remote service/client whose membership should change. This option neither starts
+a remote server nor installs SSH credentials; no live configuration is changed
+by building or opening the application.
+
+The panel lists configured HTTPS/SSH peers and their complete scopes. It does
+not claim fresh availability. Pairing accepts one peer configuration, requires
+explicit confirmation of independently verified identity and permissions, and
+uses the displayed registry digest to prevent overwriting concurrent changes.
+Revoke preserves other peers and blocks subsequent requests using the registry;
+already admitted work is not implicitly canceled. Certificate rotation remains
+the CLI `replace-trust` operation.
+
+The same-origin BFF requires the existing authenticated browser session plus
+CSRF authority for mutations. Requests have a closed, bounded JSON schema and
+bounded concurrency. The browser cannot select an arbitrary registry path.
+Missing, unsafe or invalid registries fail closed and are not initialized by a
+browser read. Peer details are rendered as text, with no credential contents
+read. All authenticated operators of an enabled browser interface have this
+membership authority; there is no separate multi-user administrator role.
+After a conflict or uncertain write, refresh and inspect current membership
+before retrying. Discovery-based onboarding, live remote capability/task views,
+and physical two-host qualification remain separate work.

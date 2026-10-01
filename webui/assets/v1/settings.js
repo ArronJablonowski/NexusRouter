@@ -85,5 +85,5 @@
 	fetch(base + "/api/v1/session/csrf", {method: "POST", credentials: "same-origin", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify({version: 1})}).then(response => {
 		if (!response.ok) throw new Error("session unavailable");
 		return response.json();
-	}).then(value => { if (!value || value.version !== 1 || typeof value.csrf_token !== "string" || !value.csrf_token) throw new Error("invalid session"); csrf = value.csrf_token; connection.textContent = "Connected"; return load(); }).catch(() => { connection.textContent = "Session needs attention"; setBusy(false); setStatus("The browser session needs attention before settings can be changed.", true); });
+	}).then(value => { if (!value || value.version !== 1 || typeof value.csrf_token !== "string" || !value.csrf_token) throw new Error("invalid session"); csrf = value.csrf_token; window.NexusRemoteMembership.mount(base, csrf); connection.textContent = "Connected"; return load(); }).catch(() => { connection.textContent = "Session needs attention"; setBusy(false); setStatus("The browser session needs attention before settings can be changed.", true); });
 })();

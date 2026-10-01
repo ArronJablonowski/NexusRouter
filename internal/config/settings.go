@@ -45,6 +45,7 @@ type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
 }
 type WebUI struct {
+	RemoteTrustFile               string   `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
 	Enabled                       bool     `yaml:"enabled" json:"enabled"`
 	PathPrefix                    string   `yaml:"path_prefix" json:"path_prefix"`
 	AllowedOrigins                []string `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`

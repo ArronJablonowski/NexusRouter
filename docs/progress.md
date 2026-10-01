@@ -1034,3 +1034,34 @@ Race package passed 4.211s; targeted vet, source formatting/size and diff passed
 Original failure is retained in this note; no production inference was involved.
 Full repository validation and conditional push remain queued. This fixes an
 admission-order defect, without changing evidence ownership or grading policy.
+
+
+### DAR-133 — authenticated browser membership (2026-10-01)
+
+Added opt-in `web_ui.remote_trust_file` and a Settings membership panel for
+configured HTTPS/SSH peers. Existing browser session/CSRF and strict JSON guards
+protect pair/revoke, with explicit identity verification and expected-current
+registry digests. The configured path is fixed at daemon startup; browser input
+cannot choose it. Existing private registry required; no discovery grants,
+credential creation, network probes or service deployment. Conflicts/uncertain
+writes clear actionable stale UI state until refresh. Revocation preserves
+unrelated peers and does not cancel already admitted work.
+
+Verification: complete internal/webuiapp, internal/config and webui race packages
+passed (4.360s / 4.486s / 9.495s), including real private-file CAS, rejected
+unauthorized/CSRF/foreign-origin/unverified/duplicate-field inputs, missing/public
+registry denial, SSH preservation and browser no-replay recovery behavior.
+Updated reviewed embedded-asset digest; resource/CSP/storage restrictions still
+pass. Initial new GET fixtures incorrectly carried empty bodies and were fixed
+to use the existing strict browserGET helper. Targeted vet and source gate passed.
+Full repository validation/push will follow the active preceding check; no full
+pass or live deployment is claimed. UI currently accepts a complete peer object;
+guided discovery/onboarding, live capabilities/tasks, separate-machine and
+cross-platform native qualification remain open.
+
+The preceding 810648d full gate finished with the known branch/resume and license
+snapshot failures plus two SDK branch/resume cases with the same version fence.
+Both exact SDK failures passed on this descendant with race detection/count=1
+(6.903s); existing version-seven correction suffices. The preceding gate remains
+failed, not relabeled. Its replacement 3d1a065 full gate is freshly live and is
+not interrupted by this UI work.
