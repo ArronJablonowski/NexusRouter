@@ -10368,3 +10368,22 @@ requests, configuration edits or harness installations occurred. Targeted vet,
 source formatting/size and diff checks passed. Full repository gate is queued
 before push; process-crash recovery, network faults, other platforms and tool
 workflows remain unfinished.
+
+## Native terminal recovery correction — DAR-132 (2026-10-01)
+
+A new regression demonstrated that successful native tasks could not be recovered
+after a lost dispatcher acknowledgement: terminal projection required model-turn
+events that native harness tasks intentionally do not create. Added a strict
+native projection using the existing bound-outcome validator. It restores only
+committed text, operation count, stop reason and verified terminal usage; nil and
+measured zero remain distinct. Failure/cancellation do not acquire accepted text,
+quality feedback or invented audit results. Mixed/tampered histories fail closed.
+
+Session projection/tampering/model regressions passed (1.603s). Real SQLite and
+dispatcher fixtures passed for expired-claim recovery after storage reopen with
+unchanged history/no repeat inference (6.417s with existing model recovery), and
+native committed/uncommitted terminal-boundary cases (5.747s). An uncommitted
+output is closed as interrupted, never replayed. Targeted vet/source/diff checks
+passed. Full repository gate remains queued before push; actual OS-process kill,
+orphan cleanup, all-platform network-fault and tool-workflow qualification remain
+open. No live task or evidence store was modified.

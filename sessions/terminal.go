@@ -82,6 +82,9 @@ func ProjectTerminalSubmission(events []runtime.Event) (TerminalOutcome, error) 
 	default:
 		return bad()
 	}
+	if start.Data.Harness != nil {
+		return projectNativeTerminal(events, out)
+	}
 	usageKnown := true
 	completed := 0
 	usage := providers.Usage{}

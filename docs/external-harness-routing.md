@@ -614,3 +614,21 @@ duplicate submission, pre-dispatch and running cancellation, and changed-registr
 retirement without inference. The 20-scenario installed-runtime race suite passed
 in 93.138 seconds on this Mac. It does not establish real model quality or
 qualify every platform under process crashes and network faults.
+
+### Recovering a lost completion acknowledgement
+
+Terminal recovery recognizes the native two-event lifecycle directly. A valid,
+completed harness outcome restores its bound text, one operation, stop reason,
+and verified terminal usage (including measured zero; absent usage stays unknown).
+It does not require fabricated model-turn or quality-evaluation events. Identity,
+text digest, ordering and lifecycle validation still apply, and recovered usage
+is copied rather than sharing mutable canonical data. Audit status remains
+`not_recovered`; recovery does not rerun an evaluator.
+
+SQLite/dispatcher fault-boundary tests cover committed completion followed by a
+lost submission acknowledgement, storage reopen, live-claim/configuration fencing,
+idempotent recovery and unchanged canonical history. If the native terminal
+commit is lost, recovery closes the started task as interrupted with no accepted
+output or invented usage and never repeats inference. These fixtures exercise
+persistence/recovery boundaries; they are not full operating-system kill or
+orphan-process qualification of each installed runtime.
