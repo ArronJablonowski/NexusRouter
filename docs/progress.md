@@ -11349,3 +11349,29 @@ Counters reset on restart and are not durable billing quotas or deployment-wide
 rate coordination. Retention, physical two-host validation, discovery/pairing UI
 and automatic accuracy-first remote destination selection remain open. Full
 repository validation and normal branch backup are queued before completion.
+
+### DAR-133 — context-bound remote harness identity preview
+
+Added `nexus-remote harness-identity` and the matching Go/HTTPS/SSH discovery
+operation. It derives the exact effective native harness identity for a scoped
+model/registration/context through the same constructor used by execution.
+Client and server enforce model/harness/context scopes; destination rejects cloud
+metadata outside peer scope and inconsistent registration/model identity. The
+existing info permission, rate allowance and durable operation audit apply.
+No task, reservation, provider connection, secret lookup or subprocess is created.
+
+All five adapter previews passed context-isolation and constructor-identity tests
+(1.629s race package). Fixtures deliberately use nonexistent executables, no
+provider server and a secret lookup that fails if called. The first test fixture
+incorrectly enabled native tools with an empty tool catalogue; corrected the
+fixture to include the normal read tool, preserving production validation.
+Remote/CLI native-SSH race suite passed (20.705s/1.611s); targeted vet and source
+checks passed. Identity endpoint scope/no-dispatch tests also run through actual
+isolated OpenSSH as well as HTTPS. This is same-host protocol qualification,
+not physical two-host evidence.
+
+Responses are configured identities, not installation/availability attestations
+or authenticated quality scores. Cross-instance evidence provenance, durable
+chosen destination and automatic ranking remain unimplemented. Full repository
+validation and backup of this descendant checkpoint are queued behind the
+active harness gate; no active gate or comparison input was edited.

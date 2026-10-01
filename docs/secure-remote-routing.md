@@ -387,3 +387,30 @@ consume allowance before scope checks, including denied requests. TLS failures a
 unknown endpoints do not allocate per-peer buckets. This complements resource
 admission; journal retention, perimeter protection and physical-host validation
 remain separate requirements.
+
+## Exact configured harness identity preview
+
+`nexus-remote harness-identity --instance NODE --model MODEL --harness REGISTRATION
+--context 32768` (with the usual trust/certificate flags) requests a configured
+identity for that exact model/registration/context. The Go client exposes
+`HarnessIdentity`; the transport is `GET /v1/remote/harness-identity` with
+`X-Nexus-Model`, `X-Nexus-Harness` and `X-Nexus-Context` headers. Both HTTPS and SSH
+use the same request path and checks. No prompt is sent.
+
+The existing `info` permission and rate budget apply. Both peer registries must
+allow the model and harness, and the context must fit the peer ceiling. The SDK
+backend also verifies its configured registration/model pair, cloud-discovery
+scope and model context bound before deriving identity. Unsupported contexts or
+inconsistent backend identity fail closed. Responses bind the instance, request,
+exact versioned harness identity and fresh computation timestamp. They disclose
+no executable/source paths, endpoint URL, credentials, tool bodies or outputs.
+
+The host derives identity using the same effective configuration constructor as
+execution, including context, output limit, deadline, adapter/model revision,
+transport and native tool policy. This performs no provider query, executable
+launch, secret lookup, task reservation or inference. It is a configuration
+preview: it does not verify installed artifact bytes, model residency, capacity
+or future admission. Discovery availability is separate. Actual completed
+execution identity must be checked before accepting learning evidence. This
+preview is a prerequisite for automatic remote routing; it does not yet rank
+nodes, authenticate imported quality scores or persist a chosen destination.

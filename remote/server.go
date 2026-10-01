@@ -99,7 +99,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	op, key := "", ""
-	if r.URL.Path == "/v1/remote/info" && r.Method == "GET" {
+	if (r.URL.Path == "/v1/remote/info" || r.URL.Path == "/v1/remote/harness-identity") && r.Method == "GET" {
 		op = "info"
 	} else if r.URL.Path == "/v1/remote/tasks" && r.Method == "GET" {
 		op = "inspect"
@@ -150,7 +150,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result any
-	if r.URL.Path == "/v1/remote/tasks" {
+	if r.URL.Path == "/v1/remote/harness-identity" {
+		result, err = s.harnessIdentity(ctx, peer, r)
+	} else if r.URL.Path == "/v1/remote/tasks" {
 		result, err = s.taskPage(ctx, peer.ID, r.Header.Get("X-Nexus-After-Request"))
 	} else if op == "info" {
 		var info Info

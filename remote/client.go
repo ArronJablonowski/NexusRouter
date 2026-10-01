@@ -78,6 +78,12 @@ func (c *Client) call(ctx context.Context, destination, op, method, path string,
 	if task != nil && !p.permitsTask(*task) {
 		return ErrDenied
 	}
+	if path == "/v1/remote/harness-identity" {
+		n, e := strconv.Atoi(headers["X-Nexus-Context"])
+		if e != nil || !p.permitsIdentity(HarnessIdentityRequest{headers["X-Nexus-Model"], headers["X-Nexus-Harness"], n}) {
+			return ErrDenied
+		}
+	}
 	address, err := p.address()
 	if err != nil {
 		return err

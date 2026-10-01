@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|harness-identity|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -51,6 +51,9 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	request := flags.String("request", "", "persisted caller request ID, 16–64 letters/digits/_/-")
 	task := flags.String("task", "", "owned task ID (events)")
 	afterRequest := flags.String("after-request", "", "last caller request ID from previous tasks page")
+	modelID := flags.String("model", "", "configured model ID (harness-identity)")
+	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
+	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
 	after := flags.Int64("after", 0, "committed event cursor")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -89,6 +92,8 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	var result any
 	switch operation {
+	case "harness-identity":
+		result, err = client.HarnessIdentity(ctx, *instance, remote.HarnessIdentityRequest{ModelID: *modelID, HarnessID: *harnessID, ContextTokens: *contextTokens})
 	case "info":
 		result, err = client.Info(ctx, *instance)
 	case "tasks":
@@ -154,7 +159,7 @@ func serve(ctx context.Context, instance, address, journalDir, configFile string
 		return err
 	}
 	defer journal.Close()
-	backend := &remote.SDKBackend{Client: client, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
+	backend := &remote.SDKBackend{Client: client, Identify: service.NativeHarnessIdentity, Observe: modelObserver(cfg, os.Getenv, resources.Profile)}
 	for _, m := range cfg.Models {
 		backend.Models = append(backend.Models, remote.Model{EstimatedCost: m.EstimatedCost, ID: m.ID, Provider: m.Provider, Model: m.Model, Harness: "nexus-native", Capabilities: m.Capabilities, ContextTokens: m.ContextTokens, Local: m.Locality == "local"})
 	}
