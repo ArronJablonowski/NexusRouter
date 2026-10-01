@@ -10795,3 +10795,20 @@ negative-lifecycle and identity policy tests passed. These use fixture providers
 not a real-model quality comparison. SDK/CLI/API native tool routing remains
 disabled pending host tool/admission/privacy policy integration in that layer.
 Full branch gate and push remain queued behind the unchanged SDK checkpoint.
+
+### 2026-10-01 — DAR-132 host-managed Pi agent lifecycle
+
+Added RunAgent for embedding inside the application's own RunHarnessAgent callback.
+This lets the host retain privacy/selection metadata and validate response contracts
+before successful terminal commit. RunAgentTask shares the same execution path.
+Corrected JSON snapshot allocation so tool schemas and message slices cannot retain
+caller backing storage; prices remain copied. A mutation regression verifies stable
+prepared attribution after caller changes, including raw schema bytes.
+
+Installed Pi 0.99.2 fixture qualification passed under race for the whole package
+(29.088s). New host-managed cases verify privacy metadata, exactly-once resource
+release and rejecting a completed provider answer before success is committed;
+tool effects and measured turns remain in the failed lineage. All harness package
+race tests, targeted vet, source check and diff check passed. No real-model quality
+claim or public native tool enablement. SDK registry/approval/selection integration
+remains next. Full gate/push queued behind the still-live SDK validation.

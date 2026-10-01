@@ -62,31 +62,9 @@ func (c AgentConfig) Identity() (harness.Identity, error) {
 // execution is pending quality review; no user-facing routing path enables this
 // adapter until those policies are connected there.
 func RunAgentTask(ctx context.Context, j runtime.Journal, c AgentConfig, t Task, tools runtime.ToolExecutor) (TaskResult, error) {
-	// Snapshot mutable host configuration before attribution or child startup.
-	if c.Prices != nil {
-		prices := *c.Prices
-		c.Prices = &prices
-	}
-	body, e := json.Marshal(c.Tools)
-	if e != nil {
-		return TaskResult{}, ErrProtocol
-	}
-	if json.Unmarshal(body, &c.Tools) != nil {
-		return TaskResult{}, ErrProtocol
-	}
-	body, e = json.Marshal(c.Messages)
-	if e != nil {
-		return TaskResult{}, ErrProtocol
-	}
-	if json.Unmarshal(body, &c.Messages) != nil {
-		return TaskResult{}, ErrProtocol
-	}
-	identity, e := c.Identity()
+	c, identity, e := prepareAgent(c, t.Prompt)
 	if e != nil {
 		return TaskResult{}, e
-	}
-	if len(c.Messages) == 0 {
-		c.Messages = []providers.Message{{Role: "system", Content: agentSystemPrompt}, {Role: "user", Content: t.Prompt}}
 	}
 	var native Result
 	outcome, text, e := runtime.RunHarnessAgent(ctx, j, runtime.HarnessAgentRequest{
@@ -94,7 +72,7 @@ func RunAgentTask(ctx context.Context, j runtime.Journal, c AgentConfig, t Task,
 		MaxTurns: c.MaxTurns, Tools: tools,
 		Execute: func(run context.Context, s *runtime.HarnessAgentSession) (runtime.HarnessOutput, error) {
 			var err error
-			native, err = runConfigured(run, c.Config, t.Prompt, &agentExecution{c, identity, s})
+			native, err = RunAgent(run, c, t.Prompt, s)
 			return runtime.HarnessOutput{Actual: native.Identity, Text: native.Text}, err
 		},
 	})
@@ -103,4 +81,52 @@ func RunAgentTask(ctx context.Context, j runtime.Journal, c AgentConfig, t Task,
 	}
 	native.Text = text
 	return TaskResult{Execution: outcome, Result: native}, nil
+}
+
+// RunAgent executes within an existing host-owned RunHarnessAgent session. The
+// caller owns the journal lifecycle and may validate the returned response before
+// committing success. Supply the same identity, tool policy and turn limit to the
+// session as this configuration. This function does not create another task or
+// commit a terminal event, and never supplies independent tool authority.
+func RunAgent(ctx context.Context, c AgentConfig, prompt string, session *runtime.HarnessAgentSession) (Result, error) {
+	if session == nil {
+		return Result{}, ErrProtocol
+	}
+	c, identity, err := prepareAgent(c, prompt)
+	if err != nil {
+		return Result{}, err
+	}
+	return runConfigured(ctx, c.Config, prompt, &agentExecution{c, identity, session})
+}
+
+func prepareAgent(c AgentConfig, prompt string) (AgentConfig, harness.Identity, error) {
+	// Snapshot mutable host configuration before attribution or child startup.
+	if c.Prices != nil {
+		prices := *c.Prices
+		c.Prices = &prices
+	}
+	body, e := json.Marshal(c.Tools)
+	if e != nil {
+		return AgentConfig{}, harness.Identity{}, ErrProtocol
+	}
+	c.Tools = nil
+	if json.Unmarshal(body, &c.Tools) != nil {
+		return AgentConfig{}, harness.Identity{}, ErrProtocol
+	}
+	body, e = json.Marshal(c.Messages)
+	if e != nil {
+		return AgentConfig{}, harness.Identity{}, ErrProtocol
+	}
+	c.Messages = nil
+	if json.Unmarshal(body, &c.Messages) != nil {
+		return AgentConfig{}, harness.Identity{}, ErrProtocol
+	}
+	identity, e := c.Identity()
+	if e != nil {
+		return AgentConfig{}, harness.Identity{}, e
+	}
+	if len(c.Messages) == 0 {
+		c.Messages = []providers.Message{{Role: "system", Content: agentSystemPrompt}, {Role: "user", Content: prompt}}
+	}
+	return c, identity, nil
 }

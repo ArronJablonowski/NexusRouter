@@ -2,6 +2,7 @@ package pi
 
 import (
 	"context"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"net/http"
 	"strings"
 	"testing"
@@ -98,5 +99,28 @@ func TestAgentIdentitySeparatesToolsAndTurnPolicy(t *testing.T) {
 	changed, e = c.Identity()
 	if e != nil || changed == id {
 		t.Fatal("tool configuration not bound")
+	}
+}
+
+func TestAgentSnapshotOwnsHostContextAndSchemas(t *testing.T) {
+	c := AgentConfig{Config: identityConfig(), Tools: extensionSchema(), MaxTurns: 3}
+	c.Messages = []providers.Message{{Role: "user", Content: "original"}}
+	prepared, id, err := prepareAgent(c, "task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Tools[0].Description = "mutated"
+	c.Tools[0].Parameters[0] = 'x'
+	c.Messages[0].Content = "mutated"
+	c.Prices.Input = 99
+	if prepared.Tools[0].Description == "mutated" || prepared.Tools[0].Parameters[0] != '{' || prepared.Messages[0].Content != "original" || prepared.Prices.Input == 99 {
+		t.Fatal("host mutation changed prepared agent")
+	}
+	got, err := prepared.Identity()
+	if err != nil || got != id {
+		t.Fatal("snapshot attribution changed", err)
+	}
+	if _, err := RunAgent(context.Background(), prepared, "task", nil); err == nil {
+		t.Fatal("missing host session accepted")
 	}
 }

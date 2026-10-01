@@ -62,7 +62,7 @@ func TestNativePiHostToolExtension(t *testing.T) {
 	}
 }
 func TestNativePiAgentTask(t *testing.T) {
-	for _, mode := range []string{"normal", "recoverable", "end", "wrong_model", "cancel", "ollama"} {
+	for _, mode := range []string{"normal", "recoverable", "end", "wrong_model", "cancel", "ollama", "host", "host_contract"} {
 		t.Run(mode, func(t *testing.T) { testNativePiHostToolExtension(t, mode, true) })
 	}
 }
@@ -274,7 +274,29 @@ func testNativePiHostToolExtension(t *testing.T, mode string, production bool) {
 	}
 	var out harness.Execution
 	var text string
-	if production {
+	if mode == "host" || mode == "host_contract" {
+		q.Request.Privacy = "local_only"
+		q.Execute = func(run context.Context, session *runtime.HarnessAgentSession) (runtime.HarnessOutput, error) {
+			result, err := RunAgent(run, cfg, "Use the fixture tool then answer.", session)
+			if err == nil && mode == "host_contract" {
+				// Host response validation happens before runtime commits success.
+				err = fmt.Errorf("fixture response contract requires JSON")
+			}
+			return runtime.HarnessOutput{Actual: result.Identity, Text: result.Text}, err
+		}
+		out, text, e = runtime.RunHarnessAgent(ctx, db, q)
+		events, readErr := db.Read(context.Background(), q.Request.TaskID, 0, 100)
+		if readErr != nil || len(events) == 0 || events[0].Data.Privacy != "local_only" || released.Load() != 1 {
+			t.Fatal("lost host policy or resource release", readErr, released.Load(), e, events)
+		}
+		if mode == "host_contract" {
+			last := events[len(events)-1]
+			if e == nil || out.Status != "" || text != "" || last.Kind != runtime.TaskFailed || last.Data.HarnessOutcome != nil || last.Data.Text != "" || requests.Load() != 2 || effects.Load() != 1 {
+				t.Fatal("response contract failure committed success", out, last, e)
+			}
+			return
+		}
+	} else if production {
 		task := Task{ID: q.Request.TaskID, SessionID: q.Request.SessionID, Prompt: "Use the fixture tool then answer.", Class: q.Request.Attribution.Task, MaxOutputBytes: 65536}
 		var result TaskResult
 		result, e = RunAgentTask(ctx, db, cfg, task, q.Tools)

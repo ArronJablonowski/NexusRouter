@@ -717,3 +717,18 @@ checks still supply quality evidence, and unreviewed completion remains pending.
 Queue contract generation 5 now binds this opt-in as well as difficulty. Older
 pending generations are retired by the existing configuration fence and require
 rollout reconciliation. No live queue was migrated by this implementation.
+
+## Host-managed Pi tool sessions
+
+Embedders can call `pi.RunAgent` from the `Execute` callback of
+`runtime.RunHarnessAgent`. The host supplies the ordinary journal, privacy and
+selection metadata, scoped tool executor, resource admission and policy transport.
+Use `AgentConfig.Identity()` and the same tool/turn configuration in the runtime
+request. The runner joins its child and bridge before returning; the host may then
+reject an invalid response before the runtime writes a successful terminal event.
+Provider usage is already recorded per turn and must not be supplied again as an
+aggregate. `RunAgentTask` remains the convenience wrapper for a complete session.
+
+Configuration snapshots own their tool schemas, message history and prices.
+Neither entry point enables native tools in SDK/CLI/API routing yet; that requires
+connecting the application registry, approval authority and selection identity.
