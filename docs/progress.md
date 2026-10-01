@@ -1262,3 +1262,21 @@ lookup. Screenshot/call evidence: reporting outputs/remote-automatic-browser-qa.
 This is UI evidence, not physical-host, inference-quality or end-to-end selector
 qualification. Browser quality-review integration and remaining remote product
 gaps are still open. No daemon configuration or live inference changed.
+
+## 2026-10-01 — production browser automatic dispatch integration
+
+Added a fixture joining the actual authenticated browser handler,
+RecordedRemoteAutomatic adapter, remote discovery/ranking, private route/choice
+store and remote.Server through mutual TLS. Only the execution backend and its
+capability/capacity observations are synthetic. After remote intake commits,
+the fixture drops the TLS connection before the dispatch response. Browser API
+returns uncertainty; recorded-status recovers the original destination. Exact-key
+resubmission remains one backend creation and does not rediscover after catalogue
+availability changes. Changed intent and fresh revocation fail without extra
+dispatch. Actual received identity, task difficulty and prompt are checked.
+
+Focused race integration, targeted vet and source/diff checks pass. This closes
+a protocol-integration gap in prior synthetic browser tests; it does not prove
+model quality, ranking among multiple candidates, installed-harness execution,
+physical two-system behavior or browser review completion. Combined full gate
+and push remain pending. No live service or inference was used.
