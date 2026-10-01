@@ -10014,3 +10014,27 @@ focused source/runtime/admission race tests passed, targeted vet and source gate
 passed. Full make check remains queued before push. No real inference or live
 router configuration changed. SDK registration, broader native cancellation and
 Ollama qualification, tool-bearing runs and other requested harnesses remain open.
+
+## Hermes SDK routing, learning and cancellation — DAR-132 (2026-10-01)
+
+SDK NativeHarness registration now accepts Hermes with explicit source directory,
+interpreter pin and host-attested dependency-manifest digest. The closed adapter
+registry supplies both execution and selection identity; ordinary provider,
+privacy, context, response-contract, admission and redacting journal paths apply.
+Documentation now describes registration requirements and trusted-runtime limits.
+
+Installed SDK fixtures verify host context/credentials, streamed output, canonical
+identity and evidence reconciliation. A same-model Pi/Hermes Ollama fixture gives
+each pair controlled reviews, selects Hermes, reverses expected review heads and
+then selects Pi. Exactly four model calls occur; reviewing the two original runs
+never repeats inference. These fixture scores are not real comparative rankings.
+Automatic accept/reject/abstain/failure reviews retain the existing limited AI
+advisory weight and replay behavior. Native cancellation independently verifies
+that provider handlers join before resource admission is released.
+
+Verification: Hermes explicit SDK race test 5.153s; Hermes/Pi learned selection
+and Hermes advisory evaluation suite 25.891s; native cancellation 3.663s;
+OpenClaw/Pi plus Hermes SDK regression 24.026s. Targeted vet, source and diff checks
+passed. Full make check remains queued before push. Goose, OpenHands, tools,
+queue/CLI/API registration, measured usage accounting, wider-platform support
+and held-out comparative qualification remain incomplete.

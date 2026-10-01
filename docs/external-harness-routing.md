@@ -225,7 +225,7 @@ remain required before this is offered as a configured production route.
 
 `ConfigOptions.NativeHarnesses` registers operator-pinned model/harness pairs.
 Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`
-or `Kind: "openclaw"`,
+or `Kind: "openclaw"` or `Kind: "hermes"`,
 absolute `Executable`, `ExecutableSHA256`, trusted `ModelRevision`, positive
 `MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*sdk.NativeHarnessPrices` (the earlier `*pi.Prices` remains
 compatible). Prices
@@ -345,10 +345,10 @@ ReadEvents and canonical outcome reconciliation validate those bindings. Reviews
 written through the SDK affect later selection immediately, including after SDK
 restart; unreviewed outputs never acquire a success vote automatically.
 
-Current registered adapters are Pi and OpenClaw text-only routes, with native Ollama or
+Current registered adapters are Pi, OpenClaw and Hermes text-only routes, with native Ollama or
 OpenAI-compatible providers. This is selection among the registered eligible
 pairs, not a claim of the globally best model/harness or a comparative ranking
-against unimplemented Hermes/Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
+against unimplemented Goose/OpenHands adapters. Additional adapters, tools, queued registration authority,
 CLI/API configuration, durable usage/cost accounting and held-out qualification
 remain required for the full feature.
 
@@ -417,5 +417,31 @@ dependencies, not an attested sandbox. Unsupported platforms, tool-bearing runs,
 queue submission and continuation are rejected. Registrations are constructor
 options and do not alter the user's live Gateway or configuration. Native tests
 use disposable configuration and fixture providers; they do not establish a
-real-world accuracy ranking. Hermes, Goose and OpenHands integration, tool support,
+real-world accuracy ranking. Goose and OpenHands integration, tool support,
 queue/CLI/API registration and held-out comparative qualification remain open.
+
+
+## Native Hermes through SDK v1
+
+Register `Kind: "hermes"` for Hermes 0.21.5+4983.g6633626. `Executable` must be
+the installed dependency-environment Python interpreter (not the shell launcher),
+with its SHA256. Set `HermesSourceDir` to the pinned, tracked-clean checkout and
+`RuntimeSHA256` to the host-attested digest of the installed dependency manifest.
+That digest participates in the learning identity; it does not independently
+attest every imported package. Source and dependencies remain trusted host code.
+
+Explicit execution, automatic pair selection, canonical evidence reconciliation
+and advisory reviews use the same SDK policy paths as Pi/OpenClaw. Native Hermes
+metadata does not establish actual completion: the gateway independently verifies
+the model response and matches final text. The host supplies any omitted token
+limit, replaces messages with assembled context, and permits at most one upstream
+dispatch. Local metadata probes cannot forward to the provider. OpenAI-compatible
+and native Ollama backends are qualified with fixtures.
+
+Each invocation has a private home, no tools/plugins/MCP/memory, disabled title
+model calls and disabled lazy installation. macOS/Linux process-group cleanup
+and provider-handler joining precede reservation release. Output and execution
+are bounded; failure does not produce an accepted result. Tool-bearing execution,
+queue/CLI/API registration, measured usage accounting and broader platform
+qualification remain incomplete. Fixture review labels test selection behavior,
+not comparative real-world model/harness quality.

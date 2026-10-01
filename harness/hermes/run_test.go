@@ -3,10 +3,12 @@ package hermes
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -71,5 +73,68 @@ func TestSourceAndRuntimeBinding(t *testing.T) {
 	c.ExecutableSHA256 = fmt.Sprintf("%x", sha256.Sum256(b))
 	if result, err := Run(context.Background(), c, "answer"); err == nil || result != (Result{}) {
 		t.Fatal("unverified source accepted")
+	}
+}
+
+type fixtureTransport func(*http.Request) (*http.Response, error)
+
+func (f fixtureTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+func TestNativeCancellationJoinsProvider(t *testing.T) {
+	if os.Getenv("NEXUS_HERMES_NATIVE") != "1" {
+		t.Skip("native Hermes required")
+	}
+	root := "/Users/aj_lobster/.hermes/hermes-agent"
+	key := fmt.Sprintf("%x", sha256.Sum256([]byte(root)))[:16]
+	facts, err := os.ReadFile(filepath.Join("/Users/aj_lobster/.hermes/installs", key, "facts.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state struct {
+		Packages struct{ Venv struct{ Environment string } }
+	}
+	if json.Unmarshal(facts, &state) != nil || state.Packages.Venv.Environment == "" {
+		t.Fatal("missing runtime")
+	}
+	executable := filepath.Join(state.Packages.Venv.Environment, "bin", "python")
+	artifact, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	joined := make(chan struct{})
+	entered := make(chan struct{})
+	released := false
+	c := Config{Executable: executable, ExecutableSHA256: fmt.Sprintf("%x", sha256.Sum256(artifact)), RuntimeSHA256: fmt.Sprintf("%x", sha256.Sum256(facts)), SourceDir: root, Provider: "fixture", Model: "fixture", ModelRevision: "r1", BaseURL: "http://127.0.0.1:1/v1", TransportPolicySHA256: strings.Repeat("c", 64), ContextTokens: 32768, MaxOutputTokens: 128, Timeout: 20 * time.Second, Prices: &Prices{}, Admit: func(context.Context) (func(), error) {
+		return func() {
+			select {
+			case <-joined:
+			default:
+				t.Error("released admission before provider joined")
+			}
+			released = true
+		}, nil
+	}}
+	c.Transport = fixtureTransport(func(r *http.Request) (*http.Response, error) {
+		close(entered)
+		<-r.Context().Done()
+		close(joined)
+		return nil, r.Context().Err()
+	})
+	go func() {
+		select {
+		case <-entered:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	result, err := Run(ctx, c, "answer")
+	if err == nil || result != (Result{}) || !released {
+		t.Fatal("canceled run accepted or reservation leaked", err)
+	}
+	select {
+	case <-entered:
+	default:
+		t.Fatal("provider was never entered")
 	}
 }

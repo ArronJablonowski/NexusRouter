@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/providers"
@@ -25,7 +26,30 @@ import (
 
 func nativeRegistration(t *testing.T, kind string) sdk.NativeHarness {
 	t.Helper()
-	executable, err := exec.LookPath(kind)
+	var executable, source, runtimeDigest string
+	var err error
+	if kind == "hermes" {
+		source = "/Users/aj_lobster/.hermes/hermes-agent"
+		revision, e := exec.Command("git", "-C", source, "rev-parse", "HEAD").Output()
+		if e != nil || strings.TrimSpace(string(revision)) != hermes.SupportedRevision {
+			t.Fatal("Hermes source revision changed")
+		}
+		key := fmt.Sprintf("%x", sha256.Sum256([]byte(source)))[:16]
+		facts, e := os.ReadFile(filepath.Join("/Users/aj_lobster/.hermes/installs", key, "facts.json"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		var r struct {
+			Packages struct{ Venv struct{ Environment string } }
+		}
+		if json.Unmarshal(facts, &r) != nil || r.Packages.Venv.Environment == "" {
+			t.Fatal("missing Hermes runtime")
+		}
+		executable = filepath.Join(r.Packages.Venv.Environment, "bin", "python")
+		runtimeDigest = fmt.Sprintf("%x", sha256.Sum256(facts))
+	} else {
+		executable, err = exec.LookPath(kind)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,13 +58,16 @@ func nativeRegistration(t *testing.T, kind string) sdk.NativeHarness {
 		t.Fatal(err)
 	}
 	sum := sha256.Sum256(body)
-	return sdk.NativeHarness{ID: kind + "-fixture", ModelID: "chat", Kind: kind, Executable: executable, ExecutableSHA256: hex.EncodeToString(sum[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, Prices: &pi.Prices{}, OverheadRAMBytes: 64 << 20}
+	return sdk.NativeHarness{HermesSourceDir: source, RuntimeSHA256: runtimeDigest, ID: kind + "-fixture", ModelID: "chat", Kind: kind, Executable: executable, ExecutableSHA256: hex.EncodeToString(sum[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, Prices: &pi.Prices{}, OverheadRAMBytes: 64 << 20}
 }
 
 func TestSDKOpenClawPreservesContextAndEvidence(t *testing.T) {
 	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
 		t.Skip("requires installed OpenClaw")
 	}
+	nativeSDKContextAndEvidence(t, "openclaw")
+}
+func nativeSDKContextAndEvidence(t *testing.T, kind string) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -55,14 +82,14 @@ func TestSDKOpenClawPreservesContextAndEvidence(t *testing.T) {
 		fmt.Fprint(w, `data: {"id":"fixture","object":"chat.completion.chunk","model":"fixture","choices":[{"index":0,"delta":{"role":"assistant","content":"correct answer"},"finish_reason":"stop"}]}`+"\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
-	registration := nativeRegistration(t, "openclaw")
+	registration := nativeRegistration(t, kind)
 	client, profiled := nativeSDKProviderClient(t, server.URL, 64<<20, false, "openai_compatible", func(c *config.Settings, o *sdk.ConfigOptions) {
 		c.Providers[0].RequestTimeout = "30s"
 		o.NativeHarnesses = []sdk.NativeHarness{registration}
 	})
 	var delivered strings.Builder
 	result, err := client.RunTextStream(context.Background(), sdk.Request{Version: 1, ModelID: "chat", HarnessID: registration.ID, Domain: "writing", Profile: "fixture-v1", Messages: []providers.Message{{Role: "system", Content: "Exact host policy."}, {Role: "user", Content: "Answer briefly."}}}, func(text string) error { delivered.WriteString(text); return nil })
-	if err != nil || result.Text != "correct answer" || delivered.String() != result.Text || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != "openclaw" || result.Usage != nil || profiled.Load() == 0 || calls.Load() != 1 {
+	if err != nil || result.Text != "correct answer" || delivered.String() != result.Text || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != kind || result.Usage != nil || profiled.Load() == 0 || calls.Load() != 1 {
 		t.Fatal("native SDK failed", result, err)
 	}
 	page, err := client.ReadEvents(context.Background(), result.TaskID, 0, 10)
@@ -84,6 +111,9 @@ func TestSDKAutoLearnsBetweenHarnessesOnSameModel(t *testing.T) {
 	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" || os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed OpenClaw and Pi")
 	}
+	nativeSDKLearnsPair(t, "openclaw")
+}
+func nativeSDKLearnsPair(t *testing.T, other string) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/api/tags" {
@@ -101,7 +131,7 @@ func TestSDKAutoLearnsBetweenHarnessesOnSameModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	registrations := []sdk.NativeHarness{nativeRegistration(t, "pi"), nativeRegistration(t, "openclaw")}
+	registrations := []sdk.NativeHarness{nativeRegistration(t, "pi"), nativeRegistration(t, other)}
 	setup := func(c *config.Settings, o *sdk.ConfigOptions) {
 		c.Providers[0].RequestTimeout = "30s"
 		o.NativeHarnesses = registrations
@@ -117,11 +147,11 @@ func TestSDKAutoLearnsBetweenHarnessesOnSameModel(t *testing.T) {
 		}
 		digest, _ := result.HarnessOutcome.Digest()
 		verdict, quality := "failed", 0.0
-		if entry.Kind == "openclaw" {
+		if entry.Kind == other {
 			verdict, quality = "passed", 1
 		}
 		// Controlled evidence exercises pair selection; these labels are not a
-		// comparative quality claim about real Pi or OpenClaw outputs.
+		// comparative quality claim about real harness outputs.
 		review := harness.Review{Version: 1, ID: entry.Kind + "-review", ExecutionDigest: digest, Verdict: verdict, Method: "deterministic", MethodVersion: "controlled-fixture-v1", Reviewer: "sdk-test", Confidence: 1, Quality: quality, CreatedAt: time.Now().UTC()}
 		if e := client.ReviewHarnessOutcome(context.Background(), ledger, result.TaskID, review); e != nil {
 			t.Fatal(e)
@@ -131,12 +161,12 @@ func TestSDKAutoLearnsBetweenHarnessesOnSameModel(t *testing.T) {
 	}
 	req := sdk.Request{Version: 1, ModelID: "auto", HarnessID: "auto", Prompt: "Fixture answer.", Domain: "writing", Profile: "comparison-v1", ContextTokens: 16384}
 	result, err := client.Run(context.Background(), req)
-	if err != nil || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != "openclaw" || result.HarnessSelection == nil || result.HarnessSelection.Primary.ConfirmedSamples != 1 || result.HarnessSelection.Primary.Identity != result.HarnessOutcome.Actual {
-		t.Fatal("did not select learned OpenClaw pair", result, err)
+	if err != nil || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.Harness != other || result.HarnessSelection == nil || result.HarnessSelection.Primary.ConfirmedSamples != 1 || result.HarnessSelection.Primary.Identity != result.HarnessOutcome.Actual {
+		t.Fatal("did not select learned pair", result, err)
 	}
 	// Reverse current review heads; the next selection must learn the new outcome
 	// for each harness, without altering or rerunning the two original executions.
-	for _, kind := range []string{"pi", "openclaw"} {
+	for _, kind := range []string{"pi", other} {
 		head := reviews[kind]
 		next := head
 		next.ID += "-revision"
