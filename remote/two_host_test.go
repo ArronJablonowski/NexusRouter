@@ -259,7 +259,14 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			wait(blockedKey, "canceled")
 		})
 	}
-	if calls.Load() != 6 {
+	physicalRestartRecovery(t, ctx, client, local, blocked, func() {
+		input, _ := json.Marshal(map[string]string{"directory": host.Directory, "binary": binary})
+		data, err := admin(ctx, twoHostRestart, input)
+		if err != nil || !validPhysicalRestart(data) {
+			t.Fatalf("restart: %v %s", err, data)
+		}
+	})
+	if calls.Load() != 8 {
 		t.Fatal("duplicate or missing provider calls", calls.Load())
 	}
 	// Revoke the caller using the normal host CLI and an expected current digest.
@@ -271,5 +278,5 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	if _, err := client.Info(ctx, "node-a"); err == nil {
 		t.Fatal("revoked caller retained access")
 	}
-	t.Log("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; six synthetic provider calls including committed response-loss recovery")
+	t.Log("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; eight synthetic provider calls including response-loss and host-restart recovery")
 }

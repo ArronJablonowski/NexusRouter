@@ -26,11 +26,16 @@ assert json.loads((d/'owner.json').read_text())['binary']==p['binary']
 env=dict(os.environ);env['DARWIN_PROCESS_OWNER_DIR']=str(d/'owners')
 args=[p['binary'],'remote','serve','--instance','node-a','--listen',p['address']+':'+str(p['port']),'--config',str(d/'config.yaml'),'--journal',str(d/'journal'),'--trust',str(d/'trust.json'),'--cert',str(d/'cert.pem'),'--key',str(d/'key.pem'),'--ca',str(d/'ca.pem')]
 with (d/'host.log').open('w') as log:
- child=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,env=env,start_new_session=True)
- (d/'host.pid').write_text(str(child.pid))
  proxy=subprocess.Popen([sys.executable,str(d/'proxy.py'),str(d),p['address'],str(p['proxy_port']),str(p['port'])],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
  (d/'proxy.pid').write_text(str(proxy.pid))
- sys.exit(child.wait())
+ while True:
+  child=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,env=env,start_new_session=True)
+  (d/'host.pid').write_text(str(child.pid))
+  code=child.wait()
+  restart=d/'restart.request'
+  if not restart.exists():sys.exit(code)
+  restart.unlink()
+
 `
 const twoHostRevoke = `
 import sys,json,pathlib,subprocess

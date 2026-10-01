@@ -1725,3 +1725,24 @@ process and checkout were left untouched.
 Final physical test passed without skip: 16.76s (race-enabled Mac package
 18.313s; Linux production binary not race-instrumented). Vet/source/diff gates
 passed. This checkpoint supersedes only the prior waiting two-host gate.
+
+## 2026-10-01: Physical host-crash task reconciliation
+
+Added a controlled single-restart path to the isolated Spark fixture supervisor.
+After verifying exact PID command/binary/journal ownership, the test sends
+SIGKILL while one synthetic model request is running and a second is durably
+queued. It requires a different live host PID, identical persisted storage,
+ordinary lease reconciliation, original running task/submission identity and
+failed committed history with no output fabrication. The queued task completes
+once; replaying the original running request returns its failed submission.
+Eight provider calls total across lifecycle, response-loss and restart cases
+prove no extra dispatch in this fixture. No production service is killed.
+
+Combined physical test passed without skip in 49.31s (Mac race package 50.868s);
+Spark production host not race-instrumented. Vet/source/diff passed. Independent
+cleanup inspection found no owned fixture directories and existing Ollama PID
+2145 remained present. Updated secure-remote-routing acceptance text to separate
+verified physical lifecycle/native managers from remaining external-harness
+crash, partition/power-loss, multicast and deployment qualification. Full gate
+and ordinary push remain queued behind the live frozen systemd checkpoint;
+only the previous waiting two-host gate was superseded.

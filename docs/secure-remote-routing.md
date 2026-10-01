@@ -306,11 +306,26 @@ accuracy-based automatic selection, bounded audit retention, explicit discovery
 and pairing UI, and service-template generation. These are implementation and
 fixture evidence, not proof of a deployed cluster.
 
-Outstanding acceptance includes physical two-system lifecycle/network-fault
-qualification; platform-native service installation, restart and shutdown;
-cross-platform certificate/storage and multicast behavior; IPv6 discovery and
-fragmented DNS bundles; and final full-repository validation before backup and
-release. Evidence from a single model/harness task is not a universal accuracy
+Physical Mac-to-Linux ARM64 fixtures now cover HTTPS and SSH dispatch,
+results/events, running cancellation, recorded retries and revocation. A remote
+test TLS proxy captures a committed production-host receipt and drops its
+response; the caller recovers the original submission without extra execution.
+Disposable launchd and systemd fixtures also verify native startup, forced-crash
+restart and shutdown. These use test certificates and synthetic providers, not
+production deployments or model-quality comparisons.
+
+The physical restart fixture additionally kills only its owned production host
+with SIGKILL during a synthetic model call. Restart uses the same config,
+journal and task database. After ordinary lease reconciliation, the started
+task retains its ID and committed events, becomes failed without replay or
+fabricated text, and the saved queued task executes once. Repeating the crashed
+request returns its original failed submission. This does not establish recovery
+of arbitrary external-harness side effects or reboot/power-loss behavior.
+
+Outstanding acceptance includes broader partition/network-fault qualification,
+external-harness crash recovery, cross-platform certificate/storage and physical
+multicast behavior, IPv6 discovery and fragmented DNS bundles, and final
+full-repository validation before backup and release. Evidence from a single model/harness task is not a universal accuracy
 ranking, and discovery never supplies authority or measured quality.
 
 NVIDIA PAIR is product inspiration for explicit pairing and separate-task private
