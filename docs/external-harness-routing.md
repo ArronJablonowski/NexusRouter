@@ -69,3 +69,38 @@ regression, replay, fallback attribution, identity isolation and admission.
 They are policy tests, not real model accuracy measurements. Real native adapter
 tests and disjoint held-out outcome qualification remain necessary before routing
 user tasks or making comparative performance claims.
+
+
+## Durable outcome ledger
+
+`harness.OpenEvidenceStore(absolutePrivateDirectory)` opens a separate version-1
+SQLite/WAL ledger with FULL synchronization. It does not migrate or write the
+runtime telemetry schema. The directory/database must be owner-private regular
+filesystem nodes. Unknown schema identity and invalid existing files fail closed;
+the store never repairs or resets them automatically.
+
+A trusted host calls `AppendExecution(ctx, execution, now)` only after obtaining
+actual model/harness/version/configuration provenance and the output digest from
+its canonical runtime. `AppendReview(ctx, review, now)` requires authenticated
+review provenance and the exact previous review ID. The store is not a public
+JSON ingestion endpoint; persistence does not authenticate arbitrary self-reports.
+Neither operation stores prompt/output bodies or turns successful execution into
+a quality vote. Failed, canceled and indeterminate executions cannot receive
+quality feedback.
+
+Immutable IDs support exact retries; conflicting records fail. Review transactions
+acquire a database write lock before checking the current head, including between
+independent handles/processes. Each accepted revision is appended; withdrawals
+preserve history. `Snapshot(ctx, now)` reads a consistent transaction and validates
+the entire log with `harness.Replay` before it can be passed to `harness.Select`.
+Only the current review contributes to ranking. Per-log limits and bounded record
+sizes reject growth beyond the supported replay contract; no replay identities
+are automatically pruned. Back up SQLite consistently and retain the ledger for
+as long as its task/review identities can be retried.
+
+Tests cover restart-equivalent selection, exact retries, conflicting IDs, revision
+and withdrawal replay, concurrent independent writers (one expected-head winner),
+failed-lineage zero feedback, canceled writes, malformed stored records and file
+permissions. This is not physical power-loss qualification or proof of native
+harness execution. SDK/runtime provenance ingestion, reviewer authentication,
+native adapters and automatic selection wiring are still required under DAR-132.

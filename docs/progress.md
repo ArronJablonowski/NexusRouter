@@ -9563,3 +9563,20 @@ fixture omitted NEXUS_API_TOKEN, and Chrome qualification used the renamed-away
 DarwinWorkboards JavaScript global. Updated those test expectations to match the
 existing production behavior, without weakening either assertion. A fresh full
 gate is required before backup/push; the SSH implementation is not deployed.
+
+
+## Durable model–harness outcome evidence — DAR-132 (2026-09-30)
+
+Added a separate private SQLite evidence store for the existing harness ranking
+contract. Immutable execution records and output-bound review revisions survive
+restart; exact retries are no-ops, conflicts reject, and a database write lock
+serializes expected-current-head checks across independent writers. Snapshot
+reads are transaction-consistent and pass the full canonical replay validator.
+Failed/canceled/indeterminate executions cannot gain quality votes; withdrawals
+retain history without contributing a sample. No prompt/output bodies are stored.
+
+Focused race tests, vet and source formatting pass, including concurrent writers,
+restart-equivalent rankings, revisions, withdrawals, corruption and canceled
+transactions. Runtime ingestion/authentication and native harness adapters remain
+unfinished. The full repository gate/push is pending; the SSH checkpoint's live
+validation is being preserved in its own checkout.
