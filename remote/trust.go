@@ -22,20 +22,21 @@ import (
 // Two pins permit explicit overlap during rotation. Removing a peer or pin
 // takes effect on the next request, including an existing server connection.
 type Peer struct {
-	Harnesses           []string `json:"harnesses,omitempty"`
-	Transport           string   `json:"transport,omitempty"`
-	SSH                 *SSH     `json:"ssh,omitempty"`
-	ID                  string   `json:"id"`
-	Endpoint            string   `json:"endpoint"`
-	ServerName          string   `json:"server_name"`
-	Pins                []string `json:"pins"`
-	Operations          []string `json:"operations"`
-	Models              []string `json:"models"`
-	AllowPrivate        bool     `json:"allow_private"`
-	AllowPublicNetwork  bool     `json:"allow_public_network"`
-	AllowCloudInference bool     `json:"allow_cloud_inference"`
-	MaxCost             float64  `json:"max_cost"`
-	MaxContextTokens    int      `json:"max_context_tokens"`
+	RequestLimits       *RequestLimits `json:"request_limits,omitempty"`
+	Harnesses           []string       `json:"harnesses,omitempty"`
+	Transport           string         `json:"transport,omitempty"`
+	SSH                 *SSH           `json:"ssh,omitempty"`
+	ID                  string         `json:"id"`
+	Endpoint            string         `json:"endpoint"`
+	ServerName          string         `json:"server_name"`
+	Pins                []string       `json:"pins"`
+	Operations          []string       `json:"operations"`
+	Models              []string       `json:"models"`
+	AllowPrivate        bool           `json:"allow_private"`
+	AllowPublicNetwork  bool           `json:"allow_public_network"`
+	AllowCloudInference bool           `json:"allow_cloud_inference"`
+	MaxCost             float64        `json:"max_cost"`
+	MaxContextTokens    int            `json:"max_context_tokens"`
 }
 type Registry struct {
 	Version int    `json:"version"`
@@ -87,6 +88,9 @@ func (f TrustFile) Read() (Registry, error) {
 	return out, nil
 }
 func (p Peer) Validate() error {
+	if p.RequestLimits != nil && !p.RequestLimits.valid() {
+		return ErrInvalid
+	}
 	if len(p.Harnesses) > 256 {
 		return ErrInvalid
 	}

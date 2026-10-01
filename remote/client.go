@@ -127,6 +127,8 @@ func (c *Client) call(ctx context.Context, destination, op, method, path string,
 		return ErrDenied
 	}
 	switch response.StatusCode {
+	case http.StatusTooManyRequests:
+		return ErrRateLimited
 	case 200:
 	case 400:
 		return ErrInvalid

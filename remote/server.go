@@ -23,6 +23,7 @@ type Server struct {
 	journal  *Journal
 	backend  Backend
 	slots    chan struct{}
+	limits   requestLimiter
 }
 
 func NewServer(instance string, trust TrustFile, journal *Journal, backend Backend) (*Server, error) {
@@ -32,7 +33,7 @@ func NewServer(instance string, trust TrustFile, journal *Journal, backend Backe
 	if _, err := trust.Read(); err != nil {
 		return nil, err
 	}
-	return &Server{instance, trust, journal, backend, make(chan struct{}, 32)}, nil
+	return &Server{instance: instance, trust: trust, journal: journal, backend: backend, slots: make(chan struct{}, 32)}, nil
 }
 
 // HTTPServer uses TLS 1.3 mutual authentication and bounded HTTP/1.1 requests.
@@ -127,6 +128,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
+	if allowed, first, retry := s.limits.allow(registry, peer, op, time.Now()); !allowed {
+		if first && s.journal.audit(ctx, peer.ID, op, key, "rate_limited") != nil {
+			s.fail(w, 503)
+			return
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		s.fail(w, http.StatusTooManyRequests)
+		return
+	}
 	if !peer.permits(op) {
 		if s.journal.audit(ctx, peer.ID, op, key, "denied") != nil {
 			s.fail(w, 503)

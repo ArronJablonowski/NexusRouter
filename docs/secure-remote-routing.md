@@ -269,7 +269,7 @@ physical two-system/network-fault tests; cross-platform certificate/storage and
 service packaging; device discovery/pairing UI; native-harness capability attestations;
 caller inventory UI; automatic remote destination selection integrated with
 DAR-132's versioned, accuracy-first model–harness evidence; and operational
-rate/retention policy. The endpoint currently takes an explicit model and peer.
+retention and deployment-wide abuse policy. The endpoint currently takes an explicit model and peer.
 It does not choose a winner based on idle capacity or claim remote evidence is
 integrated into the joint ranker. A full repository check is required before push.
 
@@ -354,3 +354,36 @@ execution, one separately canceled running execution, and zero execution for the
 queued canceled task. These are controlled transport failures using disposable
 sshd keys on one Mac, not physical two-host, packet-loss/partition or cross-platform
 qualification. Run with `NEXUS_REMOTE_SSH_NATIVE=1 go test -race ./remote`.
+
+
+## Per-peer request limits
+
+The destination enforces separate one-minute allowances for each authenticated
+peer and operation: 60 info, 60 dispatch, 600 inspect and 120 cancel requests by
+default. Status, event and task-list reads share inspect. Override all four in the
+inbound peer entry with `"request_limits":{"info":60,"dispatch":60,"inspect":600,"cancel":120}`.
+Each value must be 1–10000; omission uses defaults, not unlimited access. Updates
+use the normal expected-digest trust replacement and apply on the next request
+without resetting consumed counts. The client-side registry does not impose the
+destination's allowance. Permissions and revocation remain independently enforced.
+
+An exhausted operation returns HTTP 429 with integer-seconds `Retry-After` and the
+Go client returns `remote.ErrRateLimited`. No backend call or durable submission
+reservation occurs. Retry later with the same request key and payload; never
+switch destinations merely because a response was lost or throttled. Clients do
+not automatically retry. Cancellation uses its own allowance, so exhausting
+dispatch or discovery does not consume cancellation's budget; the existing global
+32-request concurrency bound still applies and is not a reserved cancellation lane.
+
+These are fixed windows starting at each operation's first request, with an
+allowance-sized boundary burst possible. Counters are process-local and reset on
+restart; they are not durable billing quotas or cross-listener rate coordination.
+Removed peers are pruned when requests are processed. Certificate rotation under
+the same peer ID does not reset consumption. The first throttled request per peer,
+operation and window is durably audited as `rate_limited`; subsequent rejections
+in that window are not individually journaled, to bound amplification. An audit
+write failure returns 503 and still never calls the backend. Recognized requests
+consume allowance before scope checks, including denied requests. TLS failures and
+unknown endpoints do not allocate per-peer buckets. This complements resource
+admission; journal retention, perimeter protection and physical-host validation
+remain separate requirements.

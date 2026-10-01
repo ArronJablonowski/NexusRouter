@@ -11323,3 +11323,29 @@ currently running e44dacf harness gate, followed by a normal branch push if clea
 and successful. No active gate, inference coordinator, provider resident or live
 service was stopped. Automatic remote accuracy-first selection, pairing UX,
 physical two-host tests and operational policy remain open.
+
+### DAR-133 — bounded per-peer remote request rates
+
+Added destination-side fixed one-minute allowances per authenticated peer and
+operation, with bounded defaults and explicit validated registry overrides.
+Dispatch, info, inspect and cancellation use independent allowances; throttled
+requests return 429/Retry-After without backend execution or journal reservation.
+The Go client exposes ErrRateLimited and never retries automatically. Live trust
+updates preserve consumed counts; revocation still authenticates first. Counter
+storage is bounded by registered peers/operations, with removed-peer pruning.
+Only the first throttled request per operation/window is audited to avoid journal
+amplification. Existing global concurrency limits still apply; cancellation has
+an independent rate budget, not a reserved execution lane.
+
+Remote/CLI race tests passed (10.680s/cached), targeted vet, source formatting/size
+and diff checks passed. Tests exercise concurrent exact allowances, expiry,
+policy changes, peer isolation, no dispatch after throttling, cancellation,
+bounded audit and revocation. The initial revocation assertion expected an HTTP
+denial, but fresh connections are rejected during TLS; the test now checks
+failure without mistaking throttling for revocation. No production permission
+check was weakened. Native OpenSSH loopback plus the new limit tests passed (1.853s).
+
+Counters reset on restart and are not durable billing quotas or deployment-wide
+rate coordination. Retention, physical two-host validation, discovery/pairing UI
+and automatic accuracy-first remote destination selection remain open. Full
+repository validation and normal branch backup are queued before completion.

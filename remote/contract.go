@@ -23,6 +23,7 @@ const MaxBody = 1 << 20
 var ErrInvalid = errors.New("invalid remote contract")
 var ErrDenied = errors.New("remote access denied")
 var ErrConflict = errors.New("remote request identity conflict")
+var ErrRateLimited = errors.New("remote request rate limited; retry the same request identity later")
 var ErrUnavailable = errors.New("remote operation unavailable; delivery may be uncertain")
 
 // Task deliberately excludes continuation, arbitrary messages, paths and tool
