@@ -23,6 +23,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/remote"
 	"github.com/ArronJablonowski/NexusRouter/resources"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
@@ -33,6 +34,7 @@ type browserRemoteExecution struct {
 	mu                  sync.Mutex
 	tasks               map[string]submissions.Status
 	received            remote.Task
+	events              []runtime.Event
 	creates, catalogues atomic.Int32
 	unavailable         atomic.Bool
 	identity            harness.Identity
@@ -83,8 +85,14 @@ func (b *browserRemoteExecution) Status(_ context.Context, key string) (submissi
 func (b *browserRemoteExecution) Cancel(ctx context.Context, key string) (submissions.Status, error) {
 	return b.Status(ctx, key)
 }
-func (b *browserRemoteExecution) Events(context.Context, string, int64, int) (sessions.EventPage, error) {
-	return sessions.EventPage{}, remote.ErrUnavailable
+func (b *browserRemoteExecution) Events(_ context.Context, task string, after int64, limit int) (sessions.EventPage, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if task != "review-task" || after < 0 || after > int64(len(b.events)) || limit < 1 || len(b.events) == 0 {
+		return sessions.EventPage{}, remote.ErrUnavailable
+	}
+	end := min(int64(len(b.events)), after+int64(limit))
+	return sessions.EventPage{Version: 1, TaskID: task, SessionID: "review-session", State: "completed", FromSequence: after, NextSequence: end, HeadSequence: int64(len(b.events)), HasMore: end < int64(len(b.events)), Events: b.events[after:end]}, nil
 }
 
 func browserRemoteCredentials(t *testing.T, dir string) (remote.Credentials, string) {
@@ -219,6 +227,7 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 	if b.creates.Load() != 1 || b.catalogues.Load() != 1 {
 		t.Fatal("recovery discovered or duplicated")
 	}
+	verifyBrowserRemoteReview(t, h, b, payload)
 	if _, err = clientTrust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}

@@ -1320,3 +1320,23 @@ found cramped field labels; added scoped grid spacing and verified final layout.
 Evidence: reporting outputs/remote-review-browser-qa. This is UI qualification,
 not live-provider evaluation or physical-host qualification. Background review
 supervision and remaining DAR-133 product gaps remain open. Full gate/push pending.
+
+## 2026-10-01 — browser remote review through canonical learning
+
+Extended the production mTLS/discovery/dispatch recovery fixture through runtime
+completion events, the browser review API, durable evaluator attempts and scoped
+ranking. An accepted AI review contributes one advisory sample; duplicate calls
+and a discarded response do not re-evaluate or increase weight. A failed evaluator
+remains unscored and is not retried. Changed original intent is rejected before
+reviewer policy. Current-head status and ranking retain a later hash-bound
+expected-head deterministic correction despite replay of the older evaluation.
+No review path redispatches inference or repeats discovery; metadata omits raw
+requirements, output and evaluator diagnostics.
+
+Focused integration and complete BFF race tests plus targeted vet/source checks
+are recorded with this checkpoint. Initial expanded fixture exceeded the real
+bootstrap rate limit by authenticating every request; reused one authenticated
+browser session, preserving the production limit. Execution and evaluator output
+are synthetic; this is boundary/provenance/learning qualification, not real model
+quality or physical second-host evidence. Full gate/push remains queued behind
+the unchanged Settings gate. Earlier 3d1a065 full gate passed and was pushed.
