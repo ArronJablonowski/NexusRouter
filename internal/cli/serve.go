@@ -282,6 +282,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			}
 		}
 		cursorKey := sha256.Sum256(append([]byte("darwin-browser-stream-v1\x00"), []byte(token)...))
+		var remoteAutomatic webuiapp.RemoteAutomatic
 		var remoteDispatcher webuiapp.RemoteDispatcher
 		var remoteInspector webuiapp.RemoteInspector
 		var remoteTaskController webuiapp.RemoteTaskController
@@ -295,12 +296,19 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 					return 1
 				}
 				remoteDispatcher = &webuiapp.RecordedRemoteDispatcher{Client: client, Store: store}
+				if root := s.WebUI.RemoteAutomaticEvidenceDirectory; root != "" {
+					if err := remote.PrepareOutcomeEvidence(root); err != nil {
+						fmt.Fprintln(stderr, "cannot initialize automatic remote evidence")
+						return 1
+					}
+					remoteAutomatic = &webuiapp.RecordedRemoteAutomatic{Client: client, Store: store, EvidenceRoot: root}
+				}
 			}
 			if s.WebUI.RemoteTaskControls {
 				remoteTaskController = client
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

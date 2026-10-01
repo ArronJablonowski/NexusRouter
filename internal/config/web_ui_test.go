@@ -177,3 +177,28 @@ func TestRemoteBrowserDispatchOptInAndEvidencePath(t *testing.T) {
 		t.Fatal("disabled UI dispatch authority")
 	}
 }
+
+func TestAutomaticRemoteBrowserRequiresExplicitEvidenceOptIn(t *testing.T) {
+	s := Defaults()
+	s.WebUI.RemoteAutomaticEvidenceDirectory = "/private/evidence"
+	if s.Validate() == nil {
+		t.Fatal("disabled UI authorized automatic routing")
+	}
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
+	s.WebUI.RemoteTaskControls = true
+	if s.Validate() == nil {
+		t.Fatal("automatic routing without durable dispatch")
+	}
+	s.WebUI.RemoteDispatchDirectory = "/private/routes"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"relative", "/private/../evidence", "/private/evidence\n"} {
+		s.WebUI.RemoteAutomaticEvidenceDirectory = path
+		if s.Validate() == nil {
+			t.Fatal(path)
+		}
+	}
+}

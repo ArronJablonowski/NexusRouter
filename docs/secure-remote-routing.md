@@ -1170,3 +1170,30 @@ prove that a newly supplied task matches the original intent: outcome and review
 operations retain their existing exact-request checks. Missing or uncertain
 remote status remains an error, never evidence of successful completion. Browser
 integration with automatic routing remains separate work.
+
+### Automatic browser API (opt-in; Settings form pending)
+
+`web_ui.remote_automatic_evidence_directory` is empty by default. Enabling it
+requires the existing remote dispatch directory, task controls, client credentials
+and trust registry. The daemon preflights the private evidence root at startup;
+each automatic dispatch rechecks its durable write capability before selection.
+Browser operators share the configured caller certificate and scopes.
+
+Authenticated, CSRF-protected POST `/api/v1/remote-auto-dispatch` accepts version,
+request_id, prompt, domain, profile, difficulty, context_tokens, max_cost, private
+and capabilities. No destination, candidate scores, evidence paths, credentials
+or exploration options are accepted. The server uses the existing discovered
+accuracy-first selection with its default policy and exploration disabled.
+Capacity, capability, identity and authorization checks remain authoritative;
+remote advertised quality is not imported as trusted evidence. Chosen destination
+and intent remain durable before dispatch. The bounded request timeout is not
+evidence that execution stopped: any unconfirmed response must be inspected.
+
+POST `/api/v1/remote-recorded-status` accepts only version and request_id. It
+recovers the destination from the route record and performs read-only status
+inspection using the original caller identity. Responses project task metadata;
+private config digests and transport diagnostics are excluded. Neither endpoint
+automatically retries, changes destination after uncertainty, or grades results.
+The existing exact-intent outcome/evaluation workflow remains necessary to add
+quality evidence. Settings form, UI recovery and browser review integration are
+not yet connected to these APIs. No live configuration is enabled by this change.

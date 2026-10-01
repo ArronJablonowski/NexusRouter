@@ -17,7 +17,7 @@ var webUIPath = regexp.MustCompile(`^/[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 // sole same-origin value from the request's validated listener authority.
 func (w WebUI) Validate(listen string) error {
 	if !w.Enabled {
-		if w.RemoteDispatchDirectory != "" || w.RemoteTaskControls || w.RemoteClient != nil || w.RemoteTrustFile != "" || w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || w.ModelInventoryRefreshInterval != "10s" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" || w.CommanderFallbackModel != "" || w.SpecialistsAllowCloud {
+		if w.RemoteAutomaticEvidenceDirectory != "" || w.RemoteDispatchDirectory != "" || w.RemoteTaskControls || w.RemoteClient != nil || w.RemoteTrustFile != "" || w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || w.ModelInventoryRefreshInterval != "10s" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" || w.CommanderFallbackModel != "" || w.SpecialistsAllowCloud {
 			return errors.New("disabled web UI must retain inert defaults")
 		}
 		return nil
@@ -27,6 +27,9 @@ func (w WebUI) Validate(listen string) error {
 	}
 	if dir := w.RemoteDispatchDirectory; dir != "" && (!w.RemoteTaskControls || !filepath.IsAbs(dir) || filepath.Clean(dir) != dir || len(dir) > 4096 || strings.ContainsAny(dir, "\x00\r\n")) {
 		return errors.New("remote dispatch requires task controls and a private absolute evidence directory")
+	}
+	if dir := w.RemoteAutomaticEvidenceDirectory; dir != "" && (w.RemoteDispatchDirectory == "" || !filepath.IsAbs(dir) || filepath.Clean(dir) != dir || len(dir) > 4096 || strings.ContainsAny(dir, "\x00\r\n")) {
+		return errors.New("automatic remote routing requires dispatch and a private absolute evidence directory")
 	}
 	if w.RemoteTaskControls && w.RemoteClient == nil {
 		return errors.New("remote task controls require remote client credentials")

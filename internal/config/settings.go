@@ -51,18 +51,19 @@ type WebUIRemoteClient struct {
 }
 
 type WebUI struct {
-	RemoteDispatchDirectory       string             `yaml:"remote_dispatch_directory,omitempty" json:"remote_dispatch_directory,omitempty"`
-	RemoteTaskControls            bool               `yaml:"remote_task_controls" json:"remote_task_controls"`
-	RemoteClient                  *WebUIRemoteClient `yaml:"remote_client,omitempty" json:"remote_client,omitempty"`
-	RemoteTrustFile               string             `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
-	Enabled                       bool               `yaml:"enabled" json:"enabled"`
-	PathPrefix                    string             `yaml:"path_prefix" json:"path_prefix"`
-	AllowedOrigins                []string           `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
-	BrowserSessionTTL             string             `yaml:"browser_session_ttl" json:"browser_session_ttl"`
-	ModelInventoryRefreshInterval string             `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
-	DefaultModel                  string             `yaml:"default_model,omitempty" json:"default_model,omitempty"`
-	CommanderFallbackModel        string             `yaml:"commander_fallback_model,omitempty" json:"commander_fallback_model,omitempty"`
-	SpecialistsAllowCloud         bool               `yaml:"specialists_allow_cloud" json:"specialists_allow_cloud"`
+	RemoteAutomaticEvidenceDirectory string             `yaml:"remote_automatic_evidence_directory,omitempty" json:"remote_automatic_evidence_directory,omitempty"`
+	RemoteDispatchDirectory          string             `yaml:"remote_dispatch_directory,omitempty" json:"remote_dispatch_directory,omitempty"`
+	RemoteTaskControls               bool               `yaml:"remote_task_controls" json:"remote_task_controls"`
+	RemoteClient                     *WebUIRemoteClient `yaml:"remote_client,omitempty" json:"remote_client,omitempty"`
+	RemoteTrustFile                  string             `yaml:"remote_trust_file,omitempty" json:"remote_trust_file,omitempty"`
+	Enabled                          bool               `yaml:"enabled" json:"enabled"`
+	PathPrefix                       string             `yaml:"path_prefix" json:"path_prefix"`
+	AllowedOrigins                   []string           `yaml:"allowed_origins,omitempty" json:"allowed_origins,omitempty"`
+	BrowserSessionTTL                string             `yaml:"browser_session_ttl" json:"browser_session_ttl"`
+	ModelInventoryRefreshInterval    string             `yaml:"model_inventory_refresh_interval" json:"model_inventory_refresh_interval"`
+	DefaultModel                     string             `yaml:"default_model,omitempty" json:"default_model,omitempty"`
+	CommanderFallbackModel           string             `yaml:"commander_fallback_model,omitempty" json:"commander_fallback_model,omitempty"`
+	SpecialistsAllowCloud            bool               `yaml:"specialists_allow_cloud" json:"specialists_allow_cloud"`
 }
 type Workboard struct {
 	Enabled       bool                   `yaml:"enabled" json:"enabled"`

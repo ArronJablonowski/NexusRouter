@@ -183,15 +183,31 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 9 {
 		t.Fatal("changed task dispatched", calls.Load())
 	}
+
+	h.remoteAutomatic = &RecordedRemoteAutomatic{Client: h.remoteInspector.(*remote.Client), Store: routeStore, EvidenceRoot: filepath.Join(dir, "outcomes")}
+	recorded := func(want int) {
+		t.Helper()
+		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-recorded-status", `{"version":1,"request_id":"request-browser-0001"}`)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("recorded %d want %d: %s", w.Code, want, w.Body.String())
+		}
+	}
+	recorded(200)
+	if calls.Load() != 10 {
+		t.Fatal("saved status did not use pinned mTLS", calls.Load())
+	}
 	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}
 	dispatch(body, 503)
+	recorded(503)
 	events(503)
 	inspect("info", 503)
 	inspect("tasks", 503)
 	control("cancel", 503)
-	if calls.Load() != 9 || cancellations.Load() != 1 {
+	if calls.Load() != 10 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
 }

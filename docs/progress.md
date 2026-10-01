@@ -1225,3 +1225,20 @@ and uncertain intake with no repair or extra dispatch. The initial revocation
 fixture failed because its parent directory was not private; corrected the
 fixture, preserving the production security check. Full repository gate and
 normal push remain pending; no deployment or physical second-host claim.
+
+## 2026-10-01 — opt-in automatic remote browser API
+
+Connected the production discovered accuracy-first remote selector to a bounded
+CSRF/session-protected browser API, with separate private evidence-directory
+opt-in and startup/per-dispatch storage preflight. Request fields describe only
+task requirements; destination, scores, exploration and server paths cannot be
+provided by the browser. Original durable choice/binding and caller identity
+remain authoritative. Added prompt-free recorded status projection for recovery.
+
+Authority/invalid-input/uncertainty tests cover no unauthorized dispatch or
+automatic retry, metadata redaction, exact task classification and no exploration.
+Actual mTLS BFF fixture verifies saved-destination status and fresh revocation.
+Configuration tests reject absent dispatch authority, disabled UI and unsafe
+paths. These checks do not prove full automatic browser behavior: Settings form,
+recovery UI and outcome review integration remain unfinished. Full repository
+gate/push and physical two-host qualification remain pending.
