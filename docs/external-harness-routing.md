@@ -515,9 +515,8 @@ with a non-nil NativeHarnesses option (including an explicitly empty list);
 leaving it nil preserves the file registrations. An SDK-supplied HarnessEvidence
 store can be attached without replacing the configured list.
 
-This CLI path currently supports explicit, synchronous text tasks. Persistent
-operator evidence-store configuration for automatic learning, queued dispatch
-and tool-bearing tasks are still unfinished. No task can supply
+This CLI path supports synchronous text tasks. Queued dispatch and tool-bearing
+tasks are still unfinished. No task can supply
 an executable path or mutate these registrations through its request.
 
 ## Authenticated chat API harness selection
@@ -534,6 +533,25 @@ text is released after durable completion; this is not incremental native token
 streaming. An unsupported selection returns an admission error (HTTP 422 for a
 non-streaming request, an SSE error frame without `[DONE]` after streaming headers).
 Malformed IDs and unknown registration fields fail before dispatch. This does
-not enable queued `/v1/tasks` harness execution or automatic pair selection in
-the operator service; persistent evidence-store configuration is still required
-for that learning path.
+not enable queued `/v1/tasks` harness execution. The chat request schema still
+lacks the task-class and routing constraints required for automatic pair selection.
+
+## Operator evidence store
+
+Set `native_harness_evidence_dir` to a clean absolute directory path in operator
+YAML. `nexus run` and `nexus serve` open the private persistent harness ledger and
+attach it before executing requests. The directory must not be group/world
+accessible. An invalid store identity or inaccessible ledger prevents startup; the application
+does not silently replace it or route without its evidence. The daemon opens it
+only after acquiring its listener. Handles close during process cleanup.
+
+CLI automatic selection uses `--model auto --harness auto` with `--domain`,
+`--profile`, `--context-tokens` (at least 8192), and applicable capability, privacy
+and cost constraints. Existing evaluated evidence drives selection; configuring
+an empty store never establishes quality or licenses automatic exploration.
+Configured advisory evaluation retains its existing provenance and exact-head
+rules. This setting does not create reviews or convert runtime success to a pass.
+SDK embedders continue to supply and own `Options.HarnessEvidence` explicitly;
+the operator path setting is opened by CLI/daemon entry points only. Redacted
+configuration hides the evidence directory and registered executable/source paths
+without mutating running configuration. No live store is migrated automatically.

@@ -231,6 +231,12 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "invalid application configuration")
 		return 1
 	}
+	closeEvidence, err := attachNativeHarnessEvidence(s, service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot open harness evidence storage")
+		return 1
+	}
+	defer closeEvidence()
 	request.Prompt = prompt
 	if jsonMode {
 		return runTaskJSON(ctx, request, service.RunStream, stdout, stderr)

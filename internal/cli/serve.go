@@ -105,6 +105,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer listener.Close()
+	closeEvidence, err := attachNativeHarnessEvidence(s, service)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot open harness evidence storage")
+		return 1
+	}
+	defer closeEvidence()
 	if *instance == "" {
 		*instance = daemon.NewID()
 	}

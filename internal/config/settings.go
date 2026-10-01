@@ -21,24 +21,25 @@ import (
 )
 
 type Settings struct {
-	NativeHarnesses []NativeHarness `yaml:"native_harnesses,omitempty" json:"native_harnesses,omitempty"`
-	Version         int             `yaml:"version" json:"version"`
-	Mode            string          `yaml:"mode" json:"mode"`
-	Daemon          Daemon          `yaml:"daemon" json:"daemon"`
-	WebUI           WebUI           `yaml:"web_ui" json:"web_ui"`
-	Workboard       Workboard       `yaml:"workboard" json:"workboard"`
-	Hardware        Hardware        `yaml:"hardware" json:"hardware"`
-	Workers         Workers         `yaml:"workers" json:"workers"`
-	Providers       []Provider      `yaml:"providers" json:"providers"`
-	Models          []Model         `yaml:"models" json:"models"`
-	Routing         Routing         `yaml:"routing" json:"routing"`
-	Skills          Skills          `yaml:"skills" json:"skills"`
-	Memory          Memory          `yaml:"memory" json:"memory"`
-	Evaluation      Evaluation      `yaml:"evaluation" json:"evaluation"`
-	Security        Security        `yaml:"security" json:"security"`
-	Tools           Tools           `yaml:"tools" json:"tools"`
-	Runtime         Runtime         `yaml:"runtime" json:"runtime"`
-	Telemetry       Telemetry       `yaml:"telemetry" json:"telemetry"`
+	NativeHarnessEvidenceDir string          `yaml:"native_harness_evidence_dir,omitempty" json:"native_harness_evidence_dir,omitempty"`
+	NativeHarnesses          []NativeHarness `yaml:"native_harnesses,omitempty" json:"native_harnesses,omitempty"`
+	Version                  int             `yaml:"version" json:"version"`
+	Mode                     string          `yaml:"mode" json:"mode"`
+	Daemon                   Daemon          `yaml:"daemon" json:"daemon"`
+	WebUI                    WebUI           `yaml:"web_ui" json:"web_ui"`
+	Workboard                Workboard       `yaml:"workboard" json:"workboard"`
+	Hardware                 Hardware        `yaml:"hardware" json:"hardware"`
+	Workers                  Workers         `yaml:"workers" json:"workers"`
+	Providers                []Provider      `yaml:"providers" json:"providers"`
+	Models                   []Model         `yaml:"models" json:"models"`
+	Routing                  Routing         `yaml:"routing" json:"routing"`
+	Skills                   Skills          `yaml:"skills" json:"skills"`
+	Memory                   Memory          `yaml:"memory" json:"memory"`
+	Evaluation               Evaluation      `yaml:"evaluation" json:"evaluation"`
+	Security                 Security        `yaml:"security" json:"security"`
+	Tools                    Tools           `yaml:"tools" json:"tools"`
+	Runtime                  Runtime         `yaml:"runtime" json:"runtime"`
+	Telemetry                Telemetry       `yaml:"telemetry" json:"telemetry"`
 }
 type Daemon struct {
 	Listen string `yaml:"listen" json:"listen"`
@@ -623,6 +624,7 @@ func (s Settings) RedactedJSON() ([]byte, error) {
 		}
 	}
 	s.Telemetry.Database = "[REDACTED]"
+	s.redactNativeHarnessPaths()
 	if s.Telemetry.MetricsExport != nil {
 		copy := *s.Telemetry.MetricsExport
 		if copy.Endpoint != "" {

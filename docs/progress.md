@@ -10288,3 +10288,22 @@ Existing native SDK fixtures cover actual adapters; no real inference or live
 configuration changed. Full repository gate remains queued before push. Persistent
 operator learning-store configuration, queued tasks, tool workflows and held-out
 accuracy qualification remain open; this does not complete DAR-132.
+
+## Persistent operator harness evidence — DAR-132 (2026-10-01)
+
+Added optional native_harness_evidence_dir YAML setting with clean absolute-path
+validation. CLI run and daemon serve attach the private evidence ledger before
+requests; daemon opening follows successful listener binding. Process cleanup
+closes the owned handle. SDK evidence remains explicitly caller-owned. CLI auto
+selection can now use persistent reviewed evidence with its existing task-class,
+context, privacy and cost flags. Empty evidence does not fabricate quality or
+permit exploration. Chat auto selection still needs routing-constraint fields.
+
+Related configuration inspection fix: redact registered executable/source paths
+and the evidence directory without mutating the original registration slice.
+Focused configuration/CLI race tests pass, including reopen, private-directory
+rejection, empty-store non-dispatch, invalid paths and redaction non-mutation.
+Targeted vet, source formatting/size and diff checks passed. Full gate remains
+queued before push. No live configuration, evidence store or model inference was
+changed. Queue authority, tool workflows, broad-platform and held-out accuracy
+qualification remain open.

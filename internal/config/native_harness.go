@@ -32,6 +32,9 @@ type NativeHarnessPrices struct {
 
 func (s Settings) validateNativeHarnesses() error {
 	bad := errors.New("invalid native harness configuration")
+	if d := s.NativeHarnessEvidenceDir; d != "" && (!filepath.IsAbs(d) || filepath.Clean(d) != d || strings.ContainsFunc(d, unicode.IsControl)) {
+		return bad
+	}
 	if len(s.NativeHarnesses) > 256 {
 		return bad
 	}
@@ -78,4 +81,18 @@ func (s Settings) validateNativeHarnesses() error {
 		}
 	}
 	return nil
+}
+
+// Copy the registration slice so inspection never mutates execution settings.
+func (s *Settings) redactNativeHarnessPaths() {
+	if s.NativeHarnessEvidenceDir != "" {
+		s.NativeHarnessEvidenceDir = "[REDACTED]"
+	}
+	s.NativeHarnesses = append([]NativeHarness(nil), s.NativeHarnesses...)
+	for i := range s.NativeHarnesses {
+		s.NativeHarnesses[i].Executable = "[REDACTED]"
+		if s.NativeHarnesses[i].HermesSourceDir != "" {
+			s.NativeHarnesses[i].HermesSourceDir = "[REDACTED]"
+		}
+	}
 }

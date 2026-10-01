@@ -34,3 +34,26 @@ func TestNativeHarnessConfigValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeHarnessEvidencePathAndRedaction(t *testing.T) {
+	s := Defaults()
+	for _, path := range []string{"relative", "/tmp/../evidence", "/tmp/evidence\n"} {
+		s.NativeHarnessEvidenceDir = path
+		if s.validateNativeHarnesses() == nil {
+			t.Fatalf("accepted %q", path)
+		}
+	}
+	s.NativeHarnessEvidenceDir = "/private/operator/evidence"
+	s.NativeHarnesses = []NativeHarness{{Executable: "/private/operator/pi", HermesSourceDir: "/private/operator/hermes"}}
+	data, err := s.RedactedJSON()
+	if err != nil || strings.Contains(string(data), "/private/operator") {
+		t.Fatal("path exposure", err)
+	}
+	if s.NativeHarnesses[0].Executable != "/private/operator/pi" || s.NativeHarnesses[0].HermesSourceDir != "/private/operator/hermes" || s.NativeHarnessEvidenceDir != "/private/operator/evidence" {
+		t.Fatal("inspection mutated settings")
+	}
+	s.NativeHarnesses = nil
+	if s.validateNativeHarnesses() != nil {
+		t.Fatal("absolute clean evidence path rejected")
+	}
+}
