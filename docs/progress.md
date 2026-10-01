@@ -1299,3 +1299,24 @@ without retry, metadata projection and advisory automated-AI current-head status
 These are interface/policy tests, not completed browser-to-provider qualification.
 Settings review form, combined background supervision, full repository gate and
 physical-host qualification remain pending. No live evaluator invoked.
+
+## 2026-10-01 — Settings completed-output AI review controls
+
+Added separate review-enabled membership flag and completed-only review form.
+Original request requirements survive in page memory after dispatch, never
+browser storage; reload requires re-entry and the backend checks exact intent.
+Confirmation is invalidated by edits. One evaluation per form is followed by
+read-only current-head status; uncertainty and an existing head disable another
+evaluation. AI/advisory classification is shown explicitly. Backend durable
+receipts remain responsible for cross-session replay protection.
+
+Node tests cover no implicit evaluation, stale confirmations, double clicks,
+uncertain response, original requirements, missing reload inputs, existing head
+and succeeded-only rendering. Webui/BFF race suites, targeted vet and source/diff
+checks pass. Real IAB with synthetic endpoints observed one task dispatch and one
+evaluation request with identical original requirements, lost review response,
+read-only advisory status and reload with no automatic replay. Visual inspection
+found cramped field labels; added scoped grid spacing and verified final layout.
+Evidence: reporting outputs/remote-review-browser-qa. This is UI qualification,
+not live-provider evaluation or physical-host qualification. Background review
+supervision and remaining DAR-133 product gaps remain open. Full gate/push pending.

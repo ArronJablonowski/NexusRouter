@@ -1202,10 +1202,9 @@ credentials are not stored in browser persistence. Reload never resends. Use
 Find saved destination and status to recover the bound peer, then the existing
 status/result, lifecycle progress and cancellation controls. Starting another
 independent request replaces the recovery link and may duplicate unresolved work;
-preserve earlier IDs and inspect them first. Browser quality-review integration
-is still pending. No live configuration is enabled by this change.
+preserve earlier IDs and inspect them first. Browser quality review is a separate opt-in described below. No live configuration is enabled by this change.
 
-### Browser advisory-review API (UI integration pending)
+### Browser advisory reviews (opt-in)
 
 A separate `web_ui.remote_review` opt-in sets `model` and an explicit `max_cost`
 (including zero). It requires automatic evidence storage and the configured
@@ -1229,5 +1228,14 @@ action performs no evaluation or ledger creation and projects the current
 classification, method and verdict after authenticating original completion.
 AI reviews remain advisory. Existing operator heads are not automatically
 replaced. No prompt is stored by the browser API for reload recovery: callers
-must supply the original request again. Settings review form and automatic
-background supervision are not implemented by this API.
+must supply the original request again. Settings exposes review controls only after an explicit saved-status lookup
+reports success and the review opt-in is enabled. Original requirements remain
+in page memory after dispatch and are prefilled; reload clears them and requires
+re-entry. Changed requirements are rejected by the saved intent binding. Review
+the requirements and confirm one AI evaluation; editing invalidates confirmation.
+An uncertain response disables another attempt in that form while preserving
+read-only current-review checks. Finding an existing review head also disables
+evaluation. Server receipt protection remains authoritative across reloads and
+concurrent sessions. Status shows advisory/confirmed classification and method,
+without representing AI evidence as human verification. Automatic background
+supervision and browser-to-provider qualification remain separate work.

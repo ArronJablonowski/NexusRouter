@@ -11,7 +11,7 @@ window.NexusRemoteMembership = (() => {
    if (!value || value.version!==1 || typeof value.enabled!=="boolean" || (value.enabled && (!/^[a-f0-9]{64}$/.test(value.digest) || !value.registry || value.registry.version!==1 || !Array.isArray(value.registry.peers) || value.registry.peers.length>128))) throw Error("invalid response");
    page=value; confirmations=[]; peers.replaceChildren(); form.hidden=!value.enabled;
    if (!value.enabled) { message("Membership management is disabled. An administrator can enable it with a private remote trust registry in the daemon configuration."); return; }
-   if(value.automatic_enabled)window.NexusRemoteAutomatic.attach(peers,base,csrf);
+   if(value.automatic_enabled)window.NexusRemoteAutomatic.attach(peers,base,csrf,value.review_enabled);
    value.registry.peers.forEach(peer=>{
     const card=document.createElement("details"), title=document.createElement("summary"), content=document.createElement("pre"), revoke=document.createElement("button");
     title.textContent=peer.id+" · "+(peer.transport||"https")+" · "+peer.endpoint;

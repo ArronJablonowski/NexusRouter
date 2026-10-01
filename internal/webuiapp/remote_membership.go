@@ -20,6 +20,7 @@ type membershipRequest struct {
 }
 
 type membershipPage struct {
+	ReviewEnabled       bool             `json:"review_enabled"`
 	AutomaticEnabled    bool             `json:"automatic_enabled"`
 	DispatchEnabled     bool             `json:"dispatch_enabled"`
 	TaskControlsEnabled bool             `json:"task_controls_enabled"`
@@ -104,6 +105,6 @@ func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) 
 			return true
 		}
 	}
-	h.writeJSON(w, http.StatusOK, membershipPage{AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
+	h.writeJSON(w, http.StatusOK, membershipPage{ReviewEnabled: h.remoteReviewer != nil, AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
 	return true
 }

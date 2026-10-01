@@ -373,3 +373,8 @@ input, select { padding: .55rem .7rem; }
 #remote-pair-form fieldset label { display: block; margin: .6rem 0; }
 #remote-pair-form input[type="checkbox"] { width: auto; }
 #remote-peer-preview { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Remote request/review forms keep labels and controls on separate rows. */
+#remote-peers form { display: grid; gap: .75rem; }
+#remote-peers form label { display: grid; gap: .35rem; }
+#remote-peers form button { justify-self: start; }
