@@ -1493,3 +1493,23 @@ leakage. Focused CLI lifecycle/process race package passed (4.591s), health
 readiness tests passed (1.700s). Child is the normal production binary built
 by the test, not a live installation. Actual in-flight remote evaluation through
 process shutdown and physical-host qualification remain separate evidence gaps.
+
+## 2026-10-01 — unpaired discovery record boundary
+
+Added a closed, bounded DNS-SD version-1 candidate parser for private-network
+connection hints, including optional SSH port. Candidate is separate from Peer,
+always unverified, with receiver-controlled timestamps/lifetime <=120 seconds.
+Reject duplicate case-insensitive keys, authority/unknown fields, mismatched
+instance, invalid certificate claim, malformed DNS names/ports and public,
+loopback, link-local/scoped/mapped addresses. No network, pairing, credentials,
+policy or quality evidence mutation. RFC 6763 informed record structure.
+
+This is the record-validation foundation, not completed LAN discovery. Bounded
+interface-specific transport, advertisement lifecycle, conflict handling and UI
+remain required. Evaluated an external mDNS library's API/source but added no
+dependency or network listener. Focused race tests and vet/source/diff passed;
+full remote/CLI race verification follows. No live LAN broadcast performed.
+
+Complete remote/CLI race suites passed (29.614s / 1.720s). A three-second,
+two-worker fuzz run completed 27,151 executions without failure. Full repository
+validation and normal backup remain queued behind the active Settings gate.

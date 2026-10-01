@@ -1342,3 +1342,24 @@ requests remain unavailable; the read does not create or repair state. `pending`
 means no terminal queue receipt yet; `attention` or `expired` requires inspection.
 A `completed` receipt is not a current quality verdict. This control never
 evaluates, dispatches, retries or returns prompt/output/paths.
+
+### Unpaired discovery record contract (transport integration pending)
+
+The DNS-SD record format follows the PTR/SRV/TXT separation described in
+[RFC 6763](https://www.rfc-editor.org/rfc/rfc6763). The proposed service type is
+`_nexusrouter._tcp.local.`. `ParseDiscoveryCandidate` accepts a complete instance
+record with a concrete private IPv4 or IPv6 address and service port. Version-1
+TXT fields are `v=1`, `id=INSTANCE`, `name=TLS_SERVER_NAME`, `pin=SHA256`, and an
+optional `ssh=PORT`. The instance and ID must match. Names are bounded lowercase
+DNS labels; keys compare case-insensitively and duplicates/unknown fields reject.
+Public, loopback, mapped or scoped/link-local addresses are excluded.
+
+The result is explicitly unverified metadata, never a Peer or a grant of
+permissions. Even its certificate fingerprint is a claim requiring independent
+verification. No models, harnesses, quality scores, tasks, credentials or policy
+grants are advertised. The receiver timestamps observations and caps their
+lifetime at 120 seconds; zero-TTL goodbye records do not become candidates.
+The parser caps TXT strings/count/total bytes before projection and performs no
+network or registry operation. Interface binding, bounded DNS packet collection,
+advertising lifecycle, candidate conflicts and Settings integration remain to
+be implemented. This contract alone does not discover devices on the network.
