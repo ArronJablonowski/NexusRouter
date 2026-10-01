@@ -63,6 +63,13 @@ func (d *RecordedRemoteAutomatic) DispatchAutomatic(ctx context.Context, key str
 	}
 	return remote.RecordedRequestStatus{Version: 1, RequestID: key, Destination: choice.Destination, Status: status}, nil
 }
+func (d *RecordedRemoteAutomatic) InspectReviewJob(ctx context.Context, key string) (remote.ReviewJobStatus, error) {
+	if d == nil || d.Client == nil || d.Store == nil || d.ReviewQueue == nil {
+		return remote.ReviewJobStatus{}, remote.ErrInvalid
+	}
+	return d.Client.InspectReviewJob(ctx, d.ReviewQueue, d.Store, d.EvidenceRoot, key)
+}
+
 func (d *RecordedRemoteAutomatic) InspectRecorded(ctx context.Context, key string) (remote.RecordedRequestStatus, error) {
 	if d == nil || d.Client == nil || d.Store == nil {
 		return remote.RecordedRequestStatus{}, remote.ErrInvalid
@@ -95,8 +102,9 @@ func (in remoteAutomaticRequest) request() (remote.AutomaticRequest, error) {
 	return request, nil
 }
 func (h *Handler) serveRemoteAutomatic(w http.ResponseWriter, r *http.Request) bool {
+	jobStatus := r.URL.Path == h.basePath+"/api/v1/remote-review-job"
 	dispatch := r.URL.Path == h.basePath+"/api/v1/remote-auto-dispatch"
-	if !dispatch && r.URL.Path != h.basePath+"/api/v1/remote-recorded-status" {
+	if !dispatch && !jobStatus && r.URL.Path != h.basePath+"/api/v1/remote-recorded-status" {
 		return false
 	}
 	if r.Method != http.MethodPost {
@@ -143,6 +151,32 @@ func (h *Handler) serveRemoteAutomatic(w http.ResponseWriter, r *http.Request) b
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
+	if jobStatus {
+		inspector, ok := h.remoteAutomatic.(interface {
+			InspectReviewJob(context.Context, string) (remote.ReviewJobStatus, error)
+		})
+		if !ok {
+			h.writeError(w, r, 503, "review_job_unavailable")
+			return true
+		}
+		result, err := safeCall(func() (remote.ReviewJobStatus, error) { return inspector.InspectReviewJob(ctx, key) })
+		valid := false
+		switch result.Status {
+		case "pending", "completed", "attention", "expired", "task_failed", "task_canceled":
+			valid = true
+		}
+		if err != nil || result.Version != 1 || result.RequestID != key || !valid || (result.Status != "completed" && result.ReviewApplied) {
+			h.writeError(w, r, 503, "review_job_unavailable")
+			return true
+		}
+		h.writeJSON(w, 200, struct {
+			Version       int    `json:"version"`
+			RequestID     string `json:"request_id"`
+			Status        string `json:"status"`
+			ReviewApplied bool   `json:"review_applied"`
+		}{1, key, result.Status, result.ReviewApplied})
+		return true
+	}
 	result, err := safeCall(func() (remote.RecordedRequestStatus, error) {
 		if dispatch {
 			return h.remoteAutomatic.DispatchAutomatic(ctx, key, request)

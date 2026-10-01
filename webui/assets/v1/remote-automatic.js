@@ -14,6 +14,14 @@ window.NexusRemoteAutomatic=(()=>{
     catch{notice.textContent="Status for "+key+" is unavailable. A choice or dispatch may be incomplete; this is not proof that no work ran. No retry or replacement was sent.";}
     finally{busy=false;inspect.disabled=another.disabled=false;}
    });body.append(label,inspect,controls);
+   if(backgroundReviewEnabled){
+    const job=document.createElement("button"),state=document.createElement("output");job.type="button";job.textContent="Check background review";state.setAttribute("role","status");
+    job.addEventListener("click",async()=>{if(busy)return;busy=true;job.disabled=true;
+     try{const p=await post("remote-review-job",{version:1,request_id:key});if(!p||p.version!==1||p.request_id!==key||!["pending","completed","attention","expired","task_failed","task_canceled"].includes(p.status)||typeof p.review_applied!=="boolean"||(p.status!=="completed"&&p.review_applied))throw Error();state.textContent="Background review: "+p.status+". "+(p.review_applied?"An advisory AI review was applied. This receipt is not the current quality verdict.":"No applied review is recorded by this job.")+" No evaluation or task was started.";}
+     catch{state.textContent="Background review status unavailable. This does not prove that no review ran. No evaluation or retry was sent.";}
+     finally{busy=false;job.disabled=false;}
+    });body.append(job,state);
+   }
   }
   function draft(){
    body.replaceChildren();another.hidden=true;

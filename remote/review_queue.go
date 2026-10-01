@@ -246,3 +246,25 @@ func (q *ReviewQueue) Deadline(key string) (time.Time, error) {
 	}
 	return job.Deadline, nil
 }
+
+// InspectReviewJob authenticates the saved request before exposing queue status.
+// It neither evaluates nor creates/repairs missing queue or dispatch state.
+func (c *Client) InspectReviewJob(ctx context.Context, q *ReviewQueue, routes *RouteStore, root, key string) (ReviewJobStatus, error) {
+	if ctx == nil || ctx.Err() != nil || c == nil || routes == nil {
+		return ReviewJobStatus{}, ErrInvalid
+	}
+	job, err := q.read(key)
+	if err != nil {
+		return ReviewJobStatus{}, err
+	}
+	if job.Routes != routes.directory || job.Evidence != root {
+		return ReviewJobStatus{}, ErrConflict
+	}
+	if _, err = job.resolve(routes); err != nil {
+		return ReviewJobStatus{}, err
+	}
+	if _, err = c.InspectRecorded(ctx, routes, key); err != nil {
+		return ReviewJobStatus{}, err
+	}
+	return q.status(job)
+}

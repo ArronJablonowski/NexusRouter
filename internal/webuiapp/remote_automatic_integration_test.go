@@ -203,6 +203,30 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 	}
 	automatic := &RecordedRemoteAutomatic{Client: &remote.Client{Trust: clientTrust, Credentials: creds}, Store: routes, EvidenceRoot: filepath.Join(dir, "evidence"), ReviewQueue: queue, ReviewWait: time.Hour, ReviewPolicy: policy}
 	h.remoteAutomatic = automatic
+	cookie, csrf := authenticateBrowser(t, h)
+	jobStatus := func(want int, status string) {
+		t.Helper()
+		r := browserRequest(http.MethodPost, "/app/api/v1/remote-review-job", `{"version":1,"request_id":"browser-real-auto-01"}`)
+		r.AddCookie(cookie)
+		r.Header.Set("X-Darwin-CSRF", csrf)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		if want == 200 {
+			var body map[string]any
+			if json.Unmarshal(w.Body.Bytes(), &body) != nil || body["status"] != status || len(body) != 4 {
+				t.Fatal(w.Body.String())
+			}
+		}
+		for _, secret := range []string{"private fixture task", "fixture answer", dir, "job_sha256"} {
+			if strings.Contains(w.Body.String(), secret) {
+				t.Fatal("queue projection leaked data", w.Body.String())
+			}
+		}
+	}
+	jobStatus(503, "")
 	payload := `{"version":1,"request_id":"browser-real-auto-01","prompt":"private fixture task","domain":"coding","profile":"default","difficulty":"hard","context_tokens":32768,"max_cost":0,"private":true,"capabilities":[]}`
 	call := func(path, body string, want int) remoteTaskControlPage {
 		t.Helper()
@@ -221,6 +245,7 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 		return p
 	}
 	call("remote-auto-dispatch", payload, 503)
+	jobStatus(200, "pending")
 	deadline, err := queue.Deadline("browser-real-auto-01")
 	if err != nil || !deadline.After(time.Now()) {
 		t.Fatal("lost dispatch response lost review intent", deadline, err)
@@ -254,12 +279,14 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 			t.Fatal(states, err)
 		}
 	}
+	jobStatus(200, "completed")
 	if evaluator.calls.Load() != 1 || b.creates.Load() != 1 || b.catalogues.Load() != 1 {
 		t.Fatal("background review replayed work", evaluator.calls.Load(), b.creates.Load(), b.catalogues.Load())
 	}
 	if _, err = clientTrust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}
+	jobStatus(503, "")
 	call("remote-recorded-status", `{"version":1,"request_id":"browser-real-auto-01"}`, 503)
 	call("remote-auto-dispatch", payload, 503)
 	if b.creates.Load() != 1 || b.catalogues.Load() != 1 {

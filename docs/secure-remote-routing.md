@@ -1332,3 +1332,13 @@ concurrent enrollment fails closed. The Settings form discloses private prompt
 retention and advisory AI review before confirmation. Existing explicit CLI queue
 commands remain available with matching reviewer/storage policy.
 No live configuration or service installation is changed by this implementation.
+
+For queued browser requests, **Check background review** reads the saved job
+without requiring the original prompt after reload. The session/CSRF-protected
+`remote-review-job` endpoint rechecks the immutable request binding, caller
+ownership and current remote inspect permission/revocation before returning
+only request ID, status and the job's applied flag. Missing, unbound or revoked
+requests remain unavailable; the read does not create or repair state. `pending`
+means no terminal queue receipt yet; `attention` or `expired` requires inspection.
+A `completed` receipt is not a current quality verdict. This control never
+evaluates, dispatches, retries or returns prompt/output/paths.

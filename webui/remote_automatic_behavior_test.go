@@ -23,3 +23,13 @@ func TestAutomaticRemoteBrowserReviewRecoveryAndNoReplay(t *testing.T) {
  window.location.href='http://localhost/app/settings';window.history.replaceState=()=>{throw Error('failed')};const broken=el();window.NexusRemoteAutomatic.attach(broken,'/app','csrf');const f=broken.children[0].children[2].children[0];f.children[7].children[0].value='Instructions';f.handlers.submit(event);f.children[11].handlers.click();await tick();if(calls.length!==3||!broken.children[0].children[1].textContent.includes('No work was sent'))throw Error('unrecoverable dispatch');
  })().catch(e=>{console.error(e);process.exit(1)});`)
 }
+
+func TestBackgroundReviewStatusAfterReloadNeverEvaluates(t *testing.T) {
+	script := string(mustAsset(t, "assets/v1/remote-automatic.js"))
+	runRoutingMapScript(t, `const vm=require('vm');function el(){return {children:[],handlers:{},hidden:false,disabled:false,textContent:'',setAttribute(){},append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},addEventListener(k,f){this.handlers[k]=f}}};
+ const document={createElement:el},calls=[],window={location:{href:'http://localhost/app/settings#remote_auto_request=automatic-request-001'},NexusRemoteTaskControls:{attach(){throw Error('unexpected task inspection')}}};let bad=false;
+ const fetch=async(url,opts)=>{calls.push({url,opts});return {ok:true,json:async()=>({version:1,request_id:'automatic-request-001',status:bad?'unknown':'completed',review_applied:true})}};
+ vm.runInNewContext(`+strconv.Quote(script)+`,{document,window,fetch,URL,URLSearchParams});
+ const parent=el(),tick=()=>new Promise(r=>setImmediate(r));window.NexusRemoteAutomatic.attach(parent,'/app','csrf',true,true);const body=parent.children[0].children[2],button=body.children[3],state=body.children[4];
+ (async()=>{if(calls.length)throw Error('implicit request');button.handlers.click();button.handlers.click();await tick();if(calls.length!==1||!calls[0].url.endsWith('/remote-review-job')||Object.keys(JSON.parse(calls[0].opts.body)).sort().join(',')!=='request_id,version'||!state.textContent.includes('not the current quality verdict'))throw Error('unsafe status');bad=true;button.handlers.click();await tick();if(calls.length!==2||!state.textContent.includes('does not prove')||button.disabled)throw Error('unknown status handling');})().catch(e=>{console.error(e);process.exit(1)});`)
+}

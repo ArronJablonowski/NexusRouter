@@ -92,3 +92,25 @@ func TestAutomaticBrowserAuthoritySelectionInputAndRecovery(t *testing.T) {
 	call("remote-auto-dispatch", body, 503, true)
 	call("remote-recorded-status", status, 503, true)
 }
+
+func TestRemoteReviewJobRequiresAuthorityAndStrictInput(t *testing.T) {
+	h := mutationHandlerFixture(t, MutationServices{})
+	h.remoteAutomatic = &automaticBrowserFake{}
+	body := `{"version":1,"request_id":"automatic-browser-01"}`
+	path := "/app/api/v1/remote-review-job"
+	requests := []*http.Request{browserRequest(http.MethodPost, path, body), authorizedMutationRequest(t, h, path, body), authorizedMutationRequest(t, h, path, body), authorizedMutationRequest(t, h, path, `{"version":1,"request_id":"automatic-browser-01","prompt":"forbidden"}`)}
+	requests[1].Header.Del("X-Darwin-CSRF")
+	requests[2].Header.Set("Origin", "https://evil.example")
+	for i, want := range []int{401, 403, 403, 400} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, requests[i])
+		if w.Code != want {
+			t.Fatal(i, w.Code, w.Body.String())
+		}
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, authorizedMutationRequest(t, h, path, body))
+	if w.Code != 503 || !strings.Contains(w.Body.String(), "review_job_unavailable") {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}

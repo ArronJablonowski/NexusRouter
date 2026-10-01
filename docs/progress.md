@@ -1456,3 +1456,20 @@ Verification: complete web UI/backend/config race suites passed (10.169s /
 5.722s / cached); final membership and automatic routing tests passed (2.488s).
 Targeted vet, source formatting/size and diff checks passed. Full repository
 validation and normal branch backup remain queued behind the active gate.
+
+## 2026-10-01 — recoverable browser review-job visibility
+
+Added explicit Check background review for saved automatic requests. A reload
+needs only the request ID. New protected backend read validates saved queue
+scope/original choice and fresh authenticated ownership before projecting status
+and applied flag. No evaluator, dispatch, repair, raw prompt/output/path or job
+hash projection. Missing/unbound/revoked requests remain unavailable; completed
+receipts are explicitly distinguished from current quality verdicts.
+
+Production-mTLS integration covers missing, pending, completed and revoked job
+reads alongside one evaluation/no repeated execution. Authority tests cover
+session, CSRF, origin, strict input and disabled inspector. Browser behavior
+covers reload without implicit reads, double click, safe projection, malformed
+state and no retry/evaluation. Synthetic fixtures, not live deployment. Reviewed
+asset digest updated after expected guard rejection. Full validation/backup
+remains queued and broader DAR-133 qualification remains incomplete.
