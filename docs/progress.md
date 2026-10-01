@@ -1915,3 +1915,23 @@ physical qualification.
 Validation for this checkpoint: remote race suite passed 25.923s; OpenClaw race
 suite passed 1.974s; targeted go vet and git diff --check passed. Optional physical
 Mac discovery qualification remains failing as recorded above.
+
+## 2026-10-01 — physical OpenClaw HTTPS/SSH and crash recovery
+
+The explicit two-host pinned-registration fixture now permits OpenClaw as well
+as Pi. Actual isolated Spark OpenClaw 2026.9.7 / Node 26.10.0 passed the full
+Mac-to-Spark lifecycle: authenticated identity matches durable completion events,
+results/events, running cancellation, response loss after committed acceptance,
+reopened caller-store deduplication and live revocation over HTTPS and SSH.
+Controlled owned-host SIGKILL required original harness descendants to exit,
+preserved failed interrupted lineage without replay or fabricated output, and
+completed saved queued work once. Eight synthetic provider calls exactly.
+
+Native test passed 73.18s (Mac race package 74.704s); HTTPS 15.86s, SSH 17.17s.
+Independent cleanup found no fixture host directories; existing Ollama PID2145
+remained. Linux production host is not race-instrumented. No real-model quality,
+native-tool side effects, arbitrary network partitions or power-loss claims.
+Source formatting/size gate, remote vet and diff checks passed. Operations docs
+updated. Evidence: reporting outputs/spark-openclaw-qualification/physical-test.log
+and registration.json plus previously verified runtime manifest. DAR-133 remains
+In Progress; combined full gate/normal push queued behind existing live gate.

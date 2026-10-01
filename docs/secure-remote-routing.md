@@ -1625,10 +1625,10 @@ it does not change TLS certificate validity, evidence/review timestamps or the
 destination's resource-admission clock checks. Configured identity remains an
 advisory preview and must match the actual completed harness identity.
 
-### Physical Pi fixture
+### Physical Pi and OpenClaw fixtures
 
 The two-host fixture optionally accepts `NEXUS_REMOTE_TEST_HARNESS_FIXTURE`, a
-local JSON file containing one pinned Pi registration for destination model
+local JSON file containing one pinned Pi or OpenClaw registration for destination model
 `chat`, revision `fixture-v1`, with native tools disabled. The referenced
 executable must already exist on the destination. `NEXUS_REMOTE_TEST_PATH` may
 supply an explicit absolute-component PATH for its Node runtime; it changes
@@ -1637,11 +1637,11 @@ only the disposable host environment. No installer runs from this fixture.
 The transport cases use this harness for successful dispatch, response-loss
 recovery and running cancellation over both HTTPS and SSH. Identity is read
 from the authenticated destination, bound to each task, then independently
-matched against durable completion events. The host-crash cases use the selected Pi registration too: the started task
+matched against durable completion events. The host-crash cases use the selected harness registration too: the started task
 fails without replay and saved queued work completes once. Before the controlled
 SIGKILL, the fixture records descendants of its owned host by PID and Linux
 process start time. It requires those original children to stop within five
 seconds (zombies are not running); surviving fixture children are stopped and
-cause failure. This qualifies Pi text mode without native tools, not arbitrary
+cause failure. This qualifies the selected harness in text mode without native tools, not arbitrary
 external tool side effects or power loss. Synthetic provider call totals must
 remain eight.
