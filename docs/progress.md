@@ -1678,3 +1678,26 @@ Reporting evidence: outputs/spark-systemd-qualification/manifest.json and
 native-test.log. Full combined gate/normal push remains queued behind active
 frozen validation. This closes native Linux fixture lifecycle, not physical
 cross-system dispatch/cancellation/recovery or production deployment.
+
+## 2026-10-01: Physical Mac-to-Spark remote lifecycle fixture
+
+Added an explicit opt-in two-host test using strict SSH identity/known-host
+checking, temporary pinned mTLS credentials and a hash-verified Linux ARM64
+production host on DGX Spark. HTTPS and SSH both passed dispatch, committed
+results/events, running cancellation and duplicate prevention after reopening
+the caller route store. Host CLI revocation with expected registry digest
+removed caller access. Four synthetic provider requests total; no model
+inference. Native Linux resource measurement remains enabled. The initial
+fixture disabled measurement and was correctly denied before provider dispatch;
+only the fixture was corrected. Production admission was not weakened.
+
+The Mac race-instrumented test passed in 15.10s (package 16.580s); the Linux
+production binary is not race-instrumented. Vet, source formatting/line limits
+and diff checks passed. Independent remote check found no remaining owned
+two-host fixture directories; existing Ollama PID 2145 remained present.
+The user-authorized SSH key stays outside Git, mode 0600.
+
+This qualifies the physical synthetic lifecycle, not real model quality or
+production deployment. Actual network-loss-after-commit injection, host-restart
+task recovery and physical multicast discovery remain unqualified. Full combined
+make check and normal push are queued behind the existing frozen gate.
