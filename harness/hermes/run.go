@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -84,7 +85,11 @@ func (c Config) validate() error {
 // Run performs one admitted isolated text-only execution. The native process
 // must exit and its projection must bind to the gateway's verified response.
 // Incomplete, canceled or uncertain runs return no accepted output and no retry.
-func Run(ctx context.Context, c Config, prompt string) (result Result, runErr error) {
+func Run(ctx context.Context, c Config, prompt string) (Result, error) {
+	return runConfigured(ctx, c, prompt, nil)
+}
+
+func runConfigured(ctx context.Context, c Config, prompt string, agent *agentExecution) (result Result, runErr error) {
 	if ctx == nil || ctx.Err() != nil || c.validate() != nil || !utf8.ValidString(prompt) || strings.TrimSpace(prompt) == "" || len(prompt) > MaxRecordBytes/2 {
 		return Result{}, ErrProjection
 	}
@@ -99,6 +104,9 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 		return Result{}, ErrProjection
 	}
 	identity, err := c.Identity()
+	if agent != nil {
+		identity, err = agent.identity, nil
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -146,23 +154,66 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			runErr = ErrRun
 		}
 	}()
-	base, key, verified, closeGateway, err := textgateway.Start(ctx, textgateway.Config{DefaultMissingOutputLimit: true, UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages})
+	var base, key string
+	var closeGateway func()
+	var gateway *textgateway.AgentGateway
+	gc := textgateway.Config{DefaultMissingOutputLimit: true, UpstreamProtocol: c.UpstreamProtocol, BaseURL: c.BaseURL, APIKey: c.APIKey, Model: c.Model, ContextTokens: c.ContextTokens, MaxOutputTokens: c.MaxOutputTokens, Timeout: c.Timeout, Transport: c.Transport, Messages: c.Messages}
+	if agent == nil {
+		base, key, verified, closeGateway, err = textgateway.Start(ctx, gc)
+	} else {
+		gateway, err = textgateway.StartAgent(ctx, textgateway.AgentConfig{Config: gc, Actual: identity, Session: agent.session, Tools: agent.config.Tools, NamespaceTools: true})
+		if err == nil {
+			base, key, closeGateway = gateway.BaseURL, gateway.Token, gateway.Close
+		}
+	}
 	if err != nil {
 		return Result{}, err
 	}
 	defer closeGateway()
-	_, env, err := isolatedFiles(dir, base, key, c.Model)
+	configPath, env, err := isolatedFiles(dir, base, key, c.Model)
 	if err != nil {
 		return Result{}, err
+	}
+	if agent != nil {
+		env = append(env, "HOME="+dir)
+		raw, e := os.ReadFile(configPath)
+		if e != nil {
+			return Result{}, ErrRun
+		}
+		var private map[string]any
+		if json.Unmarshal(raw, &private) != nil {
+			return Result{}, ErrProjection
+		}
+		private["agent"] = map[string]any{"max_turns": agent.config.MaxTurns}
+		private["tools"] = map[string]any{"tool_search": map[string]string{"enabled": "off"}}
+		raw, e = json.Marshal(private)
+		if e != nil || os.WriteFile(configPath, raw, 0600) != nil {
+			return Result{}, ErrRun
+		}
 	}
 	if err := verifySource(ctx, c, env, dir); err != nil {
 		return Result{}, err
 	}
 	bootstrap := "import sys; sys.path.insert(0," + strconv.Quote(c.SourceDir) + "); import hermes_bootstrap; from hermes_cli.main import main; sys.exit(main())"
 	command := exec.CommandContext(ctx, c.Executable, "-I", "-c", bootstrap, "chat", "--model", c.Model, "--provider", "nexus-gateway", "--reasoning", "none", "--toolsets", "all", "--max-turns", "1", "--run-budget", strconv.Itoa(int(math.Ceil(c.Timeout.Seconds()))), "--ignore-rules", "--query-file", "-", "--oneshot", "--format", "stream-json")
+	input := prompt
+	if agent != nil {
+		bridge := filepath.Join(dir, "bridge.py")
+		if os.WriteFile(bridge, []byte(agentBridgeSource), 0600) != nil {
+			return Result{}, ErrRun
+		}
+		entries, _ := agentToolEntries(agent.config.Tools)
+		settings := map[string]any{"source": c.SourceDir, "base_url": base, "api_key": key, "tool_token": gateway.ToolToken, "model": c.Model, "prompt": prompt, "max_output_tokens": c.MaxOutputTokens, "max_turns": agent.config.MaxTurns, "timeout_seconds": int(math.Ceil(c.Timeout.Seconds())), "tools": entries}
+		raw, e := json.Marshal(settings)
+		if e != nil {
+			return Result{}, ErrProjection
+		}
+		input = string(raw)
+		command = exec.CommandContext(ctx, c.Executable, "-I", bridge)
+	}
 	command.Env = env
 	command.Dir = dir
-	command.Stdin = strings.NewReader(prompt)
+	command.Stdin = strings.NewReader(input)
 	command.Stderr = io.Discard
 	output := &boundedOutput{limit: MaxStreamBytes, cancel: cancel}
 	command.Stdout = output
@@ -172,6 +223,21 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 	}
 	if err != nil {
 		return Result{}, ErrRun
+	}
+	if agent != nil {
+		transcript, e := gateway.Transcript()
+		if e != nil {
+			return Result{}, e
+		}
+		projection, e := parseAgentProjection(output.data, command.ProcessState.ExitCode(), c.Model, transcript)
+		if e != nil {
+			return Result{}, e
+		}
+		final, e := gateway.Final()
+		if e != nil || final != projection.Text {
+			return Result{}, ErrProjection
+		}
+		return Result{Text: final, Identity: identity}, nil
 	}
 	projection, err := ParseProjection(output.data, command.ProcessState.ExitCode(), c.Model)
 	if err != nil {

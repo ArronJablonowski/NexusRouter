@@ -35,6 +35,8 @@ type AgentConfig struct {
 	// GooseMCP enables the pinned Goose child projection and ordered MCP bridge.
 	// Canonical provider schemas, conversation and journal retain original names.
 	GooseMCP bool
+	// NamespaceTools uses the ordered ID bridge with child-only nexus__ aliases.
+	NamespaceTools bool
 }
 
 // AgentGateway owns the conversation and rendezvous for one native run. Child
@@ -101,7 +103,7 @@ func StartAgent(ctx context.Context, c AgentConfig) (*AgentGateway, error) {
 	}
 	g.client = &http.Client{Transport: c.Transport, Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	newBridge := toolbridge.New
-	if c.GooseMCP {
+	if c.GooseMCP || c.NamespaceTools {
 		newBridge = toolbridge.NewOrdered
 	}
 	g.bridge, e = newBridge(run, 128, c.Timeout, g.invoke)
@@ -277,7 +279,7 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	childStream := completed.Stream
-	if g.config.GooseMCP {
+	if g.config.GooseMCP || g.config.NamespaceTools {
 		childStream, e = gooseToolProjection(completed.Stream, g.config.Model)
 		if e != nil {
 			g.fault = e

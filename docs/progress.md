@@ -11083,3 +11083,28 @@ projection, constructor and config race tests passed (1.444/1.710/1.697s), as di
 vet, source formatting/size and diff checks. These are controlled fixtures, not
 real-model quality rankings or browser presentation qualification.
 Full make check/push remains queued behind the prior branch's live gate.
+
+### DAR-132: Hermes native host-tool embedding checkpoint
+
+Added the pinned Hermes 0.21.5 embedding runner with a host-only namespaced tool
+catalogue, original call-ID binding and ordered host execution. The embedding
+preserves distinct IDs with identical arguments instead of Hermes's default
+name/argument deduplication. Provider requests, tool policy, admission, durable
+starts, results and usage remain owned by NexusRouter; native transcripts must
+match the completed canonical transcript before accepting final text. Native
+memory, context-file discovery and tool-search catalogue rewriting are disabled
+in the private run configuration. Installed source is unchanged.
+
+Installed Hermes passed nine native race-test modes (25.615s): normal,
+recoverable tool error, end-tool-use, denial, wrong-model rejection, provider and
+tool cancellation, turn ceiling and Ollama protocol. A separate two-call fixture
+passed (4.161s), checking distinct IDs and original execution order for identical
+arguments. Identity/ownership and negative transcript tests passed (1.500s),
+including changed result, failure flag, model, final text, call ID and large JSON
+integer rejection. Targeted vet, formatting/source limits and diff checks passed.
+These tests use controlled providers, not real-model accuracy evidence.
+
+This checkpoint supplies RunAgent/RunAgentTask only. Hermes native_tools SDK/app
+registration, broader approval/HTTP/CLI qualification and real-model comparisons
+remain outstanding. Full repository validation and push are queued behind the
+previous frozen branch's live gate; no deployment is claimed.
