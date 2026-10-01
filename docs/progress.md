@@ -1632,3 +1632,22 @@ current implementation coverage from remaining acceptance, replacing stale first
 implementation gaps. Full combined check/normal backup remains queued behind
 active frozen validation; real platform install/restart/shutdown and physical
 second-system qualification remain required.
+
+### 2026-10-01 — DAR-133 native launchd remote-host lifecycle
+
+Added explicit NEXUS_REMOTE_LAUNCHD=1 qualification. Builds the production nexus
+entry point, renders the generated launchd template, registers only a unique
+owned user agent, and serves pinned mutual TLS on loopback using test certificates,
+private isolated DB/journal/admission paths and a synthetic local provider.
+Authenticated capability read proves startup; launchctl SIGKILL of that owned
+fixture proves restart with a different PID; bootout proves deregistration and
+loss of endpoint reachability. Cleanup is registered before bootstrap to handle
+ambiguous failures. No discovery or dispatch is authorized in fixture peer scopes.
+
+Native race test passed without skip: TestNativeLaunchdRemoteHostLifecycle
+32.62s, package 34.164s. Zero provider POSTs; temporary agent removed and no
+production service/configuration changed. Vet, source and diff checks passed.
+Docker CLI exists but its local daemon socket is absent; no Linux systemd runtime
+was available or started. Native Linux validation and physical separate-system
+routing remain open. Full combined check/ordinary push remains queued behind
+active frozen validation.
