@@ -322,9 +322,15 @@ fabricated text, and the saved queued task executes once. Repeating the crashed
 request returns its original failed submission. This does not establish recovery
 of arbitrary external-harness side effects or reboot/power-loss behavior.
 
+A physical IPv4 DNS-SD fixture on the Mac and Spark also verifies the exact
+advertised endpoint, TLS name/fingerprint and SSH port. Discovery leaves the
+candidate unverified and does not mutate saved trust or execute inference.
+This qualifies one LAN/interface pair, not every network, IPv6, fragmented DNS
+bundles or general mDNS probing/collision handling.
+
 Outstanding acceptance includes broader partition/network-fault qualification,
-external-harness crash recovery, cross-platform certificate/storage and physical
-multicast behavior, IPv6 discovery and fragmented DNS bundles, and final
+external-harness crash recovery, cross-platform certificate/storage and broader
+multicast interoperability, IPv6 discovery and fragmented DNS bundles, and final
 full-repository validation before backup and release. Evidence from a single model/harness task is not a universal accuracy
 ranking, and discovery never supplies authority or measured quality.
 
@@ -1530,3 +1536,26 @@ macOS race run and Linux ARM64 native run passed; Linux was cross-built without
 race instrumentation. Binary hashes were verified before running on the Spark.
 These checks establish local service lifecycle on each platform, not separate-
 system task dispatch, cancellation or recovery. Those network checks remain open.
+
+### Opt-in physical two-host qualification
+
+`TestPhysicalTwoHostHTTPSAndSSH` requires `NEXUS_REMOTE_TWO_HOST=1`,
+`NEXUS_REMOTE_TEST_HOST` (private IPv4), `NEXUS_REMOTE_TEST_USER`, absolute
+`NEXUS_REMOTE_TEST_KEY` and `NEXUS_REMOTE_TEST_KNOWN_HOSTS` paths, plus
+`NEXUS_REMOTE_TEST_BINARY` and its `NEXUS_REMOTE_TEST_BINARY_SHA256` on the
+Linux destination. Provision the trusted SSH identity and native binary first.
+The fixture verifies the binary hash; it does not install a service or Go.
+
+Set `NEXUS_REMOTE_TEST_ADVERTISE_INTERFACE` to the destination's private LAN
+interface and `NEXUS_REMOTE_TEST_BROWSE_INTERFACE` to the caller's interface to
+include the explicit three-second multicast browse. Otherwise no discovery
+traffic is generated. Run the named test with `go test -race ./remote -run
+'^TestPhysicalTwoHostHTTPSAndSSH$' -count=1 -v` on the Mac.
+
+The test creates temporary TLS credentials/storage, a synthetic provider and an
+SSH reverse loopback tunnel. It deliberately closes fault-case responses and
+kills/restarts only its owned temporary host. It removes its remote fixture
+directory/processes at teardown. Existing model services and SSH configuration
+are not modified. Do not point this test at a production router's storage or
+credentials. The remote binary is not race-instrumented merely because the
+caller uses `-race`.

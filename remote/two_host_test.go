@@ -126,7 +126,7 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	defer cleanup()
 	_, localPort, _ := net.SplitHostPort(strings.TrimPrefix(provider.URL, "http://"))
-	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort})
+	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort, "advertise_interface": os.Getenv("NEXUS_REMOTE_TEST_ADVERTISE_INTERFACE")})
 	runCtx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	args := append(append([]string{}, ssh...), "-o", "ExitOnForwardFailure=yes", "-R", fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%s", host.ProviderPort, localPort), user+"@"+address, "python3 -c "+quote(twoHostRun))
@@ -163,6 +163,31 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	if !ready {
 		t.Fatal("remote host did not become ready")
+	}
+	if browse := os.Getenv("NEXUS_REMOTE_TEST_BROWSE_INTERFACE"); browse != "" {
+		before, err := os.ReadFile(trust)
+		if err != nil {
+			t.Fatal(err)
+		}
+		candidates, err := DiscoverUnpaired(ctx, browse, 3*time.Second)
+		if err != nil {
+			t.Fatal("physical discovery", err)
+		}
+		found := false
+		for _, candidate := range candidates {
+			if candidate.Instance != "node-a" {
+				continue
+			}
+			if candidate.Verified || candidate.Endpoint != destination.Endpoint || candidate.ServerName != "node-a" || candidate.ClaimedCertificateSHA256 != sp || candidate.SSHPort != 22 || !candidate.ExpiresAt.After(time.Now()) {
+				t.Fatal("invalid physical discovery claim", candidate)
+			}
+			found = true
+		}
+		after, err := os.ReadFile(trust)
+		if !found || err != nil || !bytes.Equal(before, after) || calls.Load() != 0 {
+			t.Fatal("physical discovery missing, mutated trust or dispatched", found, err)
+		}
+		t.Log("physical IPv4 DNS-SD discovery returned exact unverified host/certificate/SSH hints without trust mutation or inference")
 	}
 	for _, transport := range []string{"https", "ssh"} {
 		t.Run(transport, func(t *testing.T) {

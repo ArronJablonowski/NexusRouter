@@ -1746,3 +1746,22 @@ verified physical lifecycle/native managers from remaining external-harness
 crash, partition/power-loss, multicast and deployment qualification. Full gate
 and ordinary push remain queued behind the live frozen systemd checkpoint;
 only the previous waiting two-host gate was superseded.
+
+## 2026-10-01: Physical unpaired IPv4 discovery
+
+The same disposable production Spark host now supports optional explicit
+advertising on its private interface, with a caller-side three-second browse.
+Fresh route/interface inspection selected Mac en1 and Spark wlP9s9. Physical
+DNS-SD returned the exact test endpoint, certificate fingerprint, TLS name and
+SSH port with Verified=false; saved caller trust bytes stayed unchanged and
+provider calls remained zero during discovery. No implicit pairing.
+
+Combined discovery/HTTPS/SSH/response-loss/crash-recovery fixture passed without
+skip: 53.63s (Mac race package55.155s, Linux binary not race-instrumented).
+Vet/source/diff passed. Independent cleanup found no owned temporary fixture
+directories; existing Ollama PID2145 remained present. Updated acceptance and
+opt-in test setup documentation. One physical IPv4 LAN pair is qualified; broader
+network interoperability, IPv6, fragmented bundles, external-harness crash side
+effects, power loss and production deployment remain open. Only the previous
+waiting gate was superseded; combined full validation/ordinary push queued
+behind the live frozen systemd checkpoint.
