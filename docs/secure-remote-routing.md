@@ -758,3 +758,37 @@ returned head ID as `ExpectedHead` when deliberately revising a review. A concur
 change still causes a conflict at write time: inspection is not a lock or permission
 to overwrite feedback. This command performs no content judging or evaluator
 inference and does not turn a pending output into a pass.
+
+### Local control-audit inspection
+
+Administrators can inspect the destination's existing private control journal:
+
+```sh
+nexus remote audit --journal /private/nexus/control --instance node-a
+nexus remote audit --journal /private/nexus/control --instance node-a \
+  --after 100 --through 205
+```
+
+The first call returns at most 100 entries, `through` (the journal's current
+maximum audit sequence), and `next` when more entries remain. Continue with
+`--after` set to `next` and the same `--through`; stop when `next` is absent.
+Start a new scan to include later events. Sequence numbers need not be contiguous.
+The example numbers above must be replaced with values from the actual response.
+Each page is a consistent SQLite read transaction. Concurrent appends do not
+extend the selected prefix; this assumes the operator retains the same journal
+and does not replace or manually edit its history during the scan.
+
+This command uses local filesystem authority, requires the exact instance ID,
+and opens SQLite read-only/query-only. It requires no peer credentials, runtime
+configuration, dispatcher or network connection. Missing journals are errors and
+are not created. Unsafe file permissions, symlinks, wrong journal identity,
+invalid cursors and malformed/oversized returned records fail the operation.
+The output includes timestamps, caller, destination, operation, request ID and
+recorded outcome; it contains no prompt/result text and is not a quality verdict.
+These metadata can still be sensitive: protect any redirected exports.
+
+Inspection neither deletes audit records nor expires durable request identities.
+It does not implement archive verification, automatic retention, compaction or
+an authenticated remote audit endpoint. Operators must continue monitoring disk
+usage; deleting replay identities to reclaim space can duplicate previously
+accepted work and is not a supported retention procedure.

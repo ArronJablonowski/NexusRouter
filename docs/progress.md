@@ -11604,3 +11604,22 @@ inspection-driven revision, stale-head conflict, immutable snapshot copies and
 all classifications. Vet/source/diff passed. Full repository gate/push queued;
 background evaluator scheduling, UI, physical second-host and production held-out
 qualification remain outstanding.
+
+### DAR-133 — local control-audit inspection (2026-10-01)
+
+Added `nexus remote audit` and `remote.ReadAuditPage` for administrators to read
+existing private control journals without SQL tooling, runtime startup or network
+credentials. Read-only/query-only transactions return at most 100 bounded records
+per page, with a fixed upper sequence for traversal during concurrent appends.
+Missing stores remain missing. Instance identity, cursor, path/permission and
+record checks fail closed. Replay reservations and all audit history are retained.
+This is inspection, not automatic retention, tamper-proof export or peer access.
+
+Focused race tests passed (remote 1.724s, shared CLI 1.933s), covering stable
+pagination under new appends, repeatability, preserved request binding/conflict,
+missing-store noncreation, unsafe paths, invalid cursors, identity mismatch and
+oversized records. Full remote/shared-CLI race packages passed (14.353s/1.785s), and
+vet/source/diff checks passed. Byte bounds also reject embedded-NUL oversized
+SQLite text. Full repository validation and push remain queued
+behind the existing gate. Physical second-host qualification, operational archive
+retention, pairing UI and remote evaluator scheduling remain open.

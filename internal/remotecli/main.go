@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote audit|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -51,9 +51,20 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
-	after := flags.Int64("after", 0, "committed event cursor")
+	after := flags.Int64("after", 0, "committed event or audit cursor")
+	through := flags.Int64("through", 0, "audit high-water sequence returned by first page")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
+	}
+	if operation == "audit" {
+		if flags.NArg() != 0 {
+			return remote.ErrInvalid
+		}
+		page, err := remote.ReadAuditPage(ctx, *journal, *instance, *after, *through)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(page)
 	}
 	if (operation == "route-binding" || operation == "automatic-choice") && flags.NArg() == 0 {
 		store, e := remote.OpenRouteStore(*routes)
