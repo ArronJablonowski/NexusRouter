@@ -543,3 +543,44 @@ AI judgments remain advisory under the existing ranker's capped weighting; they
 are not counted as confirmed deterministic or human samples. Reviews remain
 local to the caller's evidence store and do not modify the destination journal.
 Automatic evaluation scheduling and cross-instance selection remain unfinished.
+
+## Destination-specific accuracy ranking
+
+Go hosts can call `Client.RankRecordedCandidates` with the private remote evidence
+root, a `harness.Request`, ranking policy, proposed `DestinationCandidate` values,
+and a uniform draw used only for explicitly authorized evaluation exploration.
+The result identifies the chosen destination, configured model/registration,
+caller fingerprint, exact execution identity, scores, sample counts and excluded
+candidates. This is an advisory decision; it neither dispatches nor changes an
+existing saved request's destination.
+
+The embedding host supplies candidates only after its own fresh capability,
+resource, locality and credential checks. Raw free RAM from discovery does not
+establish admission headroom. The method independently filters current paired
+model/harness/privacy/budget scope, requires info and dispatch permissions, and
+fetches the exact configured identity over the selected HTTPS or SSH transport.
+A failed observation is ineligible, and configuration drift is incompatible.
+Actual admission and executable/model checks still occur at the destination.
+Caller certificate changes during observation reject the selection.
+
+Quality comes only from the caller-owned ledger for that destination and caller
+fingerprint. Existing ledgers are opened read-only; missing evidence stays unknown
+without creating a database, and corrupt existing evidence fails closed. No
+remote-advertised score is accepted. The same exact model/harness identity on two
+systems remains two candidates, with separate evidence; the same identity listed
+twice for one destination is rejected instead of double-counted. Task profile,
+difficulty, context/configuration and current review heads retain their ordinary
+isolation and weighting, including capped advisory AI judgments.
+
+`harness.SelectScoped` reuses the ordinary selector's eligibility and scoring,
+then compares correctness, quality and confidence in that order. Cost remains a
+budget gate. Ties use a deterministic destination/identity key; insufficient
+evidence does not establish a comparative winner. Ordinary routing never explores.
+Explicitly budgeted exploration retains the existing capped probability and
+least-observed eligible alternative rule.
+
+Before executing a new choice, the host must recheck admission, pin the selected
+identity into the task and persist the destination through `DispatchRecorded`.
+For an already bound request, recover its saved destination rather than ranking
+again. Automatic discovery-to-candidate admission, persisted automatic dispatch,
+UI integration and physical two-host qualification remain unfinished.

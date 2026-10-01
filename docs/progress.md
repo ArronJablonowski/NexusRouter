@@ -11450,3 +11450,19 @@ withdrawals. Native Pi/OpenSSH remote and CLI race packages passed 33.471s /
 1.483s; vet, source formatting and diff checks passed. Full make check and push
 remain queued behind the running preceding gate. Automatic evaluation scheduling, cross-instance ranking,
 pairing/discovery UI and physical two-system qualification remain open.
+
+### DAR-133 destination-specific accuracy ranking
+
+Added `harness.SelectScoped` and `Client.RankRecordedCandidates`, preserving
+ordinary eligibility/accuracy ordering while separating identical configurations
+on different nodes. Ranking reads only caller-owned destination evidence, checks
+paired scope and fresh exact configured identity, and returns chosen configuration,
+samples and exclusions without dispatch. Missing evidence stays unknown; corrupt
+existing ledgers fail closed. A read-only evidence opener cannot append or create
+a database. Host-supplied capability/capacity/credential checks remain explicit
+requirements, not inferred from raw free RAM. Discovery/admission orchestration,
+persisted automatic dispatch and UI integration remain open. Focused isolation,
+ordinary-score parity, exploration, read-only/WAL and remote binding tests passed;
+native SSH-enabled race suites passed: harness 1.583s, remote 33.782s, CLI
+1.705s. Vet, source formatting and diff checks passed. Combined full repository
+validation and normal branch backup remain queued behind the live earlier gate.

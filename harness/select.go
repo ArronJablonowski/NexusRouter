@@ -75,14 +75,8 @@ func Select(r Request, p Policy, candidates []Candidate, evidence *Snapshot, now
 	sort.Slice(out.Excluded, func(i, j int) bool { return hash(out.Excluded[i].Identity) < hash(out.Excluded[j].Identity) })
 	sort.Slice(out.Ranked, func(i, j int) bool {
 		a, b := out.Ranked[i], out.Ranked[j]
-		if a.Correctness != b.Correctness {
-			return a.Correctness > b.Correctness
-		}
-		if a.Quality != b.Quality {
-			return a.Quality > b.Quality
-		}
-		if a.Confidence != b.Confidence {
-			return a.Confidence > b.Confidence
+		if order := accuracyOrder(a, b); order != 0 {
+			return order < 0
 		}
 		return hash(a.Identity) < hash(b.Identity)
 	})
