@@ -10935,3 +10935,25 @@ queue behind the existing SDK gate; its frozen checkout remains untouched.
 Expanded full OpenHands package race suite, including all installed-SDK native
 cases and legacy text regressions, passed (45.135s). Targeted vet, source formatting
 and diff checks passed. No full-repository pass or push is claimed yet.
+
+### 2026-10-01 — DAR-132 OpenHands SDK tool routing
+
+Enabled explicit native_tools registrations for OpenHands alongside Pi. Both use
+one host agent lifecycle with exact registry matching, local-model restrictions,
+context estimation, durable approvals, response validation and usage projection.
+OpenHands selection/execution bind its runtime digest, bridge/schema/turn identity
+and extension policy rules; other harness tool modes remain rejected.
+
+Shared installed-runtime SDK race qualification passed for Pi and OpenHands
+(48.137s): rooted reads, approved create, denied create with no file, existing
+outside-root escape rejection, redaction, final response-contract rejection,
+automatic selection, YAML startup and queued idempotency/outcome reconciliation.
+This uses controlled provider fixtures, not real-model quality comparisons.
+Dedicated OpenHands HTTP/CLI/browser approval qualification, remaining harness
+tool adapters and held-out quality evidence remain open. Full gate/push remains
+queued behind the older SDK validation; no deployment is claimed.
+
+Constructor/identity race checks also passed for both tool modes, including
+extension-scope binding, immutable settings snapshots, refusal to upgrade legacy
+registrations implicitly, and refusal of cloud tool models. Targeted vet, source
+formatting and diff checks passed.

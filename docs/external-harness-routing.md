@@ -733,13 +733,13 @@ The application integration below connects this entry point to the ordinary
 registry, approval authority and selection identity.
 
 
-## Opt-in Pi host tools in SDK routing
+## Opt-in host tools in SDK routing
 
-Set `native_tools: true` on a Pi `native_harnesses` registration, or set
+Set `native_tools: true` on a Pi or OpenHands `native_harnesses` registration, or set
 `NativeTools: true` on the SDK registration. Configure the ordinary host tools and
 approval reviewer/presenter as for a direct NexusRouter task. At least one tool
-must be configured. This mode currently requires a local model and Pi 0.99.2;
-other harness kinds reject the flag. Omitting it preserves the text-only adapter.
+must be configured. This mode requires a local model and Pi 0.99.2 or OpenHands
+SDK 1.50.1; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
 The adapter does not expose Pi built-in tools, arbitrary extensions or shell access.
 
 SDK execution (and the shared CLI/API service path) reuses the normal rooted file
@@ -747,7 +747,7 @@ and Workboard registry, custom extension policy, durable approval authority,
 secret redaction, model-plus-harness resource reservation and submission journal.
 The actual registry catalogue must exactly match the catalogue used for selection.
 Tool schemas, effective turn ceiling and extension scope/decision rules bind the
-Pi tool-mode identity; text-only evidence cannot rank this mode. Automatic routing
+tool-mode identity; text-only evidence cannot rank this mode. Automatic routing
 excludes text-only pairs when host tools are configured and excludes cloud models
 for tool mode. Native delegation and continuation remain unavailable.
 
@@ -795,8 +795,8 @@ accuracy.
 ## OpenHands host tool embedding
 
 `openhands.AgentConfig`, `RunAgentTask`, and `RunAgent` add native SDK 1.50.1
-host-tool execution. This is an embedding entry point; normal application/SDK
-`native_tools` registration remains Pi-only until its routing integration is added.
+host-tool execution. These entry points also back normal application/SDK
+`native_tools: true` registrations with `kind: openhands`.
 Supply the ordinary fenced/redacting journal, policy transport, resource admission
 and scoped approval/schema-enforcing executor. The native child cannot grant tool
 permissions or supply authoritative tool arguments.
@@ -817,3 +817,10 @@ policy denial, cancellation before dispatch and during a tool, turn limits,
 wrong-model refusal, OpenAI-compatible and Ollama delivery, canonical usage and
 completed-task replay rejection. This is not a real-model accuracy benchmark or
 application/approval UI qualification.
+
+OpenHands SDK routing uses the same scoped host registry and approval authority as
+Pi, including automatic selection, YAML registration, queued execution and final
+response validation. Installed-SDK fixtures qualify approved/denied creates, rooted
+reads, escape rejection, secret redaction, per-turn usage and queued idempotency.
+Its tool identity also binds extension policy rules. Dedicated HTTP/CLI/browser
+qualification and real-model comparative evidence remain separate work.

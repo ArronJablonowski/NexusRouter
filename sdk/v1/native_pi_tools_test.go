@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/providers"
@@ -28,6 +29,17 @@ func TestSDKNativePiHostTools(t *testing.T) {
 	if os.Getenv("NEXUS_PI_NATIVE") != "1" {
 		t.Skip("requires installed Pi")
 	}
+	nativeSDKHostTools(t, "pi", pi.AgentAdapterVersion)
+}
+
+func TestSDKNativeOpenHandsHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_OPENHANDS_PYTHON") == "" {
+		t.Skip("requires installed OpenHands")
+	}
+	nativeSDKHostTools(t, "openhands", openhands.AgentAdapterVersion)
+}
+
+func nativeSDKHostTools(t *testing.T, kind, adapterVersion string) {
 	for _, mode := range []string{"read", "create", "deny", "contract", "escape", "auto", "queue", "configured"} {
 		t.Run(mode, func(t *testing.T) {
 			parent := t.TempDir()
@@ -99,7 +111,7 @@ func TestSDKNativePiHostTools(t *testing.T) {
 				c.Tools.ReadRoot = root
 				c.Runtime.MaxTurns = 3
 				c.Tools.MaxTurns = 3
-				o.NativeHarnesses = nativeFixtureRegistrations(t, nil, 64<<20)
+				o.NativeHarnesses = []sdk.NativeHarness{nativeRegistration(t, kind)}
 				o.NativeHarnesses[0].NativeTools = true
 				registrations = o.NativeHarnesses
 				if mode == "create" || mode == "deny" {
@@ -115,7 +127,7 @@ func TestSDKNativePiHostTools(t *testing.T) {
 				}
 				if mode == "configured" {
 					h := o.NativeHarnesses[0]
-					c.NativeHarnesses = []config.NativeHarness{{ID: h.ID, Kind: h.Kind, ModelID: h.ModelID, NativeTools: true, Executable: h.Executable, ExecutableSHA256: h.ExecutableSHA256, ModelRevision: h.ModelRevision, MaxOutputTokens: h.MaxOutputTokens, OverheadRAMBytes: h.OverheadRAMBytes, Prices: &config.NativeHarnessPrices{}}}
+					c.NativeHarnesses = []config.NativeHarness{{ID: h.ID, Kind: h.Kind, ModelID: h.ModelID, NativeTools: true, Executable: h.Executable, ExecutableSHA256: h.ExecutableSHA256, RuntimeSHA256: h.RuntimeSHA256, ModelRevision: h.ModelRevision, MaxOutputTokens: h.MaxOutputTokens, OverheadRAMBytes: h.OverheadRAMBytes, Prices: &config.NativeHarnessPrices{}}}
 					o.NativeHarnesses = nil
 				}
 				settings = *c
@@ -124,7 +136,7 @@ func TestSDKNativePiHostTools(t *testing.T) {
 			if mode == "contract" {
 				prompt = "Return only valid JSON."
 			}
-			req := sdk.Request{Version: 1, HarnessID: "pi-fixture", ModelID: "chat", Messages: []providers.Message{{Role: "user", Content: prompt}}, Domain: "writing", Profile: "tools-fixture"}
+			req := sdk.Request{Version: 1, HarnessID: kind + "-fixture", ModelID: "chat", Messages: []providers.Message{{Role: "user", Content: prompt}}, Domain: "writing", Profile: "tools-fixture"}
 			if mode == "auto" {
 				req.HarnessID = "auto"
 				req.ModelID = "auto"
@@ -181,7 +193,7 @@ func TestSDKNativePiHostTools(t *testing.T) {
 			} else {
 				result, err = client.Run(context.Background(), req)
 			}
-			if mode == "auto" && (result.HarnessSelection == nil || result.HarnessSelection.Primary.Identity.AdapterVersion != pi.AgentAdapterVersion) {
+			if mode == "auto" && (result.HarnessSelection == nil || result.HarnessSelection.Primary.Identity.AdapterVersion != adapterVersion) {
 				t.Fatal("automatic routing lost tools identity", result, err)
 			}
 
@@ -189,7 +201,7 @@ func TestSDKNativePiHostTools(t *testing.T) {
 				if err == nil || result.HarnessOutcome != nil || result.Text != "" {
 					t.Fatal("invalid success", result, err)
 				}
-			} else if err != nil || result.Text != "native host answer" || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.AdapterVersion != pi.AgentAdapterVersion || result.Turns != 2 || result.Usage == nil || result.Usage.InputTokens != 40 || result.Usage.OutputTokens != 8 {
+			} else if err != nil || result.Text != "native host answer" || result.HarnessOutcome == nil || result.HarnessOutcome.Actual.AdapterVersion != adapterVersion || result.Turns != 2 || result.Usage == nil || result.Usage.InputTokens != 40 || result.Usage.OutputTokens != 8 {
 				t.Fatal("host tool run", result, err, calls.Load())
 			}
 			data, readErr := os.ReadFile(filepath.Join(root, "created.txt"))
