@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|harness-identity|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|harness-identity|route-binding|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -51,12 +51,24 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	request := flags.String("request", "", "persisted caller request ID, 16–64 letters/digits/_/-")
 	task := flags.String("task", "", "owned task ID (events)")
 	afterRequest := flags.String("after-request", "", "last caller request ID from previous tasks page")
+	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding)")
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
 	after := flags.Int64("after", 0, "committed event cursor")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
+	}
+	if operation == "route-binding" && flags.NArg() == 0 {
+		store, e := remote.OpenRouteStore(*routes)
+		if e != nil {
+			return e
+		}
+		binding, e := store.Lookup(*request)
+		if e != nil {
+			return e
+		}
+		return json.NewEncoder(output).Encode(binding)
 	}
 	if flags.NArg() != 0 || *trust == "" {
 		return remote.ErrInvalid
@@ -113,7 +125,15 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		if json.Unmarshal(data, &t) != nil || t.Validate() != nil {
 			return remote.ErrInvalid
 		}
-		result, err = client.Dispatch(ctx, *instance, *request, t)
+		if *routes != "" {
+			store, e := remote.OpenRouteStore(*routes)
+			if e != nil {
+				return e
+			}
+			result, err = client.DispatchRecorded(ctx, store, *instance, *request, t)
+		} else {
+			result, err = client.Dispatch(ctx, *instance, *request, t)
+		}
 	default:
 		return remote.ErrInvalid
 	}

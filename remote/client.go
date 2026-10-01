@@ -64,6 +64,9 @@ func (c *Client) Events(ctx context.Context, destination, key, task string, afte
 	return out, err
 }
 func (c *Client) call(ctx context.Context, destination, op, method, path string, task *Task, headers map[string]string, out any) error {
+	return c.callPinned(ctx, destination, op, method, path, task, headers, out, "")
+}
+func (c *Client) callPinned(ctx context.Context, destination, op, method, path string, task *Task, headers map[string]string, out any, callerPin string) error {
 	if c == nil || ctx == nil || !id(destination) {
 		return ErrInvalid
 	}
@@ -91,6 +94,9 @@ func (c *Client) call(ctx context.Context, destination, op, method, path string,
 	tlsConfig, err := c.Credentials.clientTLS(p)
 	if err != nil {
 		return err
+	}
+	if callerPin != "" && (len(tlsConfig.Certificates) != 1 || len(tlsConfig.Certificates[0].Certificate) == 0 || certificateDigest(tlsConfig.Certificates[0].Certificate[0]) != callerPin) {
+		return ErrConflict
 	}
 	var body []byte
 	if task != nil {

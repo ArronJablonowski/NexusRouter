@@ -183,8 +183,13 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		peer.SSH = &sshConfig
 	}
 	writeRegistry(t, f.clientTrust, peer)
+	routeDirectory := filepath.Join(t.TempDir(), "caller-routes")
+	routeStore, e := OpenRouteStore(routeDirectory)
+	if e != nil {
+		t.Fatal(e)
+	}
 	request := "request-sdk-00001"
-	first, e := f.client.Dispatch(ctx, "node-a", request, task)
+	first, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
 	if interruptedSSH {
 		if e == nil || !dropped.Load() {
 			t.Fatal("connection loss not observed", first, e)
@@ -197,9 +202,17 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		if lookupErr != nil || queued.State != "queued" || calls.Load() != 0 {
 			t.Fatal("durable intake missing", queued, lookupErr)
 		}
+		routeStore, e = OpenRouteStore(routeDirectory)
+		if e != nil {
+			t.Fatal(e)
+		}
+		binding, bindingErr := routeStore.Lookup(request)
+		if bindingErr != nil || binding.Destination != "node-a" || binding.TaskSHA256 != hash(task) {
+			t.Fatal(binding, bindingErr)
+		}
 		// Intake committed before the network cut. Reuse the original key/payload.
 		// The recovered response must name that already committed submission.
-		first, e = f.client.Dispatch(ctx, "node-a", request, task)
+		first, e = f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
 		if first.ID != committed {
 			t.Fatal("retry created another submission", first, committed, e)
 		}
@@ -207,11 +220,11 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	if e != nil || first.State != "queued" {
 		t.Fatal(first, e)
 	}
-	retry, e := f.client.Dispatch(ctx, "node-a", request, task)
+	retry, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
 	if e != nil || retry.ID != first.ID {
 		t.Fatal(retry, e)
 	}
-	stopped, e := f.client.Dispatch(ctx, "node-a", "request-cancel-001", task)
+	stopped, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", "request-cancel-001", task)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -262,7 +275,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 					t.Fatal(actual, err)
 				}
 			}
-			retry, e = f.client.Dispatch(ctx, "node-a", request, task)
+			retry, e = f.client.DispatchRecorded(ctx, routeStore, "node-a", request, task)
 			if e != nil || retry.ID != first.ID || retry.State != "succeeded" {
 				t.Fatal(retry, e)
 			}
@@ -283,7 +296,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 	}
 	blocking := task
 	blocking.Prompt = "block-request"
-	running, e := f.client.Dispatch(ctx, "node-a", "request-running-01", blocking)
+	running, e := f.client.DispatchRecorded(ctx, routeStore, "node-a", "request-running-01", blocking)
 	if e != nil {
 		t.Fatal(e)
 	}

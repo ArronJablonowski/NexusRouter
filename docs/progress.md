@@ -11399,3 +11399,27 @@ that installed-Pi SSH qualification passed (11.557s race package).
 Full repository validation/normal backup remain queued behind the active harness
 gate. Per-instance evidence provenance and durable automatic destination selection
 remain the next integration work; this is not a completed cross-instance ranker.
+
+### DAR-133 — durable caller destination bindings
+
+Added private caller RouteStore, DispatchRecorded, CLI dispatch --routes and
+route-binding inspection. Immutable records bind request ID to destination,
+caller leaf-certificate fingerprint and exact task digest before dispatch.
+Synced temporary files publish through atomic no-replace hard links, followed by
+directory sync; store opening also syncs its existing parent. Exact retries can
+reopen safely, while changed destination/task/caller, corrupt records and symlinks
+fail closed. The actual TLS client certificate is checked against the saved pin,
+including if credentials change after the initial read. No prompts or credentials
+are stored. Filesystem failures prevent dispatch; there is no automatic cleanup,
+rerouting, retry or overwrite. Rotation/reconciliation and retention boundaries
+are documented; callers must preserve the same store for retries.
+
+Concurrent competing choices, reopening, lost-response recovery, altered payload,
+caller pin and unsafe-file tests passed (1.683s race). Full remote/CLI race tests
+with installed Pi and native OpenSSH passed (31.864s/1.438s). The real SDK lifecycle
+now records caller choices, reopens them after committed-intake socket loss and
+recovers the same submission, checking exact pinned actual identity and queued/
+running cancellation. Targeted vet, source and diff checks passed. These are
+same-host fixtures, not physical two-host or power-loss filesystem qualification.
+Full repository validation and backup are queued. Automatic ranking and trusted
+cross-instance evidence remain separate unfinished requirements.

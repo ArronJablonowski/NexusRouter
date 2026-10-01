@@ -435,3 +435,39 @@ Durable submission contract generation advances to 7. Existing queued intents
 from earlier generations are fenced by the usual configuration-change handling;
 they are not silently reinterpreted or replayed. Account for this boundary before
 upgrading a running host. No live runtime or queue was upgraded by these changes.
+
+## Durable caller destination binding
+
+Use `dispatch --routes /private/nexus/caller-routes` with the usual flags and
+exact task JSON, or Go `Client.DispatchRecorded`, to persist the chosen destination
+before any dispatch request. The route directory's parent must already exist.
+`route-binding --routes /private/nexus/caller-routes --request KEY` reads the saved
+choice locally without remote credentials. A binding contains only the version,
+request ID, destination ID, caller leaf-certificate fingerprint and task SHA-256;
+retain the exact task separately under the caller's normal privacy policy.
+
+The store creates private immutable files using synced temporary content and an
+atomic no-replace hard link, then syncs the directory before sending. Concurrent
+processes can agree on one identical binding; different destinations, task content
+(including any expected harness identity), or caller certificates conflict.
+Opening the store syncs its parent directory as well. Corrupt, symlinked or
+permissive records fail closed. Filesystems that cannot provide the required link
+and sync operations fail before dispatch; physical power-loss and cross-platform
+filesystem durability have not been qualified.
+
+After an uncertain response, reopen the store and retry the same destination,
+request, task and caller certificate. It will recover the destination's existing
+submission rather than select a new node. Revocation and current peer scopes are
+still checked for every network request. A certificate change between recording
+and TLS setup is rejected before sending. Credential rotation deliberately does
+not rewrite saved bindings: use current credentials to inspect/cancel the owned
+remote request, and reconcile its state before planning further work. Do not
+remove a binding, change directories, or generate a new key merely to bypass an
+uncertain submission. There is no automatic deletion or expiry; retention needs
+an explicit completed-work reconciliation policy. Bindings prove saved intent,
+not that the destination received or completed the task.
+
+Ordinary `dispatch` remains available for callers already providing equivalent
+durability. This store does not select a destination; it is the prerequisite for
+persisting an automatic selection before execution. Cross-instance evidence and
+accuracy ranking remain separate work.
