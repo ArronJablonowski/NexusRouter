@@ -25,6 +25,8 @@ func automaticResultOperation(ctx context.Context, client *remote.Client, operat
 		return nil, err
 	}
 	switch operation {
+	case "auto-review-state":
+		return client.InspectAutomaticReview(ctx, store, evidence, key, request)
 	case "auto-status":
 		return client.AutomaticStatus(ctx, store, key, request)
 	case "auto-cancel":

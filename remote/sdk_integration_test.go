@@ -324,6 +324,10 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 				if ranked := remoteRank(t, root, verified); ranked.ConfirmedSamples != 1 || ranked.AdvisorySamples != 0 || ranked.PendingOutputs != 0 {
 					t.Fatal("SSH review not counted exactly once", ranked)
 				}
+				inspection, inspectErr := f.client.InspectAutomaticReview(ctx, routeStore, root, request, automatic)
+				if inspectErr != nil || !inspection.Recorded || inspection.Evidence == nil || inspection.Evidence.Head == nil || inspection.Evidence.Head.ID != evaluation.Review.ID || inspection.Evidence.Classification != "confirmed" {
+					t.Fatal("SSH review inspection", inspection, inspectErr)
+				}
 				changed := task
 				changed.Prompt += " changed"
 				if _, err = f.client.RecordedOutcome(ctx, routeStore, request, changed); err == nil {

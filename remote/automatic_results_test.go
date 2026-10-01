@@ -22,7 +22,16 @@ func TestAutomaticResultsBindIntentAndReviewWithoutDispatch(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+
 	before := b.submits.Load()
+	unrecorded, e := f.client.InspectAutomaticReview(context.Background(), routes, root, key, request)
+	if e != nil || unrecorded.Recorded || unrecorded.Evidence != nil {
+		t.Fatal(unrecorded, e)
+	}
+	if _, e = os.Stat(root); !os.IsNotExist(e) {
+		t.Fatal("inspection created evidence", e)
+	}
+
 	got, e := f.client.AutomaticStatus(context.Background(), routes, key, request)
 	if e != nil || got.State != "succeeded" {
 		t.Fatal(got, e)
@@ -46,6 +55,29 @@ func TestAutomaticResultsBindIntentAndReviewWithoutDispatch(t *testing.T) {
 	}
 	if rank := remoteRank(t, root, verified); rank.AdvisorySamples != 1 || rank.ConfirmedSamples != 0 {
 		t.Fatal(rank)
+	}
+
+	inspected, e := f.client.InspectAutomaticReview(context.Background(), routes, root, key, request)
+	if e != nil || !inspected.Recorded || inspected.Evidence == nil || inspected.Evidence.Head.ID != review.Review.ID || inspected.Evidence.Classification != "advisory" {
+		t.Fatal(inspected, e)
+	}
+	revised := review
+	revised.Review.ID = "revision"
+	revised.Review.ExpectedHead = inspected.Evidence.Head.ID
+	revised.Review.Verdict = "failed"
+	revised.Review.Quality = 0
+	revised.Review.CreatedAt = time.Now().UTC()
+	if e = f.client.ReviewAutomaticOutcome(context.Background(), routes, root, key, request, revised); e != nil {
+		t.Fatal(e)
+	}
+	stale := revised
+	stale.Review.ID = "stale"
+	if e = f.client.ReviewAutomaticOutcome(context.Background(), routes, root, key, request, stale); !errors.Is(e, harness.ErrConflict) {
+		t.Fatal("stale head accepted", e)
+	}
+	current, e := f.client.InspectAutomaticReview(context.Background(), routes, root, key, request)
+	if e != nil || current.Evidence.Head.ID != "revision" || current.Evidence.Head.Verdict != "failed" {
+		t.Fatal(current, e)
 	}
 	changed := request
 	changed.Prompt = "changed"

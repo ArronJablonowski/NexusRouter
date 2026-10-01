@@ -743,3 +743,18 @@ and automated AI reviews remain advisory. Neither reconciliation nor successful
 execution supplies a pass automatically. Reviewer authentication remains the
 embedding host/operator's responsibility. The Go equivalents are ResolveAutomatic,
 AutomaticStatus, CancelAutomatic, AutomaticOutcome and ReviewAutomaticOutcome.
+
+`nexus remote auto-review-state --routes DIR --request KEY --evidence DIR` reads
+the original automatic request from stdin and authenticates its saved destination
+and canonical completion before inspecting local evidence. It returns receipt and
+execution hashes, whether the execution has been recorded, and a copy of its
+current review head. Missing evidence remains unrecorded without creating a ledger.
+Existing ledgers are opened read-only and their full logs are validated.
+
+The classification distinguishes pending, unverified, withdrawn, AI advisory and
+confirmed reviews; the generic harness snapshot API also identifies non-quality
+execution lineages. It contains metadata and hashes, not output text. Use the
+returned head ID as `ExpectedHead` when deliberately revising a review. A concurrent
+change still causes a conflict at write time: inspection is not a lock or permission
+to overwrite feedback. This command performs no content judging or evaluator
+inference and does not turn a pending output into a pass.

@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -107,7 +107,7 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	client := remote.Client{Trust: registry, Credentials: credentials}
 	var result any
 	switch operation {
-	case "auto-status", "auto-cancel", "auto-output", "auto-reconcile", "auto-review":
+	case "auto-status", "auto-cancel", "auto-output", "auto-reconcile", "auto-review", "auto-review-state":
 		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
 			return remote.ErrInvalid
 		}

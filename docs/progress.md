@@ -11587,3 +11587,20 @@ success. Standalone compatibility help and all shared CLI tests also passed.
 Vet/source/diff passed. Full repository validation/push remain queued. This is
 build inclusion, not signed release publication, native service installation or
 physical two-system qualification. OpenSSH is still an external SSH prerequisite.
+
+### DAR-133 current remote review inspection
+
+Added validated snapshot review-state copies and `nexus remote auto-review-state`.
+The original route and completed canonical output are authenticated before reading
+only that caller/destination's local ledger. Missing evidence is reported without
+creating a store. Current head IDs support deliberate expected-head revisions;
+inspection does not reserve the head or authorize an overwrite. Classification
+separates pending/unverified/withdrawn/advisory/confirmed/non-quality evidence.
+No output text, quality judgment, evaluator call or inference is produced.
+
+Remote/harness/shared-CLI race packages passed (38.110s/1.923s/1.933s), including
+installed Pi over native isolated SSH. Tests cover missing-store noncreation,
+inspection-driven revision, stale-head conflict, immutable snapshot copies and
+all classifications. Vet/source/diff passed. Full repository gate/push queued;
+background evaluator scheduling, UI, physical second-host and production held-out
+qualification remain outstanding.
