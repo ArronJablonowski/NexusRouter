@@ -11175,3 +11175,26 @@ validation. Its application package passed in 2365.757s and CLI testing continue
 the running checkout remains untouched. No production deployment. Comparative
 model/harness learning qualification and remaining remote-routing requirements
 are still open.
+
+### DAR-132 real-provider gateway compatibility — 2026-10-01
+
+A separately recorded Pi/Devstral diagnostic captured Ollama 0.34.4 returning
+`prompt_eval_cached_count: 0` on its terminal native tool response. The strict
+native tool gateway rejected this documented metric before releasing any tool
+proposal. Preserve both failed executions and zero quality feedback; they are
+infrastructure evidence, not model-quality rejections. An intervening admission
+was a zero-dispatch resource deferral, with no provider requests.
+
+Accept the optional cached prompt metric only as a terminal integer within the
+measured prompt total. Do not add it to token usage. A regression failed before
+the fix; the captured synthetic file-read response now verifies offline with
+705 input / 14 output tokens and the original tool arguments. Zero/nonzero cache,
+invalid types, negative/oversized values, missing totals and premature metrics
+are covered. Gateway race suite passed (18.946s), captured/metric regressions
+passed (1.412s), targeted vet and source checks passed. Ollama's upstream
+openai/openai_test.go TestToUsage confirms cached tokens are within prompt total.
+
+The queued validation was stopped before it started; the preceding frozen gate
+remains untouched. Queue the corrected commit for full make check before push.
+Real-provider success and joint held-out accuracy qualification remain open;
+no completed inference was replayed and no deployment occurred.

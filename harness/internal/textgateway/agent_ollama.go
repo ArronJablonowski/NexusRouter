@@ -51,7 +51,7 @@ func ollamaAgentCompletion(reader io.Reader, model string) (Completion, error) {
 		}
 		for key := range fields {
 			switch key {
-			case "model", "created_at", "message", "done", "done_reason", "total_duration", "load_duration", "prompt_eval_count", "prompt_eval_duration", "eval_count", "eval_duration":
+			case "model", "created_at", "message", "done", "done_reason", "total_duration", "load_duration", "prompt_eval_count", "prompt_eval_cached_count", "prompt_eval_duration", "eval_count", "eval_duration":
 			default:
 				return bad()
 			}
@@ -159,6 +159,14 @@ func ollamaAgentCompletion(reader io.Reader, model string) (Completion, error) {
 					return bad()
 				}
 				calls++
+			}
+		}
+		// Cache hits are metadata within the measured prompt total. Require a
+		// terminal, bounded integer and never add it to input-token accounting.
+		if raw, ok := fields["prompt_eval_cached_count"]; ok {
+			var cached int64
+			if !record.Done || record.Input == nil || string(raw) == "null" || json.Unmarshal(raw, &cached) != nil || cached < 0 || cached > *record.Input {
+				return bad()
 			}
 		}
 		if record.Done {
