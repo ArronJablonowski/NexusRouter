@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
+	"github.com/ArronJablonowski/NexusRouter/harness/openclaw"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -16,12 +17,15 @@ import (
 )
 
 func TestNativeToolsIdentityAndConstructorSnapshot(t *testing.T) {
-	for _, kind := range []string{"pi", "openhands", "goose", "hermes"} {
+	for _, kind := range []string{"pi", "openhands", "goose", "hermes", "openclaw"} {
 		t.Run(kind, func(t *testing.T) { testNativeToolsSnapshot(t, kind) })
 	}
 }
 func testNativeToolsSnapshot(t *testing.T, kind string) {
 	adapter := pi.AgentAdapterVersion
+	if kind == "openclaw" {
+		adapter = openclaw.AgentAdapterVersion
+	}
 	if kind == "hermes" {
 		adapter = hermes.AgentAdapterVersion
 	}

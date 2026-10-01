@@ -17,6 +17,7 @@ import (
 	"github.com/ArronJablonowski/NexusRouter/approvals"
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
+	"github.com/ArronJablonowski/NexusRouter/harness/openclaw"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
@@ -241,4 +242,11 @@ func TestHTTPNativeHermesDurableOperatorApproval(t *testing.T) {
 		t.Skip("requires installed Hermes")
 	}
 	testHTTPNativeApproval(t, "hermes", hermes.AgentAdapterVersion)
+}
+
+func TestHTTPNativeOpenClawDurableOperatorApproval(t *testing.T) {
+	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
+		t.Skip("requires installed OpenClaw")
+	}
+	testHTTPNativeApproval(t, "openclaw", openclaw.AgentAdapterVersion)
 }

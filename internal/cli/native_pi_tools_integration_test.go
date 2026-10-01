@@ -20,6 +20,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
+	"github.com/ArronJablonowski/NexusRouter/harness/openclaw"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -47,6 +48,9 @@ func testCLINativeHostTools(t *testing.T, kind, adapter string) {
 	if kind == "goose" {
 		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
 		e = nil
+	}
+	if kind == "openclaw" {
+		executable, e = exec.LookPath("openclaw")
 	}
 	var runtimeDigest, source string
 	if kind == "hermes" {
@@ -241,4 +245,11 @@ func TestCLINativeHermesHostTools(t *testing.T) {
 		t.Skip("requires installed Hermes")
 	}
 	testCLINativeHostTools(t, "hermes", hermes.AgentAdapterVersion)
+}
+
+func TestCLINativeOpenClawHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
+		t.Skip("requires installed OpenClaw")
+	}
+	testCLINativeHostTools(t, "openclaw", openclaw.AgentAdapterVersion)
 }

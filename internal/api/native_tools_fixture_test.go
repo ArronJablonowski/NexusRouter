@@ -18,6 +18,9 @@ func nativeHTTPRegistration(t *testing.T, kind string) config.NativeHarness {
 		executable = "/Users/aj_lobster/Documents/Codex/2026-09-19/do-x20/outputs/harness-runtime/goose-1.52.0/goose"
 		e = nil
 	}
+	if kind == "openclaw" {
+		executable, e = exec.LookPath("openclaw")
+	}
 	var runtimeDigest, source string
 	if kind == "hermes" {
 		source = "/Users/aj_lobster/.hermes/hermes-agent"

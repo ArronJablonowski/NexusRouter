@@ -19,6 +19,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/harness/goose"
 	"github.com/ArronJablonowski/NexusRouter/harness/hermes"
+	"github.com/ArronJablonowski/NexusRouter/harness/openclaw"
 	"github.com/ArronJablonowski/NexusRouter/harness/openhands"
 	"github.com/ArronJablonowski/NexusRouter/harness/pi"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -240,4 +241,11 @@ func TestSDKNativeHermesHostTools(t *testing.T) {
 		t.Skip("requires installed Hermes")
 	}
 	nativeSDKHostTools(t, "hermes", hermes.AgentAdapterVersion)
+}
+
+func TestSDKNativeOpenClawHostTools(t *testing.T) {
+	if os.Getenv("NEXUS_OPENCLAW_NATIVE") != "1" {
+		t.Skip("requires installed OpenClaw")
+	}
+	nativeSDKHostTools(t, "openclaw", openclaw.AgentAdapterVersion)
 }

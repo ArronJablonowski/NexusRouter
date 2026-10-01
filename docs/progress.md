@@ -11151,3 +11151,27 @@ This checkpoint exposes embedding only. OpenClaw native_tools SDK/application
 registration and HTTP/CLI/approval qualification remain next. Full make check and
 push are queued behind the preceding frozen branch's live validation; no
 production deployment or completed DAR-132 claim.
+
+### DAR-132: OpenClaw tools through SDK/application routing
+
+Enabled explicit OpenClaw native_tools registrations through the shared native
+agent lifecycle. Constructor identity and queued authority bind the actual host
+tool catalogue and policy; unknown harness kinds still reject. The normal local
+model, rooted tools, approval, redaction, response contract and resource controls
+remain shared with Pi, OpenHands, Goose and Hermes. Documentation now describes
+all five tool-mode adapters and OpenClaw's original-ID/receipt boundary.
+
+Installed OpenClaw 2026.9.7 passed eight SDK modes (52.865s race driver): rooted
+read, approved create, denied create, response contract, escape rejection,
+automatic routing, queued idempotency and configured registration. HTTP plain/SSE,
+contract/cancellation and durable operator approve/deny/cancel passed (46.700s).
+Compiled CLI text/JSON and rejection of unreviewable writes passed (14.015s).
+Constructor/config race checks passed (1.913/1.350s), plus targeted vet, source
+formatting/size and diff checks. Controlled provider fixtures qualify execution
+and attribution, not real-model comparative quality or completed DAR-132.
+
+Full make check and normal push are queued behind the preceding live frozen
+validation. Its application package passed in 2365.757s and CLI testing continues;
+the running checkout remains untouched. No production deployment. Comparative
+model/harness learning qualification and remaining remote-routing requirements
+are still open.

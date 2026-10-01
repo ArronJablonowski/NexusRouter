@@ -45,7 +45,7 @@ func (s Settings) validateNativeHarnesses() error {
 		return e == nil && len(b) == 32 && strings.ToLower(v) == v
 	}
 	for _, h := range s.NativeHarnesses {
-		if (h.NativeTools && h.Kind != "pi" && h.Kind != "openhands" && h.Kind != "goose" && h.Kind != "hermes") || h.ID == "" || h.ID == "auto" || len(h.ID) > 128 || strings.TrimSpace(h.ID) != h.ID || strings.ContainsFunc(h.ID, unicode.IsControl) || seen[h.ID] || !filepath.IsAbs(h.Executable) || !digest(h.ExecutableSHA256) || h.ModelRevision == "" || h.OverheadRAMBytes == 0 || h.MaxOutputTokens < 1 || h.MaxOutputTokens > 65536 || h.Prices == nil {
+		if (h.NativeTools && h.Kind != "pi" && h.Kind != "openhands" && h.Kind != "goose" && h.Kind != "hermes" && h.Kind != "openclaw") || h.ID == "" || h.ID == "auto" || len(h.ID) > 128 || strings.TrimSpace(h.ID) != h.ID || strings.ContainsFunc(h.ID, unicode.IsControl) || seen[h.ID] || !filepath.IsAbs(h.Executable) || !digest(h.ExecutableSHA256) || h.ModelRevision == "" || h.OverheadRAMBytes == 0 || h.MaxOutputTokens < 1 || h.MaxOutputTokens > 65536 || h.Prices == nil {
 			return bad
 		}
 		seen[h.ID] = true

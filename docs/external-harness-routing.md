@@ -735,11 +735,11 @@ registry, approval authority and selection identity.
 
 ## Opt-in host tools in SDK routing
 
-Set `native_tools: true` on a Pi, OpenHands, Goose or Hermes `native_harnesses` registration, or set
+Set `native_tools: true` on a Pi, OpenHands, Goose, Hermes or OpenClaw `native_harnesses` registration, or set
 `NativeTools: true` on the SDK registration. Configure the ordinary host tools and
 approval reviewer/presenter as for a direct NexusRouter task. At least one tool
 must be configured. This mode requires a local model and Pi 0.99.2, OpenHands
-SDK 1.50.1, Goose 1.52.0 or the pinned Hermes 0.21.5 source/runtime; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
+SDK 1.50.1, Goose 1.52.0, the pinned Hermes 0.21.5 source/runtime or OpenClaw 2026.9.7; other harness kinds reject the flag. Omitting it preserves the text-only adapter.
 The adapter does not expose Pi built-in tools, arbitrary extensions or shell access.
 
 SDK execution (and the shared CLI/API service path) reuses the normal rooted file
@@ -765,7 +765,7 @@ approval-backed create, denied writes, path traversal rejection, response contra
 automatic selection, queued idempotency, redaction and measured per-turn usage.
 This is integration evidence, not a real-model quality ranking or deployment.
 
-Authenticated HTTP qualification runs installed Pi, OpenHands, Goose and Hermes through the real chat
+Authenticated HTTP qualification runs installed Pi, OpenHands, Goose, Hermes and OpenClaw through the real chat
 handler and application service with pinned Ollama-wire fixtures. Plain and SSE
 responses preserve canonical completion and measured multi-turn usage; file-tool
 secrets remain redacted. Client cancellation after the tool completes leaves a
@@ -887,5 +887,28 @@ Tool-mode evidence has a separate adapter identity from the text-only runner.
 Installed-runtime fixtures cover SDK reads, approved/denied writes, file-root
 boundaries, response contracts, automatic selection, queue idempotency and YAML
 registration. These fixtures validate execution and attribution, not comparative
-model accuracy. OpenClaw host-tool embedding and real-model comparisons remain
-separate work.
+model accuracy. Real-model comparisons remain separate work.
+
+
+## OpenClaw host tool embedding
+
+`openclaw.AgentConfig`, `RunAgentTask` and `RunAgent` provide host-owned tool
+execution through the pinned OpenClaw 2026.9.7 native agent loop. SDK/application
+registrations select `kind: openclaw` and explicitly enable `native_tools: true`.
+The ordinary local-model policy, scoped file/tool registry, approval authority,
+resource admission, response contracts, redaction and durable queue apply.
+
+Each run loads only a generated private plugin with the exact `nexus__` host-tool
+catalogue. Built-in tool access and tool-search catalogue rewriting are excluded
+by the explicit allowlist and private configuration. Calls carry original native
+callback IDs to the ordered host bridge. OpenClaw normalizes IDs in its later
+provider transcript; these derived IDs never replace host journal identity.
+Bounded execution receipts must match canonical names, IDs, arguments, results
+and failures. Native counts and final output also reconcile with host evidence.
+Recoverable tool errors use `details.status: error` while preserving host content;
+the native `ok` flag alone cannot establish successful execution.
+
+The installed-runtime SDK/HTTP/CLI fixtures qualify routing and authority, not
+comparative model quality. Tool-mode and text-mode evidence remain separate.
+The executable digest pins the launcher; Node and installed dependencies remain
+trusted host components, as documented for the text adapter.
