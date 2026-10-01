@@ -347,12 +347,11 @@ ReadEvents and canonical outcome reconciliation validate those bindings. Reviews
 written through the SDK affect later selection immediately, including after SDK
 restart; unreviewed outputs never acquire a success vote automatically.
 
-Current registered adapters are Pi, OpenClaw, Hermes and Goose text-only routes, with native Ollama or
-OpenAI-compatible providers. This is selection among the registered eligible
-pairs, not a claim of the globally best model/harness or a comparative ranking
-against the unimplemented OpenHands adapter. Additional adapters, tools, queued registration authority,
-CLI/API configuration, durable usage/cost accounting and held-out qualification
-remain required for the full feature.
+Registered adapters include Pi, OpenClaw, Hermes, Goose and OpenHands with native
+Ollama or OpenAI-compatible providers. Pi additionally supports explicit host-tool
+mode described below. The other adapters retain their text-only contracts.
+Selection compares registered eligible pairs using current evidence; held-out
+real-model qualification remains required for comparative quality claims.
 
 
 ## Automatic advisory evaluation and learning
@@ -589,13 +588,13 @@ the actual pair. The API does not accept evidence-store paths or review verdicts
 
 ## Durable queued native tasks
 
-SDK `Submit` and the native task API accept `harness_id` for registered text-only
-pairs. The native API uses its existing snake_case task fields (`model_id`,
+SDK `Submit` and the native task API accept `harness_id` for registered pairs. The native API uses its existing snake_case task fields (`model_id`,
 `prompt`, `domain`, `profile`, `context_tokens`, `max_cost`, `local_required`,
 `capabilities`), rather than the chat API's nested routing object. Submit explicit
 pairs or `harness_id: auto` with `model_id: auto` and sufficient context. Automatic
 selection uses the current reviewed evidence when the dispatcher executes work.
-Tools, branching/continuation and delegated native tasks remain unsupported.
+Pi host tools are available with the opt-in below. Branching/continuation and
+delegated native tasks remain unsupported.
 
 Queue contract generation 3 binds admitted work to the effective operator and
 programmatic registrations plus compiled adapter identities. Equivalent restarts
@@ -730,5 +729,38 @@ Provider usage is already recorded per turn and must not be supplied again as an
 aggregate. `RunAgentTask` remains the convenience wrapper for a complete session.
 
 Configuration snapshots own their tool schemas, message history and prices.
-Neither entry point enables native tools in SDK/CLI/API routing yet; that requires
-connecting the application registry, approval authority and selection identity.
+The application integration below connects this entry point to the ordinary
+registry, approval authority and selection identity.
+
+
+## Opt-in Pi host tools in SDK routing
+
+Set `native_tools: true` on a Pi `native_harnesses` registration, or set
+`NativeTools: true` on the SDK registration. Configure the ordinary host tools and
+approval reviewer/presenter as for a direct NexusRouter task. At least one tool
+must be configured. This mode currently requires a local model and Pi 0.99.2;
+other harness kinds reject the flag. Omitting it preserves the text-only adapter.
+The adapter does not expose Pi built-in tools, arbitrary extensions or shell access.
+
+SDK execution (and the shared CLI/API service path) reuses the normal rooted file
+and Workboard registry, custom extension policy, durable approval authority,
+secret redaction, model-plus-harness resource reservation and submission journal.
+The actual registry catalogue must exactly match the catalogue used for selection.
+Tool schemas, effective turn ceiling and extension scope/decision rules bind the
+Pi tool-mode identity; text-only evidence cannot rank this mode. Automatic routing
+excludes text-only pairs when host tools are configured and excludes cloud models
+for tool mode. Native delegation and continuation remain unavailable.
+
+The final response is checked against the existing response contract before a
+success is journaled. Turn count and usage come from the validated durable agent
+journal, never a child aggregate. Completed inference alone is not accepted quality.
+
+Queue contract generation 6 fences the new capability and compiled tool contract.
+Existing restrictions on queuing custom process-local extensions and replace-file
+operations remain in force. Reconcile pending older-generation work before a live
+rollout; this change does not migrate or execute a live queue.
+
+Qualification uses installed Pi with controlled provider fixtures for reads,
+approval-backed create, denied writes, path traversal rejection, response contracts,
+automatic selection, queued idempotency, redaction and measured per-turn usage.
+This is integration evidence, not a real-model quality ranking or deployment.

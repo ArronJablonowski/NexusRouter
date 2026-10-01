@@ -21,13 +21,22 @@ type nativeAdapter struct {
 	Identity        func() (harness.Identity, error)
 	Run             func(context.Context, string) (runtime.HarnessOutput, error)
 	MaxOutputTokens int
+	Agent           *pi.AgentConfig
 }
 
-func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens int, policyDigest, key string, tr http.RoundTripper, messages []providers.Message) (nativeAdapter, error) {
+func nativeConfig(entry NativeHarness, p config.Provider, m config.Model, tokens int, policyDigest, key string, tr http.RoundTripper, messages []providers.Message, toolConfig nativeToolContract) (nativeAdapter, error) {
 	if entry.Prices == nil {
 		return nativeAdapter{}, ErrHarnessUnsupported
 	}
 	c := nativePiConfig(entry, p, m, tokens, policyDigest, key, tr, messages)
+	if entry.NativeTools {
+		if entry.Kind != "pi" || len(toolConfig.Catalog) == 0 {
+			return nativeAdapter{}, ErrHarnessUnsupported
+		}
+		c.TransportPolicySHA256 = toolConfig.policyDigest(policyDigest)
+		agent := &pi.AgentConfig{Config: c, Tools: toolConfig.Catalog, MaxTurns: toolConfig.MaxTurns}
+		return nativeAdapter{Identity: agent.Identity, MaxOutputTokens: c.MaxOutputTokens, Agent: agent}, nil
+	}
 	switch entry.Kind {
 	case "pi":
 		return nativeAdapter{Identity: c.Identity, MaxOutputTokens: c.MaxOutputTokens, Run: func(ctx context.Context, prompt string) (runtime.HarnessOutput, error) {

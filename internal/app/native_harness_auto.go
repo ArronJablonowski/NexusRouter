@@ -42,6 +42,7 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 	entries := map[harness.Identity]NativeHarness{}
 	artifacts := map[string]bool{}
 	inventories := map[string]map[string]bool{}
+	toolContract := nativeToolsFor(s.settings, s.toolExtension)
 	for _, id := range ids {
 		entry := s.nativeHarnesses[id]
 		var model config.Model
@@ -56,7 +57,7 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 				provider = p
 			}
 		}
-		c, e := nativeConfig(entry, provider, model, r.ContextTokens, digest, "", deniedNativeTransport{}, nil)
+		c, e := nativeConfig(entry, provider, model, r.ContextTokens, digest, "", deniedNativeTransport{}, nil, toolContract)
 		if e != nil {
 			return Result{}, e
 		}
@@ -79,7 +80,7 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 		if model.EstimatedCost != nil {
 			cost = *model.EstimatedCost
 		}
-		candidate := harness.Candidate{Identity: identity, Local: model.Locality == "local", Available: available, Authorized: true, Compatible: model.EstimatedCost != nil, CapacityAvailable: model.Locality != "local" || model.RAMBytes > 0, CredentialAvailable: credential, Capabilities: model.Capabilities, ContextTokens: int64(model.ContextTokens), EstimatedCost: cost}
+		candidate := harness.Candidate{Identity: identity, Local: model.Locality == "local", Available: available, Authorized: true, Compatible: model.EstimatedCost != nil && (len(toolContract.Catalog) == 0 || entry.NativeTools) && (!entry.NativeTools || model.Locality == "local"), CapacityAvailable: model.Locality != "local" || model.RAMBytes > 0, CredentialAvailable: credential, Capabilities: model.Capabilities, ContextTokens: int64(model.ContextTokens), EstimatedCost: cost}
 
 		allowed := credential && available && candidate.Compatible && cost <= r.MaxCost && !(s.settings.Mode == "local_only" && !candidate.Local) && !(s.settings.Mode == "cloud_only" && candidate.Local) && !(r.LocalRequired && !candidate.Local)
 		if allowed {

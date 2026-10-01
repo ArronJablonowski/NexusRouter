@@ -11,6 +11,7 @@ import (
 
 // NativeHarness declares an operator-trusted installed runtime, never credentials.
 type NativeHarness struct {
+	NativeTools      bool                 `yaml:"native_tools,omitempty" json:"native_tools,omitempty"`
 	ID               string               `yaml:"id" json:"id"`
 	Kind             string               `yaml:"kind" json:"kind"`
 	ModelID          string               `yaml:"model_id" json:"model_id"`
@@ -44,7 +45,7 @@ func (s Settings) validateNativeHarnesses() error {
 		return e == nil && len(b) == 32 && strings.ToLower(v) == v
 	}
 	for _, h := range s.NativeHarnesses {
-		if h.ID == "" || h.ID == "auto" || len(h.ID) > 128 || strings.TrimSpace(h.ID) != h.ID || strings.ContainsFunc(h.ID, unicode.IsControl) || seen[h.ID] || !filepath.IsAbs(h.Executable) || !digest(h.ExecutableSHA256) || h.ModelRevision == "" || h.OverheadRAMBytes == 0 || h.MaxOutputTokens < 1 || h.MaxOutputTokens > 65536 || h.Prices == nil {
+		if (h.NativeTools && h.Kind != "pi") || h.ID == "" || h.ID == "auto" || len(h.ID) > 128 || strings.TrimSpace(h.ID) != h.ID || strings.ContainsFunc(h.ID, unicode.IsControl) || seen[h.ID] || !filepath.IsAbs(h.Executable) || !digest(h.ExecutableSHA256) || h.ModelRevision == "" || h.OverheadRAMBytes == 0 || h.MaxOutputTokens < 1 || h.MaxOutputTokens > 65536 || h.Prices == nil {
 			return bad
 		}
 		seen[h.ID] = true

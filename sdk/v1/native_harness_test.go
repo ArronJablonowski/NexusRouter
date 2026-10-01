@@ -57,7 +57,7 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 	if len(cfg.NativeHarnesses) == 0 || extra.NativeHarnesses != nil {
 		registrations = nativeFixtureRegistrations(t, extra.NativeHarnesses, overhead)
 	}
-	client, e := sdk.New(sdk.ConfigOptions{Evaluator: extra.Evaluator, HarnessEvidence: extra.HarnessEvidence, ProjectFile: path, LookupSecret: func(name string) string {
+	client, e := sdk.New(sdk.ConfigOptions{ApprovalReviewer: extra.ApprovalReviewer, Tools: extra.Tools, ToolPolicy: extra.ToolPolicy, Evaluator: extra.Evaluator, HarnessEvidence: extra.HarnessEvidence, ProjectFile: path, LookupSecret: func(name string) string {
 		if name == "NATIVE_TEST_SECRET" {
 			return "native-fixture-secret"
 		}

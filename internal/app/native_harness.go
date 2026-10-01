@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/tools"
 	"math"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
@@ -26,6 +28,7 @@ type NativeHarnessPrices = pi.Prices
 // and OverheadRAMBytes must be verified host metadata, not model self-reports.
 // Registration grants no task authority; ordinary admission still applies.
 type NativeHarness struct {
+	NativeTools bool // Explicit host-tool mode; currently supported by Pi only.
 	// HermesSourceDir binds Hermes source; RuntimeSHA256 attests Hermes or OpenHands dependencies.
 	HermesSourceDir, RuntimeSHA256                                 string
 	ID, ModelID, Kind, Executable, ExecutableSHA256, ModelRevision string
@@ -46,7 +49,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		return err
 	}
 	for _, entry := range registrations {
-		if entry.Prices == nil {
+		if entry.Prices == nil || (entry.NativeTools && entry.Kind != "pi") {
 			return ErrAdmission
 		}
 		prices := *entry.Prices
@@ -72,7 +75,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger
 		if model.ID == "" || (provider.Kind != "openai_compatible" && provider.Kind != "ollama") {
 			return ErrHarnessUnsupported
 		}
-		c, e := nativeConfig(entry, provider, model, model.WorkingContextTokens(), digest, "", deniedNativeTransport{}, nil)
+		c, e := nativeConfig(entry, provider, model, model.WorkingContextTokens(), digest, "", deniedNativeTransport{}, nil, nativeToolsFor(s.settings, s.toolExtension))
 		if e != nil {
 			return e
 		}
@@ -108,7 +111,7 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	if !validHarnessDifficulty(r.HarnessDifficulty) {
 		return Request{}, ErrHarnessUnsupported
 	}
-	if (r.submissionID != "" && r.submissionToken == "") || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" {
+	if (r.submissionID != "" && r.submissionToken == "") || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Workers.DelegateModel != "" {
 		return Request{}, ErrHarnessUnsupported
 	}
 	if r.HarnessID == "auto" {
@@ -120,6 +123,16 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	entry, ok := s.nativeHarnesses[r.HarnessID]
 	if !ok || r.ModelID != entry.ModelID || r.ModelID == "auto" {
 		return Request{}, ErrHarnessUnsupported
+	}
+	if len(nativeToolsFor(s.settings, s.toolExtension).Catalog) > 0 && !entry.NativeTools {
+		return Request{}, ErrHarnessUnsupported
+	}
+	if entry.NativeTools {
+		for _, m := range s.settings.Models {
+			if m.ID == entry.ModelID && m.Locality != "local" {
+				return Request{}, ErrHarnessUnsupported
+			}
+		}
 	}
 	r.nativeHarness = &entry
 	return r, nil
@@ -155,7 +168,7 @@ func nativeReservationModel(model config.Model, entry *NativeHarness, tokens int
 	return sized, nil
 }
 
-func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p config.Provider, m config.Model, key string, messages []providers.Message, j runtime.Journal, result Result, sessionID string, secrets []string) (Result, error) {
+func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p config.Provider, m config.Model, key string, messages []providers.Message, j runtime.Journal, result Result, sessionID string, secrets []string, registry *tools.Registry, executor runtime.ToolExecutor) (Result, error) {
 	for _, capability := range r.Capabilities {
 		switch capability {
 		case "completion", "chat", "text", "writing", "translation", "creative", "coding", "code":
@@ -179,7 +192,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if tokens == 0 {
 		tokens = m.WorkingContextTokens()
 	}
-	c, err := nativeConfig(*r.nativeHarness, p, m, tokens, digest, key, tr, messages)
+	c, err := nativeConfig(*r.nativeHarness, p, m, tokens, digest, key, tr, messages, nativeToolsFor(s, r.toolExtension))
 	if err != nil {
 		return result, err
 	}
@@ -195,6 +208,12 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	privacy := "cloud_allowed"
 	if m.Locality == "local" {
 		privacy = "local_only"
+	}
+	if c.Agent != nil {
+		if m.Locality != "local" || registry == nil || executor == nil || !reflect.DeepEqual(registry.Catalog(), c.Agent.Tools) {
+			return result, ErrHarnessUnsupported
+		}
+		return runNativeAgentAdmitted(ctx, r, m, c.Agent, identity, task, tokens, messages, privacy, j, executor, result, sessionID, secrets)
 	}
 	var measured *providers.Usage
 	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, SubmissionID: r.submissionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task, Selection: r.nativeSelection}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {

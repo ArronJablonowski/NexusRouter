@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
@@ -57,7 +58,21 @@ func NewServiceWithToolControls(settings config.Settings, secret func(string) st
 	if (reviewer != nil && presenter != nil) || ((extension.RequiresApproval() || settings.Tools.CreateEnabled || settings.Tools.ReplaceEnabled || settings.Tools.WorkboardWriteEnabled) && reviewer == nil && presenter == nil) {
 		return nil, ErrAdmission
 	}
-	svc, err := NewService(settings, secret)
+	if settings.Validate() != nil {
+		return nil, ErrAdmission
+	}
+	body, err := json.Marshal(settings)
+	if err != nil {
+		return nil, ErrAdmission
+	}
+	var snapshot config.Settings
+	if json.Unmarshal(body, &snapshot) != nil {
+		return nil, ErrAdmission
+	}
+	settings = snapshot
+	constructionSettings := settings
+	constructionSettings.NativeHarnesses = nil
+	svc, err := NewService(constructionSettings, secret)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +87,10 @@ func NewServiceWithToolControls(settings config.Settings, secret func(string) st
 	svc.toolExtension = extension
 	svc.toolReviewer = reviewer
 	svc.toolPresenter = presenter
+	svc.settings = settings
+	if err := svc.ConfigureNativeHarnesses(configuredNativeHarnesses(settings), nil); err != nil {
+		return nil, err
+	}
 	return svc, nil
 }
 

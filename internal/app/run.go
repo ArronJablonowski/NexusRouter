@@ -510,8 +510,37 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
+	var toolExecutor runtime.ToolExecutor
+	maxTurns := s.Runtime.MaxTurns
+	if registry != nil {
+		executor := tools.Executor{Registry: registry, Policy: toolPolicy, Reader: newToolAuthority(db, nil, nil, secrets)}
+		if (r.toolReviewer != nil || r.toolPresenter != nil) && r.delegatedParent == "" {
+			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
+		}
+		toolExecutor = executor
+		if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
+			maxTurns = min(maxTurns, s.Tools.MaxTurns)
+		}
+	}
 	if r.HarnessID != "" {
-		nativeResult, nativeErr := runNativeAdmitted(ctx, s, r, provider, model, key, messages, j, result, sessionID, secrets)
+		nativeResult, nativeErr := runNativeAdmitted(ctx, s, r, provider, model, key, messages, j, result, sessionID, secrets, registry, toolExecutor)
+		if nativeErr == nil && r.nativeHarness != nil && r.nativeHarness.NativeTools {
+			events, readErr := db.Read(ctx, result.TaskID, 0, 400)
+			if readErr == nil {
+				nativeResult.Usage, readErr = runtime.ValidateHarnessAgentJournal(events, result.TaskID)
+			}
+			if readErr != nil {
+				nativeErr = runtime.ErrPersistence
+				nativeResult.Text, nativeResult.HarnessOutcome = "", nil
+			} else {
+				nativeResult.Turns = 0
+				for _, event := range events {
+					if event.Kind == runtime.TurnStarted {
+						nativeResult.Turns++
+					}
+				}
+			}
+		}
 		watchErr := stopWatcher()
 		watcherStopped = true
 		if watchErr != nil {
@@ -545,17 +574,9 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 		contextTokens = r.ContextTokens
 	}
 	inference := providers.Request{Model: model.Model, Messages: messages, ContextTokens: int64(contextTokens)}
-	maxTurns := s.Runtime.MaxTurns
+	loop.Tools = toolExecutor
 	if registry != nil {
 		inference.Tools = registry.Catalog()
-		executor := tools.Executor{Registry: registry, Policy: toolPolicy, Reader: newToolAuthority(db, nil, nil, secrets)}
-		if (r.toolReviewer != nil || r.toolPresenter != nil) && r.delegatedParent == "" {
-			executor.Authority = newToolAuthority(db, r.toolReviewer, r.toolPresenter, secrets)
-		}
-		loop.Tools = executor
-		if s.Tools.Enabled || s.Tools.WorkboardReadEnabled || len(r.toolExtension.Names()) > 0 {
-			maxTurns = min(maxTurns, s.Tools.MaxTurns)
-		}
 	}
 	parentID, maxOutput := r.ContinueTaskID, 1<<20
 	if r.delegatedParent != "" {

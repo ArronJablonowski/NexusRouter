@@ -10812,3 +10812,35 @@ tool effects and measured turns remain in the failed lineage. All harness packag
 race tests, targeted vet, source check and diff check passed. No real-model quality
 claim or public native tool enablement. SDK registry/approval/selection integration
 remains next. Full gate/push queued behind the still-live SDK validation.
+
+### 2026-10-01 — DAR-132 opt-in SDK Pi host-tool routing
+
+Connected NativeTools/native_tools Pi registrations to the ordinary application
+registry, rooted file handlers, Workboard/custom-tool definitions, durable scoped
+approval executor, redacting submission journal, privacy transport and combined
+model/harness reservation. The actual runtime catalogue must equal the selected
+catalogue. Identity binds schemas, turn ceiling and extension scope/decision rules;
+automatic selection excludes text-only pairs when tools are configured and cloud
+models in tool mode. Existing text registrations retain their prior behavior.
+
+The host validates final response contracts before success. Result turns and usage
+come from the validated native journal without an aggregate duplicate. Constructor
+ordering snapshots settings and installs extensions before computing native
+identities. Queue generation 6 fences this new capability; branch/resume storage
+readers recognize the envelope version without enabling native continuation.
+Custom process-local extensions and replace operations retain queue restrictions.
+
+Installed Pi fixture SDK qualification passed for read/create/deny/contract/escape,
+automatic selection, durable queue duplicate suppression and YAML registrations
+under race (19.121s). Measured usage totals and secret redaction are verified.
+Additional tests with an existing outside-root file and final-response rejection
+passed (5.599s). App native identity/configuration tests passed under race (25.412s)
+and focused approval/extension/file-tool regressions passed (35.489s); targeted vet,
+source formatting/size and diff checks passed. A broader SDK regression run exposed
+a duplicate-usage fixture error; the strict gateway correctly refused it and the
+corrected native tool cases passed. No production check was relaxed.
+
+Full repository gate/push is queued behind the live SDK gate. No daemon was
+reconfigured or deployed. Native tools in the other four harnesses, dedicated
+CLI/API tool-mode qualification, broader fault qualification and held-out real-model
+accuracy comparisons remain open; this fixture evidence does not close DAR-132.
