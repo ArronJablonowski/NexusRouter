@@ -247,7 +247,7 @@ func TestRemoteReviewQueueRequiresSeparateAbsoluteStorage(t *testing.T) {
 	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
 	s.WebUI.RemoteDispatchDirectory = "/private/routes"
 	s.WebUI.RemoteAutomaticEvidenceDirectory = "/private/evidence"
-	s.WebUI.RemoteReview = &WebUIRemoteReview{Model: "reviewer", MaxCost: &zero, QueueDirectory: "/private/reviews"}
+	s.WebUI.RemoteReview = &WebUIRemoteReview{Model: "reviewer", MaxCost: &zero, QueueDirectory: "/private/reviews", Wait: "1h"}
 	if err := s.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,37 @@ func TestRemoteReviewQueueRequiresSeparateAbsoluteStorage(t *testing.T) {
 		}
 	}
 	s.WebUI.RemoteReview.QueueDirectory = ""
+	s.WebUI.RemoteReview.Wait = ""
 	if err := s.Validate(); err != nil {
 		t.Fatal("manual review requires no queue", err)
+	}
+}
+
+func TestRemoteReviewWaitRejectsIncompleteOrUnboundedEnrollment(t *testing.T) {
+	for _, wait := range []string{"", "0s", "-1s", "25h", "invalid"} {
+		w := WebUI{RemoteReview: &WebUIRemoteReview{QueueDirectory: "/private/queue", Wait: wait}}
+		// Exercise the duration boundary through a fully configured valid fixture.
+		s := Defaults()
+		s.WebUI.Enabled = true
+		s.WebUI.RemoteTaskControls = true
+		s.WebUI.RemoteTrustFile = "/private/peers"
+		s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
+		s.WebUI.RemoteDispatchDirectory = "/private/routes"
+		s.WebUI.RemoteAutomaticEvidenceDirectory = "/private/evidence"
+		zero := 0.0
+		w.RemoteReview.Model = "reviewer"
+		w.RemoteReview.MaxCost = &zero
+		s.WebUI.RemoteReview = w.RemoteReview
+		if s.Validate() == nil {
+			t.Fatal(wait)
+		}
+		s.WebUI.RemoteReview.Wait = "1h"
+		if err := s.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		s.WebUI.RemoteReview.QueueDirectory = ""
+		if s.Validate() == nil {
+			t.Fatal("wait without queue")
+		}
 	}
 }

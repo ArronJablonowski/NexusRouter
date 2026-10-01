@@ -20,15 +20,16 @@ type membershipRequest struct {
 }
 
 type membershipPage struct {
-	ReviewEnabled       bool             `json:"review_enabled"`
-	AutomaticEnabled    bool             `json:"automatic_enabled"`
-	DispatchEnabled     bool             `json:"dispatch_enabled"`
-	TaskControlsEnabled bool             `json:"task_controls_enabled"`
-	InspectionEnabled   bool             `json:"inspection_enabled"`
-	Version             int              `json:"version"`
-	Enabled             bool             `json:"enabled"`
-	Digest              string           `json:"digest,omitempty"`
-	Registry            *remote.Registry `json:"registry,omitempty"`
+	BackgroundReviewEnabled bool             `json:"background_review_enabled"`
+	ReviewEnabled           bool             `json:"review_enabled"`
+	AutomaticEnabled        bool             `json:"automatic_enabled"`
+	DispatchEnabled         bool             `json:"dispatch_enabled"`
+	TaskControlsEnabled     bool             `json:"task_controls_enabled"`
+	InspectionEnabled       bool             `json:"inspection_enabled"`
+	Version                 int              `json:"version"`
+	Enabled                 bool             `json:"enabled"`
+	Digest                  string           `json:"digest,omitempty"`
+	Registry                *remote.Registry `json:"registry,omitempty"`
 }
 
 func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) bool {
@@ -105,6 +106,10 @@ func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) 
 			return true
 		}
 	}
-	h.writeJSON(w, http.StatusOK, membershipPage{ReviewEnabled: h.remoteReviewer != nil, AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
+	background := false
+	if configured, ok := h.remoteAutomatic.(interface{ BackgroundReviewEnabled() bool }); ok {
+		background = configured.BackgroundReviewEnabled()
+	}
+	h.writeJSON(w, http.StatusOK, membershipPage{BackgroundReviewEnabled: background, ReviewEnabled: h.remoteReviewer != nil, AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
 	return true
 }

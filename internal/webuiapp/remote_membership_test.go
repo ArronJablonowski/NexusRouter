@@ -72,6 +72,17 @@ func TestRemoteMembershipAuthorityAndAtomicChanges(t *testing.T) {
 	cookie, _ := authenticateBrowser(t, h)
 	get := browserGET("/app/api/v1/remote-membership", cookie)
 	page := call(get, 200)
+	if page.BackgroundReviewEnabled {
+		t.Fatal("background review enabled without queue")
+	}
+	queue, err := remote.OpenReviewQueue(filepath.Join(dir, "review-queue"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.remoteAutomatic = &RecordedRemoteAutomatic{ReviewQueue: queue}
+	if !call(browserGET("/app/api/v1/remote-membership", cookie), 200).BackgroundReviewEnabled {
+		t.Fatal("queue flag missing")
+	}
 	if page.Digest != paired.Digest {
 		t.Fatal("read digest drift")
 	}

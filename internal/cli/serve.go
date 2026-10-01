@@ -309,7 +309,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 						fmt.Fprintln(stderr, "cannot initialize automatic remote evidence")
 						return 1
 					}
-					remoteAutomatic = &webuiapp.RecordedRemoteAutomatic{Client: client, Store: store, EvidenceRoot: root}
+					automatic := &webuiapp.RecordedRemoteAutomatic{Client: client, Store: store, EvidenceRoot: root}
+					remoteAutomatic = automatic
 					if review := s.WebUI.RemoteReview; review != nil {
 						model, cost := review.Model, *review.MaxCost
 						policy := func(private bool) (remote.RemoteEvaluator, error) {
@@ -327,6 +328,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 								fmt.Fprintln(stderr, "cannot initialize remote review queue")
 								return 1
 							}
+							automatic.ReviewQueue, automatic.ReviewPolicy = queue, policy
+							automatic.ReviewWait, _ = time.ParseDuration(review.Wait) // configuration validation already checked the bound
 							runRemoteReviews = func(ctx context.Context) error { return client.RunReviewJobs(ctx, queue, store, root, policy) }
 						}
 					}

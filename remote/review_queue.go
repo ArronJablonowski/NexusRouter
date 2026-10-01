@@ -236,3 +236,13 @@ func (c *Client) ProcessReviewJobs(ctx context.Context, q *ReviewQueue, routes *
 	}
 	return results, nil
 }
+
+// Deadline returns only the saved deadline. A caller reusing it must still use
+// the combined dispatch operation, which verifies the entire immutable intent.
+func (q *ReviewQueue) Deadline(key string) (time.Time, error) {
+	job, err := q.read(key)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return job.Deadline, nil
+}

@@ -35,6 +35,12 @@ func (w WebUI) Validate(listen string) error {
 	if review := w.RemoteReview; review != nil && (w.RemoteAutomaticEvidenceDirectory == "" || !identifier.MatchString(review.Model) || review.MaxCost == nil || *review.MaxCost < 0 || *review.MaxCost > 1_000_000 || math.IsNaN(*review.MaxCost) || math.IsInf(*review.MaxCost, 0)) {
 		return errors.New("remote review requires automatic evidence, an explicit reviewer and finite cost limit")
 	}
+	if review := w.RemoteReview; review != nil && (review.Wait != "" || review.QueueDirectory != "") {
+		wait, err := time.ParseDuration(review.Wait)
+		if err != nil || wait <= 0 || wait > 24*time.Hour || review.QueueDirectory == "" {
+			return errors.New("remote review queue requires an explicit wait between zero and 24 hours")
+		}
+	}
 	if review := w.RemoteReview; review != nil && review.QueueDirectory != "" {
 		dir := review.QueueDirectory
 		if !filepath.IsAbs(dir) || filepath.Clean(dir) != dir || len(dir) > 4096 || strings.ContainsAny(dir, "\x00\r\n") || dir == w.RemoteDispatchDirectory || dir == w.RemoteAutomaticEvidenceDirectory {

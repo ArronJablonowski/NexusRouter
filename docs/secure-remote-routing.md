@@ -1283,9 +1283,9 @@ reads only job metadata and never creates a missing queue. A `completed` receipt
 means review orchestration completed, not that its verdict passed or remains the
 current head. Use the existing authenticated current-review lookup for that.
 Terminal job records are retained, not silently recycled; queue size is bounded
-and archival requires separate explicit administration. Automatic enrollment
-from browser/daemon dispatch, continuous service installation, queue-management
-UI and real second-host qualification remain separate work. These commands
+and archival requires separate explicit administration. Automatic enrollment is available through the configured browser/daemon path
+described below. Service installation, queue-management UI and real second-host
+qualification remain separate work. These commands
 neither create a service nor reconfigure a running daemon.
 
 For durable enrollment before submission, `auto-dispatch-review-job` takes the
@@ -1303,9 +1303,9 @@ missing binding, submits a task or retries execution. A job without a published
 choice stays pending until its deadline; merely restoring an available peer is
 not permission for the review worker to dispatch. Completed/attention jobs do
 not authorize another combined dispatch. Exact request/deadline/policy retries
-cannot overwrite the private intent. Browser and daemon automatic enrollment
-remain separate integrations; this command provides an explicit operator-owned
-workflow without installing or enabling a service.
+cannot overwrite the private intent. The configured browser/daemon path can use the same enrollment operation; this
+command also provides an explicit operator-owned workflow without installing or
+enabling a service.
 
 Embedding hosts may use `Client.RunReviewJobs` to supervise an existing private
 queue. It performs an immediate pass, then waits fifteen seconds between passes.
@@ -1316,7 +1316,8 @@ or evidence databases. This library lifecycle does not enable daemon enrollment
 or install a background service.
 
 The stock daemon can now own that worker when `web_ui.remote_review.queue_directory`
-is set to a separate private absolute directory. The existing remote reviewer
+is set to a separate private absolute directory and `wait` is an explicit
+positive duration at most `24h` (for example `1h`). The existing remote reviewer
 model/cost, dispatch directory, automatic evidence directory, client credentials
 and trust registry are required. Omit `queue_directory` to retain manual review
 only. The worker starts with the dispatcher, resumes existing jobs, and is
@@ -1324,6 +1325,10 @@ cancelled and joined before shared storage/resource cleanup. Queue-level failure
 set the `remote_review` health component to `supervisor_error` and make daemon
 readiness unhealthy; no private error text is returned. Health describes the
 worker, not individual job verdicts. Inspect terminal receipts and current review
-heads for those. This setting does not yet enroll browser dispatches: use the
-existing explicit CLI queue commands with matching reviewer/storage policy.
+heads for those. This setting also enrolls browser automatic dispatches before discovery or
+submission. Original requirements and the absolute deadline survive lost
+responses and exact retries; retries never extend the deadline. A conflicting
+concurrent enrollment fails closed. The Settings form discloses private prompt
+retention and advisory AI review before confirmation. Existing explicit CLI queue
+commands remain available with matching reviewer/storage policy.
 No live configuration or service installation is changed by this implementation.

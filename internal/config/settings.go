@@ -51,6 +51,7 @@ type WebUIRemoteClient struct {
 }
 
 type WebUIRemoteReview struct {
+	Wait           string   `yaml:"wait,omitempty" json:"wait,omitempty"`
 	QueueDirectory string   `yaml:"queue_directory,omitempty" json:"queue_directory,omitempty"`
 	Model          string   `yaml:"model" json:"model"`
 	MaxCost        *float64 `yaml:"max_cost" json:"max_cost"`

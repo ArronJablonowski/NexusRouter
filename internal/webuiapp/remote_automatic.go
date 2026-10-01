@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
@@ -20,11 +21,38 @@ type RecordedRemoteAutomatic struct {
 	Client       *remote.Client
 	Store        *remote.RouteStore
 	EvidenceRoot string
+	ReviewQueue  *remote.ReviewQueue
+	ReviewWait   time.Duration
+	ReviewPolicy func(bool) (remote.RemoteEvaluator, error)
+}
+
+func (d *RecordedRemoteAutomatic) BackgroundReviewEnabled() bool {
+	return d != nil && d.ReviewQueue != nil
 }
 
 func (d *RecordedRemoteAutomatic) DispatchAutomatic(ctx context.Context, key string, request remote.AutomaticRequest) (remote.RecordedRequestStatus, error) {
 	if d == nil || d.Client == nil || d.Store == nil || request.Routing.AllowExploration {
 		return remote.RecordedRequestStatus{}, remote.ErrInvalid
+	}
+	if d.ReviewQueue != nil {
+		if d.ReviewPolicy == nil || d.ReviewWait <= 0 || d.ReviewWait > 24*time.Hour {
+			return remote.RecordedRequestStatus{}, remote.ErrInvalid
+		}
+		deadline, err := d.ReviewQueue.Deadline(key)
+		if errors.Is(err, os.ErrNotExist) {
+			deadline = time.Now().UTC().Add(d.ReviewWait)
+		} else if err != nil {
+			return remote.RecordedRequestStatus{}, err
+		}
+		reviewer, err := d.ReviewPolicy(request.Routing.LocalRequired)
+		if err != nil {
+			return remote.RecordedRequestStatus{}, err
+		}
+		status, choice, err := d.Client.DispatchQueuedAutomaticReview(ctx, d.ReviewQueue, d.Store, d.EvidenceRoot, key, request, reviewer, deadline)
+		if err != nil {
+			return remote.RecordedRequestStatus{}, err
+		}
+		return remote.RecordedRequestStatus{Version: 1, RequestID: key, Destination: choice.Destination, Status: status}, nil
 	}
 	if err := remote.PrepareOutcomeEvidence(d.EvidenceRoot); err != nil {
 		return remote.RecordedRequestStatus{}, err

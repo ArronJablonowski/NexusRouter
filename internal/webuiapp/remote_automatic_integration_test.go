@@ -190,7 +190,19 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := mutationHandlerFixture(t, MutationServices{})
-	h.remoteAutomatic = &RecordedRemoteAutomatic{Client: &remote.Client{Trust: clientTrust, Credentials: creds}, Store: routes, EvidenceRoot: filepath.Join(dir, "evidence")}
+	queue, err := remote.OpenReviewQueue(filepath.Join(dir, "review-jobs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evaluator := &browserContentEvaluator{t: t}
+	policy := func(private bool) (remote.RemoteEvaluator, error) {
+		if !private {
+			t.Error("review privacy lost")
+		}
+		return remote.RemoteEvaluator{Evaluator: evaluator, Local: true, Timeout: time.Second}, nil
+	}
+	automatic := &RecordedRemoteAutomatic{Client: &remote.Client{Trust: clientTrust, Credentials: creds}, Store: routes, EvidenceRoot: filepath.Join(dir, "evidence"), ReviewQueue: queue, ReviewWait: time.Hour, ReviewPolicy: policy}
+	h.remoteAutomatic = automatic
 	payload := `{"version":1,"request_id":"browser-real-auto-01","prompt":"private fixture task","domain":"coding","profile":"default","difficulty":"hard","context_tokens":32768,"max_cost":0,"private":true,"capabilities":[]}`
 	call := func(path, body string, want int) remoteTaskControlPage {
 		t.Helper()
@@ -209,6 +221,10 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 		return p
 	}
 	call("remote-auto-dispatch", payload, 503)
+	deadline, err := queue.Deadline("browser-real-auto-01")
+	if err != nil || !deadline.After(time.Now()) {
+		t.Fatal("lost dispatch response lost review intent", deadline, err)
+	}
 	page := call("remote-recorded-status", `{"version":1,"request_id":"browser-real-auto-01"}`, 200)
 	choice, err := routes.AutomaticChoice("browser-real-auto-01")
 	if err != nil || choice.Destination != "node-a" || choice.Identity != b.identity || choice.Explored || page.Instance != choice.Destination || b.creates.Load() != 1 || b.catalogues.Load() != 1 {
@@ -223,11 +239,24 @@ func TestBrowserAutomaticProductionDiscoveryDispatchAndRecovery(t *testing.T) {
 	b.unavailable.Store(true)
 	call("remote-recorded-status", `{"version":1,"request_id":"browser-real-auto-01"}`, 200)
 	call("remote-auto-dispatch", payload, 200)
+	savedDeadline, err := queue.Deadline("browser-real-auto-01")
+	if err != nil || !savedDeadline.Equal(deadline) {
+		t.Fatal("retry extended review deadline", savedDeadline, err)
+	}
 	call("remote-auto-dispatch", strings.Replace(payload, "private fixture task", "changed intent", 1), 503)
 	if b.creates.Load() != 1 || b.catalogues.Load() != 1 {
 		t.Fatal("recovery discovered or duplicated")
 	}
 	verifyBrowserRemoteReview(t, h, b, payload)
+	for range 2 {
+		states, err := automatic.Client.ProcessReviewJobs(context.Background(), queue, routes, automatic.EvidenceRoot, policy)
+		if err != nil || len(states) != 1 || states[0].Status != "completed" || !states[0].ReviewApplied {
+			t.Fatal(states, err)
+		}
+	}
+	if evaluator.calls.Load() != 1 || b.creates.Load() != 1 || b.catalogues.Load() != 1 {
+		t.Fatal("background review replayed work", evaluator.calls.Load(), b.creates.Load(), b.catalogues.Load())
+	}
 	if _, err = clientTrust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}

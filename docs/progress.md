@@ -1433,3 +1433,26 @@ tests passed; targeted vet, source formatting/size and diff checks passed. This
 is daemon integration source plus lifecycle tests, not live deployment or an
 end-to-end installed-service qualification. Browser automatic enrollment remains
 next. Full repository validation and normal branch backup remain queued.
+
+## 2026-10-01 — browser dispatch enrolls background content review
+
+An explicitly configured review queue plus bounded wait now enrolls browser
+automatic requests before discovery/submission. Original intent, caller, reviewer
+policy and absolute deadline remain immutable; exact retries reuse the saved
+deadline, while conflicting or expired enrollment rejects rather than extending
+work. Browser fields cannot override reviewer/storage/wait. The membership
+projection exposes only an enabled flag; the form discloses private retention
+and one advisory AI review before sending. No prompt browser storage added.
+
+Production authenticated remote integration covers committed dispatch with a
+lost response, saved intent/deadline, same-key recovery without rediscovery or
+duplicate execution, then one queued review with canonical completion. Execution
+and evaluator are synthetic. Browser behavior verifies visible disclosure and
+no implicit sends. Reviewed embedded asset digest updated; the initial digest
+guard failure was expected and not weakened. Physical-host/live-model and
+installed-service qualification remain open. No live daemon configuration changed.
+
+Verification: complete web UI/backend/config race suites passed (10.169s /
+5.722s / cached); final membership and automatic routing tests passed (2.488s).
+Targeted vet, source formatting/size and diff checks passed. Full repository
+validation and normal branch backup remain queued behind the active gate.

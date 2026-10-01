@@ -1,6 +1,6 @@
 "use strict";
 window.NexusRemoteAutomatic=(()=>{
- function attach(parent,base,csrf,reviewEnabled=false){
+ function attach(parent,base,csrf,reviewEnabled=false,backgroundReviewEnabled=false){
   const card=document.createElement("section"),title=document.createElement("h3"),notice=document.createElement("output"),body=document.createElement("div"),another=document.createElement("button");
   title.textContent="Automatically choose a remote model and harness";notice.setAttribute("role","status");notice.setAttribute("aria-live","polite");another.type="button";another.textContent="Start another independent automatic request";another.hidden=true;
   let busy=false;
@@ -19,6 +19,7 @@ window.NexusRemoteAutomatic=(()=>{
    body.replaceChildren();another.hidden=true;
    const key=crypto.randomUUID(),form=document.createElement("form"),identity=document.createElement("p"),review=document.createElement("button"),confirm=document.createElement("button"),preview=document.createElement("pre"),fields={};
    identity.textContent="New request "+key+". Selection uses recorded task-specific accuracy evidence and current permissions, capabilities and capacity. Limited evidence is not a guarantee of the best result. Exploration is disabled.";
+   if(backgroundReviewEnabled)identity.textContent+=" Background AI review is enabled. Original instructions are retained in the private local review queue before dispatch, for one automated review within the configured time limit. AI review is advisory, not human confirmation.";
    function field(name,label,value,options){const wrapper=document.createElement("label"),input=document.createElement(options?"select":name==="prompt"?"textarea":"input");wrapper.textContent=label;if(options)options.forEach(([v,text])=>{const o=document.createElement("option");o.value=v;o.textContent=text;input.append(o);});input.value=value;fields[name]=input;wrapper.append(input);form.append(wrapper);return input;}
    field("domain","Task domain","coding");field("profile","Routing profile","default");field("difficulty","Task difficulty","unknown",["unknown","easy","medium","hard"].map(x=>[x,x]));field("context","Context tokens","32768").type="number";
    const cost=field("cost","Maximum estimated cost","0");cost.type="number";cost.step="any";cost.min="0";
