@@ -160,3 +160,33 @@ completion remains pending, a separately bound exact-answer evaluation changes
 ranking, and a new model revision starts without the old quality sample. This
 exercises composition of the components; production SDK dispatch and ownership
 integration is still outstanding.
+
+## Durable native task execution
+
+`pi.RunTask` wraps native execution with `runtime.RunHarness` using the host's
+ordinary journal. The start commits with expected sequence zero before Pi can
+launch. Reusing a task ID, including concurrent submissions, therefore fails
+before a second native execution. The host must supply its normal submission-
+fenced, redacting journal and maintain cancellation ownership; this embedding
+API does not grant public dispatch authority or replace shared admission.
+
+Successful terminal text and `harness.Execution` identity/output binding commit
+in one event before the result returns. The host `OutputView` must match journal
+redaction so the digest binds the delivered/evaluated text. Failed, canceled,
+panicked or mismatched runs publish no accepted text or quality verdict. Failure
+journals retain the admitted attribution but do not invent an actual-execution
+record when the adapter could not establish it. Uncertain journal writes return
+persistence failure; inspect the existing task rather than restarting inference.
+
+`runtime.RecordHarnessOutcome` reads the canonical two-event task protocol,
+checks start/terminal identity, task class, sequence, timestamps and output hash,
+then idempotently appends the execution to the separate ledger. The reader must
+be the trusted canonical journal, never imported caller JSON. No review or
+quality vote is created. Native Pi qualification now exercises this path using a
+temporary real telemetry database; it verifies one dispatch despite task reuse,
+terminal binding, reconciliation retries and separately evaluated learning.
+
+Still outstanding: normal SDK/API/CLI route selection and registration, shared
+process/cost admission wiring, durable progress and usage accounting, recovery
+of interrupted host ownership, tool-enabled harness authority and other adapters.
+The embedding API is not a deployed replacement for those host responsibilities.

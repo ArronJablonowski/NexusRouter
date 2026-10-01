@@ -9603,3 +9603,19 @@ and no transfer to changed model revisions. Cancellation, protocol tests, vet an
 source checks pass. The queued Pi full gate was stopped before starting and will
 be replaced with the updated committed checkpoint; SSH/evidence gates continue
 unchanged. Production dispatch/ownership/accounting integration remains open.
+
+## Durable native harness task boundary — DAR-132 (2026-10-01)
+
+Added runtime harness execution using the existing journal/expected-sequence
+ownership boundary and a Pi `RunTask` embedding entry point. Start precedes native
+execution; terminal text, output hash and verified identity commit together.
+Journal ambiguity returns no accepted output and never retries. Failed/canceled
+runs retain task attribution without inventing verified actual identity or quality
+feedback. Added trusted canonical-journal reconciliation into the evidence ledger,
+with exact-retry behavior and start/terminal binding checks. Installed-Pi native
+race tests passed through a temporary real telemetry database and ledger. The full
+runtime race suite passed (165.639s), with separate adversarial reconciliation
+and subsequent output-view cancellation regressions passing. Targeted vet and
+source checks passed; SDK/application/storage test packages compile. Full
+repository validation remains queued before push. Production SDK registration/selection, process/cost wiring,
+progress/usage accounting and tool authority remain open.

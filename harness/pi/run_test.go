@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
+	"github.com/ArronJablonowski/NexusRouter/runtime"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -58,11 +60,28 @@ func TestNativePiIsolatedRPC(t *testing.T) {
 	}))
 	defer provider.Close()
 	cfg := Config{ModelRevision: "fixture-v1", Prices: &Prices{}, Executable: executable, ExecutableSHA256: hex.EncodeToString(digest[:]), Provider: "nexus-test", Model: "nexus-fixture", BaseURL: provider.URL + "/v1", APIKey: "fixture-only", ContextTokens: 16384, MaxOutputTokens: 1024, Timeout: 15 * time.Second, Admit: func(context.Context) (func(), error) { return func() { released.Add(1) }, nil }}
-	result, e := Run(context.Background(), cfg, "Return a short answer.")
+	journal, e := telemetry.Open(context.Background(), filepath.Join(t.TempDir(), "native.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer journal.Close()
+	task := Task{ID: "native-task", SessionID: "native-session", Prompt: "Return a short answer.", Class: harness.TaskClass{Domain: "fixture", Profile: "exact-answer-v1", Difficulty: "easy"}, MaxOutputBytes: 4096}
+	taskResult, e := RunTask(context.Background(), journal, cfg, task)
+	result := taskResult.Result
+	if e == nil {
+		events, readErr := journal.Read(context.Background(), task.ID, 0, 10)
+		if readErr != nil || len(events) != 2 || events[1].Data.HarnessOutcome == nil || *events[1].Data.HarnessOutcome != taskResult.Execution {
+			t.Fatal("native terminal was not durably bound", events, readErr)
+		}
+	}
+	if _, retryErr := RunTask(context.Background(), journal, cfg, task); retryErr == nil {
+		t.Fatal("reused native task executed")
+	}
+
 	if e != nil || result.Text != "native Pi result" || result.Provider != "nexus-test" || result.Model != "nexus-fixture" {
 		t.Fatal(result, e)
 	}
-	verifyNativeLearningBoundary(t, result)
+	verifyNativeLearningBoundary(t, result, journal, taskResult.Execution)
 	expectedIdentity, identityErr := cfg.Identity()
 	if identityErr != nil || result.Identity != expectedIdentity || result.Usage == nil || *result.Usage.Input != 20 || *result.Usage.Output != 4 || *result.Usage.TotalTokens != 24 {
 		t.Fatal("lost native provenance/usage", result, identityErr)
@@ -106,7 +125,7 @@ func TestNativePiCancellation(t *testing.T) {
 
 // The fixture host supplies canonical ownership and a deterministic fixture
 // evaluator; neither adapter success nor imported self-reports create a vote.
-func verifyNativeLearningBoundary(t *testing.T, result Result) {
+func verifyNativeLearningBoundary(t *testing.T, result Result, journal *telemetry.Store, committed harness.Execution) {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -115,12 +134,14 @@ func verifyNativeLearningBoundary(t *testing.T, result Result) {
 		t.Fatal(err)
 	}
 	defer ledger.Close()
-	sum := sha256.Sum256([]byte(result.Text))
-	task := harness.TaskClass{Domain: "fixture", Profile: "exact-answer-v1", Difficulty: "easy"}
-	execution := harness.Execution{Version: 1, ID: "native-fixture-attempt", Actual: result.Identity, Task: task, Status: "completed", OutputSHA256: hex.EncodeToString(sum[:]), CompletedAt: now}
-	if err := ledger.AppendExecution(ctx, execution, now); err != nil {
-		t.Fatal(err)
+	execution, err := runtime.RecordHarnessOutcome(ctx, journal, ledger, committed.ID, now)
+	if err != nil || execution != committed {
+		t.Fatal("canonical native reconciliation failed", execution, err)
 	}
+	if _, err := runtime.RecordHarnessOutcome(ctx, journal, ledger, committed.ID, now); err != nil {
+		t.Fatal("reconciliation retry failed", err)
+	}
+	task := execution.Task
 	candidate := harness.Candidate{Identity: result.Identity, Local: true, Available: true, Authorized: true, Compatible: true, CapacityAvailable: true, CredentialAvailable: true, ContextTokens: 16384}
 	request := harness.Request{Version: 1, Task: task, Mode: "local_only", ContextTokens: 100}
 	selectCurrent := func() harness.Selection {

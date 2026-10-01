@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/providers"
 	"github.com/ArronJablonowski/NexusRouter/resources"
 	"github.com/ArronJablonowski/NexusRouter/routing"
@@ -66,6 +67,8 @@ type Event struct {
 }
 
 type Data struct {
+	Harness               *HarnessAttribution            `json:"harness,omitempty"`
+	HarnessOutcome        *harness.Execution             `json:"harness_outcome,omitempty"`
 	ProviderStreamDetail  string                         `json:"provider_stream_detail,omitempty"`
 	SkillContext          *SkillContextUse               `json:"skill_context,omitempty"`
 	IntentClassification  *IntentClassificationUse       `json:"intent_classification,omitempty"`
@@ -108,6 +111,28 @@ type Data struct {
 }
 
 func (e Event) Validate() error {
+	if a := e.Data.Harness; a != nil {
+		if e.Kind != TaskStarted || a.Identity.Validate() != nil || a.Task.Validate() != nil || e.Data.ProviderID != a.Identity.Provider || e.Data.ModelID != a.Identity.Model || e.Data.ConfigID != a.Identity.ConfigSHA256 || e.Data.Domain != a.Task.Domain || e.Data.Profile != a.Task.Profile {
+			return errors.New("invalid harness attribution")
+		}
+	}
+	if o := e.Data.HarnessOutcome; o != nil {
+		if o.Validate() != nil || o.ID != e.TaskID || !o.CompletedAt.Equal(e.Time) || e.Data.Accepted != nil {
+			return errors.New("invalid harness outcome")
+		}
+		expected := map[Kind]string{TaskCompleted: "completed", TaskFailed: "infrastructure_failed", TaskCanceled: "canceled"}
+		if expected[e.Kind] != o.Status {
+			return errors.New("invalid harness outcome placement")
+		}
+		if o.Status == "completed" {
+			if harnessOutputDigest(e.Data.Text) != o.OutputSHA256 {
+				return errors.New("invalid harness output binding")
+			}
+		} else if e.Data.Text != "" || o.OutputSHA256 != "" {
+			return errors.New("failed harness outcome contains accepted output")
+		}
+	}
+
 	if detail := e.Data.ProviderStreamDetail; detail != "" && (e.Kind != TaskFailed || (&providers.Failure{StreamDetail: detail}).SafeStreamDetail() != detail) {
 		return errors.New("invalid provider stream diagnostic")
 	}
