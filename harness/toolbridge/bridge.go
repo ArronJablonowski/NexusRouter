@@ -48,6 +48,8 @@ type Bridge struct {
 	limit   int
 	mu      sync.Mutex
 	closed  bool
+	halted  bool
+	slot    chan struct{}
 	calls   map[string]*entry
 	wg      sync.WaitGroup
 }
@@ -60,7 +62,7 @@ func New(ctx context.Context, limit int, timeout time.Duration, invoke Invoke) (
 		return nil, ErrDenied
 	}
 	child, cancel := context.WithCancel(ctx)
-	return &Bridge{ctx: child, cancel: cancel, token: rand.Text(), invoke: invoke, timeout: timeout, limit: limit, calls: map[string]*entry{}}, nil
+	return &Bridge{ctx: child, cancel: cancel, token: rand.Text(), invoke: invoke, timeout: timeout, limit: limit, calls: map[string]*entry{}, slot: make(chan struct{}, 1)}, nil
 }
 func (b *Bridge) Token() string { return b.token }
 func label(s string, max int) bool {
@@ -116,18 +118,9 @@ func (b *Bridge) execute(ctx context.Context, id string) (runtime.ToolResult, er
 		defer b.wg.Done()
 		call, cancel := context.WithTimeout(b.ctx, b.timeout)
 		stop := context.AfterFunc(ctx, cancel)
-		x := e.execution
-		x.Call.Arguments = append(json.RawMessage(nil), x.Call.Arguments...)
-		result, err := invoke(call, b.invoke, x)
-		if call.Err() != nil {
-			err = ErrUncertain
-		}
+		result, err := b.invokeRegistered(call, e.execution)
 		stop()
 		cancel()
-		if err != nil || len(result.Content) > 1<<20 || !utf8.ValidString(result.Content) || (result.Effect != runtime.NoEffect && result.Effect != runtime.ConfirmedEffect) {
-			result = runtime.ToolResult{}
-			err = ErrUncertain
-		}
 		e.result, e.err = result, err
 		close(e.done)
 	} else {
@@ -141,6 +134,39 @@ func (b *Bridge) execute(ctx context.Context, id string) (runtime.ToolResult, er
 	}
 	return e.result, e.err
 }
+
+// Calls are serial within a run. A terminal result fences every later effect,
+// including a different call already registered or waiting concurrently. Exact
+// retries still retrieve their cached result; they never invoke the host twice.
+func (b *Bridge) invokeRegistered(ctx context.Context, x runtime.ToolExecution) (runtime.ToolResult, error) {
+	select {
+	case b.slot <- struct{}{}:
+		defer func() { <-b.slot }()
+	case <-ctx.Done():
+		return runtime.ToolResult{}, ErrUncertain
+	}
+	b.mu.Lock()
+	blocked := b.closed || b.halted || ctx.Err() != nil
+	b.mu.Unlock()
+	if blocked {
+		return runtime.ToolResult{}, ErrDenied
+	}
+	x.Call.Arguments = append(json.RawMessage(nil), x.Call.Arguments...)
+	result, err := invoke(ctx, b.invoke, x)
+	if ctx.Err() != nil || err != nil || len(result.Content) > 1<<20 || !utf8.ValidString(result.Content) ||
+		(result.Effect != runtime.NoEffect && result.Effect != runtime.ConfirmedEffect) ||
+		(result.Recoverable && (!result.Failed || result.Effect != runtime.NoEffect)) ||
+		(result.Failed && !result.Recoverable) {
+		result, err = runtime.ToolResult{}, ErrUncertain
+	}
+	if err != nil || (result.EndToolUse && !result.Failed) {
+		b.mu.Lock()
+		b.halted = true
+		b.mu.Unlock()
+	}
+	return result, err
+}
+
 func invoke(ctx context.Context, fn Invoke, x runtime.ToolExecution) (result runtime.ToolResult, err error) {
 	defer func() {
 		if recover() != nil {
@@ -188,9 +214,10 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Only host-redacted tool content and trusted failure state cross back.
 	output := struct {
-		Content string `json:"content"`
-		Failed  bool   `json:"failed"`
-	}{result.Content, result.Failed}
+		Content    string `json:"content"`
+		Failed     bool   `json:"failed"`
+		EndToolUse bool   `json:"end_tool_use"`
+	}{result.Content, result.Failed, result.EndToolUse && !result.Failed}
 	var data bytes.Buffer
 	if json.NewEncoder(&data).Encode(output) != nil {
 		deny(500)

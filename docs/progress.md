@@ -10552,3 +10552,22 @@ and an isolated Pi extension before the remaining adapters. The existing text
 protocol's two-event journal must not be silently reinterpreted. In-memory replay
 cannot authorize replay after restart. Full gate/push remains queued behind the
 live prior Pi gate; physical-host remote and held-out quality gaps remain open.
+
+### 2026-10-01 — DAR-132 native tool terminal boundary
+
+Runtime integration review found that the new bridge did not yet carry the
+runtime's EndToolUse rule across distinct registered calls. It now serializes
+host invocations within each run and fences later effects after successful
+EndToolUse or an unrecoverable/uncertain result. Already waiting requests cannot
+cross the fence; exact retries can still retrieve a cached completed result.
+The response exposes the trusted end_tool_use flag so an adapter can remove
+active tools. Recoverable failures are valid only with Failed and NoEffect;
+those permit a new model proposal, not replay of the old call. Canceled queued
+calls return promptly and remain non-executable on retry.
+
+Focused race tests passed (1.481s), including concurrent/later terminal fencing,
+recoverable correction, cached end markers and cancellation before invocation.
+Targeted vet, source and diff checks passed. Native tools remain disabled pending
+provider-proposal, durable journal/recovery and adapter integration. This closes
+an identified bridge semantic gap; it is not a claim of completed tool-enabled
+harness routing. Full branch validation/push is queued behind the prior live gate.
