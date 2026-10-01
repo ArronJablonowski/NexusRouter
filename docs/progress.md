@@ -1587,3 +1587,23 @@ rejected a non-private test registry directory; fixture now chmods its directory
 combined make check and normal push remain queued behind frozen active validation.
 Physical two-system qualification and cross-platform multicast behavior remain
 open; these tests do not establish deployment or complete DAR-133.
+
+### 2026-10-01 — DAR-133 real Chrome discovery-to-SSH pairing qualification
+
+Added a production embedded-Settings Chrome qualification with synthetic local
+API responses and an isolated browser profile. It proves no automatic scan,
+duplicate-click suppression, unverified connection/SSH hints, 390px viewport
+without horizontal overflow, connection-detail handoff clearing prior identity
+consent/cloud permission/SSH key, default HTTPS retained until explicit SSH
+selection, no unverified pairing submission, bounded CSRF-bearing version-only
+scan, explicit verified SSH pairing payload with info-only scope/current digest,
+receipt reset, and failed scans removing actionable candidates without leaking
+private failure text. This complements the production BFF authority/trust tests;
+the API fixture does not claim to exercise actual trust mutation or network mDNS.
+
+Required real Chrome race test passed: TestChromeRemoteDiscoveryPairingHandoff
+0.83s, package 2.255s, no skip (DARWIN_REQUIRE_CHROME=1). Vet and source
+format/size checks passed. No production assets or live configuration changed;
+no physical remote peer, SSH connection, multicast scan or inference was used.
+Full combined check/ordinary push remains queued behind active frozen validation.
+Physical cross-system lifecycle and multicast qualification remain outstanding.
