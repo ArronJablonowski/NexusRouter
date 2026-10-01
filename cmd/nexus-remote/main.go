@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|harness-identity|route-binding|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|harness-identity|route-binding|reconcile|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -51,7 +51,8 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	request := flags.String("request", "", "persisted caller request ID, 16–64 letters/digits/_/-")
 	task := flags.String("task", "", "owned task ID (events)")
 	afterRequest := flags.String("after-request", "", "last caller request ID from previous tasks page")
-	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding)")
+	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding/reconcile)")
+	evidence := flags.String("evidence", "", "private destination-separated outcome evidence root (reconcile)")
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
@@ -116,7 +117,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		result, err = client.Cancel(ctx, *instance, *request)
 	case "events":
 		result, err = client.Events(ctx, *instance, *request, *task, *after)
-	case "dispatch":
+	case "dispatch", "reconcile":
 		data, e := io.ReadAll(io.LimitReader(input, remote.MaxBody+1))
 		if e != nil || len(data) > remote.MaxBody {
 			return remote.ErrInvalid
@@ -124,6 +125,28 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		var t remote.Task
 		if json.Unmarshal(data, &t) != nil || t.Validate() != nil {
 			return remote.ErrInvalid
+		}
+		if operation == "reconcile" {
+			store, e := remote.OpenRouteStore(*routes)
+			if e != nil {
+				return e
+			}
+			binding, e := store.Lookup(*request)
+			if e != nil {
+				return e
+			}
+			if *instance != "" && *instance != binding.Destination {
+				return remote.ErrConflict
+			}
+			verified, e := client.RecordedOutcome(ctx, store, *request, t)
+			if e != nil {
+				return e
+			}
+			if e = verified.Record(ctx, *evidence, time.Now().UTC()); e != nil {
+				return e
+			}
+			result = verified.Receipt()
+			break
 		}
 		if *routes != "" {
 			store, e := remote.OpenRouteStore(*routes)

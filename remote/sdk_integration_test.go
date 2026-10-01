@@ -270,6 +270,22 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 				t.Fatal(page, e)
 			}
 			if native {
+				verified, err := f.client.RecordedOutcome(ctx, routeStore, request, task)
+				if err != nil {
+					t.Fatal("reconcile completed remote outcome", err)
+				}
+				root := filepath.Join(t.TempDir(), "caller-evidence")
+				if err = verified.Record(ctx, root, time.Now().UTC()); err != nil {
+					t.Fatal(err)
+				}
+				if err = verified.Record(ctx, root, time.Now().UTC()); err != nil {
+					t.Fatal("idempotent evidence", err)
+				}
+				changed := task
+				changed.Prompt += " changed"
+				if _, err = f.client.RecordedOutcome(ctx, routeStore, request, changed); err == nil {
+					t.Fatal("changed intent accepted")
+				}
 				actual, err := runtime.ValidateHarnessOutcome(page.Events, status.TaskIDs[0])
 				if err != nil || actual.Actual.Harness != cfg.NativeHarnesses[0].Kind || actual.Actual.Model != "fixture" || actual.Actual.ModelRevision != "fixture-v1" || actual.Task.Difficulty != "hard" || task.ExpectedHarnessIdentity == nil || actual.Actual != *task.ExpectedHarnessIdentity {
 					t.Fatal(actual, err)

@@ -11423,3 +11423,16 @@ running cancellation. Targeted vet, source and diff checks passed. These are
 same-host fixtures, not physical two-host or power-loss filesystem qualification.
 Full repository validation and backup are queued. Automatic ranking and trusted
 cross-instance evidence remain separate unfinished requirements.
+
+### DAR-133 remote outcome reconciliation
+
+Added caller-side `RecordedOutcome` / `VerifiedOutcome.Record` and CLI `reconcile`.
+Saved destination/caller/task bindings and exact harness identity are checked
+against authenticated succeeded status, complete stable-head event pages,
+submission/context/prompt/privacy and output. Receipts precede immutable execution
+writes in destination/caller-separated ledgers. Completed output creates pending
+evidence, never automatic quality credit or imported remote scores. This advances
+the evidence prerequisite; bound reviews, cross-instance automatic ranking,
+pairing UI and physical two-host qualification remain open. Native Pi SSH reconciliation and the remote/CLI race suites passed (31.910s /
+1.807s), with focused caller-change rejection (1.491s), vet, source formatting
+and diff checks. Full repository validation is still required before push.

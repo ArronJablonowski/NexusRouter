@@ -471,3 +471,35 @@ Ordinary `dispatch` remains available for callers already providing equivalent
 durability. This store does not select a destination; it is the prerequisite for
 persisting an automatic selection before execution. Cross-instance evidence and
 accuracy ranking remain separate work.
+
+## Reconcile completed remote harness evidence
+
+`nexus-remote reconcile --routes /private/nexus/caller-routes --evidence
+/private/nexus/remote-evidence --request KEY` takes the saved exact task JSON on
+stdin and the usual trust/certificate flags. The saved route selects the
+instance; an optional `--instance` must agree. The task must have pinned
+`expected_harness_identity`. Go callers use `Client.RecordedOutcome` followed by
+`VerifiedOutcome.Record`.
+
+This path only reads authenticated status and canonical event pages. Each read
+checks current paired trust and the original caller certificate. A succeeded
+single-task result must match a complete, bounded, stable-head native harness
+journal, actual identity, task class, context, submission ID, exact user prompt,
+private locality when required, and output hash. Failed, running, incomplete,
+altered or mismatched evidence is rejected. Redacted input that cannot be matched
+to the saved prompt is not silently accepted. No inference is repeated.
+
+Recording first publishes a private immutable receipt binding the saved route,
+submission, event hash and execution. It then appends that execution to a separate
+ledger for the destination/caller pair. Identical retries recover partial writes;
+changed receipts conflict. No prompt or result text is copied into these stores.
+No quality review or vote is created: content still needs a bound evaluation.
+Remote-advertised quality scores are never imported through this API.
+
+Use one stable paired instance ID for one runtime and preserve its canonical
+history. Reusing an ID for another system is not supported. Caller certificate
+rotation deliberately isolates ledgers; historical evidence is not automatically
+merged. The paired runtime remains trusted to report its own canonical events;
+these checks do not attest a compromised destination's operating system or model
+weights. No automatic retention, cross-instance ranking, or automatic review is
+provided by this reconciliation step.
