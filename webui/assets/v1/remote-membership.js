@@ -1,10 +1,11 @@
 "use strict";
 window.NexusRemoteMembership = (() => {
  function mount(base, csrf) {
-  const form=document.querySelector("#remote-pair-form"), input=document.querySelector("#remote-peer-json"), verified=document.querySelector("#remote-identity-verified"), pair=document.querySelector("#remote-pair"), refresh=document.querySelector("#remote-refresh"), status=document.querySelector("#remote-status"), peers=document.querySelector("#remote-peers");
+  const form=document.querySelector("#remote-pair-form"), verified=document.querySelector("#remote-identity-verified"), pair=document.querySelector("#remote-pair"), refresh=document.querySelector("#remote-refresh"), status=document.querySelector("#remote-status"), peers=document.querySelector("#remote-peers");
+  const editor=window.NexusRemotePairForm.mount(form,verified);
   let page=null, busy=false;
   function message(text) { status.textContent=text; }
-  function lock(value) { busy=value; pair.disabled=value||!page||!page.enabled; refresh.disabled=value; input.disabled=value; verified.disabled=value; peers.querySelectorAll("button").forEach(b=>b.disabled=value); }
+  function lock(value) { busy=value; pair.disabled=value||!page||!page.enabled; refresh.disabled=value; editor.lock(value); verified.disabled=value; peers.querySelectorAll("button").forEach(b=>b.disabled=value); }
   function render(value) {
    if (!value || value.version!==1 || typeof value.enabled!=="boolean" || (value.enabled && (!/^[a-f0-9]{64}$/.test(value.digest) || !value.registry || value.registry.version!==1 || !Array.isArray(value.registry.peers) || value.registry.peers.length>128))) throw Error("invalid response");
    page=value; peers.replaceChildren(); form.hidden=!value.enabled;
@@ -31,13 +32,13 @@ window.NexusRemoteMembership = (() => {
    try {
     const response=await fetch(base+"/api/v1/remote-membership",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,expected_digest:page.digest,...fields})});
     if (!response.ok) throw Error(response.status===409?"conflict":"unknown");
-    render(await response.json()); if(fields.action==="pair"){input.value="";verified.checked=false;}
+    render(await response.json()); if(fields.action==="pair"){editor.clear();verified.checked=false;}
    } catch(error) {
-    page=null; form.hidden=true; peers.replaceChildren();
+    page=null; verified.checked=false; form.hidden=true; peers.replaceChildren();
     message(error.message==="conflict"?"Membership changed elsewhere. Refresh and review it before making another change.":"The membership change could not be confirmed. Refresh to inspect current membership before retrying.");
    } finally { lock(false); }
   }
-  form.addEventListener("submit",event=>{event.preventDefault();if(!verified.checked||busy)return;try{const peer=JSON.parse(input.value);if(!peer||typeof peer!=="object"||Array.isArray(peer))throw Error();mutate({action:"pair",peer,identity_verified:true});}catch{message("Enter a valid peer configuration object.");}});
+  form.addEventListener("submit",event=>{event.preventDefault();if(!verified.checked||busy)return;try{const peer=editor.read();mutate({action:"pair",peer,identity_verified:true});}catch{message("Review the pairing fields and permission preview.");}});
   refresh.addEventListener("click",load);
   load();
  }

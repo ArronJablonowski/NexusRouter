@@ -14,17 +14,17 @@ func TestRemoteMembershipBrowserFencesAndUncertainWrites(t *testing.T) {
  const peer={id:'<script>no</script>',endpoint:'https://127.0.0.1:8443',transport:'ssh'};
  const page={version:1,enabled:true,digest:'a'.repeat(64),registry:{version:1,peers:[peer]}};
  let posts=[],failure=false; const fetch=async(url,opts)=>{if(opts.method==='POST'){posts.push(JSON.parse(opts.body));if(failure)return {ok:false,status:409}}return {ok:true,json:async()=>page}};
- const window={confirm:()=>true};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});
+ let clears=0; const window={confirm:()=>true,NexusRemotePairForm:{mount(){return {read:()=>peer,lock(){},clear(){clears++;}}}}};vm.runInNewContext(`+strconv.Quote(script)+`,{window,document,fetch});
  const tick=()=>new Promise(resolve=>setImmediate(resolve));
  (async()=>{
  window.NexusRemoteMembership.mount('/console','token');await tick();
- const form=nodes.get('#remote-pair-form'),input=nodes.get('#remote-peer-json'),verified=nodes.get('#remote-identity-verified'),peers=nodes.get('#remote-peers');
+ const form=nodes.get('#remote-pair-form'),verified=nodes.get('#remote-identity-verified'),peers=nodes.get('#remote-peers');
  if(form.hidden||peers.children.length!==1||peers.children[0].children[0].textContent!==peer.id+' · ssh · '+peer.endpoint)throw Error('membership render');
- input.value=JSON.stringify(peer);form.handlers.submit({preventDefault(){}});await tick();if(posts.length)throw Error('unverified pairing');
- verified.checked=true;form.handlers.submit({preventDefault(){}});await tick();if(posts.length!==1||!posts[0].identity_verified||posts[0].expected_digest!==page.digest||input.value!==''||verified.checked)throw Error('pair receipt');
+ form.handlers.submit({preventDefault(){}});await tick();if(posts.length)throw Error('unverified pairing');
+ verified.checked=true;form.handlers.submit({preventDefault(){}});await tick();if(posts.length!==1||!posts[0].identity_verified||posts[0].expected_digest!==page.digest||clears!==1||verified.checked)throw Error('pair receipt');
  failure=true;peers.children[0].children[2].handlers.click();await tick();
  if(posts.length!==2||posts[1].action!=='revoke'||posts[1].instance!==peer.id||!form.hidden||peers.children.length)throw Error('conflict retained actionable stale state');
- verified.checked=true;input.value=JSON.stringify(peer);form.handlers.submit({preventDefault(){}});await tick();if(posts.length!==2)throw Error('replayed uncertain mutation');
+ verified.checked=true;form.handlers.submit({preventDefault(){}});await tick();if(posts.length!==2)throw Error('replayed uncertain mutation');
  if(!nodes.get('#remote-status').textContent.includes('Refresh'))throw Error('missing recovery instruction');
  nodes.get('#remote-refresh').handlers.click();await tick();if(form.hidden||peers.children.length!==1)throw Error('refresh failed');
  })().catch(e=>{console.error(e);process.exit(1)});`)

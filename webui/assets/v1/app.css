@@ -369,3 +369,7 @@ input, select { padding: .55rem .7rem; }
 #remote-peers pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 #remote-pair-form > label { display: block; margin: .8rem 0; }
 #remote-identity-verified { width: auto; }
+#remote-pair-form fieldset { margin: 1rem 0; border: 1px solid #34415d; border-radius: .5rem; padding: 1rem; }
+#remote-pair-form fieldset label { display: block; margin: .6rem 0; }
+#remote-pair-form input[type="checkbox"] { width: auto; }
+#remote-peer-preview { white-space: pre-wrap; overflow-wrap: anywhere; }

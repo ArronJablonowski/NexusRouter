@@ -1008,7 +1008,7 @@ a remote server nor installs SSH credentials; no live configuration is changed
 by building or opening the application.
 
 The panel lists configured HTTPS/SSH peers and their complete scopes. It does
-not claim fresh availability. Pairing accepts one peer configuration, requires
+not claim fresh availability. Pairing uses guided fields for one peer, requires
 explicit confirmation of independently verified identity and permissions, and
 uses the displayed registry digest to prevent overwriting concurrent changes.
 Revoke preserves other peers and blocks subsequent requests using the registry;
@@ -1077,3 +1077,24 @@ to the configured certificate's submissions, shared by authorized browser
 operators. They do not authorize task dispatch, change peer scopes, revoke
 credentials or enable controls on another daemon. No live configuration or
 remote work is changed by building this feature.
+
+
+### Guided pairing fields
+
+Settings exposes instance/TLS identity, explicit HTTPS or SSH transport, allowed
+operations, model/harness allowlists, private/public/cloud permissions, context
+and estimated-cost ceilings, and optional bounded per-minute request limits.
+Only capability inspection is selected by default. Model and harness lists are
+empty; private, public-network and cloud permissions require explicit choices.
+SSH identity and known-hosts paths refer to the local router host. The server's
+normal validation remains authoritative; the browser does not read key files,
+create credentials, contact candidates or trust discovery advertisements.
+
+The exact peer configuration preview updates with each edit. Any field change
+clears the identity-verification checkbox, and an uncertain/conflicting save also
+requires renewed confirmation after refresh. Fingerprints may be pasted as
+colon-separated hex and are previewed in the canonical lowercase format. Hidden
+SSH fields and disabled custom limits never enter an HTTPS/default-limits peer.
+This replaces JSON-only entry, not the requirement to independently verify the
+endpoint, certificate fingerprint, SSH host key and allowed scopes. Automatic
+unpaired-device discovery and cross-machine onboarding remain incomplete.

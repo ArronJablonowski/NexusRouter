@@ -1114,3 +1114,28 @@ verify one authorized call and fresh revocation preventing further calls. Review
 CSP/resource restrictions. Full repository check/push will follow the unchanged
 running gate; no live deployment. Guided onboarding, browser dispatch/event
 streaming, physical two-host/cross-platform and real-model qualification remain.
+
+### DAR-133 — guided HTTPS/SSH pairing (2026-10-01)
+
+Replaced JSON-only peer entry with grouped identity, transport, scope, privacy,
+context/cost and optional request-limit fields. Exact configuration preview
+updates on edit. Verification clears when any field changes and after an
+uncertain/conflicting write. Defaults grant info only, no model/harness access
+and no private/public-network/cloud permissions. SSH and custom-limit fields
+are included only when explicitly selected; fingerprints normalize to the
+existing canonical lowercase format. No discovery, connection, credential read
+or trust-on-first-use occurs while filling the form. Server peer validation and
+existing expected-digest/session/CSRF guards remain unchanged.
+
+Verification: full webui race package passed 9.461s; webuiapp race package passed
+4.196s. Focused guided form/consent/browser tests passed; a Node-to-Go contract
+test generates HTTPS and SSH peers with the actual form builder and validates
+both with remote.Peer.Validate. Covers explicit scopes, optional-field exclusion,
+duplicate IDs/fingerprints, invalid ports/numerics, verification reset and
+uncertain-save no replay. New module included in reviewed asset digest and
+resource/CSP guard lists. An example URL placeholder triggered the existing
+literal external-resource guard and was replaced with descriptive text; guard
+unchanged. Targeted vet/source/diff passed. Combined full check and normal push
+remain queued behind the live preceding gate. No live trust/service edits.
+Unpaired discovery, physical two-host onboarding and other remote qualification
+requirements remain open.

@@ -221,12 +221,51 @@
           <button id="remote-refresh" type="button" class="secondary">Refresh membership</button>
           <output id="remote-status" role="status" aria-live="polite">Loading membership…</output>
           <div id="remote-peers"></div>
-          <form id="remote-pair-form" hidden>
+          <form id="remote-pair-form" hidden novalidate>
             <h3>Pair a verified instance</h3>
             <p>Exchange the peer configuration through a trusted channel. Review its endpoint, certificate fingerprints, model and operation permissions, privacy policy, and resource limits. For SSH, also verify the host key and dedicated key configuration. This grants access using the supplied scopes.</p>
-            <label for="remote-peer-json">Peer configuration (JSON)</label>
-            <textarea id="remote-peer-json" rows="12" maxlength="65536" spellcheck="false" required aria-describedby="remote-pair-help"></textarea>
-            <p id="remote-pair-help">Paste one Peer object from the remote-routing configuration. Existing peers retain their scopes. Key file paths refer to this system; never paste private keys or passwords.</p>
+            <fieldset><legend>Instance identity</legend>
+              <label for="remote-peer-id">Instance ID</label><input id="remote-peer-id" maxlength="64" autocomplete="off" required placeholder="workstation-a">
+              <label for="remote-peer-endpoint">Task endpoint</label><input id="remote-peer-endpoint" maxlength="256" autocomplete="off" required placeholder="Verified HTTPS endpoint with explicit IP and port">
+              <small>Use the verified IP address and TLS task port. SSH uses this same destination through its encrypted tunnel.</small>
+              <label for="remote-peer-server-name">TLS certificate server name</label><input id="remote-peer-server-name" maxlength="128" autocomplete="off" required>
+              <label for="remote-peer-pins">Verified certificate SHA-256 fingerprints</label><textarea id="remote-peer-pins" rows="2" maxlength="256" required></textarea>
+              <small>One fingerprint per line. A second fingerprint supports an explicitly verified certificate rotation.</small>
+            </fieldset>
+            <fieldset><legend>Connection</legend>
+              <label for="remote-peer-transport">Transport</label><select id="remote-peer-transport"><option value="https">HTTPS with mutual TLS</option><option value="ssh">SSH with mutual TLS inside the tunnel</option></select>
+              <div id="remote-ssh-fields" hidden>
+                <label for="remote-peer-ssh-user">SSH user</label><input id="remote-peer-ssh-user" maxlength="64" autocomplete="off">
+                <label for="remote-peer-ssh-port">SSH port</label><input id="remote-peer-ssh-port" type="number" min="1" max="65535" value="22">
+                <label for="remote-peer-ssh-key">Dedicated SSH identity file on this system</label><input id="remote-peer-ssh-key" maxlength="4096" autocomplete="off">
+                <label for="remote-peer-ssh-hosts">Verified known-hosts file on this system</label><input id="remote-peer-ssh-hosts" maxlength="4096" autocomplete="off">
+                <p>Verify the SSH host key independently. Enter file paths, never private keys or passwords. No trust-on-first-use or transport fallback is enabled.</p>
+              </div>
+            </fieldset>
+            <fieldset><legend>Allowed operations and resources</legend>
+              <label><input id="remote-op-info" type="checkbox" checked> Inspect capabilities</label>
+              <label><input id="remote-op-inspect" type="checkbox"> Inspect tasks and results</label>
+              <label><input id="remote-op-dispatch" type="checkbox"> Dispatch tasks</label>
+              <label><input id="remote-op-cancel" type="checkbox"> Cancel tasks</label>
+              <label for="remote-peer-models">Allowed model IDs</label><textarea id="remote-peer-models" rows="2" maxlength="17000"></textarea>
+              <label for="remote-peer-harnesses">Allowed harness registration IDs</label><textarea id="remote-peer-harnesses" rows="2" maxlength="34000"></textarea>
+              <small>One ID per line or comma separated. Empty lists grant no model or external harness access.</small>
+              <label for="remote-peer-context">Maximum context tokens</label><input id="remote-peer-context" type="number" min="1" step="1" value="32768" required>
+              <label for="remote-peer-cost">Maximum estimated task cost</label><input id="remote-peer-cost" type="number" min="0" step="any" value="0" required>
+              <label><input id="remote-peer-private" type="checkbox"> Permit private tasks on the private network</label>
+              <label><input id="remote-peer-public" type="checkbox"> Permit a public-network endpoint</label>
+              <label><input id="remote-peer-cloud" type="checkbox"> Permit cloud inference</label>
+            </fieldset>
+            <fieldset><legend>Request limits</legend>
+              <label><input id="remote-peer-custom-limits" type="checkbox"> Override bounded per-minute defaults</label>
+              <div id="remote-limit-fields" hidden>
+                <label for="remote-limit-info">Capability requests per minute</label><input id="remote-limit-info" type="number" min="1" max="10000" value="60">
+                <label for="remote-limit-dispatch">Dispatch requests per minute</label><input id="remote-limit-dispatch" type="number" min="1" max="10000" value="60">
+                <label for="remote-limit-inspect">Task inspection requests per minute</label><input id="remote-limit-inspect" type="number" min="1" max="10000" value="600">
+                <label for="remote-limit-cancel">Cancellation requests per minute</label><input id="remote-limit-cancel" type="number" min="1" max="10000" value="120">
+              </div>
+            </fieldset>
+            <details open><summary>Review the exact permissions before pairing</summary><pre id="remote-peer-preview"></pre></details>
             <label><input id="remote-identity-verified" type="checkbox" required> I independently verified the peer identity, SSH host key if applicable, and requested permissions.</label>
             <button id="remote-pair" type="submit">Pair verified instance</button>
           </form>
@@ -500,6 +539,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/workboard-mutations.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-task-controls.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-inspection.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/remote-pair-form.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/models.js" defer></script>
