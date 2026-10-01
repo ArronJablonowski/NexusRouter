@@ -1139,3 +1139,10 @@ unchanged. Targeted vet/source/diff passed. Combined full check and normal push
 remain queued behind the live preceding gate. No live trust/service edits.
 Unpaired discovery, physical two-host onboarding and other remote qualification
 requirements remain open.
+
+
+## 2026-10-01 — DAR-133 inline remote confirmations
+
+Replaced browser-native confirmation dialogs for cancellation and peer revocation with accessible inline groups naming the request/peer and effect. Opening/dismissing makes no request; status/membership refresh invalidates confirmation, busy guards prevent duplicate submissions, and uncertain cancellation still requires status reload. Existing backend authentication, CSRF, scopes, expected-submission and registry-digest checks are unchanged.
+
+Web UI race suite passed (9.755s), targeted vet/source/diff checks passed after explicitly updating the reviewed embedded asset digest. Behavior tests cover dismissal, stale confirmations, duplicate clicks and uncertain responses. A real in-app browser exercised production assets against a disposable synthetic HTTP API: exactly one cancel despite a simulated applied-but-503 response, status recovery showing cancellation requested, and one explicitly confirmed revocation. Reporting evidence: outputs/remote-settings-inline-qa. This closes the prior native-dialog browser-check obstruction; it is not live deployment, backend security qualification or physical two-system testing. Full repository validation remains required before push.

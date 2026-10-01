@@ -1098,3 +1098,10 @@ SSH fields and disabled custom limits never enter an HTTPS/default-limits peer.
 This replaces JSON-only entry, not the requirement to independently verify the
 endpoint, certificate fingerprint, SSH host key and allowed scopes. Automatic
 unpaired-device discovery and cross-machine onboarding remain incomplete.
+
+
+Cancellation and revocation use inline confirmation groups with explicit confirm
+and dismiss buttons. Loading status or refreshing membership invalidates an open
+confirmation. An uncertain cancellation disables another attempt until status is
+loaded again; the client does not automatically retry. Revocation continues to
+require the displayed registry digest and does not cancel already admitted work.

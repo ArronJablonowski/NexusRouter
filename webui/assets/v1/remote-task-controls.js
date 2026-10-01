@@ -4,8 +4,12 @@ window.NexusRemoteTaskControls = (()=>{
   const card=document.createElement("section"),title=document.createElement("h4"),refresh=document.createElement("button"),cancel=document.createElement("button"),status=document.createElement("output"),result=document.createElement("pre");
   title.textContent="Request "+task.request_id;refresh.type=cancel.type="button";refresh.textContent="Load status and result";cancel.textContent="Request cancellation";cancel.disabled=true;
   status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Load current status before requesting cancellation.";
+  const confirmation=document.createElement("div"),warning=document.createElement("p"),confirm=document.createElement("button"),dismiss=document.createElement("button");
+  confirmation.hidden=true;confirmation.setAttribute("role","group");confirmation.setAttribute("aria-label","Confirm task cancellation");
+  warning.textContent="Request cancellation of "+task.request_id+" on "+peer.id+"? Work may finish before cancellation takes effect.";
+  confirm.type=dismiss.type="button";confirm.textContent="Confirm cancellation";dismiss.textContent="Keep running";confirmation.append(warning,confirm,dismiss);
   let current=null,busy=false;
-  function lock(value){busy=value;refresh.disabled=value;cancel.disabled=value||!current||current.cancel_requested||!["queued","running"].includes(current.state);}
+  function lock(value){confirmation.hidden=true;busy=value;refresh.disabled=value;cancel.disabled=value||!current||current.cancel_requested||!["queued","running"].includes(current.state);}
   async function control(action){
    if(busy||(action==="cancel"&&!current))return;
    const expected=current&&current.submission_id;current=null;lock(true);result.textContent="";status.textContent=action==="cancel"?"Requesting cancellation…":"Loading current remote status…";
@@ -19,8 +23,10 @@ window.NexusRemoteTaskControls = (()=>{
    finally{lock(false);}
   }
   refresh.addEventListener("click",()=>control("status"));
-  cancel.addEventListener("click",()=>{if(!busy&&current&&!cancel.disabled&&window.confirm("Request cancellation of "+task.request_id+" on "+peer.id+"? Work may finish before cancellation takes effect."))control("cancel");});
-  card.append(title,refresh,cancel,status,result);parent.append(card);
+  cancel.addEventListener("click",()=>{if(!busy&&current&&!cancel.disabled){confirmation.hidden=false;confirm.focus();}});
+  dismiss.addEventListener("click",()=>{confirmation.hidden=true;cancel.focus();});
+  confirm.addEventListener("click",()=>{if(!confirmation.hidden&&!busy&&current&&!cancel.disabled)control("cancel");});
+  card.append(title,refresh,cancel,status,result,confirmation);parent.append(card);
  }
  return {attach};
 })();
