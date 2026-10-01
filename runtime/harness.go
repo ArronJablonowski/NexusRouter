@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ArronJablonowski/NexusRouter/harness"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 )
 
 // HarnessAttribution binds the host-admitted route to one native harness run.
@@ -24,6 +25,8 @@ type HarnessOutput struct {
 	Text   string
 }
 type HarnessRequest struct {
+	Messages []providers.Message
+	Privacy  string
 	// OutputView must match the host journal redaction policy. Hashes bind the
 	// delivered/evaluated text, not private raw harness output.
 	OutputView                      func(string) string
@@ -67,7 +70,7 @@ func RunHarness(ctx context.Context, j Journal, r HarnessRequest) (harness.Execu
 		return e, nil
 	}
 	attribution := r.Attribution
-	if _, err := appendEvent(ctx, TaskStarted, Data{Harness: &attribution, SubmissionID: r.SubmissionID, Domain: attribution.Task.Domain, Profile: attribution.Task.Profile, ProviderID: attribution.Identity.Provider, ModelID: attribution.Identity.Model, ContextTokens: r.ContextTokens, ConfigID: attribution.Identity.ConfigSHA256}); err != nil {
+	if _, err := appendEvent(ctx, TaskStarted, Data{Messages: r.Messages, Privacy: r.Privacy, Harness: &attribution, SubmissionID: r.SubmissionID, Domain: attribution.Task.Domain, Profile: attribution.Task.Profile, ProviderID: attribution.Identity.Provider, ModelID: attribution.Identity.Model, ContextTokens: r.ContextTokens, ConfigID: attribution.Identity.ConfigSHA256}); err != nil {
 		return harness.Execution{}, "", err
 	}
 	output, runErr := invokeHarness(ctx, r.Execute)

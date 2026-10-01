@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ArronJablonowski/NexusRouter/providers"
 	"io"
 	"math"
 	"net/http"
@@ -34,6 +35,8 @@ type Prices struct {
 }
 type Progress struct{ Kind, Text string }
 type Config struct {
+	// Messages, when supplied, are the exact host-assembled inference context.
+	Messages []providers.Message
 	// Transport is the host policy-enforcing transport, never a default fallback.
 	Transport                                                      http.RoundTripper
 	TransportPolicySHA256                                          string
@@ -82,6 +85,11 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 		c.Prices = &prices
 	}
 	if ctx == nil || ctx.Err() != nil || c.validate() != nil || strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > MaxRecordBytes/2 || len(prompt)+len(systemPrompt)+4096+c.MaxOutputTokens > c.ContextTokens {
+		return Result{}, ErrProtocol
+	}
+	c.Messages = append([]providers.Message(nil), c.Messages...)
+	contextBody, contextErr := contextMessages(c.Messages)
+	if contextErr != nil || (len(contextBody) > 0 && len(contextBody)+4096+c.MaxOutputTokens > c.ContextTokens) {
 		return Result{}, ErrProtocol
 	}
 	identity, identityErr := c.Identity()

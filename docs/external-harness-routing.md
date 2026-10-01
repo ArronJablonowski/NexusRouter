@@ -219,3 +219,43 @@ pass with this gateway. Dedicated tests prove denied-transport no-fallback,
 credential separation, one-dispatch semantics, redirect refusal, request-policy
 rejection and cancellation/join. Normal SDK registration and admission wiring
 remain required before this is offered as a configured production route.
+
+
+## Explicit native Pi through SDK v1
+
+`ConfigOptions.NativeHarnesses` registers operator-pinned model/harness pairs.
+Each `sdk.NativeHarness` needs a unique `ID`, configured `ModelID`, `Kind: "pi"`,
+absolute `Executable`, `ExecutableSHA256`, trusted `ModelRevision`, positive
+`MaxOutputTokens` and `OverheadRAMBytes`, and an explicit `*pi.Prices`. Prices
+and registrations are copied during construction. Zero prices must be an
+intentional operator assertion, not a substitute for unknown cloud pricing.
+
+Call `Run`, `RunStream` or `RunTextStream` with that `HarnessID` and the matching
+explicit `ModelID`. The normal SDK configuration, secret resolver, privacy and
+context policy, shared process admission and cancellation remain in force. The
+reservation includes fixed local harness overhead even for a cloud model. Local
+model context memory is sized before adding that overhead. Registration does not
+start a process or grant task authority.
+
+Only `openai_compatible` providers are currently supported; their configured base
+endpoint is preserved exactly and `/chat/completions` is appended. In particular,
+Ollama requires a native bridge preserving `options.num_ctx` and `num_predict`;
+using its compatibility endpoint does not establish those allocation guarantees.
+Do not register an Ollama route as a workaround for this missing bridge.
+
+Adapter `pi-rpc-text-v3` forwards the host-assembled system/user/assistant messages
+through the single-request policy gateway, retaining their roles. The durable
+start records the same context; successful terminal events bind the delivered,
+redacted text to `Result.HarnessOutcome`. `ReadEvents` exposes that canonical
+outcome. Text streaming currently delivers the committed final text once; it does
+not promise live token deltas. Unknown registrations, model mismatches, automatic
+selection, queued submissions, continuation/compaction, evaluation workers,
+delegation, tools and unsupported capabilities are rejected without a substitute
+execution. Deterministic response-contract failure is terminal, without repair or
+hidden inference retry.
+
+`Result.Usage` remains absent: Pi's normalized harness-reported counters must not
+be presented as provider-measured usage. Durable usage/cost accounting, ordinary
+quality-review ingestion into the joint ledger, automatic model/harness selection,
+CLI/API registration, native Ollama support, tools and other harness adapters
+remain outstanding. A successful execution alone creates no quality vote.

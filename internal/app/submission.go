@@ -62,6 +62,9 @@ func (s *Service) submissionPayload(key string, r Request) (string, string, []by
 }
 
 func (s *Service) submissionEnvelopePayload(key string, envelope submissionEnvelope) (string, string, []byte, error) {
+	if envelope.Request.HarnessID != "" {
+		return "", "", nil, ErrHarnessUnsupported
+	}
 	if envelope.Version != submissionContractVersion || envelope.Intent.Version != 0 {
 		return "", "", nil, ErrAdmission
 	}

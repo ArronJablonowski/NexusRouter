@@ -6,6 +6,7 @@ package v1
 import (
 	"context"
 	"github.com/ArronJablonowski/NexusRouter/contextengine"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
 	"github.com/ArronJablonowski/NexusRouter/internal/app"
@@ -20,6 +21,10 @@ import (
 )
 
 var ErrAdmission = app.ErrAdmission
+var ErrHarnessUnsupported = app.ErrHarnessUnsupported
+
+type NativeHarness = app.NativeHarness
+
 var ErrEventDelivery = app.ErrEventDelivery
 
 // ErrRecoveryExhausted reports that automatic routing exhausted its eligible
@@ -62,6 +67,7 @@ type ApprovalPresenter = tools.ApprovalPresenter
 // ConfigOptions has no implicit process-environment lookup. Environment and
 // Overrides contain scalar configuration paths; LookupSecret resolves secrets.
 type ConfigOptions struct {
+	NativeHarnesses        []NativeHarness
 	UserFile, ProjectFile  string
 	Environment, Overrides map[string]string
 	LookupSecret           func(string) string
@@ -120,6 +126,7 @@ type Client struct {
 }
 
 type Request struct {
+	HarnessID                       string
 	Version                         int
 	SummaryAttemptID                string
 	Compaction                      *sessions.CompactionRequest
@@ -134,6 +141,7 @@ type Request struct {
 }
 
 type Result struct {
+	HarnessOutcome       *harness.Execution
 	Version              int
 	PreviousTaskIDs      []string
 	RouteEstimatedCost   *float64
@@ -188,14 +196,17 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
+	if err := service.ConfigureNativeHarnesses(options.NativeHarnesses); err != nil {
+		return nil, err
+	}
 	return &Client{service: service, database: cfg.Telemetry.Database}, nil
 }
 
 func (r Request) internal() app.Request {
-	return app.Request{SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
+	return app.Request{HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
 }
 func publicResult(r app.Result) Result {
-	return Result{Version: 1, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
+	return Result{Version: 1, HarnessOutcome: r.HarnessOutcome, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}
 }
 func (c *Client) valid(ctx context.Context) bool { return c != nil && c.service != nil && ctx != nil }
 

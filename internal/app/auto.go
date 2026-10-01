@@ -33,6 +33,7 @@ import (
 // Construct one per daemon. Resource estimates are operator supplied upper
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
+	nativeHarnesses            map[string]NativeHarness
 	taskStoreMu                sync.Mutex
 	taskStore                  *telemetry.Store
 	toolExtension              *tools.Extension
@@ -126,6 +127,11 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 	if s == nil || ctx == nil {
 		return Result{}, ErrAdmission
 	}
+	var nativeErr error
+	r, nativeErr = s.bindNativeHarness(r)
+	if nativeErr != nil {
+		return Result{}, nativeErr
+	}
 	// Host-owned identities authorize one named execution attempt. Automatic
 	// routing can create fallback task identities and is therefore not an
 	// admissible host-runtime surface.
@@ -182,7 +188,7 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 		}
 	}
 	result, runErr = s.runRouteChain(ctx, r)
-	if r.runtimeHostAdmission == nil {
+	if r.HarnessID == "" && r.runtimeHostAdmission == nil {
 		if recovered, ok := s.providerOverflowCompaction(ctx, r, result, runErr); ok {
 			next, nextErr := s.runRouteChain(ctx, recovered)
 			if next.TaskID != "" {

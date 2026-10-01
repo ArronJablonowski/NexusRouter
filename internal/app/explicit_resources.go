@@ -133,11 +133,21 @@ func (s *Service) runExplicit(ctx context.Context, r Request) (result Result, ru
 	if r.admissionContext != nil {
 		admission = r.admissionContext
 	}
-	if model.Locality == "local" {
-		if model.RAMBytes == 0 {
+	reservationModel := model
+	if r.HarnessID != "" {
+		if r.nativeHarness == nil {
+			return Result{}, ErrHarnessUnsupported
+		}
+		reservationModel, err = nativeReservationModel(model, r.nativeHarness, r.ContextTokens)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+	if reservationModel.Locality == "local" {
+		if reservationModel.RAMBytes == 0 {
 			return Result{}, ErrAdmission
 		}
-		reservedContext, release, reserveErr := s.reservePrimary(ctx, admission, model, r)
+		reservedContext, release, reserveErr := s.reservePrimary(ctx, admission, reservationModel, r)
 		if reserveErr != nil {
 			return Result{}, errors.Join(ErrAdmission, reserveErr)
 		}

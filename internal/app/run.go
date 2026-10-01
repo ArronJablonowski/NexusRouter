@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/ArronJablonowski/NexusRouter/contextengine"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/memory"
@@ -26,6 +27,8 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
+	HarnessID                       string `json:"harness_id,omitempty"`
+	nativeHarness                   *NativeHarness
 	openTaskStore                   func(context.Context) (*telemetry.Store, func(), error)
 	toolExtension                   *tools.Extension
 	toolReviewer                    tools.ApprovalReviewer
@@ -132,6 +135,7 @@ func validRuntimeHostWorkerID(value string) bool {
 }
 
 type Result struct {
+	HarnessOutcome       *harness.Execution
 	PreviousTaskIDs      []string
 	RouteEstimatedCost   *float64
 	retryable            bool
@@ -498,6 +502,17 @@ func runExplicitAdmitted(ctx context.Context, s config.Settings, r Request, secr
 			return result, ErrAdmission
 		}
 	}
+	if r.HarnessID != "" {
+		nativeResult, nativeErr := runNativeAdmitted(ctx, s, r, provider, model, key, messages, j, result, sessionID, secrets)
+		watchErr := stopWatcher()
+		watcherStopped = true
+		if watchErr != nil {
+			nativeErr = errors.Join(nativeErr, watchErr)
+			nativeResult.Text = ""
+			nativeResult.HarnessOutcome = nil
+		}
+		return nativeResult, nativeErr
+	}
 	providerOpen, providerAdmissionCleanup, err := prepareTaskProvider(s, provider, model, r, messages, privacy, key, providers.PurposeExecution)
 	if err != nil {
 		return result, ErrAdmission
@@ -726,7 +741,11 @@ func (j redactingJournal) appendJournal(ctx context.Context, expected int64, e r
 		}
 	}
 	if j.textDelivery != nil && (j.eventDelivery == nil || !j.eventDelivery.Failed()) {
-		j.textDelivery.accept(e.Kind, rawText)
+		if e.Kind == runtime.TaskCompleted && e.Data.HarnessOutcome != nil {
+			j.textDelivery.deliver(redact(rawText, j.secrets), true)
+		} else {
+			j.textDelivery.accept(e.Kind, rawText)
+		}
 	}
 	return nil
 }

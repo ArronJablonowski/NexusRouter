@@ -66,8 +66,16 @@ func startGateway(ctx context.Context, c Config) (base, key string, closeGateway
 			deny(http.StatusBadRequest)
 			return
 		}
+		if len(c.Messages) > 0 {
+			contextBody, contextErr := contextMessages(c.Messages)
+			if contextErr != nil {
+				deny(http.StatusBadRequest)
+				return
+			}
+			canonical.(map[string]any)["messages"] = json.RawMessage(contextBody)
+		}
 		body, e = json.Marshal(canonical)
-		if e != nil {
+		if e != nil || len(body) > MaxRecordBytes || !validGatewayRequest(body, c.Model, c.MaxOutputTokens) {
 			deny(http.StatusBadRequest)
 			return
 		}

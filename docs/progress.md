@@ -9632,3 +9632,29 @@ composition, gateway adversarial tests, targeted vet and source checks pass.
 The new checkpoint is isolated from all running/queued validation checkouts.
 Public SDK/CLI/API routing and shared admission/accounting integration remain open;
 no live service or provider deployment was changed.
+
+
+## Explicit native Pi SDK integration — DAR-132 (2026-10-01)
+
+Public SDK constructor registration and explicit HarnessID dispatch now use the
+normal context, privacy, shared process reservation, cancellation and durable
+journal path. Fixed harness RAM overhead is included for local and cloud models.
+The v3 gateway preserves host-assembled message roles and the configured endpoint;
+no provider credentials enter native configuration. Canonical final outcomes are
+returned by the SDK and ReadEvents; final text delivery occurs after commit.
+Cancellation and deterministic contract failure return no accepted harness outcome
+and do not retry inference. Unsupported auto/tool/queue/continuation paths reject.
+
+Verification: installed Pi 0.99.2 native SDK race tests plus ordinary submission
+restart/dispatcher compatibility passed (9.794s); full Pi race tests passed
+(8.392s). Targeted vet and source formatting/size gate passed. Prior focused
+reservation, runtime/gateway and ordinary SDK provider tests also passed. These
+are native harness tests against fixture providers, not live-model quality or
+physical remote-system qualification. Full make check remains queued before push.
+
+Still open: joint automatic model/harness choice, continuous evaluated-feedback
+integration, durable usage/cost/progress accounting, tools, queue registration
+persistence, CLI/API configuration and remaining native adapters. Registration
+currently requires openai_compatible; Ollama needs a native bridge preserving its
+context/output options. Reported usage is deliberately not exposed as measured
+usage. No live deployment or benchmark inference was performed.
