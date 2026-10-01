@@ -202,8 +202,8 @@ The destination rechecks registration identity, executable pins, local resource
 reservation including harness overhead, privacy, context and tool policy through
 the ordinary SDK dispatcher. Unknown registrations and wrong model/harness pairs
 are rejected; no substitution to native completion or another harness occurs.
-Automatic cross-instance model/harness selection remains unfinished and `auto`
-is rejected in this explicit protocol.
+The explicit protocol rejects `auto`; automatic selection uses the separate
+`DispatchAutomatic` workflow described below.
 
 The native integration fixture qualifies installed harnesses through actual OpenSSH,
 pinned mTLS and the durable SDK queue with a local synthetic provider. It covers
@@ -329,7 +329,7 @@ This qualifies one LAN/interface pair, not every network, IPv6, fragmented DNS
 bundles or general mDNS probing/collision handling.
 
 Outstanding acceptance includes broader partition/network-fault qualification,
-external-harness crash recovery, cross-platform certificate/storage and broader
+arbitrary external-tool crash side effects, cross-platform certificate/storage and broader
 multicast interoperability, IPv6 discovery and fragmented DNS bundles, and final
 full-repository validation before backup and release. Evidence from a single model/harness task is not a universal accuracy
 ranking, and discovery never supplies authority or measured quality.
@@ -603,7 +603,8 @@ add another vote. Failed/partial lineages cannot be reviewed through this path.
 AI judgments remain advisory under the existing ranker's capped weighting; they
 are not counted as confirmed deterministic or human samples. Reviews remain
 local to the caller's evidence store and do not modify the destination journal.
-Automatic evaluation scheduling and cross-instance selection remain unfinished.
+Destination-specific selection and the persistent evaluation queue are described
+in the later automatic-routing and review-worker sections.
 
 ## Destination-specific accuracy ranking
 
@@ -643,8 +644,9 @@ least-observed eligible alternative rule.
 Before executing a new choice, the host must recheck admission, pin the selected
 identity into the task and persist the destination through `DispatchRecorded`.
 For an already bound request, recover its saved destination rather than ranking
-again. Automatic discovery-to-candidate admission, persisted automatic dispatch,
-UI integration and physical two-host qualification remain unfinished.
+again. The following sections implement candidate discovery, persisted automatic
+dispatch and browser integration; the physical fixture section defines the
+separate cross-system qualification scope.
 
 ## Durable automatic dispatch
 
@@ -1048,8 +1050,8 @@ browser read. Peer details are rendered as text, with no credential contents
 read. All authenticated operators of an enabled browser interface have this
 membership authority; there is no separate multi-user administrator role.
 After a conflict or uncertain write, refresh and inspect current membership
-before retrying. Discovery-based onboarding, live remote capability/task views,
-and physical two-host qualification remain separate work.
+before retrying. Later sections describe discovery-based onboarding, live remote
+capability/task views and the physical two-host qualification scope.
 
 ### Explicit live inspection from Settings
 
@@ -1655,3 +1657,14 @@ This prevents the direct harness from surviving an abrupt host exit. It is not a
 general descendant-tree or external-tool side-effect guarantee; arbitrary tools
 and power loss require separate qualification. Existing process-group cleanup
 continues to apply to ordinary cancellation.
+
+### Physical automatic-dispatch fixture
+
+Set `NEXUS_REMOTE_TEST_AUTOMATIC=1` with a pinned harness registration to add
+one automatic task on each transport. The fixture waits for the previous direct
+task before measuring candidate capacity. It discovers the sole paired candidate,
+dispatches through `DispatchAutomatic`, verifies actual durable completion identity
+against the saved choice, reopens the caller route store, and recovers that choice
+with no current candidates or valid ranking policy. Expected total provider calls
+become ten. Confirmed/advisory/effective sample counts must remain zero: this is
+single-candidate workflow evidence, not a comparative accuracy result.

@@ -2017,3 +2017,29 @@ reporting outputs/spark-hermes-qualification retains original physical-test.log,
 parent-death-test.log, physical-parent-death-fixed.log and pinned manifest.
 DAR-133 remains In Progress. Full combined gate and normal push queued behind
 existing live frozen validation; no full-gate pass or deployment claimed.
+
+## 2026-10-01 — physical automatic dispatch and saved-choice recovery
+
+Added opt-in NEXUS_REMOTE_TEST_AUTOMATIC with a pinned harness. On both physical
+HTTPS and SSH, discover the paired destination with fresh capacity/readiness,
+dispatch automatically, match durable actual identity to the saved choice, then
+reopen caller storage and recover the same submission/choice with no candidates
+and an invalid current ranking policy. Confirmed/advisory/effective sample counts
+remain zero; sole-candidate selection is not comparative accuracy evidence.
+
+Initial fixture incorrectly attempted automatic selection before its preceding
+direct task released the sole execution slot. HTTPS correctly returned no eligible
+candidate; SSH passed. Preserved initial log. Corrected fixture waits for completed
+direct work; production admission unchanged. Combined physical Pi fixture passed
+55.94s (Mac race57.480s), exactly ten synthetic calls including existing connection
+loss, cancellation, revocation and host-crash cases. Independent cleanup found no
+fixture hosts; OllamaPID2145 remained. Source formatting/size, remote vet and diff
+checks passed. Linux binary is not race-instrumented; no model quality claim.
+
+Updated stale historical documentation to point to implemented automatic/browser
+workflows and distinguish arbitrary tool side effects from qualified harness text
+crash recovery. Evidence: reporting outputs/physical-automatic-routing-20261001.log
+and physical-automatic-routing-corrected-20261001.log. DAR-133 remains In Progress;
+Mac advertised service, broad network/side-effect qualification, real comparative
+accuracy, full repository gate and deployment remain open. Combined validation
+and normal push queued behind the freshly verified existing live gate.

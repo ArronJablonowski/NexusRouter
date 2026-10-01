@@ -212,6 +212,10 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 		}
 		t.Log("physical IPv4 DNS-SD discovery returned exact unverified host/certificate/SSH hints without trust mutation or inference")
 	}
+	automatic := os.Getenv("NEXUS_REMOTE_TEST_AUTOMATIC") == "1"
+	if automatic && registration == nil {
+		t.Fatal("automatic fixture requires pinned harness")
+	}
 	for _, transport := range []string{"https", "ssh"} {
 		t.Run(transport, func(t *testing.T) {
 			destination.Transport = transport
@@ -271,6 +275,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 				if e != nil || actual.Actual != *task.ExpectedHarnessIdentity || actual.Actual.Harness != registration.Kind || actual.Actual.ModelRevision != registration.ModelRevision || actual.Task.Difficulty != "hard" {
 					t.Fatal("physical harness identity mismatch", actual, e)
 				}
+			}
+			if automatic {
+				physicalAutomaticDispatch(t, ctx, client, local, transport, task, wait)
 			}
 			routes, err = OpenRouteStore(filepath.Join(local, "routes-"+transport))
 			if err != nil {
@@ -344,7 +351,11 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			t.Fatalf("restart: %v %s", err, data)
 		}
 	})
-	if calls.Load() != 8 {
+	expectedCalls := int32(8)
+	if automatic {
+		expectedCalls += 2
+	}
+	if calls.Load() != expectedCalls {
 		t.Fatal("duplicate or missing provider calls", calls.Load())
 	}
 	// Revoke the caller using the normal host CLI and an expected current digest.
@@ -356,5 +367,5 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	if _, err := client.Info(ctx, "node-a"); err == nil {
 		t.Fatal("revoked caller retained access")
 	}
-	t.Log("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; eight synthetic provider calls including response-loss and host-restart recovery")
+	t.Logf("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; %d synthetic provider calls including response-loss and host-restart recovery", calls.Load())
 }
