@@ -17,8 +17,9 @@ import (
 // HarnessAttribution binds the host-admitted route to one native harness run.
 // This is execution provenance, never an evaluation or permission grant.
 type HarnessAttribution struct {
-	Identity harness.Identity
-	Task     harness.TaskClass
+	Selection *harness.Selection `json:",omitempty"`
+	Identity  harness.Identity
+	Task      harness.TaskClass
 }
 type HarnessOutput struct {
 	Actual harness.Identity

@@ -9696,3 +9696,27 @@ targeted vet and source checks are run for this checkpoint. Full repository gate
 remains pending before push; no live inference/service mutation was performed.
 Joint automatic selection/evaluation, durable usage accounting, tools, queued
 registration, other harness adapters and real-model qualification remain open.
+
+
+## Automatic registered-pair SDK selection — DAR-132 (2026-10-01)
+
+HarnessID=auto now reads current joint evidence and selects registered native
+pairs using accuracy-first ranking. Fresh pinned-artifact and provider inventory
+checks precede dispatch; privacy, capabilities, credentials, context and the strict
+auto budget filter candidates. Shared combined resource admission is rechecked;
+capacity denial before a task exists excludes that pair and reranks, without
+inference replay. Started attempts never silently fall back. Decision identity,
+task class, scores, evidence time and exclusions are durable in TaskStarted and
+returned through the SDK, with structural/binding validation on replay.
+
+Installed-Pi fixture tests verify accuracy over cheaper price, budget exclusion,
+zero-cost rejection without inference, revision-driven selection after restart,
+profile isolation, fresh inventory changes and pre-dispatch capacity reranking.
+Combined SDK native/evidence tests passed under race (23.439s); focused harness
+selection validation and runtime journal tests passed (1.455s / 13.992s). Targeted
+vet and source gate passed before the final test-only extension. Full repository
+validation remains queued before push; no live inference or deployment occurred.
+Only Pi is currently registered as a native adapter. This is not a ranking across
+all requested harnesses or proof of globally optimal routing. Evaluation scheduling,
+remaining adapters, tools, durable queues/accounting and held-out comparisons are
+still open, and DAR-132 remains In Progress.

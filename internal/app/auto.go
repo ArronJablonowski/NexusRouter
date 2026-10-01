@@ -16,6 +16,7 @@ import (
 
 	"github.com/ArronJablonowski/NexusRouter/contextengine"
 	"github.com/ArronJablonowski/NexusRouter/evaluation"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/internal/config"
 	"github.com/ArronJablonowski/NexusRouter/internal/telemetry"
 	"github.com/ArronJablonowski/NexusRouter/memory"
@@ -34,6 +35,7 @@ import (
 // bounds including weights and context/KV memory; absent metadata fails closed.
 type Service struct {
 	nativeHarnesses            map[string]NativeHarness
+	harnessEvidence            *harness.EvidenceStore
 	taskStoreMu                sync.Mutex
 	taskStore                  *telemetry.Store
 	toolExtension              *tools.Extension
@@ -216,6 +218,9 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 var ErrRecoveryExhausted = errors.New("automatic recovery exhausted eligible candidates or attempt budget")
 
 func (s *Service) runRouteChain(ctx context.Context, r Request) (Result, error) {
+	if r.HarnessID == "auto" {
+		return s.runWithPressure(ctx, r, s.runNativeAuto)
+	}
 	var result Result
 	var err error
 	maxAttempts := s.settings.Runtime.FallbackMaxAttempts

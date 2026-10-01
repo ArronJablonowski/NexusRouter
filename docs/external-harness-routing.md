@@ -248,15 +248,14 @@ through the single-request policy gateway, retaining their roles. The durable
 start records the same context; successful terminal events bind the delivered,
 redacted text to `Result.HarnessOutcome`. `ReadEvents` exposes that canonical
 outcome. Text streaming currently delivers the committed final text once; it does
-not promise live token deltas. Unknown registrations, model mismatches, automatic
-selection, queued submissions, continuation/compaction, evaluation workers,
+not promise live token deltas. Unknown registrations, model mismatches, queued submissions, continuation/compaction, evaluation workers,
 delegation, tools and unsupported capabilities are rejected without a substitute
 execution. Deterministic response-contract failure is terminal, without repair or
 hidden inference retry.
 
 `Result.Usage` remains absent: Pi's normalized harness-reported counters must not
 be presented as provider-measured usage. Durable usage/cost accounting, ordinary
-quality-review ingestion into the joint ledger, automatic model/harness selection,
+automatic quality evaluation, broader model/harness selection across adapters,
 CLI/API registration, tools and other harness adapters
 remain outstanding. A successful execution alone creates no quality vote.
 
@@ -284,9 +283,9 @@ Identical retries preserve one vote, including replay after a later revision;
 withdrawal removes the active vote without rewriting history. The existing
 `Snapshot` and accuracy-first `harness.Select` consume these current heads with
 method-specific confidence and exact model/harness/configuration/task binding.
-This SDK bridge makes evaluated outcomes available to selection; automatic
-invocation of evaluation and automatic route dispatch remain separate unfinished
-integration work. A completed run still contributes no quality sample until an
+This SDK bridge makes evaluated outcomes available to selection. Automatic
+invocation of evaluation remains unfinished; registered-pair SDK selection is
+described below. A completed run still contributes no quality sample until an
 actual bound evaluation is supplied.
 
 
@@ -315,3 +314,40 @@ context/output/credential preservation, completed task provenance, wrong-model
 and truncated-stream rejection, cancellation and exactly one upstream request.
 It does not establish model quality or compatibility with every deployed Ollama
 model; model revision, capability and resource metadata remain host obligations.
+
+
+## Automatic selection among registered native pairs
+
+Pass the open host-owned ledger as `ConfigOptions.HarnessEvidence`, then request
+`HarnessID: "auto"`, `ModelID: "auto"` (or empty), an explicit `ContextTokens`
+at least 8192, and a finite `MaxCost`. For automatic selection, zero means a strict
+zero-cost ceiling. Use stable domain/profile metadata; difficulty is currently
+`unknown`. Selection never borrows observations from another profile, context-
+bound configuration, model revision or adapter version.
+
+Each request reads the current ledger snapshot, verifies pinned harness artifacts,
+and refreshes provider model inventory through the host policy transport. Only
+privacy/mode/budget/credential-eligible endpoints are queried. The ranker applies
+correctness first, quality second, confidence next; price cannot outweigh stronger
+accuracy evidence while within budget. No-evidence ties are explicitly labeled,
+and ordinary requests never perform exploratory inference.
+
+The chosen pair goes through shared model-plus-harness admission. If capacity is
+unavailable before any task starts, that pair is excluded and the remaining pairs
+are ranked again. Missing resource data is an error. Once an attempt exists,
+provider/protocol failures do not silently dispatch a substitute or repeat the
+inference. No model-only fallback is used for a native-pair request.
+
+`Result.HarnessSelection` explains the decision; the same selection is bound to
+identity and task class in the durable `TaskStarted.Harness.Selection` record.
+ReadEvents and canonical outcome reconciliation validate those bindings. Reviews
+written through the SDK affect later selection immediately, including after SDK
+restart; unreviewed outputs never acquire a success vote automatically.
+
+Current registered adapters are Pi text-only routes, with native Ollama or
+OpenAI-compatible providers. This is selection among the registered eligible
+pairs, not a claim of the globally best model/harness or a comparative ranking
+against unimplemented Hermes/OpenClaw/Goose/OpenHands adapters. Automatic
+evaluation scheduling, additional adapters, tools, queued registration authority,
+CLI/API configuration, durable usage/cost accounting and held-out qualification
+remain required for the full feature.

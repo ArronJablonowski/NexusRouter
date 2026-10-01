@@ -29,7 +29,7 @@ type NativeHarness struct {
 }
 
 // ConfigureNativeHarnesses is constructor-only; call before exposing Service.
-func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness) error {
+func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness, ledger *harness.EvidenceStore) error {
 	if s == nil || len(registrations) > 256 {
 		return ErrAdmission
 	}
@@ -44,7 +44,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness) error 
 		}
 		prices := *entry.Prices
 		entry.Prices = &prices
-		if !reservationLabel(entry.ID, 128) || entry.Kind != "pi" || entry.OverheadRAMBytes == 0 {
+		if !reservationLabel(entry.ID, 128) || entry.ID == "auto" || entry.Kind != "pi" || entry.OverheadRAMBytes == 0 {
 			return ErrAdmission
 		}
 		if _, exists := entries[entry.ID]; exists {
@@ -72,6 +72,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness) error 
 		entries[entry.ID] = entry
 	}
 	s.nativeHarnesses = entries
+	s.harnessEvidence = ledger
 	return nil
 }
 
@@ -85,8 +86,17 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 	if r.HarnessID == "" {
 		return r, nil
 	}
+	if r.submissionID != "" || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" || s.settings.Evaluation.AutoReviewModel != "" {
+		return Request{}, ErrHarnessUnsupported
+	}
+	if r.HarnessID == "auto" {
+		if s.harnessEvidence == nil || (r.ModelID != "" && r.ModelID != "auto") || r.ContextTokens < 8192 {
+			return Request{}, ErrHarnessUnsupported
+		}
+		return r, nil
+	}
 	entry, ok := s.nativeHarnesses[r.HarnessID]
-	if !ok || r.ModelID != entry.ModelID || r.ModelID == "auto" || r.submissionID != "" || r.runtimeHostAdmission != nil || r.delegatedParent != "" || r.ContinueTaskID != "" || r.Compaction != nil || r.SummaryAttemptID != "" || r.Validation != "" || s.settings.Tools.Enabled || s.settings.Tools.WorkboardReadEnabled || s.settings.Tools.WorkboardWriteEnabled || len(s.toolExtension.Names()) > 0 || s.settings.Workers.DelegateModel != "" || s.settings.Evaluation.AutoReviewModel != "" {
+	if !ok || r.ModelID != entry.ModelID || r.ModelID == "auto" {
 		return Request{}, ErrHarnessUnsupported
 	}
 	r.nativeHarness = &entry
@@ -161,7 +171,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	if m.Locality == "local" {
 		privacy = "local_only"
 	}
-	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {
+	outcome, text, err := runtime.RunHarness(ctx, j, runtime.HarnessRequest{TaskID: result.TaskID, SessionID: sessionID, Attribution: runtime.HarnessAttribution{Identity: identity, Task: task, Selection: r.nativeSelection}, ContextTokens: tokens, MaxOutputBytes: 1 << 20, Messages: messages, Privacy: privacy, OutputView: func(text string) string { return redact(text, secrets) }, Execute: func(run context.Context) (runtime.HarnessOutput, error) {
 		estimate, e := providers.EstimateWith(run, r.contextEstimator, providers.Request{Model: m.Model, Messages: messages, ContextTokens: int64(tokens), MaxOutputTokens: int64(c.MaxOutputTokens)})
 		if e != nil || estimate+c.MaxOutputTokens > tokens {
 			return runtime.HarnessOutput{}, runtime.ErrContextOverflow
@@ -174,6 +184,7 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 		return runtime.HarnessOutput{Actual: native.Identity, Text: native.Text}, e
 	}})
 	result.Text = text
+	result.HarnessSelection = r.nativeSelection
 	result.HarnessOutcome = nil
 	if err == nil {
 		result.HarnessOutcome = &outcome

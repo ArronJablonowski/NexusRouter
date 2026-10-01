@@ -29,6 +29,7 @@ var ErrAdmission = errors.New("task admission failed")
 type Request struct {
 	HarnessID                       string `json:"harness_id,omitempty"`
 	nativeHarness                   *NativeHarness
+	nativeSelection                 *harness.Selection
 	openTaskStore                   func(context.Context) (*telemetry.Store, func(), error)
 	toolExtension                   *tools.Extension
 	toolReviewer                    tools.ApprovalReviewer
@@ -136,6 +137,7 @@ func validRuntimeHostWorkerID(value string) bool {
 
 type Result struct {
 	HarnessOutcome       *harness.Execution
+	HarnessSelection     *harness.Selection
 	PreviousTaskIDs      []string
 	RouteEstimatedCost   *float64
 	retryable            bool

@@ -112,6 +112,9 @@ type Data struct {
 
 func (e Event) Validate() error {
 	if a := e.Data.Harness; a != nil {
+		if a.Selection != nil && (a.Selection.Validate() != nil || a.Selection.Primary.Identity != a.Identity || a.Selection.Task != a.Task || a.Selection.AsOf.After(e.Time)) {
+			return errors.New("invalid harness selection")
+		}
 		if e.Kind != TaskStarted || a.Identity.Validate() != nil || a.Task.Validate() != nil || e.Data.ProviderID != a.Identity.Provider || e.Data.ModelID != a.Identity.Model || e.Data.ConfigID != a.Identity.ConfigSHA256 || e.Data.Domain != a.Task.Domain || e.Data.Profile != a.Task.Profile {
 			return errors.New("invalid harness attribution")
 		}
