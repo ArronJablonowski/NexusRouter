@@ -32,6 +32,7 @@ type Prices struct {
 }
 type Progress struct{ Kind, Text string }
 type Config struct {
+	ModelRevision                                                  string
 	Prices                                                         *Prices
 	OnProgress                                                     func(context.Context, Progress) error
 	Executable, ExecutableSHA256, Provider, Model, BaseURL, APIKey string
@@ -51,7 +52,7 @@ func (c Config) validate() error {
 	}
 	u, e := url.Parse(c.BaseURL)
 	pin, e2 := hex.DecodeString(c.ExecutableSHA256)
-	if !filepath.IsAbs(c.Executable) || e2 != nil || len(pin) != 32 || strings.ToLower(c.ExecutableSHA256) != c.ExecutableSHA256 || c.Provider == "" || c.Model == "" || len(c.Provider) > 256 || len(c.Model) > 256 || e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || c.APIKey == "" || c.ContextTokens < 8192 || c.ContextTokens > 1<<24 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.Admit == nil {
+	if !filepath.IsAbs(c.Executable) || e2 != nil || len(pin) != 32 || strings.ToLower(c.ExecutableSHA256) != c.ExecutableSHA256 || c.ModelRevision == "" || c.Provider == "" || c.Model == "" || len(c.Provider) > 256 || len(c.Model) > 256 || e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || c.APIKey == "" || c.ContextTokens < 8192 || c.ContextTokens > 1<<24 || c.MaxOutputTokens < 1 || c.MaxOutputTokens > 65536 || c.Timeout <= 0 || c.Timeout > 15*time.Minute || c.Admit == nil {
 		return ErrProtocol
 	}
 	return nil
@@ -61,8 +62,16 @@ func (c Config) validate() error {
 // retry, compaction or model-switch behavior fails closed. No retry is performed.
 // Success means a settled valid execution, never a quality verdict.
 func Run(ctx context.Context, c Config, prompt string) (result Result, runErr error) {
+	if c.Prices != nil {
+		prices := *c.Prices
+		c.Prices = &prices
+	}
 	if ctx == nil || ctx.Err() != nil || c.validate() != nil || strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > MaxRecordBytes/2 || len(prompt)+len(systemPrompt)+4096+c.MaxOutputTokens > c.ContextTokens {
 		return Result{}, ErrProtocol
+	}
+	identity, identityErr := c.Identity()
+	if identityErr != nil {
+		return Result{}, identityErr
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
@@ -191,7 +200,9 @@ func Run(ctx context.Context, c Config, prompt string) (result Result, runErr er
 			}
 		}
 		if settled {
-			return protocol.Result()
+			result, err := protocol.Result()
+			result.Identity = identity
+			return result, err
 		}
 	}
 	if ctx.Err() != nil {

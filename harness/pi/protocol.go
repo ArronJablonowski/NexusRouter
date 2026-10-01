@@ -5,6 +5,7 @@ package pi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,7 +19,11 @@ const MaxRecords = 10000
 
 // Result describes execution, not correctness. Quality requires a separately
 // bound evaluation. Thinking, tool arguments and raw errors are not returned.
-type Result struct{ Provider, Model, Text string }
+type Result struct {
+	Provider, Model, Text string
+	Identity              harness.Identity
+	Usage                 *Usage
+}
 
 // Protocol validates one no-tool prompt in one isolated Pi session. Tool-bearing
 // runs require a separately authorized adapter capability; they fail closed here.
@@ -132,6 +137,7 @@ func (p *Protocol) Consume(line []byte) (bool, error) {
 			return false, ErrProtocol
 		}
 		var message struct {
+			Usage                                            *Usage
 			Role, Provider, Model, ResponseModel, StopReason string
 			Content                                          json.RawMessage
 		}
@@ -142,6 +148,9 @@ func (p *Protocol) Consume(line []byte) (bool, error) {
 			return false, nil
 		}
 		if message.Role != "assistant" || p.final != nil || message.Provider != p.provider || message.Model != p.model || (message.ResponseModel != "" && message.ResponseModel != p.model) {
+			return false, ErrProtocol
+		}
+		if !message.Usage.valid() {
 			return false, ErrProtocol
 		}
 		if message.StopReason != "stop" {
@@ -167,7 +176,7 @@ func (p *Protocol) Consume(line []byte) (bool, error) {
 		if strings.TrimSpace(text.String()) == "" {
 			return false, ErrRun
 		}
-		p.final = &Result{Provider: message.Provider, Model: message.Model, Text: text.String()}
+		p.final = &Result{Provider: message.Provider, Model: message.Model, Text: text.String(), Usage: message.Usage}
 	case "turn_end":
 		if p.turns != 1 || p.final == nil || p.turnEnded || p.ended {
 			return false, ErrProtocol

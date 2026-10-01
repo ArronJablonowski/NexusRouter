@@ -11,7 +11,7 @@ func transcript() []string {
 		`{"type":"response","id":"prompt","command":"prompt","success":true,"data":{"disposition":"started"}}`,
 		`{"type":"agent_start"}`,
 		`{"type":"turn_start"}`,
-		`{"type":"message_end","message":{"role":"assistant","provider":"fixture","model":"model","stopReason":"stop","content":[{"type":"text","text":"answer"}]}}`,
+		`{"type":"message_end","message":{"usage":{"input":20,"output":4,"cacheRead":0,"cacheWrite":0,"totalTokens":24,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"role":"assistant","provider":"fixture","model":"model","stopReason":"stop","content":[{"type":"text","text":"answer"}]}}`,
 		`{"type":"turn_end"}`,
 		`{"type":"agent_end","willRetry":false}`,
 		`{"type":"agent_settled"}`,

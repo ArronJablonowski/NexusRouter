@@ -140,3 +140,23 @@ identity/configuration and usage accounting, durable SDK task ownership,
 authenticated ledger ingestion, automatic joint selection, remaining harness
 adapters and held-out quality evaluation. This package is not yet wired into
 production routing and makes no comparative accuracy claim.
+
+Pi results also carry `harness.Identity` computed from the verified CLI artifact,
+pinned harness/adapter version, actual protocol-checked provider/model and the
+admitted effective endpoint/context/output/deadline/pricing/system settings.
+`Config.ModelRevision` is required and must come from a trusted host inspection
+of the deployed model revision: the adapter cannot infer weights from a model
+name. Credentials are omitted from the identity; rotating a credential alone
+neither loses nor manufactures model quality evidence. Changed deployment or
+configuration identities do not borrow previous observations.
+
+Reported usage preserves input/output/cache and optional reasoning/subset counts,
+with bounded nonnegative counts and a consistent total. Pi may normalize missing
+provider usage to zero; these are harness-reported values, never a claim of
+provider measurement or zero billing. The normal accounting integration must
+preserve that distinction. Native qualification verifies actual outgoing output
+limits and a fixture-host path from completed output to the durable ledger:
+completion remains pending, a separately bound exact-answer evaluation changes
+ranking, and a new model revision starts without the old quality sample. This
+exercises composition of the components; production SDK dispatch and ownership
+integration is still outstanding.

@@ -9593,3 +9593,13 @@ repository validation remains pending behind the SSH and evidence-ledger gates.
 No live provider calls or service deployment occurred. Tool authorization,
 SDK/ledger/selection integration and other native harness adapters remain open;
 this is a native protocol checkpoint, not completion of DAR-132.
+
+Pi provenance follow-up: results now include configuration-bound harness identity
+and validated harness-reported usage. Trusted host model-revision attestation is
+required; credentials are excluded from learning identity. Installed-Pi race
+qualification verifies the outgoing output ceiling and native-result/ledger/
+ranking composition: no quality vote before a bound evaluation, one vote after,
+and no transfer to changed model revisions. Cancellation, protocol tests, vet and
+source checks pass. The queued Pi full gate was stopped before starting and will
+be replaced with the updated committed checkpoint; SSH/evidence gates continue
+unchanged. Production dispatch/ownership/accounting integration remains open.
