@@ -880,6 +880,33 @@ recorded, not that a later operator revision cannot become the current head.
 Attempt files contain hashes and host provenance. The saved advisory audit can
 quote reviewed content in its findings, so its private directory and backups
 must receive the same protection as the source task. Raw evaluator errors are
-not persisted. This API supplies durable orchestration; configuring concrete
-provider-backed evaluators in the main CLI, background scheduling and review UI
-remain separate integration work. No evaluator is enabled by default.
+not persisted. This API supplies durable orchestration. Background scheduling and review UI
+remain separate integration work. No evaluator is invoked by default.
+
+
+### Explicit provider-backed content evaluation
+
+`nexus remote evaluate` consumes the original `Task` JSON on stdin;
+`nexus remote auto-evaluate` consumes the original `AutomaticRequest` JSON.
+Supply the same trust/TLS flags, `--routes`, `--evidence` and `--request` used for
+recording the outcome. Also supply `--config /private/nexus/runtime.yaml`,
+`--reviewer MODEL_ID` and an explicit `--review-max-cost AMOUNT` (zero for a
+configured zero-cost local model). Omit destination/model/harness/context
+overrides: evaluation uses the saved route and original request.
+
+The evaluator must be enabled by the runtime evaluation policy. Its configured
+model must declare context and estimated cost; local models must declare RAM.
+Private tasks require a local evaluator, and the runtime local/cloud mode remains
+binding. Local review uses the shared host resource coordinator and the existing
+auxiliary provider lifecycle. Known secrets are redacted from review input and
+findings. Credentials are resolved only when the admitted evaluator executes.
+Review is bounded to one minute, 4096 output tokens and no tools, without provider
+fallback or an automatic second attempt. The cost ceiling checks configured
+estimates; it is not a provider billing guarantee or measured usage accounting.
+
+The CLI emits the durable attempt status even when reconciliation fails after
+admission. Keep the same config, evaluator, privacy and cost policy to reconcile
+an existing attempt. The stored descriptor binds these settings, and changing
+them produces a conflict rather than another evaluator call. These explicit
+commands apply automated advisory evidence; they do not claim objective proof
+of correctness or trigger another original-task execution.

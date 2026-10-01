@@ -22,7 +22,7 @@ import (
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
 )
 
-const Usage = "Usage: nexus remote audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
+const Usage = "Usage: nexus remote evaluate|auto-evaluate|audit|audit-archive|audit-prune|serve|info|catalogue|candidates|rank|auto-dispatch|auto-status|auto-cancel|auto-output|auto-reconcile|auto-review|auto-review-state|automatic-choice|harness-identity|harness-capacity|harness-readiness|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]"
 
 // Run executes explicit remote operations using only the supplied configuration.
 func Run(ctx context.Context, args []string, input io.Reader, output, errorOutput io.Writer) error {
@@ -48,6 +48,8 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding/reconcile/review)")
 	evidence := flags.String("evidence", "", "private destination-separated outcome evidence root (reconcile/review)")
 	reviewFile := flags.String("review", "", "absolute owner-private saved outcome review JSON (review)")
+	reviewerID := flags.String("reviewer", "", "configured evaluator model ID (evaluate/auto-evaluate)")
+	reviewMaxCost := flags.Float64("review-max-cost", -1, "explicit evaluator cost ceiling")
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
@@ -139,6 +141,18 @@ func Run(ctx context.Context, args []string, input io.Reader, output, errorOutpu
 		return serve(ctx, *instance, *listen, *journal, *configFile, registry, credentials)
 	}
 	client := remote.Client{Trust: registry, Credentials: credentials}
+	if operation == "evaluate" || operation == "auto-evaluate" {
+		if *instance != "" || *modelID != "" || *harnessID != "" || *contextTokens != 0 {
+			return remote.ErrInvalid
+		}
+		result, e := evaluateOperation(ctx, &client, operation, *routes, *evidence, *request, *configFile, *reviewerID, *reviewMaxCost, input)
+		if result.Version != 0 {
+			if err := json.NewEncoder(output).Encode(result); err != nil {
+				return err
+			}
+		}
+		return e
+	}
 	var result any
 	switch operation {
 	case "auto-status", "auto-cancel", "auto-output", "auto-reconcile", "auto-review", "auto-review-state":

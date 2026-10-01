@@ -881,3 +881,28 @@ diagnostics and split the original progress file into bounded historical parts;
 verified their ordered concatenation is byte-for-byte identical to the original.
 The main progress file retains recent checkpoints and links the preserved history.
 Clean-commit license freeze/verification is being revalidated on this correction.
+
+### DAR-132 / DAR-133 — configured remote content evaluator CLI
+
+Added explicit `nexus remote evaluate` and `auto-evaluate` commands to connect
+verified remote output and durable evaluator admissions to configured providers.
+The original task/automatic request and saved route remain authoritative; no
+original inference or discovery is replayed. Required reviewer/config/cost flags
+bind evaluator policy, private tasks prohibit cloud evaluators, and local review
+uses shared auxiliary resource reservations with provider cleanup before release.
+Known secrets are redacted, tools are absent, and review has a one-minute/4096-token
+bound. Estimated cost checks do not claim measured billing guarantees. Valid
+advisory results reconcile through existing current-head protections, and CLI
+status remains visible if reconciliation fails after an admitted attempt.
+
+Verification: provider-backed remote integration called twice produced one
+reviewer HTTP call, one original dispatch and one advisory sample with zero
+confirmed samples. Full remote and shared CLI race suites passed (18.263s and
+1.702s); configured evaluator admission/redaction/reservation race tests passed
+(1.576s). Targeted vet, source format/size and diff checks passed. Invalid CLI
+input tests cover unknown/trailing/oversized JSON and missing/nonfinite policy
+values without creating route/evidence state. Integration uses synthetic local
+provider output, not real-model grading accuracy or physical two-host validation.
+Full repository gate/push is pending behind the active earlier validation job.
+Background review scheduling, review UI, physical two-system qualification and
+production accuracy comparison remain incomplete. No running service changed.
