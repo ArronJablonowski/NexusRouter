@@ -2,7 +2,9 @@ package v1_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/ArronJablonowski/NexusRouter/submissions"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -146,9 +148,19 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 						}
 						auto := req
 						auto.HarnessID = "auto"
+						auto.HarnessEvaluation = true
 						auto.ModelID = "auto"
 						auto.ContextTokens = 16384
 						selected, e := client.Submit(ctx, "native-auto-queue-key", auto)
+						if e != nil {
+							t.Fatal(e)
+						}
+						changed := auto
+						changed.HarnessEvaluation = false
+						if _, conflict := client.Submit(ctx, "native-auto-queue-key", changed); !errors.Is(conflict, submissions.ErrConflict) {
+							t.Fatal("evaluation intent not bound", conflict)
+						}
+
 						for e == nil && (selected.State == "queued" || selected.State == "running") {
 							select {
 							case <-ctx.Done():

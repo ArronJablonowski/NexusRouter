@@ -93,9 +93,9 @@ func (s *Service) runNativeAuto(ctx context.Context, r Request) (Result, error) 
 		}
 		candidates = append(candidates, candidate)
 	}
-	request := harness.Request{Version: 1, Task: harness.TaskClass{Domain: r.Domain, Profile: r.Profile, Difficulty: nativeDifficulty(r.HarnessDifficulty)}, Mode: s.settings.Mode, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: int64(r.ContextTokens), MaxCost: r.MaxCost}
+	selectRoute := s.nativeRouteSelector(r, evidence, now)
 	for range candidates {
-		selected, e := harness.Select(request, harness.DefaultPolicy(), candidates, evidence, now, 0)
+		selected, e := selectRoute(candidates)
 		if e != nil {
 			return Result{}, errors.Join(ErrAdmission, e)
 		}
@@ -159,4 +159,26 @@ func (s *Service) nativeModels(ctx context.Context, p config.Provider, local boo
 		models[name] = true
 	}
 	return models
+}
+
+// Take one independent draw per evaluation request, reused after pre-dispatch
+// capacity exclusions. Ordinary tasks never consume an exploration draw.
+func (s *Service) nativeEvaluationPolicy(r Request) (harness.Policy, float64) {
+	p := harness.DefaultPolicy()
+	p.Exploration = s.settings.Routing.Exploration
+	draw := 0.0
+	if r.HarnessEvaluation && p.Exploration > 0 {
+		s.mu.Lock()
+		draw = s.draw()
+		s.mu.Unlock()
+	}
+	return p, draw
+}
+
+func (s *Service) nativeRouteSelector(r Request, evidence *harness.Snapshot, now time.Time) func([]harness.Candidate) (harness.Selection, error) {
+	request := harness.Request{Version: 1, AllowExploration: r.HarnessEvaluation, Task: harness.TaskClass{Domain: r.Domain, Profile: r.Profile, Difficulty: nativeDifficulty(r.HarnessDifficulty)}, Mode: s.settings.Mode, LocalRequired: r.LocalRequired, Capabilities: r.Capabilities, ContextTokens: int64(r.ContextTokens), MaxCost: r.MaxCost}
+	p, draw := s.nativeEvaluationPolicy(r)
+	return func(candidates []harness.Candidate) (harness.Selection, error) {
+		return harness.Select(request, p, candidates, evidence, now, draw)
+	}
 }

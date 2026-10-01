@@ -96,6 +96,9 @@ func (deniedNativeTransport) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func (s *Service) bindNativeHarness(r Request) (Request, error) {
+	if r.HarnessEvaluation && r.HarnessID != "auto" {
+		return Request{}, ErrHarnessUnsupported
+	}
 	if r.HarnessID == "" {
 		if r.HarnessDifficulty != "" {
 			return Request{}, ErrHarnessUnsupported

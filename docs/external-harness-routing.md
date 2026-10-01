@@ -695,3 +695,25 @@ storage validators can still read generation 2/3 envelopes, but the application
 retires old-generation queued work under its existing configuration-change rules.
 Reconcile pending work before deploying this version; this change does not migrate
 or execute a live queue. Existing completed outcomes retain their original labels.
+
+## Explicit candidate-evaluation requests
+
+Ordinary native automatic requests continue to select the strongest eligible
+combination supported by current evidence. A caller can explicitly permit
+exploration for an evaluation task with SDK `HarnessEvaluation: true`, CLI
+`--harness-evaluation`, native API `harness_evaluation: true`, or chat routing
+`evaluate_candidates: true`. This requires `harness_id: auto` (CLI `--harness auto`).
+
+The operator's `routing.exploration_rate` supplies the per-request probability,
+bounded to 0–0.25; zero disables exploration even for opted-in requests. This is
+a probability bound, not a guarantee that at most one in four finite requests
+will explore. One fresh draw is reused during pre-dispatch capacity reranking.
+The ranker can choose an under-observed eligible alternative and records
+`Explored` plus `explicit_bounded_evaluation`; it never bypasses authorization,
+privacy, capability, cost or resource constraints or creates an additional run.
+Opt-in does not itself evaluate correctness: configured audit or trusted bound
+checks still supply quality evidence, and unreviewed completion remains pending.
+
+Queue contract generation 5 now binds this opt-in as well as difficulty. Older
+pending generations are retired by the existing configuration fence and require
+rollout reconciliation. No live queue was migrated by this implementation.

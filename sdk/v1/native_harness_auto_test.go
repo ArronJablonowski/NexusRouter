@@ -61,6 +61,7 @@ func TestSDKNativeAutoLearnsExactPairsAndHonorsBudget(t *testing.T) {
 	pin := sha256.Sum256(body)
 	cfg := config.Defaults()
 	cfg.Mode = "local_only"
+	cfg.Routing.Exploration = 0
 	cfg.Tools.Enabled = false
 	cfg.Hardware.Concurrent = "1"
 	cfg.Workers.Max = 1
@@ -186,12 +187,18 @@ func TestSDKNativeAutoLearnsExactPairsAndHonorsBudget(t *testing.T) {
 		t.Fatal("borrowed other difficulty", result, err)
 	}
 	req.HarnessDifficulty = "hard"
+	req.HarnessEvaluation = true
+	result, err = client.Run(ctx, req)
+	if err != nil || result.HarnessSelection.Explored || result.Text != "alpha fixture" {
+		t.Fatal("disabled exploration ignored", result, err)
+	}
+	req.HarnessEvaluation = false
 	req.Profile = "unseen-profile"
 	result, err = client.Run(ctx, req)
 	if err != nil || result.HarnessSelection.Reason != "insufficient_evidence_stable_tiebreak" || result.HarnessSelection.Primary.EffectiveSamples != 0 {
 		t.Fatal("borrowed unrelated evidence", result, err)
 	}
-	if calls.Load() != 9 {
+	if calls.Load() != 10 {
 		t.Fatal("duplicate or missing inference", calls.Load())
 	}
 }

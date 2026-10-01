@@ -225,3 +225,13 @@ func TestRunHarnessDifficultyFlags(t *testing.T) {
 		t.Fatal("ignored difficulty without harness")
 	}
 }
+
+func TestRunHarnessEvaluationFlag(t *testing.T) {
+	_, req, _, err := parseRunOptions([]string{"--config", "project.yaml", "--model", "auto", "--harness", "auto", "--harness-evaluation"})
+	if err != nil || !req.HarnessEvaluation {
+		t.Fatal(req, err)
+	}
+	if _, _, _, err := parseRunOptions([]string{"--config", "project.yaml", "--model", "chat", "--harness", "pi-local", "--harness-evaluation"}); err == nil {
+		t.Fatal("evaluation on explicit route")
+	}
+}

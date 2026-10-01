@@ -381,6 +381,13 @@ func decodeRequest(reader io.Reader) (app.Request, error) {
 		}
 		var target *string
 		switch key {
+		case "harness_evaluation":
+			b, ok := value.(bool)
+			if !ok {
+				return req, bad
+			}
+			req.HarnessEvaluation = b
+			continue
 		case "harness_difficulty":
 			d, ok := value.(string)
 			if !ok || (d != "unknown" && d != "easy" && d != "medium" && d != "hard") {

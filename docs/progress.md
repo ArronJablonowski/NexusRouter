@@ -10501,3 +10501,27 @@ previous validated SSH implementation; its full gate/push remains queued. No
 live SSH account, service or credentials changed. Physical two-host, packet-loss/
 partition, wider-platform, discovery and automatic destination selection remain
 open; loopback socket-loss coverage is not a claim of full remote qualification.
+
+### 2026-10-01 — DAR-132 explicit bounded native exploration
+
+Native routes previously never enabled the joint ranker's exploration path.
+Added explicit evaluation opt-in through SDK HarnessEvaluation, CLI
+--harness-evaluation, native task harness_evaluation and chat routing
+ evaluate_candidates. Only automatic harness routes accept it. Ordinary tasks
+retain accuracy-first selection. Opted-in requests use the validated operator
+exploration rate (0–0.25 probability), one fresh draw reused across capacity
+reranking, and the existing under-observed eligible-alternative policy. Decisions
+persist the explored marker and explicit_bounded_evaluation reason. No additional
+inference, implicit quality vote, or bypass of normal eligibility is introduced.
+Queue generation 5 binds the opt-in; deployment must reconcile older pending work.
+
+Race tests passed: production selection closure checks opt-in, probability boundary,
+zero-rate disablement, authorization exclusions and one draw across reranking
+(app 1.722s); API metadata (2.028s), CLI flags (2.390s); installed Pi exact-pair
+accuracy/difficulty and disabled-exploration execution (10.618s); durable queue
+opt-in binding, conflict on changed intent, completion and cancellation (16.393s);
+branch/resume storage regressions (35.322s). Targeted vet/source/diff passed.
+Full gate/push remains queued behind the live Pi gate. No live configuration or
+inference changed. This provides bounded evaluation-task selection, not automatic
+quality certification or a real held-out model leaderboard. Native tools,
+incremental adapter progress, held-out quality and wider qualification remain open.
