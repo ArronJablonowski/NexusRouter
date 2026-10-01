@@ -35,6 +35,8 @@ type Prices struct {
 }
 type Progress struct{ Kind, Text string }
 type Config struct {
+	// UpstreamProtocol selects the host provider wire protocol; empty means openai_compatible.
+	UpstreamProtocol string
 	// Messages, when supplied, are the exact host-assembled inference context.
 	Messages []providers.Message
 	// Transport is the host policy-enforcing transport, never a default fallback.
@@ -50,7 +52,7 @@ type Config struct {
 }
 
 func (c Config) validate() error {
-	if c.Transport == nil || c.Prices == nil {
+	if (c.UpstreamProtocol != "" && c.UpstreamProtocol != "openai_compatible" && c.UpstreamProtocol != "ollama") || c.Transport == nil || c.Prices == nil {
 		return ErrProtocol
 	}
 	switch reflect.ValueOf(c.Transport).Kind() {

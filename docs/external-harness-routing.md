@@ -237,13 +237,13 @@ reservation includes fixed local harness overhead even for a cloud model. Local
 model context memory is sized before adding that overhead. Registration does not
 start a process or grant task authority.
 
-Only `openai_compatible` providers are currently supported; their configured base
-endpoint is preserved exactly and `/chat/completions` is appended. In particular,
-Ollama requires a native bridge preserving `options.num_ctx` and `num_predict`;
-using its compatibility endpoint does not establish those allocation guarantees.
-Do not register an Ollama route as a workaround for this missing bridge.
+Both `openai_compatible` and native `ollama` providers are supported. The configured
+base endpoint is preserved: `/chat/completions` is appended for OpenAI-compatible
+providers and `/api/chat` for Ollama. Use the actual configured provider kind;
+Ollama context allocation is enforced through its native options, not inferred
+from compatibility-endpoint metadata.
 
-Adapter `pi-rpc-text-v3` forwards the host-assembled system/user/assistant messages
+Adapter `pi-rpc-text-v4` forwards the host-assembled system/user/assistant messages
 through the single-request policy gateway, retaining their roles. The durable
 start records the same context; successful terminal events bind the delivered,
 redacted text to `Result.HarnessOutcome`. `ReadEvents` exposes that canonical
@@ -257,7 +257,7 @@ hidden inference retry.
 `Result.Usage` remains absent: Pi's normalized harness-reported counters must not
 be presented as provider-measured usage. Durable usage/cost accounting, ordinary
 quality-review ingestion into the joint ledger, automatic model/harness selection,
-CLI/API registration, native Ollama support, tools and other harness adapters
+CLI/API registration, tools and other harness adapters
 remain outstanding. A successful execution alone creates no quality vote.
 
 
@@ -288,3 +288,30 @@ This SDK bridge makes evaluated outcomes available to selection; automatic
 invocation of evaluation and automatic route dispatch remain separate unfinished
 integration work. A completed run still contributes no quality sample until an
 actual bound evaluation is supplied.
+
+
+## Native Ollama protocol bridge
+
+Adapter v4 binds `UpstreamProtocol` into the learning identity. SDK registration
+selects it from the configured provider kind. Ollama requests use the native
+[chat API](https://docs.ollama.com/api/chat) with the allocated `options.num_ctx`,
+bounded `options.num_predict`, text message roles and `think: false`. Smaller
+child output limits stay smaller; conflicting limits and unsupported controls
+reject. The bridge leaves `keep_alive` unspecified and never unloads a resident.
+It retains the same policy transport, upstream-only credentials, shared admission,
+single dispatch, no redirects/fallback, deadline and cancellation cleanup.
+
+The bridge buffers a bounded native NDJSON response through its terminal record
+and EOF before emitting successful SSE framing for Pi. It requires the exact
+configured model and a normal stop. Truncation, extra records after completion,
+model mismatch, tools/images/thinking output, malformed or oversized records,
+provider errors and partial/invalid usage counts cannot produce an accepted
+answer. Absent counts remain absent in translated usage; the SDK still does not
+label Pi-normalized counters as provider-measured. This is final-output delivery,
+not live token streaming.
+
+Installed-Pi SDK qualification uses a fixture native Ollama server and verifies
+context/output/credential preservation, completed task provenance, wrong-model
+and truncated-stream rejection, cancellation and exactly one upstream request.
+It does not establish model quality or compatibility with every deployed Ollama
+model; model revision, capability and resource metadata remain host obligations.

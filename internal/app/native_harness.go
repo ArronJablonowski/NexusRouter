@@ -62,7 +62,7 @@ func (s *Service) ConfigureNativeHarnesses(registrations []NativeHarness) error 
 				provider = p
 			}
 		}
-		if model.ID == "" || provider.Kind != "openai_compatible" {
+		if model.ID == "" || (provider.Kind != "openai_compatible" && provider.Kind != "ollama") {
 			return ErrHarnessUnsupported
 		}
 		c := nativePiConfig(entry, provider, model, model.WorkingContextTokens(), digest, "", deniedNativeTransport{}, nil)
@@ -96,7 +96,7 @@ func (s *Service) bindNativeHarness(r Request) (Request, error) {
 func nativePiConfig(entry NativeHarness, p config.Provider, m config.Model, contextTokens int, policyDigest, key string, tr http.RoundTripper, messages []providers.Message) pi.Config {
 	endpoint := strings.TrimRight(p.ResolvedEndpoint(), "/")
 
-	return pi.Config{Messages: messages, Executable: entry.Executable, ExecutableSHA256: entry.ExecutableSHA256, ModelRevision: entry.ModelRevision, Provider: p.ID, Model: m.Model, BaseURL: endpoint, APIKey: key, ContextTokens: contextTokens, MaxOutputTokens: entry.MaxOutputTokens, Prices: entry.Prices, Timeout: httpProviderTimeout(p), Transport: tr, TransportPolicySHA256: policyDigest,
+	return pi.Config{UpstreamProtocol: p.Kind, Messages: messages, Executable: entry.Executable, ExecutableSHA256: entry.ExecutableSHA256, ModelRevision: entry.ModelRevision, Provider: p.ID, Model: m.Model, BaseURL: endpoint, APIKey: key, ContextTokens: contextTokens, MaxOutputTokens: entry.MaxOutputTokens, Prices: entry.Prices, Timeout: httpProviderTimeout(p), Transport: tr, TransportPolicySHA256: policyDigest,
 		// The caller already owns the ordinary model + native-process reservation.
 		Admit: func(context.Context) (func(), error) { return func() {}, nil }}
 }

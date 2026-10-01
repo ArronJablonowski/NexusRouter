@@ -9676,3 +9676,23 @@ another provider dispatch. Automatic evaluation scheduling and joint route
 selection/dispatch remain open; this is an integration checkpoint, not DAR-132
 completion. The waiting SDK full-gate supervisor was stopped before starting;
 other gate processes were left untouched, and this checkpoint will replace it.
+
+
+## Native Ollama transport for Pi — DAR-132 (2026-10-01)
+
+Closed the SDK provider-kind gap with a native /api/chat bridge. Context allocation
+and output limits survive as num_ctx/num_predict; host messages and credentials
+remain policy controlled. No compatibility-endpoint workaround or residency unload
+is introduced. Adapter v4 isolates evidence by upstream protocol and version.
+
+Native NDJSON must reach a verified exact-model stop and EOF before successful
+SSE is returned to Pi. Truncation, model mismatch, unsupported tool/media/thinking,
+extra terminal records, malformed/oversized data and invalid counts reject.
+Unknown counts are not invented. Streaming is bounded final-output delivery.
+Installed-Pi SDK fixture qualification passed for limits, provenance, cancellation,
+wrong-model and truncated responses; one dispatch per attempt. Translation and
+adversarial terminal tests, existing native OpenAI-compatible qualification,
+targeted vet and source checks are run for this checkpoint. Full repository gate
+remains pending before push; no live inference/service mutation was performed.
+Joint automatic selection/evaluation, durable usage accounting, tools, queued
+registration, other harness adapters and real-model qualification remain open.

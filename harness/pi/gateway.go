@@ -25,7 +25,11 @@ func startGateway(ctx context.Context, c Config) (base, key string, closeGateway
 	if err != nil {
 		return "", "", nil, ErrProtocol
 	}
-	target.Path = strings.TrimRight(target.Path, "/") + "/chat/completions"
+	suffix := "/chat/completions"
+	if c.UpstreamProtocol == "ollama" {
+		suffix = "/api/chat"
+	}
+	target.Path = strings.TrimRight(target.Path, "/") + suffix
 	target.RawPath = ""
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
@@ -79,6 +83,13 @@ func startGateway(ctx context.Context, c Config) (base, key string, closeGateway
 			deny(http.StatusBadRequest)
 			return
 		}
+		if c.UpstreamProtocol == "ollama" {
+			body, e = ollamaRequest(body, c)
+			if e != nil {
+				deny(http.StatusBadRequest)
+				return
+			}
+		}
 		if !dispatched.CompareAndSwap(false, true) {
 			deny(http.StatusConflict)
 			return
@@ -94,6 +105,9 @@ func startGateway(ctx context.Context, c Config) (base, key string, closeGateway
 		}
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Accept", "text/event-stream")
+		if c.UpstreamProtocol == "ollama" {
+			request.Header.Set("Accept", "application/x-ndjson")
+		}
 		if c.APIKey != "" {
 			request.Header.Set("Authorization", "Bearer "+c.APIKey)
 		}
@@ -103,6 +117,22 @@ func startGateway(ctx context.Context, c Config) (base, key string, closeGateway
 			return
 		}
 		defer response.Body.Close()
+
+		if c.UpstreamProtocol == "ollama" {
+			if response.StatusCode != http.StatusOK {
+				deny(http.StatusBadGateway)
+				return
+			}
+			translated, err := ollamaCompletion(response.Body, c.Model)
+			if err != nil {
+				deny(http.StatusBadGateway)
+				return
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-store")
+			_, _ = w.Write(translated)
+			return
+		}
 		if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
 			deny(http.StatusBadGateway)
 			return
