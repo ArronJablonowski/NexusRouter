@@ -926,3 +926,26 @@ both independent CLI paths without weakening the execution/head invariant.
 Focused race qualification passed (3.073s package), as did targeted vet, source
 format/size and diff checks. Full make check and conditional normal push remain
 queued behind the running earlier gate; no deployed service was changed.
+
+### DAR-133 — explicit local peer membership operations
+
+Added `nexus remote peers`, `pair` and `revoke`, backed by `TrustFile.Pair` and
+`Revoke`. Operators can inspect registry plus canonical digest, add one verified
+and explicitly scoped peer, or remove one peer without reconstructing unrelated
+entries. Existing atomic replacement/current-digest checks remain authoritative;
+existing IDs, pin collisions, stale writers and missing removals fail closed.
+Pairing is offline administrator registration after trusted identity exchange,
+not automatic discovery, certificate issuance, or a pairing UI. Credential
+rotation/scope updates still use explicit whole-registry replacement. Revocation
+blocks future requests without retroactively canceling admitted work.
+
+The CLI shares strict bounded JSON decoding for pair and replace-trust; unknown
+fields no longer disappear silently during whole-registry decoding. No remote
+membership write endpoint or live-machine trust change was introduced.
+Tests cover preserved scopes, failed-update preservation, concurrent writers,
+strict CLI inputs and live mTLS revocation. The initial revocation fixture lacked
+the private parent-directory permissions required by atomic replacement; fixed
+fixture permissions without changing production policy. Full remote/CLI race
+suites passed (20.464s / 2.006s), targeted vet, source format/size and diff checks
+passed. Full repository validation and push remain queued. Discovery/pairing UI,
+physical two-system qualification and other recorded DAR-133 gaps remain open.

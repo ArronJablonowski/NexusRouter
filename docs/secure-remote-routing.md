@@ -68,6 +68,34 @@ remains before removing it. Do not bypass the compare-and-swap operation with
 concurrent manual edits. A sync failure after rename is uncertain: reread and
 compare the registry rather than repeating an old mutation blindly.
 
+For changes to one member, the local membership commands preserve all other
+entries and their scopes:
+
+```sh
+nexus remote peers --trust /private/nexus/peers.json
+nexus remote pair --trust /private/nexus/peers.json --expected CURRENT_DIGEST < verified-peer.json
+nexus remote revoke --trust /private/nexus/peers.json --instance node-b --expected CURRENT_DIGEST
+```
+
+`peers` returns the configured registry and its canonical digest; it does not
+probe availability. `pair` accepts one `Peer` object using the schema above,
+without the `version`/`peers` envelope. Use `--expected absent` only to create a
+new registry. Verify the certificate fingerprint, endpoint, SSH host key where
+applicable, and requested permissions through a trusted channel first. This is
+an offline registration command, not a certificate-exchange handshake or a
+trust-on-first-use discovery operation. Neither peer discovery nor SSH access
+establishes NexusRouter authority by itself.
+
+Adding an existing ID, sharing another member's certificate pin, removing an
+unknown ID, or using a stale digest fails without changing the registry. For
+intentional certificate rotation or scope changes, use `replace-trust` with the
+current digest. Both pairing and whole-registry replacement reject unknown JSON
+fields, oversized input and trailing values. Successful mutations print the new
+digest. A write may succeed even if printing it fails; reread with `peers` before
+retrying an uncertain operation. Revocation blocks subsequent authenticated
+requests but does not cancel already admitted jobs. These commands are local
+administrator operations and do not expose a network membership-management API.
+
 TLS 1.3 authenticates both endpoints with the CA chain plus pinned leaf certificate.
 Clients verify the configured server SAN. No proxy, redirect, DNS resolution,
 TLS session cache, or plaintext fallback is used. Concrete public addresses need
