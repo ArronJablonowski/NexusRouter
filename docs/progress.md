@@ -1473,3 +1473,23 @@ covers reload without implicit reads, double click, safe projection, malformed
 state and no retry/evaluation. Synthetic fixtures, not live deployment. Reviewed
 asset digest updated after expected guard rejection. Full validation/backup
 remains queued and broader DAR-133 qualification remains incomplete.
+
+## 2026-10-01 — daemon process qualification found two review lifecycle defects
+
+A disposable production-binary daemon test exposed remote_review error health
+with Ready=true: the shared health Outcome calculation omitted that component.
+It now gates readiness like other configured review/learning supervisors; disabled
+or absent optional review retains compatibility. Source shutdown audit also
+found explicit shared-resource cleanup before the deferred review join. The
+review worker now joins immediately after HTTP serving ends, before explicit
+cleanup as well as deferred cleanup.
+
+The original process test failed on false readiness, preserved as the defect
+trigger. Corrected test passed across three fresh daemon processes: corrupt
+private queue is unhealthy, restart remains unhealthy without automatic repair,
+then explicit test-only corruption removal permits healthy worker startup. All
+three exit cleanly on SIGTERM, with no inference calls or private diagnostic
+leakage. Focused CLI lifecycle/process race package passed (4.591s), health
+readiness tests passed (1.700s). Child is the normal production binary built
+by the test, not a live installation. Actual in-flight remote evaluation through
+process shutdown and physical-host qualification remain separate evidence gaps.

@@ -586,6 +586,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	rootHandler := composeServeHandler(handler, browserHandler, s.WebUI.PathPrefix)
 	rootHandler = api.WithRequestLog(rootHandler, api.JSONRequestLog(stderr))
 	serveErr := serveHTTP(ctx, listener, rootHandler, stdout)
+	// Join remote evaluator use before any explicit shared-resource cleanup.
+	remoteReviews.Close()
 	var workboardCloseErr error
 	if workboardScheduler != nil {
 		workboardCloseErr = workboardScheduler.Close()

@@ -88,7 +88,7 @@ func (c Check) Validate() error {
 // discovered configured model. Unknown supplemental measurements degrade the
 // report but do not assert that an otherwise usable model is unavailable.
 // An included Workboard scheduler must be healthy. Included learning and
-// regression supervisors must be healthy or disabled. Older reports without
+// regression and remote-review supervisors must be healthy or disabled. Older reports without
 // these optional components retain their prior semantics.
 // Metrics and trace export are supplemental: failure degrades status, not
 // serving readiness.
@@ -105,7 +105,7 @@ func Outcome(checks []Check) (string, bool) {
 		if c.Component == "workboard_scheduler" {
 			schedulerReady = schedulerReady && c.Status == "healthy"
 		}
-		if c.Component == "learning" || c.Component == "skill_regression" || c.Component == "outcome_supervision" {
+		if c.Component == "learning" || c.Component == "skill_regression" || c.Component == "outcome_supervision" || c.Component == "remote_review" {
 			learningReady = learningReady && (c.Status == "healthy" || c.Status == "disabled")
 		}
 		if c.Status != "healthy" && c.Status != "disabled" {
