@@ -764,3 +764,13 @@ Qualification uses installed Pi with controlled provider fixtures for reads,
 approval-backed create, denied writes, path traversal rejection, response contracts,
 automatic selection, queued idempotency, redaction and measured per-turn usage.
 This is integration evidence, not a real-model quality ranking or deployment.
+
+Authenticated HTTP qualification also runs installed Pi through the real chat
+handler and application service with pinned Ollama-wire fixtures. Plain and SSE
+responses preserve canonical completion and measured multi-turn usage; file-tool
+secrets remain redacted. Client cancellation after the tool completes leaves a
+canceled journal, and invalid final JSON leaves a failed journal; neither emits a
+successful completion marker or final answer. Unauthenticated requests cannot
+dispatch. Clients cannot enable `native_tools` in chat or native task payloads:
+that remains an operator registration setting. These checks do not establish CLI
+process qualification or browser/operator approval workflow qualification.

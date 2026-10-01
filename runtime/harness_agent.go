@@ -23,7 +23,8 @@ const HarnessAgentProtocol = "native-tools-v1"
 // provider dispatches through BeginTurn/CompleteTurn, use Invoke for tools, and
 // join its child and bridge before returning. The host owns context admission,
 // pinned gateway verification, resource leases and redacting journal wrappers.
-// This runtime is not yet enabled by the SDK native adapter entry points.
+// Opt-in SDK adapters must reuse those host controls rather than granting
+// independent authority to the child harness.
 type HarnessAgentRequest struct {
 	Request  HarnessRequest
 	MaxTurns int

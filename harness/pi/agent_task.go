@@ -59,8 +59,8 @@ func (c AgentConfig) Identity() (harness.Identity, error) {
 // RunAgentTask is a host embedding entry point, not independent tool authority.
 // Supply the normal submission-fenced/redacting journal, policy transport,
 // resource admission and scoped approval/schema-enforcing executor. The returned
-// execution is pending quality review; no user-facing routing path enables this
-// adapter until those policies are connected there.
+// execution is pending quality review. The SDK opt-in path uses RunAgent inside
+// its own host-managed journal lifecycle and response validation.
 func RunAgentTask(ctx context.Context, j runtime.Journal, c AgentConfig, t Task, tools runtime.ToolExecutor) (TaskResult, error) {
 	c, identity, e := prepareAgent(c, t.Prompt)
 	if e != nil {

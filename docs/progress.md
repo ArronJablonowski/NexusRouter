@@ -10844,3 +10844,24 @@ Full repository gate/push is queued behind the live SDK gate. No daemon was
 reconfigured or deployed. Native tools in the other four harnesses, dedicated
 CLI/API tool-mode qualification, broader fault qualification and held-out real-model
 accuracy comparisons remain open; this fixture evidence does not close DAR-132.
+
+### 2026-10-01 — DAR-132 authenticated HTTP Pi tool qualification
+
+Added installed-Pi integration through the real authenticated chat handler and
+application service with configured native_tools, rooted reads and a pinned
+Ollama-wire provider fixture. Plain and SSE output preserve final text and measured
+30-input/6-output usage across two turns. Provider bodies and HTTP output exclude
+the secret read from the file. Independent durable reads verify the native agent
+journal and actual Pi adapter identity.
+
+Client cancellation after a completed tool leaves TaskCanceled; invalid final JSON
+leaves TaskFailed. Neither exposes the final answer, outcome or SSE DONE marker.
+Unauthenticated calls cannot dispatch inference. Chat and native-task decoders also
+reject caller-supplied native_tools, preserving operator-only registration authority.
+Updated stale embedding comments to reflect opt-in SDK integration.
+
+Native and adjacent HTTP authority/usage race tests passed (11.846s), including
+installed Pi; targeted vet, source and diff checks passed. No real-model benchmark
+or deployed daemon was used. CLI process qualification, API operator-approval
+workflow qualification, other harness tool adapters and held-out quality evidence
+remain open. Full repository gate/push remains queued behind the live SDK gate.

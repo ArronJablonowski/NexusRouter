@@ -53,7 +53,7 @@ func TestChatHarnessSelectionPreservesAuthorityBoundary(t *testing.T) {
 }
 
 func TestChatHarnessRejectsInvalidAndExecutableInput(t *testing.T) {
-	for _, field := range []string{`"harness_id":null`, `"harness_id":7`, `"harness_id":""`, `"harness_id":" x"`, `"harness_id":"x\n"`, `"harness_id":"x","harness_id":"y"`, `"Harness_ID":"x"`, `"executable":"/tmp/evil"`, `"native_harnesses":[]`} {
+	for _, field := range []string{`"harness_id":null`, `"harness_id":7`, `"harness_id":""`, `"harness_id":" x"`, `"harness_id":"x\n"`, `"harness_id":"x","harness_id":"y"`, `"Harness_ID":"x"`, `"executable":"/tmp/evil"`, `"native_harnesses":[]`, `"native_tools":true`} {
 		s := services()
 		s.Run = func(context.Context, app.Request) (app.Result, error) {
 			t.Fatal("invalid input dispatched")
@@ -98,7 +98,7 @@ func TestNativeTaskDecoderHarnessAuthority(t *testing.T) {
 	if err != nil || req.HarnessID != "pi-local" {
 		t.Fatal(req, err)
 	}
-	for _, fields := range []string{`"harness_id":null`, `"harness_id":""`, `"harness_id":" x"`, `"harness_id":"x\n"`, `"harness_id":"x","harness_id":"y"`, `"harness_id":"x","executable":"/tmp/evil"`} {
+	for _, fields := range []string{`"harness_id":null`, `"harness_id":""`, `"harness_id":" x"`, `"harness_id":"x\n"`, `"harness_id":"x","harness_id":"y"`, `"harness_id":"x","executable":"/tmp/evil"`, `"harness_id":"x","native_tools":true`} {
 		if _, err := decodeRequest(strings.NewReader(`{"model_id":"chat","prompt":"fixture",` + fields + `}`)); err == nil {
 			t.Fatal("invalid authority admitted", fields)
 		}
