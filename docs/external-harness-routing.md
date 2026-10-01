@@ -826,3 +826,30 @@ Its tool identity also binds extension policy rules. The authenticated HTTP,
 durable operator-decision and compiled CLI checks described above also cover
 OpenHands. Browser presentation and real-model comparative evidence remain
 separate work.
+
+## Goose host tool embedding
+
+`goose.AgentConfig`, `RunAgentTask`, and `RunAgent` provide native Goose 1.52.0
+host-tool embedding. Normal SDK/application `native_tools` registration for Goose
+is not enabled yet. Supply the usual fenced/redacting journal, policy transport,
+resource admission and scoped approval/schema-enforcing executor.
+
+The private recipe enables only a named `nexus` MCP extension over authenticated
+loopback HTTP. Goose receives `nexus__` tool aliases; provider schemas, canonical
+context and journal records retain the original names. The gateway verifies the
+entire provider stream before committing proposals or releasing the child stream.
+Concurrent MCP arrivals execute in canonical proposal order; call ID, name and
+arguments must match the host proposal. Native cwd/session metadata has no
+execution authority, and cached request retries cannot duplicate tool effects.
+
+The runner independently compares native proposals, observations and final text
+against an owned completed host transcript. Missing, altered, duplicate or
+out-of-order lifecycle messages fail reconciliation. Tool observations within one
+batch may arrive in any order; host effect order remains canonical. Usage comes
+from the durable provider-turn journal. The `goose-mcp-tools-v1` identity separates
+this mode from text-only evidence and binds schemas, turns and protocol settings.
+
+Installed-binary qualification uses controlled OpenAI-compatible/Ollama fixtures,
+covering normal and concurrent calls, recoverable/terminal tool results, denial,
+wrong-model refusal, cancellation, turn limits and completed-task replay. It does
+not establish comparative model accuracy or SDK/HTTP/CLI approval integration.

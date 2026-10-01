@@ -11026,3 +11026,30 @@ The frozen SDK full gate completed with exactly the two previously reviewed
 releasepack license-evidence failures; no additional package/test failures or
 panic were found. The current branch includes the validated dbdb477 correction.
 A fresh full gate will run against this clean committed checkpoint before push.
+
+### 2026-10-01 — DAR-132 Goose host tool runner and canonical reconciliation
+
+Reused the clean former SDK checkout on codex/goose-native-tools after its gate
+terminated; the prior native-adapter checkout remains untouched under full check.
+Added Goose embedding entry points using the normal RunHarnessAgent session,
+ordered private MCP extension and a separate goose-mcp-tools-v1 identity. The
+native child sees namespaced aliases while provider requests and journals retain
+canonical tool names. The gateway re-verifies projected streams and exposes an
+owned completed transcript for native-output reconciliation. The runner compares
+every native tool proposal/result and final answer, rejects missing/replayed or
+altered evidence, and preserves per-turn journal usage and process cleanup.
+
+Installed Goose passed nine durable-journal modes (31.646s race driver), plus the
+concurrent two-call case and identity ownership checks (3.236s). Cases cover normal,
+recoverable and terminal tool results, denial, wrong model, provider/tool
+cancellation, turn bounds and Ollama delivery. The gateway race suite passed
+(18.642s), including canonical journal, redaction, result retries and concurrent
+MCP calls. Projection rejection and legacy runner unit tests passed (1.602s).
+All inference is controlled fixture data; no accuracy ranking is claimed.
+Normal SDK/config opt-in and HTTP/CLI approval qualification remain open for Goose.
+
+The complete Goose package also passed with native qualification enabled
+(45.620s), including the legacy text adapter and private MCP fixture. Targeted
+vet, source formatting/size and diff checks passed. Full repository validation
+and push will follow the already-running predecessor gate; no deployment is
+claimed.

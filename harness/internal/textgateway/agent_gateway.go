@@ -32,6 +32,9 @@ type AgentConfig struct {
 	Actual  harness.Identity
 	Session *runtime.HarnessAgentSession
 	Tools   []providers.Tool
+	// GooseMCP enables the pinned Goose child projection and ordered MCP bridge.
+	// Canonical provider schemas, conversation and journal retain original names.
+	GooseMCP bool
 }
 
 // AgentGateway owns the conversation and rendezvous for one native run. Child
@@ -45,6 +48,7 @@ type AgentGateway struct {
 	target                    string
 	client                    *http.Client
 	bridge                    *toolbridge.Bridge
+	mcp                       http.Handler
 	server                    *http.Server
 	done                      chan struct{}
 	lifecycle                 sync.Mutex
@@ -96,10 +100,22 @@ func StartAgent(ctx context.Context, c AgentConfig) (*AgentGateway, error) {
 		return nil, e
 	}
 	g.client = &http.Client{Transport: c.Transport, Timeout: c.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	g.bridge, e = toolbridge.New(run, 128, c.Timeout, g.invoke)
+	newBridge := toolbridge.New
+	if c.GooseMCP {
+		newBridge = toolbridge.NewOrdered
+	}
+	g.bridge, e = newBridge(run, 128, c.Timeout, g.invoke)
 	if e != nil {
 		cancel()
 		return nil, e
+	}
+	if c.GooseMCP {
+		g.mcp, e = toolbridge.GooseMCP(g.bridge, c.Tools)
+		if e != nil {
+			g.bridge.Close()
+			cancel()
+			return nil, e
+		}
 	}
 	g.ToolToken = g.bridge.Token()
 	listener, e := net.Listen("tcp4", "127.0.0.1:0")
@@ -170,7 +186,11 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 	g.lifecycle.Unlock()
 	defer g.handlers.Done()
 	w.Header().Set("Cache-Control", "no-store")
-	if r.URL.Path == "/v1/tool" {
+	if r.URL.Path == "/mcp" && g.mcp != nil {
+		g.mcp.ServeHTTP(w, r)
+		return
+	}
+	if r.URL.Path == "/v1/tool" && !g.config.GooseMCP {
 		g.bridge.ServeHTTP(w, r)
 		return
 	}
@@ -256,6 +276,15 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 		deny(502)
 		return
 	}
+	childStream := completed.Stream
+	if g.config.GooseMCP {
+		childStream, e = gooseToolProjection(completed.Stream, g.config.Model)
+		if e != nil {
+			g.fault = e
+			deny(502)
+			return
+		}
+	}
 	// Commit before registration and before releasing a byte to the child.
 	calls, e := g.config.Session.CompleteTurn(run, turn, attempt, runtime.HarnessTurnOutput{Actual: g.config.Actual, Text: completed.Text, Calls: completed.Calls, Usage: completed.Usage})
 	if e != nil {
@@ -283,7 +312,7 @@ func (g *AgentGateway) serve(w http.ResponseWriter, r *http.Request) {
 		g.final = &completed
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
-	if _, e = w.Write(completed.Stream); e != nil {
+	if _, e = w.Write(childStream); e != nil {
 		g.fault = e
 	}
 }
