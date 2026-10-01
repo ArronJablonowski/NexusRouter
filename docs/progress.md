@@ -1866,3 +1866,24 @@ directories removed and existing Ollama untouched. Relevant focused race tests
 passed 1.583s; full remote race suite passed 27.427s. Source checks and targeted vet pass. Full repository validation remains queued.
 Evidence: reporting outputs/spark-pi-qualification/physical-test-clock-fix.log.
 DAR-133 remains In Progress; full check/normal push queued behind frozen gate.
+
+
+## 2026-10-01 — physical Pi host-crash recovery
+
+The selected Pi registration now also drives the physical fixture's interrupted
+and durably queued tasks. Verified ordinary lease reconciliation preserves
+interrupted lineage/events, fails without fabricated text or replay, completes
+queued work once, and returns the original failed submission on retry. The
+fixture identifies descendants of its exact owned host before SIGKILL by PID
+and Linux start time and requires their execution to end within five seconds.
+Failure would stop only those fixture descendants and fail qualification.
+
+Physical Mac/Spark combined HTTPS/SSH/Pi test passed 52.39s (Mac race package
+53.888s), eight synthetic provider calls. Original children exited naturally;
+independent cleanup found no fixture host directories and existing Ollama
+remained untouched. Linux host is not race-instrumented. This qualifies Pi text
+mode with native tools disabled; it does not establish arbitrary tool side
+effects, other harness crash handling, or power-loss recovery. Source, vet and
+diff checks pass. Full combined check/normal push will follow the existing
+running frozen gate. Evidence: reporting
+outputs/spark-pi-qualification/physical-pi-crash.log. DAR-133 remains In Progress.

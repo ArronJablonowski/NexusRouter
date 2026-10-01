@@ -323,8 +323,19 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	if t.Failed() {
 		return
 	}
-	physicalRestartRecovery(t, ctx, client, local, blocked, func() {
-		input, _ := json.Marshal(map[string]string{"directory": host.Directory, "binary": binary})
+	restartTask := testTask()
+	if registration != nil {
+		restartTask.HarnessID = registration.ID
+		restartTask.HarnessDifficulty = "hard"
+		restartTask.ContextTokens = cfg.Models[0].ContextTokens
+		preview, e := client.HarnessIdentity(ctx, "node-a", HarnessIdentityRequest{ModelID: restartTask.ModelID, HarnessID: restartTask.HarnessID, ContextTokens: restartTask.ContextTokens})
+		if e != nil {
+			t.Fatal(e)
+		}
+		restartTask.ExpectedHarnessIdentity = &preview.Identity
+	}
+	physicalRestartRecovery(t, ctx, client, local, blocked, restartTask, func() {
+		input, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "check_harness_children": registration != nil})
 		data, err := admin(ctx, twoHostRestart, input)
 		if err != nil || !validPhysicalRestart(data) {
 			t.Fatalf("restart: %v %s", err, data)

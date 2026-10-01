@@ -8,13 +8,12 @@ import (
 	"time"
 )
 
-func physicalRestartRecovery(t *testing.T, ctx context.Context, client *Client, local string, blocked <-chan struct{}, restart func()) {
+func physicalRestartRecovery(t *testing.T, ctx context.Context, client *Client, local string, blocked <-chan struct{}, task Task, restart func()) {
 	t.Helper()
 	routes, err := OpenRouteStore(filepath.Join(local, "restart-routes"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	task := testTask()
 	task.Prompt = "block-request"
 	running, err := client.DispatchRecorded(ctx, routes, "node-a", "physical-restart-running", task)
 	if err != nil {
@@ -29,7 +28,8 @@ func physicalRestartRecovery(t *testing.T, ctx context.Context, client *Client, 
 	if err != nil || before.State != "running" || len(before.TaskIDs) != 1 {
 		t.Fatal("missing durable running task", before, err)
 	}
-	queuedTask := testTask()
+	queuedTask := task
+	queuedTask.Prompt = "Return a short answer."
 	queued, err := client.DispatchRecorded(ctx, routes, "node-a", "physical-restart-queued", queuedTask)
 	if err != nil || queued.State != "queued" {
 		t.Fatal("fixture not queued", queued, err)
@@ -77,14 +77,40 @@ assert d.parent==pathlib.Path('/tmp') and d.name.startswith('nexus-two-host-')
 assert json.loads((d/'owner.json').read_text())['binary']==p['binary']
 old=int((d/'host.pid').read_text());args=(pathlib.Path('/proc')/str(old)/'cmdline').read_bytes().split(b'\0')
 assert p['binary'].encode() in args and str(d/'journal').encode() in args
+children={}
+def identity(pid):
+ try:
+  root=pathlib.Path('/proc')/str(pid);stat=(root/'stat').read_text().rsplit(')',1)[1].split()
+  return (stat[0],int(stat[1]),stat[19])
+ except (FileNotFoundError,ProcessLookupError):return None
+if p.get('check_harness_children'):
+ ancestors={old}
+ for _ in range(16):
+  changed=False
+  for path in pathlib.Path('/proc').iterdir():
+   if not path.name.isdigit():continue
+   pid=int(path.name);value=identity(pid)
+   if value and value[1] in ancestors and pid not in ancestors:
+    ancestors.add(pid);children[pid]=value[2];changed=True
+  if not changed:break
+ assert children,'running harness had no owned child process'
 (d/'restart.request').write_text('one owned fixture restart')
 os.kill(old,signal.SIGKILL)
+if children:
+ deadline=time.monotonic()+5
+ def surviving():
+  return [pid for pid,start in children.items() if (v:=identity(pid)) and v[2]==start and v[0]!='Z']
+ while surviving() and time.monotonic()<deadline:time.sleep(.05)
+ survivors=surviving()
+ if survivors:
+  for pid in survivors:os.kill(pid,signal.SIGKILL)
+  raise RuntimeError('owned harness child survived host crash; fixture children stopped')
 until=time.monotonic()+10
 while time.monotonic()<until:
  try:new=int((d/'host.pid').read_text())
  except ValueError:new=old
  if new!=old and pathlib.Path('/proc',str(new)).exists():
-  print(json.dumps({'previous_pid':old,'new_pid':new}));sys.exit(0)
+  print(json.dumps({'previous_pid':old,'new_pid':new,'exited_harness_children':len(children)}));sys.exit(0)
  time.sleep(.05)
 raise RuntimeError('fixture restart failed')
 `

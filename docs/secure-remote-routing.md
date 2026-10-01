@@ -1637,6 +1637,11 @@ only the disposable host environment. No installer runs from this fixture.
 The transport cases use this harness for successful dispatch, response-loss
 recovery and running cancellation over both HTTPS and SSH. Identity is read
 from the authenticated destination, bound to each task, then independently
-matched against durable completion events. The following host-crash cases
-still use the native model path; they do not qualify external-harness crash
-side effects. Synthetic provider call totals must remain eight.
+matched against durable completion events. The host-crash cases use the selected Pi registration too: the started task
+fails without replay and saved queued work completes once. Before the controlled
+SIGKILL, the fixture records descendants of its owned host by PID and Linux
+process start time. It requires those original children to stop within five
+seconds (zombies are not running); surviving fixture children are stopped and
+cause failure. This qualifies Pi text mode without native tools, not arbitrary
+external tool side effects or power loss. Synthetic provider call totals must
+remain eight.
