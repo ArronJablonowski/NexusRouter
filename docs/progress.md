@@ -11436,3 +11436,17 @@ the evidence prerequisite; bound reviews, cross-instance automatic ranking,
 pairing UI and physical two-host qualification remain open. Native Pi SSH reconciliation and the remote/CLI race suites passed (31.910s /
 1.807s), with focused caller-change rejection (1.491s), vet, source formatting
 and diff checks. Full repository validation is still required before push.
+
+### DAR-133 bound remote review integration
+
+Added operator/evaluator-only `ReviewRecordedOutcome` and `nexus-remote review`.
+Reviews bind both the destination/caller/request/event receipt and exact execution;
+fresh authenticated canonical reads precede writes. Separate destination ledgers
+retain expected-current-head revisions, identical retry behavior, withdrawals and
+AI advisory classification. No remote write endpoint, evaluator inference or
+imported score totals are introduced. CLI requires strict owner-private review
+files. Revision/race/binding tests passed, including stale concurrent updates and
+withdrawals. Native Pi/OpenSSH remote and CLI race packages passed 33.471s /
+1.483s; vet, source formatting and diff checks passed. Full make check and push
+remain queued behind the running preceding gate. Automatic evaluation scheduling, cross-instance ranking,
+pairing/discovery UI and physical two-system qualification remain open.

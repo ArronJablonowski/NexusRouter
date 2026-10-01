@@ -18,34 +18,45 @@ import (
 // on different systems cannot silently pool votes. No review is created. A retry
 // after partial persistence must use this same root and receipt.
 func (v VerifiedOutcome) Record(ctx context.Context, root string, now time.Time) error {
+	ledger, err := v.recordLedger(ctx, root, now)
+	if err != nil {
+		return err
+	}
+	return ledger.Close()
+}
+
+func (v VerifiedOutcome) recordLedger(ctx context.Context, root string, now time.Time) (*harness.EvidenceStore, error) {
 	if !v.verified || ctx == nil || ctx.Err() != nil || v.receipt.Execution.Validate() != nil || now.IsZero() || v.receipt.Execution.CompletedAt.After(now) {
-		return ErrInvalid
+		return nil, ErrInvalid
 	}
 	// Reuse the strict private-directory and parent-sync checks; this root must be
 	// dedicated to remote evidence, never the local runtime's learning ledger.
 	base, err := OpenRouteStore(root)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	scope := hash(struct{ Destination, Caller string }{v.receipt.Route.Destination, v.receipt.Route.CallerFingerprint})
 	dir, err := OpenRouteStore(filepath.Join(base.directory, scope))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	body, err := json.Marshal(v.receipt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	key := certificateDigest([]byte(v.receipt.Route.RequestID))
 	if err = immutableReceipt(dir, filepath.Join(dir.directory, key+".outcome.json"), body); err != nil {
-		return err
+		return nil, err
 	}
 	ledger, err := harness.OpenEvidenceStore(filepath.Join(dir.directory, "ledger"))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer ledger.Close()
-	return ledger.AppendExecution(ctx, v.receipt.Execution, now)
+	if err = ledger.AppendExecution(ctx, v.receipt.Execution, now); err != nil {
+		ledger.Close()
+		return nil, err
+	}
+	return ledger, nil
 }
 
 func immutableReceipt(dir *RouteStore, path string, body []byte) error {

@@ -281,6 +281,19 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 				if err = verified.Record(ctx, root, time.Now().UTC()); err != nil {
 					t.Fatal("idempotent evidence", err)
 				}
+				receiptDigest, _ := verified.Receipt().Digest()
+				executionDigest, _ := verified.Receipt().Execution.Digest()
+				// The fixture already checked the exact returned text above. This
+				// deterministic review is not a judgment of a production model.
+				evaluation := OutcomeReview{Version: 1, ReceiptSHA256: receiptDigest, Review: harness.Review{Version: 1, ID: "remote-fixture-review", ExecutionDigest: executionDigest, Verdict: "passed", Method: "deterministic", MethodVersion: "exact-fixture-text-v1", Reviewer: "remote-sdk-fixture", Confidence: 1, Quality: 1, CreatedAt: time.Now().UTC()}}
+				for range 2 {
+					if err = f.client.ReviewRecordedOutcome(ctx, routeStore, root, request, task, evaluation); err != nil {
+						t.Fatal("SSH bound review", err)
+					}
+				}
+				if ranked := remoteRank(t, root, verified); ranked.ConfirmedSamples != 1 || ranked.AdvisorySamples != 0 || ranked.PendingOutputs != 0 {
+					t.Fatal("SSH review not counted exactly once", ranked)
+				}
 				changed := task
 				changed.Prompt += " changed"
 				if _, err = f.client.RecordedOutcome(ctx, routeStore, request, changed); err == nil {

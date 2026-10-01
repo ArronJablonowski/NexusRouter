@@ -35,7 +35,7 @@ func main() {
 }
 func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: nexus-remote serve|info|harness-identity|route-binding|reconcile|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
+		return errors.New("usage: nexus-remote serve|info|harness-identity|route-binding|reconcile|review|tasks|dispatch|status|cancel|events|validate-trust|replace-trust [flags]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet("nexus-remote", flag.ContinueOnError)
@@ -51,8 +51,9 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	request := flags.String("request", "", "persisted caller request ID, 16–64 letters/digits/_/-")
 	task := flags.String("task", "", "owned task ID (events)")
 	afterRequest := flags.String("after-request", "", "last caller request ID from previous tasks page")
-	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding/reconcile)")
-	evidence := flags.String("evidence", "", "private destination-separated outcome evidence root (reconcile)")
+	routes := flags.String("routes", "", "private caller route-binding directory (dispatch/route-binding/reconcile/review)")
+	evidence := flags.String("evidence", "", "private destination-separated outcome evidence root (reconcile/review)")
+	reviewFile := flags.String("review", "", "absolute owner-private saved outcome review JSON (review)")
 	modelID := flags.String("model", "", "configured model ID (harness-identity)")
 	harnessID := flags.String("harness", "", "configured harness registration (harness-identity)")
 	contextTokens := flags.Int("context", 0, "requested context tokens (harness-identity)")
@@ -117,7 +118,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		result, err = client.Cancel(ctx, *instance, *request)
 	case "events":
 		result, err = client.Events(ctx, *instance, *request, *task, *after)
-	case "dispatch", "reconcile":
+	case "dispatch", "reconcile", "review":
 		data, e := io.ReadAll(io.LimitReader(input, remote.MaxBody+1))
 		if e != nil || len(data) > remote.MaxBody {
 			return remote.ErrInvalid
@@ -126,7 +127,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		if json.Unmarshal(data, &t) != nil || t.Validate() != nil {
 			return remote.ErrInvalid
 		}
-		if operation == "reconcile" {
+		if operation == "reconcile" || operation == "review" {
 			store, e := remote.OpenRouteStore(*routes)
 			if e != nil {
 				return e
@@ -138,6 +139,17 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 			if *instance != "" && *instance != binding.Destination {
 				return remote.ErrConflict
 			}
+			if operation == "review" {
+				evaluation, e := readOutcomeReview(*reviewFile)
+				if e != nil {
+					return e
+				}
+				if e = client.ReviewRecordedOutcome(ctx, store, *evidence, *request, t, evaluation); e != nil {
+					return e
+				}
+				result = evaluation
+				break
+			}
 			verified, e := client.RecordedOutcome(ctx, store, *request, t)
 			if e != nil {
 				return e
@@ -145,7 +157,20 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 			if e = verified.Record(ctx, *evidence, time.Now().UTC()); e != nil {
 				return e
 			}
-			result = verified.Receipt()
+			receipt := verified.Receipt()
+			digest, e := receipt.Digest()
+			if e != nil {
+				return e
+			}
+			executionDigest, e := receipt.Execution.Digest()
+			if e != nil {
+				return e
+			}
+			result = struct {
+				ExecutionSHA256 string                `json:"execution_sha256"`
+				ReceiptSHA256   string                `json:"receipt_sha256"`
+				Receipt         remote.OutcomeReceipt `json:"receipt"`
+			}{executionDigest, digest, receipt}
 			break
 		}
 		if *routes != "" {

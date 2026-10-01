@@ -503,3 +503,43 @@ merged. The paired runtime remains trusted to report its own canonical events;
 these checks do not attest a compromised destination's operating system or model
 weights. No automatic retention, cross-instance ranking, or automatic review is
 provided by this reconciliation step.
+
+### Bound operator/evaluator reviews
+
+`reconcile` returns `receipt`, `receipt_sha256` and `execution_sha256`. Preserve that receipt and
+review the exact remote result it identifies. An authorized local operator can
+then use `nexus-remote review --routes /private/nexus/caller-routes --evidence
+/private/nexus/remote-evidence --request KEY --review /private/nexus/review.json`
+with the usual trust/certificate flags and the exact saved task JSON on stdin.
+The optional `--instance` must match the saved destination. The review file must
+be an absolute regular owner-private file, at most 32 KiB; symlinks, unknown JSON
+fields and trailing values are rejected.
+
+The file contains `version:1`, the exact `receipt_sha256` from reconciliation,
+and `review`, the existing `harness.Review` JSON object. Its `ExecutionDigest`
+is the returned `execution_sha256` (Go callers use `receipt.Execution.Digest()`). `ID` is an immutable unique review ID; `ExpectedHead` is empty for the
+first review and names the exact current review ID for a revision. Preserve the
+original file for identical retries. Supply `Verdict` (passed/failed), `Method`
+(deterministic/human/automated_ai), versioned rubric in `MethodVersion`, truthful
+`Reviewer`, `Confidence`, `Quality`, and UTC `CreatedAt`. A withdrawal uses
+`Verdict:withdrawn`, the current head, empty method/version and zero scores.
+
+Go hosts call `Client.ReviewRecordedOutcome` with `OutcomeReview`. Before this
+operator/evaluator-only call the embedding host must authenticate the reviewer
+and evaluation method; a JSON label is not proof of authorship. This is not a
+remote HTTP endpoint or model tool. It does not run a judge, invent scores or
+import a destination's advertised quality totals.
+
+Every call freshly authenticates the saved peer and caller certificate, rechecks
+its canonical completed events and output, and requires both the receipt and
+execution digests before writing any evidence. The receipt binds destination,
+caller, request and event history even if another system reports an identical
+execution. The destination-specific ledger applies atomic expected-head updates.
+Concurrent conflicting revisions have one winner; stale revisions fail. Replaying
+an identical old review after a newer revision does not restore the old head or
+add another vote. Failed/partial lineages cannot be reviewed through this path.
+
+AI judgments remain advisory under the existing ranker's capped weighting; they
+are not counted as confirmed deterministic or human samples. Reviews remain
+local to the caller's evidence store and do not modify the destination journal.
+Automatic evaluation scheduling and cross-instance selection remain unfinished.
