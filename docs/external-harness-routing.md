@@ -772,8 +772,9 @@ secrets remain redacted. Client cancellation after the tool completes leaves a
 canceled journal, and invalid final JSON leaves a failed journal; neither emits a
 successful completion marker or final answer. Unauthenticated requests cannot
 dispatch. Clients cannot enable `native_tools` in chat or native task payloads:
-that remains an operator registration setting. These checks do not establish CLI
-process qualification or browser/operator approval workflow qualification.
+that remains an operator registration setting. Browser approval presentation
+remains unqualified; compiled CLI and HTTP operator approval qualification are
+described below.
 
 Compiled CLI qualification builds `cmd/nexus` and runs installed Pi with a private
 CLI home and process-owner directory. Both plain output and `--json` preserve
@@ -781,3 +782,12 @@ rooted reads, redaction, verified per-turn usage and the durable tool journal.
 The test uses the production host resource profiler and requires measurable local
 capacity. A CLI invocation without a reviewer/presenter refuses configured writes
 at admission, before inference or task storage; it does not implicitly approve them.
+
+Authenticated HTTP operator decisions are also qualified with installed Pi and a
+controlled provider. A pending create leaves the file absent; unauthenticated and
+argument-digest-mismatched decisions are rejected. Replaying the same bound
+approval records one operator decision and one confirmed write. Denial and request
+cancellation leave no file or successful harness outcome; a late decision after
+cancellation is rejected. The approval inspection excludes raw file content.
+These tests exercise the durable API workflow, not browser presentation or model
+accuracy.

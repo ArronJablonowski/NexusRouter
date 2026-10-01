@@ -10894,3 +10894,22 @@ and only releasepack failed. Any additional failure requires investigation.
 Remaining DAR-132 scope includes API operator-approval workflow qualification,
 other harness native tools and held-out real-model accuracy evidence. No full-gate
 pass or push is claimed for the corrected checkpoint yet.
+
+### 2026-10-01 — DAR-132 native Pi durable HTTP approvals
+
+Qualified installed Pi through the authenticated streaming HTTP task path and the
+ordinary durable approval presenter/decision API. While the task occupies the
+single execution slot, operators can inspect and decide its pending file create.
+No write occurs before approval; unauthenticated and incorrectly bound decisions
+are rejected. Replaying the approved command leaves exactly one decision and one
+confirmed effect. Denial and canceled requests leave no file or successful harness
+outcome, and cancellation rejects subsequent decisions. Independent read-only
+journal inspection verifies terminal state and operator attribution. Raw proposed
+content is absent from approval inspection.
+
+The installed-Pi fixture integration test passed under race; targeted API vet,
+source and diff checks passed. This is protocol/authority qualification, not a
+real-model quality result or browser UI verification. Other harness native tool
+adapters and held-out accuracy evidence remain open. The earlier SDK full gate
+is still running; its known releasepack failures have a separately verified
+correction on this branch. A fresh complete gate is required before pushing.
