@@ -111,6 +111,9 @@ func (c *Client) call(ctx context.Context, destination, op, method, path string,
 		if network != "tcp" || addr != address {
 			return nil, ErrDenied
 		}
+		if p.Transport == "ssh" {
+			return p.SSH.dial(ctx, address)
+		}
 		return dialer.DialContext(ctx, network, address)
 	}}
 	defer transport.CloseIdleConnections()

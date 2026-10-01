@@ -22,6 +22,8 @@ import (
 // Two pins permit explicit overlap during rotation. Removing a peer or pin
 // takes effect on the next request, including an existing server connection.
 type Peer struct {
+	Transport           string   `json:"transport,omitempty"`
+	SSH                 *SSH     `json:"ssh,omitempty"`
 	ID                  string   `json:"id"`
 	Endpoint            string   `json:"endpoint"`
 	ServerName          string   `json:"server_name"`
@@ -84,6 +86,18 @@ func (f TrustFile) Read() (Registry, error) {
 	return out, nil
 }
 func (p Peer) Validate() error {
+	switch p.Transport {
+	case "", "https":
+		if p.SSH != nil {
+			return ErrInvalid
+		}
+	case "ssh":
+		if p.SSH == nil || p.SSH.Validate() != nil {
+			return ErrInvalid
+		}
+	default:
+		return ErrInvalid
+	}
 	if !id(p.ID) || len(p.Pins) < 1 || len(p.Pins) > 2 || len(p.Operations) < 1 || len(p.Operations) > 4 || len(p.Models) > 128 || !name(p.ServerName) || p.MaxContextTokens < 1 || p.MaxCost < 0 || math.IsNaN(p.MaxCost) || math.IsInf(p.MaxCost, 0) {
 		return ErrInvalid
 	}

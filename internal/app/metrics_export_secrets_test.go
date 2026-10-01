@@ -25,14 +25,14 @@ func TestMetricsExportSecretSetAndAbsentLookupCompatibility(t *testing.T) {
 	calls := []string{}
 	resolve := func(name string) string { calls = append(calls, name); return name + "-value" }
 	values := memorySecrets(cfg, resolve)
-	if !reflect.DeepEqual(calls, []string{"DARWIN_API_TOKEN", "PROVIDER_KEY"}) || len(values) != 2 {
+	if !reflect.DeepEqual(calls, []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN", "PROVIDER_KEY"}) || len(values) != 3 {
 		t.Fatal(values, calls)
 	}
 	for _, enabled := range []bool{false, true} {
 		cfg.Telemetry.MetricsExport = &config.MetricsExport{Enabled: enabled, APIKeyEnv: "COLLECTOR_KEY"}
 		calls = nil
 		values = memorySecrets(cfg, resolve)
-		if !slices.Contains(values, "COLLECTOR_KEY-value") || !reflect.DeepEqual(calls, []string{"DARWIN_API_TOKEN", "PROVIDER_KEY", "COLLECTOR_KEY"}) {
+		if !slices.Contains(values, "COLLECTOR_KEY-value") || !reflect.DeepEqual(calls, []string{"NEXUS_API_TOKEN", "DARWIN_API_TOKEN", "PROVIDER_KEY", "COLLECTOR_KEY"}) {
 			t.Fatal(values, calls)
 		}
 	}

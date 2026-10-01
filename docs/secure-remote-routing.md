@@ -197,3 +197,67 @@ integrated into the joint ranker. A full repository check is required before pus
 NVIDIA PAIR is product inspiration for explicit pairing and separate-task private
 compute routing. Its product page does not establish this protocol's security or
 provide acceptance evidence for NexusRouter.
+
+## SSH transport
+
+SSH is selectable per peer with `"transport":"ssh"`; omit the field or use
+`"https"` for a direct connection. Add this object to the otherwise unchanged
+peer entry:
+
+```json
+"transport": "ssh",
+"ssh": {
+  "user": "nexus",
+  "port": 22,
+  "identity_file": "/private/nexus/ssh_identity",
+  "known_hosts_file": "/private/nexus/known_hosts"
+}
+```
+
+The endpoint remains the HTTPS task-control URL. Its concrete IP identifies the
+SSH host as well; its port identifies the destination task endpoint. OpenSSH
+`-W` opens a direct-tcpip stream to that same IP and endpoint port from the remote
+host, and the client performs the normal pinned mutual TLS handshake inside it.
+For example, `https://192.168.1.20:8443` with SSH port 22 connects to SSH on
+192.168.1.20:22 and forwards to 192.168.1.20:8443. The endpoint must listen on that
+address. Arbitrary jump hosts, shell commands and remote installation are not
+part of this transport. Existing dispatch/status/events/cancel CLI commands work
+unchanged. TLS credentials and paired permissions are still required.
+
+The installed OpenSSH executable must be available on PATH. Identity and known
+hosts files must be regular owner-private files. Paths must be literal absolute
+paths without whitespace, quotes, percent/dollar expansion, tilde or backslash.
+Populate known_hosts from independently verified host keys; this implementation
+never performs trust-on-first-use or learns changed keys automatically. Rotate
+SSH keys through the remote account's authorized_keys and update the dedicated
+known_hosts file through normal administrator controls. TLS peer revocation is
+independent and continues to block task access through an existing SSH account.
+
+The client disables user/system SSH configuration, agent use and forwarding,
+password/interactive authentication, connection multiplexing, proxies, X11 and
+local commands. It enables strict host-key checking and uses one bounded
+noninteractive connection per operation. There is no automatic direct-HTTPS
+fallback after SSH authentication, host-key or connection failure. Requests keep
+the same durable caller key across transport changes and uncertain delivery.
+Subprocess pipes implement deadlines and cancellation; closing the transport
+terminates and reaps its SSH child. No SSH account or system service is modified.
+
+Use a dedicated remote account/key with forwarding restricted to the NexusRouter
+endpoint (`AllowTcpForwarding local` and exact `PermitOpen` in sshd policy), and
+no agent/X11/TTY or general command authority. Bind/firewall SSH to the intended
+private network for private tasks. A tunnel changes the source IP seen by the
+inner TLS server; that address cannot prove the original SSH client's network
+location. Both nodes and the SSH account/network policy are trusted deployment
+components, not an untrusted multi-tenant sandbox.
+
+Qualification: `NEXUS_REMOTE_SSH_NATIVE=1 go test -race ./remote -run
+'^TestSSHNativeLoopback$' -v` starts an isolated loopback sshd with disposable
+keys and uses the installed real OpenSSH client. It verifies dispatch, duplicate
+suppression, cancellation, wrong-host-key refusal, unauthorized-client-key refusal
+and no direct fallback. It does not change the system SSH daemon. The ordinary
+suite additionally checks effective OpenSSH configuration and a subprocess stream
+fixture with router revocation. Native loopback qualification passed on this Mac;
+separate-machine, network interruption and cross-platform qualification remain.
+
+OpenSSH behavior reference: [ssh(1)](https://man.openbsd.org/ssh.1) and
+[ssh_config(5)](https://man.openbsd.org/ssh_config).

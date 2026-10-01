@@ -9542,3 +9542,24 @@ cross-platform packaging, discovery/pairing UI, live capability/resource probes,
 operational rate/retention policy and automatic remote selection with DAR-132's
 joint accuracy evidence remain unimplemented/unverified. See
 `docs/secure-remote-routing.md` for the trust model, protocol and operator steps.
+
+
+## SSH remote transport follow-up — DAR-133 (2026-09-30)
+
+Added explicit per-peer SSH transport using an OpenSSH direct-tcpip stream with
+strict known-host checking and a dedicated identity file. The existing pinned
+mutual TLS task protocol runs inside the stream, preserving router ownership,
+scopes, audit and retry identity. No passwords, agent forwarding, user SSH config,
+remote shell commands or silent HTTPS fallback are allowed. The SSH subprocess
+is canceled/reaped when the transport closes. Deployment requires private-network
+SSH restrictions because tunneling masks the original source IP from the inner
+TLS listener; see the protocol document.
+
+Native loopback sshd qualification passed with disposable keys and the installed
+OpenSSH client, including duplicate suppression and host-key refusal. Focused
+remote race tests passed. Physical second-host and cross-platform checks remain.
+The prior full check failed two rename-era expectations: the secret-redaction
+fixture omitted NEXUS_API_TOKEN, and Chrome qualification used the renamed-away
+DarwinWorkboards JavaScript global. Updated those test expectations to match the
+existing production behavior, without weakening either assertion. A fresh full
+gate is required before backup/push; the SSH implementation is not deployed.

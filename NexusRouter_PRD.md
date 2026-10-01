@@ -1598,7 +1598,9 @@ routing with scoped dispatch, progress, results and cancellation. Discovery does
 not grant trust. The destination retains normal privacy and resource admission.
 Stable caller-owned request IDs, durable audit and existing SDK idempotency must
 prevent duplicate execution after an uncertain response. Administrators must be
-able to rotate credentials and revoke access. Remote selection must eventually
+able to rotate credentials and revoke access. SSH must be an explicitly selectable
+remote transport with strict host verification and key authentication, retaining
+the same task permissions, audit and retry identity as direct HTTPS. Remote selection must eventually
 consume the accuracy-first model–harness evidence in DAR-132; idle capacity alone
 must not determine the winner. Separate tasks use separate systems; GPU pooling
 is outside scope. Protocol and current qualification boundaries are documented in
