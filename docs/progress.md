@@ -9809,3 +9809,34 @@ Full repository validation will run against this checkpoint before push.
 SSH follow-up: the separate frozen 7b8f3c1 checkpoint passed its entire make check
 and was pushed. Fresh remote branch lookup confirmed the exact SHA; DAR-133 was
 updated. Physical second-host qualification remains unverified.
+
+## OpenClaw verified policy gateway — DAR-132 (2026-10-01)
+
+The native OpenClaw configuration fixture now runs through an authenticated
+single-dispatch gateway using only a supplied host policy transport. Child tokens
+remain separate from provider credentials, redirects do not follow, and invalid
+requests, unsupported tools/media and duplicate dispatches are rejected. Gateway
+closure cancels and joins in-flight upstream work. Supplied host-assembled text
+context replaces child-assembled messages without losing roles or policy text.
+
+Added bounded OpenAI-compatible stream verification: exact model and consistent
+stream identity, one choice, text only, normal stop, explicit DONE and EOF are all
+required before any successful stream reaches the harness. Length stops, missing
+terminals, data after termination, duplicate fields, invalid usage, reasoning,
+refusals, tool content and malformed framing return no verified completion. Native
+Ollama NDJSON is translated only after its model/normal terminal/EOF checks, with
+num_ctx, bounded num_predict and think=false; the translated stream passes the
+same verifier. Unknown usage is not invented or exported as measured SDK usage.
+
+Installed OpenClaw 2026.9.7 passed both OpenAI-compatible and Ollama native loopback
+fixtures through this gateway; each made one policy transport request and the
+projection matched the independently verified upstream text. Combined opt-in
+native/projection race suite passed in 9.742s. Additional host-context preservation
+race test, targeted vet and source gate passed. No real model inference, live
+configuration change or production adapter activation occurred.
+
+The gateway remains private adapter infrastructure. The remaining production
+runner must bind artifact/config/model provenance, normal resource admission,
+bounded stdout/process lifetime, cancellation/cleanup, and the canonical runtime
+journal before SDK registration. Full repository validation is queued at the
+committed checkpoint; DAR-132 remains In Progress.
