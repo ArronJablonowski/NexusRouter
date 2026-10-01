@@ -2043,3 +2043,13 @@ and physical-automatic-routing-corrected-20261001.log. DAR-133 remains In Progre
 Mac advertised service, broad network/side-effect qualification, real comparative
 accuracy, full repository gate and deployment remain open. Combined validation
 and normal push queued behind the freshly verified existing live gate.
+
+## 2026-10-01 — release notes reflect external and remote routing
+
+The release-notes template omitted newly implemented external harnesses, secure
+remote routing and Settings controls. Added their current behavior and explicit
+qualification limits: synthetic physical text evidence, unknown comparative
+quality, Linux direct-child crash fixes, and unresolved Mac service advertisement
+identity. This prepares accurate candidate collateral; no release approval.
+Earlier license evidence remains bound to31e7674 and must be regenerated for a
+new final candidate. Proposed candidate artifacts will remain unapproved.

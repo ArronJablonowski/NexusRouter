@@ -7,6 +7,34 @@ four-target artifact contract. Candidate notes are authenticated evidence, not
 authority: legal, target, signing, and publication approvals remain separate
 operator records.
 
+- External harness routing supports pinned Pi, OpenClaw, Goose, Hermes Agent
+  and OpenHands runtimes through the normal SDK admission, durable task history
+  and evidence paths. Selection compares model/harness outcomes by task profile
+  and difficulty; unknown evidence stays unknown and AI reviews remain advisory.
+  The comparative real-model campaign is incomplete because a configured model
+  exceeds available local admission headroom. No universal accuracy winner is
+  claimed.
+
+- Secure remote routing supports explicitly paired instances over pinned mutual
+  TLS, directly through HTTPS or inside verified-key SSH. Per-peer operation,
+  model and harness scopes, revocation, durable request identities and saved
+  automatic choices preserve authority and prevent retry-based duplicate work.
+  All five harnesses passed physical Mac-to-Linux ARM64 text-mode fixtures using
+  synthetic providers, including cancellation, committed-response loss and host
+  restart. Linux Goose and Hermes now terminate their direct harness child when
+  the owning host dies. These fixtures do not qualify arbitrary native-tool
+  side effects, power loss, all network partitions or comparative model quality.
+
+- Settings includes remote membership, task lifecycle controls and explicit
+  opt-in LAN advertisement configuration. Discovery provides unverified hints;
+  pairing still requires authenticated identity and explicit scopes. Private
+  IPv4 discovery and the generated Linux user service have physical fixture
+  evidence. Mac user-agent advertisement remains unqualified: the temporary
+  launchd service was not discovered even after network permission was enabled.
+  Stable application identity and Apple signing still need resolution. Saved
+  advertisement changes require restart; no production cluster deployment or
+  full native release-target qualification is implied.
+
 - The authenticated Models page now receives its validated refresh interval
   from configuration, polls without overlapping requests, pauses while hidden,
   and retains a visibly stale last verified snapshot through transient errors.
