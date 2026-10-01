@@ -97,7 +97,10 @@ func targetNoticeClosure(ctx context.Context, source, targetOS, targetArch strin
 	if err != nil || goExecutable != reconstruction.goExecutable.path || toolchain.Sum != "" || toolchain.GoModSum != "" {
 		return targetClosure{}, ErrInvalid
 	}
-	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json", "./cmd/nexus")
+	// Omit build/debug metadata while retaining every field used to validate
+	// package completeness, module identity and the full dependency graph.
+	// This keeps expanding release closures within the unchanged output bound.
+	out, err := reconstruction.goOutput(ctx, source, listEnv, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors", "./cmd/nexus")
 	if err != nil {
 		return targetClosure{}, err
 	}
@@ -276,7 +279,7 @@ func targetNoticeModules(ctx context.Context, source, targetOS, targetArch strin
 	if err != nil {
 		return nil, err
 	}
-	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json", "./cmd/nexus")
+	out, err := command(ctx, source, listEnv, goExecutable, "list", "-mod=readonly", "-deps", "-json=ImportPath,Imports,Module,Standard,Incomplete,Error,DepsErrors", "./cmd/nexus")
 	if err != nil {
 		return nil, err
 	}
