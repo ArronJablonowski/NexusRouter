@@ -300,14 +300,18 @@ integration with a local fixture provider covers queued and running cancellation
 committed progress, results and duplicate suppression (one executed first task,
 one separately canceled running task; the queued canceled task never executes).
 
-This is a first implementation, not completed DAR-133 qualification. Remaining:
-physical two-system/network-fault tests; cross-platform certificate/storage and
-service packaging; device discovery/pairing UI; native-harness capability attestations;
-caller inventory UI; automatic remote destination selection integrated with
-DAR-132's versioned, accuracy-first model–harness evidence; and operational
-retention and deployment-wide abuse policy. The endpoint currently takes an explicit model and peer.
-It does not choose a winner based on idle capacity or claim remote evidence is
-integrated into the joint ranker. A full repository check is required before push.
+DAR-133 remains in progress. Later sections document the implemented native
+harness capability/readiness checks, caller inventory and task UI, recorded
+accuracy-based automatic selection, bounded audit retention, explicit discovery
+and pairing UI, and service-template generation. These are implementation and
+fixture evidence, not proof of a deployed cluster.
+
+Outstanding acceptance includes physical two-system lifecycle/network-fault
+qualification; platform-native service installation, restart and shutdown;
+cross-platform certificate/storage and multicast behavior; IPv6 discovery and
+fragmented DNS bundles; and final full-repository validation before backup and
+release. Evidence from a single model/harness task is not a universal accuracy
+ranking, and discovery never supplies authority or measured quality.
 
 NVIDIA PAIR is product inspiration for explicit pairing and separate-task private
 compute routing. Its product page does not establish this protocol's security or
@@ -1435,3 +1439,54 @@ The discovery endpoint never writes the registry or contacts the task endpoint.
 Browser behavior and BFF authority tests use synthetic discovery results. Actual
 multicast discovery between physical hosts still requires qualification; the
 Settings control being available is not evidence that a peer is reachable.
+
+### Generate a per-user remote-host service template
+
+`nexus remote service-template` renders a launchd agent or systemd user unit to
+standard output. It does not inspect credentials, create directories, install or
+start a service, change trust, or enable discovery. Use the main `nexus` binary
+(the template invokes `nexus remote serve`), not the compatibility executable.
+For example, replace every illustrative path and address before use:
+
+```sh
+nexus remote service-template --platform launchd \
+  --executable '/opt/Nexus Router/nexus' \
+  --working-directory /private/nexus/runtime \
+  --owner-directory /private/nexus/shared-admission \
+  --instance node-a --listen 192.168.1.20:8443 \
+  --config /private/nexus/runtime.yaml --journal /private/nexus/journal \
+  --trust /private/nexus/peers.json --cert /private/nexus/cert.pem \
+  --key /private/nexus/key.pem --ca /private/nexus/ca.pem
+```
+
+Use `--platform systemd` for a Linux user unit and Linux paths. Every path must be
+absolute and normalized. The working directory must exist. The owner directory
+must be the same shared process-admission directory used by other NexusRouter
+processes on that machine; assigning a fresh isolated directory defeats shared
+admission. This value is emitted as `DARWIN_PROCESS_OWNER_DIR`, whose legacy name
+is the runtime contract. The renderer neither copies the user's environment nor
+embeds credentials. Arrange provider credentials and native harness executable
+availability separately; a user-service environment may differ from a terminal.
+
+Templates use a private 0077 creation mask, restart on failure with a 30-second
+interval, and a 30-second stop timeout. Systemd also caps repeated start failures
+and terminates the service control group on stop. The launchd label is
+`com.nexusrouter.remote.INSTANCE`; its plist uses distinct literal argument
+strings. The systemd command disables environment expansion with the `:` prefix,
+escapes percent specifiers, and quotes argument/environment values. Its
+WorkingDirectory value follows systemd's single-path parser rather than shell
+quoting. These are user services, not system/root units. SSH server configuration
+and host keys remain an independent administrator responsibility.
+
+Before installation, independently verify the executable, private directories,
+config, TLS material and trust, and prove foreground startup with the exact
+settings. Save and review the output as a private file. On macOS, `plutil -lint`
+checks the plist; on Linux, `systemd-analyze --user verify` checks the unit against
+the installed manager. Installing/enabling, host startup/restart, inherited
+credentials, crash recovery and shutdown must be qualified separately on each
+platform. Native plist decoding passed on this Mac; no service was installed and
+native systemd validation was unavailable here. Rendering is not deployment
+qualification.
+
+Serialization references: [systemd command syntax](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml)
+and [systemd environment and working-directory parsers](https://github.com/systemd/systemd/blob/main/src/core/load-fragment.c).

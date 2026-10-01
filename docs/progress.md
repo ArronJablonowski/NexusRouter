@@ -1607,3 +1607,28 @@ format/size checks passed. No production assets or live configuration changed;
 no physical remote peer, SSH connection, multicast scan or inference was used.
 Full combined check/ordinary push remains queued behind active frozen validation.
 Physical cross-system lifecycle and multicast qualification remain outstanding.
+
+### 2026-10-01 — DAR-133 per-user remote host service templates
+
+Added `nexus remote service-template` with explicit launchd/systemd selection,
+main executable, working directory, shared process-admission directory, instance,
+listener and runtime/trust/TLS/journal paths. Rendering only emits a reviewable
+artifact: no file reads/writes, install, network, credentials copy, trust changes,
+SSH server management or discovery. Paths are absolute/normalized/bounded and
+control/invalid XML characters reject. Literal launchd argv uses XML escaping;
+systemd command uses colon to disable environment expansion, percent escaping,
+and context-appropriate value quoting. Upstream parser inspection caught and
+corrected WorkingDirectory quoting before commit (single path, not token list).
+Both templates use private umask, bounded restart intervals and stop timeout;
+Linux includes start limiting/control-group stop. Shared admission path is explicit
+rather than silently allocating an isolated reservation namespace.
+
+Remote/CLI race suites passed 27.653s/2.088s; native plutil decoded the generated
+plist and preserved quoted/metacharacter paths, argv, umask and admission env.
+Vet/source/diff checks passed. Systemd serialization was checked against upstream
+source/documentation; native systemd unavailable on this Mac and not claimed.
+No service installed or running environment modified. Documentation now separates
+current implementation coverage from remaining acceptance, replacing stale first-
+implementation gaps. Full combined check/normal backup remains queued behind
+active frozen validation; real platform install/restart/shutdown and physical
+second-system qualification remain required.
