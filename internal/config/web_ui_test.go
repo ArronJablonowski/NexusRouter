@@ -237,3 +237,28 @@ func TestRemoteBrowserReviewerNeedsExplicitPolicyAndCost(t *testing.T) {
 		t.Fatal("implicit reviewer allowed")
 	}
 }
+
+func TestRemoteReviewQueueRequiresSeparateAbsoluteStorage(t *testing.T) {
+	s := Defaults()
+	zero := 0.0
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTaskControls = true
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	s.WebUI.RemoteClient = &WebUIRemoteClient{CertificateFile: "/private/cert", KeyFile: "/private/key", CAFile: "/private/ca"}
+	s.WebUI.RemoteDispatchDirectory = "/private/routes"
+	s.WebUI.RemoteAutomaticEvidenceDirectory = "/private/evidence"
+	s.WebUI.RemoteReview = &WebUIRemoteReview{Model: "reviewer", MaxCost: &zero, QueueDirectory: "/private/reviews"}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{"relative", "/private/../reviews", "/private/reviews\n", "/private/routes", "/private/evidence"} {
+		s.WebUI.RemoteReview.QueueDirectory = dir
+		if s.Validate() == nil {
+			t.Fatal("invalid queue accepted", dir)
+		}
+	}
+	s.WebUI.RemoteReview.QueueDirectory = ""
+	if err := s.Validate(); err != nil {
+		t.Fatal("manual review requires no queue", err)
+	}
+}

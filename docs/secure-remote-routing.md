@@ -1314,3 +1314,16 @@ loop for operator attention. Individual terminal job receipts remain durable.
 Cancel and join the call before closing the evaluator, shared resource coordinator
 or evidence databases. This library lifecycle does not enable daemon enrollment
 or install a background service.
+
+The stock daemon can now own that worker when `web_ui.remote_review.queue_directory`
+is set to a separate private absolute directory. The existing remote reviewer
+model/cost, dispatch directory, automatic evidence directory, client credentials
+and trust registry are required. Omit `queue_directory` to retain manual review
+only. The worker starts with the dispatcher, resumes existing jobs, and is
+cancelled and joined before shared storage/resource cleanup. Queue-level failures
+set the `remote_review` health component to `supervisor_error` and make daemon
+readiness unhealthy; no private error text is returned. Health describes the
+worker, not individual job verdicts. Inspect terminal receipts and current review
+heads for those. This setting does not yet enroll browser dispatches: use the
+existing explicit CLI queue commands with matching reviewer/storage policy.
+No live configuration or service installation is changed by this implementation.

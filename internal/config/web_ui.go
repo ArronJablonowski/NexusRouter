@@ -35,6 +35,12 @@ func (w WebUI) Validate(listen string) error {
 	if review := w.RemoteReview; review != nil && (w.RemoteAutomaticEvidenceDirectory == "" || !identifier.MatchString(review.Model) || review.MaxCost == nil || *review.MaxCost < 0 || *review.MaxCost > 1_000_000 || math.IsNaN(*review.MaxCost) || math.IsInf(*review.MaxCost, 0)) {
 		return errors.New("remote review requires automatic evidence, an explicit reviewer and finite cost limit")
 	}
+	if review := w.RemoteReview; review != nil && review.QueueDirectory != "" {
+		dir := review.QueueDirectory
+		if !filepath.IsAbs(dir) || filepath.Clean(dir) != dir || len(dir) > 4096 || strings.ContainsAny(dir, "\x00\r\n") || dir == w.RemoteDispatchDirectory || dir == w.RemoteAutomaticEvidenceDirectory {
+			return errors.New("remote review queue requires a separate private absolute directory")
+		}
+	}
 	if w.RemoteTaskControls && w.RemoteClient == nil {
 		return errors.New("remote task controls require remote client credentials")
 	}

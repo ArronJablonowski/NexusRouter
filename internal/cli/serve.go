@@ -169,6 +169,8 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var workboardScheduler *app.WorkboardScheduleSupervisor
 	var browserHandler *webuiapp.Handler
 	var harnessCatchup *app.HarnessEvidenceCatchup
+	var remoteReviews *remoteReviewSupervisor
+	var runRemoteReviews func(context.Context) error
 	healthReport := func(ctx context.Context) (health.Report, error) {
 		if dispatcher == nil {
 			return health.Report{}, errors.New("supervisor unavailable")
@@ -198,6 +200,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		}
 		report, err = withTraceExportHealth(report, traceExporter.Health())
 		if err != nil {
+			return health.Report{}, err
+		}
+		report.Checks = append(report.Checks, remoteReviews.health())
+		report.Status, report.Ready = health.Outcome(report.Checks)
+		if err := report.Validate(); err != nil {
 			return health.Report{}, err
 		}
 		if s.Workboard.Scheduler.Enabled {
@@ -314,6 +321,14 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 							return 1
 						}
 						remoteReviewer = &webuiapp.RecordedRemoteReviewer{Client: client, Store: store, EvidenceRoot: root, Policy: policy}
+						if review.QueueDirectory != "" {
+							queue, err := remote.OpenReviewQueue(review.QueueDirectory)
+							if err != nil {
+								fmt.Fprintln(stderr, "cannot initialize remote review queue")
+								return 1
+							}
+							runRemoteReviews = func(ctx context.Context) error { return client.RunReviewJobs(ctx, queue, store, root, policy) }
+						}
 					}
 				}
 			}
@@ -386,7 +401,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		DeleteMemory:     service.DeleteMemory,
 		DaemonStatus: func(ctx context.Context) (daemon.Status, error) {
 			status, err := control.Current(ctx)
-			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health()) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler)) {
+			if err == nil && status.State == "ready" && (dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || !remoteReviews.ready() || metricsExportDegraded(exporter.Health()) || traceExportDegraded(traceExporter.Health()) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler)) {
 				// Keep identity visible so an operator can stop a degraded daemon.
 				status.State = "degraded"
 			}
@@ -475,7 +490,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 			return app.InspectLeaseAttentionHistory(ctx, s.Telemetry.Database, id, options)
 		},
 		Health: func(ctx context.Context) error {
-			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler) {
+			if dispatcher == nil || dispatcher.Health().Status != "healthy" || !configuredLearningReady(learner) || !configuredOutcomeSupervisionReady(outcomeSupervisor) || !remoteReviews.ready() || !workboardSchedulerReady(s.Workboard.Scheduler.Enabled, workboardScheduler) {
 				return errors.New("supervisor unavailable")
 			}
 			_, err := db.Read(ctx, "__health__", 0, 1)
@@ -528,6 +543,10 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer dispatcher.Close()
+	if runRemoteReviews != nil {
+		remoteReviews = startRemoteReviewSupervisor(ctx, runRemoteReviews)
+		defer remoteReviews.Close()
+	}
 	exporter, err = app.StartConfiguredMetricsExport(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start metrics exporter")

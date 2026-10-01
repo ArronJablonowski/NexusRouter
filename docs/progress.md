@@ -1415,3 +1415,21 @@ shutdown and reopened supervision after interrupted receipt publication using
 one evaluator invocation. Synthetic fixtures, not deployed daemon or physical
 host evidence. Daemon config/startup/health and browser enrollment remain open.
 Full repository validation and normal branch backup are queued separately.
+
+## 2026-10-01 — daemon-owned remote review worker
+
+Added optional web_ui.remote_review.queue_directory, validated as a separate
+absolute path under the existing explicit reviewer/evidence/client configuration.
+Daemon startup prepares the private queue and owns RunReviewJobs after dispatcher
+startup. Shutdown cancels and joins it before closing shared resource/storage
+dependencies. Health/readiness reflect unexpected worker exit or queue errors,
+without disclosing private diagnostics. Disabled configuration starts no worker.
+Individual review verdicts remain in durable receipts/current heads.
+
+Tests cover configuration rejection, disabled/manual compatibility, successful
+worker lifecycle, cancellation joining, unexpected nil/error exits and real
+malformed queue failure propagating into health. Focused CLI/config/health race
+tests passed; targeted vet, source formatting/size and diff checks passed. This
+is daemon integration source plus lifecycle tests, not live deployment or an
+end-to-end installed-service qualification. Browser automatic enrollment remains
+next. Full repository validation and normal branch backup remain queued.

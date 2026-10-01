@@ -51,8 +51,9 @@ type WebUIRemoteClient struct {
 }
 
 type WebUIRemoteReview struct {
-	Model   string   `yaml:"model" json:"model"`
-	MaxCost *float64 `yaml:"max_cost" json:"max_cost"`
+	QueueDirectory string   `yaml:"queue_directory,omitempty" json:"queue_directory,omitempty"`
+	Model          string   `yaml:"model" json:"model"`
+	MaxCost        *float64 `yaml:"max_cost" json:"max_cost"`
 }
 type WebUI struct {
 	RemoteReview                     *WebUIRemoteReview `yaml:"remote_review,omitempty" json:"remote_review,omitempty"`
