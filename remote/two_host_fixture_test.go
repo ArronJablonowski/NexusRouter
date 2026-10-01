@@ -6,7 +6,7 @@ const twoHostPrepare = `
 import sys,json,os,tempfile,pathlib,base64,hashlib,socket
 p=json.load(sys.stdin)
 assert hashlib.sha256(pathlib.Path(p['binary']).read_bytes()).hexdigest()==p['sha256']
-assert set(p['files'])=={'cert.pem','key.pem','ca.pem','config.yaml','trust.json'}
+assert set(p['files'])=={'cert.pem','key.pem','ca.pem','config.yaml','trust.json','caller-cert.pem','caller-key.pem','proxy.py'}
 d=pathlib.Path(tempfile.mkdtemp(prefix='nexus-two-host-',dir='/tmp'))
 def port(host):
  s=socket.socket();s.bind((host,0));v=s.getsockname()[1];s.close();return v
@@ -17,7 +17,7 @@ for name,encoded in p['files'].items():
  f=os.open(d/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
  with os.fdopen(f,'wb') as out:out.write(b)
 (d/'owner.json').write_text(json.dumps({'binary':p['binary']}))
-print(json.dumps({'directory':str(d),'port':listener,'provider_port':provider}))
+print(json.dumps({'directory':str(d),'port':listener,'proxy_port':port(p['address']),'provider_port':provider}))
 `
 const twoHostRun = `
 import sys,json,pathlib,subprocess,os
@@ -27,7 +27,10 @@ env=dict(os.environ);env['DARWIN_PROCESS_OWNER_DIR']=str(d/'owners')
 args=[p['binary'],'remote','serve','--instance','node-a','--listen',p['address']+':'+str(p['port']),'--config',str(d/'config.yaml'),'--journal',str(d/'journal'),'--trust',str(d/'trust.json'),'--cert',str(d/'cert.pem'),'--key',str(d/'key.pem'),'--ca',str(d/'ca.pem')]
 with (d/'host.log').open('w') as log:
  child=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,env=env,start_new_session=True)
- (d/'host.pid').write_text(str(child.pid));sys.exit(child.wait())
+ (d/'host.pid').write_text(str(child.pid))
+ proxy=subprocess.Popen([sys.executable,str(d/'proxy.py'),str(d),p['address'],str(p['proxy_port']),str(p['port'])],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+ (d/'proxy.pid').write_text(str(proxy.pid))
+ sys.exit(child.wait())
 `
 const twoHostRevoke = `
 import sys,json,pathlib,subprocess
@@ -40,11 +43,12 @@ const twoHostCleanup = `
 import sys,json,pathlib,os,signal,time,shutil
 p=json.load(sys.stdin);d=pathlib.Path(p['directory']);assert str(d).startswith('/tmp/nexus-two-host-') and d.parent==pathlib.Path('/tmp')
 assert d.stat().st_uid==os.getuid() and json.loads((d/'owner.json').read_text())['binary']==p['binary']
-f=d/'host.pid'
-if f.exists():
+for filename,marker in [('host.pid',str(d/'journal')),('proxy.pid',str(d/'proxy.py'))]:
+ f=d/filename
+ if not f.exists():continue
  pid=int(f.read_text());proc=pathlib.Path('/proc')/str(pid)
  def owned():
-  try:args=(proc/'cmdline').read_bytes().split(b'\0');return p['binary'].encode() in args and str(d/'journal').encode() in args
+  try:args=(proc/'cmdline').read_bytes().split(b'\0');return marker.encode() in args and (filename=='proxy.pid' or p['binary'].encode() in args)
   except FileNotFoundError:return False
  if owned():
   os.kill(pid,signal.SIGTERM)

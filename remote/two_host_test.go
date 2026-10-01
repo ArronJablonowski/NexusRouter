@@ -50,7 +50,7 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 		cmd.Stdin = bytes.NewReader(input)
 		return cmd.CombinedOutput()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
 	defer cancel()
 	var calls atomic.Int32
 	blocked := make(chan struct{}, 2)
@@ -85,13 +85,14 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	sc, sp := ca.leaf(t, "node-a")
 	cc, cp := ca.leaf(t, "node-b")
 	files := map[string]string{}
-	for name, path := range map[string]string{"cert.pem": sc.CertificateFile, "key.pem": sc.KeyFile, "ca.pem": sc.CAFile} {
+	for name, path := range map[string]string{"cert.pem": sc.CertificateFile, "key.pem": sc.KeyFile, "ca.pem": sc.CAFile, "caller-cert.pem": cc.CertificateFile, "caller-key.pem": cc.KeyFile} {
 		b, e := os.ReadFile(path)
 		if e != nil {
 			t.Fatal(e)
 		}
 		files[name] = base64.StdEncoding.EncodeToString(b)
 	}
+	files["proxy.py"] = base64.StdEncoding.EncodeToString([]byte(twoHostFaultProxy))
 	cfgBody, err := yaml.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -108,9 +109,10 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	var host struct {
 		Directory    string `json:"directory"`
 		Port         int    `json:"port"`
+		ProxyPort    int    `json:"proxy_port"`
 		ProviderPort int    `json:"provider_port"`
 	}
-	if json.Unmarshal(data, &host) != nil || !strings.HasPrefix(host.Directory, "/tmp/nexus-two-host-") || host.Port < 1 || host.ProviderPort < 1 {
+	if json.Unmarshal(data, &host) != nil || !strings.HasPrefix(host.Directory, "/tmp/nexus-two-host-") || host.Port < 1 || host.ProxyPort < 1 || host.ProviderPort < 1 {
 		t.Fatalf("invalid fixture response %s", data)
 	}
 	cleanup := func() {
@@ -124,7 +126,7 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	}
 	defer cleanup()
 	_, localPort, _ := net.SplitHostPort(strings.TrimPrefix(provider.URL, "http://"))
-	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port})
+	runInput, _ := json.Marshal(map[string]any{"directory": host.Directory, "binary": binary, "address": address, "port": host.Port, "proxy_port": host.ProxyPort})
 	runCtx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	args := append(append([]string{}, ssh...), "-o", "ExitOnForwardFailure=yes", "-R", fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%s", host.ProviderPort, localPort), user+"@"+address, "python3 -c "+quote(twoHostRun))
@@ -214,6 +216,33 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			if err != nil || retry.ID != first.ID || retry.State != "succeeded" {
 				t.Fatal("duplicate/reconnect", retry, err)
 			}
+			directEndpoint := destination.Endpoint
+			destination.Endpoint = fmt.Sprintf("https://%s:%d", address, host.ProxyPort)
+			writeRegistry(t, trust, destination)
+			lostKey := "physical-" + transport + "-lost-001"
+			if _, err := client.DispatchRecorded(ctx, routes, "node-a", lostKey, task); err == nil {
+				t.Fatal("fault proxy did not interrupt committed response")
+			}
+			receiptInput, _ := json.Marshal(map[string]string{"directory": host.Directory, "binary": binary, "key": lostKey})
+			receiptBody, err := admin(ctx, twoHostFaultReceipt, receiptInput)
+			var committed submissions.Status
+			if err != nil || json.Unmarshal(receiptBody, &committed) != nil || committed.ID == "" {
+				t.Fatalf("missing independently captured committed receipt: %v %s", err, receiptBody)
+			}
+			routes, err = OpenRouteStore(filepath.Join(local, "routes-"+transport))
+			if err != nil {
+				t.Fatal(err)
+			}
+			recovered, err := client.DispatchRecorded(ctx, routes, "node-a", lostKey, task)
+			if err != nil || recovered.ID != committed.ID {
+				t.Fatal("response-loss retry duplicated submission", recovered, committed, err)
+			}
+			lostResult := wait(lostKey, "succeeded")
+			if lostResult.Result == nil || lostResult.Result.Text != "physical fixture result" {
+				t.Fatal("lost-response result missing", lostResult)
+			}
+			destination.Endpoint = directEndpoint
+			writeRegistry(t, trust, destination)
 			task.Prompt = "block-request"
 			blockedKey := "physical-" + transport + "-cancel-001"
 			if _, err := client.DispatchRecorded(ctx, routes, "node-a", blockedKey, task); err != nil {
@@ -230,7 +259,7 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 			wait(blockedKey, "canceled")
 		})
 	}
-	if calls.Load() != 4 {
+	if calls.Load() != 6 {
 		t.Fatal("duplicate or missing provider calls", calls.Load())
 	}
 	// Revoke the caller using the normal host CLI and an expected current digest.
@@ -242,5 +271,5 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	if _, err := client.Info(ctx, "node-a"); err == nil {
 		t.Fatal("revoked caller retained access")
 	}
-	t.Log("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; four synthetic provider calls")
+	t.Log("physical HTTPS and SSH results/events, running cancellation, reopened caller-store deduplication and revocation passed; six synthetic provider calls including committed response-loss recovery")
 }

@@ -1701,3 +1701,27 @@ This qualifies the physical synthetic lifecycle, not real model quality or
 production deployment. Actual network-loss-after-commit injection, host-restart
 task recovery and physical multicast discovery remain unqualified. Full combined
 make check and normal push are queued behind the existing frozen gate.
+
+## 2026-10-01: Physical committed-response loss recovery
+
+Extended the Mac-to-Spark fixture with an isolated remote TLS fault proxy.
+Ordinary lifecycle checks still contact the production host directly. Only the
+response-loss cases use the proxy: both TLS legs authenticate with disposable
+test credentials, and the proxy captures/fsyncs the production host's accepted
+submission receipt before closing the caller socket without an HTTP response.
+The test independently reads that receipt over strict SSH, reopens caller
+records and retries the same payload/key. HTTPS and SSH recover the same
+submission ID and successful result. Six synthetic provider calls cover four
+successful tasks and two canceled tasks; retries add none. This is physical
+connection/response loss, not a claim of arbitrary packet-loss or partition
+qualification. Production code and admission are unchanged.
+
+Temporary proxy/host processes and credentials are owned and cleaned up by the
+fixture. Host-restart task recovery, physical multicast, real-model qualification
+and production deployment remain open. Full repository gate and normal push
+remain queued behind the already running systemd qualification checkpoint; its
+process and checkout were left untouched.
+
+Final physical test passed without skip: 16.76s (race-enabled Mac package
+18.313s; Linux production binary not race-instrumented). Vet/source/diff gates
+passed. This checkpoint supersedes only the prior waiting two-host gate.
