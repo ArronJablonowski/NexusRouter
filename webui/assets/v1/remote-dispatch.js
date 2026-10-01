@@ -35,7 +35,7 @@ window.NexusRemoteDispatch=(()=>{
    });
    confirm.addEventListener("click",async()=>{
     if(busy||!reviewed||confirm.hidden)return;
-    try{const url=new URL(window.location.href);url.searchParams.set("remote_peer",peer.id);url.searchParams.set("remote_request",key);window.history.replaceState(null,"",url);}catch{notice.textContent="Cannot preserve the request recovery link. No work was sent.";return;}
+    try{const url=new URL(window.location.href);url.hash=new URLSearchParams({remote_peer:peer.id,remote_request:key}).toString();window.history.replaceState(null,"",url);}catch{notice.textContent="Cannot preserve the request recovery link. No work was sent.";return;}
     busy=true;const task=reviewed;reviewed=null;confirm.hidden=true;review.disabled=true;Object.values(fields).forEach(f=>f.disabled=true);notice.textContent="Sending request "+key+"…";
     try{
      const response=await fetch(base+"/api/v1/remote-dispatch",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json","X-Darwin-CSRF":csrf},body:JSON.stringify({version:1,instance:peer.id,request_id:key,task})});
@@ -48,7 +48,7 @@ window.NexusRemoteDispatch=(()=>{
   }
   another.addEventListener("click",()=>{if(!busy){notice.textContent="Creating a separate request does not retry or cancel previous work.";draft();}});
   card.append(title,notice,body,another);parent.append(card);
-  try{const url=new URL(window.location.href),key=url.searchParams.get("remote_peer")===peer.id?url.searchParams.get("remote_request"):null;if(key){if(!/^[A-Za-z0-9_-]{16,64}$/.test(key))throw Error();notice.textContent="Recovered request ID. Inspect its status before starting replacement work.";recover(key);}else draft();}catch{notice.textContent="Request recovery is unavailable. No work was sent.";}
+  try{const params=new URLSearchParams(new URL(window.location.href).hash.slice(1)),key=params.get("remote_peer")===peer.id?params.get("remote_request"):null;if(key){if(!/^[A-Za-z0-9_-]{16,64}$/.test(key))throw Error();notice.textContent="Recovered request ID. Inspect its status before starting replacement work.";recover(key);}else draft();}catch{notice.textContent="Request recovery is unavailable. No work was sent.";}
  }
  return {attach};
 })();

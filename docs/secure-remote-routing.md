@@ -1133,9 +1133,10 @@ configured remote certificate and its paired scopes.
 Peers with dispatch permission expose a form for an explicitly chosen model,
 optional external harness, task domain/profile, context, cost and privacy. The
 user reviews the exact request before sending. A new random request ID and peer
-are put in the page URL before sending; these are recovery references, never
-authority. No prompt, credential or authoritative task state enters browser
-storage or the URL. Bookmark/copy this recovery URL before closing the page if
+are put in the page URL fragment before sending; these are recovery references, never
+authority. Fragments are not sent in HTTP requests; the production Settings route keeps
+rejecting query strings. No prompt, credential or authoritative task state enters
+browser storage or the URL. Bookmark/copy this recovery URL before closing the page if
 it is needed later. Changing to a new request replaces the recovery reference
 in the current page; it does not cancel or retry earlier work.
 

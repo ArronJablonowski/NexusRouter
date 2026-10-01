@@ -1194,3 +1194,18 @@ repository validation and push remain pending. No live daemon, SSH account or
 trust changes. This exposes explicit routing only; automated accuracy selection
 in the browser, continuous streaming, discovery and physical two-host
 qualification remain incomplete.
+
+
+## 2026-10-01 — production recovery-link boundary correction
+
+Production-handler audit found the prior synthetic browser fixture accepted
+Settings query parameters that the real shell rejects. Remote dispatch recovery
+now uses only URL fragments, retaining the unchanged query-string restriction.
+The fragment contains peer/request references, not prompts or authority.
+Added a real HTTP client/server test with authenticated production Handler: the
+fragment URL loads the shell without dispatch; the former query URL stays 400.
+The Node workflow verifies a query-free fragment before sending and reload
+recovery without another dispatch. This corrects a deployment gap not covered by
+the earlier synthetic UI fixture; prior browser evidence alone was insufficient
+to prove production recovery. Reviewed asset digest updated; full combined gate
+remains required before push.
