@@ -11295,3 +11295,31 @@ race suite with native Pi and SSH enabled passed (31.083s/1.725s); targeted vet,
 source formatting/size and diff checks passed. Full repository check/push is
 queued after the task-inventory checkpoint. Other four harnesses inherit the
 shared SDK path but are not claimed remotely qualified by this Pi fixture.
+
+### DAR-133 — five installed harnesses through native SSH
+
+Extended the durable remote lifecycle fixture to operator-pinned Pi, OpenClaw,
+Goose, OpenHands and Hermes registrations, each using an isolated SSH server,
+mTLS, a synthetic local provider and disposable journals/evidence. Pi (9.98s),
+OpenClaw (15.40s), Goose (9.83s) and Hermes (11.90s) passed the initial matrix.
+OpenHands initially failed after launch: its SDK rejects an 8192-token context
+below its required 16384. A fixture-only stderr overlay identified that precise
+exception; production stderr handling was unchanged. The OpenHands adapter now
+rejects smaller contexts before its admission callback/process launch, with a
+regression test. The corrected OpenHands remote case passed (12.31s). Original
+failure/diagnostic logs remain in reporting outputs.
+
+All five qualified cases exercise committed-intake and queued-cancel response
+loss, same-key recovery without duplicate execution, results/events and exact
+actual harness/model revision/difficulty, evidence recording and running cancel.
+These are protocol/lifecycle fixtures, not model quality or physical two-host
+qualification. Host tools remain covered separately; this matrix is text-only.
+The OpenHands race package passed (2.151s); targeted vet/source/diff checks passed.
+
+Consolidated the three waiting remote validation supervisors before any began
+running tests. Their prior phases/commits are preserved with superseded status.
+One full check of this descendant branch will cover all remote changes after the
+currently running e44dacf harness gate, followed by a normal branch push if clean
+and successful. No active gate, inference coordinator, provider resident or live
+service was stopped. Automatic remote accuracy-first selection, pairing UX,
+physical two-host tests and operational policy remain open.

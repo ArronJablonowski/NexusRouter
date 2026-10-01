@@ -50,7 +50,7 @@ func TestRemoteSDKNativeHarnessSSH(t *testing.T) {
 	remoteSDKLifecycle(t, true, true)
 }
 
-func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
+func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations ...config.NativeHarness) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	var calls atomic.Int32
@@ -80,20 +80,29 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
 	cfg.Models = []config.Model{{ID: "chat", Provider: "local", Model: "fixture", Locality: "local", RAMBytes: 1, Capabilities: []string{"chat"}, ContextTokens: 8192, EstimatedCost: &zero}}
 	task := testTask()
 	if native {
-		executable, err := exec.LookPath("pi")
-		if err != nil {
-			t.Fatal(err)
+		var registration config.NativeHarness
+		if len(registrations) == 0 {
+			executable, err := exec.LookPath("pi")
+			if err != nil {
+				t.Fatal(err)
+			}
+			bytes, err := os.ReadFile(executable)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := sha256.Sum256(bytes)
+			registration = config.NativeHarness{ID: "pi-fixture", Kind: "pi", ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(sum[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}
+		} else {
+			registration = registrations[0]
 		}
-		bytes, err := os.ReadFile(executable)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sum := sha256.Sum256(bytes)
 		cfg.Tools.Enabled = false
 		cfg.NativeHarnessEvidenceDir = filepath.Join(t.TempDir(), "evidence")
-		cfg.NativeHarnesses = []config.NativeHarness{{ID: "pi-fixture", Kind: "pi", ModelID: "chat", Executable: executable, ExecutableSHA256: hex.EncodeToString(sum[:]), ModelRevision: "fixture-v1", MaxOutputTokens: 1024, OverheadRAMBytes: 64 << 20, Prices: &config.NativeHarnessPrices{}}}
-		task.ContextTokens = 8192
-		task.HarnessID = "pi-fixture"
+		cfg.NativeHarnesses = []config.NativeHarness{registration}
+		if registration.Kind == "openhands" {
+			cfg.Models[0].ContextTokens = 16384
+		}
+		task.ContextTokens = cfg.Models[0].ContextTokens
+		task.HarnessID = cfg.NativeHarnesses[0].ID
 		task.HarnessDifficulty = "hard"
 	}
 	body, e := yaml.Marshal(cfg)
@@ -118,11 +127,11 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
 	}
 	f := setup(t)
 	f.http.Close()
-	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Local: true, ContextTokens: 8192}}}
+	backend := &SDKBackend{Client: sdkClient, Models: []Model{{EstimatedCost: &zero, ID: "chat", Local: true, ContextTokens: cfg.Models[0].ContextTokens}}}
 	if native {
-		backend.Harnesses = []Harness{{ID: "pi-fixture", ModelID: "chat", Kind: "pi", ModelRevision: "fixture-v1"}}
+		backend.Harnesses = []Harness{{ID: task.HarnessID, ModelID: "chat", Kind: cfg.NativeHarnesses[0].Kind, ModelRevision: "fixture-v1"}}
 		authorized := f.clientPeer
-		authorized.Harnesses = []string{"pi-fixture"}
+		authorized.Harnesses = []string{task.HarnessID}
 		writeRegistry(t, f.serverTrust, authorized)
 	}
 	server, e := NewServer("node-a", TrustFile(f.serverTrust), f.journal, backend)
@@ -157,7 +166,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
 	peer := f.serverPeer
 	peer.Endpoint = "https://" + ln.Addr().String()
 	if native {
-		peer.Harnesses = []string{"pi-fixture"}
+		peer.Harnesses = []string{task.HarnessID}
 	}
 	if interruptedSSH {
 		sshConfig := nativeSSHServer(t)
@@ -240,7 +249,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
 			}
 			if native {
 				actual, err := runtime.ValidateHarnessOutcome(page.Events, status.TaskIDs[0])
-				if err != nil || actual.Actual.Harness != "pi" || actual.Actual.Model != "fixture" || actual.Actual.ModelRevision != "fixture-v1" || actual.Task.Difficulty != "hard" {
+				if err != nil || actual.Actual.Harness != cfg.NativeHarnesses[0].Kind || actual.Actual.Model != "fixture" || actual.Actual.ModelRevision != "fixture-v1" || actual.Task.Difficulty != "hard" {
 					t.Fatal(actual, err)
 				}
 			}
@@ -251,7 +260,11 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool) {
 			break
 		}
 		if status.State == "failed" {
-			t.Fatal(status)
+			if len(status.TaskIDs) > 0 {
+				page, err := f.client.Events(ctx, "node-a", request, status.TaskIDs[0], 0)
+				t.Logf("failed fixture events: %+v (error %v)", page, err)
+			}
+			t.Fatalf("failed submission: %+v result: %+v", status, status.Result)
 		}
 		select {
 		case <-ctx.Done():

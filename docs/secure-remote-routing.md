@@ -169,11 +169,21 @@ are rejected; no substitution to native completion or another harness occurs.
 Automatic cross-instance model/harness selection remains unfinished and `auto`
 is rejected in this explicit protocol.
 
-The native integration fixture qualifies installed Pi through actual OpenSSH,
+The native integration fixture qualifies installed harnesses through actual OpenSSH,
 pinned mTLS and the durable SDK queue with a local synthetic provider. It covers
 lost-response recovery, duplicate suppression, returned identity/difficulty,
 results/events, and queued/running cancellation. This is not a real-model quality
-measurement or physical two-host qualification of all five harnesses.
+measurement or physical two-host qualification.
+
+The opt-in all-harness matrix accepts an operator-owned JSON array of five pinned
+`config.NativeHarness` registrations via `NEXUS_REMOTE_HARNESS_FIXTURES`, with
+`NEXUS_REMOTE_SSH_NATIVE=1`. Run `go test -race ./remote -run
+'^TestRemoteSDKAllNativeHarnessesSSH$' -v`. The fixture registrations must use
+model ID `chat`, revision `fixture-v1`, and text-only mode; they identify installed
+runtimes, never a production provider. The test creates disposable providers,
+ledgers and SSH credentials. OpenHands SDK 1.50.1 requires at least 16,384 context
+tokens; its adapter rejects smaller contexts before admission or process launch.
+The other four fixtures currently use 8,192.
 
 ## Protocol and durability
 
