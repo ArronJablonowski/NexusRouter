@@ -135,6 +135,9 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		h.serveBoardEvents(writer, request, board)
 		return
 	}
+	if h.serveRemoteEvents(writer, request) {
+		return
+	}
 	if h.serveRemoteTaskControl(writer, request) {
 		return
 	}

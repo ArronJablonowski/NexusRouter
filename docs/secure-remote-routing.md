@@ -1105,3 +1105,17 @@ and dismiss buttons. Loading status or refreshing membership invalidates an open
 confirmation. An uncertain cancellation disables another attempt until status is
 loaded again; the client does not automatically retry. Revocation continues to
 require the displayed registry digest and does not cancel already admitted work.
+
+
+### Browser lifecycle event pages
+
+With remote task controls enabled, loading a request's current status exposes
+progress controls for its task IDs. Refresh starts at the first page and Next
+loads at most 100 additional lifecycle facts. Each request rechecks authenticated
+status ownership and uses the normal remote client's inspect scope, TLS pins,
+revocation and selected HTTPS/SSH transport. The browser projection contains only
+event sequence, kind and timestamp, plus page state/cursors. Raw runtime data
+(prompt messages, tool arguments and configuration) is not forwarded; final text
+remains available from task status. Failed or malformed pages clear displayed
+progress and require an explicit refresh. There is no background polling, event
+stream, inference dispatch or automatic retry in these controls.

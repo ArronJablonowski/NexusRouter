@@ -53,7 +53,13 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 		case "/v1/remote/tasks":
 			json.NewEncoder(w).Encode(remote.TaskPage{Version: 1, Instance: "node-a", After: r.Header.Get("X-Nexus-After-Request"), Next: "request-existing-0001", Tasks: []remote.TaskSummary{{RequestID: "request-existing-0001", State: "running", TaskIDs: []string{"task-1"}}}})
 		case "/v1/remote/tasks/request-existing-0001":
-			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-a", State: "running"})
+			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-a", State: "running", TaskIDs: []string{"task-1"}})
+		case "/v1/remote/tasks/request-existing-0001/events":
+			if r.Header.Get("X-Nexus-Task") != "task-1" || r.Header.Get("X-Nexus-After") != "0" {
+				http.Error(w, "invalid", 400)
+				return
+			}
+			json.NewEncoder(w).Encode(browserEventPage())
 		case "/v1/remote/tasks/request-existing-0001/cancel":
 			cancellations.Add(1)
 			json.NewEncoder(w).Encode(submissions.Status{Version: 1, ID: "submission-a", State: "running", CancelRequested: true})
@@ -130,13 +136,27 @@ func TestBrowserRemoteInspectionUsesPinnedMTLSAndFreshRevocation(t *testing.T) {
 	if calls.Load() != 6 || cancellations.Load() != 1 {
 		t.Fatal("wrong control calls", calls.Load(), cancellations.Load())
 	}
+	events := func(want int) {
+		t.Helper()
+		r := authorizedMutationRequest(t, h, "/app/api/v1/remote-task-events", `{"version":1,"instance":"node-a","request_id":"request-existing-0001","task_id":"task-1","after":0}`)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != want {
+			t.Fatalf("events %d want %d: %s", w.Code, want, w.Body.String())
+		}
+	}
+	events(200)
+	if calls.Load() != 8 {
+		t.Fatal("events did not use authenticated status and events calls", calls.Load())
+	}
 	if _, err = trust.Revoke("node-a", registry.Digest()); err != nil {
 		t.Fatal(err)
 	}
+	events(503)
 	inspect("info", 503)
 	inspect("tasks", 503)
 	control("cancel", 503)
-	if calls.Load() != 6 || cancellations.Load() != 1 {
+	if calls.Load() != 8 || cancellations.Load() != 1 {
 		t.Fatal("revoked peer contacted")
 	}
 }

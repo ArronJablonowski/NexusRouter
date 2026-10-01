@@ -1146,3 +1146,23 @@ requirements remain open.
 Replaced browser-native confirmation dialogs for cancellation and peer revocation with accessible inline groups naming the request/peer and effect. Opening/dismissing makes no request; status/membership refresh invalidates confirmation, busy guards prevent duplicate submissions, and uncertain cancellation still requires status reload. Existing backend authentication, CSRF, scopes, expected-submission and registry-digest checks are unchanged.
 
 Web UI race suite passed (9.755s), targeted vet/source/diff checks passed after explicitly updating the reviewed embedded asset digest. Behavior tests cover dismissal, stale confirmations, duplicate clicks and uncertain responses. A real in-app browser exercised production assets against a disposable synthetic HTTP API: exactly one cancel despite a simulated applied-but-503 response, status recovery showing cancellation requested, and one explicitly confirmed revocation. Reporting evidence: outputs/remote-settings-inline-qa. This closes the prior native-dialog browser-check obstruction; it is not live deployment, backend security qualification or physical two-system testing. Full repository validation remains required before push.
+
+
+## 2026-10-01 — DAR-133 browser lifecycle progress
+
+Added authenticated, CSRF-protected remote-task-events BFF and bounded browser
+progress pagination for task IDs from current submission status. Each page
+rechecks task ownership and validates the full remote EventPage before emitting
+only lifecycle kind/time/sequence. Raw event payloads remain excluded. Uses the
+existing inspect permission and HTTPS/SSH client; no new live configuration.
+
+Focused UI and BFF race suites passed (9.753s/4.287s), including actual pinned
+mTLS client calls and fresh revocation. Initial fixture used an invalid config
+hash and was correctly rejected; corrected fixture preserves strict validation.
+Node behavior tests cover pagination, malformed sequences, no duplicate loads,
+stale clearing and no retry. Real in-app browser traversed two synthetic progress
+pages using production assets (reporting outputs/remote-events-browser-qa); this
+is UI fixture evidence, not physical remote-system qualification. Reviewed asset
+digest updated after the display-label correction. Full repository check and
+normal backup remain queued requirements. Browser dispatch, continuous streaming,
+unpaired discovery and physical two-host qualification remain incomplete.
