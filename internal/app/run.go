@@ -136,6 +136,7 @@ func validRuntimeHostWorkerID(value string) bool {
 }
 
 type Result struct {
+	HarnessEvidenceStatus   string
 	HarnessOutcome          *harness.Execution
 	HarnessSelection        *harness.Selection
 	HarnessReview           *harness.Review

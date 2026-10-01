@@ -34,6 +34,7 @@ func projectNativeTerminal(events []runtime.Event, out TerminalOutcome) (Termina
 		copy := *usage
 		out.Result.Usage = &copy
 	}
+	out.Result.HarnessEvidenceStatus = "not_recovered"
 	out.Result.Text = last.Data.Text
 	out.Result.Turns = 1
 	out.Result.FinishReason = "stop"

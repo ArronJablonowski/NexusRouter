@@ -128,7 +128,7 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 				}
 				if status.State != "queued" && status.State != "running" {
 					if mode == "complete" {
-						if status.State != "succeeded" || status.Result == nil || status.Result.Text != "queued native answer" || len(status.TaskIDs) != 1 || calls.Load() != 1 || status.Result.Usage == nil || status.Result.Usage.InputTokens != 10 {
+						if status.State != "succeeded" || status.Result == nil || status.Result.Text != "queued native answer" || len(status.TaskIDs) != 1 || calls.Load() != 1 || status.Result.Usage == nil || status.Result.Usage.InputTokens != 10 || status.Result.HarnessEvidenceStatus != "recorded" {
 							t.Fatal(status, e, calls.Load())
 						}
 						outcome, e := client.ReconcileHarnessOutcome(ctx, ledger, status.Result.TaskID)

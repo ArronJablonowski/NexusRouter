@@ -247,6 +247,11 @@ func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
+	if result.HarnessEvidenceStatus != "" {
+		if _, err := fmt.Fprintln(stderr, "Harness evidence:", result.HarnessEvidenceStatus); err != nil {
+			return 1
+		}
+	}
 	if result.AuditStatus != "" {
 		if _, writeErr := fmt.Fprintln(stderr, "Audit:", result.AuditStatus, result.AuditID); writeErr != nil {
 			return 1

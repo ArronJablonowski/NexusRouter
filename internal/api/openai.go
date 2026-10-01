@@ -90,6 +90,9 @@ func (h *Handler) serveChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if u := result.Usage; u != nil && u.InputTokens >= 0 && u.OutputTokens >= 0 && u.InputTokens <= (1<<63-1)-u.OutputTokens {
 		response["usage"] = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
 	}
+	if result.HarnessEvidenceStatus != "" {
+		response["nexus_harness_evidence_status"] = result.HarnessEvidenceStatus
+	}
 	writeJSON(w, 200, response)
 }
 

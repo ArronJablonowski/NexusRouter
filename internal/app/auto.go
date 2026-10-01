@@ -210,6 +210,9 @@ func (s *Service) Run(ctx context.Context, r Request) (result Result, runErr err
 			}
 		}
 	}
+	if runErr == nil && result.HarnessOutcome != nil {
+		result = s.recordNativeCompleted(ctx, result)
+	}
 	if runErr == nil && r.runtimeHostAdmission == nil && s.settings.Evaluation.Judge && s.settings.Evaluation.AutoReviewModel != "" {
 		if result.HarnessOutcome != nil {
 			return s.reviewNativeCompleted(ctx, result), runErr

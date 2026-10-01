@@ -632,3 +632,25 @@ commit is lost, recovery closes the started task as interrupted with no accepted
 output or invented usage and never repeats inference. These fixtures exercise
 persistence/recovery boundaries; they are not full operating-system kill or
 orphan-process qualification of each installed runtime.
+
+## Automatic outcome persistence
+
+After canonical harness completion, a configured service copies the verified
+outcome into its evidence ledger automatically. The SDK result exposes
+`HarnessEvidenceStatus`; native submission results use `harness_evidence_status`,
+and chat responses/final SSE chunks use `nexus_harness_evidence_status`. CLI text
+output reports the status too. Values are `recorded`, `not_configured`, or `failed`.
+A failure leaves the completed task successful and repairable through canonical
+reconciliation; it never triggers another inference. The copy has a separate
+five-second persistence budget and does not execute a model or evaluator.
+Recovered task results use `not_recovered` until ledger reconciliation is verified.
+A crash between canonical completion and copying still requires reconciliation;
+a background catch-up sweep is not yet implemented.
+
+An execution record alone contributes pending output, not a confirmed or advisory
+quality vote. Configured automated review continues to use the existing bound
+review/expected-head rules. Without review evidence, the selector can choose a
+stable tie-break among otherwise authorized eligible pairs and explicitly labels
+its reason `insufficient_evidence_stable_tiebreak`. This cold start is not an
+accuracy claim. Earlier empty-store non-dispatch tests also had no registered
+candidates; they do not establish a general prohibition on cold-start inference.

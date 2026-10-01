@@ -60,7 +60,7 @@ func TestNativeRecoveryRestoresUnacknowledgedCompletion(t *testing.T) {
 	if err := dispatcher.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 1 || providerCalls.Load() != 0 || status.Result == nil || status.Result.Text != "durable answer" || status.Result.Turns != 1 || status.Result.FinishReason != "stop" || status.Result.Usage == nil || status.Result.Usage.InputTokens != 10 || status.Result.AuditStatus != "not_recovered" {
+	if calls != 1 || providerCalls.Load() != 0 || status.Result == nil || status.Result.Text != "durable answer" || status.Result.Turns != 1 || status.Result.FinishReason != "stop" || status.Result.Usage == nil || status.Result.Usage.InputTokens != 10 || status.Result.AuditStatus != "not_recovered" || status.Result.HarnessEvidenceStatus != "not_recovered" {
 		t.Fatal(status, calls, providerCalls.Load())
 	}
 	after, err := reopened.Read(ctx, "native-recovery", 0, 100)

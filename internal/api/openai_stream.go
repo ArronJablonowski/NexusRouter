@@ -76,8 +76,12 @@ func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req ap
 		}
 	}()
 	id, created := "chatcmpl-"+rand.Text(), time.Now().Unix()
+	harnessEvidenceStatus := ""
 	frame := func(choices []any, usage any) error {
 		payload := map[string]any{"id": id, "object": "chat.completion.chunk", "created": created, "model": req.ModelID, "choices": choices}
+		if harnessEvidenceStatus != "" {
+			payload["nexus_harness_evidence_status"] = harnessEvidenceStatus
+		}
 		if includeUsage {
 			payload["usage"] = usage
 		}
@@ -154,6 +158,7 @@ func (h *Handler) serveChatStream(w http.ResponseWriter, r *http.Request, req ap
 		}
 		usage = map[string]int64{"prompt_tokens": u.InputTokens, "completion_tokens": u.OutputTokens, "total_tokens": u.InputTokens + u.OutputTokens}
 	}
+	harnessEvidenceStatus = result.HarnessEvidenceStatus
 	var finish any
 	switch result.FinishReason {
 	case "stop", "length", "content_filter", "tool_calls", "function_call":

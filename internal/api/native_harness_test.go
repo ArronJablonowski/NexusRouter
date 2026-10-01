@@ -18,7 +18,7 @@ func TestChatHarnessSelectionPreservesAuthorityBoundary(t *testing.T) {
 			if req.HarnessID != "pi-local" || req.ModelID != "m" || len(req.Messages) != 1 || req.Messages[0].Content != "hi" {
 				t.Fatal("lost selection or context", req)
 			}
-			return app.Result{TaskID: "task", Text: "answer", FinishReason: "stop"}, nil
+			return app.Result{TaskID: "task", Text: "answer", FinishReason: "stop", HarnessEvidenceStatus: "recorded"}, nil
 		}
 		s.Run = run
 		s.RunTextStream = func(ctx context.Context, r app.Request, emit func(string) error) (app.Result, error) {
@@ -46,7 +46,7 @@ func TestChatHarnessSelectionPreservesAuthorityBoundary(t *testing.T) {
 		}
 		w = httptest.NewRecorder()
 		h.ServeHTTP(w, request("POST", "/v1/chat/completions", body))
-		if w.Code != 200 || calls != 1 || !strings.Contains(w.Body.String(), "answer") {
+		if w.Code != 200 || calls != 1 || !strings.Contains(w.Body.String(), "answer") || !strings.Contains(w.Body.String(), `"nexus_harness_evidence_status":"recorded"`) {
 			t.Fatal(w.Code, w.Body.String(), calls)
 		}
 	}

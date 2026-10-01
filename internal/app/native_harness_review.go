@@ -91,7 +91,30 @@ func (s *Service) reviewNativeCompleted(ctx context.Context, result Result) Resu
 		}
 		return result
 	}
+	result.HarnessEvidenceStatus = "recorded"
 	result.HarnessReview = &review
 	result.HarnessReviewStatus = "recorded"
+	return result
+}
+
+// Ledger persistence follows canonical completion and must never cause inference
+// retry. A failed copy is repairable from the immutable task journal.
+func (s *Service) recordNativeCompleted(ctx context.Context, result Result) Result {
+	result.HarnessEvidenceStatus = "not_configured"
+	if s.harnessEvidence == nil {
+		return result
+	}
+	result.HarnessEvidenceStatus = "failed"
+	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	db, err := telemetry.OpenReadOnly(persist, s.settings.Telemetry.Database)
+	if err != nil {
+		return result
+	}
+	defer db.Close()
+	outcome, err := runtime.RecordHarnessOutcome(persist, db, s.harnessEvidence, result.TaskID, time.Now().UTC())
+	if err == nil && result.HarnessOutcome != nil && outcome == *result.HarnessOutcome {
+		result.HarnessEvidenceStatus = "recorded"
+	}
 	return result
 }

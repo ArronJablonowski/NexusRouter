@@ -10387,3 +10387,24 @@ output is closed as interrupted, never replayed. Targeted vet/source/diff checks
 passed. Full repository gate remains queued before push; actual OS-process kill,
 orphan cleanup, all-platform network-fault and tool-workflow qualification remain
 open. No live task or evidence store was modified.
+
+## Automatic harness outcome ingestion — DAR-132 (2026-10-01)
+
+Successful native execution now copies its canonical, hash-bound outcome into a
+configured evidence ledger before optional advisory review. It reports recorded,
+not_configured or failed through SDK, queued results, CLI and chat metadata. A
+failed evidence copy does not turn durable execution into a retry; canonical
+reconciliation repairs it without new inference. Persistence is bounded separately
+to five seconds. Recovered results truthfully report not_recovered for the separate
+ledger. Execution success still contributes only pending evidence, not quality.
+
+Installed Pi SDK race tests passed (33.735s) for automatic pending-record creation,
+no-store/closed-store success, repair without inference, zero fabricated quality,
+queued status and advisory review compatibility. API metadata/stream regressions
+passed (9.194s), terminal projection regressions (1.632s), and native recovery
+regressions (5.665s); targeted vet/source/diff passed. Full gate remains queued.
+No live data changed. A catch-up sweep across crash gaps, tool workflows and
+broader qualification remain open. Clarification: empty-store tests with zero
+registered candidates prove no dispatch in that condition only. Eligible cold
+starts may use the selector's explicitly labeled insufficient-evidence stable
+tie-break; they are not evidence-backed accuracy rankings.
