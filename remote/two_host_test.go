@@ -89,6 +89,9 @@ func TestPhysicalTwoHostHTTPSAndSSH(t *testing.T) {
 	registration := physicalHarnessRegistration(t)
 	if registration != nil {
 		cfg.NativeHarnesses = []config.NativeHarness{*registration}
+		if registration.Kind == "openhands" {
+			cfg.Models[0].ContextTokens = 16384
+		}
 		cfg.NativeHarnessEvidenceDir = "FIXTURE_DIRECTORY/evidence"
 	}
 	ca := newCA(t)

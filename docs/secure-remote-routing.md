@@ -1625,14 +1625,16 @@ it does not change TLS certificate validity, evidence/review timestamps or the
 destination's resource-admission clock checks. Configured identity remains an
 advisory preview and must match the actual completed harness identity.
 
-### Physical Pi, OpenClaw and Goose fixtures
+### Physical external-harness fixtures
 
 The two-host fixture optionally accepts `NEXUS_REMOTE_TEST_HARNESS_FIXTURE`, a
-local JSON file containing one pinned Pi, OpenClaw or Goose registration for destination model
+local JSON file containing one pinned Pi, OpenClaw, Goose or OpenHands registration for destination model
 `chat`, revision `fixture-v1`, with native tools disabled. The referenced
 executable must already exist on the destination. `NEXUS_REMOTE_TEST_PATH` may
 supply an explicit absolute-component PATH for its Node runtime; it changes
 only the disposable host environment. No installer runs from this fixture.
+OpenHands uses its required 16384-token context; other fixtures use 8192.
+Python-based OpenHands also requires a host-attested dependency-manifest digest.
 
 The transport cases use this harness for successful dispatch, response-loss
 recovery and running cancellation over both HTTPS and SSH. Identity is read

@@ -1964,3 +1964,27 @@ source/binary hashes, original physical-test.log, parent-death-test.log and
 physical-parent-death-fixed.log. DAR-133 remains In Progress, including unresolved
 Mac advertised-service identity/permission qualification. Combined full validation
 and normal push queued behind the existing frozen gate.
+
+## 2026-10-01 — physical OpenHands remote lifecycle
+
+Fresh PyPI metadata confirms openhands-sdk1.50.1, matching the adapter. Prepared
+isolated Spark Python3.12 venv with wheels only; captured dependency freeze,
+interpreter SHA256 and installation report with hashes for138 distributions.
+Existing environments unchanged. Physical fixture now permits pinned OpenHands
+and supplies its required16384 context; normal resource admission remains.
+
+Actual Mac-to-Spark OpenHands over HTTPS/SSH passed63.03s (Mac race64.577s),
+including identity-bound durable results/events, cancellation, committed-response
+loss recovery, reopened caller-store deduplication, revocation and controlled
+host-crash recovery. Original owned child execution ended naturally; interrupted
+lineage failed without replay/fabricated output and queued work completed once.
+Exactly eight synthetic provider calls. Independent cleanup found no fixture
+host directories; existing OllamaPID2145 remained untouched. Source formatting,
+size, remote vet and diff checks passed. Linux host is not race-instrumented;
+this does not qualify model quality, arbitrary native tools or power loss.
+
+Evidence: reporting outputs/spark-openhands-qualification contains pinned runtime
+manifest, install report, registration and physical-test.log. Full combined
+validation/normal push queued behind existing live gate. DAR-133 remains In
+Progress; Hermes physical qualification and Mac advertised-service permission
+identity remain open alongside broader acceptance work.
