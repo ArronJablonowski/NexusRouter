@@ -51,6 +51,10 @@ func TestSDKHarnessEvidenceCanonicalReviewAndRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cursor, copied, err := client.ReconcileHarnessEvidencePage(ctx, ledger, sdk.HarnessEvidenceCursor{})
+	if err != nil || copied != 1 || cursor.After != 4 {
+		t.Fatal(cursor, copied, err)
+	}
 	outcome, err := client.ReconcileHarnessOutcome(ctx, ledger, "completed")
 	if err != nil {
 		t.Fatal(err)

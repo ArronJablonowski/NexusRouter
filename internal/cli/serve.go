@@ -167,6 +167,7 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 	var providerHealthRecorder *app.ProviderHealthRecorder
 	var workboardScheduler *app.WorkboardScheduleSupervisor
 	var browserHandler *webuiapp.Handler
+	var harnessCatchup *app.HarnessEvidenceCatchup
 	healthReport := func(ctx context.Context) (health.Report, error) {
 		if dispatcher == nil {
 			return health.Report{}, errors.New("supervisor unavailable")
@@ -174,6 +175,13 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		report, err := service.HealthReport(ctx, dispatcher.Health())
 		if err != nil {
 			return health.Report{}, err
+		}
+		if harnessCatchup != nil {
+			report.Checks = append(report.Checks, harnessCatchup.Health())
+			report.Status, report.Ready = health.Outcome(report.Checks)
+			if err := report.Validate(); err != nil {
+				return health.Report{}, err
+			}
 		}
 		report, err = withConfiguredLearningHealth(report, learner.Health())
 		if err != nil {
@@ -468,6 +476,12 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 		return 1
 	}
 	defer outcomeSupervisor.Close()
+	harnessCatchup, err = app.StartHarnessEvidenceCatchup(ctx, service, db)
+	if err != nil {
+		fmt.Fprintln(stderr, "cannot start harness evidence catch-up")
+		return 1
+	}
+	defer harnessCatchup.Close()
 	dispatcher, err = app.StartDispatcher(ctx, service)
 	if err != nil {
 		fmt.Fprintln(stderr, "cannot start task dispatcher")

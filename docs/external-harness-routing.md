@@ -644,8 +644,21 @@ A failure leaves the completed task successful and repairable through canonical
 reconciliation; it never triggers another inference. The copy has a separate
 five-second persistence budget and does not execute a model or evaluator.
 Recovered task results use `not_recovered` until ledger reconciliation is verified.
-A crash between canonical completion and copying still requires reconciliation;
-a background catch-up sweep is not yet implemented.
+The daemon now runs a catch-up worker when evidence storage is configured. It
+scans at most 100 journal events per second with a five-second page budget,
+revalidates each completed harness protocol and copies only immutable outcomes.
+It uses the already-open daemon store, avoiding a full database integrity scan
+on every tick. A failed copy retains its scan position for retry and exposes a
+`harness_evidence` degraded health check; inference remains available. The worker
+is canceled and joined before its storage handles close.
+
+Its cursor is in memory and bound to the workspace identity. Restart replays from
+zero; exact copies remain idempotent. SDK hosts can schedule
+`ReconcileHarnessEvidencePage` themselves, starting with a zero cursor after
+restart or replacing the ledger. SDK page calls open and integrity-check the
+canonical database before their bounded event scan. Neither path runs inference
+or creates reviews. Invalid canonical evidence blocks that position visibly
+rather than being skipped. Historical result metadata is not rewritten by repair.
 
 An execution record alone contributes pending output, not a confirmed or advisory
 quality vote. Configured automated review continues to use the existing bound

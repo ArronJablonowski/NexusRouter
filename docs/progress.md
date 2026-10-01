@@ -10408,3 +10408,26 @@ broader qualification remain open. Clarification: empty-store tests with zero
 registered candidates prove no dispatch in that condition only. Eligible cold
 starts may use the selector's explicitly labeled insufficient-evidence stable
 tie-break; they are not evidence-backed accuracy rankings.
+
+### 2026-10-01 — DAR-132 canonical evidence catch-up
+
+The daemon now repairs the completion-to-ledger crash gap automatically when
+harness evidence storage is configured. A worker scans at most 100 journal events
+per tick, validates the full native completion protocol, and copies immutable
+outcomes without inference or reviews. It reuses the daemon store, has a five-second
+page budget, retains the failed position for retry, exposes supplemental
+harness_evidence health, and cancels/joins before ledger closure. Restart scans
+from zero idempotently. SDK hosts can schedule bounded reconciliation pages with
+workspace-bound cursors; those calls include the normal database-open integrity
+check. Failed/canceled tasks never become quality evidence. Existing result status
+metadata is not retroactively rewritten.
+
+Race verification passed: catch-up failure/retry, restart deduplication, actual
+worker repair, workspace mismatch, scan limits, no extra inference, pending-only
+quality and lifecycle (5.719s); SDK canonical evidence (5.088s), health (2.015s),
+CLI serve/health (2.776s), plus selected app health regressions (32.963s before the
+final worker store-reuse refinement). Targeted vet, source formatting/size and
+whitespace checks passed. Full make check remains queued behind the live Pi base
+gate before push. No live data/configuration changed. Tools, real held-out quality,
+OS-kill/orphan/network/platform qualification and automatic audit-review catch-up
+remain open; this worker copies outcomes, not judgments.

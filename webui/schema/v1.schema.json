@@ -3152,7 +3152,7 @@
       "additionalProperties": false,
       "required": ["component", "status", "code"],
       "properties": {
-        "component": {"enum": ["daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "trace_export", "resources", "provider", "model"]},
+        "component": {"enum": ["daemon", "database", "supervisor", "learning", "skill_regression", "metrics_export", "trace_export", "harness_evidence", "resources", "provider", "model"]},
         "id": {"type": "string", "minLength": 1, "maxLength": 128, "x-maxBytes": 128},
         "status": {"enum": ["healthy", "degraded", "unavailable", "disabled", "unknown"]},
         "code": {"enum": ["learning_budget_wait", "serving", "available", "unavailable", "configuration_limit", "disabled_by_policy", "credentials_missing", "discovery_failed", "model_missing", "model_metadata_missing", "capacity_available", "capacity_exhausted", "metrics_unknown", "supervisor_unavailable", "supervisor_ok", "supervisor_starting", "supervisor_stopping", "supervisor_stopped", "supervisor_error", "supervisor_stalled"]}

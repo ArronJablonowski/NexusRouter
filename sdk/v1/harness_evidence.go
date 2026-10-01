@@ -75,3 +75,15 @@ func (c *Client) ReconcileHarnessAudit(ctx context.Context, ledger *harness.Evid
 	}
 	return app.ReconcileHarnessAudit(ctx, c.database, ledger, task, operation)
 }
+
+// HarnessEvidenceCursor identifies progress in one canonical journal.
+type HarnessEvidenceCursor = app.HarnessEvidenceCursor
+
+// ReconcileHarnessEvidencePage repairs pending outcome copies in a bounded batch.
+// Hosts schedule pages and own ledger lifetime; no inference or review is run.
+func (c *Client) ReconcileHarnessEvidencePage(ctx context.Context, ledger *harness.EvidenceStore, cursor HarnessEvidenceCursor) (HarnessEvidenceCursor, int, error) {
+	if !c.valid(ctx) {
+		return cursor, 0, ErrAdmission
+	}
+	return app.ReconcileHarnessEvidencePage(ctx, c.database, ledger, cursor)
+}
