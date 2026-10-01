@@ -203,8 +203,12 @@ func New(options ConfigOptions) (*Client, error) {
 	if err != nil {
 		return nil, ErrAdmission
 	}
-	if err := service.ConfigureNativeHarnesses(options.NativeHarnesses, options.HarnessEvidence); err != nil {
-		return nil, err
+	if options.NativeHarnesses != nil {
+		if err := service.ConfigureNativeHarnesses(options.NativeHarnesses, options.HarnessEvidence); err != nil {
+			return nil, err
+		}
+	} else if options.HarnessEvidence != nil {
+		service.ConfigureHarnessEvidence(options.HarnessEvidence)
 	}
 	return &Client{service: service, database: cfg.Telemetry.Database}, nil
 }

@@ -114,7 +114,13 @@ func NewService(s config.Settings, secret func(string) string) (*Service, error)
 		// must not invent capacity or allow local execution without admission.
 		profile = func(context.Context) (resources.Snapshot, error) { return resources.Snapshot{}, resources.ErrProfile }
 	}
-	return &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, resourceLimits: limits, resourceReservationTTL: hostResourceTTL, resourceRenewTimeout: hostResourceRenewTimeout, profile: profile, draw: rand.Float64, now: time.Now}, nil
+	service := &Service{execution: make(chan struct{}, s.Workers.Max), discovery: newHealthCache(), settings: s, secret: secret, budget: b, resourceLimits: limits, resourceReservationTTL: hostResourceTTL, resourceRenewTimeout: hostResourceRenewTimeout, profile: profile, draw: rand.Float64, now: time.Now}
+	if len(s.NativeHarnesses) > 0 {
+		if err := service.ConfigureNativeHarnesses(configuredNativeHarnesses(s), nil); err != nil {
+			return nil, err
+		}
+	}
+	return service, nil
 }
 
 func (s *Service) routingNow() time.Time {

@@ -43,6 +43,7 @@ func parseRunFlagSet(args []string, jsonMode *bool) (config.Options, app.Request
 	fs.BoolVar(jsonMode, "json", false, "stream committed events and final result as versioned JSON lines")
 	fs.StringVar(&options.ProjectFile, "config", "", "project configuration")
 	fs.StringVar(&options.UserFile, "user-config", "", "user configuration")
+	fs.StringVar(&request.HarnessID, "harness", "", "registered native harness ID or auto")
 	fs.StringVar(&request.ModelID, "model", "", "configured model ID or auto")
 	fs.StringVar(&request.ContinueTaskID, "continue-task", "", "completed or recovered task history to continue")
 	fs.StringVar(&request.SummaryAttemptID, "summary-attempt", "", "approved stored summary attempt for continuation")
@@ -201,7 +202,7 @@ func readCompactionSummary(path string) (sessions.Summary, error) {
 func runTask(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	options, request, jsonMode, err := parseRunOptions(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: nexus run --config path --model id|auto [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
+		fmt.Fprintln(stderr, "usage: nexus run --config path --model id|auto [--harness registered-id] [--domain name] [--profile name] [--capability name ...] [--context-tokens n] [--max-cost n] [--local-required] [--validate go_source] < prompt.txt")
 		fmt.Fprintln(stderr, "go_source validation expects output containing a raw full Go source file")
 		fmt.Fprintln(stderr, "continuation compaction: --continue-task id --compact-keep n --compact-summary summary.json")
 		fmt.Fprintln(stderr, "approved stored summary: --continue-task id --summary-attempt id")

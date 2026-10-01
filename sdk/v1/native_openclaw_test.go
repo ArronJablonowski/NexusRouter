@@ -94,7 +94,7 @@ func nativeSDKContextAndEvidence(t *testing.T, kind string) {
 	registration := nativeRegistration(t, kind)
 	client, profiled := nativeSDKProviderClient(t, server.URL, 64<<20, false, "openai_compatible", func(c *config.Settings, o *sdk.ConfigOptions) {
 		c.Providers[0].RequestTimeout = "30s"
-		o.NativeHarnesses = []sdk.NativeHarness{registration}
+		c.NativeHarnesses = []config.NativeHarness{{ID: registration.ID, Kind: registration.Kind, ModelID: registration.ModelID, Executable: registration.Executable, ExecutableSHA256: registration.ExecutableSHA256, ModelRevision: registration.ModelRevision, RuntimeSHA256: registration.RuntimeSHA256, HermesSourceDir: registration.HermesSourceDir, MaxOutputTokens: registration.MaxOutputTokens, OverheadRAMBytes: registration.OverheadRAMBytes, Prices: &config.NativeHarnessPrices{Input: registration.Prices.Input, Output: registration.Prices.Output, CacheRead: registration.Prices.CacheRead, CacheWrite: registration.Prices.CacheWrite}}}
 	})
 	var delivered strings.Builder
 	result, err := client.RunTextStream(context.Background(), sdk.Request{Version: 1, ModelID: "chat", HarnessID: registration.ID, Domain: "writing", Profile: "fixture-v1", Messages: []providers.Message{{Role: "system", Content: "Exact host policy."}, {Role: "user", Content: "Answer briefly."}}}, func(text string) error { delivered.WriteString(text); return nil })

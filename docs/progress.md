@@ -10253,3 +10253,21 @@ unknown. Failure fixture race test passed (1.909s), all other runner non-native
 race suites passed, vet/source/diff checks passed. Full gate queued before push.
 Measurements inside an incomplete/invalid upstream stream are still unknown;
 no estimate or cache-aware cost is synthesized. No live state was changed.
+
+## Operator harness registration and CLI selection — DAR-132 (2026-10-01)
+
+Added optional native_harnesses YAML registrations with pinned executable/model/
+runtime metadata, explicit prices and process memory overhead. Normal service
+construction validates and loads the operator list. SDK nil registrations preserve
+that list; non-nil options explicitly replace it, while an evidence-store option
+can attach independently. No provider credentials are added to this schema.
+
+CLI run now accepts --harness to select an installed registration through ordinary
+request admission. User task input does not choose executable paths. Installed
+native fixture tests for all five adapters loaded registrations from YAML and
+verified context, credentials, durable measured results (18.480s). CLI selection
+and configuration rejection race tests passed; targeted vet/source/diff checks
+passed. This is initial explicit synchronous CLI access, not finished API/queue/
+tool integration. Persistent operator evidence configuration for automatic
+learning is still required. Full gate queued before push; no live configuration
+or installed runtime changed.

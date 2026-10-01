@@ -497,3 +497,25 @@ interpreter and dependency manifest for native tests; Pi pair tests also require
 NEXUS_PI_NATIVE=1. Fixture scores are not comparative quality qualification.
 Tools, queued/CLI/API registration, measured usage, wider-platform and held-out
 accuracy qualification remain incomplete.
+
+## Operator configuration and CLI selection
+
+The versioned YAML settings accept an optional `native_harnesses` array. Each
+entry supplies `id`, `kind`, `model_id`, an absolute `executable`, its verified
+`executable_sha256`, `model_revision`, `max_output_tokens`, `overhead_ram_bytes`,
+and explicit `prices` (`input`, `output`, `cache_read`, `cache_write`). Use actual
+operator-verified metadata and prices; omitted prices never mean free. Hermes
+also requires `hermes_source_dir` and `runtime_sha256`; OpenHands requires
+`runtime_sha256`. Registration does not install a runtime or grant task authority.
+
+Run an explicitly registered pair with `nexus run --config config.yaml --model
+<model-id> --harness <registration-id> < prompt.txt`. The normal application
+constructor loads these registrations. SDK callers may replace the file list
+with a non-nil NativeHarnesses option (including an explicitly empty list);
+leaving it nil preserves the file registrations. An SDK-supplied HarnessEvidence
+store can be attached without replacing the configured list.
+
+This CLI path currently supports explicit, synchronous text tasks. Persistent
+operator evidence-store configuration for automatic learning, API selection,
+queued dispatch and tool-bearing tasks are still unfinished. No task can supply
+an executable path or mutate these registrations through its request.

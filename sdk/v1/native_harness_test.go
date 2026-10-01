@@ -53,6 +53,10 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 		t.Fatal(e)
 	}
 	profiled := &atomic.Int32{}
+	var registrations []sdk.NativeHarness
+	if len(cfg.NativeHarnesses) == 0 || extra.NativeHarnesses != nil {
+		registrations = nativeFixtureRegistrations(t, extra.NativeHarnesses, overhead)
+	}
 	client, e := sdk.New(sdk.ConfigOptions{Evaluator: extra.Evaluator, HarnessEvidence: extra.HarnessEvidence, ProjectFile: path, LookupSecret: func(name string) string {
 		if name == "NATIVE_TEST_SECRET" {
 			return "native-fixture-secret"
@@ -61,7 +65,7 @@ func nativeSDKProviderClient(t *testing.T, endpoint string, overhead uint64, too
 	}, ResourceProfiler: sdkFixtureProfiler(func(context.Context) (resources.Measurement, error) {
 		profiled.Add(1)
 		return sdkGoodMeasurement(), nil
-	}), NativeHarnesses: nativeFixtureRegistrations(t, extra.NativeHarnesses, overhead)})
+	}), NativeHarnesses: registrations})
 	if e != nil {
 		t.Fatal(e)
 	}
