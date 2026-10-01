@@ -194,6 +194,17 @@ func safeRetryPredecessor(ctx context.Context, tx *sql.Tx, task string) (string,
 }
 
 func routedUsage(ctx context.Context, tx *sql.Tx, task, provider, model string) (*providers.Usage, error) {
+	var rawStart []byte
+	if err := tx.QueryRowContext(ctx, "SELECT body FROM events WHERE task_id=? AND sequence=1", task).Scan(&rawStart); err != nil {
+		return nil, err
+	}
+	var start runtime.Event
+	if json.Unmarshal(rawStart, &start) != nil || start.Validate() != nil {
+		return nil, accounting.ErrUsage
+	}
+	if start.Data.Harness != nil {
+		return harnessTerminalUsage(ctx, tx, start, provider, model)
+	}
 	rows, err := tx.QueryContext(ctx, "SELECT body FROM events WHERE task_id=? AND json_extract(body,'$.kind') IN('turn.started','turn.completed') ORDER BY sequence", task)
 	if err != nil {
 		return nil, err

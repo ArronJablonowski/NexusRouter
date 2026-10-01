@@ -10214,3 +10214,24 @@ fixtures passed (15.867s). Two old assertions requiring nil usage despite fixtur
 provider counts were updated to require exact verified counts. Vet/source/diff
 checks passed. Full gate queued before push. Accounting aggregation and measured
 usage from incomplete attempts remain unfinished; no live state was changed.
+
+## Harness accounting aggregation — DAR-132 (2026-10-01)
+
+Accounting now recognizes the declared native harness lifecycle and uses its
+terminal operation measurement rather than searching for ordinary provider-turn
+records. Strict identity, task/session/correlation, terminal outcome/disposition
+and measurement checks apply during both atomic insertion and evidence replay.
+Mixed turn/harness lifecycles fail closed to prevent double counting. Measurement
+and accounting record commit in the existing terminal transaction.
+
+Real runtime/SQLite tests verify completed, failed, canceled, unknown and measured
+zero totals, exact provider/model evidence, changed-measurement refusal, repeated
+record reconciliation, duplicate inference refusal and database reopen with one
+record. A mixed lifecycle rolls back terminal and accounting together. Focused
+accounting regressions passed (12.100s), expanded harness accounting suite passed
+(10.691s), vet/source/diff checks passed. Full gate queued before push.
+
+Cache-aware cost normalization and measurements for incomplete upstream streams
+remain outstanding. Unknown counts are not estimated; normalized cost remains
+unknown without appropriate pricing evidence. No live accounting database was
+modified or backfilled.
