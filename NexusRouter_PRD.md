@@ -1573,6 +1573,24 @@ agent pipelines; and messaging and scheduling adapters. Advanced analytics and
 cross-installation board federation remain post-MVP; the core Web UI and Kanban
 are 1.0 requirements.
 
+### 17.1 External harness routing (DAR-132)
+
+Extend routing to Hermes Agent, OpenClaw, Pi Agent, Goose and OpenHands through
+explicit, versioned adapters. Select the most accurate eligible model/provider
+and harness combination for the task, with correctness ahead of output quality
+and cost used only as an admission constraint. Continuously learn from evaluated
+outputs bound to their actual execution identity, rubric, configuration and
+version. Execution success alone and infrastructure failures are not quality
+evidence. Expose sample counts, uncertainty, exclusions and selection rationale;
+isolate changed versions and bound explicitly authorized evaluation exploration.
+
+Adapters must preserve existing privacy, authorization, tool restrictions,
+context/resource budgets, cancellation, restart ownership and audit contracts.
+Unsupported controls reject execution. Acceptance requires native adapter tests,
+durable evidence reconciliation, and held-out qualification of joint model and
+harness selection. The read-only ranking foundation is tracked separately in
+DAR-135 and does not establish execution readiness.
+
 ## 18. Risks and Mitigations
 
 | Risk | Mitigation |

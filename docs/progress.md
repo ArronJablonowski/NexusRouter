@@ -1,5 +1,21 @@
 # Implementation evidence
 
+## 2026-10-01 — DAR-135 external harness ranking foundation
+
+Added the public, effect-free `harness` package for exact versioned model/harness
+identities, trusted hash-bound review replay, revisions/withdrawals, and task-specific
+accuracy-first selection. Hard policy and resource eligibility precede ranking;
+execution success and infrastructure failures do not become quality feedback.
+Automated review remains explicitly advisory, versions do not inherit evidence,
+and bounded exploration requires an explicit evaluation request.
+
+Focused race tests and source formatting/line limits pass. Tests include joint
+interaction, task specialization, recent regression, deterministic replay, caller
+mutation isolation and actual fallback attribution. Full `make check` remains
+required before pushing. This is a policy foundation, not five working native
+adapters or a completed DAR-132 feature. See `docs/external-harness-routing.md`
+for execution, durable storage, policy propagation and live qualification gaps.
+
 ## 2026-09-30 — DAR-134 NexusRouter name migration
 
 The implementation adopts NexusRouter across the UI, CLI, Go module/imports,
