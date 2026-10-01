@@ -1361,3 +1361,22 @@ visual inspection. Evidence is in reporting outputs/remote-progress-follow-brows
 This is browser/read-flow qualification, not physical-host or push-stream evidence.
 Reviewed asset digest and targeted tests are recorded with the checkpoint;
 full repository validation/push remains queued behind the active Settings gate.
+
+## 2026-10-01 — persistent remote review queue and worker CLI
+
+Added explicit enqueue-review/enqueue-auto-review, run-review-jobs and read-only
+review-job-status. Private queue stores original requirements, exact bound route,
+reviewer provenance, storage scope and absolute deadline. Worker passes serialize
+with an OS lock, poll pending remote status and reuse durable one-attempt review
+orchestration. Failed/uncertain evaluation and access/policy failures are terminal
+attention records. Shutdown leaves pending jobs recoverable; recovered completed
+evaluator results reconcile without repeating inference. No inference dispatch,
+automatic enrollment, live service or configuration changes.
+
+Tests cover reopen, queued-to-completed progression, discarded terminal queue
+receipt, one advisory sample, changed intent/deadline/policy/storage, failed
+review, revocation, expiry, shutdown during evaluation, private storage and real
+process lock release after SIGKILL. CLI invalid-input checks are inert. Execution
+and evaluator content remain synthetic; automatic daemon/browser enrollment and
+physical-host qualification are not claimed. Full repository gate/push is queued
+behind the unchanged Settings check after focused qualification.

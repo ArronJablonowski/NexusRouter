@@ -1246,3 +1246,44 @@ evaluation. Server receipt protection remains authoritative across reloads and
 concurrent sessions. Status shows advisory/confirmed classification and method,
 without representing AI evidence as human verification. Automatic background
 supervision and browser-to-provider qualification remain separate work.
+
+### Persistent review queue and worker
+
+An explicit CLI workflow can retain a recorded task's requirements for review
+without keeping the browser open. Unlike routing bindings, the dedicated
+owner-private queue **contains original prompts**. Keep it local and out of
+Git, diagnostics and shared artifacts. No queue is enabled or populated by
+ordinary dispatch or browser review configuration.
+
+`enqueue-review` accepts the original explicit `Task` JSON on stdin;
+`enqueue-auto-review` accepts the original `AutomaticRequest` and resolves its
+saved choice. Supply the normal trust/cert/key/CA flags plus `--routes`,
+`--evidence`, `--review-queue`, `--request`, `--config`, `--reviewer`, explicit
+`--review-max-cost`, and `--review-deadline` as an absolute RFC3339 timestamp
+at most 24 hours ahead. Keep the same timestamp on an exact retry. Enrollment
+checks current authenticated ownership, original intent, private/local policy
+and evidence storage; it does not dispatch or evaluate. The saved job binds
+caller/destination/task, storage scope, evaluator provenance, locality, timeout
+and deadline. Changed enrollment is a conflict, not an extension or new attempt.
+
+`run-review-jobs` uses the same connection, queue, route/evidence and reviewer
+configuration, plus an explicit `--review-wait` of at most 24 hours. It processes
+pending jobs serially and checks again every 15 seconds while work remains.
+It exits when all observed jobs are terminal or the worker wait expires; an
+operator-owned supervisor may run it again. Each pass has one OS-locked worker
+on macOS/Linux. Other platforms fail closed pending lock qualification. Process
+exit releases the lock; missing terminal queue receipts may be reconciled from
+the durable evaluator attempt without another inference. Shutdown preserves
+pending intent. A failed/uncertain evaluator, access failure or policy change
+produces `attention`, with no automatic reattempt. Failed/canceled tasks and
+expired jobs are terminal without quality feedback.
+
+`review-job-status --review-queue /private/nexus/review-jobs --request REQUEST_ID`
+reads only job metadata and never creates a missing queue. A `completed` receipt
+means review orchestration completed, not that its verdict passed or remains the
+current head. Use the existing authenticated current-review lookup for that.
+Terminal job records are retained, not silently recycled; queue size is bounded
+and archival requires separate explicit administration. Automatic enrollment
+from browser/daemon dispatch, continuous service installation, queue-management
+UI and real second-host qualification remain separate work. These commands
+neither create a service nor reconfigure a running daemon.
