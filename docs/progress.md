@@ -10683,3 +10683,34 @@ Host-owned context assembly, scoped tool registration, isolated Pi extension and
 real native integration remain required before enabling user-facing native tools.
 The clean SDK recovery checkpoint is running its full gate in its unchanged
 checkout; this separate branch will validate and push after that gate finishes.
+
+### 2026-10-01 — DAR-132 host-owned multi-turn native gateway
+
+Connected the native response verifier, HarnessAgentSession and scoped tool bridge
+in an isolated loopback gateway. The host snapshots initial conversation and
+tool schemas, rebuilds each upstream request from verified turns and durable tool
+results, and strips child context/schema/sampling authority. Credentials for the
+provider, completion endpoint and tool endpoint are separate. Pinned model and
+output/context limits, serial turns, no redirects, no retries, and pending-tool
+fences apply before dispatch. Every provider turn commits before dispatch; every
+verified proposal commits before bridge registration and stream delivery. Known
+recoverable tool failures remain failure context; EndToolUse removes offered tools.
+Canonical request fingerprints reject whitespace-only replay. Shutdown cancels
+and joins provider handlers and tool callbacks.
+
+Real runtime + SQLite + HTTP integration race tests passed (15.686s), covering
+host context/schema snapshotting, discarded forged child context, credential
+isolation, journal-before-effect ordering, cached tool result replay, redaction,
+recoverable failure context, EndToolUse, malformed/truncated/wrong-model streams,
+unknown tools, transport/redirect failures, post-terminal requests, proposal commit
+failures both before and after write, and shutdown of an active provider request.
+No completed outcome can be recovered from a failed gateway path. All harness
+package race tests also passed (gateway 16.317s), along with targeted vet and
+source/diff checks.
+
+This gateway currently accepts OpenAI-compatible upstreams only; native Ollama
+tool translation and isolated Pi extension/RPC integration remain required before
+user-facing native tools can be enabled. It is not an OS sandbox, admission layer
+or approval authority: normal host transport/resource/tool policies remain required.
+The active SDK checkpoint stays unchanged under full validation; this cumulative
+branch will queue its full make check and normal push after that job succeeds.
