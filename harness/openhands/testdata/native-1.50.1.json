@@ -1,0 +1,23 @@
+{
+  "sdk_version": "1.50.1",
+  "model": "openai/fixture-model",
+  "status": "finished",
+  "events": [
+    {
+      "kind": "MessageEvent",
+      "source": "agent",
+      "llm_response_id": "chatcmpl-fixture",
+      "llm_message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "native OpenHands fixture"
+          }
+        ],
+        "tool_calls": null,
+        "reasoning_content": null
+      }
+    }
+  ]
+}

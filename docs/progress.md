@@ -10092,3 +10092,27 @@ source gate and diff checks passed. Full check queued before push. OpenHands,
 tool-bearing workflows, queue/CLI/API registration, usage accounting and wider
 platform/held-out qualification remain incomplete. No real model calls or live
 router configuration changes were used.
+
+## OpenHands native SDK bridge — DAR-132 (2026-10-01)
+
+Added a pinned OpenHands SDK 1.50.1 Python bridge and bounded Go result parser.
+The native SDK supports explicit empty tools and include_default_tools; the
+current CLI restores default tools and is not used for this text-only path.
+Bridge configuration accepts only a loopback gateway, explicit context/output/
+timeout bounds and one iteration with zero LLM retries. Host admission, isolated
+process lifecycle, gateway completion binding and SDK registration are still
+required before this bridge is available for routing. This is not an OS sandbox.
+
+Native fixture qualification uses the installed SDK, a disposable workspace and
+scrubbed environment. One streaming request returns one exact assistant text
+result with FINISHED state; streaming requires a token callback. Parser tests
+reject failed processes, wrong model/version/status, tool/reasoning/media output,
+duplicate JSON keys and incomplete/trailing envelopes. The projection alone does
+not prove upstream stop reason or actual model; the future runner must compare
+against the verified gateway. No SDK token accounting is claimed.
+
+Verification: native fixture and parser race tests passed (3.373s), targeted vet,
+source gate and diff checks passed. Full repository gate queued before push.
+Official CLI 1.16.0 and SDK 1.50.1 were installed only in reporting private runtime
+paths. No live provider requests or router settings changed. Tool-bearing OpenHands
+workflows remain in scope and incomplete.
