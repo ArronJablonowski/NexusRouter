@@ -1558,3 +1558,32 @@ broadcast or live service configuration was performed. Full combined make check
 and ordinary push are queued behind the already running frozen validation gate.
 Physical two-system multicast/SSH qualification, Settings discovery, IPv6,
 fragment assembly and general mDNS probing/collision handling remain open.
+
+### 2026-10-01 — DAR-133 explicit Settings discovery and pairing handoff
+
+Added administrator-fixed web_ui.remote_discovery_interface with membership
+prerequisite and inert disabled defaults. Browser discovery is an explicit POST
+behind session, same-origin and CSRF authority; input contains only protocol
+version, one scan can run at a time, the production interface browse lasts three
+seconds and the request context caps at four. It neither reads client credentials
+nor changes trust. Errors and cancellation release the scan slot without partial
+results. Membership advertises whether discovery was explicitly enabled.
+
+Settings renders unverified connection hints using text nodes. No automatic scan
+on load/refresh, duplicate click or stale completion; expired candidates cannot be
+copied. Pairing handoff resets old consent, scopes and credential fields and fills
+only identity/endpoint/claimed pin/optional SSH port, leaving HTTPS selected until
+operator choice. Existing independently verified identity and expected-digest
+pairing requirements remain intact. Asset manifest reviewed as
+7f201e961f69491d2d3c978af68b013c369b641f44bf40972f36496a72807460.
+
+BFF/config/browser race suites passed (5.811s/config cached/9.791s), including
+unauthorized/CSRF/foreign-origin/unknown/duplicate input rejection before scan,
+no trust mutation, one concurrent scan, cancellation, explicit UI request,
+expiry/late result rejection and clearing prior pairing authority. Vet,
+source-size/format and diff checks passed. Initial fixture failure correctly
+rejected a non-private test registry directory; fixture now chmods its directory
+0700. No live multicast scan or daemon configuration change occurred. Full
+combined make check and normal push remain queued behind frozen active validation.
+Physical two-system qualification and cross-platform multicast behavior remain
+open; these tests do not establish deployment or complete DAR-133.

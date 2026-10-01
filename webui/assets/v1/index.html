@@ -220,6 +220,13 @@
           <p>Manage the configured peers for HTTPS and SSH routing. Membership does not indicate that a system is online. Revoking a peer blocks subsequent requests; it does not cancel work already admitted.</p>
           <button id="remote-refresh" type="button" class="secondary">Refresh membership</button>
           <output id="remote-status" role="status" aria-live="polite">Loading membership…</output>
+          <section id="remote-discovery" hidden aria-labelledby="remote-discovery-title">
+            <h3 id="remote-discovery-title">Discover nearby instances</h3>
+            <p>Scan the administrator-configured network interface. Results are unverified claims. Verify certificate fingerprints and SSH host keys through a trusted channel before pairing.</p>
+            <button id="remote-discover" type="button" class="secondary">Scan for instances</button>
+            <output id="remote-discovery-status" role="status" aria-live="polite"></output>
+            <div id="remote-discovery-results"></div>
+          </section>
           <div id="remote-peers"></div>
           <form id="remote-pair-form" hidden novalidate>
             <h3>Pair a verified instance</h3>
@@ -543,6 +550,7 @@
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-events.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-task-controls.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-inspection.js" defer></script>
+  <script src="__DARWIN_BASE_PATH__/assets/v1/remote-discovery.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-pair-form.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/remote-membership.js" defer></script>
   <script src="__DARWIN_BASE_PATH__/assets/v1/settings.js" defer></script>

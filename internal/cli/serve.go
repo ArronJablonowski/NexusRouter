@@ -339,7 +339,11 @@ func runServeWithValidators(args []string, stdout, stderr io.Writer, registry *s
 				remoteTaskController = client
 			}
 		}
-		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
+		var remoteDiscoverer webuiapp.RemoteDiscoverer
+		if s.WebUI.RemoteDiscoveryInterface != "" {
+			remoteDiscoverer = webuiapp.InterfaceRemoteDiscoverer{Interface: s.WebUI.RemoteDiscoveryInterface}
+		}
+		browserHandler, err = webuiapp.New(webuiapp.Options{RemoteDiscoverer: remoteDiscoverer, RemoteReviewer: remoteReviewer, RemoteAutomatic: remoteAutomatic, RemoteDispatcher: remoteDispatcher, RemoteTaskController: remoteTaskController, RemoteInspector: remoteInspector, RemoteTrustFile: s.WebUI.RemoteTrustFile, BasePath: s.WebUI.PathPrefix, AllowedHosts: allowedHosts, AllowedOrigins: s.WebUI.AllowedOrigins, Store: browserStore, LiveText: liveText, CursorKey: cursorKey[:], Mutations: webuiapp.MutationServices{
 			Chat: browserMutations.Chat, Cancel: browserMutations.Cancel, Steer: browserMutations.Steer,
 			TaskControls: browserMutations.TaskControls, FeedbackContext: browserMutations.FeedbackContext,
 			Feedback: browserMutations.Feedback, Approvals: browserMutations.Approvals, DecideApproval: browserMutations.DecideApproval,

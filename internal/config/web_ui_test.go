@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestWebUIConfigurationLayeringAndValidation(t *testing.T) {
 	s, err := Load(Options{Env: map[string]string{
@@ -290,5 +293,32 @@ func TestRemoteReviewWaitRejectsIncompleteOrUnboundedEnrollment(t *testing.T) {
 		if s.Validate() == nil {
 			t.Fatal("wait without queue")
 		}
+	}
+}
+
+func TestRemoteDiscoveryRequiresExplicitMembershipInterface(t *testing.T) {
+	s := Defaults()
+	s.WebUI.Enabled = true
+	s.WebUI.RemoteTrustFile = "/private/peers.json"
+	for _, name := range []string{"en0", "eth0", "bridge_1", ""} {
+		s.WebUI.RemoteDiscoveryInterface = name
+		if err := s.WebUI.Validate("127.0.0.1:9090"); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	for _, name := range []string{"*", "en0\nen1", strings.Repeat("a", 65), " en0"} {
+		s.WebUI.RemoteDiscoveryInterface = name
+		if err := s.WebUI.Validate("127.0.0.1:9090"); err == nil {
+			t.Fatal("accepted", name)
+		}
+	}
+	s.WebUI.RemoteDiscoveryInterface = "en0"
+	s.WebUI.RemoteTrustFile = ""
+	if err := s.WebUI.Validate("127.0.0.1:9090"); err == nil {
+		t.Fatal("discovery without membership")
+	}
+	s.WebUI.Enabled = false
+	if err := s.WebUI.Validate("127.0.0.1:9090"); err == nil {
+		t.Fatal("discovery while UI disabled")
 	}
 }

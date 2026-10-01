@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var remoteDiscoveryInterface = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
+
 var webUIPath = regexp.MustCompile(`^/[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 
 // Validate keeps the browser surface on a small, unambiguous path and accepts
@@ -18,10 +20,13 @@ var webUIPath = regexp.MustCompile(`^/[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 // sole same-origin value from the request's validated listener authority.
 func (w WebUI) Validate(listen string) error {
 	if !w.Enabled {
-		if w.RemoteReview != nil || w.RemoteAutomaticEvidenceDirectory != "" || w.RemoteDispatchDirectory != "" || w.RemoteTaskControls || w.RemoteClient != nil || w.RemoteTrustFile != "" || w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || w.ModelInventoryRefreshInterval != "10s" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" || w.CommanderFallbackModel != "" || w.SpecialistsAllowCloud {
+		if w.RemoteDiscoveryInterface != "" || w.RemoteReview != nil || w.RemoteAutomaticEvidenceDirectory != "" || w.RemoteDispatchDirectory != "" || w.RemoteTaskControls || w.RemoteClient != nil || w.RemoteTrustFile != "" || w.PathPrefix != "/app" || w.BrowserSessionTTL != "8h" || w.ModelInventoryRefreshInterval != "10s" || len(w.AllowedOrigins) != 0 || w.DefaultModel != "" || w.CommanderFallbackModel != "" || w.SpecialistsAllowCloud {
 			return errors.New("disabled web UI must retain inert defaults")
 		}
 		return nil
+	}
+	if w.RemoteDiscoveryInterface != "" && (w.RemoteTrustFile == "" || !remoteDiscoveryInterface.MatchString(w.RemoteDiscoveryInterface)) {
+		return errors.New("remote discovery requires membership and an explicit interface name")
 	}
 	if w.RemoteTrustFile != "" && (!filepath.IsAbs(w.RemoteTrustFile) || filepath.Clean(w.RemoteTrustFile) != w.RemoteTrustFile || len(w.RemoteTrustFile) > 4096 || strings.ContainsAny(w.RemoteTrustFile, "\x00\r\n")) {
 		return errors.New("invalid remote trust file")

@@ -20,11 +20,12 @@ func TestGuidedRemotePairingClearsVerificationWhenFieldsChange(t *testing.T) {
  const document={querySelector(id){if(!nodes.has(id))nodes.set(id,{value:'',checked:false,hidden:false,disabled:false,textContent:''});return nodes.get(id)}};
  const fields={'peer-id':'node-a','peer-endpoint':'https://127.0.0.1:8443','peer-server-name':'node-a','peer-pins':'a'.repeat(64),'peer-transport':'https','peer-context':'32768','peer-cost':'0'};
  for(const [key,value]of Object.entries(fields))document.querySelector('#remote-'+key).value=value;document.querySelector('#remote-op-info').checked=true;
- const form={handlers:{},addEventListener(k,f){this.handlers[k]=f},querySelectorAll(){return [...nodes.values()]},reset(){}},verified={checked:true};
+ const form={handlers:{},addEventListener(k,f){this.handlers[k]=f},querySelectorAll(){return [...nodes.values()]},reset(){for(const n of nodes.values()){n.value="";n.checked=false;}for(const [key,value]of Object.entries(fields))document.querySelector("#remote-"+key).value=value;document.querySelector("#remote-op-info").checked=true;}},verified={checked:true};
  vm.runInNewContext(`+strconv.Quote(script)+`,{window,document});const editor=window.NexusRemotePairForm.mount(form,verified);
  if(verified.checked||!nodes.get('#remote-peer-preview').textContent.includes('node-a')||!nodes.get('#remote-ssh-fields').hidden)throw Error('initial review invalid');
  verified.checked=true;form.handlers.change({target:verified});if(!verified.checked)throw Error('verification cannot be selected');
  const cloud=nodes.get('#remote-peer-cloud');cloud.checked=true;form.handlers.input({target:cloud});if(verified.checked||!editor.read().allow_cloud_inference)throw Error('scope edit kept old verification');
+ verified.checked=true;editor.prefill({instance:"discovered",endpoint:"https://192.168.1.20:8443",server_name:"new.local",claimed_certificate_sha256:"b".repeat(64),ssh_port:2222});if(verified.checked||editor.read().id!=="discovered"||editor.read().allow_cloud_inference||editor.read().transport!=="https"||nodes.get("#remote-peer-ssh-port").value!=="2222")throw Error("prefill retained authority");
  verified.checked=true;editor.clear();if(verified.checked)throw Error('reset retained consent');editor.lock(true);if([...nodes.values()].some(n=>!n.disabled))throw Error('inflight edits enabled');editor.lock(false);
  `)
 }

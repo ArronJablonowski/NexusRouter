@@ -20,6 +20,7 @@ type membershipRequest struct {
 }
 
 type membershipPage struct {
+	DiscoveryEnabled        bool             `json:"discovery_enabled"`
 	BackgroundReviewEnabled bool             `json:"background_review_enabled"`
 	ReviewEnabled           bool             `json:"review_enabled"`
 	AutomaticEnabled        bool             `json:"automatic_enabled"`
@@ -110,6 +111,6 @@ func (h *Handler) serveRemoteMembership(w http.ResponseWriter, r *http.Request) 
 	if configured, ok := h.remoteAutomatic.(interface{ BackgroundReviewEnabled() bool }); ok {
 		background = configured.BackgroundReviewEnabled()
 	}
-	h.writeJSON(w, http.StatusOK, membershipPage{BackgroundReviewEnabled: background, ReviewEnabled: h.remoteReviewer != nil, AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
+	h.writeJSON(w, http.StatusOK, membershipPage{DiscoveryEnabled: h.remoteDiscoverer != nil, BackgroundReviewEnabled: background, ReviewEnabled: h.remoteReviewer != nil, AutomaticEnabled: h.remoteAutomatic != nil, DispatchEnabled: h.remoteDispatcher != nil, TaskControlsEnabled: h.remoteTaskController != nil, InspectionEnabled: h.remoteInspector != nil, Version: 1, Enabled: true, Digest: registry.Digest(), Registry: &registry})
 	return true
 }

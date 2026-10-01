@@ -57,6 +57,7 @@ type WebUIRemoteReview struct {
 	MaxCost        *float64 `yaml:"max_cost" json:"max_cost"`
 }
 type WebUI struct {
+	RemoteDiscoveryInterface         string             `yaml:"remote_discovery_interface,omitempty" json:"remote_discovery_interface,omitempty"`
 	RemoteReview                     *WebUIRemoteReview `yaml:"remote_review,omitempty" json:"remote_review,omitempty"`
 	RemoteAutomaticEvidenceDirectory string             `yaml:"remote_automatic_evidence_directory,omitempty" json:"remote_automatic_evidence_directory,omitempty"`
 	RemoteDispatchDirectory          string             `yaml:"remote_dispatch_directory,omitempty" json:"remote_dispatch_directory,omitempty"`

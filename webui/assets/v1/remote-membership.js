@@ -4,12 +4,13 @@ window.NexusRemoteMembership = (() => {
   const form=document.querySelector("#remote-pair-form"), verified=document.querySelector("#remote-identity-verified"), pair=document.querySelector("#remote-pair"), refresh=document.querySelector("#remote-refresh"), status=document.querySelector("#remote-status"), peers=document.querySelector("#remote-peers");
   const editor=window.NexusRemotePairForm.mount(form,verified);
   let page=null, busy=false, confirmations=[];
+  const discovery=window.NexusRemoteDiscovery.mount(base,csrf,c=>{if(busy||!page||!page.enabled)return false;editor.prefill(c);form.scrollIntoView({block:"nearest"});});
   const lockedButtons=new Map();
   function message(text) { status.textContent=text; }
   function lock(value) { confirmations.forEach(node=>node.hidden=true); busy=value; pair.disabled=value||!page||!page.enabled; refresh.disabled=value; editor.lock(value); verified.disabled=value; if(value){peers.querySelectorAll("button").forEach(b=>{lockedButtons.set(b,b.disabled);b.disabled=true;});}else{lockedButtons.forEach((disabled,b)=>b.disabled=disabled);lockedButtons.clear();} }
   function render(value) {
    if (!value || value.version!==1 || typeof value.enabled!=="boolean" || (value.enabled && (!/^[a-f0-9]{64}$/.test(value.digest) || !value.registry || value.registry.version!==1 || !Array.isArray(value.registry.peers) || value.registry.peers.length>128))) throw Error("invalid response");
-   page=value; confirmations=[]; peers.replaceChildren(); form.hidden=!value.enabled;
+   page=value; discovery.setEnabled(value.enabled&&value.discovery_enabled===true); confirmations=[]; peers.replaceChildren(); form.hidden=!value.enabled;
    if (!value.enabled) { message("Membership management is disabled. An administrator can enable it with a private remote trust registry in the daemon configuration."); return; }
    if(value.automatic_enabled)window.NexusRemoteAutomatic.attach(peers,base,csrf,value.review_enabled,value.background_review_enabled);
    value.registry.peers.forEach(peer=>{
@@ -31,7 +32,7 @@ window.NexusRemoteMembership = (() => {
    if (busy) return;
    lock(true);
    try { const response=await fetch(base+"/api/v1/remote-membership",{credentials:"same-origin",cache:"no-store",headers:{Accept:"application/json"}}); if(!response.ok)throw Error(); render(await response.json()); }
-   catch { page=null; form.hidden=true; peers.replaceChildren(); message("Membership could not be loaded. Check the browser session and configured private registry."); }
+   catch { page=null; discovery.setEnabled(false); form.hidden=true; peers.replaceChildren(); message("Membership could not be loaded. Check the browser session and configured private registry."); }
    finally { lock(false); }
   }
   async function mutate(fields) {
@@ -42,7 +43,7 @@ window.NexusRemoteMembership = (() => {
     if (!response.ok) throw Error(response.status===409?"conflict":"unknown");
     render(await response.json()); if(fields.action==="pair"){editor.clear();verified.checked=false;}
    } catch(error) {
-    page=null; verified.checked=false; form.hidden=true; peers.replaceChildren();
+    page=null; discovery.setEnabled(false); verified.checked=false; form.hidden=true; peers.replaceChildren();
     message(error.message==="conflict"?"Membership changed elsewhere. Refresh and review it before making another change.":"The membership change could not be confirmed. Refresh to inspect current membership before retrying.");
    } finally { lock(false); }
   }

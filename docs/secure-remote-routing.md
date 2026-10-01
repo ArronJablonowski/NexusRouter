@@ -1361,7 +1361,7 @@ grants are advertised. The receiver timestamps observations and caps their
 lifetime at 120 seconds; zero-TTL goodbye records do not become candidates.
 The parser caps TXT strings/count/total bytes before projection and performs no
 network or registry operation. The explicit IPv4 browse below binds the interface and bounds packet collection
-and conflicts; Settings integration and physical multicast qualification remain open. This contract alone does not discover devices on the network.
+and conflicts; physical multicast qualification remains open. This contract alone does not discover devices on the network.
 
 ### Explicit IPv4 discovery browse
 
@@ -1384,7 +1384,7 @@ without presenting a partial success. Results remain explicitly unverified.
 
 This first transport supports IPv4 and complete same-packet bundles only;
 fragmented DNS record assembly, IPv6 browsing,
-Settings integration and actual multicast cross-host qualification remain open.
+actual multicast cross-host qualification remains open.
 The packet parser uses golang.org/x/net/dns/dnsmessage v0.56.0; interface controls
 use its ipv4 package. No external mDNS daemon or zeroconf dependency is installed.
 
@@ -1408,5 +1408,30 @@ trust; independently verify both the certificate and SSH host key before pairing
 This narrow legacy-unicast responder is not a general mDNS service: multicast
 queries from port 5353, IPv6, probing/collision resolution and fragmented record
 assembly are unsupported. Actual multicast operation across two physical systems
-and Settings integration remain unqualified. Advertisement stops responding if
+remain unqualified. Advertisement stops responding if
 the loaded certificate expires; certificate replacement requires host restart.
+
+### Discovery in Settings
+
+An administrator can opt in with `web_ui.remote_discovery_interface: en0`
+(or an explicit interface name on the daemon's system), alongside the existing
+private `remote_trust_file`. Restart the daemon to apply this setting. No scan
+runs at startup, on opening Settings, or on membership refresh. Clicking **Scan
+for instances** sends one authenticated, same-origin, CSRF-protected request;
+the host scans its fixed interface for three seconds, with one scan at a time
+and a four-second request context. Browsers cannot choose interfaces, endpoints,
+credentials or scan duration. Cancellation closes the browse socket.
+
+Settings shows the bounded results as **Unverified**, including the claimed
+certificate fingerprint and optional SSH port hint. **Review pairing details**
+resets the pairing form and fills only connection hints; it clears prior identity
+verification, permissions and credentials to the form defaults and leaves HTTPS
+selected. Choose SSH explicitly and supply independently verified host-key and
+key settings when appropriate. Expired candidates cannot be copied, and disabling
+membership hides and invalidates pending results. Pairing still requires explicit
+identity verification, permission review and the current trust-registry digest.
+The discovery endpoint never writes the registry or contacts the task endpoint.
+
+Browser behavior and BFF authority tests use synthetic discovery results. Actual
+multicast discovery between physical hosts still requires qualification; the
+Settings control being available is not evidence that a peer is reachable.
