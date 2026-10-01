@@ -31,6 +31,20 @@ func TestNativeHarnessIdentityPreviewContextAndNoEffects(t *testing.T) {
 			if err != nil || smaller == larger {
 				t.Fatal("context identity borrowed", err)
 			}
+			r := Request{ModelID: "chat", HarnessID: "pair", ContextTokens: 16384, ExpectedHarnessIdentity: &smaller, Prompt: "fixture", Domain: "writing", Profile: "identity-v1"}
+			bound, e := s.bindNativeHarness(r)
+			if e != nil || bound.ExpectedHarnessIdentity == r.ExpectedHarnessIdentity {
+				t.Fatal("pin not copied", e)
+			}
+			r.ExpectedHarnessIdentity = &larger
+			if _, e = s.bindNativeHarness(r); e == nil {
+				t.Fatal("changed context identity accepted")
+			}
+			r.ExpectedHarnessIdentity = &smaller
+			r.HarnessID = "auto"
+			if _, e = s.bindNativeHarness(r); e == nil {
+				t.Fatal("auto silently ignored identity pin")
+			}
 			for _, q := range []struct {
 				m, h string
 				n    int

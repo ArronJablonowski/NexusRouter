@@ -104,6 +104,15 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 		task.ContextTokens = cfg.Models[0].ContextTokens
 		task.HarnessID = cfg.NativeHarnesses[0].ID
 		task.HarnessDifficulty = "hard"
+		preview, err := app.NewService(cfg, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected, err := preview.NativeHarnessIdentity(task.ModelID, task.HarnessID, task.ContextTokens)
+		if err != nil {
+			t.Fatal(err)
+		}
+		task.ExpectedHarnessIdentity = &expected
 	}
 	body, e := yaml.Marshal(cfg)
 	if e != nil {
@@ -249,7 +258,7 @@ func remoteSDKLifecycle(t *testing.T, interruptedSSH, native bool, registrations
 			}
 			if native {
 				actual, err := runtime.ValidateHarnessOutcome(page.Events, status.TaskIDs[0])
-				if err != nil || actual.Actual.Harness != cfg.NativeHarnesses[0].Kind || actual.Actual.Model != "fixture" || actual.Actual.ModelRevision != "fixture-v1" || actual.Task.Difficulty != "hard" {
+				if err != nil || actual.Actual.Harness != cfg.NativeHarnesses[0].Kind || actual.Actual.Model != "fixture" || actual.Actual.ModelRevision != "fixture-v1" || actual.Task.Difficulty != "hard" || task.ExpectedHarnessIdentity == nil || actual.Actual != *task.ExpectedHarnessIdentity {
 					t.Fatal(actual, err)
 				}
 			}

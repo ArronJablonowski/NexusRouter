@@ -123,7 +123,7 @@ func (b *SDKBackend) Submit(ctx context.Context, key string, t Task) (submission
 	if !eligible {
 		return submissions.Status{}, ErrDenied
 	}
-	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
+	return b.Client.Submit(ctx, key, sdk.Request{Version: 1, ExpectedHarnessIdentity: t.ExpectedHarnessIdentity, HarnessID: t.HarnessID, HarnessDifficulty: t.HarnessDifficulty, ModelID: t.ModelID, Prompt: t.Prompt, Domain: t.Domain, Profile: t.Profile, ContextTokens: t.ContextTokens, MaxCost: t.MaxCost, LocalRequired: t.Private})
 }
 func (b *SDKBackend) Status(ctx context.Context, id string) (submissions.Status, error) {
 	return b.Client.SubmissionStatus(ctx, id)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ArronJablonowski/NexusRouter/harness"
+	"strings"
 	"testing"
 
 	sdk "github.com/ArronJablonowski/NexusRouter/sdk/v1"
@@ -86,5 +88,26 @@ func TestRemoteHarnessContractAndLegacyDigest(t *testing.T) {
 	b := SDKBackend{Client: &sdk.Client{}, Harnesses: []Harness{{ID: "pi", ModelID: "other"}}}
 	if _, err := b.Submit(context.Background(), "key", task); !errors.Is(err, ErrDenied) {
 		t.Fatal("wrong model/harness pair", err)
+	}
+}
+
+func TestRemoteExpectedHarnessIdentityBindsPayload(t *testing.T) {
+	task := testTask()
+	original := hash(task)
+	identity := harness.Identity{Version: 1, Harness: "pi", HarnessVersion: "1", AdapterVersion: "1", Provider: "local", Model: "fixture", ModelRevision: "1", ConfigSHA256: strings.Repeat("a", 64)}
+	task.ExpectedHarnessIdentity = &identity
+	if task.Validate() == nil {
+		t.Fatal("pin without harness")
+	}
+	task.HarnessID = "pi"
+	task.HarnessDifficulty = "easy"
+	task.ContextTokens = 16384
+	if task.Validate() != nil || hash(task) == original {
+		t.Fatal("pin missing from contract")
+	}
+	first := hash(task)
+	identity.ModelRevision = "2"
+	if hash(task) == first {
+		t.Fatal("different identity reused payload digest")
 	}
 }

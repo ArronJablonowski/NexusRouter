@@ -77,6 +77,26 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 				o.HarnessEvidence = ledger
 			})
 			req := sdk.Request{Version: 1, HarnessID: registrations[0].ID, ModelID: "chat", Prompt: "Write an answer.", Domain: "writing", Profile: "queue-v1", HarnessDifficulty: "hard"}
+			preview, err := app.NewService(cfg, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = preview.ConfigureNativeHarnesses(registrations, ledger); err != nil {
+				t.Fatal(err)
+			}
+			expected, err := preview.NativeHarnessIdentity("chat", registrations[0].ID, 16384)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.ContextTokens = 16384
+			req.ExpectedHarnessIdentity = &expected
+			wrong := expected
+			wrong.ModelRevision += "-wrong"
+			bad := req
+			bad.ExpectedHarnessIdentity = &wrong
+			if _, e := client.Submit(ctx, "wrong-identity-queue-key", bad); e == nil || calls.Load() != 0 {
+				t.Fatal("wrong identity admitted", e)
+			}
 			queued, err := client.Submit(ctx, "native-queue-authority-key", req)
 			if err != nil || queued.State != "queued" {
 				t.Fatal(queued, err)
@@ -134,7 +154,7 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 							t.Fatal(status, e, calls.Load())
 						}
 						outcome, e := client.ReconcileHarnessOutcome(ctx, ledger, status.Result.TaskID)
-						if e != nil || outcome.Actual.Model != "fixture" || outcome.Task.Difficulty != "hard" {
+						if e != nil || outcome.Actual.Model != "fixture" || outcome.Task.Difficulty != "hard" || outcome.Actual != expected {
 							t.Fatal(outcome, e)
 						}
 						again, e := client.Submit(ctx, "native-queue-authority-key", req)
@@ -148,6 +168,7 @@ func nativeQueueAuthority(t *testing.T, kind string) {
 						}
 						auto := req
 						auto.HarnessID = "auto"
+						auto.ExpectedHarnessIdentity = nil
 						auto.HarnessEvaluation = true
 						auto.ModelID = "auto"
 						auto.ContextTokens = 16384

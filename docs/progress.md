@@ -11375,3 +11375,27 @@ or authenticated quality scores. Cross-instance evidence provenance, durable
 chosen destination and automatic ranking remain unimplemented. Full repository
 validation and backup of this descendant checkpoint are queued behind the
 active harness gate; no active gate or comparison input was edited.
+
+### DAR-133 — expected harness identity through durable dispatch
+
+Added optional expected_harness_identity to remote dispatch and the SDK request.
+It is validated/copied during ordinary native admission and rechecked against the
+actual effective configuration before native execution. Explicit model/harness
+and context are required; native-without-harness and auto reject pins rather than
+ignoring them. Remote request hashes bind the field while absent fields preserve
+legacy encoding. SDK queue payloads retain it across durable dispatch. Submission
+contract generation 7 fences prior queued interpretations; upgrade boundary is
+documented and no live queue was changed.
+
+Installed Pi durable queue qualification passed (16.619s race), including wrong
+identity rejection before provider traffic, exact actual identity on completion,
+duplicate handling, registration drift, and queued/running cancellation. Automatic
+follow-on evaluation explicitly clears the prior explicit pin. All-five preview/
+pin admission and queue-generation focused tests passed (3.128s). Remote/CLI
+native-SSH race packages passed (20.934s/1.704s), targeted vet/source checks passed.
+The remote installed-Pi SSH test now pins identity and compares canonical completed
+provenance exactly, in addition to its lost-response and cancellation checks;
+that installed-Pi SSH qualification passed (11.557s race package).
+Full repository validation/normal backup remain queued behind the active harness
+gate. Per-instance evidence provenance and durable automatic destination selection
+remain the next integration work; this is not a completed cross-instance ranker.

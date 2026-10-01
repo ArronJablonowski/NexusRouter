@@ -129,6 +129,9 @@ type Client struct {
 }
 
 type Request struct {
+	// Optional exact configured identity pin. Requires an explicit harness/model
+	// and context; rechecked at admission and execution, including queued work.
+	ExpectedHarnessIdentity         *harness.Identity
 	HarnessEvaluation               bool
 	HarnessDifficulty               string
 	HarnessID                       string
@@ -217,7 +220,7 @@ func New(options ConfigOptions) (*Client, error) {
 }
 
 func (r Request) internal() app.Request {
-	return app.Request{HarnessEvaluation: r.HarnessEvaluation, HarnessDifficulty: r.HarnessDifficulty, HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
+	return app.Request{ExpectedHarnessIdentity: r.ExpectedHarnessIdentity, HarnessEvaluation: r.HarnessEvaluation, HarnessDifficulty: r.HarnessDifficulty, HarnessID: r.HarnessID, SummaryAttemptID: r.SummaryAttemptID, Compaction: r.Compaction, Validation: r.Validation, ModelID: r.ModelID, Prompt: r.Prompt, ContinueTaskID: r.ContinueTaskID, Messages: r.Messages, Domain: r.Domain, Profile: r.Profile, Capabilities: r.Capabilities, ContextTokens: r.ContextTokens, MaxCost: r.MaxCost, LocalRequired: r.LocalRequired}
 }
 func publicResult(r app.Result) Result {
 	return Result{Version: 1, HarnessEvidenceStatus: r.HarnessEvidenceStatus, HarnessOutcome: r.HarnessOutcome, HarnessSelection: r.HarnessSelection, HarnessReview: r.HarnessReview, HarnessReviewStatus: r.HarnessReviewStatus, HarnessAuditOperationID: r.HarnessAuditOperationID, PreviousTaskIDs: r.PreviousTaskIDs, RouteEstimatedCost: r.RouteEstimatedCost, AuditID: r.AuditID, AuditStatus: r.AuditStatus, TaskID: r.TaskID, Text: r.Text, Turns: r.Turns, FinishReason: r.FinishReason, Usage: r.Usage}

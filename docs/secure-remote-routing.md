@@ -414,3 +414,24 @@ or future admission. Discovery availability is separate. Actual completed
 execution identity must be checked before accepting learning evidence. This
 preview is a prerequisite for automatic remote routing; it does not yet rank
 nodes, authenticate imported quality scores or persist a chosen destination.
+
+### Pinning the previewed execution identity
+
+An external-harness dispatch may include `expected_harness_identity` containing
+the complete `identity` object returned by `harness-identity`. Keep the same model,
+registration and explicit context. The optional field is bound to the remote
+request digest and SDK durable submission payload; changing it under a reused
+request key conflicts. Omitting it preserves the previous remote payload encoding.
+Native routing without an external harness and automatic harness selection cannot
+carry this pin.
+
+The normal SDK admission derives the effective identity and rejects mismatches
+before queue admission. Execution compares it again before the native harness is
+run. This prevents a stale preview from silently executing another configuration;
+it is still not proof of model residency or eventual success. Pin failures do not
+authorize rerouting an ambiguously delivered request to another instance.
+
+Durable submission contract generation advances to 7. Existing queued intents
+from earlier generations are fenced by the usual configuration-change handling;
+they are not silently reinterpreted or replayed. Account for this boundary before
+upgrading a running host. No live runtime or queue was upgraded by these changes.

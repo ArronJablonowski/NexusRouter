@@ -27,9 +27,10 @@ import (
 var ErrAdmission = errors.New("task admission failed")
 
 type Request struct {
-	HarnessEvaluation               bool   `json:"harness_evaluation,omitempty"`
-	HarnessDifficulty               string `json:"harness_difficulty,omitempty"`
-	HarnessID                       string `json:"harness_id,omitempty"`
+	ExpectedHarnessIdentity         *harness.Identity `json:"expected_harness_identity,omitempty"`
+	HarnessEvaluation               bool              `json:"harness_evaluation,omitempty"`
+	HarnessDifficulty               string            `json:"harness_difficulty,omitempty"`
+	HarnessID                       string            `json:"harness_id,omitempty"`
 	nativeHarness                   *NativeHarness
 	nativeSelection                 *harness.Selection
 	openTaskStore                   func(context.Context) (*telemetry.Store, func(), error)

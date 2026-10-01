@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ArronJablonowski/NexusRouter/harness"
 	"github.com/ArronJablonowski/NexusRouter/sessions"
 	"github.com/ArronJablonowski/NexusRouter/submissions"
 )
@@ -29,20 +30,24 @@ var ErrUnavailable = errors.New("remote operation unavailable; delivery may be u
 // Task deliberately excludes continuation, arbitrary messages, paths and tool
 // authority. The destination's configured runtime retains all admission rules.
 type Task struct {
-	HarnessID         string  `json:"harness_id,omitempty"`
-	HarnessDifficulty string  `json:"harness_difficulty,omitempty"`
-	Version           int     `json:"version"`
-	ModelID           string  `json:"model_id"`
-	Prompt            string  `json:"prompt"`
-	Domain            string  `json:"domain"`
-	Profile           string  `json:"profile"`
-	ContextTokens     int     `json:"context_tokens"`
-	MaxCost           float64 `json:"max_cost"`
+	ExpectedHarnessIdentity *harness.Identity `json:"expected_harness_identity,omitempty"`
+	HarnessID               string            `json:"harness_id,omitempty"`
+	HarnessDifficulty       string            `json:"harness_difficulty,omitempty"`
+	Version                 int               `json:"version"`
+	ModelID                 string            `json:"model_id"`
+	Prompt                  string            `json:"prompt"`
+	Domain                  string            `json:"domain"`
+	Profile                 string            `json:"profile"`
+	ContextTokens           int               `json:"context_tokens"`
+	MaxCost                 float64           `json:"max_cost"`
 	// Private means both explicitly paired private transport and local inference.
 	Private bool `json:"private"`
 }
 
 func (t Task) Validate() error {
+	if t.ExpectedHarnessIdentity != nil && (t.ExpectedHarnessIdentity.Validate() != nil || t.HarnessID == "" || t.ContextTokens < 8192) {
+		return ErrInvalid
+	}
 	if t.HarnessID == "" {
 		if t.HarnessDifficulty != "" {
 			return ErrInvalid

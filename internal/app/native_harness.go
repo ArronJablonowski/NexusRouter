@@ -99,6 +99,17 @@ func (deniedNativeTransport) RoundTrip(*http.Request) (*http.Response, error) {
 }
 
 func (s *Service) bindNativeHarness(r Request) (Request, error) {
+	if r.ExpectedHarnessIdentity != nil {
+		expected := *r.ExpectedHarnessIdentity
+		if expected.Validate() != nil || r.HarnessID == "" || r.HarnessID == "auto" {
+			return Request{}, ErrHarnessUnsupported
+		}
+		actual, err := s.NativeHarnessIdentity(r.ModelID, r.HarnessID, r.ContextTokens)
+		if err != nil || actual != expected {
+			return Request{}, ErrHarnessUnsupported
+		}
+		r.ExpectedHarnessIdentity = &expected
+	}
 	if r.HarnessEvaluation && r.HarnessID != "auto" {
 		return Request{}, ErrHarnessUnsupported
 	}
@@ -199,6 +210,9 @@ func runNativeAdmitted(ctx context.Context, s config.Settings, r Request, p conf
 	identity, err := c.Identity()
 	if err != nil {
 		return result, ErrAdmission
+	}
+	if r.ExpectedHarnessIdentity != nil && identity != *r.ExpectedHarnessIdentity {
+		return result, ErrHarnessUnsupported
 	}
 	profile := r.Profile
 	if profile == "" {
