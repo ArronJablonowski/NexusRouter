@@ -35,7 +35,10 @@ func (d *Dispatcher) recoverInterrupted(ctx context.Context, item submissions.Su
 	if delegation {
 		commit, err = d.db.RecoverInterruptedDelegationCommitScreened(ctx, item.ID, configDigest, time.Now().UTC(), secrets)
 	} else {
-		commit, err = d.db.RecoverInterruptedModelCommitScreened(ctx, item.ID, configDigest, time.Now().UTC(), secrets)
+		commit, err = d.db.RecoverInterruptedNativeAgentCommitScreened(ctx, item.ID, configDigest, time.Now().UTC(), secrets)
+		if err == nil && !commit.Changed {
+			commit, err = d.db.RecoverInterruptedModelCommitScreened(ctx, item.ID, configDigest, time.Now().UTC(), secrets)
+		}
 	}
 	if err != nil || !commit.Changed {
 		return commit, err

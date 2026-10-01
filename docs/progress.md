@@ -10635,3 +10635,29 @@ passed. No native user-facing tool route is enabled yet: pinned multi-turn
 provider gateway, isolated Pi extension and host recovery remain integration
 requirements before other adapters and real tool-task qualification. Full branch
 validation/push remains queued behind the live prior Pi gate.
+
+### 2026-10-01 — DAR-132 native agent host recovery
+
+Connected native-tools-v1 journals to durable dispatcher recovery. Fully committed
+terminal results restore their verified text, turn count and measured provider
+usage without executing the adapter or tools again. Interrupted runs append one
+failure or cancellation with an explicit interrupted_native_agent receipt after
+configuration and expired-owner checks. The same transaction records terminal
+status and usage. Pending, confirmed and uncertain tool effects remain intact;
+recovery never fabricates a tool result, quality outcome or resume authority.
+Legacy model recovery explicitly rejects native agent histories. Recoverable
+tool failures retain their failure flag in conversation replay.
+
+Focused race checks passed for sessions/submissions recovery (1.752s/1.328s) and
+native dispatcher plus existing native-text/model/event-sink recovery regressions
+(26.429s). Coverage includes every native journal boundary, committed completion,
+cancellation, configuration mismatch, live-owner refusal, concurrent recovery,
+stale-owner writes, preserved uncertain effects, no provider/tool rerun, one
+receipt/usage record and rejection of resume authority. Targeted vet, source
+formatting/size and diff checks passed.
+
+The prior Pi checkpoint full gate has passed and pushed. This new clean checkpoint
+will run its cumulative make check before backup. Native tools remain disabled in
+user-facing adapters until the pinned multi-turn gateway and isolated Pi extension
+are integrated and qualified. Other adapter tool paths, real task accuracy and
+physical second-host SSH qualification remain open.

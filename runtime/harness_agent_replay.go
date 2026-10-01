@@ -139,7 +139,7 @@ func ValidateHarnessAgentJournal(events []Event, task string) (*providers.Usage,
 		if last.Data.HarnessOutcome != nil || last.Data.Text != "" {
 			return nil, ErrProtocol
 		}
-		if last.Kind == TaskFailed && last.Data.Code != "harness_failed" || last.Kind == TaskCanceled && last.Data.Code != "harness_canceled" {
+		if last.Kind == TaskFailed && last.Data.Code != "harness_failed" && last.Data.Code != "harness_interrupted" || last.Kind == TaskCanceled && last.Data.Code != "harness_canceled" {
 			return nil, ErrProtocol
 		}
 	default:

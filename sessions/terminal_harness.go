@@ -6,6 +6,9 @@ import "github.com/ArronJablonowski/NexusRouter/runtime"
 // Recovery consumes its bound terminal result without inferring quality.
 func projectNativeTerminal(events []runtime.Event, out TerminalOutcome) (TerminalOutcome, error) {
 	bad := func() (TerminalOutcome, error) { return TerminalOutcome{}, ErrHistory }
+	if len(events) > 0 && events[0].Data.Harness != nil && events[0].Data.Harness.Protocol == runtime.HarnessAgentProtocol {
+		return projectNativeAgentTerminal(events, out)
+	}
 	if len(events) != 2 {
 		return bad()
 	}
@@ -38,5 +41,27 @@ func projectNativeTerminal(events []runtime.Event, out TerminalOutcome) (Termina
 	out.Result.Text = last.Data.Text
 	out.Result.Turns = 1
 	out.Result.FinishReason = "stop"
+	return out, nil
+}
+
+func projectNativeAgentTerminal(events []runtime.Event, out TerminalOutcome) (TerminalOutcome, error) {
+	usage, err := runtime.ValidateHarnessAgentJournal(events, events[0].TaskID)
+	if err != nil || events[0].Data.Validation != "" {
+		return TerminalOutcome{}, ErrHistory
+	}
+	out.Result.Usage = usage
+	out.Result.HarnessEvidenceStatus = "not_recovered"
+	for _, e := range events {
+		if e.Kind == runtime.TurnStarted {
+			out.Result.Turns++
+		}
+	}
+	if out.State == "succeeded" {
+		if _, err := runtime.ValidateHarnessOutcome(events, events[0].TaskID); err != nil {
+			return TerminalOutcome{}, ErrHistory
+		}
+		out.Result.Text = events[len(events)-1].Data.Text
+		out.Result.FinishReason = "stop"
+	}
 	return out, nil
 }

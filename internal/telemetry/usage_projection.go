@@ -256,7 +256,7 @@ func terminalRetryClass(code string) accounting.RetryClass {
 		return accounting.Retryable
 	}
 	switch code {
-	case "interrupted_model", "interrupted_read_only_model", "interrupted_read_only_tool", "worker_owner_interrupted", "interrupted_after_delegation":
+	case "harness_interrupted", "interrupted_model", "interrupted_read_only_model", "interrupted_read_only_tool", "worker_owner_interrupted", "interrupted_after_delegation":
 		return accounting.Uncertain
 	default:
 		return accounting.NonRetryable

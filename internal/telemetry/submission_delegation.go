@@ -212,7 +212,19 @@ func (s *Store) recoverInterruptedSubmission(ctx context.Context, id, configDige
 	if _, err = tx.ExecContext(ctx, `INSERT INTO submission_recoveries VALUES(?,?,?,?)`, receipt.ID, id, hex.EncodeToString(digest[:]), audit); err != nil {
 		return false, err
 	}
-	result, err := json.Marshal(submissions.Result{TaskID: plan.ParentTaskID, AuditStatus: "not_recovered", PreviousTaskIDs: []string{}})
+	resultValue := submissions.Result{TaskID: plan.ParentTaskID, AuditStatus: "not_recovered", PreviousTaskIDs: []string{}}
+	if reason == "interrupted_native_agent" {
+		projected, e := sessions.ProjectTerminalSubmission(combined)
+		if e != nil || projected.State != action || projected.Result == nil {
+			return false, submissions.ErrInvalid
+		}
+		resultValue = *projected.Result
+		resultValue.PreviousTaskIDs = []string{}
+		if e = appendRoutedUsage(ctx, tx, plan.Events[len(plan.Events)-1]); e != nil {
+			return false, e
+		}
+	}
+	result, err := json.Marshal(resultValue)
 	if err != nil {
 		return false, err
 	}

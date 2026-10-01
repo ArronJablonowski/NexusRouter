@@ -33,6 +33,9 @@ func planInterruptedModel(histories [][]runtime.Event, now time.Time, canceled, 
 	}
 	history := histories[0]
 	start := history[0]
+	if start.Data.Harness != nil && start.Data.Harness.Protocol == runtime.HarnessAgentProtocol {
+		return bad()
+	}
 	if readOnly && start.Data.ParentTaskID == "" {
 		return bad()
 	}

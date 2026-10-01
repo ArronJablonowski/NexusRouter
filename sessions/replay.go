@@ -198,7 +198,7 @@ func Replay(ctx context.Context, r Reader, task string) (Snapshot, error) {
 					if !pending.Dispatched || pending.ToolBehavior != e.Data.ToolBehavior {
 						return s, ErrHistory
 					}
-					s.Messages = append(s.Messages, providers.Message{Role: "tool", ToolCallID: e.Data.ToolCallID, Content: e.Data.Text, ToolFailed: e.Data.Code == "tool_failed"})
+					s.Messages = append(s.Messages, providers.Message{Role: "tool", ToolCallID: e.Data.ToolCallID, Content: e.Data.Text, ToolFailed: e.Data.Code == "tool_failed" || e.Data.Code == "tool_failed_recoverable"})
 					s.MessageSequences = append(s.MessageSequences, e.Sequence)
 					delete(s.Pending, e.Data.ToolCallID)
 					if e.Data.Effect == runtime.UncertainEffect {

@@ -21,7 +21,7 @@ func (r Recovery) Validate() error {
 	if r.Action == "failed" && r.Reason == "configuration_changed" {
 		return nil
 	}
-	if (r.Reason == "interrupted_delegation" || r.Reason == "interrupted_model") && (r.Action == "failed" || r.Action == "canceled") {
+	if (r.Reason == "interrupted_delegation" || r.Reason == "interrupted_model" || r.Reason == "interrupted_native_agent") && (r.Action == "failed" || r.Action == "canceled") {
 		return nil
 	}
 	return ErrInvalid
